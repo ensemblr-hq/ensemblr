@@ -327,7 +327,14 @@ Four gates, in order:
    a root, so `peer` there is a misunderstanding rather than a request.
 2. **Plan Mode is refused.** A peer is a second writer, and a planning agent has
    nothing yet for two agents to write.
-3. **Two agents writing one checkout**, the caller included. Counted from two
+3. **A cap on agents writing one checkout**, the caller included — two while the
+   user is here, and four for an unattended caller, whose delivery loop holds a
+   review peer open across every round it runs
+   ([ADR 0063](./adr/0063-open-an-agent-requested-review-as-a-peer-again.md)).
+   The limit is read off the caller rather than the workspace, so an attended
+   orchestrator working beside an unattended one is still held to two. The
+   widened half of it is not reachable *here*: gate 4 refuses an unattended peer
+   spawn outright, so the four only ever admits a `startReview`. Counted from two
    places, because the two kinds of writer are recorded in different ones:
    - **Conversations** — control origins in the workspace whose species drives a
      chat tab, minus the ones carrying the durable sub-agent marker.
@@ -351,7 +358,10 @@ Four gates, in order:
    about its own prompt, so passing `peer` states an intent and the confirmation
    is what turns it into authority. `workspace-trusted` is the user trusting an
    agent with its own workspace, which is not the same as trusting it to add a
-   second writer to it.
+   second writer to it. An unattended caller is **refused** rather than asked,
+   releasing the reservation gate 3 took: the premise the dialog exists to
+   establish cannot hold while nobody is there to be asked, so two unsupervised
+   writers never land on one worktree by an agent's own choice.
 
 The schema refuses a peer with no `title` (two unnamed orchestrator tabs cannot
 be told apart) and a peer with `wait` (it is not a child to wait on).
@@ -713,16 +723,16 @@ one are the same review; when no window answers within
 template and the repository's committed `[prompts]` preference, and the result
 message says so.
 
-What it opens is the caller's **sub-agent**
-([ADR 0062](./adr/0062-open-an-agent-requested-review-as-a-sub-agent.md)), so it
-is among the children `waitForAgents` defaults to and costs none of the
-workspace's co-tenancy allowance — a running harness or an open peer does not
-refuse it, and it does not refuse a later peer. Three consequences the result
-message spells out for the caller: it reads the diff itself and cannot spawn
-readers of its own, so a wide change takes it longer; it shares the worktree, so
-the caller holds off writing while it works; and the caller stays the committer
-and owns the pull request. Findings go back to the *same* conversation with
-`sendFollowUp` — the reviewer fixes what it found, in the context that found it.
+What it opens is a **root orchestrator**, not a sub-agent
+([ADR 0063](./adr/0063-open-an-agent-requested-review-as-a-peer-again.md)), so it
+can delegate its own readers over a wide diff — which is the point, since the
+review is the one step whose job is a wider reading than the author managed.
+Three consequences the result message spells out for the caller: it is absent
+from the children `waitForAgents` defaults to and must be named in `targets`; it
+shares the worktree, so the caller holds off writing while it works; and the
+caller stays the committer and owns the pull request. Findings go back to the
+*same* conversation with `sendFollowUp` — the reviewer fixes what it found, in
+the context that found it.
 
 **The user's review model is honoured across runtimes.** The pin is looked up in
 every runtime's catalogue rather than only the caller's, and the spawn withholds
@@ -751,10 +761,28 @@ beside it — ahead of the spawn guardrail and the compose, so reuse spends
 neither. The probe is `resolveConversationWorkspace`: the session row outlives
 the reviewer going idle and outlives its tab being closed, and `sendFollowUp`
 reaches it in both, so both still count as a reviewer the caller has. Only a
-session that no longer exists opens a fresh one. This is the one thing the
-dropped co-tenancy cap was still doing here — two reviewers are two writers over
-the same whole diff, where the app's usual answer to concurrent children is to
+session that no longer exists opens a fresh one. The co-tenancy cap no longer
+does this on its own — it is now wide enough for an unattended caller that a
+second `startReview` would fit through it — and two reviewers are two writers
+over the same whole diff, where the app's usual answer to concurrent agents is to
 brief them onto disjoint files.
+
+**A review may not open a review.** The reviewer is a root, so nothing about its
+role refuses the op the way `SUBAGENT_BLOCKED_OPS` did while it was a child, and
+the widened unattended allowance has room for the chain — orchestrator, reviewer,
+reviewer's reviewer — that the attended cap of two closed by arithmetic. The
+session ids `startReview` opened are kept alongside `reviewsByCaller`, and a
+caller in that set is refused `denied-scope` ahead of every other check.
+
+It costs one of the workspace's co-tenancy slots and refuses with the same
+message a peer spawn does when the checkout is full. The allowance is
+`maxPerWorkspace` (two) for an attended caller and `maxPerUnattendedWorkspace`
+(four) for an unattended one, chosen off the caller rather than the workspace:
+the unattended delivery loop holds a reviewer open across every round it runs, so
+its own floor is two, and the extra pair absorbs the still-running harness
+terminal and the earlier peer a user routinely leaves behind when they step away.
+A run script is not one of them — the count reads terminals of kind `agent`, so a
+dev server has never taken a slot. The refusal names whichever limit was applied.
 
 Unlike a peer it raises no confirmation and is not refused while the user is
 away: a peer is a second writer the agent chose, whereas this is the Review

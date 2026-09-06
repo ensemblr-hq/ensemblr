@@ -58,27 +58,25 @@ export const AFK_WORKFLOW_HEADER = 'UNATTENDED DELIVERY LOOP';
  * five numbered steps has already started step one.
  *
  * The second gate covers the agents this block reaches by inheritance rather
- * than by being asked for. A peer opened by `startConversation` inherits the
- * caller's AFK mode, so it reads this block on every turn — and the turn where
- * it is asked to fix what it found is a change to the codebase by the first
- * gate's own definition. Without the second gate that turn ends in a commit and
- * a pull request from an agent whose opening brief forbids both, racing the
- * orchestrator that owns them. Written as scope prose rather than enforced by
- * role because a peer holds no role the app can read: it is spawned as a root,
- * exactly like the orchestrator it answers to.
+ * than by being asked for. A review opened by `startReview` and a peer opened by
+ * `startConversation` both inherit the caller's AFK mode, so both read this
+ * block on every turn — and the turn where one is asked to fix what it found is
+ * a change to the codebase by the first gate's own definition. Without the
+ * second gate that turn ends in a commit and a pull request from an agent whose
+ * opening brief forbids both, racing the orchestrator that owns them. Written as
+ * scope prose rather than enforced by role because both are spawned as roots and
+ * hold no role the app can read.
  *
- * The peer is the gate's only example, and that is a completeness claim rather
- * than an omission. The review is on the role axis rather than this one since
- * [ADR 0062](../../../docs/adr/0062-open-an-agent-requested-review-as-a-sub-agent.md):
- * it is spawned as a sub-agent, so it reads {@link SUBAGENT_BODY}, which refuses
- * it the commit outright. A harness is in the same position as a peer, but
- * nothing above it names a committer — `harnessAwareness` makes it the committer
- * for the peers it opens — so it has nothing to recognise itself by here, and
- * naming it would offer a test it cannot run.
+ * Those two are the gate's only examples, and that is a completeness claim
+ * rather than an omission. The gate is self-checking — it asks what this
+ * conversation's own brief said — so an example only works for a reader who can
+ * match it. A harness is a root in the same position on the role axis, but
+ * nothing above it names a committer: `harnessAwareness` makes it the committer
+ * for the peers it opens. Naming it here would offer a test it cannot run.
  */
 const SCOPE = `This applies when the task in front of you is a **change to this codebase** that this workspace's branch would carry — a feature, a fix, a refactor, a migration. It does not apply to a question, an investigation, a review of somebody else's work, or a one-line correction the user asked for by name. Answer those directly, and skip the rest of this block; opening a pull request for work nobody asked to have shipped is worse than not doing it.
 
-It also does not apply when this conversation's own opening brief named another orchestrator in this workspace as the committer — as it does for a peer opened to take half the work. That brief wins outright over every step below, including on a follow-up asking you to fix what you found: make the change, leave it in the working tree, and say what you touched. Committing, pushing, or opening a pull request from there would move HEAD underneath the agent already doing those things for both of you.`;
+It also does not apply when this conversation's own opening brief named another orchestrator in this workspace as the committer — as it does for a reviewer, and for a peer opened to take half the work. That brief wins outright over every step below, including on a follow-up asking you to fix what you found: make the change, leave it in the working tree, and say what you touched. Committing, pushing, or opening a pull request from there would move HEAD underneath the agent already doing those things for both of you.`;
 
 /**
  * Why an unattended run delegates more than an attended one, and what it must
@@ -121,12 +119,20 @@ const BUILD = `**2. Build the plan.** Follow it. When something you find while b
 
 /**
  * Step three for the Ensemblr mechanism. Names the tool and its two non-obvious
- * mechanics — the reviewer reads alone, and it shares the checkout — because
+ * mechanics — the review is not a child, and it shares the checkout — because
  * both cost a wasted turn when discovered by trial.
+ *
+ * It also names the one refusal, which the reviewer's shape made reachable
+ * again: a review takes a co-tenancy slot, so a workspace already full of
+ * writers answers `denied-quota`. Nothing the agent can do frees one — a running
+ * harness is the user's to close — so the step states the fallback rather than
+ * leaving a mandatory step with no way past it.
  */
 const REVIEW_ENSEMBLR = `**3. Have it reviewed by an agent that did not write it.** Call \`ensemblr_start_review\`. That opens this workspace's Review conversation over your change: the same review the user's Review button runs, on the model they configured for it, deferring to whatever review skill this repository ships. Do not review your own work instead — a reader who already believes the code is right is the weakest reviewer available, and the whole point of the hours nobody is watching is that a second reading is free. It reads the diff so you do not have to, which is the largest single saving of context in the loop.
 
-Three things about what it opens. It is one of your own sub-agents, so \`ensemblr_wait_for_agents\` picks it up like any other child — and it costs none of the workspace's co-tenancy allowance, so a running harness or an open peer does not refuse it. It reads the whole change itself rather than fanning readers out over it, so give it the time a wide diff takes. And it shares this worktree with you, so leave the files alone while it works.`;
+Two things about what it opens. It is a root orchestrator rather than your child — it has a delegation budget of its own and fans readers out over a wide diff — so \`ensemblr_wait_for_agents\` will not find it unless you name its \`agentSessionId\` in \`targets\`; wait on it that way. And it shares this worktree with you, so leave the files alone while it works.
+
+A \`denied-quota\` here means this workspace already holds as many agents writing the checkout as your allowance covers, and nothing you can do frees a slot — a running harness is the user's to close. Do not retry it in a loop: read your own diff as adversarially as you can manage, carry on to step 5, and say in both your report and the pull request that the second reading was refused and why.`;
 
 /**
  * Step three for a root delegating through its own runtime, which does not hold
@@ -146,7 +152,7 @@ Brief it as a reviewer rather than as a helper, or it comes back with prose you 
  * caller already has, so the sentence describes what happens rather than warning
  * against what would.
  */
-const FIX_ENSEMBLR = `**4. Send the findings back to the same conversation.** When the review reports, use \`ensemblr_send_follow_up\` against that same \`agentSessionId\` and ask it to fix what it found. The fixes belong there, not here: it holds the finding and the file in one context, and every repair made there is one that never enters your window. Then wait on it again.
+const FIX_ENSEMBLR = `**4. Send the findings back to the same conversation.** When the review reports, use \`ensemblr_send_follow_up\` against that same \`agentSessionId\` and ask it to fix what it found. The fixes belong there, not here: it holds the finding and the file in one context, it can spawn its own sub-agents when the list is long, and every repair made there is one that never enters your window. Then wait on it again.
 
 Judge each finding rather than accepting the whole list. A finding you disagree with is one you say you disagree with — in the follow-up, so the reviewer can answer, and in your final report, so the user can. Where it is right, the fix is the fix, not a comment explaining the problem.
 
@@ -170,11 +176,13 @@ Make the repairs here, or hand a mechanical one to a child of its own. Then spaw
  * the re-entry bypasses step 4 entirely, which is why it is stated twice rather
  * than once.
  *
- * Both statements describe the op rather than restraining the agent. While the
- * reviewer was a peer the sentence leaned on a `denied-quota` refusal; between
- * [ADR 0062](../../../docs/adr/0062-open-an-agent-requested-review-as-a-sub-agent.md)
- * and the reuse guard it leaned on nothing, which is too little for a rule the
- * numbered steps themselves walk an agent into.
+ * Both statements describe the op rather than restraining the agent. They used to
+ * lean on a `denied-quota` refusal from the co-tenancy cap, which stopped being
+ * load-bearing once
+ * [ADR 0063](../../../docs/adr/0063-open-an-agent-requested-review-as-a-peer-again.md)
+ * widened that cap for an unattended caller: the reviewer is a peer again, but
+ * the workspace now has room for a second one. What holds the rule is
+ * `reviewsByCaller`, which hands the open reviewer back.
  */
 const REBUILT_REVIEW_ENSEMBLR = `Send the rebuilt change back to the reviewer you already have, the way you sent the first round. Calling \`ensemblr_start_review\` again on the way past step 3 hands that same reviewer back rather than opening a fresh one: it has read every round that led here, where a new reader would start from the diff alone.`;
 
@@ -251,11 +259,12 @@ Being unsure is not a hard block. An ambiguous requirement, a missing convention
  * of children, and every other claim in the block is worth following only
  * because they can all be checked.
  *
- * The agent-opened review is one of the children reading this, since
- * [ADR 0062](../../../docs/adr/0062-open-an-agent-requested-review-as-a-sub-agent.md)
- * spawns it as a sub-agent. What it needs beyond this — that fixing its own
- * findings on a follow-up is in scope — is in its own opening brief rather than
- * here, because no other child is asked for a second turn.
+ * The agent-opened review is not one of the children reading this:
+ * [ADR 0063](../../../docs/adr/0063-open-an-agent-requested-review-as-a-peer-again.md)
+ * spawns it as a root, so it reads the full loop and is held off the commit by
+ * {@link SCOPE}'s second gate, exactly as a peer is. What it needs beyond that —
+ * that fixing its own findings on a follow-up is in scope — is in its own
+ * opening brief, because nothing else opened this way is asked for a second turn.
  */
 const SUBAGENT_BODY = `The delivery loop Ensemblr runs an unattended change through is not yours. You were spawned to carry out one unit of work, and nothing that happens to the change afterwards is yours: the commit, the review, and the pull request all sit above you, however many levels up that is. Do not commit, push, rebase, or open one from here — make the change, leave it in the working tree, and say in your report exactly what you touched.
 

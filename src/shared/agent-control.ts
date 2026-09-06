@@ -62,9 +62,9 @@ export {
 } from './agent-control/peer-brief.ts';
 export { buildPlanSubmittedResult } from './agent-control/plan-mode.ts';
 export {
-	buildReviewSubAgentDirective,
-	REVIEW_SUBAGENT_BRIEF_HEADER,
-} from './agent-control/review-subagent-brief.ts';
+	buildReviewPeerDirective,
+	REVIEW_PEER_BRIEF_HEADER,
+} from './agent-control/review-peer-brief.ts';
 export * from './agent-control/schemas.ts';
 export {
 	buildPlanModeDelegationDirective,

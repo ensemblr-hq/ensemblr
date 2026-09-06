@@ -259,17 +259,35 @@ export interface StartConversationArgs {
 
 /**
  * How many agents may write one workspace's checkout at once, the caller
- * included. Two, because they share one worktree and one git index and nothing
- * arbitrates that: the hazard grows with every additional writer, and the user
- * asked for *a* peer. It is also what bounds the recursion — a peer opening a
- * peer is refused by this cap rather than by a rule about who may open what.
+ * included. Two while somebody is watching, because they share one worktree and
+ * one git index and nothing arbitrates that: the hazard grows with every
+ * additional writer, and the user asked for *a* peer. It is also what bounds the
+ * recursion — a peer opening a peer is refused by this cap rather than by a rule
+ * about who may open what. A review opening a review is the one case that does
+ * take a rule: the widened unattended allowance below leaves room for the chain,
+ * so `startReview` refuses a caller it opened itself.
  *
  * Root orchestrators are not the only thing counted against it. A harness
  * terminal that is still running is an unrestricted writer on the same files, so
- * it takes one of the two.
+ * it takes one of the slots, whichever limit below is in force.
+ *
+ * An unattended caller is allowed four, and the extra two are arithmetic rather
+ * than generosity. The delivery loop holds a reviewer open across every round it
+ * runs, so the run's own floor is two — the orchestrator and its review — which
+ * leaves an attended-width workspace with no room for anything the user left
+ * behind. Two more absorb exactly what they routinely do leave: a harness
+ * terminal still running, and a peer they opened before stepping away. A run
+ * script is not one of them — the count reads terminals of kind `agent` only, so
+ * a dev server has never taken a slot. Beyond that the writers are genuinely
+ * uncoordinated and the loop has no use for them.
+ *
+ * Widened per caller rather than per workspace, because the need belongs to the
+ * unattended run rather than to the checkout: an attended orchestrator working
+ * beside one still asked for *a* peer and is still held to two.
  */
 export const PEER_ORCHESTRATOR_LIMITS = {
 	maxPerWorkspace: 2,
+	maxPerUnattendedWorkspace: 4,
 } as const;
 
 /**
@@ -291,10 +309,11 @@ export interface StartReviewArgs {
 
 /**
  * What `startReview` opened, or the review the caller already had. The session is
- * one of the caller's own sub-agents, so it is among the children `waitForAgents`
- * defaults to and costs none of the workspace's co-tenancy allowance. A second
- * call answers with the first review rather than a new one, and the two cases are
- * told apart by `message` rather than by shape — either way the caller holds a
+ * a root orchestrator with a delegation budget of its own, so it takes a slot in
+ * {@link PEER_ORCHESTRATOR_LIMITS} and is waited on by naming it in `targets`
+ * rather than by the default that covers a caller's children. A second call
+ * answers with the first review rather than a new one, and the two cases are told
+ * apart by `message` rather than by shape — either way the caller holds a
  * reviewer to follow up, which is what it asked for.
  */
 export interface StartReviewResult {
