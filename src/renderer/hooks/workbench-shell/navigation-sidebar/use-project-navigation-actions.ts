@@ -11,6 +11,7 @@ import {
 import { queryClient } from '@/renderer/api/query-client';
 import { failureDetail, failureText } from '@/renderer/lib/failure-text';
 import { i18n } from '@/renderer/lib/i18n';
+import { reportCreateWorkspaceWarnings } from '@/renderer/lib/workbench/create-workspace-warnings';
 import {
 	addPendingWorkspaceToNavigationSnapshot,
 	removePendingWorkspaceFromNavigationSnapshot,
@@ -238,6 +239,7 @@ function settlePendingWorkspace(
 	pendingWorkspaceId: string,
 	result: CreateWorkspaceResult,
 ): void {
+	reportCreateWorkspaceWarnings(result);
 	if (!result.reusedExisting) {
 		replacePendingWorkspaceInCache(pendingWorkspaceId, result);
 		return;

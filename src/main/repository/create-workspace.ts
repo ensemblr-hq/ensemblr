@@ -43,6 +43,7 @@ import {
 } from './files-to-copy.ts';
 import {
 	DEFAULT_FALLBACK_BRANCH,
+	ensureBaseRefAvailable,
 	GIT_WORKTREE_TIMEOUT_MS,
 	listLocalBranchNames,
 	refResolvesToCommit,
@@ -51,6 +52,7 @@ import {
 } from './git-ops.ts';
 import type { GithubUsernameResolver } from './github-username.ts';
 import { toSlug } from './slug.ts';
+import { type GitRefRejection, validateGitRef } from './validate-git-ref.ts';
 import { validateWorkspaceName } from './workspace-validation.ts';
 import {
 	cleanupWorkspaceDirectory,
@@ -109,6 +111,8 @@ interface SourceRepository {
 interface WorkspaceBranchPoint {
 	/** Merge target: diff base, conflict probe, and pull-request base. */
 	baseBranch: string;
+	/** Raised when a configured `branchFrom` had to be abandoned for the fallback. */
+	diagnostic?: CreateWorkspaceDiagnostic;
 	plan: WorkspaceBranchPlan;
 }
 
@@ -162,18 +166,24 @@ async function resolveBranchPoint({
 	request: CreateWorkspaceRequest;
 }): Promise<WorkspaceBranchPoint> {
 	const plan = request.branchPlan ?? { kind: 'create' };
-	const baseBranch = await resolveBaseBranch({
+	const { baseBranch, diagnostic } = await resolveBaseBranch({
 		adoptedBranch: plan.kind === 'adopt' ? plan.branch.trim() : null,
 		configuredBase,
 		explicitBase: request.baseBranch?.trim(),
 		localCommandService,
 		repository,
 	});
+	const raised = diagnostic ? { diagnostic } : {};
 	if (plan.kind === 'adopt') {
-		return { baseBranch, plan: { branch: plan.branch.trim(), kind: 'adopt' } };
+		return {
+			baseBranch,
+			...raised,
+			plan: { branch: plan.branch.trim(), kind: 'adopt' },
+		};
 	}
 	return {
 		baseBranch,
+		...raised,
 		plan: { forkRef: plan.forkRef?.trim() || baseBranch, kind: 'create' },
 	};
 }
@@ -186,11 +196,25 @@ async function resolveBranchPoint({
  * back to the live repository root branch, resolved fresh so a stale stored
  * `default_branch` cannot pin the workspace to the wrong target.
  *
+ * The configured base is fetched before it is probed, the same way changing a
+ * workspace's target branch already does. The Git settings picker lists a
+ * repository's branches from GitHub rather than from local refs, so it can hand
+ * back an `origin/<name>` this clone has never fetched — and without the fetch
+ * that selection is silently discarded and every workspace comes off the root
+ * branch instead. That fetch is also why the configured base is validated here
+ * rather than left to the worktree placement's own check: the setting is stored
+ * verbatim and can come from a repository's committed settings file, and
+ * `ensureBaseRefAvailable` would hand it straight to `git fetch`.
+ *
  * A candidate naming the branch the workspace is adopting is skipped: measuring
  * a branch against itself puts the merge-base on HEAD, which empties the review
- * panel of the very commits the workspace was opened to review.
+ * panel of the very commits the workspace was opened to review. That retarget is
+ * deliberate, so it is not reported as a problem; a base that was abandoned is,
+ * because the setting silently doing nothing is indistinguishable from the app
+ * ignoring it.
  * @param options - The adopted branch, explicit/configured bases, and git deps.
- * @returns The resolved merge target.
+ * @returns The resolved merge target, plus a diagnostic when a configured base
+ * was abandoned.
  */
 async function resolveBaseBranch({
 	adoptedBranch,
@@ -204,35 +228,96 @@ async function resolveBaseBranch({
 	explicitBase: string | undefined;
 	localCommandService: LocalCommandService;
 	repository: SourceRepository;
-}): Promise<string> {
+}): Promise<{ baseBranch: string; diagnostic?: CreateWorkspaceDiagnostic }> {
 	const wouldSelfDiff = (candidate: string): boolean =>
 		adoptedBranch !== null &&
 		bareBranchName(candidate) === bareBranchName(adoptedBranch);
 
 	if (explicitBase && !wouldSelfDiff(explicitBase)) {
-		return explicitBase;
+		return { baseBranch: explicitBase };
 	}
 
-	if (
-		configuredBase &&
-		!wouldSelfDiff(configuredBase) &&
-		(await refResolvesToCommit({
+	const candidateBase =
+		configuredBase && !wouldSelfDiff(configuredBase) ? configuredBase : null;
+	const rejection = candidateBase ? validateGitRef(candidateBase) : null;
+
+	if (candidateBase && !rejection) {
+		await ensureBaseRefAvailable({
+			baseBranch: candidateBase,
 			localCommandService,
-			ref: configuredBase,
 			repositoryPath: repository.path,
-		}))
-	) {
-		return configuredBase;
+		});
+		if (
+			await refResolvesToCommit({
+				localCommandService,
+				ref: candidateBase,
+				repositoryPath: repository.path,
+			})
+		) {
+			return { baseBranch: candidateBase };
+		}
 	}
 
-	return (
+	const fallbackBranch =
 		(await resolveRootBranch({
 			localCommandService,
 			repositoryPath: repository.path,
 		})) ??
 		repository.defaultBranch ??
-		DEFAULT_FALLBACK_BRANCH
-	);
+		DEFAULT_FALLBACK_BRANCH;
+
+	if (!candidateBase) {
+		return { baseBranch: fallbackBranch };
+	}
+
+	return {
+		baseBranch: fallbackBranch,
+		diagnostic: abandonedBaseDiagnostic({
+			candidateBase,
+			fallbackBranch,
+			rejection,
+		}),
+	};
+}
+
+/**
+ * Reports a configured base the workspace could not come off, keeping a ref the
+ * validator refused apart from one that was fetched and still did not resolve.
+ * The two ask for different things — correct the setting, versus the branch is
+ * gone — and a single code would tell whoever reads the support bundle that a
+ * fetch was attempted for a value that never reached one.
+ *
+ * Both say the workspace *took* the fallback as its base rather than branched
+ * from it, because only one of the three plans makes those the same thing: an
+ * adopted branch keeps the history it already had, and a create plan carrying
+ * its own `forkRef` cuts from that ref. In every case the base is the merge
+ * target, which is what these two sentences are actually about.
+ * @param options - The abandoned base, the fallback taken, and the validator's
+ * rejection when it had one.
+ * @returns The warning to attach to the workspace that was created anyway.
+ */
+function abandonedBaseDiagnostic({
+	candidateBase,
+	fallbackBranch,
+	rejection,
+}: {
+	candidateBase: string;
+	fallbackBranch: string;
+	rejection: GitRefRejection | null;
+}): CreateWorkspaceDiagnostic {
+	const landedOn = `The workspace took "${fallbackBranch}" as its base instead.`;
+	if (rejection) {
+		return {
+			code: 'configured-base-invalid',
+			message: `Cannot use "${candidateBase}" as the branch new workspaces fork from. ${rejection.message} ${landedOn}`,
+			severity: 'warning',
+		};
+	}
+	return {
+		code: 'configured-base-unresolvable',
+		message: `Could not resolve "${candidateBase}" in this repository, even after fetching. ${landedOn}`,
+		severity: 'warning',
+	};
 }
 
 /**
@@ -530,7 +615,7 @@ export function createWorkspaceService({
 		};
 
 		return {
-			diagnostics: [],
+			diagnostics: branchPoint.diagnostic ? [branchPoint.diagnostic] : [],
 			filesToCopy: filesToCopySnapshot,
 			reusedExisting: false,
 			status: 'success',

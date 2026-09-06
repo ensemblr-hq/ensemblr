@@ -15,6 +15,8 @@ export type CreateWorkspaceDiagnosticCode =
 	| 'branch-already-checked-out'
 	| 'branch-name-invalid'
 	| 'branch-not-found'
+	| 'configured-base-invalid'
+	| 'configured-base-unresolvable'
 	| 'database-unavailable'
 	| 'destination-exists'
 	| 'destination-not-writable'

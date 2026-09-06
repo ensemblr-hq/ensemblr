@@ -11,6 +11,7 @@ import type { StoredWorkspaceSelection } from '@/renderer/types/workbench';
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 import type { CreateWorkspaceResult } from '@/shared/ipc/contracts/workspace';
 import { pickComposerSurname } from '@/shared/workspace-name-pool';
+import { reportCreateWorkspaceWarnings } from './create-workspace-warnings';
 import { mapRepositoriesToProjects } from './navigation-model';
 import { resolveWorkspaceRouteParams } from './navigation-selection';
 
@@ -76,6 +77,8 @@ export async function seedFirstWorkspace({
 			);
 		return { error: reason, status: 'failure' };
 	}
+
+	reportCreateWorkspaceWarnings(result);
 
 	const workspaceId = result.workspace.id;
 	let navigationSnapshot: RepositoryWorkspaceNavigationSnapshot;
