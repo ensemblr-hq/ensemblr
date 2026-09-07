@@ -2,7 +2,9 @@
   <img alt="Ensemblr" src="./assets/wordmark.gif" width="588">
 </p>
 
-# Ensemblr™ ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/ensemblr-hq/ensemblr?utm_source=oss&utm_medium=github&utm_campaign=ensemblr-hq%2Fensemblr&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+# Ensemblr™
+
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/ensemblr-hq/ensemblr?utm_source=oss&utm_medium=github&utm_campaign=ensemblr-hq%2Fensemblr&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 **A desktop orchestrator for multi-agent coding work, driving the Pi CLI or the Claude Code CLI — whichever
 you already run.**
