@@ -6,6 +6,13 @@ Date: 2026-09-05
 
 Accepted
 
+Amended by [0065](./0065-reach-the-concierge-conversation-not-its-runtime-attachment.md)
+(2026-09-07) on one point: "A missing conversation is a loud refusal" below gated
+on the live runtime attachment, and an attachment is not a conversation. A
+Concierge conversation that exists but has nothing attached to it is now
+delivered to. The refusal itself, the late session resolution, and the "not a
+queue" rule all stand.
+
 ## Context
 
 The agent topology only pointed one way: down. The Concierge briefed an
@@ -119,6 +126,15 @@ its shutdown event had not landed yet. `deliverAgentMessage` takes the other
 branch at the same fork: it reports `no-session` where `submitPrompt` would
 reopen, and it never holds the prompt for replay into a conversation that does
 not exist yet.
+
+> **Amended by [0065](./0065-reach-the-concierge-conversation-not-its-runtime-attachment.md).**
+> Asking "is one attached?" was the wrong question, not merely an insufficient
+> one: the attachment comes and goes for reasons unrelated to whether the user
+> has a Concierge — the panel unopened this launch, a child they stopped, a clear
+> mid-flight — and refusing on it reported an absence in every one of those. The
+> fork now falls at the conversation row rather than at the attachment.
+> `deliverAgentMessage` still never creates a conversation and still never holds
+> a prompt; where one exists without a child, it attaches one.
 
 **The user sees every one.** It arrives as an ordinary turn in the Concierge
 panel, headed `MESSAGE FROM AN AGENT` and naming the sending workspace, tab, and

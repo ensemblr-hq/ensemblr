@@ -15,11 +15,27 @@ import {
 } from '../../src/main/agent-runtime';
 import { createConciergeSessionService } from '../../src/main/concierge';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
+import {
+	listConciergeSessions,
+	updateConciergeSession,
+} from '../../src/main/storage/repositories/concierge-session-repository.ts';
+import type { AgentProviderId } from '../../src/shared/agent-provider.ts';
 
 const HOME = '/tmp/root/concierge';
 
 let database: DatabaseSync;
 let directory: string;
+
+/** Leaves the user with no Concierge conversation at all, as a clear that failed would. */
+const closeEverySession = (): void => {
+	for (const row of listConciergeSessions({ database })) {
+		updateConciergeSession({
+			database,
+			id: row.id,
+			patch: { closedAt: '2026-08-24T00:00:00.000Z', status: 'closed' },
+		});
+	}
+};
 
 /** A runtime child the test can kill, to stand in for one that died. */
 interface FakeChild {
@@ -28,6 +44,8 @@ interface FakeChild {
 	kill: () => void;
 	/** Emits a plain crash, with nothing said about why the child went away. */
 	crash: () => void;
+	/** Whether anything has closed this child, which is how a stranded one shows. */
+	isClosed: () => boolean;
 	/**
 	 * Emits what a runtime asked to reload a conversation it no longer holds
 	 * actually produces: an error naming the missing session, then a crash.
@@ -124,6 +142,7 @@ const fakeChild = (runtimeSessionId: string): FakeChild => {
 				type: 'shutdown',
 			});
 		},
+		isClosed: () => closed,
 		kill: () => {
 			closed = true;
 		},
@@ -169,6 +188,10 @@ const fakeChild = (runtimeSessionId: string): FakeChild => {
  */
 const setup = (
 	options: {
+		/** Runs against each child as it is handed out, to model one born dead. */
+		onChild?: (child: FakeChild) => void;
+		/** Read per settings lookup, so a test can switch runtimes mid-flight. */
+		provider?: () => AgentProviderId;
 		refuseOpen?: (request: AgentSessionRequest) => boolean;
 		runMemoryPass?: (sessionId: string) => Promise<boolean>;
 	} = {},
@@ -183,6 +206,7 @@ const setup = (
 			}
 			const child = fakeChild(`runtime-${children.length + 1}`);
 			children.push(child);
+			options.onChild?.(child);
 			return child.session;
 		},
 		listSessions: () => [],
@@ -201,7 +225,7 @@ const setup = (
 		resolveSettings: () => ({
 			autoClearAtPercent: 0.8,
 			model: null,
-			provider: 'claude',
+			provider: options.provider?.() ?? 'claude',
 			thinkingLevel: null,
 		}),
 		...(options.runMemoryPass ? { runMemoryPass: options.runMemoryPass } : {}),
@@ -312,11 +336,13 @@ describe('a Concierge prompt sent after its runtime child has died', () => {
 	});
 });
 
-// A workspace agent reaching upward takes the opposite branch from a user
-// prompt at exactly one point: it must never bring a Concierge conversation into
-// being. One that booted from here would spend tokens and act on the app with
-// nobody watching, and a message replayed into it hours later would land in a
-// conversation the user has since cleared.
+// A workspace agent reaching upward takes the opposite branch from a user prompt
+// at exactly one point: it must never bring a Concierge conversation into being.
+// One that booted from here would spend tokens on a conversation nobody asked
+// for and nobody would think to read. What it may do is put a child back under a
+// conversation that already exists — the panel unopened this launch, a child the
+// user stopped, one that crashed — because the message lands in the transcript
+// they already have either way.
 describe('a workspace agent message to the Concierge', () => {
 	it('delivers into the conversation that is live, and names it', async () => {
 		const { children, service } = setup();
@@ -335,19 +361,44 @@ describe('a workspace agent message to the Concierge', () => {
 		]);
 	});
 
-	// The window the guard on `activeSessionId` could not see: the child is gone
+	// The window the guard on the live attachment could not see: the child is gone
 	// but the shutdown event has not cleared the attachment yet, so the send gets
-	// as far as the runtime before finding out.
-	it('opens no replacement when the runtime child has died', async () => {
+	// as far as the runtime before finding out. The conversation is still open, so
+	// the message belongs in it.
+	it('rebuilds the child that died under the send, into the same conversation', async () => {
 		const { children, requests, service } = setup();
-		await service.openSession({ fresh: true });
+		const opened = await service.openSession({ fresh: true });
 		children[0]?.kill();
 
 		const result = await service.deliverAgentMessage({ prompt: 'anyone up?' });
 
-		expect(result).toMatchObject({ cause: 'no-session', delivered: false });
-		expect(children).toHaveLength(1);
-		expect(requests).toHaveLength(1);
+		expect(result).toEqual({
+			conciergeSessionId: opened.session?.id,
+			delivered: true,
+		});
+		expect(children[1]?.submitted).toEqual(['anyone up?']);
+		expect(requests).toHaveLength(2);
+	});
+
+	// The case that made the channel unreachable in practice. Nothing attaches a
+	// Concierge child at boot — the panel does it when the user opens it — so an
+	// agent messaging before they have looked at it once found no attachment while
+	// the conversation sat on disk with its whole transcript.
+	it('attaches the conversation on disk when nothing is attached yet', async () => {
+		const first = setup();
+		const opened = await first.service.openSession({ fresh: true });
+		await first.service.shutdown();
+
+		const relaunched = setup();
+		const result = await relaunched.service.deliverAgentMessage({
+			prompt: 'anyone up?',
+		});
+
+		expect(result).toEqual({
+			conciergeSessionId: opened.session?.id,
+			delivered: true,
+		});
+		expect(relaunched.children[0]?.submitted).toEqual(['anyone up?']);
 	});
 
 	it('reports no session when the Concierge was never opened', async () => {
@@ -357,6 +408,57 @@ describe('a workspace agent message to the Concierge', () => {
 
 		expect(result).toMatchObject({ cause: 'no-session', delivered: false });
 		expect(children).toHaveLength(0);
+	});
+
+	// The refusal the op was written for still has to hold: every conversation
+	// closed means the user has none, and inventing one from here is the thing
+	// this path may never do.
+	it('starts no conversation when every one of them is closed', async () => {
+		const { children, service } = setup();
+		await service.openSession({ fresh: true });
+		await service.shutdown();
+		closeEverySession();
+
+		const result = await service.deliverAgentMessage({ prompt: 'anyone up?' });
+
+		expect(result).toMatchObject({ cause: 'no-session', delivered: false });
+		expect(children).toHaveLength(1);
+	});
+
+	// Closing the row is how the panel reports a runtime the user could not
+	// start. Reached from here it would let a background message end a
+	// conversation somebody else owns: the transcript would be orphaned, and the
+	// user's next look at the panel would open a stranger.
+	it('leaves the conversation open when the runtime refuses to attach', async () => {
+		const first = setup();
+		const opened = await first.service.openSession({ fresh: true });
+		await first.service.shutdown();
+
+		const refusing = setup({ refuseOpen: () => true });
+		const result = await refusing.service.deliverAgentMessage({
+			prompt: 'anyone up?',
+		});
+		expect(result).toMatchObject({ cause: 'failed', delivered: false });
+
+		const reopened = await setup().service.openSession({ fresh: false });
+		expect(reopened.session?.id).toBe(opened.session?.id);
+	});
+
+	// A runtime that cannot hold a child at all is not a race, and retrying it is
+	// how one message becomes a process per attempt.
+	it('gives up rather than rebuilding a child that keeps dying', async () => {
+		const { children, service } = setup({
+			onChild: (child) => {
+				child.kill();
+			},
+		});
+		await service.openSession({ fresh: true });
+
+		const result = await service.deliverAgentMessage({ prompt: 'anyone up?' });
+
+		expect(result).toMatchObject({ cause: 'failed', delivered: false });
+		// The one the open spawned, and the single rebuild the retry is worth.
+		expect(children).toHaveLength(2);
 	});
 
 	it('passes on a refusal from a live child rather than reopening', async () => {
@@ -557,5 +659,54 @@ describe('two Concierge clears racing each other', () => {
 				.prepare('SELECT COUNT(*) AS total FROM concierge_sessions')
 				.get() as { total: number },
 		).toMatchObject({ total: 2 });
+	});
+});
+
+// Opening, clearing, and an agent reattach each ask the runtime for a child, and
+// each used to dedupe only its own callers. Two of them overlapping inside the
+// attach left one child running with nothing pointing at it — no handle, no
+// subscription reachable, nothing that could ever close it.
+//
+// Both operations have to be ones that reach the attach, or the race is not one.
+// A `fresh: false` open finds the live attachment and returns it without asking
+// the runtime for anything, so pairing that with a clear only collides when the
+// clear goes first — an order the test would be silently relying on. A `fresh`
+// open always attaches, so it collides whichever way round the two are started,
+// which is what makes the assertion mean something.
+describe('two lifecycle operations racing for the runtime child', () => {
+	for (const clearFirst of [true, false]) {
+		it(`leaves one child and one conversation, ${clearFirst ? 'clear' : 'open'} first`, async () => {
+			const { children, service } = setup({ runMemoryPass: async () => true });
+			await service.openSession({ fresh: true });
+
+			const clear = () => service.clearContext({ reason: 'manual' });
+			const open = () => service.openSession({ fresh: true });
+			await Promise.all(clearFirst ? [clear(), open()] : [open(), clear()]);
+			await settle();
+
+			expect(children.filter((child) => !child.isClosed())).toHaveLength(1);
+			expect(listConciergeSessions({ database })).toHaveLength(1);
+		});
+	}
+});
+
+// The heal reopens through `fresh: false`, which is also the path that retires a
+// row whose provider the user has since changed. Run against a row the current
+// runtime cannot resume, it would close the very conversation it was repairing
+// and hand back a stranger.
+describe('a heal for a conversation the settings have moved off', () => {
+	it('neither closes nor replaces the row it cannot resume', async () => {
+		let provider: AgentProviderId = 'claude';
+		const { children, service } = setup({ provider: () => provider });
+		const opened = await service.openSession({ fresh: true });
+
+		provider = 'pi';
+		children[0]?.refuseResume();
+		await settle();
+
+		expect(children).toHaveLength(1);
+		expect(listConciergeSessions({ database }).map((row) => row.id)).toEqual([
+			opened.session?.id,
+		]);
 	});
 });

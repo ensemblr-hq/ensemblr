@@ -138,9 +138,10 @@ export interface ConciergeSessionRuntimeChoice {
 
 /**
  * How a workspace agent's message to the Concierge ended. `no-session` and
- * `failed` are separated because only the first is the ordinary case — the
- * Concierge is simply not open — and the agent is told something different
- * about each.
+ * `failed` are separated because only the first is the ordinary case — there is
+ * no Concierge conversation at all — and the agent is told something different
+ * about each. `no-session` is answered against the persisted conversation rather
+ * than against the live attachment, so it means what it says.
  */
 export type DeliverConciergeMessageResult =
 	| { conciergeSessionId: string; delivered: true }
@@ -149,16 +150,24 @@ export type DeliverConciergeMessageResult =
 /** Public surface of the Concierge session service. */
 export interface ConciergeSessionService {
 	/**
-	 * Submits a workspace agent's message into whichever conversation is attached
-	 * right now, and never opens one.
+	 * Submits a workspace agent's message into the Concierge conversation that is
+	 * open, and never starts one that is not.
 	 *
 	 * The session is resolved here rather than passed in because a clear replaces
 	 * the conversation without warning, so any id a caller could hold is stale by
-	 * the time it sends. Reviving is deliberately not on this path either, unlike
-	 * {@link ConciergeSessionService.submitPrompt}: a message that raised a
-	 * Concierge child would spend tokens and act on the app with no human in the
-	 * loop, and a prompt held for a conversation that does not exist yet would
-	 * land hours later in one that has since been cleared.
+	 * the time it sends. What "open" means is the persisted row — the transcript
+	 * the panel reopens into — and not the live runtime attachment, which comes
+	 * and goes for reasons unrelated to whether the user has a Concierge: the
+	 * panel has not been opened yet this launch, they pressed stop, a clear is
+	 * halfway through, the child crashed. Gating on the attachment refused an
+	 * agent the one channel it has upward while the conversation it was aimed at
+	 * sat on disk waiting to be read, so a message is delivered by putting a child
+	 * back under that row where there is not one.
+	 *
+	 * What stays refused is the case the refusal was written for: no open
+	 * conversation at all. Nothing here creates one, and nothing here holds a
+	 * message for one — a prompt delivered hours later into a conversation that
+	 * has since been cleared is context nobody can place.
 	 */
 	deliverAgentMessage: (input: {
 		prompt: string;
@@ -237,6 +246,12 @@ interface PendingConciergePrompt {
  */
 const MAX_HEAL_ATTEMPTS = 1;
 
+/** First pass of an agent message: deliver into whatever is attached. */
+const FIRST_DELIVERY = 'first';
+
+/** Second pass: the child died under the first send, so rebuild it once. */
+const RETRY_DELIVERY = 'retry';
+
 /**
  * Converts the stored 0-1 fraction to the 0-100 percentage the runtimes report.
  *
@@ -312,6 +327,45 @@ export function createConciergeSessionService({
 	let pendingPrompt: PendingConciergePrompt | null = null;
 	let replayedPrompt: PendingConciergePrompt | null = null;
 	let healAttempts = 0;
+	let lifecycle: Promise<unknown> = Promise.resolve();
+
+	/**
+	 * Orders the three operations that attach or replace a runtime child —
+	 * opening, clearing, and reattaching for an agent message — so only one runs
+	 * at a time.
+	 *
+	 * Opening and clearing additionally deduplicate their own concurrent callers,
+	 * through `openInFlight` and `clearInFlight`; the agent reattach has no such
+	 * dedupe and does not need one, since a second one finds the child the first
+	 * attached. What none of them did was order against the other two, which left
+	 * a clear and an open able to sit inside {@link attachRuntime} together, each
+	 * having asked the runtime for a child: whichever wrote `active` last owned
+	 * the conversation and the other child was left running with nothing pointing
+	 * at it, so nothing could ever close it.
+	 * @param work - The operation to run once the queue reaches it.
+	 * @returns What the operation returned.
+	 */
+	const serialiseLifecycle = <T>(work: () => Promise<T>): Promise<T> => {
+		const next = lifecycle.then(work);
+		lifecycle = next.catch(() => undefined);
+		return next;
+	};
+
+	/**
+	 * The open conversation a caller may put a runtime child back under, which is
+	 * the newest row nothing has closed — the same one the panel reopens into.
+	 *
+	 * A row remembers the runtime it opened on and a runtime cannot change under a
+	 * live session, so one whose provider the user has since changed is not
+	 * resumable however open it looks; resuming it anyway put the previous runtime
+	 * back and sent it the new runtime's model. Shared by the three callers that
+	 * ask the question so they cannot answer it differently.
+	 * @returns The resumable row, or null when there is none.
+	 */
+	const resumableOpenRow = (): ConciergeSessionRow | null => {
+		const openRow = getActiveConciergeSession({ database: requireDatabase() });
+		return openRow?.provider === resolveSettings().provider ? openRow : null;
+	};
 
 	/**
 	 * Records the runtime's own id for the live conversation, now that there is
@@ -544,6 +598,15 @@ export function createConciergeSessionService({
 	 * @param sessionId - The conversation to rebuild.
 	 */
 	const healUnresumableSession = async (sessionId: string): Promise<void> => {
+		// A row the current runtime cannot resume is not healed at all. `fresh:
+		// false` still replaces one whose provider has since changed — that is what
+		// makes a runtime switch take effect — so healing through it would close the
+		// very conversation being repaired and open a stranger in its place, and the
+		// held prompt would then be dropped for landing in the wrong row.
+		if (resumableOpenRow()?.id !== sessionId) {
+			healAttempts = Math.max(0, healAttempts - 1);
+			return;
+		}
 		const reopened = await openSession({ fresh: false });
 		if (!reopened.session) {
 			healAttempts = Math.max(0, healAttempts - 1);
@@ -668,10 +731,18 @@ export function createConciergeSessionService({
 	 * a turn under it — {@link rememberRuntimeConversation} is the only writer —
 	 * so it is the one case where reloading that conversation is the right ask.
 	 * @param row - The session row to attach.
+	 * @param onFailure - What a failed attach does to the conversation itself.
+	 * `close-the-conversation` for the two paths a user drove — opening the panel
+	 * and clearing it — where the failure is being reported to the person who
+	 * asked for the conversation and the next open should start clean.
+	 * `leave-the-conversation` for a background agent message, which has no
+	 * standing to end a conversation the user owns: the delivery failed and
+	 * nothing else about their Concierge changed.
 	 * @returns The row as it stands after the attach, streaming status included.
 	 */
 	const attachRuntime = async (
 		row: ConciergeSessionRow,
+		onFailure: 'close-the-conversation' | 'leave-the-conversation',
 	): Promise<ConciergeSessionRow> => {
 		const database = requireDatabase();
 		const settings = resolveSettings();
@@ -736,11 +807,14 @@ export function createConciergeSessionService({
 			updateConciergeSession({
 				database,
 				id: row.id,
-				patch: {
-					closedAt: now().toISOString(),
-					lastError: toMessage(error),
-					status: 'errored',
-				},
+				patch:
+					onFailure === 'close-the-conversation'
+						? {
+								closedAt: now().toISOString(),
+								lastError: toMessage(error),
+								status: 'errored',
+							}
+						: { lastError: toMessage(error), status: row.status },
 			});
 			throw error;
 		}
@@ -759,15 +833,9 @@ export function createConciergeSessionService({
 		const database = requireDatabase();
 		// Read whatever is open regardless of `fresh`, so a session being
 		// replaced is still closed rather than left behind for a later resume to
-		// find. A row remembers the runtime it opened on, and a runtime cannot
-		// change under a live session — so one whose provider the user has since
-		// changed is not resumable however open it looks. Resuming it anyway put
-		// the previous runtime back and sent it the new runtime's model.
+		// find.
 		const openRow = getActiveConciergeSession({ database });
-		const existing =
-			!fresh && openRow?.provider === resolveSettings().provider
-				? openRow
-				: null;
+		const existing = fresh ? null : resumableOpenRow();
 
 		if (existing && active?.sessionId === existing.id) {
 			return { session: toSnapshot(existing, true) };
@@ -776,7 +844,12 @@ export function createConciergeSessionService({
 		await detach();
 		try {
 			if (existing) {
-				return { session: toSnapshot(await attachRuntime(existing), true) };
+				return {
+					session: toSnapshot(
+						await attachRuntime(existing, 'close-the-conversation'),
+						true,
+					),
+				};
 			}
 			// Closing whatever was open before opening its replacement: a row left
 			// open is one `getActiveConciergeSession` would hand back later, so a
@@ -789,7 +862,12 @@ export function createConciergeSessionService({
 					patch: { closedAt: now().toISOString(), status: 'closed' },
 				});
 			}
-			return { session: toSnapshot(await attachRuntime(createRow()), true) };
+			return {
+				session: toSnapshot(
+					await attachRuntime(createRow(), 'close-the-conversation'),
+					true,
+				),
+			};
 		} catch (error) {
 			return { error: toMessage(error) };
 		}
@@ -807,7 +885,7 @@ export function createConciergeSessionService({
 		request: OpenConciergeSessionRequest,
 	): Promise<OpenConciergeSessionResult> => {
 		try {
-			return await runOpenSession(request);
+			return await serialiseLifecycle(() => runOpenSession(request));
 		} finally {
 			openInFlight = null;
 		}
@@ -928,6 +1006,38 @@ export function createConciergeSessionService({
 	};
 
 	/**
+	 * Puts a runtime child back under the conversation that is already open,
+	 * without ever starting a conversation that is not.
+	 *
+	 * This is the difference {@link ConciergeSessionService.deliverAgentMessage}
+	 * turns on. What a user has is the row — the transcript the panel reopens into
+	 * and reads whenever they next look — and the live child is an attachment over
+	 * it that comes and goes for reasons that have nothing to do with whether the
+	 * conversation exists: the panel has not been opened yet this launch, the user
+	 * pressed stop, a clear is halfway through, the runtime process died. Attaching
+	 * here delivers into the conversation they already have, where reopening on a
+	 * closed row would invent one nobody asked for.
+	 *
+	 * An attach that fails leaves the row open, which is what
+	 * `leave-the-conversation` buys: closing it is how the panel reports a runtime
+	 * the *user* could not start, and a background message has no standing to end
+	 * a conversation on their behalf. The message fails and nothing else changes.
+	 * @returns The now-live attachment, or null when no open conversation exists.
+	 */
+	const attachExistingConversation =
+		async (): Promise<ActiveConciergeSession | null> => {
+			if (active) {
+				return active;
+			}
+			const existing = resumableOpenRow();
+			if (!existing) {
+				return null;
+			}
+			await attachRuntime(existing, 'leave-the-conversation');
+			return active;
+		};
+
+	/**
 	 * Hands a request to the child that is attached right now, without deciding
 	 * what to do when there is no longer one.
 	 *
@@ -1012,7 +1122,7 @@ export function createConciergeSessionService({
 		}
 
 		try {
-			const row = await attachRuntime(createRow());
+			const row = await attachRuntime(createRow(), 'close-the-conversation');
 			return { memoryPassStarted, session: toSnapshot(row, true) };
 		} catch (error) {
 			return { error: toMessage(error), memoryPassStarted };
@@ -1034,7 +1144,9 @@ export function createConciergeSessionService({
 			request: ClearConciergeContextRequest,
 		): Promise<ClearConciergeContextResult> => {
 			if (!clearInFlight) {
-				clearInFlight = runClearContext(request).finally(() => {
+				clearInFlight = serialiseLifecycle(() =>
+					runClearContext(request),
+				).finally(() => {
 					clearInFlight = null;
 				});
 			}
@@ -1044,25 +1156,53 @@ export function createConciergeSessionService({
 		deliverAgentMessage: async ({
 			prompt,
 		}): Promise<DeliverConciergeMessageResult> => {
-			const live = active;
-			if (!live) {
-				return {
-					cause: 'no-session',
-					delivered: false,
-					detail: SESSION_NOT_OPEN_MESSAGE,
-				};
-			}
-			const served = await submitToLiveSession(live, { prompt }, {});
-			if ('acceptedAt' in served) {
-				return { conciergeSessionId: live.sessionId, delivered: true };
-			}
-			return 'closed' in served
-				? {
+			for (const attempt of [FIRST_DELIVERY, RETRY_DELIVERY]) {
+				let live: ActiveConciergeSession | null;
+				try {
+					// Queued rather than read straight off `active`, so a clear halfway
+					// between dropping its old child and attaching the new one is waited
+					// out instead of reported as a conversation that no longer exists. The
+					// wait is bounded by the operation already running and lands in the
+					// conversation that operation produces, which is what separates it
+					// from holding the message for a conversation nobody has opened yet.
+					live = await serialiseLifecycle(async () => {
+						if (attempt === RETRY_DELIVERY) {
+							await detach();
+						}
+						return await attachExistingConversation();
+					});
+				} catch (error) {
+					return {
+						cause: 'failed',
+						delivered: false,
+						detail: toMessage(error),
+					};
+				}
+				if (!live) {
+					return {
 						cause: 'no-session',
 						delivered: false,
 						detail: SESSION_NOT_OPEN_MESSAGE,
-					}
-				: { cause: 'failed', delivered: false, detail: served.error };
+					};
+				}
+				const served = await submitToLiveSession(live, { prompt }, {});
+				if ('acceptedAt' in served) {
+					return { conciergeSessionId: live.sessionId, delivered: true };
+				}
+				if ('error' in served) {
+					return { cause: 'failed', delivered: false, detail: served.error };
+				}
+				// The child reported itself closed under the submit, so it died between
+				// the attach and the send: the conversation is still there and only its
+				// attachment is gone. One retry rebuilds it. A second refusal is a
+				// runtime that cannot hold a child at all, which is not a race.
+			}
+			return {
+				cause: 'failed',
+				delivered: false,
+				detail:
+					'The Concierge conversation is open, but its runtime child closed under the message twice running.',
+			};
 		},
 
 		/**
