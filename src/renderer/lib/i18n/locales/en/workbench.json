@@ -111,7 +111,7 @@
 		"in-review": "In review"
 	},
 	"browse-archive": {
-		"description": "Restore an archived workspace, or permanently purge it. Restoring rebuilds the worktree from the recorded base branch when branch cleanup ran at archive time.",
+		"description": "Restore an archived workspace, or permanently purge it. Archiving kept its branch and a snapshot of any uncommitted changes, so restoring rebuilds the workspace from git.",
 		"empty": {
 			"failed": "Failed to load archived workspaces.",
 			"loading": "Loading archived workspaces…",
@@ -346,40 +346,32 @@
 			"running": "Reading the architecture diagram"
 		},
 		"get-conversation-status": {
+			"chat": {
+				"done": "Checked a chat",
+				"running": "Checking a chat"
+			},
 			"concierge": {
 				"done": "Checked a chat",
 				"running": "Checking a chat"
 			},
 			"done": "Checked a sub-agent",
-			"orchestrator": {
-				"done": "Checked an orchestrator",
-				"running": "Checking an orchestrator"
-			},
-			"running": "Checking a sub-agent",
-			"unresolved": {
-				"done": "Checked a chat",
-				"running": "Checking a chat"
-			}
+			"running": "Checking a sub-agent"
 		},
 		"get-diff-comments": {
 			"done": "Read review comments",
 			"running": "Reading review comments"
 		},
 		"get-last-message": {
+			"chat": {
+				"done": "Read a chat's report",
+				"running": "Reading a chat's report"
+			},
 			"concierge": {
 				"done": "Read a chat's report",
 				"running": "Reading a chat's report"
 			},
 			"done": "Read a sub-agent's report",
-			"orchestrator": {
-				"done": "Read an orchestrator's report",
-				"running": "Reading an orchestrator's report"
-			},
-			"running": "Reading a sub-agent's report",
-			"unresolved": {
-				"done": "Read a chat's report",
-				"running": "Reading a chat's report"
-			}
+			"running": "Reading a sub-agent's report"
 		},
 		"get-workspace-diff": {
 			"done": "Read the diff",
@@ -446,28 +438,24 @@
 			"running": "Messaging the Concierge"
 		},
 		"notify-orchestrator": {
-			"done": "Notified the orchestrator",
-			"running": "Notifying the orchestrator"
+			"done": "Notified the parent chat",
+			"running": "Notifying the parent chat"
 		},
 		"open-tab": {
 			"done": "Opened a tab",
 			"running": "Opening a tab"
 		},
 		"read-conversation": {
+			"chat": {
+				"done": "Read a chat's transcript",
+				"running": "Reading a chat's transcript"
+			},
 			"concierge": {
 				"done": "Read a chat's transcript",
 				"running": "Reading a chat's transcript"
 			},
 			"done": "Read a sub-agent's transcript",
-			"orchestrator": {
-				"done": "Read an orchestrator's transcript",
-				"running": "Reading an orchestrator's transcript"
-			},
-			"running": "Reading a sub-agent's transcript",
-			"unresolved": {
-				"done": "Read a chat's transcript",
-				"running": "Reading a chat's transcript"
-			}
+			"running": "Reading a sub-agent's transcript"
 		},
 		"read-terminal-output": {
 			"done": "Read terminal output",
@@ -482,20 +470,16 @@
 			"running": "Resolving review comments"
 		},
 		"send-follow-up": {
+			"chat": {
+				"done": "Steered a chat",
+				"running": "Steering a chat"
+			},
 			"concierge": {
 				"done": "Steered a chat",
 				"running": "Steering a chat"
 			},
 			"done": "Steered a sub-agent",
-			"orchestrator": {
-				"done": "Steered an orchestrator",
-				"running": "Steering an orchestrator"
-			},
-			"running": "Steering a sub-agent",
-			"unresolved": {
-				"done": "Steered a chat",
-				"running": "Steering a chat"
-			}
+			"running": "Steering a sub-agent"
 		},
 		"set-workspace-status": {
 			"done": "Moved the workspace",
@@ -506,15 +490,15 @@
 			"running": "Opening a chat tab"
 		},
 		"start-conversation": {
+			"chat": {
+				"done": "Started a chat",
+				"running": "Starting a chat"
+			},
 			"concierge": {
 				"done": "Started a chat",
 				"running": "Starting a chat"
 			},
 			"done": "Started a sub-agent",
-			"orchestrator": {
-				"done": "Started an orchestrator",
-				"running": "Starting an orchestrator"
-			},
 			"running": "Starting a sub-agent"
 		},
 		"start-review": {
@@ -534,20 +518,16 @@
 			"running": "Redrawing the architecture diagram"
 		},
 		"wait-for-agents": {
+			"chat": {
+				"done": "Waited for chats",
+				"running": "Waiting for chats"
+			},
 			"concierge": {
 				"done": "Waited for the chats",
 				"running": "Waiting for the chats"
 			},
 			"done": "Waited for sub-agents",
-			"orchestrator": {
-				"done": "Waited for orchestrators",
-				"running": "Waiting for orchestrators"
-			},
-			"running": "Waiting for sub-agents",
-			"unresolved": {
-				"done": "Waited for the chats",
-				"running": "Waiting for the chats"
-			}
+			"running": "Waiting for sub-agents"
 		},
 		"with-detail": "{{action}}: {{detail}}",
 		"write-terminal": {

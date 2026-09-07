@@ -721,18 +721,19 @@ describe('ensemblrToolLabel against the target role', () => {
 	});
 
 	test.each([
-		['ensemblr_get_conversation_status', 'Checked an orchestrator'],
-		['ensemblr_get_last_message', "Read an orchestrator's report"],
-		['ensemblr_read_conversation', "Read an orchestrator's transcript"],
-		['ensemblr_send_follow_up', 'Steered an orchestrator'],
-	])('names a root orchestrator in the %s row', (toolName, expected) => {
+		['ensemblr_get_conversation_status', 'Checked a chat'],
+		['ensemblr_get_last_message', "Read a chat's report"],
+		['ensemblr_read_conversation', "Read a chat's transcript"],
+		['ensemblr_send_follow_up', 'Steered a chat'],
+	])('names a resolved root a chat in the %s row', (toolName, expected) => {
 		expect(titleFor(toolName, { agentSessionId: 'session-review' })).toBe(
 			expected,
 		);
 	});
 
-	// Neutral is the fallback for ignorance, not a blanket replacement: the app no
-	// longer holds this conversation, so neither noun can be claimed.
+	// Ignorance lands on the same noun a resolved root gets, by a different route:
+	// the app no longer holds this conversation, so the one thing still true of it
+	// is that it is a chat.
 	test.each([
 		['ensemblr_get_conversation_status', 'Checked a chat'],
 		['ensemblr_get_last_message', "Read a chat's report"],
@@ -747,14 +748,14 @@ describe('ensemblrToolLabel against the target role', () => {
 		},
 	);
 
-	test('reads a steered orchestrator in the present participle', () => {
+	test('reads a steered root in the present participle', () => {
 		expect(
 			titleFor(
 				'ensemblr_send_follow_up',
 				{ agentSessionId: 'session-peer' },
 				true,
 			),
-		).toBe('Steering an orchestrator');
+		).toBe('Steering a chat');
 	});
 
 	// A spawn carries the answer in its own arguments — `peer: true` is what made
@@ -762,7 +763,7 @@ describe('ensemblrToolLabel against the target role', () => {
 	test.each([
 		[{ prompt: 'go' }, 'Started a sub-agent'],
 		[{ peer: false, prompt: 'go' }, 'Started a sub-agent'],
-		[{ peer: true, prompt: 'go' }, 'Started an orchestrator'],
+		[{ peer: true, prompt: 'go' }, 'Started a chat'],
 	])('names what a spawn opened from its own arguments', (input, title) => {
 		expect(titleFor('ensemblr_start_conversation', input)).toBe(title);
 	});
@@ -782,10 +783,10 @@ describe('ensemblrToolLabel against the target role', () => {
 	test.each([
 		[['session-child'], 'Waited for sub-agents'],
 		[['session-child', 'session-child'], 'Waited for sub-agents'],
-		[['session-review'], 'Waited for orchestrators'],
-		[['session-peer', 'session-review'], 'Waited for orchestrators'],
-		[['session-child', 'session-review'], 'Waited for the chats'],
-		[['session-gone'], 'Waited for the chats'],
+		[['session-review'], 'Waited for chats'],
+		[['session-peer', 'session-review'], 'Waited for chats'],
+		[['session-child', 'session-review'], 'Waited for chats'],
+		[['session-gone'], 'Waited for chats'],
 	])('resolves every named target before naming the set', (targets, title) => {
 		expect(titleFor('ensemblr_wait_for_agents', { targets })).toBe(title);
 	});

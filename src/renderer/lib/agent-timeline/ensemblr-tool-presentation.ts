@@ -357,9 +357,10 @@ function targetRoles(
  * own arguments; everything else resolves session ids against the app's live
  * catalogue of chat tabs.
  *
- * The mixed case falls to the neutral wording deliberately: a wait naming one
- * child and one peer has no single noun that is true of the set, and picking
- * either would be a claim about the other.
+ * Only a call acting wholly on the caller's own children keeps the sub-agent
+ * noun. A peer, the Review conversation, a batch mixing the two roles and an id
+ * the catalogue no longer holds all read as a chat, because that is the word
+ * true of every one of them and the one the user sees in the tab strip.
  * @param label - The tool's registry entry
  * @param input - The tool call's input bag
  * @param resolveRole - The catalogue lookup, or null on a surface that has none
@@ -377,7 +378,7 @@ function targetTitles(
 	}
 	if ('peerFlagKey' in target) {
 		return valuesAtPath(input, target.peerFlagKey)[0] === true
-			? target.orchestrator
+			? target.chat
 			: null;
 	}
 	if (resolveRole === null) {
@@ -387,12 +388,7 @@ function targetTitles(
 	if (roles.length === 0) {
 		return null;
 	}
-	if (roles.every((role) => role === 'subagent')) {
-		return null;
-	}
-	return roles.every((role) => role === 'orchestrator')
-		? target.orchestrator
-		: target.unresolved;
+	return roles.every((role) => role === 'subagent') ? null : target.chat;
 }
 
 /**
