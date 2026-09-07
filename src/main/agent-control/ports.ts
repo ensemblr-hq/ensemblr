@@ -505,13 +505,13 @@ export interface ConciergePort {
 	 * than taking one: a clear replaces the conversation without warning, so any
 	 * id a caller could hold is stale by the time it sends.
 	 *
-	 * Never opens a conversation that is not already there. A message that started
-	 * a Concierge turn nobody was watching would spend tokens and act on the app
-	 * with no human in the loop, so an absent conversation is reported rather than
-	 * created — and that has to hold through a child that has died but whose
-	 * shutdown has not landed yet, which is why the adapter behind this reaches
-	 * for the session service's non-reviving path rather than guarding the
-	 * reviving one.
+	 * Never opens a conversation that is not already there: an absent one is
+	 * reported rather than created, because a message that invented a Concierge
+	 * would spend tokens on a conversation nobody asked for and nobody would think
+	 * to read. A conversation that exists but has no runtime child attached is a
+	 * different thing and is delivered to — the panel unopened this launch, a
+	 * child the user stopped, a clear mid-flight — since the message lands in the
+	 * transcript they already have either way.
 	 */
 	deliverMessage: (input: {
 		prompt: string;

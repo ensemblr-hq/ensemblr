@@ -2720,10 +2720,12 @@ export function createAgentControlService({
 	 *
 	 * Nothing here takes a session id, and that is the feature: the Concierge is
 	 * cleared and restarted routinely, so the only id that is ever right is the one
-	 * resolved at this moment. An absent conversation is refused rather than
-	 * opened — a message that booted the Concierge would start a turn nobody is
-	 * watching — and the refusal names what to do instead, because the failure this
-	 * op exists to prevent is a discovery that never reaches anybody.
+	 * resolved at this moment. A conversation that exists is delivered to whether
+	 * or not a runtime child happens to be attached to it, and only the absence of
+	 * one is refused — a message that booted a Concierge nobody had opened would
+	 * spend tokens on a conversation nobody would think to read. That refusal names
+	 * what to do instead, because the failure this op exists to prevent is a
+	 * discovery that never reaches anybody.
 	 * @param origin - Resolved caller identity.
 	 * @param args - The reason and the agent's own prose.
 	 * @returns Which conversation took the message, or why none did.
