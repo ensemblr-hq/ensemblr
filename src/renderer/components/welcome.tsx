@@ -53,7 +53,7 @@ export function Welcome() {
 	}, [navigate, router, setLastWorkspaceSelection, setLocalProjectImportOpen]);
 
 	return (
-		<ShellScreen className='min-h-0 items-center justify-center px-8 py-10'>
+		<ShellScreen className='min-h-0 items-center overflow-auto px-8 py-10'>
 			{/* Frameless welcome screen has no toolbar; this invisible top strip
 			    gives the window a draggable edge. Interactive children opt out of
 			    dragging via the global no-drag rule in styles/index.css. */}
@@ -62,21 +62,25 @@ export function Welcome() {
 				className='window-drag-region absolute inset-x-0 top-0 z-10 h-12'
 			/>
 			<SidebarTrigger className={SHELL_FLOATING_TRIGGER_CLASS} />
-			<section className='flex flex-col items-center gap-12'>
+			{/* One capped measure for both rows so neither outruns a narrowed pane, and
+			    `m-auto` rather than `justify-center` so a short window scrolls, not clips. */}
+			<section className='@container/welcome-actions m-auto flex w-full max-w-xl flex-col items-center gap-12'>
 				{/* fallow-ignore-next-line css-token-drift -- intentional sub-pixel blur softens the wordmark; no design token exists for it */}
 				<WelcomeWordmark className='blur-[0.046875rem]' />
-				<div className='flex flex-wrap items-center justify-center gap-3'>
+				<div className='grid w-full grid-cols-3 gap-3'>
 					<WelcomeActionCard
 						disabled={localProjectImportOpen}
 						icon={FolderIcon}
 						label={t('common:welcome.open-project', 'Open project')}
 						onClick={onOpenLocalProject}
 					/>
+					{/* English only: the NBSP forces the break to "Open" / "GitHub project".
+					    `ru` and `el` need none: every word in them fits the cell on its own. */}
 					<WelcomeActionCard
 						icon={GlobeIcon}
 						label={t(
 							'common:welcome.open-github-project',
-							'Open GitHub project',
+							'Open GitHub\u00A0project',
 						)}
 						onClick={() => setCloneOpen(true)}
 					/>

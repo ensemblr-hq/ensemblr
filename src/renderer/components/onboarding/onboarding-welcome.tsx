@@ -78,10 +78,11 @@ export function OnboardingWelcome({
 			<section className='m-auto flex w-full max-w-lg flex-col items-center gap-10 text-center'>
 				<motion.div
 					animate={{ opacity: 1, y: 0 }}
+					className='w-full max-w-md'
 					initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 12 }}
 					transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
 				>
-					<WelcomeWordmark className='h-12 blur-[0.046875rem] sm:h-16' />
+					<WelcomeWordmark className='blur-[0.046875rem]' />
 				</motion.div>
 
 				<motion.div

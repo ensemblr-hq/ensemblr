@@ -462,7 +462,7 @@ export default interface Resources {
 			'up-to-date': 'Ensemblr {{version}} is up to date.';
 		};
 		welcome: {
-			'open-github-project': 'Open GitHub project';
+			'open-github-project': 'Open GitHub project';
 			'open-project': 'Open project';
 			'quick-start': 'Quick start';
 		};
