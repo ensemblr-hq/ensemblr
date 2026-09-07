@@ -1,5 +1,13 @@
 // @vitest-environment happy-dom
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import {
+	DELETE_CHARACTER_COMMAND,
+	DELETE_LINE_COMMAND,
+	DELETE_WORD_COMMAND,
+	getNearestEditorFromDOMNode,
+	type LexicalCommand,
+	type LexicalEditor,
+} from 'lexical';
 import { createRef, useRef, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -77,6 +85,22 @@ function editorRoot(): HTMLElement {
 	}
 	return root;
 }
+
+/** The live editor behind the mounted composer, to dispatch commands straight at. */
+function mountedEditor(): LexicalEditor {
+	const editor = getNearestEditorFromDOMNode(editorRoot());
+	if (!editor) {
+		throw new Error('No editor on the editable root');
+	}
+	return editor;
+}
+
+/** Every command `TrayGuardPlugin` guards, as the test dispatches them. */
+const BACKWARD_DELETE_COMMANDS: readonly LexicalCommand<boolean>[] = [
+	DELETE_CHARACTER_COMMAND,
+	DELETE_LINE_COMMAND,
+	DELETE_WORD_COMMAND,
+];
 
 function mountEditor(
 	initial: {
@@ -455,9 +479,10 @@ describe('composer editor', () => {
 		expect(chipHost(0).parentElement).toBe(editorRoot());
 	});
 
-	// `addAttachments` inserts a batch one chip at a time, so a paste carrying a
+	// A batch is only ever this: `addAttachments` loops over the entry point below
+	// one chip at a time, and holds no ordering of its own. So a paste carrying a
 	// file and a stored-text block comes back in a different order than it went
-	// in: the tray stands above the sentence, so its chip reads — and sends —
+	// in — the tray stands above the sentence, so its chip reads, and sends,
 	// ahead of an inline chip attached before it.
 	it('carries a tray chip ahead of an inline chip attached first', async () => {
 		const { handleRef, latest } = mountEditor();
@@ -474,6 +499,32 @@ describe('composer editor', () => {
 			{ kind: 'text', text: '\ncompare' },
 			{ attachment: APP_FILE, kind: 'attachment' },
 		]);
+	});
+
+	// Every tray chip is a top-level block of its own, so a second one leaves a
+	// separator between two chips with nothing else beside it — a text run that
+	// is one newline the user never typed. This is the shape the prompt
+	// serializer is handed for a full draft: two tray chips, typed text ending in
+	// a newline of the user's own, an inline chip. `mention-payload.test.ts`
+	// asserts what it makes of it, so the two must stay pinned to one shape.
+	it('separates every tray chip from the block after it', async () => {
+		const { handleRef, latest } = mountEditor();
+
+		await write(() => handleRef.current?.insertAttachment(TERMINAL_OUTPUT));
+		await write(() => handleRef.current?.insertAttachment(PASTED_BLOCK));
+		await write(() => handleRef.current?.appendText('draft text\n'));
+		await write(() => handleRef.current?.insertAttachment(APP_FILE));
+
+		await waitFor(() => {
+			expect(latest()?.segments).toEqual([
+				{ attachment: TERMINAL_OUTPUT, kind: 'attachment' },
+				{ kind: 'text', text: '\n' },
+				{ attachment: PASTED_BLOCK, kind: 'attachment' },
+				{ kind: 'text', text: '\ndraft text\n' },
+				{ attachment: APP_FILE, kind: 'attachment' },
+			]);
+		});
+		expect(latest()?.text).toBe(' \n \ndraft text\n ');
 	});
 
 	// Lexical's own Backspace walks out of the paragraph and takes its previous
@@ -550,6 +601,34 @@ describe('composer editor', () => {
 		});
 		expect(latest()?.attachments).toEqual([TERMINAL_OUTPUT]);
 	});
+
+	// A chord only reaches the command the platform maps it to, and happy-dom
+	// builds `navigator.platform` out of its own user agent — `X11; Darwin arm64`
+	// on a Mac — so Lexical reads IS_APPLE as false on every runner and the
+	// Apple-only chords above are inert. ⌘⌫ has no other mapping, which leaves
+	// DELETE_LINE_COMMAND unreachable from a keystroke here. Dispatching each
+	// registration directly is what makes a guard dropped from one of the three
+	// fail wherever the suite runs; the chord test above still covers the
+	// bindings.
+	it.each(BACKWARD_DELETE_COMMANDS)(
+		'refuses $type at the start of the sentence',
+		async (command) => {
+			const { handleRef, latest } = mountEditor({
+				attachments: [TERMINAL_OUTPUT],
+				text: 'hi',
+			});
+
+			await write(() => handleRef.current?.replaceRangeWithText(2, 2, ''));
+			await write(() => {
+				mountedEditor().dispatchCommand(command, true);
+			});
+
+			await waitFor(() => {
+				expect(latest()?.text).toBe(' \nhi');
+			});
+			expect(latest()?.attachments).toEqual([TERMINAL_OUTPUT]);
+		},
+	);
 
 	it('removes a tray chip by attachment id', async () => {
 		const { handleRef, latest } = mountEditor({
