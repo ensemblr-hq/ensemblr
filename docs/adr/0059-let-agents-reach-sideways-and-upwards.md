@@ -6,7 +6,7 @@ Date: 2026-09-05
 
 Accepted
 
-Amended by [0065](./0065-reach-the-concierge-conversation-not-its-runtime-attachment.md)
+Amended by [0066](./0066-reach-the-concierge-conversation-not-its-runtime-attachment.md)
 (2026-09-07) on one point: "A missing conversation is a loud refusal" below gated
 on the live runtime attachment, and an attachment is not a conversation. A
 Concierge conversation that exists but has nothing attached to it is now
@@ -127,7 +127,7 @@ branch at the same fork: it reports `no-session` where `submitPrompt` would
 reopen, and it never holds the prompt for replay into a conversation that does
 not exist yet.
 
-> **Amended by [0065](./0065-reach-the-concierge-conversation-not-its-runtime-attachment.md).**
+> **Amended by [0066](./0066-reach-the-concierge-conversation-not-its-runtime-attachment.md).**
 > Asking "is one attached?" was the wrong question, not merely an insufficient
 > one: the attachment comes and goes for reasons unrelated to whether the user
 > has a Concierge — the panel unopened this launch, a child they stopped, a clear

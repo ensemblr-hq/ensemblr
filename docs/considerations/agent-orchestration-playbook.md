@@ -2,8 +2,8 @@
 
 > The canonical guidance that teaches an agent to use the `ensemblr_*` control tools. The
 > authoritative text lives in `src/shared/agent-control/awareness.ts` as a **2×2 of role by Plan
-> Mode**: `ORCHESTRATOR_AWARENESS` / `SUBAGENT_AWARENESS` for working agents, and
-> `PLAN_MODE_ORCHESTRATOR_AWARENESS` / `PLAN_MODE_SUBAGENT_AWARENESS` for planning ones. The role axis
+> Mode**: `orchestratorAwareness` / `subagentAwareness` for working agents, and
+> `planModeOrchestratorAwareness` / `planModeSubagentAwareness` for planning ones. The role axis
 > comes from `resolveAgentRole(marked, depth)`: the durable sub-agent marker on the chat tab decides
 > it, falling back to `roleForDepth` when there is none — a root (depth 0) is an orchestrator that may
 > delegate; a spawned child (depth ≥ 1) is a sub-agent that does its own work and never fans out. The
@@ -50,7 +50,7 @@ Plan Mode itself is narrower still: the two plan-mode playbooks are consumed onl
 extension, since a runtime whose only channel is MCP has its system prompt fixed at session open.
 
 A harness also gets no per-turn upkeep block — the app renders that into a Pi system prompt and a
-harness has no equivalent hook — so `HARNESS_AWARENESS` carries the branch-naming nudge itself.
+harness has no equivalent hook — so `harnessAwareness` carries the branch-naming nudge itself.
 `ensemblr_set_branch_name` still enforces `git.renameWorkspaceOnBranch` on its own; the playbook's
 job is to frame a refusal as settled rather than as a fault worth retrying.
 
@@ -459,7 +459,7 @@ the caller's runtime, so every id it returns is spawnable. The caller's runtime 
 control origin — `pi` and `claude` chats name theirs; a **terminal harness cannot**, because its
 origin is minted per workspace (`ws:<id>`) and shared by every terminal in it. Such a caller gets the
 unfiltered list and must pass `model` explicitly; omitting it is refused rather than defaulted onto
-Pi, and `HARNESS_AWARENESS` plus both tool descriptions say so up front so no harness has to learn
+Pi, and `harnessAwareness` plus both tool descriptions say so up front so no harness has to learn
 it from a failed call.
 
 A refusal is a modelled outcome, not a thrown error: the port returns
