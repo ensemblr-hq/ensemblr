@@ -9,28 +9,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-09-07
+
+**Update to this release.** It closes a privately reported bypass of the `bash` command gate that
+Pi Plan Mode and the Concierge both depend on: a command could be presented to the gate so that it
+was judged by a word that was not the thing actually being run, and reach execution while reading
+as read-only inspection. The Concierge is the surface that matters, because it reads across every
+open workspace, so a single hostile repository reached a context with access to all of them. The
+`read-only` workspace mode was never exposed — both runtimes withhold the shell there outright —
+and Claude Code's own plan mode is a separate native gate. Alongside the fix, the welcome screen
+now fits a narrowed pane instead of clipping, and pasted-text chips stand in a tray above the draft
+rather than breaking the sentence they were dropped into.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.7) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.7/Ensemblr-0.1.7-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.7/Ensemblr-0.1.7-x64.AppImage)
+
 ### Security
 
 - **Plan Mode and the Concierge could be talked past with a leading environment assignment.** The
   `bash` guard dropped `NAME=value` tokens to reach the head word without ever inspecting them, so it
-  judged a command by a word that was not the thing being run. `GIT_EXTERNAL_DIFF='sh -c …' git diff`
-  and `GIT_CONFIG_GLOBAL=… git status` both reached arbitrary execution while the gate read them as
-  read-only git inspection, and `PATH=` redirects the binary itself — which a hostile repository can
-  supply, because git preserves the exec bit. A leading assignment is now refused outright, with no
-  safe-list: the deny side is unbounded across every allowlisted binary, so there is no allowed subset
-  to enumerate, and the refusal names the variable and says to re-run without it. Three sibling holes
-  in the same classifier went with it — `uniq <in> <out>` truncates its second operand with no
-  redirection for the `>` scan to catch, and does so past a `--` as well; flag guards compared whole
-  tokens, so `sort -o/tmp/x`, `sort -no /tmp/x`, `fd -Hx` and `git grep -iO` walked through them; and
-  both git's parse-options and `getopt_long` accept any unambiguous truncation, so `sort --out=` wrote
-  a file and `git branch --unset-upst` cleared a branch's upstream. Matching every spelling costs
-  precision, so each guard's flags are scoped to the command that really has them — git's output guard
-  is long-only, since git has no short output flag anywhere — and a per-command table of value-taking
-  letters stops the scan where an attached value begins, which keeps `git status -uno`, `git log -S`
-  and `date -Iseconds` readable. Only Pi Plan Mode and the Concierge were exposed: the `read-only`
-  workspace mode withholds the shell outright on both runtimes, and Claude Code's plan mode is its own
-  native gate. ADR 0044 §3 records the decisions and the false-positive discipline they rest on.
-  Reported privately under `SECURITY.md`. (#491)
+  judged a command by a word that was not the thing being run. An assignment of one of git's own
+  environment hooks, or of `PATH`, turned a command the gate read as read-only inspection into
+  arbitrary execution — and a hostile repository can supply the binary, because git preserves the
+  exec bit. A leading assignment is now refused outright, with no safe-list: the deny side is
+  unbounded across every allowlisted binary, so there is no allowed subset to enumerate, and the
+  refusal names the variable and says to re-run without it. Three sibling holes in the same
+  classifier went with it — `uniq` truncates its second operand with no redirection for the `>` scan
+  to catch, and does so past a `--` as well; flag guards compared whole tokens, so a flag written
+  with its value attached or clustered walked through them; and both git's parse-options and
+  `getopt_long` accept any unambiguous truncation, so an abbreviated long flag reached the same
+  sinks. Matching every spelling costs precision, so each guard's flags are scoped to the command
+  that really has them — git's output guard is long-only, since git has no short output flag anywhere
+  — and a per-command table of value-taking letters stops the scan where an attached value begins,
+  which keeps `git status -uno`, `git log -S` and `date -Iseconds` readable. Only Pi Plan Mode and
+  the Concierge were exposed: the `read-only` workspace mode withholds the shell outright on both
+  runtimes, and Claude Code's plan mode is its own native gate. ADR 0044 §3 records the decisions and
+  the false-positive discipline they rest on. (#491)
+- **Acknowledgement pending.** This issue was reported privately under `SECURITY.md`. We have asked
+  the reporter whether they are willing to be publicly acknowledged and have not yet heard back;
+  these notes will be updated once we have their answer.
+
+### Fixed
+
+- **The welcome screen fits a narrowed pane.** Both elements on it carried a hard intrinsic width
+  with no relationship to the pane they sat in, and the shell's content column is `overflow-hidden`,
+  so the excess was clipped silently. The wordmark was sized by height against a 47:7 glyph grid,
+  fixing its width at 430px/537px, and `sm:` is a viewport breakpoint — the wrong axis when the pane
+  is the window less the sidebar; the three action tiles were non-shrinking inside `flex-wrap`, so
+  the row's intrinsic 552px wrapped to two tiles plus a centred orphan. Correctness now comes from
+  the box model: one capped measure the wordmark and the action grid both fill, the wordmark deriving
+  its height from the aspect ratio it already declared, and the tiles in a three-column grid carrying
+  no width of their own. Two follow-on constraints were measured in Chromium against the compiled
+  stylesheet rather than estimated — an English-only non-breaking space that moves the "Open GitHub
+  project" line break off a stranded word, and a `@container` tier that drops the label a size below
+  the width at which that unbreakable token stops fitting. (#490)
+- **Stored-text chips stand in a tray above the draft.** A pasted-text chip stacks a two-line preview
+  over its meta row, close to three lines tall; inline, that inflated the line box it sat in, so the
+  sentence wrapped around it and the runs either side landed on different lines with a wall of
+  monospace between them. Stored-text chips are now root-level blocks pinned to the top of the draft
+  and render as a wrapping row above the typed text; every other chip is one row of label and stays
+  in the sentence, where it reads as a word. The chip remains an `AttachmentNode` in the same Lexical
+  document, so ADR 0047's single ordered attachment list, the linearizer, the `segments` contract,
+  the snapshot round-trip, dedupe, remove-by-id, the send pipeline and the follow-up queue are all
+  untouched. Two deliberate consequences: a mixed batch no longer sends in attach order, because the
+  prompt carries what the composer shows; and a backward delete at the start of the sentence no
+  longer silently eats the last tray chip, since Lexical routes ⌥⌫, ⌃⌫, ⌘⌫, ⌃H and
+  `deleteContentBackward` past the plain backspace command. ADR 0067 records it, amending 0047.
+  (#492)
+
+### Changed
+
+- **`docs/` audited against the repository and pinned to the published 0.1.6 assets**, read off the
+  tag rather than string-replaced, with every rewritten URL checked against the release's asset list.
+  Renumbers the second ADR 0065 to 0066 — two shipped with that number — and corrects the ADR count,
+  the test-file counts, the bound-shortcut count and six stale symbol names. (#489)
+- **A CodeRabbit PR-reviews badge in the README header.**
 
 ## [0.1.6] - 2026-09-07
 
