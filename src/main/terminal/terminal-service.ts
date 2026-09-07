@@ -390,8 +390,6 @@ interface TrackedSession {
 	 */
 	ptyExited: boolean;
 	scrollback: ScrollbackBuffer;
-	/** Shell the PTY spawned, compared against the foreground process to tell idle from busy. */
-	shell: string;
 	/** Whether quit has already wound this session down, so it is not signalled twice. */
 	shutdownStarted: boolean;
 	snapshot: TerminalSessionSnapshot;
@@ -925,7 +923,7 @@ export function createTerminalService({
 			session.snapshot.status === 'running'
 				? resolveForegroundCommand(
 						session.pty?.foregroundProcess?.(),
-						session.shell,
+						session.snapshot.shell,
 					)
 				: null;
 
@@ -1293,7 +1291,6 @@ export function createTerminalService({
 			pty,
 			ptyExited: false,
 			scrollback: buildSessionScrollback(seedOutput),
-			shell,
 			shutdownStarted: false,
 			snapshot: {
 				agentBusy: false,
@@ -1312,6 +1309,7 @@ export function createTerminalService({
 				restored: Boolean(seedOutput),
 				rows,
 				scriptName: scriptName ?? null,
+				shell,
 				status: 'running',
 				title: title?.trim() || defaultTitle(kind),
 				titleIsDefault: !title?.trim(),
@@ -1365,13 +1363,11 @@ export function createTerminalService({
 	 * advisory: a write failure leaves the live session running.
 	 * @param session - The running session to persist
 	 * @param harnessId - Harness backing an agent session, when there is one
-	 * @param shell - Shell file the PTY spawned
 	 * @returns A warning diagnostic when the row could not be written, otherwise null
 	 */
 	function persistNewSession(
 		session: TrackedSession,
 		harnessId: string | undefined,
-		shell: string,
 	): TerminalDiagnostic | null {
 		const database = getDatabase();
 
@@ -1379,7 +1375,7 @@ export function createTerminalService({
 			return null;
 		}
 
-		const { createdAt, id, kind, title, workspaceId } = session.snapshot;
+		const { createdAt, id, kind, shell, title, workspaceId } = session.snapshot;
 
 		try {
 			insertTerminalSessionRow({
@@ -1498,7 +1494,7 @@ export function createTerminalService({
 		startConversationInfoPolling(session);
 		startForegroundCommandPolling(session);
 
-		const persistenceWarning = persistNewSession(session, harnessId, shell);
+		const persistenceWarning = persistNewSession(session, harnessId);
 
 		broadcastLifecycle(session);
 

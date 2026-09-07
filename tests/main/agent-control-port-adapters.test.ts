@@ -19,8 +19,12 @@ import {
 	listAllWorkspaceRows,
 	selectWorkspaceWithRepositoryById,
 } from '../../src/main/storage/repositories/workspace-repository.ts';
+import { TerminalServiceError } from '../../src/main/terminal/terminal-service.ts';
 import type { AgentPersistedEnvelope } from '../../src/shared/ipc/contracts/agent-session';
-import type { CreateTerminalSessionResult } from '../../src/shared/ipc/contracts/terminal.ts';
+import type {
+	CreateTerminalSessionResult,
+	TerminalSessionSnapshot,
+} from '../../src/shared/ipc/contracts/terminal.ts';
 import {
 	DEFAULT_RUN_SCRIPT_ICON,
 	type RunScriptDefinition,
@@ -1636,11 +1640,17 @@ describe('agent-control port adapters: run scripts', () => {
 		);
 	});
 
-	it('returns the session id when the run script starts', async () => {
+	// The shell travels with the id because a caller that then writes into the
+	// terminal has to compose its input in that shell's syntax, and an
+	// interactive one runs whatever login shell the user picked.
+	it('returns the session id and its shell when the run script starts', async () => {
 		const ports = withScripts({
 			runScript: {
 				diagnostics: [],
-				session: { id: 'term-1' } as CreateTerminalSessionResult['session'],
+				session: {
+					id: 'term-1',
+					shell: '/bin/zsh',
+				} as CreateTerminalSessionResult['session'],
 			},
 		});
 		expect(
@@ -1650,7 +1660,7 @@ describe('agent-control port adapters: run scripts', () => {
 				workspaceCwd: '/tmp/ws',
 				workspaceId: 'ws',
 			}),
-		).toEqual({ ok: true, terminalId: 'term-1' });
+		).toEqual({ ok: true, shell: '/bin/zsh', terminalId: 'term-1' });
 	});
 
 	// A launch that starts nothing used to answer with an empty terminal id,
@@ -1765,5 +1775,181 @@ describe('agent-control port adapters: terminal output', () => {
 		expect(
 			await ports.terminals.readOutput({ ansi: false, terminalId: 'term-1' }),
 		).toBeNull();
+	});
+});
+
+/**
+ * Builds ports over a terminal-service stub that records which lifecycle call
+ * each stop took, and can refuse a close the way the real service does.
+ */
+const withTerminals = (
+	overrides: Partial<{
+		sessions: readonly Partial<TerminalSessionSnapshot>[];
+		closeThrows: Error;
+		killThrows: Error;
+	}> = {},
+): {
+	ports: ReturnType<typeof createAgentControlPorts>;
+	calls: string[];
+} => {
+	const calls: string[] = [];
+	const { deps } = makeDeps();
+	const ports = createAgentControlPorts({
+		...deps,
+		terminalService: {
+			close: (terminalId: string) => {
+				calls.push(`close:${terminalId}`);
+				if (overrides.closeThrows) {
+					throw overrides.closeThrows;
+				}
+			},
+			kill: (terminalId: string) => {
+				calls.push(`kill:${terminalId}`);
+				if (overrides.killThrows) {
+					throw overrides.killThrows;
+				}
+				return null;
+			},
+			list: () => overrides.sessions ?? [],
+		},
+	} as unknown as PortAdapterDeps);
+	return { calls, ports };
+};
+
+describe('agent-control port adapters: terminal lifecycle', () => {
+	// Stopping leaves the tab so its output stays readable; taking the tab away
+	// is the separate act, which is what keeps a dock from filling with terminals
+	// nobody closed.
+	it('kills without closing unless the caller asks for the tab to go', async () => {
+		const { calls, ports } = withTerminals();
+		expect(
+			await ports.terminals.stopTerminal({
+				terminalId: 'term-1',
+				workspaceId: 'ws',
+			}),
+		).toEqual({ ok: true });
+		expect(calls).toEqual(['kill:term-1']);
+	});
+
+	it('closes the dock tab when the caller asks', async () => {
+		const { calls, ports } = withTerminals();
+		expect(
+			await ports.terminals.stopTerminal({
+				close: true,
+				terminalId: 'term-1',
+				workspaceId: 'ws',
+			}),
+		).toEqual({ ok: true });
+		expect(calls).toEqual(['close:term-1']);
+	});
+
+	// The service refuses to close anything but a dock terminal. Letting that
+	// throw would fail the whole op rather than telling the caller which of its
+	// two arguments was wrong.
+	it('reports a refused close rather than throwing across the port', async () => {
+		const { ports } = withTerminals({
+			closeThrows: new TerminalServiceError(
+				'not-a-dock-terminal',
+				'Only a dock terminal can be closed; term-run is a run-script session.',
+			),
+		});
+		expect(
+			await ports.terminals.stopTerminal({
+				close: true,
+				terminalId: 'term-run',
+				workspaceId: 'ws',
+			}),
+		).toEqual({
+			ok: false,
+			message:
+				'Only a dock terminal can be closed; term-run is a run-script session.',
+		});
+	});
+
+	// A kill refuses too — the terminal service looks the id up first — so both
+	// stops travel back as an outcome. Left to throw, a stale id would reach the
+	// service's outer catch and answer `internal`, telling the caller to retry an
+	// id no retry will fix.
+	it('reports a stale id on a kill rather than throwing across the port', async () => {
+		const { ports } = withTerminals({
+			killThrows: new TerminalServiceError(
+				'session-not-found',
+				'No terminal session is registered with id term-gone.',
+			),
+		});
+		expect(
+			await ports.terminals.stopTerminal({
+				terminalId: 'term-gone',
+				workspaceId: 'ws',
+			}),
+		).toEqual({
+			ok: false,
+			message: 'No terminal session is registered with id term-gone.',
+		});
+	});
+
+	// Anything the terminal service did not raise itself has no message worth
+	// forwarding, so the port names the terminal instead of leaking the throw.
+	it('names the terminal when the stop fails for an unrecognised reason', async () => {
+		const { ports } = withTerminals({
+			killThrows: new Error('boom'),
+		});
+		expect(
+			await ports.terminals.stopTerminal({
+				terminalId: 'term-1',
+				workspaceId: 'ws',
+			}),
+		).toEqual({
+			ok: false,
+			message: 'Terminal term-1 could not be stopped.',
+		});
+	});
+
+	// An agent picks a terminal to reuse from this listing, so the two fields
+	// that decide it — which shell to write in, and whether anything is running
+	// there — have to survive the mapping.
+	it('reports each terminal’s shell and what occupies it', async () => {
+		const { ports } = withTerminals({
+			sessions: [
+				{
+					foregroundCommand: null,
+					id: 'term-idle',
+					kind: 'terminal',
+					scriptName: null,
+					shell: '/opt/homebrew/bin/fish',
+					status: 'running',
+					workspaceId: 'ws',
+				},
+				{
+					foregroundCommand: 'npm',
+					id: 'term-busy',
+					kind: 'terminal',
+					scriptName: null,
+					shell: '/opt/homebrew/bin/fish',
+					status: 'running',
+					workspaceId: 'ws',
+				},
+			],
+		});
+		expect(await ports.terminals.listTerminals({ workspaceId: 'ws' })).toEqual([
+			{
+				foregroundCommand: null,
+				kind: 'terminal',
+				scriptName: null,
+				shell: '/opt/homebrew/bin/fish',
+				status: 'running',
+				terminalId: 'term-idle',
+				workspaceId: 'ws',
+			},
+			{
+				foregroundCommand: 'npm',
+				kind: 'terminal',
+				scriptName: null,
+				shell: '/opt/homebrew/bin/fish',
+				status: 'running',
+				terminalId: 'term-busy',
+				workspaceId: 'ws',
+			},
+		]);
 	});
 });

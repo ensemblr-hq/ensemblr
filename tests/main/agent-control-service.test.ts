@@ -91,8 +91,8 @@ const makePorts = (
 	terminals: {
 		startTerminal: vi
 			.fn()
-			.mockResolvedValue({ ok: true, terminalId: 'term-1' }),
-		stopTerminal: vi.fn().mockResolvedValue(undefined),
+			.mockResolvedValue({ ok: true, shell: '/bin/zsh', terminalId: 'term-1' }),
+		stopTerminal: vi.fn().mockResolvedValue({ ok: true }),
 		writeTerminal: vi.fn().mockResolvedValue(undefined),
 		readOutput: vi.fn().mockResolvedValue('output'),
 		listTerminals: vi.fn().mockResolvedValue([]),
@@ -286,6 +286,16 @@ const setup = (
 	});
 	return { service, ports, registry };
 };
+
+/**
+ * Starts a spawn terminal through the service so the session that owns the
+ * returned id is on record. Closing is refused for a terminal the caller did not
+ * start, so a stop-with-close test has to open one rather than name an id.
+ */
+const startTerminalAs = (
+	service: ReturnType<typeof setup>['service'],
+	token: string,
+) => service.invoke({ op: 'startTerminal', token, rawArgs: { kind: 'spawn' } });
 
 describe('agent-control service: gating', () => {
 	it('rejects an unknown token', async () => {
@@ -1371,6 +1381,182 @@ describe('agent-control service: delegation', () => {
 		);
 	});
 
+	// The shell is what tells a caller which syntax its next `writeTerminal` has
+	// to be in — an interactive terminal runs the user's login shell, which may
+	// be fish, where a POSIX line is a syntax error rather than a command.
+	it('answers a start with the shell that terminal runs', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.terminals.startTerminal).mockResolvedValue({
+			ok: true,
+			shell: '/opt/homebrew/bin/fish',
+			terminalId: 'term-1',
+		});
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'spawn' },
+		});
+		expect(result).toMatchObject({
+			ok: true,
+			data: { shell: '/opt/homebrew/bin/fish', terminalId: 'term-1' },
+		});
+	});
+
+	// Cleaning up is the point of `close`, so the flag has to reach the port
+	// rather than being dropped into an ordinary stop that leaves the tab.
+	it('forwards a close request to the terminal port', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		await startTerminalAs(service, 'tok-caller');
+		const result = await service.invoke({
+			op: 'stopTerminal',
+			token: 'tok-caller',
+			rawArgs: { terminalId: 'term-1', close: true },
+		});
+		expect(result.ok).toBe(true);
+		expect(ports.terminals.stopTerminal).toHaveBeenCalledWith(
+			expect.objectContaining({ close: true, terminalId: 'term-1' }),
+		);
+	});
+
+	// The service refuses to close anything but an interactive terminal. Reported
+	// as a correctable argument error, since the caller picked the wrong id.
+	it('reports a refused close as invalid args, not as a silent success', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.terminals.startTerminal).mockResolvedValue({
+			ok: true,
+			shell: '/bin/zsh',
+			terminalId: 'term-run',
+		});
+		vi.mocked(ports.terminals.stopTerminal).mockResolvedValue({
+			ok: false,
+			message:
+				'Only a dock terminal can be closed; term-run is a run-script session.',
+		});
+		const { service } = setup({ ports });
+		await startTerminalAs(service, 'tok-caller');
+		const result = await service.invoke({
+			op: 'stopTerminal',
+			token: 'tok-caller',
+			rawArgs: { terminalId: 'term-run', close: true },
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('invalid-args');
+			expect(result.error).toContain('run-script session');
+		}
+	});
+
+	// A stale id is a correctable argument error on both stop paths. Before the
+	// two shared one refusal handler, a bare kill let the terminal service's throw
+	// escape into the outer catch, which answers `internal` — a fault the caller
+	// is told to retry, for an id no retry will fix.
+	it('reports a stale id the same way whether or not close is set', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.terminals.stopTerminal).mockResolvedValue({
+			ok: false,
+			message: 'No terminal session is registered with id term-gone.',
+		});
+		const { service } = setup({ ports });
+		await startTerminalAs(service, 'tok-caller');
+		const result = await service.invoke({
+			op: 'stopTerminal',
+			token: 'tok-caller',
+			rawArgs: { terminalId: 'term-1' },
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('invalid-args');
+		}
+	});
+
+	// Closing discards the scrollback for good, and the workspace scope check
+	// cannot tell an agent's own spawn terminal from the one the user is working
+	// in — both sit in the same workspace. So ownership is enforced rather than
+	// asked for in the playbook.
+	it('refuses a close on a terminal this session did not start', async () => {
+		const ports = makePorts();
+		const { service, registry } = setup({ ports });
+		const other = registry.register({
+			sessionId: 'other',
+			workspaceId: 'ws',
+			workspaceCwd: '/ws',
+			species: 'pi',
+		});
+		await startTerminalAs(service, 'tok-caller');
+		const result = await service.invoke({
+			op: 'stopTerminal',
+			token: other.token,
+			rawArgs: { terminalId: 'term-1', close: true },
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-scope');
+			expect(result.error).toContain('yours to close');
+		}
+		expect(ports.terminals.stopTerminal).not.toHaveBeenCalled();
+	});
+
+	// Stopping is recoverable — the tab stays and its output stays readable — so
+	// it keeps the workspace-scope check it always had and gains no owner check.
+	it('leaves an ordinary stop open to any session in the workspace', async () => {
+		const ports = makePorts();
+		const { service, registry } = setup({ ports });
+		const other = registry.register({
+			sessionId: 'other',
+			workspaceId: 'ws',
+			workspaceCwd: '/ws',
+			species: 'pi',
+		});
+		await startTerminalAs(service, 'tok-caller');
+		const result = await service.invoke({
+			op: 'stopTerminal',
+			token: other.token,
+			rawArgs: { terminalId: 'term-1' },
+		});
+		expect(result.ok).toBe(true);
+		expect(ports.terminals.stopTerminal).toHaveBeenCalledWith(
+			expect.objectContaining({ terminalId: 'term-1' }),
+		);
+	});
+
+	// The record is dropped with the tab, so a later id that happens to repeat one
+	// an earlier session closed does not inherit that session's ownership.
+	it('forgets a terminal once its close succeeds', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		await startTerminalAs(service, 'tok-caller');
+		await service.invoke({
+			op: 'stopTerminal',
+			token: 'tok-caller',
+			rawArgs: { terminalId: 'term-1', close: true },
+		});
+		const again = await service.invoke({
+			op: 'stopTerminal',
+			token: 'tok-caller',
+			rawArgs: { terminalId: 'term-1', close: true },
+		});
+		expect(again.ok).toBe(false);
+		if (!again.ok) {
+			expect(again.code).toBe('denied-scope');
+		}
+	});
+
+	// Closing a script by kind would take away a tab the user is watching, and
+	// the kind selector cannot name which terminal that is.
+	it('refuses a close that names a kind rather than a terminal', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'stopTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run', close: true },
+		});
+		expect(result.ok).toBe(false);
+		expect(ports.terminals.stopTerminal).not.toHaveBeenCalled();
+	});
+
 	// A terminal an agent started behind whatever dock tab was already open is one
 	// the user never sees, so starting one focuses it.
 	it('brings a spawned terminal forward in the dock', async () => {
@@ -1521,6 +1707,8 @@ describe('agent-control service: delegation', () => {
 				terminalId: 'term-stale',
 				kind: 'run-script',
 				scriptName: 'dev',
+				shell: '/bin/zsh',
+				foregroundCommand: null,
 				status: 'exited',
 				workspaceId: 'ws',
 			},
@@ -1528,6 +1716,8 @@ describe('agent-control service: delegation', () => {
 				terminalId: 'term-run',
 				kind: 'run-script',
 				scriptName: 'playground',
+				shell: '/bin/zsh',
+				foregroundCommand: null,
 				status: 'running',
 				workspaceId: 'ws',
 			},
@@ -1589,6 +1779,8 @@ describe('agent-control service: delegation', () => {
 				terminalId: 'term-run',
 				kind: 'run-script',
 				scriptName: 'dev',
+				shell: '/bin/zsh',
+				foregroundCommand: null,
 				status: 'running',
 				workspaceId: 'ws',
 			},
@@ -2226,6 +2418,8 @@ describe('agent-control service: peer orchestrators', () => {
 			{
 				kind: 'agent',
 				scriptName: null,
+				shell: '/bin/zsh',
+				foregroundCommand: null,
 				status: 'running',
 				terminalId: 'term-claude',
 				workspaceId: 'ws',
@@ -2254,6 +2448,8 @@ describe('agent-control service: peer orchestrators', () => {
 			{
 				kind: 'agent',
 				scriptName: null,
+				shell: '/bin/zsh',
+				foregroundCommand: null,
 				status: 'exited',
 				terminalId: 'term-dead',
 				workspaceId: 'ws',
@@ -2261,6 +2457,8 @@ describe('agent-control service: peer orchestrators', () => {
 			{
 				kind: 'run-script',
 				scriptName: 'dev',
+				shell: '/bin/zsh',
+				foregroundCommand: null,
 				status: 'running',
 				terminalId: 'term-dev',
 				workspaceId: 'ws',

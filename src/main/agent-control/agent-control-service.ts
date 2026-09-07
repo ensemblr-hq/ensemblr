@@ -14,6 +14,7 @@ import type {
 	AgentControlOp,
 	AgentControlResult,
 	AgentControlRole,
+	AgentControlStartedTerminal,
 	ArchitectureFailureReason,
 	AskUserQuestionArgs,
 	CheckPlanModeToolArgs,
@@ -124,6 +125,10 @@ import {
 	type ReviewLaunchBrief,
 } from './ports.ts';
 import { createReviewFocus } from './review-focus.ts';
+import {
+	createStartedTerminalRegistry,
+	type StartedTerminalRegistry,
+} from './started-terminals.ts';
 
 /** A single inbound control command, as handed over by either bridge. */
 export interface AgentControlCommand {
@@ -239,6 +244,13 @@ interface AgentControlServiceOptions {
 	originRegistry: OriginRegistry;
 	guardrails: Guardrails;
 	/**
+	 * Records which session started which dock terminal, so a `close` on somebody
+	 * else's terminal is refused rather than asked against. Defaults to a fresh
+	 * registry: it is in-memory state with no collaborators, and one service owns
+	 * one of them.
+	 */
+	startedTerminals?: StartedTerminalRegistry;
+	/**
 	 * Whether the architecture diagram feature is on, read live rather than
 	 * captured: it is a user setting the app watches, and the answer gates both
 	 * the two diagram ops and the playbook that describes them. Defaults to off,
@@ -322,6 +334,10 @@ const HARNESS_TERMINAL_KIND = 'agent';
 
 /** Terminal status of a session whose process is still alive. */
 const RUNNING_TERMINAL_STATUS = 'running';
+
+/** Why a `close` on a terminal this session did not start is refused. */
+const CLOSE_NOT_YOURS =
+	'Only a terminal you started yourself is yours to close, and this session did not start this one. The user’s own terminals — and another agent’s — are not clutter for you to tidy: closing one discards its scrollback for good. Stop it without `close` if it genuinely has to stop, and say in your answer which tab you left behind and why.';
 
 /** Tab title an agent-opened review takes when the caller names none. */
 const DEFAULT_REVIEW_TAB_TITLE = 'Review';
@@ -704,6 +720,7 @@ export function createAgentControlService({
 	ports,
 	originRegistry,
 	guardrails,
+	startedTerminals = createStartedTerminalRegistry(),
 	readArchitectureDiagramEnabled = () => false,
 	readTuiHarnessesEnabled = () => false,
 	scheduler = REAL_SCHEDULER,
@@ -2222,6 +2239,7 @@ export function createAgentControlService({
 			);
 		}
 		guardrails.recordSpawn(origin.sessionId);
+		startedTerminals.record(origin.sessionId, started.terminalId);
 		// A terminal an agent started is one the user is meant to watch, so bring it
 		// forward rather than leaving it behind whichever dock tab was already open.
 		ports.focus.focusDockTab({
@@ -2229,7 +2247,10 @@ export function createAgentControlService({
 			dock:
 				args.kind === 'spawn' ? `terminal:${started.terminalId}` : args.kind,
 		});
-		return ok({ terminalId: started.terminalId });
+		return ok({
+			shell: started.shell,
+			terminalId: started.terminalId,
+		} satisfies AgentControlStartedTerminal);
 	};
 
 	/**
@@ -2313,12 +2334,25 @@ export function createAgentControlService({
 			if (scoped) {
 				return scoped;
 			}
+			if (
+				args.close &&
+				!startedTerminals.wasStartedBy(origin.sessionId, args.terminalId)
+			) {
+				return fail('denied-scope', CLOSE_NOT_YOURS);
+			}
 		}
-		await ports.terminals.stopTerminal({
+		const stopped = await ports.terminals.stopTerminal({
 			workspaceId: origin.workspaceId,
 			terminalId: args.terminalId,
 			kind: args.kind,
+			close: args.close,
 		});
+		if (!stopped.ok) {
+			return fail('invalid-args', stopped.message);
+		}
+		if (args.close && args.terminalId) {
+			startedTerminals.forget(args.terminalId);
+		}
 		return ok({ ok: true });
 	};
 

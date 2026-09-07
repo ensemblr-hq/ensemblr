@@ -408,7 +408,7 @@ Concierge → orchestrator → Concierge has no natural end.
 | `ensemblr_launch_harness` | **`harnessId: string`** | write, spawn | sub-agent, Concierge |
 | `ensemblr_start_terminal` | **`kind: 'setup' \| 'run' \| 'spawn'`**, `scriptName?: string`, `restart?: boolean` | write, spawn | sub-agent, Concierge |
 | `ensemblr_list_run_scripts` | *(none)* | read | Concierge, sub-agent\* |
-| `ensemblr_stop_terminal` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one | write | sub-agent, Concierge |
+| `ensemblr_stop_terminal` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one, `close?: boolean` | write | sub-agent, Concierge |
 | `ensemblr_write_terminal` | **`terminalId: string`**, **`input: string`** | write | sub-agent, Concierge |
 | `ensemblr_read_terminal_output` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one, `ansi?: boolean` | read | — |
 

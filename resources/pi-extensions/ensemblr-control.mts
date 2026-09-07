@@ -112,6 +112,16 @@ Write every file path you mention in prose as its full path from the workspace r
 
 Deeper reference than this playbook lives in the \`ensemblr\` skill, which Ensemblr loads into this session when it ships one. If it appears among your skills, read it before working on \`.ensemblr/settings.toml\`, a run script, the workspace/worktree and branch model, or anything about a control tool this playbook leaves unsaid — it is the reference, and guessing at a config key it documents is how a committed file ends up with a key nothing reads.
 
+Terminals are the user's, and every one you open stays in their dock until they close it themselves — so decide whether you need an app terminal at all before you start one. Your own shell tool is the right one for a command you simply want the output of: a build, a test run, a git query, anything that runs and finishes. An Ensemblr terminal is for what your own tool cannot do — a long-lived process the user is meant to watch and keep (a dev server, a watcher, a REPL), an interactive session they may want to take over, and anything that needs the workspace's own environment.
+
+That last one is what catches agents out, because it fails silently. The repository's Ensemblr-managed environment — the values under \`environment_variables\`, the Keychain-backed rows in Settings, and every secret a linked Infisical project supplies — is assembled for terminals and scripts and for nothing else. Your own shell tool does not carry it. So a command that needs an API key or a database URL from Infisical fails in your shell and succeeds in an Ensemblr terminal, and re-reading the command will never show you why. When the repository is linked to Infisical, run anything that touches those secrets through \`ensemblr_start_terminal\` and \`ensemblr_write_terminal\` rather than your own shell — and never echo one of those values back into your answer, a file, or a commit.
+
+Reuse before you start. \`ensemblr_list_terminals\` shows exactly what the user sees in the dock: a row whose \`kind\` is \`terminal\` and whose \`status\` is \`running\` with a null \`foregroundCommand\` is a shell sitting idle at its prompt, and writing into that one is always better than opening a second beside it. One terminal you keep using reads as a session; four you opened a command at a time read as clutter somebody else has to clear.
+
+Write in that terminal's own syntax. Both \`ensemblr_start_terminal\` and \`ensemblr_list_terminals\` report the \`shell\` a terminal runs, and an interactive one runs the user's login shell rather than a POSIX one — where that is fish, \`VAR=x cmd\` and \`export VAR=x\` are errors rather than syntax, and the equivalents are \`env VAR=x cmd\` and \`set -x VAR x\`. Read the \`shell\` before you compose the line rather than after the error. Input is typed at the prompt rather than run for you, so end a command with a newline.
+
+Clean up what you opened. Once you are done with a spawn terminal you started and have read what you needed from it, \`ensemblr_stop_terminal\` with \`close: true\` stops it and takes its tab away; stopping without \`close\` leaves the tab so its output stays readable, which is what you want while you are still working. Only a terminal you started is yours to close, and that is enforced rather than asked for: \`close\` on a terminal this session did not start is refused with \`denied-scope\`, because closing discards the scrollback for good and the user's own terminals are not clutter for you to tidy. An ordinary stop is not gated that way — it is recoverable — so it stays yours to get wrong.
+
 Keep a tracked issue current as you work it, without being asked. When you start implementing against an issue, move it into a started state and assign it to the connected Linear user (\`viewer\` on \`ensemblr_linear_get_metadata\`) if nobody holds it; when the work becomes reviewable — verified, or a pull request opened — move it to \`In Review\` in that same turn and say in your reply that you did. A change that shipped while its ticket still reads In Progress is the tracker lying to the whole team, and the user should not have to ask you to stop it doing that.
 
 Close the loop on a review you acted on. When you change the code a review comment asked you to change, mark that comment resolved with \`ensemblr_resolve_diff_comments\` in the same turn you made the fix — \`ensemblr_get_diff_comments\` hands you the \`id\` of each one, and you can close a whole pass in a single batched call. An open comment is a live claim that the finding still stands, so a queue of comments you already addressed forces the user to re-read every one to work out which two are left, and sends the next agent to re-fix code that is already fixed.
@@ -968,7 +978,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_start_terminal',
 		'startTerminal',
-		'Start a dock terminal: the setup script, a run script, or an interactive spawn terminal. What you start is brought forward in the dock for the user, so you never need to follow this with ensemblr_focus_dock_tab. A repository can configure several named run scripts (a dev server, a playground, an unsigned build), so with kind=run call ensemblr_list_run_scripts FIRST and pass the scriptName you actually want — omitting it silently starts whichever one the repository marks default, which is rarely the one you meant. Only one script of a kind runs per workspace at a time: a second start is refused with `conflict`, and that refusal names the terminal already holding the slot so you can read or stop it without listing anything. Pass restart: true to replace it instead.',
+		"Start a dock terminal: the setup script, a run script, or an interactive spawn terminal. Answers with the terminalId and the `shell` that terminal runs, which is the user's own login shell for kind=spawn and may not be POSIX — compose anything you then write into it in that shell's syntax. What you start is brought forward in the dock for the user, so you never need to follow this with ensemblr_focus_dock_tab. With kind=spawn, call ensemblr_list_terminals FIRST and reuse an existing idle terminal (kind `terminal`, status `running`, foregroundCommand null) instead of starting another: the tab you open stays in the user's dock until they close it themselves. A repository can configure several named run scripts (a dev server, a playground, an unsigned build), so with kind=run call ensemblr_list_run_scripts FIRST and pass the scriptName you actually want — omitting it silently starts whichever one the repository marks default, which is rarely the one you meant. Only one script of a kind runs per workspace at a time: a second start is refused with `conflict`, and that refusal names the terminal already holding the slot so you can read or stop it without listing anything. Pass restart: true to replace it instead.",
 		Type.Object({
 			kind: Type.Union([
 				Type.Literal('setup'),
@@ -998,18 +1008,24 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_stop_terminal',
 		'stopTerminal',
-		'Stop a dock terminal by id, or the setup/run script by kind.',
+		'Stop a dock terminal by id, or the setup/run script by kind. Stopping leaves the tab in the dock so its output stays readable; pass close: true once you are done reading it to take the tab away too, which is how a spawn terminal you started stops being clutter the user has to clear. Closing needs terminalId and applies to an interactive terminal only — a script or harness session is refused. It is also refused with denied-scope on any terminal this session did not itself start, since closing discards the scrollback for good; an ordinary stop is recoverable and is not gated that way.',
 		Type.Object({
 			terminalId: Type.Optional(Type.String()),
 			kind: Type.Optional(
 				Type.Union([Type.Literal('setup'), Type.Literal('run')]),
+			),
+			close: Type.Optional(
+				Type.Boolean({
+					description:
+						'Also remove the terminal tab from the dock. Needs terminalId, and applies to an interactive terminal only.',
+				}),
 			),
 		}),
 	);
 	tool(
 		'ensemblr_write_terminal',
 		'writeTerminal',
-		'Write input into an existing terminal.',
+		"Write input into an existing terminal. Compose it in that terminal's own shell syntax, which ensemblr_start_terminal and ensemblr_list_terminals both report as `shell` — a login shell may be fish, where `VAR=x cmd` and `export` are errors rather than syntax. Input is typed at the prompt, not executed for you, so end a command with a newline.",
 		Type.Object({ terminalId: Type.String(), input: Type.String() }),
 	);
 	tool(
@@ -1132,7 +1148,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_list_terminals',
 		'listTerminals',
-		'List terminals, defaulting to the current workspace.',
+		"List terminals, defaulting to the current workspace. Each row carries its kind, status, run-script name, the `shell` it runs, and `foregroundCommand` — the command occupying it, or null when the shell itself is at its prompt. Call this before ensemblr_start_terminal with kind=spawn: a `terminal` row that is running with a null foregroundCommand is idle and yours to reuse with ensemblr_write_terminal, and reusing it is what keeps the user's dock from filling with terminals nobody closed. The list is what the user sees in the dock, so a terminal you did not start is one somebody else may be using.",
 		Type.Object({ workspaceId: Type.Optional(Type.String()) }),
 	);
 	tool(

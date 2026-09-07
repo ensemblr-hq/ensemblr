@@ -158,16 +158,19 @@ const startTerminalSchema = z
 			'restart applies to the setup and run scripts only; a spawn terminal has nothing to replace.',
 	});
 
-const terminalIdOrKindSchema = z
+const stopTerminalSchema = z
 	.strictObject({
 		terminalId: nonEmpty.optional(),
 		kind: z.enum(['setup', 'run']).optional(),
+		close: z.boolean().optional(),
 	})
 	.refine((value) => Boolean(value.terminalId) !== Boolean(value.kind), {
 		message: 'Provide exactly one of terminalId or kind.',
+	})
+	.refine((value) => !value.close || Boolean(value.terminalId), {
+		message:
+			'close applies to an interactive terminal addressed by terminalId; a script keeps its tab.',
 	});
-
-const stopTerminalSchema = terminalIdOrKindSchema;
 
 const writeTerminalSchema = z.strictObject({
 	terminalId: nonEmpty,

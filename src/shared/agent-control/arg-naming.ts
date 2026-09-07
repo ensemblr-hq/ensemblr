@@ -28,6 +28,8 @@ export const CANONICAL_ARG_KEYS = {
 	ansi: 'Return raw terminal bytes with their escape sequences, not readable text.',
 	assigneeId: 'Identifier of the person an issue is assigned to.',
 	chatTabId: 'Identifier of a chat tab in the workspace.',
+	close:
+		'Take the tab away as well as stopping what it holds, rather than leaving it for its output to stay readable.',
 	command: 'Shell command a guarded tool call is about to run.',
 	commentBody: 'Markdown body of a comment an op writes or opens a tab on.',
 	commentIds: 'Ids of review comments an op acts on.',

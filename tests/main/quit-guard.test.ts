@@ -29,6 +29,7 @@ function terminal(
 		restored: false,
 		rows: 24,
 		scriptName: null,
+		shell: '/bin/zsh',
 		status: 'running',
 		title: `${SPINNER} Fix login bug`,
 		titleIsDefault: false,

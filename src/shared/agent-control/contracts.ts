@@ -550,6 +550,14 @@ export interface StartTerminalArgs {
 export interface StopTerminalArgs {
 	terminalId?: string;
 	kind?: 'setup' | 'run';
+	/**
+	 * Also remove the terminal's tab from the dock, discarding its output.
+	 * Stopping alone leaves the tab in place so its scrollback stays readable,
+	 * which is why tidying up is a separate opt-in rather than the default. Only
+	 * an interactive terminal has a tab an agent may close; a script or harness
+	 * session is refused.
+	 */
+	close?: boolean;
 }
 
 /** Args for `writeTerminal`: write input into an existing terminal or harness. */
@@ -1723,6 +1731,27 @@ export interface AgentControlTerminalInfo {
 	workspaceId: string;
 	/** Named run script this terminal is running, or null for every other kind. */
 	scriptName: string | null;
+	/** Absolute path of the shell this terminal runs, so input can be composed in its syntax. */
+	shell: string;
+	/**
+	 * Command running in this terminal's foreground, or null when the shell
+	 * itself is — which is what makes an idle terminal identifiable as one worth
+	 * reusing rather than starting another beside it. Only an interactive
+	 * terminal reports it; every script and harness session reads null.
+	 */
+	foregroundCommand: string | null;
+}
+
+/** What `startTerminal` answers with once a terminal is running. */
+export interface AgentControlStartedTerminal {
+	terminalId: string;
+	/**
+	 * Absolute path of the shell the terminal runs. An interactive terminal runs
+	 * the user's own login shell, which is not necessarily POSIX — fish rejects
+	 * `VAR=x cmd` and `export` — so input written into it has to be composed in
+	 * that shell's syntax rather than in the caller's.
+	 */
+	shell: string;
 }
 
 /** Lightweight workspace descriptor returned by `listWorkspaces`. */

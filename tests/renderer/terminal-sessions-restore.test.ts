@@ -30,6 +30,7 @@ function relaunchedSnapshot(
 		restored: Boolean(request.seedOutput),
 		rows: 24,
 		scriptName: null,
+		shell: '/bin/zsh',
 		status: 'running',
 		titleIsDefault: false,
 		title: request.title ?? 'Terminal',

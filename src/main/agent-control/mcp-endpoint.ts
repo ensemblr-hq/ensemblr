@@ -278,7 +278,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_start_terminal',
 		op: 'startTerminal',
 		description:
-			'Start a dock terminal: the setup script, a run script, or an interactive spawn terminal. What you start is brought forward in the dock for the user, so you never need to follow this with ensemblr_focus_dock_tab. A repository can configure several named run scripts (a dev server, a playground, an unsigned build), so with kind=run call ensemblr_list_run_scripts FIRST and pass the scriptName you actually want — omitting it silently starts whichever one the repository marks default, which is rarely the one you meant. Only one script of a kind runs per workspace at a time: a second start is refused with `conflict`, and that refusal names the terminal already holding the slot so you can read or stop it without listing anything. Pass restart: true to replace it instead.',
+			"Start a dock terminal: the setup script, a run script, or an interactive spawn terminal. Answers with the terminalId and the `shell` that terminal runs, which is the user's own login shell for kind=spawn and may not be POSIX — compose anything you then write into it in that shell's syntax. What you start is brought forward in the dock for the user, so you never need to follow this with ensemblr_focus_dock_tab. With kind=spawn, call ensemblr_list_terminals FIRST and reuse an existing idle terminal (kind `terminal`, status `running`, foregroundCommand null) instead of starting another: the tab you open stays in the user's dock until they close it themselves. A repository can configure several named run scripts (a dev server, a playground, an unsigned build), so with kind=run call ensemblr_list_run_scripts FIRST and pass the scriptName you actually want — omitting it silently starts whichever one the repository marks default, which is rarely the one you meant. Only one script of a kind runs per workspace at a time: a second start is refused with `conflict`, and that refusal names the terminal already holding the slot so you can read or stop it without listing anything. Pass restart: true to replace it instead.",
 		shape: {
 			kind: z.enum(['setup', 'run', 'spawn']),
 			scriptName: z.string().optional(),
@@ -295,8 +295,10 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 	{
 		name: 'ensemblr_stop_terminal',
 		op: 'stopTerminal',
-		description: 'Stop a dock terminal by id, or the setup/run script by kind.',
+		description:
+			'Stop a dock terminal by id, or the setup/run script by kind. Stopping leaves the tab in the dock so its output stays readable; pass close: true once you are done reading it to take the tab away too, which is how a spawn terminal you started stops being clutter the user has to clear. Closing needs terminalId and applies to an interactive terminal only — a script or harness session is refused. It is also refused with denied-scope on any terminal this session did not itself start, since closing discards the scrollback for good; an ordinary stop is recoverable and is not gated that way.',
 		shape: {
+			close: z.boolean().optional(),
 			terminalId: z.string().optional(),
 			kind: startStop.optional(),
 		},
@@ -304,7 +306,8 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 	{
 		name: 'ensemblr_write_terminal',
 		op: 'writeTerminal',
-		description: 'Write input into an existing terminal.',
+		description:
+			"Write input into an existing terminal. Compose it in that terminal's own shell syntax, which ensemblr_start_terminal and ensemblr_list_terminals both report as `shell` — a login shell may be fish, where `VAR=x cmd` and `export` are errors rather than syntax. Input is typed at the prompt, not executed for you, so end a command with a newline.",
 		shape: { terminalId: z.string(), input: z.string() },
 	},
 	{
@@ -549,7 +552,8 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 	{
 		name: 'ensemblr_list_terminals',
 		op: 'listTerminals',
-		description: 'List terminals, defaulting to the current workspace.',
+		description:
+			"List terminals, defaulting to the current workspace. Each row carries its kind, status, run-script name, the `shell` it runs, and `foregroundCommand` — the command occupying it, or null when the shell itself is at its prompt. Call this before ensemblr_start_terminal with kind=spawn: a `terminal` row that is running with a null foregroundCommand is idle and yours to reuse with ensemblr_write_terminal, and reusing it is what keeps the user's dock from filling with terminals nobody closed. The list is what the user sees in the dock, so a terminal you did not start is one somebody else may be using.",
 		shape: { workspaceId: z.string().optional() },
 	},
 	{

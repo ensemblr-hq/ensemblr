@@ -266,6 +266,49 @@ Resolve only what you actually fixed. A comment you deferred, could not reproduc
 const joinBullets = (...bullets: readonly string[]): string =>
 	bullets.filter((bullet) => bullet !== '').join('\n');
 
+/**
+ * How the harness playbook's terminal bullet opens while harnesses are on: the
+ * launch op shares the bullet rather than taking one of its own, because that
+ * playbook writes its bullets inline instead of composing them through
+ * {@link joinBullets}. A separate harness bullet there would be a ternary
+ * spanning a whole line, which leaves a blank one behind with the feature off —
+ * exactly what `joinBullets` exists to drop everywhere else.
+ */
+const HARNESS_TERMINAL_BULLET_OPENING = `Harnesses & terminals: launch another CLI harness (\`ensemblr_launch_harness\`); start`;
+
+/** The same opening with nothing to launch, so the bullet is terminals alone. */
+const TERMINAL_BULLET_OPENING = `Terminals: start`;
+
+/**
+ * Everything the terminal bullet says after the word each variant opens it with.
+ * Held apart because the two openings differ — a harness folds its launch op into
+ * the same bullet — while the surface being described is identical, and a rule
+ * that landed in one copy and not the other would leave one role reading a
+ * terminal contract the app does not honour.
+ */
+const TERMINAL_BULLET_TAIL = `/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant. Only one script of a kind runs at a time: starting a second is refused with \`conflict\`, and that refusal names the terminal already holding the slot, which \`restart: true\` replaces.`;
+
+/**
+ * How to use a terminal, for the roles that hold the ops to open one. Written as
+ * its own block rather than folded into the inventory bullet because none of it
+ * is about which tool exists: it is when to reach for one at all, why the
+ * workspace environment lives there and nowhere else, which shell syntax the
+ * input has to be in, and the two habits — reuse and cleanup — that decide
+ * whether the user's dock stays legible.
+ *
+ * Withheld from a sub-agent, which holds no terminal op but `readTerminalOutput`
+ * and would only be taught to reach for tools the app refuses it.
+ */
+const TERMINAL_DISCIPLINE = `Terminals are the user's, and every one you open stays in their dock until they close it themselves — so decide whether you need an app terminal at all before you start one. Your own shell tool is the right one for a command you simply want the output of: a build, a test run, a git query, anything that runs and finishes. An Ensemblr terminal is for what your own tool cannot do — a long-lived process the user is meant to watch and keep (a dev server, a watcher, a REPL), an interactive session they may want to take over, and anything that needs the workspace's own environment.
+
+That last one is what catches agents out, because it fails silently. The repository's Ensemblr-managed environment — the values under \`environment_variables\`, the Keychain-backed rows in Settings, and every secret a linked Infisical project supplies — is assembled for terminals and scripts and for nothing else. Your own shell tool does not carry it. So a command that needs an API key or a database URL from Infisical fails in your shell and succeeds in an Ensemblr terminal, and re-reading the command will never show you why. When the repository is linked to Infisical, run anything that touches those secrets through \`ensemblr_start_terminal\` and \`ensemblr_write_terminal\` rather than your own shell — and never echo one of those values back into your answer, a file, or a commit.
+
+Reuse before you start. \`ensemblr_list_terminals\` shows exactly what the user sees in the dock: a row whose \`kind\` is \`terminal\` and whose \`status\` is \`running\` with a null \`foregroundCommand\` is a shell sitting idle at its prompt, and writing into that one is always better than opening a second beside it. One terminal you keep using reads as a session; four you opened a command at a time read as clutter somebody else has to clear.
+
+Write in that terminal's own syntax. Both \`ensemblr_start_terminal\` and \`ensemblr_list_terminals\` report the \`shell\` a terminal runs, and an interactive one runs the user's login shell rather than a POSIX one — where that is fish, \`VAR=x cmd\` and \`export VAR=x\` are errors rather than syntax, and the equivalents are \`env VAR=x cmd\` and \`set -x VAR x\`. Read the \`shell\` before you compose the line rather than after the error. Input is typed at the prompt rather than run for you, so end a command with a newline.
+
+Clean up what you opened. Once you are done with a spawn terminal you started and have read what you needed from it, \`ensemblr_stop_terminal\` with \`close: true\` stops it and takes its tab away; stopping without \`close\` leaves the tab so its output stays readable, which is what you want while you are still working. Only a terminal you started is yours to close, and that is enforced rather than asked for: \`close\` on a terminal this session did not start is refused with \`denied-scope\`, because closing discards the scrollback for good and the user's own terminals are not clutter for you to tidy. An ordinary stop is not gated that way — it is recoverable — so it stays yours to get wrong.`;
+
 /** The conversations bullet a root holds when it delegates through chat tabs. */
 const ORCHESTRATOR_CONVERSATIONS = `- Conversations: open a chat tab and start a sub-agent on your own runtime (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`, which also reaches a peer and the Review conversation), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).`;
 
@@ -307,7 +350,7 @@ const orchestratorInventory = (
 	joinBullets(
 		conversations,
 		harnesses,
-		`- Terminals: start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant. Only one script of a kind runs at a time: starting a second is refused with \`conflict\`, and that refusal names the terminal already holding the slot, which \`restart: true\` replaces.`,
+		`- ${TERMINAL_BULLET_OPENING}${TERMINAL_BULLET_TAIL}`,
 		`- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).`,
 		REVIEW_INVENTORY,
 		architecture,
@@ -415,12 +458,15 @@ const HARNESS_SKILL_POINTER = `If an \`ensemblr\` skill appears among your skill
  * @param legibility - The bookkeeping bullet and paragraph for this role.
  * @param trackerObligation - The Linear follow-through, for a role that may write
  * to a tracker; omitted for one whose Linear writes are refused.
+ * @param terminalDiscipline - The terminal block, for a role that may open one;
+ * omitted for one whose terminal ops are refused.
  * @returns The preamble every playbook of that role opens with.
  */
 const preambleFor = (
 	inventory: string,
 	legibility: string,
 	trackerObligation = '',
+	terminalDiscipline = '',
 ): string =>
 	`You are running inside Ensemblr, a desktop coding-workspace app, and you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`).
 
@@ -431,7 +477,7 @@ ${legibility}
 Write every file path you mention in prose as its full path from the workspace root, in backticks — \`src/renderer/components/message.tsx\`, never a bare \`message.tsx\` or a trailing fragment like \`components/message.tsx\`. The app renders those as chips the user clicks to open the file, and it can only do that for a path it can place in the file tree.
 
 ${SKILL_POINTER}
-${trackerObligation ? `\n${trackerObligation}\n` : ''}
+${terminalDiscipline ? `\n${terminalDiscipline}\n` : ''}${trackerObligation ? `\n${trackerObligation}\n` : ''}
 ${REVIEW_FOLLOW_THROUGH}`;
 
 /**
@@ -486,7 +532,7 @@ const ORCHESTRATOR_ANSWER_LAST = `Your last message is your answer to the user, 
  * @returns The root orchestrator's playbook.
  */
 export const orchestratorAwareness = (features: AwarenessFeatures): string =>
-	`${preambleFor(orchestratorInventory(ORCHESTRATOR_CONVERSATIONS, harnessInventory(features.tuiHarnesses), architectureInventory(features.architectureDiagram), orchestratorStartReview(features.tuiHarnesses)), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
+	`${preambleFor(orchestratorInventory(ORCHESTRATOR_CONVERSATIONS, harnessInventory(features.tuiHarnesses), architectureInventory(features.architectureDiagram), orchestratorStartReview(features.tuiHarnesses)), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH, TERMINAL_DISCIPLINE)}
 
 ${peerOrchestratorGuidance(features.tuiHarnesses)}
 
@@ -537,7 +583,7 @@ ${SHARED_ETIQUETTE}`;
 export const nativeOrchestratorAwareness = (
 	features: AwarenessFeatures,
 ): string =>
-	`${preambleFor(orchestratorInventory(NATIVE_ORCHESTRATOR_CONVERSATIONS, harnessInventory(features.tuiHarnesses), architectureInventory(features.architectureDiagram), ''), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH)}
+	`${preambleFor(orchestratorInventory(NATIVE_ORCHESTRATOR_CONVERSATIONS, harnessInventory(features.tuiHarnesses), architectureInventory(features.architectureDiagram), ''), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH, TERMINAL_DISCIPLINE)}
 
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper to do a single unit of work you could do in one pass, and never delegate a task just because you can. Do not tell the user to click; drive the app yourself.
 
@@ -590,16 +636,6 @@ Etiquette & limits:
 ${SUBAGENT_ETIQUETTE}`;
 
 /**
- * How the harness playbook's terminal bullet opens while harnesses are on: the
- * launch op shares the bullet rather than taking one of its own, because this
- * variant is appended to a command line and pays for every line it spends.
- */
-const HARNESS_TERMINAL_BULLET_OPENING = `Harnesses & terminals: launch another CLI harness (\`ensemblr_launch_harness\`); start`;
-
-/** The same opening with nothing to launch, so the bullet is terminals alone. */
-const TERMINAL_BULLET_OPENING = `Terminals: start`;
-
-/**
  * Self-contained playbook for a third-party CLI harness. Harnesses launch as
  * root sessions and orchestrate like one, but they own a terminal tab rather
  * than a chat tab: the tab titles itself from the harness's own session log, and
@@ -621,7 +657,7 @@ export const harnessAwareness = (features: AwarenessFeatures): string =>
 
 What you can drive:
 - Sub-agents: start one in a fresh chat tab (\`ensemblr_start_conversation\`), steer it (\`ensemblr_send_follow_up\`), block until children settle (\`ensemblr_wait_for_agents\`), read a child's status or last message, audit what it actually did (\`ensemblr_read_conversation\`), close its tab (\`ensemblr_close_tab\`). Your terminal is not one of Ensemblr's own agent runtimes, so a child cannot inherit your model — pass a \`model\` from \`ensemblr_list_models\`, and it opens on whichever runtime that model belongs to.
-- ${features.tuiHarnesses ? HARNESS_TERMINAL_BULLET_OPENING : TERMINAL_BULLET_OPENING}/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant. Only one script of a kind runs at a time: starting a second is refused with \`conflict\`, and that refusal names the terminal already holding the slot, which \`restart: true\` replaces.
+- ${features.tuiHarnesses ? HARNESS_TERMINAL_BULLET_OPENING : TERMINAL_BULLET_OPENING}${TERMINAL_BULLET_TAIL}
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces, tabs, and terminals. Reads may span every open workspace.
 ${joinBullets(REVIEW_INVENTORY, architectureInventory(features.architectureDiagram), LINEAR_INVENTORY, `- Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).`)}
 - Name the work: \`ensemblr_set_branch_name\` renames this workspace AND its git branch together from one short readable name (2-5 words, e.g. \`Add dark mode\`), keeping any \`prefix/\` segment. Write it the way you would write it to a person — the workspace carries it as you spell it, and the branch carries it slugged, so \`Fix the IPC handler\` gives a workspace named that and a branch \`fix-ipc-handler\`. Call it once, early, as soon as you know what the work is called. It applies while the git branch still carries the name it was cut with, a workspace the user has already titled keeps that title while its branch moves, and the user can switch the whole thing off — so a reply saying nothing changed is a settled outcome, not a fault to retry. When the USER asks for a different branch name in so many words, pass \`userRequested: true\` and it applies anyway. Never reach for \`git branch -m\`: it moves the branch behind the app and leaves the workspace pointing at one that no longer exists.
@@ -629,6 +665,8 @@ ${joinBullets(REVIEW_INVENTORY, architectureInventory(features.architectureDiagr
 Your tab names itself from your own session log, so you have no tab-naming tool and nothing to do about the title. Naming a tab, recording a session summary, putting a structured question to the user, and Plan Mode are native Pi-chat features — they are absent from your tool list by design, so do not go hunting for them.
 
 ${HARNESS_SKILL_POINTER}
+
+${TERMINAL_DISCIPLINE}
 
 ${LINEAR_FOLLOW_THROUGH}
 

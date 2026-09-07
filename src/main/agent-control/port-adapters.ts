@@ -76,7 +76,11 @@ import {
 	listAllWorkspaceRows,
 	selectWorkspaceWithRepositoryById,
 } from '../storage/repositories/workspace-repository.ts';
-import { type TerminalService, toReadableScrollback } from '../terminal';
+import {
+	type TerminalService,
+	TerminalServiceError,
+	toReadableScrollback,
+} from '../terminal';
 import type { WorkspaceGitService } from '../workspace-git';
 import { makeArchitecturePort } from './architecture-ports.ts';
 import type { BoardStatusStore } from './board-status-store.ts';
@@ -98,6 +102,7 @@ import {
 	type ReviewLaunchPort,
 	type SessionNamingPort,
 	type StartTerminalOutcome,
+	type StopTerminalOutcome,
 	type TabPort,
 	type TerminalPort,
 	type WorkspaceCreationPort,
@@ -1150,7 +1155,11 @@ function toStartTerminalOutcome(
 	fallbackMessage: string,
 ): StartTerminalOutcome {
 	if (result.session) {
-		return { ok: true, terminalId: result.session.id };
+		return {
+			ok: true,
+			shell: result.session.shell,
+			terminalId: result.session.id,
+		};
 	}
 
 	const diagnostic = result.diagnostics.at(0);
@@ -1161,6 +1170,34 @@ function toStartTerminalOutcome(
 		message: diagnostic?.message ?? fallbackMessage,
 		...(diagnostic?.terminalId && { terminalId: diagnostic.terminalId }),
 	};
+}
+
+/**
+ * Runs one terminal-lifecycle call and reports a refusal instead of throwing
+ * across the port. Both stops refuse the same way on an id whose session is
+ * gone, and a close refuses again for anything but an interactive terminal;
+ * either is a correctable caller mistake, so reporting it keeps the caller from
+ * reading a stale id as a fault worth retrying.
+ * @param terminalId - The session the call addresses, named in the fallback message.
+ * @param stop - The terminal-service call to run.
+ * @returns The stop outcome, carrying the service's reason on a refusal.
+ */
+function toStopTerminalOutcome(
+	terminalId: string,
+	stop: () => void,
+): StopTerminalOutcome {
+	try {
+		stop();
+		return { ok: true };
+	} catch (error) {
+		return {
+			ok: false,
+			message:
+				error instanceof TerminalServiceError
+					? error.message
+					: `Terminal ${terminalId} could not be stopped.`,
+		};
+	}
 }
 
 /**
@@ -1205,14 +1242,18 @@ function makeTerminalPort(deps: PortAdapterDeps): TerminalPort {
 				})),
 			};
 		},
-		stopTerminal: async ({ workspaceId, terminalId, kind }) => {
+		stopTerminal: async ({ workspaceId, terminalId, kind, close }) => {
 			if (terminalId) {
-				deps.terminalService.kill(terminalId);
-				return;
+				return toStopTerminalOutcome(terminalId, () =>
+					close
+						? deps.terminalService.close(terminalId)
+						: deps.terminalService.kill(terminalId),
+				);
 			}
 			if (kind) {
 				await deps.scriptLifecycleService.stopScript({ kind, workspaceId });
 			}
+			return { ok: true };
 		},
 		writeTerminal: async ({ terminalId, input }) => {
 			deps.terminalService.write(terminalId, input);
@@ -1231,7 +1272,9 @@ function makeTerminalPort(deps: PortAdapterDeps): TerminalPort {
 			deps.terminalService.list(workspaceId).map((session) => ({
 				terminalId: session.id,
 				kind: session.kind,
+				foregroundCommand: session.foregroundCommand,
 				scriptName: session.scriptName ?? null,
+				shell: session.shell,
 				status: session.status,
 				workspaceId: session.workspaceId,
 			})),

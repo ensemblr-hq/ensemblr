@@ -358,7 +358,12 @@ export interface ConversationPort {
  * empty terminal id that reads as success.
  */
 export type StartTerminalOutcome =
-	| { ok: true; terminalId: string }
+	| {
+			ok: true;
+			terminalId: string;
+			/** Absolute path of the shell the started terminal runs. */
+			shell: string;
+	  }
 	| {
 			ok: false;
 			code: string;
@@ -366,6 +371,14 @@ export type StartTerminalOutcome =
 			/** The session the refusal is about, when one already holds the slot. */
 			terminalId?: string;
 	  };
+
+/**
+ * A dock terminal that stopped, or the reason it could not also be closed.
+ * Closing is refused for anything but an interactive terminal, and that refusal
+ * is a correctable caller mistake rather than a crash, so it travels as an
+ * outcome instead of throwing across the port boundary.
+ */
+export type StopTerminalOutcome = { ok: true } | { ok: false; message: string };
 
 /** Dock terminal operations plus their scope-check and read helpers. */
 export interface TerminalPort {
@@ -386,7 +399,9 @@ export interface TerminalPort {
 		workspaceId: string;
 		terminalId?: string;
 		kind?: 'setup' | 'run';
-	}) => Promise<void>;
+		/** Also drop the terminal's dock tab, discarding its output. */
+		close?: boolean;
+	}) => Promise<StopTerminalOutcome>;
 	writeTerminal: (input: {
 		terminalId: string;
 		input: string;
