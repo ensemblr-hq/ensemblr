@@ -57,6 +57,16 @@ export interface DemoTerminal {
  */
 export interface DemoChat {
 	agentSessionId: string;
+	/**
+	 * Turns this chat's AFK chip on, which also tints its tab in the strip.
+	 *
+	 * Declared per chat rather than per scenario because that is how the app
+	 * models it — one `localStorage`-backed atom per chat tab — and because a
+	 * spawned delegate inherits AFK from its parent. A scenario that set it once
+	 * for the whole window could not put the glyph on a delegate's tab, which is
+	 * the detail that says an unattended run is what fanned it out.
+	 */
+	afkMode?: boolean;
 	branchId: string;
 	/** Marks the session `streaming`, which is what raises the working indicator. */
 	isStreaming: boolean;

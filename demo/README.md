@@ -23,6 +23,8 @@ enforces it in both directions.
 | `workspace-mid-turn` | An agent mid-turn: reasoning, tool cards, streaming answer |
 | `workspace-mid-turn-light` | The same turn in the light theme, and nothing else |
 | `plan-mode` | Plan Mode on, with a finished plan waiting on the user |
+| `afk-mode` | AFK mode on, mid-run through the delivery loop, delegates in the strip |
+| `afk-mode-report` | What an unattended run leaves behind: its report, its review, its PR |
 | `subagent-fanout` | Four delegates, each in its own tab with its own transcript |
 | `review-changes` | The diff viewer with an inline review comment thread |
 | `checks-pull-request` | The Checks tab over an open PR with its check runs |
@@ -126,10 +128,14 @@ field for each:
   read the one snapshot — `handlers.ts` derives the counts and the overall status
   the way the main process does, so the summary strip cannot disagree with the
   rows under it.
-- `boardStatusByWorkspaceId` and the Plan Mode chip are seeded into
-  `localStorage`, because both are persisted atoms rather than IPC calls. Every
-  scenario clears the Plan Mode keys, so one plan shot cannot leave the chip on
-  in the next.
+- `boardStatusByWorkspaceId` and the two turn-mode chips are seeded into
+  `localStorage`, because all three are persisted atoms rather than IPC calls.
+  Plan Mode follows from `planReview`; AFK is `afkMode` on a `chat`, declared per
+  chat rather than per scenario because that is how the app keys it and because a
+  delegate inherits it — so a `subAgents` entry carries its own. Every scenario
+  clears both prefixes, so one plan or AFK shot cannot leave a chip on in the
+  next, and a chat that asks for both gets Plan Mode, matching the composer
+  controller that switches one off when the other goes on.
 - `interactions` covers everything else: state a component owns in a `useState`
   that no route reaches. A gesture is `click`, `context-menu`, `press-key`, or
   `scroll-into-view`, addressed by CSS selector and optionally narrowed by

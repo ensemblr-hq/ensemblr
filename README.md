@@ -247,6 +247,45 @@ configuration is committed, legible, and ours.
 
 ---
 
+## AFK mode — hand over the machine, not the judgement
+
+Toggle **AFK** (⌥⇧A) and the agent is told you are away: finish the task, or take it as far as it honestly
+goes, without stopping to ask. It is plan mode's opposite number — planning exists to stop and ask, so
+switching one on switches the other off — and every conversation it spawns inherits it.
+
+![An unattended run part-way through the delivery loop: the AFK chip lit under a dashed composer border, the approach and the rejected alternative written into the timeline, and two delegates in the tab strip carrying the same away tint.](./docs/guide/images/06-afk-mode.png)
+
+Three things change while the chip is on. **The question tool is refused** — `ensemblr_ask_user_question`
+has no time limit by design, which is right while you are watching and is exactly what strands an overnight
+run when you are not; instead the agent takes the most defensible reading and records what it assumed.
+**Approval prompts are answered for you**, without widening the workspace's permission mode: a `read-only`
+workspace still blocks every write, because AFK answers a question the mode already permits rather than
+granting a new one. **A second orchestrator is refused rather than approved**, since a peer writer on the
+worktree only ever happens because you asked for one (the Review chat below is the deliberate exception —
+an unattended run is the one that most needs a second reader).
+
+**A change gets a delivery loop, not just a longer leash.** Nobody is there to correct the approach at
+message three or read the diff before it lands, so the agent plans in writing before its first edit, builds
+it, opens the **Review chat** — your review skill, your review model, over its own change — sends the
+findings back and has them fixed there, then opens a pull request. It never merges, never force-pushes over
+work that is not its own, and updates an existing PR rather than opening a second. It judges each finding
+rather than accepting the list, and it decides how many rounds the loop runs.
+
+Not every change earns all five steps. A documentation edit, a version bump, or a rename the compiler
+follows end to end takes a **short path** — make it, run your checks, read the diff back adversarially, open
+the PR. The agent sizes the change first, breaks towards the full loop when it cannot tell, and never drops
+out of the full loop to save time.
+
+![A finished unattended run: the report naming the path it took, the calls it made on the user's behalf, the review finding it argued with, and what it is least sure of — with the Review chat beside it in the tab strip and the pull request it opened in the header.](./docs/guide/images/06-afk-report.png)
+
+**The report is the point.** You come back to one account of the run: which path it took, what each review
+round moved, every decision it made on your behalf, every finding it disagreed with and why, what it could
+not finish, and the pull request. The same account lands in the session summary, so the tab still tells you
+months later. Full detail in [`docs/guide/06-agents.md`](./docs/guide/06-agents.md#afk-mode) and
+[ADR 0060](./docs/adr/0060-let-a-chat-run-unattended.md).
+
+---
+
 ## What it stores, and where
 
 There is no Ensemblr account to create, nothing to sign in to, and nothing synced off your machine.
