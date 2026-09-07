@@ -9,6 +9,132 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-09-07
+
+**Linux updates now install in the app instead of sending the user to a release page, and an agent
+that opens a terminal is finally told which shell it got.** An AppImage in a directory it can write
+downloads a newer release, verifies it against the digest GitHub publishes, and swaps itself in with
+an atomic rename on restart; everything that cannot swap keeps the check-only behaviour. Alongside
+that, `ensemblr_start_terminal` reports the shell so an agent knows whether `VAR=x cmd` will be
+rejected, `ensemblr_message_concierge` stops refusing a Concierge conversation that is open on disk
+but not attached in memory, and the dashboard header, the dock empty states and the archive toast
+each stop breaking under a narrow window or a light one.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.6) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.6/Ensemblr-0.1.6-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.6/Ensemblr-0.1.6-x64.AppImage)
+
+### Added
+
+- **A Linux build running as an AppImage installs its own updates.** It downloads the newer release,
+  verifies it against the SHA-256 digest GitHub publishes for the asset, stages it beside the running
+  file, and swaps it in with an atomic rename on restart. Rename rather than write-in-place is
+  load-bearing: a running AppImage is a FUSE mount of the very file being replaced, so truncating it
+  corrupts the live process while a rename leaves the old inode alive for as long as the mount holds
+  it. Everything that cannot swap keeps the check-only behaviour ADR 0056 built and links at the
+  release page — a build not running as an AppImage, a read-only or root-owned directory, and a
+  release whose asset GitHub published no digest for. The update service's Squirrel-shaped seams
+  became the port rather than growing a parallel Linux service: `armUpdater` takes the whole candidate
+  and returns `armed` or `declined`, so each platform installs from the part of a release it needs and
+  ADR 0055's hard-off and staged-drop rules stay in one place. Where `install.sh` placed the AppImage,
+  the version it recorded in `.version` is rewritten to match, so a later `update.sh` does not
+  re-download what the app already applied. Also fixes a Linux-only bug in which `app.relaunch()` was
+  called with no `execPath` — under an AppImage that points at the ephemeral `/tmp/.mount_*` squashfs
+  the runtime unmounts on exit, so the app never came back. (#484)
+- **A terminal an agent starts now reports its shell, and the terminal ops around it carry a
+  policy.** `ensemblr_start_terminal` answered with a terminal id alone, so an agent writing into it
+  had no way to know which syntax the input had to be in — a fish login shell rejects `VAR=x cmd` and
+  `export`. `TerminalSessionSnapshot` now carries `shell` on both `startTerminal` and `listTerminals`;
+  `listTerminals` also reports `foregroundCommand`, so an idle terminal is identifiable as one worth
+  reusing rather than opening a second beside it. `stopTerminal` takes `close: true`, which removes
+  the dock tab an ordinary stop deliberately leaves behind — and because closing discards the
+  scrollback for good, a new `started-terminals` registry refuses it with `denied-scope` on any
+  terminal the calling session did not start. Both stop paths report a refusal instead of throwing, so
+  a stale id answers `invalid-args` rather than `internal`. The playbook gains the matching
+  terminal-discipline block, including the fact that the repository's Ensemblr-managed environment —
+  Infisical secrets included — reaches terminals and scripts and never an agent's own shell tool.
+  (#479)
+- **Demo mode can stage AFK mode, so the one capability with no screenshot has two.** `DemoChat`
+  gains an `afkMode` flag, declared per chat rather than per scenario because that is how the app keys
+  it and because a delegate inherits AFK from its parent — a scenario-level flag could not tint a
+  delegate's tab, which is the detail that says an unattended run is what fanned it out. `seedPlanMode`
+  becomes `seedTurnModes`, owning both mutually exclusive turn modes behind one clear loop; a chat
+  asking for both gets Plan Mode, matching the composer controller. Two scenarios ship: `afk-mode`
+  mid-run through the delivery loop with its delegates in the strip, and `afk-mode-report` settled,
+  where the report is the subject. (#481)
+
+### Changed
+
+- **The scroll-to-newest button is a composer-aligned squircle rather than a centered pill.** It now
+  anchors to the left edge of the surface's composer, mirroring the unread pill anchored to that
+  composer's right. Two things needed care. `corner-shape: superellipse()` takes a log2 exponent, so
+  `round` is `superellipse(1)` and `squircle` is `superellipse(2)`; the utility had gone in as
+  `superellipse(4)` — two steps past squircle, toward square — on the premise that Chromium's
+  `squircle` keyword was broken. That serialization is correct and the keyword works, which is why
+  raising `rounded-*` against the old value appeared to do nothing. The wrapper also repeats the
+  composer's own two boxes rather than one hardcoded pair, because the three call sites do not share a
+  layout: `ConversationScrollButton` takes `insetClassName` and `columnClassName`, defaulting to the
+  workbench composer's pair, and the Concierge composer and the Pi replay view pass their own. (#487)
+- **The Concierge has its own README section, and the composer screenshots were re-captured.** It was
+  one bullet in "What it does"; it is now a top-level section in the AFK section's mould, with a row
+  in the Core vocabulary table and two screenshots rather than one. The second is a new demo scenario,
+  `concierge-delegation`, held mid-turn deliberately because a finished turn folds its tool cards into
+  a summary row and the cards are the subject. Every shot under `docs/guide/images` predated the AFK
+  composer chip, so the ten whose composer is visible were re-captured. (#482)
+- **`docs/` audited against the repository and pinned to the published 0.1.5 assets.** The
+  architecture map gained the `afk-mode` main-process concern, the `afk-mode/`, `review-launch/` and
+  `window-chrome/` renderer state concerns, and re-counted the shared root, `ipc/contracts/` and the
+  four test suites; four renamed symbols were corrected in `agent-control.md` and `considerations.md`.
+  The asset names and URLs were read off the tag with `gh release view` rather than string-replaced,
+  and every URL confirmed to return 200 before it was written. (#477, #478)
+
+### Fixed
+
+- **`ensemblr_message_concierge` no longer refuses a Concierge conversation that is open.** It
+  refused with "No Concierge conversation is open" whenever the in-memory runtime attachment was null
+  — but an attachment is not a conversation: nothing attaches a Concierge child at boot, a stop clears
+  it, a crash clears it, and a context clear spends a whole process launch between dropping the old
+  child and attaching the new one. In all four the conversation was open on disk with its transcript,
+  and the agent was told nobody was there. Reachability now resolves against the persisted
+  conversation row, attaching a child where one is missing; no open row still refuses, with the copy
+  unchanged. Two lifecycle paths this exposed are hardened alongside: opening, clearing, and the new
+  reattach each deduplicated their own callers and none deduplicated against the others, so a clear
+  and an open could each hold a runtime child with no handle to close the loser — all three now run
+  behind one lifecycle queue; and the self-heal no longer reopens through `fresh: false`, which closed
+  the very conversation it was repairing whenever the provider had changed. A failed *agent* attach
+  also no longer closes the user's conversation: `attachRuntime` closing the row it could not attach
+  is right for a user-driven open and wrong for a background message, so the decision is a parameter
+  rather than an inference from the caller. ADR 0065 records the amendment to 0059. (#485)
+- **The dashboard header fits at the app's minimum width.** Every control was `shrink-0` behind a
+  fixed `w-44` search field, so the row's intrinsic width outran the header and the sort control
+  clipped while the refresh button disappeared entirely — silently, since the header is
+  `overflow-hidden`. The tightest case is not the 720px minimum window but 768px with the sidebar
+  expanded, where the header is only ~512px. Correctness now comes from flex rather than breakpoints:
+  the search field is the one shrinkable item, `w-44` down to a `min-w-24` floor. Two container-query
+  tiers follow the pattern `dock-panel/actions.tsx` already establishes — below 48rem the heading
+  drops, below 42rem the facet labels and sort value collapse to icons — and nothing loses its name,
+  since both facet triggers gain `aria-label` and `title` carrying the already-translated label. The
+  sort value collapses by width rather than `display: none`, because Radix lays an item-aligned menu
+  out from `getBoundingClientRect()` and a hidden node reports zeros, which opened a menu as wide as
+  the window. No new catalogue keys. (#486)
+- **The dock empty states and the archive toast respect light mode.** The four Setup/Run dock empty
+  states wrapped themselves in `.terminal-surface`, which is dark in both window modes for the
+  timeline's tool-output card, while the real dock terminal they stand in for paints `bg-sidebar` and
+  already follows the app theme — so only the empty states went black under a light window. They now
+  take the same app tokens. The toast passed `theme='system'` to sonner, which resolves from
+  `prefers-color-scheme` while the toast's own surface comes from `--popover`, which follows the root
+  theme class; when the two disagreed sonner painted its hardcoded grey description on a light card.
+  The theme now comes from `useColorMode()`. The archived-workspace toast also names the workspace it
+  archived, falling back to the nameless headline when the archive returned no snapshot. (#483)
+- **Renderer tests install their own web storage instead of borrowing the host's.**
+  `atomWithStorage`'s `onMount` re-reads its key, so a test that seeds a per-chat atom before render
+  depends on `window.localStorage` existing — and whether it does was decided by the host Node rather
+  than by happy-dom, because Vitest's `getWindowKeys` drops a happy-dom window key that already exists
+  on the process global unless it is on Vitest's allowlist. Node 24 defines neither storage key, so
+  both happy-dom stores are published; Node 26 defines both, so happy-dom's are dropped, and 13
+  assertions passed on one and failed on the other. The shared setup now installs a fresh Map-backed
+  `localStorage` and `sessionStorage` before every renderer test, so the suite is hermetic on any host.
+  (#480)
+
 ## [0.1.5] - 2026-09-07
 
 **The composer's `@` menu now reaches this workspace's other chats, and the app's own jargon stops
