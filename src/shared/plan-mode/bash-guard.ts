@@ -45,7 +45,6 @@ const READ_ONLY_COMMANDS: ReadonlySet<string> = new Set([
 	'tree',
 	'tr',
 	'type',
-	'uniq',
 	'wc',
 	'which',
 ]);
@@ -152,9 +151,6 @@ const GIT_REF_MUTATING_FLAGS: ReadonlySet<string> = new Set([
 	'-u',
 ]);
 
-/** The `--flag=value` forms of {@link GIT_REF_MUTATING_FLAGS}. */
-const GIT_REF_MUTATING_PREFIXES: readonly string[] = ['--set-upstream-to='];
-
 /** `git remote` subcommands that mutate the configured remotes. */
 const GIT_REMOTE_MUTATING_SUBCOMMANDS: ReadonlySet<string> = new Set([
 	'add',
@@ -212,12 +208,6 @@ const GIT_PROGRAM_INJECTING_FLAGS: ReadonlySet<string> = new Set([
 	'-c',
 ]);
 
-/** The `--flag=value` forms of {@link GIT_PROGRAM_INJECTING_FLAGS}. */
-const GIT_PROGRAM_INJECTING_PREFIXES: readonly string[] = [
-	'--config-env=',
-	'--exec-path=',
-];
-
 /** `git branch` flags that consume the token after them while still only listing. */
 const GIT_BRANCH_VALUE_FLAGS: ReadonlySet<string> = new Set([
 	'--contains',
@@ -229,29 +219,70 @@ const GIT_BRANCH_VALUE_FLAGS: ReadonlySet<string> = new Set([
 	'--sort',
 ]);
 
-const ASSIGNMENT_PREFIX = /^[A-Za-z_][A-Za-z0-9_]*=/;
+/** `uniq` flags that consume the token after them, which is a count rather than a file. */
+const UNIQ_VALUE_FLAGS: ReadonlySet<string> = new Set([
+	'--check-chars',
+	'--skip-chars',
+	'--skip-fields',
+	'-f',
+	'-s',
+	'-w',
+]);
+
+const ASSIGNMENT_PREFIX = /^([A-Za-z_][A-Za-z0-9_]*)=/;
 
 /**
  * A read-mostly command that a specific flag turns into a writer or a command
- * runner. `flags` matches a token exactly; `prefixes` matches the `--flag=value`
- * form; `label` names what the flag does, for the denial reason.
+ * runner. `flags` holds both spellings of each flag, the long `--name` and the
+ * short `-x`; the `--name=value`, abbreviated-long, and clustered forms are
+ * derived rather than listed. `label` names what the flag does, for the denial
+ * reason.
+ *
+ * `valueLetters` names the short letters of *this command* that consume the
+ * rest of their token as a value, which stops the cluster scan before it reads
+ * that value as more flags. Its two directions are not symmetric: a letter left
+ * out over-blocks a read-only command, while a letter wrongly added under-blocks
+ * a writing one. Only list a letter after confirming the command takes a value
+ * on it, and never widen it to quiet a false positive nobody has checked.
  */
 interface FlagGuard {
 	flags: ReadonlySet<string>;
-	prefixes: readonly string[];
 	label: string;
+	valueLetters?: ReadonlySet<string>;
 }
 
 /**
- * The `--output`/`-o` guard shared by the commands that redirect stdout to a
- * file with no shell redirection for the `>` scan to catch: `sort -o`, `tree -o`,
- * and `git … --output`. Scoped to those commands on purpose — `grep -o` and
- * `rg -o` mean `--only-matching` and only read.
+ * The `--output`/`-o` guard for the commands that redirect stdout to a file
+ * with no shell redirection for the `>` scan to catch. Scoped to `sort` and
+ * `tree` on purpose — `grep -o` and `rg -o` mean `--only-matching` and only
+ * read.
  */
-const OUTPUT_FILE_GUARD: FlagGuard = {
+const SORT_OUTPUT_FILE_GUARD: FlagGuard = {
 	flags: new Set(['--output', '-o']),
 	label: 'writes its output to a file',
-	prefixes: ['--output='],
+};
+
+/**
+ * {@link SORT_OUTPUT_FILE_GUARD} for `tree`, whose `-I <pattern>` excludes
+ * matching files and takes its value attached, so `tree -Iout` is a pattern
+ * rather than the `-o` that writes one.
+ */
+const TREE_OUTPUT_FILE_GUARD: FlagGuard = {
+	flags: new Set(['--output', '-o']),
+	label: 'writes its output to a file',
+	valueLetters: new Set(['I']),
+};
+
+/**
+ * The output-file guard for `git`'s read-only subcommands, long-only because
+ * git has no short output flag anywhere: `git diff -o` answers `invalid option`,
+ * and `git diff -O<file>` reads an orderfile. A set with no short flag in it
+ * cannot trip the cluster scan at all, which is what keeps `git status -uno`,
+ * `git log -S<term>`, `git ls-files -o` and `git for-each-ref --sort` readable.
+ */
+const GIT_OUTPUT_FILE_GUARD: FlagGuard = {
+	flags: new Set(['--output']),
+	label: 'writes its output to a file',
 };
 
 /**
@@ -260,6 +291,15 @@ const OUTPUT_FILE_GUARD: FlagGuard = {
  * arbitrary programs and `date -s` sets the clock, yet the plain read forms
  * (`fd -tf`, `rg -o`, `date +%s`) still pass. `--pre-glob` is deliberately not
  * caught: it only filters which files `--pre` runs on and executes nothing.
+ *
+ * `fd -t`/`-e` and `date -I`/`-d`/`-f`/`-r`/`-v` are the value-taking letters
+ * whose own values collide with a guarded one — `fd -tx` is `--type executable`,
+ * `fd -exml` an extension, `date -Iseconds` an ISO format, `date -dyesterday` a
+ * relative date — so each is declared rather than refused. `date -d` matters on
+ * Linux specifically: it is GNU-only, and BSD `date` rejects it, so a table
+ * written against macOS alone would deny it on the platform where it works.
+ * Each was confirmed to consume its value rather than fall through to `-s`.
+ * `rg` needs none, its guards being long-only.
  */
 const FLAG_GUARDED_COMMANDS: ReadonlyMap<string, FlagGuard> = new Map([
 	[
@@ -267,7 +307,7 @@ const FLAG_GUARDED_COMMANDS: ReadonlyMap<string, FlagGuard> = new Map([
 		{
 			flags: new Set(['--exec', '--exec-batch', '-X', '-x']),
 			label: 'runs a command for every match',
-			prefixes: ['--exec='],
+			valueLetters: new Set(['e', 't']),
 		},
 	],
 	[
@@ -275,7 +315,6 @@ const FLAG_GUARDED_COMMANDS: ReadonlyMap<string, FlagGuard> = new Map([
 		{
 			flags: new Set(['--hostname-bin', '--pre']),
 			label: 'runs a program for every file',
-			prefixes: ['--hostname-bin=', '--pre='],
 		},
 	],
 	[
@@ -283,17 +322,20 @@ const FLAG_GUARDED_COMMANDS: ReadonlyMap<string, FlagGuard> = new Map([
 		{
 			flags: new Set(['--set', '-s']),
 			label: 'sets the system clock',
-			prefixes: ['--set='],
+			valueLetters: new Set(['I', 'd', 'f', 'r', 'v']),
 		},
 	],
-	['sort', OUTPUT_FILE_GUARD],
-	['tree', OUTPUT_FILE_GUARD],
+	['sort', SORT_OUTPUT_FILE_GUARD],
+	['tree', TREE_OUTPUT_FILE_GUARD],
 ]);
 
 /**
  * Extra flag guards for individual read-only `git` subcommands, screened
- * alongside {@link OUTPUT_FILE_GUARD}. `git grep -O` hands every match to a pager
- * command of the caller's choosing, so it runs a program the classifier cannot see.
+ * alongside {@link GIT_OUTPUT_FILE_GUARD}. `git grep -O` hands every match to a
+ * pager command of the caller's choosing, so it runs a program the classifier
+ * cannot see. Its `valueLetters` is left empty because only `git grep -eO<term>`
+ * collides — a pattern beginning with a capital `O` attached to `-e` — and the
+ * same search spelled with a space does not.
  */
 const GIT_SUBCOMMAND_FLAG_GUARDS: ReadonlyMap<string, FlagGuard> = new Map([
 	[
@@ -301,14 +343,85 @@ const GIT_SUBCOMMAND_FLAG_GUARDS: ReadonlyMap<string, FlagGuard> = new Map([
 		{
 			flags: new Set(['--open-files-in-pager', '-O']),
 			label: 'runs a pager program of its own',
-			prefixes: ['--open-files-in-pager=', '-O'],
 		},
 	],
 ]);
 
 /**
- * Finds the first argument that trips a flag guard, matching both the bare
- * `--flag` form and the `--flag=value` form.
+ * Reads the letters a single-dash token clusters, stopping where an attached
+ * value begins.
+ *
+ * Short options cluster (`-no` is `-n -o`) and take their value attached
+ * (`-o/tmp/out`), so comparing a whole token against a flag set misses both and
+ * every flag guard in this module was bypassable that way. The scan stops at the
+ * first non-letter because a path or a number sharing the token cannot supply a
+ * guarded letter: `sort -T/tmp/sort-work` names a scratch directory rather than
+ * the `-o` its own spelling contains. An attached value that is *all* letters
+ * needs `FlagGuard.valueLetters` instead.
+ * @param token - One argument token.
+ * @returns The clustered letters, empty when the token is not a short-flag group.
+ */
+function shortFlagLetters(token: string): string {
+	if (!token.startsWith('-') || token.startsWith('--')) {
+		return '';
+	}
+	return /^[A-Za-z]*/.exec(token.slice(1))?.[0] ?? '';
+}
+
+/**
+ * Names the guarded flag a token carries across the four spellings these
+ * commands accept: the flag alone, `--flag=value`, an unambiguous abbreviation
+ * of the long name, and a short flag clustered with others or carrying an
+ * attached value.
+ *
+ * Abbreviations are matched by prefix rather than enumerated, because git's
+ * parse-options and getopt_long both accept any unambiguous truncation —
+ * `sort --out=` writes the file and `git branch --unset-upst` retargets a ref.
+ * Nothing shorter than one character after the dashes is considered, so a bare
+ * `--` ends options rather than naming one.
+ *
+ * A guard's own {@link FlagGuard.valueLetters} stops the cluster scan where an
+ * all-letter value begins. Without one for that letter, a value colliding with a
+ * guarded letter is refused along with the real thing: the recoverable
+ * direction, since the agent reads the reason and re-runs.
+ * @param token - One argument token.
+ * @param flags - The guarded flag spellings, long and short.
+ * @param valueLetters - Short letters of this command that consume their value attached.
+ * @returns The guarded flag the token names, or null when it names none.
+ */
+function guardedFlagIn(
+	token: string,
+	flags: ReadonlySet<string>,
+	valueLetters?: ReadonlySet<string>,
+): string | null {
+	if (flags.has(token)) {
+		return token;
+	}
+	if (token.startsWith('--')) {
+		const equals = token.indexOf('=');
+		const name = equals === -1 ? token : token.slice(0, equals);
+		if (name.length <= 2) {
+			return null;
+		}
+		return (
+			[...flags].find(
+				(flag) => flag.startsWith('--') && flag.startsWith(name),
+			) ?? null
+		);
+	}
+	for (const letter of shortFlagLetters(token)) {
+		if (flags.has(`-${letter}`)) {
+			return `-${letter}`;
+		}
+		if (valueLetters?.has(letter)) {
+			return null;
+		}
+	}
+	return null;
+}
+
+/**
+ * Finds the first argument that trips a flag guard.
  * @param args - Tokens after the head word.
  * @param guard - The command's flag guard.
  * @returns The offending flag, or null when none is present.
@@ -317,27 +430,22 @@ function findGuardedFlag(
 	args: readonly string[],
 	guard: FlagGuard,
 ): string | null {
-	return (
-		args.find(
-			(token) =>
-				guard.flags.has(token) ||
-				guard.prefixes.some((prefix) => token.startsWith(prefix)),
-		) ?? null
-	);
+	for (const token of args) {
+		const flag = guardedFlagIn(token, guard.flags, guard.valueLetters);
+		if (flag !== null) {
+			return flag;
+		}
+	}
+	return null;
 }
 
 /**
- * Drops the leading `FOO=bar` environment assignments so the head word is the
- * command the segment actually runs.
- * @param tokens - One lexed segment.
- * @returns The tokens from the head word onward.
+ * Names the variable a leading `FOO=bar` token assigns.
+ * @param token - The segment's first token.
+ * @returns The variable name, or null when the token is not an assignment.
  */
-function stripAssignments(tokens: readonly string[]): readonly string[] {
-	let start = 0;
-	while (start < tokens.length && ASSIGNMENT_PREFIX.test(tokens[start] ?? '')) {
-		start += 1;
-	}
-	return tokens.slice(start);
+function assignedVariable(token: string): string | null {
+	return ASSIGNMENT_PREFIX.exec(token)?.[1] ?? null;
 }
 
 /**
@@ -361,6 +469,31 @@ function evaluateFind(args: readonly string[]): BashGuardVerdict {
 		: deny(`\`find ${action}\` runs commands or deletes files`);
 }
 
+/**
+ * Classifies a `uniq` invocation, whose second positional argument is an output
+ * file rather than a second input. `uniq in.txt notes.md` truncates `notes.md`
+ * with no shell redirection for the `>` scan to catch, while the piped and
+ * single-file forms only read.
+ * @param args - Tokens after the `uniq` head word.
+ * @returns Allowed while at most one positional names a file.
+ */
+function evaluateUniq(args: readonly string[]): BashGuardVerdict {
+	let positionals = 0;
+	let index = 0;
+	while (index < args.length) {
+		const token = args[index] ?? '';
+		if (!token.startsWith('-') || token === '-') {
+			positionals += 1;
+			index += 1;
+			continue;
+		}
+		index += UNIQ_VALUE_FLAGS.has(token) ? 2 : 1;
+	}
+	return positionals > 1
+		? deny('`uniq <input> <output>` writes its second argument to a file')
+		: { ok: true };
+}
+
 /** The tokens at `git`'s subcommand, or the global flag that disqualified it. */
 type GitGlobals = { rest: readonly string[] } | { violation: string };
 
@@ -370,10 +503,7 @@ type GitGlobals = { rest: readonly string[] } | { violation: string };
  * @returns True when the flag injects configuration or relocates git's helpers.
  */
 function injectsGitProgram(flag: string): boolean {
-	return (
-		GIT_PROGRAM_INJECTING_FLAGS.has(flag) ||
-		GIT_PROGRAM_INJECTING_PREFIXES.some((prefix) => flag.startsWith(prefix))
-	);
+	return guardedFlagIn(flag, GIT_PROGRAM_INJECTING_FLAGS) !== null;
 }
 
 /**
@@ -397,24 +527,37 @@ function skipGitGlobalFlags(args: readonly string[]): GitGlobals {
 }
 
 /**
- * Reports whether `git branch` was handed a bare name, which creates or resets a
- * ref. `--list` marks its positional as a match pattern rather than a new name.
- * @param rest - Tokens after the `branch` subcommand.
- * @returns True when a positional argument would write a ref.
+ * Drops the values {@link GIT_BRANCH_VALUE_FLAGS} consume, leaving only the
+ * tokens `git branch` and `git remote` read as arguments of their own.
+ *
+ * Scanning the raw list reads a value as an argument of its own, and a sort key
+ * is spelled like a flag cluster: `--sort -committerdate` put a `c` in front of
+ * the classifier, which matched the `-c` that copies a ref and denied a listing.
+ * @param rest - Tokens after the subcommand.
+ * @returns The tokens that are the command's own.
  */
-function createsGitBranch(rest: readonly string[]): boolean {
-	if (rest.includes('--list')) {
-		return false;
-	}
+function refArgumentsWithoutValues(rest: readonly string[]): string[] {
+	const own: string[] = [];
 	let index = 0;
 	while (index < rest.length) {
 		const token = rest[index] ?? '';
-		if (!token.startsWith('-')) {
-			return true;
-		}
+		own.push(token);
 		index += GIT_BRANCH_VALUE_FLAGS.has(token) ? 2 : 1;
 	}
-	return false;
+	return own;
+}
+
+/**
+ * Reports whether `git branch` was handed a bare name, which creates or resets a
+ * ref. `--list` marks its positional as a match pattern rather than a new name.
+ * @param own - The branch arguments with flag values already dropped.
+ * @returns True when a positional argument would write a ref.
+ */
+function createsGitBranch(own: readonly string[]): boolean {
+	if (own.includes('--list')) {
+		return false;
+	}
+	return own.some((token) => !token.startsWith('-'));
 }
 
 /**
@@ -429,7 +572,7 @@ function evaluateGitReadFlags(
 	rest: readonly string[],
 ): BashGuardVerdict | null {
 	const guards = [
-		OUTPUT_FILE_GUARD,
+		GIT_OUTPUT_FILE_GUARD,
 		GIT_SUBCOMMAND_FLAG_GUARDS.get(subcommand),
 	];
 	for (const guard of guards) {
@@ -475,16 +618,16 @@ function evaluateGitRefs(
 	subcommand: string,
 	rest: readonly string[],
 ): BashGuardVerdict {
-	const mutation = rest.find(
+	const own = refArgumentsWithoutValues(rest);
+	const mutation = own.find(
 		(token) =>
-			GIT_REF_MUTATING_FLAGS.has(token) ||
-			GIT_REF_MUTATING_PREFIXES.some((prefix) => token.startsWith(prefix)) ||
+			guardedFlagIn(token, GIT_REF_MUTATING_FLAGS) !== null ||
 			(subcommand === 'remote' && GIT_REMOTE_MUTATING_SUBCOMMANDS.has(token)),
 	);
 	if (mutation !== undefined) {
 		return deny(`\`git ${subcommand} ${mutation}\` mutates refs`);
 	}
-	if (subcommand === 'branch' && createsGitBranch(rest)) {
+	if (subcommand === 'branch' && createsGitBranch(own)) {
 		return deny(
 			'`git branch <name>` creates a ref; `git branch` and `git branch --list` only list',
 		);
@@ -576,12 +719,17 @@ function evaluateFlagGuard(
  * @returns Allowed when its head word is read-only, denied otherwise.
  */
 function evaluateSegment(segment: readonly string[]): BashGuardVerdict {
-	const tokens = stripAssignments(segment);
-	const head = tokens[0];
+	const head = segment[0];
 	if (head === undefined) {
 		return { ok: true };
 	}
-	const args = tokens.slice(1);
+	const assigned = assignedVariable(head);
+	if (assigned !== null) {
+		return deny(
+			`\`${assigned}=\` sets an environment variable, and a variable can name a program the command then runs: \`GIT_EXTERNAL_DIFF\` and \`GIT_CONFIG_GLOBAL\` execute during \`git diff\`, and \`PATH\` redirects the binary itself. Re-run without the assignment`,
+		);
+	}
+	const args = segment.slice(1);
 	if (head === 'find') {
 		return evaluateFind(args);
 	}
@@ -590,6 +738,9 @@ function evaluateSegment(segment: readonly string[]): BashGuardVerdict {
 	}
 	if (head === 'gh') {
 		return evaluateGh(args);
+	}
+	if (head === 'uniq') {
+		return evaluateUniq(args);
 	}
 	const guarded = evaluateFlagGuard(head, args);
 	if (guarded) {

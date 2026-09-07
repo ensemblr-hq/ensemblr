@@ -135,6 +135,46 @@ describe('the Concierge tool policy', () => {
 		).toBe(true);
 	});
 
+	// The Concierge reads across every workspace at once, so a command that
+	// classifies on its head word while its payload hides in an assignment or an
+	// attached flag value is the one bypass here whose blast radius leaves the
+	// repository it came from.
+	test.each([
+		['an environment assignment git resolves to a program', 'bash'],
+		['the same command however the runtime spells the tool', 'Bash'],
+	])('refuses %s', (_label, tool) => {
+		expect(
+			verdict(tool, {
+				command: `GIT_EXTERNAL_DIFF='sh -c "id"' git diff HEAD~1`,
+			}).blocked,
+		).toBe(true);
+	});
+
+	test.each([
+		['a variable that only looks harmless', 'FOO=bar ls'],
+		['a redirected binary', 'PATH=./tools ls'],
+		['a second positional that is an output file', 'uniq a.txt /root/.bashrc'],
+		['an output flag clustered with another', 'sort -no /root/.bashrc a.txt'],
+		['an output flag carrying an attached value', 'sort -o/root/.bashrc a.txt'],
+		[
+			'an output flag truncated to an abbreviation',
+			'sort --out=/root/.bashrc a.txt',
+		],
+	])('refuses %s', (_label, command) => {
+		expect(verdict('bash', { command }).blocked).toBe(true);
+	});
+
+	// The Concierge is read-only outside its own folder for its whole life, not
+	// for one planning turn, so a guard that over-blocks costs it the commands
+	// it supervises with.
+	test.each([
+		['the untracked-files mode', 'git status -uno'],
+		['a pickaxe search', 'git log -Sneedle'],
+		['a ref listing sorted by date', 'git for-each-ref --sort -committerdate'],
+	])('still allows %s', (_label, command) => {
+		expect(verdict('bash', { command }).blocked).toBe(false);
+	});
+
 	test('leaves every other tool untouched', () => {
 		for (const tool of ['read', 'Read', 'Grep', 'glob', 'WebFetch']) {
 			expect(verdict(tool).blocked).toBe(false);
