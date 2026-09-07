@@ -555,7 +555,7 @@ tag with `v` stripped, or when the release is still a draft.
 
 **Five version-pinned lines stay hand-edited, and the release commit touches
 none of them.** The README's version line and `.dmg` download URL are the two
-that get remembered; the other three live under `docs/` and quietly point at the
+that get remembered; the other four live under `docs/` and quietly point at the
 previous release until someone edits them:
 
 | File | What is pinned |
