@@ -47,7 +47,7 @@ An agent doing something Ensemblr's permission model says it cannot do **is**.
 
 - Preferred: GitHub's **private vulnerability reporting** on this repository (Security → Report a
   vulnerability).
-- Or email **philipp@soldunov.dev**.
+- Or email **howdy@ensemblr.dev**.
 
 Please include the version and build channel, macOS version, which agent runtime was involved, and the
 smallest reproduction you have. A proof of concept is welcome; please do not test against anyone else's
