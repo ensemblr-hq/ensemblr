@@ -8,8 +8,20 @@ import {
 import type { CSSProperties } from 'react';
 import { Toaster as Sonner, type ToasterProps } from 'sonner';
 
-/** App-wide toast surface. Inherits theme via `prefers-color-scheme`. */
+import { useColorMode } from '@/renderer/hooks/preferences/use-color-mode';
+
+/**
+ * App-wide toast surface, painted in the mode the app is actually in.
+ *
+ * `theme='system'` would resolve from `prefers-color-scheme`, which reports the
+ * OS scheme rather than the user's theme setting — nothing sets
+ * `nativeTheme.themeSource`. The toast's own surface comes from `--popover`,
+ * which follows the root theme class, so an OS-dark machine pinned to a light
+ * app got sonner's dark description grey on a light card.
+ */
 function Toaster(props: ToasterProps) {
+	const colorMode = useColorMode();
+
 	return (
 		<Sonner
 			className='toaster group'
@@ -28,10 +40,12 @@ function Toaster(props: ToasterProps) {
 					'--normal-text': 'var(--popover-foreground)',
 				} as CSSProperties
 			}
-			theme='system'
+			theme={colorMode}
 			toastOptions={{
 				classNames: {
-					toast: 'cn-toast',
+					// Sonner hardcodes the description colour per theme at a specificity
+					// a bare class cannot reach, so the app token needs `!` to win.
+					description: 'text-muted-foreground!',
 				},
 			}}
 			{...props}

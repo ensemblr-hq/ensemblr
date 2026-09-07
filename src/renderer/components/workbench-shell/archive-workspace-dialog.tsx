@@ -198,6 +198,7 @@ function ArchiveWorkspaceDialogForm({
 				branchCleanup: plan.branchCleanup,
 				bytesFreed: result.workspace?.bytesFreed ?? null,
 				workspaceId: workspace.id,
+				workspaceName: result.workspace?.name ?? workspace.name,
 			}),
 		operationKey: `archive-workspace:${workspace.id}`,
 		run: () =>

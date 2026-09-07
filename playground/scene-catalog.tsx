@@ -1,11 +1,13 @@
 import { AgentErrorScene } from './agent-error-preview.tsx';
 import { AnswerPreview } from './answer-preview.tsx';
+import { ArchiveToastScene } from './archive-toast-preview.tsx';
 import { CommentPreviewScene } from './comment-preview.tsx';
 import { ComposerScene } from './composer-preview.tsx';
 import { ComposerQueueScene } from './composer-queue-preview.tsx';
 import { ConciergeScene } from './concierge-preview.tsx';
 import { ConflictsScene } from './conflicts-preview.tsx';
 import { ConversationScrollScene } from './conversation-scroll-preview.tsx';
+import { DockEmptyStatesScene } from './dock-empty-states-preview.tsx';
 import { FailureBannerScene } from './failure-banner-preview.tsx';
 import { FilePreviewScene } from './file-preview.tsx';
 import { LinearIssueEditorScene } from './linear-issue-editor-preview.tsx';
@@ -183,6 +185,18 @@ export const SCENE_GROUPS = [
 				label: 'update panel',
 				render: () => <UpdatePanelScene />,
 				source: 'playground/update-panel-preview.tsx',
+			},
+			{
+				id: 'dock-empty',
+				label: 'dock empty',
+				render: () => <DockEmptyStatesScene />,
+				source: 'playground/dock-empty-states-preview.tsx',
+			},
+			{
+				id: 'archive-toast',
+				label: 'archive toast',
+				render: () => <ArchiveToastScene />,
+				source: 'playground/archive-toast-preview.tsx',
 			},
 		],
 	},

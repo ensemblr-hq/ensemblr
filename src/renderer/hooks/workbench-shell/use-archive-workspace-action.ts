@@ -17,7 +17,10 @@ import { useRemoveHoppedWorkspaceAction } from '@/renderer/hooks/workbench-shell
 import { useWorkspaceTeardownHop } from '@/renderer/hooks/workbench-shell/use-workspace-teardown-hop';
 import { getErrorMessage } from '@/renderer/lib/error';
 import { failureText } from '@/renderer/lib/failure-text';
-import { reclaimedDiskDescription } from '@/renderer/lib/workbench';
+import {
+	archivedWorkspaceTitle,
+	reclaimedDiskDescription,
+} from '@/renderer/lib/workbench';
 import {
 	type ArchivedWorkspace,
 	type ArchiveWorktreePlan,
@@ -38,6 +41,8 @@ interface ArchiveOutcome {
 	bytesFreed: number | null;
 	description: string | undefined;
 	status: ArchiveWorkspaceStatus;
+	/** Name the archive reported back, or null when it returned no snapshot. */
+	workspaceName: string | null;
 }
 
 /**
@@ -107,12 +112,14 @@ async function runArchive(
 			bytesFreed: result.workspace?.bytesFreed ?? null,
 			description: failureText(t, result.diagnostics[0]) ?? undefined,
 			status: result.status,
+			workspaceName: result.workspace?.name ?? null,
 		};
 	} catch (error) {
 		return {
 			bytesFreed: null,
 			description: getErrorMessage(error) ?? undefined,
 			status: 'failure',
+			workspaceName: null,
 		};
 	}
 }
@@ -206,11 +213,13 @@ export function useArchivedWorkspaceToast(): (
 	const { i18n: i18nInstance, t } = useTranslation();
 
 	return useCallback(
-		({ branchCleanup, bytesFreed, workspaceId }: ArchivedWorkspace) => {
-			const title = t(
-				'errors:workspace-archive.archived.title',
-				'Workspace archived.',
-			);
+		({
+			branchCleanup,
+			bytesFreed,
+			workspaceId,
+			workspaceName,
+		}: ArchivedWorkspace) => {
+			const title = archivedWorkspaceTitle({ t, workspaceName });
 
 			if (branchCleanup) {
 				toast.success(title, {
@@ -329,6 +338,7 @@ export function useArchiveWorkspaceAction({
 						branchCleanup: plan.branchCleanup,
 						bytesFreed: outcome.bytesFreed,
 						workspaceId: workspace.id,
+						workspaceName: outcome.workspaceName ?? workspace.name,
 					});
 					return;
 				}

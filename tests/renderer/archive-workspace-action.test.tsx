@@ -218,6 +218,48 @@ test('reports the disk the archive freed in the success toast', async () => {
 	);
 });
 
+// Several workspaces get archived in a row, and the row that vanished from the
+// sidebar is the only other evidence of which one this toast is about.
+test('names the archived workspace in the success toast', async () => {
+	archiveWorkspace.mockResolvedValue({
+		archiveRecordId: 'record-1',
+		diagnostics: [],
+		status: 'success',
+		workspace: { bytesFreed: null, name: 'kyriakides' },
+	});
+	const { view } = mountAction();
+
+	await act(async () => {
+		await view.result.current(workspace('ws-named'));
+	});
+
+	expect(toast.success).toHaveBeenCalledWith(
+		expect.stringContaining('kyriakides'),
+		expect.anything(),
+	);
+});
+
+// The archive reports the name back, so a missing one means it returned no
+// snapshot at all — the headline drops to its nameless form rather than
+// interpolating an empty string into the sentence.
+test('falls back to the nameless headline when no name is known', () => {
+	const { view } = mountHook(() => useArchivedWorkspaceToast());
+
+	act(() => {
+		view.result.current({
+			branchCleanup: false,
+			bytesFreed: null,
+			workspaceId: 'ws-anonymous',
+			workspaceName: null,
+		});
+	});
+
+	expect(toast.success).toHaveBeenCalledWith(
+		'Workspace archived.',
+		expect.anything(),
+	);
+});
+
 // `du` is best-effort, and a measurement that did not complete is not news the
 // user can act on — the toast says nothing about size rather than "0 bytes".
 test('omits the size when the archive could not measure it', async () => {
@@ -308,6 +350,7 @@ test('offers no undo for an archive that dropped the local branch', () => {
 			branchCleanup: true,
 			bytesFreed: null,
 			workspaceId: 'ws-dropped',
+			workspaceName: 'doomed',
 		});
 	});
 
