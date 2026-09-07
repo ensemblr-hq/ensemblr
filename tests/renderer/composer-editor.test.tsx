@@ -1,5 +1,13 @@
 // @vitest-environment happy-dom
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import {
+	DELETE_CHARACTER_COMMAND,
+	DELETE_LINE_COMMAND,
+	DELETE_WORD_COMMAND,
+	getNearestEditorFromDOMNode,
+	type LexicalCommand,
+	type LexicalEditor,
+} from 'lexical';
 import { createRef, useRef, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -49,6 +57,15 @@ const TERMINAL_OUTPUT: ComposerAttachment = {
 	source: { kind: 'terminal', label: 'npm run dev' },
 };
 
+const PASTED_BLOCK: ComposerAttachment = {
+	id: 'wsfile:.context/attachments/cc55dd/pasted-text.txt',
+	kind: 'pasted-text',
+	label: 'pasted-text.txt',
+	lineCount: 19,
+	path: '.context/attachments/cc55dd/pasted-text.txt',
+	preview: 'GAMMA_LINE_ONE\nDELTA_LINE_TWO',
+};
+
 /** The host span Lexical mounts a chip into, for the nth chip in the draft. */
 function chipHost(index: number): HTMLElement {
 	const host = document.querySelectorAll<HTMLElement>(
@@ -59,6 +76,31 @@ function chipHost(index: number): HTMLElement {
 	}
 	return host;
 }
+
+/** The editable root, whose own children are the tray and then the paragraph. */
+function editorRoot(): HTMLElement {
+	const root = document.querySelector<HTMLElement>('[contenteditable="true"]');
+	if (!root) {
+		throw new Error('No editable root');
+	}
+	return root;
+}
+
+/** The live editor behind the mounted composer, to dispatch commands straight at. */
+function mountedEditor(): LexicalEditor {
+	const editor = getNearestEditorFromDOMNode(editorRoot());
+	if (!editor) {
+		throw new Error('No editor on the editable root');
+	}
+	return editor;
+}
+
+/** Every command `TrayGuardPlugin` guards, as the test dispatches them. */
+const BACKWARD_DELETE_COMMANDS: readonly LexicalCommand<boolean>[] = [
+	DELETE_CHARACTER_COMMAND,
+	DELETE_LINE_COMMAND,
+	DELETE_WORD_COMMAND,
+];
 
 function mountEditor(
 	initial: {
@@ -364,22 +406,241 @@ describe('composer editor', () => {
 		expect(latest()?.text).toBe('Implement the attached plan. !');
 	});
 
-	// A stored-text chip is nearly three lines tall. Pinned to one line box it
-	// overflows half its height above the line, where the draft's own scroll
-	// container clips the preview's first row clean off.
-	it('sizes a stored-text chip to its own height rather than one line box', async () => {
-		mountEditor({ attachments: [TERMINAL_OUTPUT] });
+	// A stored-text chip is nearly three lines tall. Inline it inflates the line
+	// box and the sentence wraps around it, so it stands above the text instead.
+	it('stands a stored-text chip above the typed text rather than in it', async () => {
+		mountEditor({ attachments: [TERMINAL_OUTPUT], text: 'Explain this.' });
 
 		await waitFor(() => {
-			expect(chipHost(0).className).not.toContain('h-[1.625em]');
+			expect(chipHost(0).parentElement).toBe(editorRoot());
+		});
+		expect([...editorRoot().children].map((child) => child.tagName)).toEqual([
+			'SPAN',
+			'P',
+		]);
+		expect(chipHost(0).className).not.toContain('h-[1.625em]');
+	});
+
+	it('keeps a one-row chip in the sentence, pinned to a single line box', async () => {
+		mountEditor({ attachments: [APP_FILE], text: 'see' });
+
+		await waitFor(() => {
+			expect(chipHost(0).parentElement?.tagName).toBe('P');
+		});
+		expect(chipHost(0).className).toContain('h-[1.625em]');
+	});
+
+	// The caret is in the sentence the user is typing; a stored-text chip belongs
+	// in the tray whatever that caret was doing when it arrived.
+	it('pins a stored-text chip above the draft rather than at the caret', async () => {
+		const { handleRef, latest } = mountEditor();
+
+		await write(() => handleRef.current?.appendText('explain'));
+		await write(() => handleRef.current?.insertAttachment(TERMINAL_OUTPUT));
+
+		await waitFor(() => {
+			expect(latest()?.segments).toEqual([
+				{ attachment: TERMINAL_OUTPUT, kind: 'attachment' },
+				{ kind: 'text', text: '\nexplain' },
+			]);
 		});
 	});
 
-	it('keeps a one-row chip pinned to a single line box', async () => {
-		mountEditor({ attachments: [APP_FILE] });
+	it('keeps the tray in the order its chips were attached', async () => {
+		const { handleRef, latest } = mountEditor();
+
+		await write(() => handleRef.current?.insertAttachment(TERMINAL_OUTPUT));
+		await write(() => handleRef.current?.appendText('and'));
+		await write(() => handleRef.current?.insertAttachment(PASTED_BLOCK));
 
 		await waitFor(() => {
-			expect(chipHost(0).className).toContain('h-[1.625em]');
+			expect(latest()?.attachments).toEqual([TERMINAL_OUTPUT, PASTED_BLOCK]);
 		});
+		expect(chipHost(1).parentElement).toBe(editorRoot());
+	});
+
+	// Where a chip goes is a property of the attachment, not of the entry point
+	// that added it — otherwise the tray holds only what `insertAttachment` put
+	// there and a token replaced by a stored-text chip splits the paragraph.
+	it('sends a token replaced by a stored-text chip to the tray', async () => {
+		const { handleRef, latest } = mountEditor();
+
+		await write(() => handleRef.current?.appendText('read @notes'));
+		await write(() =>
+			handleRef.current?.replaceRangeWithAttachment(5, 11, TERMINAL_OUTPUT),
+		);
+
+		await waitFor(() => {
+			expect(latest()?.segments).toEqual([
+				{ attachment: TERMINAL_OUTPUT, kind: 'attachment' },
+				{ kind: 'text', text: '\nread ' },
+			]);
+		});
+		expect(chipHost(0).parentElement).toBe(editorRoot());
+	});
+
+	// A batch is only ever this: `addAttachments` loops over the entry point below
+	// one chip at a time, and holds no ordering of its own. So a paste carrying a
+	// file and a stored-text block comes back in a different order than it went
+	// in — the tray stands above the sentence, so its chip reads, and sends,
+	// ahead of an inline chip attached before it.
+	it('carries a tray chip ahead of an inline chip attached first', async () => {
+		const { handleRef, latest } = mountEditor();
+
+		await write(() => handleRef.current?.appendText('compare'));
+		await write(() => handleRef.current?.insertAttachment(APP_FILE));
+		await write(() => handleRef.current?.insertAttachment(TERMINAL_OUTPUT));
+
+		await waitFor(() => {
+			expect(latest()?.attachments).toEqual([TERMINAL_OUTPUT, APP_FILE]);
+		});
+		expect(latest()?.segments).toEqual([
+			{ attachment: TERMINAL_OUTPUT, kind: 'attachment' },
+			{ kind: 'text', text: '\ncompare' },
+			{ attachment: APP_FILE, kind: 'attachment' },
+		]);
+	});
+
+	// Every tray chip is a top-level block of its own, so a second one leaves a
+	// separator between two chips with nothing else beside it — a text run that
+	// is one newline the user never typed. This is the shape the prompt
+	// serializer is handed for a full draft: two tray chips, typed text ending in
+	// a newline of the user's own, an inline chip. `mention-payload.test.ts`
+	// asserts what it makes of it, so the two must stay pinned to one shape.
+	it('separates every tray chip from the block after it', async () => {
+		const { handleRef, latest } = mountEditor();
+
+		await write(() => handleRef.current?.insertAttachment(TERMINAL_OUTPUT));
+		await write(() => handleRef.current?.insertAttachment(PASTED_BLOCK));
+		await write(() => handleRef.current?.appendText('draft text\n'));
+		await write(() => handleRef.current?.insertAttachment(APP_FILE));
+
+		await waitFor(() => {
+			expect(latest()?.segments).toEqual([
+				{ attachment: TERMINAL_OUTPUT, kind: 'attachment' },
+				{ kind: 'text', text: '\n' },
+				{ attachment: PASTED_BLOCK, kind: 'attachment' },
+				{ kind: 'text', text: '\ndraft text\n' },
+				{ attachment: APP_FILE, kind: 'attachment' },
+			]);
+		});
+		expect(latest()?.text).toBe(' \n \ndraft text\n ');
+	});
+
+	// Lexical's own Backspace walks out of the paragraph and takes its previous
+	// sibling, which for the first paragraph is a tray chip. The tray is not part
+	// of the sentence and its chips are removed by their own control, so editing
+	// the sentence must not silently empty it — least of all from the start of the
+	// text, where a Backspace normally does nothing at all.
+	it('leaves the tray alone when Backspace runs at the start of the sentence', async () => {
+		const { handleRef, latest } = mountEditor({
+			attachments: [TERMINAL_OUTPUT],
+			text: 'hi',
+		});
+
+		await write(() => handleRef.current?.replaceRangeWithText(2, 2, ''));
+		await write(() => {
+			fireEvent.keyDown(editorRoot(), { key: 'Backspace' });
+		});
+
+		await waitFor(() => {
+			expect(latest()?.text).toBe(' \nhi');
+		});
+		expect(latest()?.attachments).toEqual([TERMINAL_OUTPUT]);
+	});
+
+	// The same Backspace from an empty draft deletes the paragraph rather than the
+	// chip, leaving a document whose only block is a decorator and no place to type.
+	it('keeps a place to type when Backspace runs on an empty draft below the tray', async () => {
+		const { handleRef, latest } = mountEditor({
+			attachments: [TERMINAL_OUTPUT],
+		});
+
+		await write(() => handleRef.current?.appendText(''));
+		await write(() => {
+			fireEvent.keyDown(editorRoot(), { key: 'Backspace' });
+		});
+
+		await waitFor(() => {
+			expect(latest()?.attachments).toEqual([TERMINAL_OUTPUT]);
+		});
+		expect([...editorRoot().children].map((child) => child.tagName)).toEqual([
+			'SPAN',
+			'P',
+		]);
+	});
+
+	// A bare Backspace is not the only way back into the tray. Lexical sends ⌥⌫
+	// and ⌃⌫ to DELETE_WORD_COMMAND, ⌘⌫ to DELETE_LINE_COMMAND and ⌃H to
+	// DELETE_CHARACTER_COMMAND without any of them passing through
+	// KEY_BACKSPACE_COMMAND, so a guard on the keystroke alone leaves three doors
+	// open. Which chord is live depends on the platform Lexical read at load, so
+	// every one of them is fired and none may reach the tray.
+	it('leaves the tray alone for every backward-delete chord, not just Backspace', async () => {
+		const { handleRef, latest } = mountEditor({
+			attachments: [TERMINAL_OUTPUT],
+			text: 'hi',
+		});
+
+		await write(() => handleRef.current?.replaceRangeWithText(2, 2, ''));
+		for (const modifier of [
+			{ ctrlKey: true },
+			{ altKey: true },
+			{ metaKey: true },
+		]) {
+			await write(() => {
+				fireEvent.keyDown(editorRoot(), { key: 'Backspace', ...modifier });
+			});
+		}
+		await write(() => {
+			fireEvent.keyDown(editorRoot(), { ctrlKey: true, key: 'h' });
+		});
+
+		await waitFor(() => {
+			expect(latest()?.text).toBe(' \nhi');
+		});
+		expect(latest()?.attachments).toEqual([TERMINAL_OUTPUT]);
+	});
+
+	// A chord only reaches the command the platform maps it to, and happy-dom
+	// builds `navigator.platform` out of its own user agent — `X11; Darwin arm64`
+	// on a Mac — so Lexical reads IS_APPLE as false on every runner and the
+	// Apple-only chords above are inert. ⌘⌫ has no other mapping, which leaves
+	// DELETE_LINE_COMMAND unreachable from a keystroke here. Dispatching each
+	// registration directly is what makes a guard dropped from one of the three
+	// fail wherever the suite runs; the chord test above still covers the
+	// bindings.
+	it.each(BACKWARD_DELETE_COMMANDS)(
+		'refuses $type at the start of the sentence',
+		async (command) => {
+			const { handleRef, latest } = mountEditor({
+				attachments: [TERMINAL_OUTPUT],
+				text: 'hi',
+			});
+
+			await write(() => handleRef.current?.replaceRangeWithText(2, 2, ''));
+			await write(() => {
+				mountedEditor().dispatchCommand(command, true);
+			});
+
+			await waitFor(() => {
+				expect(latest()?.text).toBe(' \nhi');
+			});
+			expect(latest()?.attachments).toEqual([TERMINAL_OUTPUT]);
+		},
+	);
+
+	it('removes a tray chip by attachment id', async () => {
+		const { handleRef, latest } = mountEditor({
+			attachments: [TERMINAL_OUTPUT],
+			text: 'Explain this.',
+		});
+
+		await write(() => handleRef.current?.removeAttachment(TERMINAL_OUTPUT.id));
+
+		await waitFor(() => {
+			expect(latest()?.attachments).toEqual([]);
+		});
+		expect(latest()?.text).toBe('Explain this.');
 	});
 });

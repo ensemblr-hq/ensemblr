@@ -14,12 +14,17 @@ import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react';
 import { cn } from '@/renderer/lib/utils';
 import type { ComposerAttachment } from '@/renderer/types/workbench';
 
-import { $createAttachmentNode, AttachmentNode } from './attachment-node';
+import {
+	$createAttachmentNode,
+	AttachmentNode,
+	isTrayChip,
+} from './attachment-node';
 import {
 	DraftChangePlugin,
 	EditableStatePlugin,
 	EditorHandlePlugin,
 	TransferPlugin,
+	TrayGuardPlugin,
 } from './editor-plugins';
 import type { ComposerDraftChange, ComposerEditorHandle } from './types';
 
@@ -35,7 +40,8 @@ interface ComposerEditorSeed {
 /**
  * Builds the editor's opening document: a restored snapshot when the composer
  * is remounting onto a draft it already had, otherwise the text and chips other
- * surfaces queued for it while it was unmounted.
+ * surfaces queued for it while it was unmounted. Tray chips open above the
+ * paragraph rather than in it, which is where a later one is added too.
  * @param seed - Text and chips to open with
  * @param snapshot - A previous draft to restore instead
  * @returns The initial state LexicalComposer accepts
@@ -55,7 +61,12 @@ function buildInitialEditorState(
 			paragraph.append($createTextNode(seed.text));
 		}
 		for (const attachment of seed.attachments) {
-			paragraph.append($createAttachmentNode(attachment));
+			const chip = $createAttachmentNode(attachment);
+			if (isTrayChip(attachment)) {
+				root.append(chip);
+			} else {
+				paragraph.append(chip);
+			}
 		}
 		root.append(paragraph);
 	};
@@ -63,8 +74,9 @@ function buildInitialEditorState(
 
 /**
  * The composer's editable surface: plain text with attachment chips living
- * inline in it, at the position the user put them. Replaces the textarea the
- * composer used to hold, which could only stack chips above the sentence.
+ * inline in it, at the position the user put them, and a tray of stored-text
+ * chips above them. Replaces the textarea the composer used to hold, which could
+ * only stack every chip above the sentence.
  *
  * Everything outside this folder talks to it through `handleRef`, and reads the
  * draft back through `onDraftChange` as plain text plus an ordered chip list —
@@ -148,6 +160,7 @@ export function ComposerEditor({
 				onDroppedTransfer={onDroppedTransfer}
 				onPastedTransfer={onPastedTransfer}
 			/>
+			<TrayGuardPlugin />
 			<EditorHandlePlugin handleRef={handleRef} />
 		</LexicalComposer>
 	);

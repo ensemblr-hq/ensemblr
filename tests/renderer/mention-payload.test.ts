@@ -46,6 +46,18 @@ function fileAttachment(path: string): ComposerAttachment {
 	};
 }
 
+/** A stored-text chip, the one kind the composer stands in the tray. */
+function storedTextAttachment(path: string): ComposerAttachment {
+	return {
+		id: `wsfile:${path}`,
+		kind: 'pasted-text',
+		label: path.split('/').pop() ?? path,
+		lineCount: 1,
+		path,
+		preview: 'selected',
+	};
+}
+
 function externalAttachment(
 	absolutePath: string,
 	sizeBytes: number,
@@ -212,6 +224,46 @@ describe('serializeComposerDraft', () => {
 				'against',
 				'<attached_file path="/Users/me/big.mov">\n[external file — inspect this path directly]\n</attached_file>',
 				'and report back',
+			].join('\n\n'),
+		);
+	});
+
+	// The tray is what first gives the draft more than one top-level block, and
+	// the linearizer puts a newline between every pair of them so its offsets
+	// stay addressable. Those newlines arrive here inside the text runs — two
+	// tray chips leave one standing alone as a run of its own — and none of them
+	// is anything the user typed, so a prompt that carried them through would
+	// open on a blank block and space the rest out by an extra line.
+	test('drops the separators the tray put between the draft blocks', async () => {
+		readWorkspaceFile.mockResolvedValue({
+			content: 'selected',
+			path: '.context/attachments/aa44bb/terminal-selection.txt',
+			sizeBytes: 8,
+		});
+
+		const text = await serializeComposerDraft({
+			segments: [
+				...chips(
+					storedTextAttachment(
+						'.context/attachments/aa44bb/terminal-selection.txt',
+					),
+				),
+				{ kind: 'text', text: '\n' },
+				...chips(
+					storedTextAttachment('.context/attachments/cc55dd/pasted-text.txt'),
+				),
+				{ kind: 'text', text: '\ndraft text\n' },
+				...chips(fileAttachment('src/app.ts')),
+			],
+			workspaceCwd: '/repo',
+		});
+
+		expect(text).toBe(
+			[
+				'<attached_file path=".context/attachments/aa44bb/terminal-selection.txt">\nselected\n</attached_file>',
+				'<attached_file path=".context/attachments/cc55dd/pasted-text.txt">\nselected\n</attached_file>',
+				'draft text',
+				'<attached_file path="src/app.ts">\nselected\n</attached_file>',
 			].join('\n\n'),
 		);
 	});
