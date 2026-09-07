@@ -541,7 +541,8 @@ worktree would fight. See
 
 ## Composer attachments
 
-Anything you pin into a message becomes a chip sitting inline in your sentence:
+Anything you pin into a message becomes a chip. Most sit inline in your sentence;
+a block of stored text stands in a tray above it:
 
 | Attachment | How you add it |
 | --- | --- |
@@ -555,9 +556,19 @@ Anything you pin into a message becomes a chip sitting inline in your sentence:
 | A terminal's output | select it, then **Attach selection to chat** from the terminal's right-click menu |
 
 They form **one ordered list**, and the outgoing prompt carries each one at the
-position its chip sat in your sentence. "Compare this screenshot against this
-file" arrives with both in place, so the agent does not have to re-derive which
-was which.
+position its chip sat in the draft. "Compare this screenshot against this file"
+arrives with both in place, so the agent does not have to re-derive which was
+which.
+
+A **pasted text block** — an ordinary long paste, or a terminal selection — is
+the one chip that does not sit in the sentence. Its chip shows a two-line preview
+of what it holds, which is the only thing telling one stored block from another,
+and at three lines tall it wraps the sentence around itself rather than reading
+as a word in it. Those chips are pinned to the top of the draft as a tray, so the
+prompt carries them ahead of your typed text and ahead of any inline chip you
+added first. They come off with their own control rather than by backspacing into
+them. See
+[ADR 0067](../adr/0067-stand-stored-text-chips-in-a-tray-above-the-draft.md).
 
 Payloads are written to disk under the workspace's `.context/attachments/` at the
 moment you attach them, keyed by content — so an attachment has a real path the
