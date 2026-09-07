@@ -2,8 +2,9 @@
 
 Organized by what you see. Each entry names the symptom, the cause, and the fix.
 
-**Settings → Diagnostics is the first place to look.** It runs all fifteen setup
-checks, shows the command output each one collected, and offers the fix for
+**Settings → Diagnostics is the first place to look.** It runs every setup check
+— fifteen on macOS, sixteen on Linux — shows the command output each one
+collected, and offers the fix for
 every failure. **Copy diagnostics bundle** puts the whole rollup on the
 clipboard with secrets, account ids, and full paths redacted — safe to paste
 into a bug report.

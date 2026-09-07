@@ -330,6 +330,19 @@ filters still only list.
 `cd` is allowlisted. It changes the directory of a shell that exits with the command, and everything
 chained after it is classified on its own, so `cd x && rm -rf y` still denies on `rm`.
 
+Two more shapes are classified rather than looked past, for the same reason the git `-c` keys are.
+**A segment that opens with a `FOO=bar` assignment is denied whatever follows it**: an assignment is
+`env` without the word, and several of the variables an allowlisted binary reads name a program it
+then runs, or move the binary the segment resolves to. There is no read-only subset to enumerate, so
+a genuinely harmless prefix like `LC_ALL=C sort` is denied too — re-run the command without it.
+**A guarded flag is matched in every spelling its command accepts**, not as a whole token: split at
+the `=` in `--flag=value`, prefix-matched when a long name is abbreviated, and scanned letter by
+letter through a clustered single-dash group. Each guard names the command that really has the flag,
+so `grep -o` and `rg -o` — which mean `--only-matching` — stay allowed, and read-only forms carrying
+a guarded letter inside a value (`git status -uno`, `git log -S<term>`, `date -Iseconds`) still pass.
+[ADR 0044](../adr/0044-enforce-plan-mode-fail-closed-at-the-control-channel.md) records both rules
+and the false-positive discipline they are held to.
+
 ## Sub-agent side
 
 If you were spawned as a sub-agent, you were given **one delegated unit of work** — do it yourself,
@@ -342,11 +355,12 @@ further sub-agents, launch harnesses, or delegate onward; that is the orchestrat
 still read and inspect freely, and focus a view so the user can follow along.
 
 **The surface is narrowed by role, not by depth.** `SUBAGENT_BLOCKED_OPS`
-(`src/shared/agent-control/subagent-policy.ts`) fails `denied-scope` for thirteen ops whatever mode
-the child is in — `spawnChatTab`, `startConversation`, `sendFollowUp`, `launchHarness`,
-`startTerminal`, `stopTerminal`, `writeTerminal`, `openTab`, `closeTab`, `setBranchName`,
-`setWorkspaceStatus`, `askUserQuestion`, `exitPlanMode` — and `gateSubAgentRole` runs it before the
-plan-mode gate on every dispatch.
+(`src/shared/agent-control/subagent-policy.ts`) fails `denied-scope` for eighteen ops whatever mode
+the child is in — `spawnChatTab`, `startConversation`, `startReview`, `sendFollowUp`,
+`launchHarness`, `startTerminal`, `stopTerminal`, `writeTerminal`, `openTab`, `closeTab`,
+`setBranchName`, `setWorkspaceStatus`, `askUserQuestion`, `exitPlanMode`, `messageConcierge`,
+`linearCreateComment`, `linearCreateIssue`, `linearUpdateIssue` — and `gateSubAgentRole` runs it
+before the plan-mode gate on every dispatch.
 
 That check reads the **durable tab marker** via `resolveRole`, not `origin.depth`. The distinction
 is the whole point: lineage lives in the in-memory origin registry, so a child resumed after a
