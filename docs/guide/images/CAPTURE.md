@@ -43,10 +43,12 @@ inside the app.
   at 2×. To go higher, capture on a display with a larger backing store; there is
   no software lever.
 - **Budget: 600 KB per image, 9 MB for this directory.** The set in place is
-  7.2 MB across twenty-one shots, averaging 343 KB — roughly nine times what the
-  downscaled set cost, for four times the pixels and no lossy step. The two
+  8.0 MB across twenty-three shots, averaging 356 KB — roughly nine times what
+  the downscaled set cost, for four times the pixels and no lossy step. The two
   create-workspace dialogs are the heaviest at ~550 KB, because a long list of
-  distinct rows is the worst case for PNG.
+  distinct rows is the worst case for PNG. There is about a megabyte of headroom
+  left, so the next shot added is the one that has to justify itself against
+  dropping another.
 
 ### Processing a raw capture
 
@@ -83,6 +85,8 @@ by the two commands above.
 | `05-board.png` | `board-card-menu` | `05-workspaces.md` | The board with one card's action menu open, beside the sentence that describes it. Not the same shot as `00-hero-dashboard.png` — the open menu is the point. |
 | `06-chat.png` | `workspace-mid-turn` | `06-agents.md` | The chat timeline mid-turn with tool cards, the model picker, and the context gauge visible. |
 | `06-plan-mode.png` | `plan-mode` | `06-agents.md` | Plan mode active in the composer, with a submitted plan raised in the review panel. |
+| `06-afk-mode.png` | `afk-mode` | `README.md`, `06-agents.md` | AFK mode active in the composer — the lit chip, the dashed away-tinted border, and a tab strip where the delegates the run spawned carry the tint too. Mid-run, so the loop's own steps are on camera rather than folded into a summary row. |
+| `06-afk-report.png` | `afk-mode-report` | `README.md`, `06-agents.md` | What the run left behind: the report with its decisions and the finding it argued with, the Review chat in the strip, and the open pull request in the header. The settled counterpart to `06-afk-mode.png` — deliberately a finished turn, because the report is the subject. |
 | `06-chat-light.png` | `workspace-mid-turn-light` | `11-app-settings.md` | The same workspace and the same turn as `06-chat.png`, on the light theme — the shot the Appearance section points at. |
 | `06-concierge.png` | `concierge` | `README.md`, `06-agents.md` | The Concierge panel open over the board, reading across every workspace at once. |
 | `07-dock-run-scripts.png` | `dock-run-picker` | `README.md`, `07-terminals-and-run-scripts.md` | The dock with a run script running **and** the run-script picker open, so the named scripts and their icons are legible. |

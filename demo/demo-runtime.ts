@@ -28,13 +28,22 @@ const BOARD_STATUS_KEY = 'ensemblr_workspace_board_status';
 /** Chat tab id the scenario's own chat is bound to when it names none. */
 const ACTIVE_TAB_ID = 'demo-chat';
 
-/**
- * Prefix of the per-chat Plan Mode preference keys. `localStorage` outlives a
- * demo run, so every scenario clears these rather than only the one that stages
- * a plan — otherwise one plan-mode shot leaves the chip on in every shot taken
- * after it.
- */
+/** Prefix of the per-chat Plan Mode preference keys. */
 const PLAN_MODE_KEY_PREFIX = 'ensemblr_pref_chat_plan_mode_';
+
+/** Prefix of the per-chat AFK preference keys. */
+const AFK_MODE_KEY_PREFIX = 'ensemblr_pref_chat_afk_mode_';
+
+/**
+ * Both prefixes, for the clear that runs before either is seeded. `localStorage`
+ * outlives a demo run, so every scenario clears both rather than only the one
+ * that stages a mode — otherwise one plan-mode or AFK shot leaves its chip on in
+ * every shot taken after it.
+ */
+const TURN_MODE_KEY_PREFIXES = [
+	PLAN_MODE_KEY_PREFIX,
+	AFK_MODE_KEY_PREFIX,
+] as const;
 
 /**
  * Holds the scenario the window is currently showing and the machinery that
@@ -63,7 +72,7 @@ export class DemoRuntime {
 		this.scenario = applyPlayhead(scenario, playhead);
 		this.handlers = createDemoHandlers(() => this.scenario, this.channels);
 		seedBoardStatuses(scenario);
-		seedPlanMode(scenario);
+		seedTurnModes(scenario);
 		installDemoBridge(() => this.handlers);
 	}
 
@@ -96,7 +105,7 @@ export class DemoRuntime {
 		this.playhead = playhead;
 		this.scenario = applyPlayhead(scenario, playhead);
 		seedBoardStatuses(scenario);
-		seedPlanMode(scenario);
+		seedTurnModes(scenario);
 		queryClient.clear();
 		if (playhead === 'live') {
 			this.startReplay(queryClient);
@@ -297,28 +306,43 @@ function findInteractionTarget(
 }
 
 /**
- * Turns the open chat's Plan Mode chip on when the scenario stages a plan.
+ * Turns the turn-mode chips on for the chats a scenario stages them for.
  *
- * The chip reads a `localStorage`-backed atom keyed by chat tab, not anything
- * the bridge answers, so a plan raised without this shows a decision bar over a
- * composer whose Plan Mode chip is off — a state the app never produces. Every
- * other scenario clears the keys for the same reason in reverse.
+ * Both chips read `localStorage`-backed atoms keyed by chat tab rather than
+ * anything the bridge answers, so a plan raised without this shows a decision bar
+ * over a composer whose Plan Mode chip is off — a state the app never produces —
+ * and an unattended transcript reads as an ordinary one. The two are mutually
+ * exclusive in the app, and a scenario that sets both on one chat would stage a
+ * pair the composer cannot produce, so Plan Mode wins and the AFK key is left
+ * clear, matching the controller that switches one off when the other goes on.
+ *
+ * Every scenario clears both prefixes first, for the same reason in reverse.
  * @param scenario - Scenario being applied.
  */
-function seedPlanMode(scenario: DemoScenario): void {
+function seedTurnModes(scenario: DemoScenario): void {
 	for (const key of Object.keys(window.localStorage)) {
-		if (key.startsWith(PLAN_MODE_KEY_PREFIX)) {
+		if (TURN_MODE_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) {
 			window.localStorage.removeItem(key);
 		}
 	}
-	if (!scenario.planReview) {
-		return;
+	const planTabId = scenario.planReview
+		? (scenario.chat.tabId ?? ACTIVE_TAB_ID)
+		: null;
+	if (planTabId) {
+		window.localStorage.setItem(
+			`${PLAN_MODE_KEY_PREFIX}${planTabId}`,
+			JSON.stringify(true),
+		);
 	}
-	const tabId = scenario.chat.tabId ?? ACTIVE_TAB_ID;
-	window.localStorage.setItem(
-		`${PLAN_MODE_KEY_PREFIX}${tabId}`,
-		JSON.stringify(true),
-	);
+	for (const chat of [scenario.chat, ...scenario.subAgents]) {
+		const tabId = chat.tabId ?? ACTIVE_TAB_ID;
+		if (chat.afkMode && tabId !== planTabId) {
+			window.localStorage.setItem(
+				`${AFK_MODE_KEY_PREFIX}${tabId}`,
+				JSON.stringify(true),
+			);
+		}
+	}
 }
 
 /**

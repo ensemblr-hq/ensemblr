@@ -1,4 +1,6 @@
 import type { DemoScenario } from '../scenario.ts';
+import afkMode from './afk-mode.ts';
+import afkModeReport from './afk-mode-report.ts';
 import board from './board.ts';
 import boardCardMenu from './board-card-menu.ts';
 import checksPullRequest from './checks-pull-request.ts';
@@ -31,6 +33,8 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
 	workspaceMidTurn,
 	workspaceMidTurnLight,
 	planMode,
+	afkMode,
+	afkModeReport,
 	subagentFanout,
 	reviewChanges,
 	checksPullRequest,

@@ -425,6 +425,14 @@ AFK and plan mode are mutually exclusive — planning exists to stop and ask —
 so switching one on switches the other off. A conversation an AFK agent spawns
 inherits AFK, the same way a planning agent's investigators inherit plan mode.
 
+![An unattended run part-way through the delivery loop: the AFK chip lit under a dashed composer border, the written approach and the alternative it rejected in the timeline, and two delegates in the tab strip carrying the same away tint.](./images/06-afk-mode.png)
+
+The mode is carried by the tab strip as well as the composer, so a glance at the
+strip says which chats are running unattended without opening any of them. A
+working chat keeps its spinner and takes the tint; a settled one takes the
+keyboard-off glyph, and a delegate keeps its bot glyph so the orchestrator is
+still distinguishable from the children it spawned.
+
 ### The delivery loop
 
 When the task is a **change to the code**, AFK also hands the agent a workflow to
@@ -502,7 +510,13 @@ does gets an answer, not a pull request.
 Read the session summary first when you come back: it is written for exactly this
 case, and it carries what the agent did, what it assumed, and what it left. The
 report names every decision it took on your behalf, every review finding it
-disagreed with, and anything it could not finish. See
+disagreed with, and anything it could not finish.
+
+![A finished unattended run: the report naming the path it took, the calls it made on the user's behalf, the review finding it argued with, and what it is least sure of — with the Review chat beside it in the tab strip and the pull request it opened in the header.](./images/06-afk-report.png)
+
+The chip stays lit once the run is over, because it is a property of the chat
+rather than of the turn — so a strip you come back to still says which chats ran
+while you were gone. See
 [ADR 0060](../adr/0060-let-a-chat-run-unattended.md),
 [ADR 0061](../adr/0061-run-an-unattended-change-through-plan-review-and-a-pull-request.md),
 and [ADR 0064](../adr/0064-size-the-unattended-delivery-loop-to-the-change.md).
