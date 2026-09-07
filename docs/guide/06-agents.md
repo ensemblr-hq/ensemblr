@@ -447,6 +447,25 @@ or to read the diff before it lands:
    It never merges, never force-pushes over other work, and updates an existing
    pull request rather than opening a second.
 
+**Not every change earns all five.** A documentation edit, a version bump, a
+translation of copy that already exists, or a rename the compiler follows end to
+end is a change the agent can settle by reading its own diff, so running a plan,
+a second orchestrator, and a round of fixes over it buys nothing you would not
+have had anyway. The agent sizes the loop first: where the whole diff fits in one
+reading, where that reading plus your repository's checks establish it is right,
+and where the shape was decided before it started, it takes a **short path** —
+steps 1, 3 and 4 do not run. It makes the change, runs your checks, reads the
+diff back from the top looking for what it got wrong, and goes to step 5. The
+pull request and the report are the same either way, and the report says which
+path it took.
+
+The judgement breaks towards the full loop. A change it cannot place is on the
+full loop, and one that outgrows a single reading part-way through — a check
+failing for a reason it did not predict, a repair that turns out to need a design
+call — goes back to step 1 rather than carrying on short. It never moves the
+other way: a run already inside the full loop does not drop out of it to save
+time.
+
 A Claude chat set to **Claude Code built-in** sub-agents
 ([11. App settings](./11-app-settings.md#providers)) reads a step 3 and 4 of its
 own. It cannot open the Review chat — driving one needs the spawn tools that
@@ -484,8 +503,9 @@ Read the session summary first when you come back: it is written for exactly thi
 case, and it carries what the agent did, what it assumed, and what it left. The
 report names every decision it took on your behalf, every review finding it
 disagreed with, and anything it could not finish. See
-[ADR 0060](../adr/0060-let-a-chat-run-unattended.md) and
-[ADR 0061](../adr/0061-run-an-unattended-change-through-plan-review-and-a-pull-request.md).
+[ADR 0060](../adr/0060-let-a-chat-run-unattended.md),
+[ADR 0061](../adr/0061-run-an-unattended-change-through-plan-review-and-a-pull-request.md),
+and [ADR 0064](../adr/0064-size-the-unattended-delivery-loop-to-the-change.md).
 
 ## Checkpoints and session branching
 
