@@ -666,20 +666,28 @@ describe('two Concierge clears racing each other', () => {
 // each used to dedupe only its own callers. Two of them overlapping inside the
 // attach left one child running with nothing pointing at it — no handle, no
 // subscription reachable, nothing that could ever close it.
+//
+// Both operations have to be ones that reach the attach, or the race is not one.
+// A `fresh: false` open finds the live attachment and returns it without asking
+// the runtime for anything, so pairing that with a clear only collides when the
+// clear goes first — an order the test would be silently relying on. A `fresh`
+// open always attaches, so it collides whichever way round the two are started,
+// which is what makes the assertion mean something.
 describe('two lifecycle operations racing for the runtime child', () => {
-	it('leaves exactly one child open and one conversation open', async () => {
-		const { children, service } = setup({ runMemoryPass: async () => true });
-		await service.openSession({ fresh: true });
+	for (const clearFirst of [true, false]) {
+		it(`leaves one child and one conversation, ${clearFirst ? 'clear' : 'open'} first`, async () => {
+			const { children, service } = setup({ runMemoryPass: async () => true });
+			await service.openSession({ fresh: true });
 
-		await Promise.all([
-			service.clearContext({ reason: 'manual' }),
-			service.openSession({ fresh: false }),
-		]);
-		await settle();
+			const clear = () => service.clearContext({ reason: 'manual' });
+			const open = () => service.openSession({ fresh: true });
+			await Promise.all(clearFirst ? [clear(), open()] : [open(), clear()]);
+			await settle();
 
-		expect(children.filter((child) => !child.isClosed())).toHaveLength(1);
-		expect(listConciergeSessions({ database })).toHaveLength(1);
-	});
+			expect(children.filter((child) => !child.isClosed())).toHaveLength(1);
+			expect(listConciergeSessions({ database })).toHaveLength(1);
+		});
+	}
 });
 
 // The heal reopens through `fresh: false`, which is also the path that retires a
