@@ -82,6 +82,20 @@ and the submit, so the conversation is intact and only its attachment is gone.
 A second refusal is a runtime that cannot hold a child at all, which is not a
 race, and retrying it is how one message becomes a process per attempt.
 
+**A failed attach leaves the conversation alone.** `attachRuntime` closes the row
+it could not attach — correct for the two paths a user drove, where the panel is
+reporting a runtime *they* could not start and the next open should begin clean.
+It is wrong for a background message, which has no standing to end a conversation
+somebody else owns. The decision is a parameter on `attachRuntime` rather than an
+inference from the caller, and rather than a repair applied to the row afterwards,
+which would race the next attach and hide the choice from the reader.
+
+**A delivery that reached the attach is charged for.** The per-session and
+per-minute counters advance for a delivered message and for a failed one alike.
+Only `no-session` stays free, because it returns before anything attaches and so
+spends nothing — which is what a refusal cost when this op could not attach at
+all.
+
 **The three operations that attach or replace a child are serialised against each
 other.** Opening, clearing, and this reattach each deduplicated their own
 concurrent callers and none deduplicated against the other two, which left a
@@ -106,8 +120,19 @@ opened once — stops being a failure.
 An agent message can now start a runtime process. That is the real cost, and it
 is bounded three ways: only ever onto a conversation that already exists, only
 one rebuild per message, and behind the guardrail counters 0059 already set at 10
-per session and 3 per minute. A workspace agent cannot spend more than those
-counters allow however broken the runtime is.
+per session and 3 per minute. Those counters are what makes the bound hold, and
+they only hold because a failed delivery is charged for as well as a delivered
+one — a budget that advanced on success alone would have left an agent looping
+against a broken runtime spawning two children per attempt with nothing counting
+them. So: at most twenty runtime children over a workspace conversation's whole
+life, six in any minute, however broken the runtime is.
+
+A failed attach from this path leaves the conversation intact. That is what the
+`onFailure` parameter buys, and it is the property that matters most here: a
+background agent cannot close a conversation the user owns. Before it, a message
+that hit a missing executable or a refusing runtime marked the row closed and
+errored, and the user's next look at the panel opened a fresh conversation with
+their whole transcript orphaned and no way to reach it.
 
 A Concierge turn can now begin without the panel having been opened. It was
 already true that a turn could begin with nobody watching; what is new is that

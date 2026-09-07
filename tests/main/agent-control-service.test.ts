@@ -2709,10 +2709,11 @@ describe('agent-control service: messaging the Concierge', () => {
 		expect(deliverMessage).toHaveBeenCalledTimes(2);
 	});
 
-	// A refused delivery must not spend the allowance: an agent that could not
-	// reach the Concierge has said nothing, and burning its budget on the attempt
-	// would silence it for the rest of the run.
-	it('does not spend the allowance on a message that was never delivered', async () => {
+	// `no-session` returns before the port attaches anything, so it costs nothing
+	// and stays free: an agent that could not reach the Concierge has said
+	// nothing, and burning its budget on the attempt would silence it for the
+	// rest of the run.
+	it('does not spend the allowance when no conversation was there to take it', async () => {
 		const deliverMessage = vi
 			.fn()
 			.mockResolvedValueOnce({
@@ -2742,6 +2743,41 @@ describe('agent-control service: messaging the Concierge', () => {
 
 		expect(refused.ok).toBe(false);
 		expect(later.ok).toBe(true);
+	});
+
+	// `failed` is the other half and is not free: it got as far as attaching, so
+	// it may have spent two runtime children. Left uncounted, an agent looping
+	// against a broken runtime spawns a process per attempt with nothing to stop
+	// it — the allowance is the only thing that bounds this op.
+	it('spends the allowance on a delivery that failed after attaching', async () => {
+		const deliverMessage = vi.fn().mockResolvedValue({
+			cause: 'failed',
+			delivered: false,
+			detail: 'The runtime could not start a child.',
+		});
+		const { service } = setup({
+			guardrails: { maxConciergeMessagesPerSession: 1 },
+			ports: makePorts({ deliverMessage }),
+		});
+		const send = () =>
+			service.invoke({
+				op: 'messageConcierge',
+				token: 'tok-caller',
+				rawArgs: { message: 'Blocked.', reason: 'blocked' },
+			});
+
+		const first = await send();
+		const second = await send();
+
+		expect(first.ok).toBe(false);
+		if (!first.ok) {
+			expect(first.code).toBe('internal');
+		}
+		expect(second.ok).toBe(false);
+		if (!second.ok) {
+			expect(second.code).toBe('denied-quota');
+		}
+		expect(deliverMessage).toHaveBeenCalledTimes(1);
 	});
 });
 

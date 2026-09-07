@@ -2726,6 +2726,11 @@ export function createAgentControlService({
 	 * spend tokens on a conversation nobody would think to read. That refusal names
 	 * what to do instead, because the failure this op exists to prevent is a
 	 * discovery that never reaches anybody.
+	 *
+	 * The per-session budget is charged for a delivery and for a `failed` one
+	 * alike, because both reach the attach and a failure can spend two runtime
+	 * children on the way. Only `no-session` is free: it returns before anything
+	 * attaches, so it costs what a refusal cost before this op could attach at all.
 	 * @param origin - Resolved caller identity.
 	 * @param args - The reason and the agent's own prose.
 	 * @returns Which conversation took the message, or why none did.
@@ -2753,6 +2758,14 @@ export function createAgentControlService({
 			}),
 		});
 		if (!delivery.delivered) {
+			// A `failed` delivery got as far as attaching, so it may have spent up to
+			// two runtime children; charging the budget for it is what stops an agent
+			// looping against a broken runtime spawning a process per attempt.
+			// `no-session` returns before anything attaches and stays free, as it was
+			// when this op could not attach at all.
+			if (delivery.cause === 'failed') {
+				guardrails.recordConciergeMessage(origin.sessionId);
+			}
 			return fail(
 				delivery.cause === 'no-session' ? 'not-found' : 'internal',
 				delivery.cause === 'no-session'

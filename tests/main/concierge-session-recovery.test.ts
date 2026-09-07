@@ -19,6 +19,7 @@ import {
 	listConciergeSessions,
 	updateConciergeSession,
 } from '../../src/main/storage/repositories/concierge-session-repository.ts';
+import type { AgentProviderId } from '../../src/shared/agent-provider.ts';
 
 const HOME = '/tmp/root/concierge';
 
@@ -43,6 +44,8 @@ interface FakeChild {
 	kill: () => void;
 	/** Emits a plain crash, with nothing said about why the child went away. */
 	crash: () => void;
+	/** Whether anything has closed this child, which is how a stranded one shows. */
+	isClosed: () => boolean;
 	/**
 	 * Emits what a runtime asked to reload a conversation it no longer holds
 	 * actually produces: an error naming the missing session, then a crash.
@@ -139,6 +142,7 @@ const fakeChild = (runtimeSessionId: string): FakeChild => {
 				type: 'shutdown',
 			});
 		},
+		isClosed: () => closed,
 		kill: () => {
 			closed = true;
 		},
@@ -186,6 +190,8 @@ const setup = (
 	options: {
 		/** Runs against each child as it is handed out, to model one born dead. */
 		onChild?: (child: FakeChild) => void;
+		/** Read per settings lookup, so a test can switch runtimes mid-flight. */
+		provider?: () => AgentProviderId;
 		refuseOpen?: (request: AgentSessionRequest) => boolean;
 		runMemoryPass?: (sessionId: string) => Promise<boolean>;
 	} = {},
@@ -219,7 +225,7 @@ const setup = (
 		resolveSettings: () => ({
 			autoClearAtPercent: 0.8,
 			model: null,
-			provider: 'claude',
+			provider: options.provider?.() ?? 'claude',
 			thinkingLevel: null,
 		}),
 		...(options.runMemoryPass ? { runMemoryPass: options.runMemoryPass } : {}),
@@ -417,6 +423,25 @@ describe('a workspace agent message to the Concierge', () => {
 
 		expect(result).toMatchObject({ cause: 'no-session', delivered: false });
 		expect(children).toHaveLength(1);
+	});
+
+	// Closing the row is how the panel reports a runtime the user could not
+	// start. Reached from here it would let a background message end a
+	// conversation somebody else owns: the transcript would be orphaned, and the
+	// user's next look at the panel would open a stranger.
+	it('leaves the conversation open when the runtime refuses to attach', async () => {
+		const first = setup();
+		const opened = await first.service.openSession({ fresh: true });
+		await first.service.shutdown();
+
+		const refusing = setup({ refuseOpen: () => true });
+		const result = await refusing.service.deliverAgentMessage({
+			prompt: 'anyone up?',
+		});
+		expect(result).toMatchObject({ cause: 'failed', delivered: false });
+
+		const reopened = await setup().service.openSession({ fresh: false });
+		expect(reopened.session?.id).toBe(opened.session?.id);
 	});
 
 	// A runtime that cannot hold a child at all is not a race, and retrying it is
@@ -634,5 +659,46 @@ describe('two Concierge clears racing each other', () => {
 				.prepare('SELECT COUNT(*) AS total FROM concierge_sessions')
 				.get() as { total: number },
 		).toMatchObject({ total: 2 });
+	});
+});
+
+// Opening, clearing, and an agent reattach each ask the runtime for a child, and
+// each used to dedupe only its own callers. Two of them overlapping inside the
+// attach left one child running with nothing pointing at it — no handle, no
+// subscription reachable, nothing that could ever close it.
+describe('two lifecycle operations racing for the runtime child', () => {
+	it('leaves exactly one child open and one conversation open', async () => {
+		const { children, service } = setup({ runMemoryPass: async () => true });
+		await service.openSession({ fresh: true });
+
+		await Promise.all([
+			service.clearContext({ reason: 'manual' }),
+			service.openSession({ fresh: false }),
+		]);
+		await settle();
+
+		expect(children.filter((child) => !child.isClosed())).toHaveLength(1);
+		expect(listConciergeSessions({ database })).toHaveLength(1);
+	});
+});
+
+// The heal reopens through `fresh: false`, which is also the path that retires a
+// row whose provider the user has since changed. Run against a row the current
+// runtime cannot resume, it would close the very conversation it was repairing
+// and hand back a stranger.
+describe('a heal for a conversation the settings have moved off', () => {
+	it('neither closes nor replaces the row it cannot resume', async () => {
+		let provider: AgentProviderId = 'claude';
+		const { children, service } = setup({ provider: () => provider });
+		const opened = await service.openSession({ fresh: true });
+
+		provider = 'pi';
+		children[0]?.refuseResume();
+		await settle();
+
+		expect(children).toHaveLength(1);
+		expect(listConciergeSessions({ database }).map((row) => row.id)).toEqual([
+			opened.session?.id,
+		]);
 	});
 });

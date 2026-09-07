@@ -330,19 +330,23 @@ export function createConciergeSessionService({
 	let lifecycle: Promise<unknown> = Promise.resolve();
 
 	/**
-	 * Runs one attach-or-replace operation at a time.
+	 * Orders the three operations that attach or replace a runtime child —
+	 * opening, clearing, and reattaching for an agent message — so only one runs
+	 * at a time.
 	 *
-	 * Each of the three — opening, clearing, and reattaching for an agent message
-	 * — deduplicates its own concurrent callers, and none of them deduplicates
-	 * against the other two. That left a clear and an open able to sit inside
-	 * {@link attachRuntime} together, each having asked the runtime for a child:
-	 * whichever wrote `active` last owned the conversation and the other child was
-	 * left running with nothing pointing at it, so nothing could ever close it.
+	 * Opening and clearing additionally deduplicate their own concurrent callers,
+	 * through `openInFlight` and `clearInFlight`; the agent reattach has no such
+	 * dedupe and does not need one, since a second one finds the child the first
+	 * attached. What none of them did was order against the other two, which left
+	 * a clear and an open able to sit inside {@link attachRuntime} together, each
+	 * having asked the runtime for a child: whichever wrote `active` last owned
+	 * the conversation and the other child was left running with nothing pointing
+	 * at it, so nothing could ever close it.
 	 * @param work - The operation to run once the queue reaches it.
 	 * @returns What the operation returned.
 	 */
 	const serialiseLifecycle = <T>(work: () => Promise<T>): Promise<T> => {
-		const next = lifecycle.then(work, work);
+		const next = lifecycle.then(work);
 		lifecycle = next.catch(() => undefined);
 		return next;
 	};
@@ -727,10 +731,18 @@ export function createConciergeSessionService({
 	 * a turn under it — {@link rememberRuntimeConversation} is the only writer —
 	 * so it is the one case where reloading that conversation is the right ask.
 	 * @param row - The session row to attach.
+	 * @param onFailure - What a failed attach does to the conversation itself.
+	 * `close-the-conversation` for the two paths a user drove — opening the panel
+	 * and clearing it — where the failure is being reported to the person who
+	 * asked for the conversation and the next open should start clean.
+	 * `leave-the-conversation` for a background agent message, which has no
+	 * standing to end a conversation the user owns: the delivery failed and
+	 * nothing else about their Concierge changed.
 	 * @returns The row as it stands after the attach, streaming status included.
 	 */
 	const attachRuntime = async (
 		row: ConciergeSessionRow,
+		onFailure: 'close-the-conversation' | 'leave-the-conversation',
 	): Promise<ConciergeSessionRow> => {
 		const database = requireDatabase();
 		const settings = resolveSettings();
@@ -795,11 +807,14 @@ export function createConciergeSessionService({
 			updateConciergeSession({
 				database,
 				id: row.id,
-				patch: {
-					closedAt: now().toISOString(),
-					lastError: toMessage(error),
-					status: 'errored',
-				},
+				patch:
+					onFailure === 'close-the-conversation'
+						? {
+								closedAt: now().toISOString(),
+								lastError: toMessage(error),
+								status: 'errored',
+							}
+						: { lastError: toMessage(error), status: row.status },
 			});
 			throw error;
 		}
@@ -829,7 +844,12 @@ export function createConciergeSessionService({
 		await detach();
 		try {
 			if (existing) {
-				return { session: toSnapshot(await attachRuntime(existing), true) };
+				return {
+					session: toSnapshot(
+						await attachRuntime(existing, 'close-the-conversation'),
+						true,
+					),
+				};
 			}
 			// Closing whatever was open before opening its replacement: a row left
 			// open is one `getActiveConciergeSession` would hand back later, so a
@@ -842,7 +862,12 @@ export function createConciergeSessionService({
 					patch: { closedAt: now().toISOString(), status: 'closed' },
 				});
 			}
-			return { session: toSnapshot(await attachRuntime(createRow()), true) };
+			return {
+				session: toSnapshot(
+					await attachRuntime(createRow(), 'close-the-conversation'),
+					true,
+				),
+			};
 		} catch (error) {
 			return { error: toMessage(error) };
 		}
@@ -992,6 +1017,11 @@ export function createConciergeSessionService({
 	 * pressed stop, a clear is halfway through, the runtime process died. Attaching
 	 * here delivers into the conversation they already have, where reopening on a
 	 * closed row would invent one nobody asked for.
+	 *
+	 * An attach that fails leaves the row open, which is what
+	 * `leave-the-conversation` buys: closing it is how the panel reports a runtime
+	 * the *user* could not start, and a background message has no standing to end
+	 * a conversation on their behalf. The message fails and nothing else changes.
 	 * @returns The now-live attachment, or null when no open conversation exists.
 	 */
 	const attachExistingConversation =
@@ -1003,7 +1033,7 @@ export function createConciergeSessionService({
 			if (!existing) {
 				return null;
 			}
-			await attachRuntime(existing);
+			await attachRuntime(existing, 'leave-the-conversation');
 			return active;
 		};
 
@@ -1092,7 +1122,7 @@ export function createConciergeSessionService({
 		}
 
 		try {
-			const row = await attachRuntime(createRow());
+			const row = await attachRuntime(createRow(), 'close-the-conversation');
 			return { memoryPassStarted, session: toSnapshot(row, true) };
 		} catch (error) {
 			return { error: toMessage(error), memoryPassStarted };

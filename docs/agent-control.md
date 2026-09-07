@@ -389,10 +389,22 @@ It takes **no session id**, and that is the design rather than an omission. The
 Concierge conversation is cleared and restarted routinely, so any id an agent
 could hold was captured at spawn time and names a session that is gone; the port
 resolves the live one at delivery, which is the only moment the answer is true.
-An absent conversation is refused with `not-found` rather than queued or opened:
-queueing delivers stale context into a conversation that has since been cleared,
-and opening one would start a turn nobody is watching. The refusal says to put it
-in the agent's last message instead.
+What it resolves is the conversation — the persisted row the panel reopens into —
+rather than the runtime child attached to it, which comes and goes for reasons
+that have nothing to do with whether the user has a Concierge. A conversation
+with no child gets one attached and the message delivered into it. Only the
+absence of a conversation is refused, with `not-found`, and it is refused rather
+than queued or opened: queueing delivers stale context into a conversation that
+has since been cleared, and opening one would invent a conversation nobody asked
+for and nobody would think to read. The refusal says to put it in the agent's
+last message instead. See
+[ADR 0065](./adr/0065-reach-the-concierge-conversation-not-its-runtime-attachment.md).
+
+Because attaching can start a runtime process, the per-session and per-minute
+allowances are charged for a delivered message and for a `failed` one alike —
+both reached the attach. Only the `not-found` refusal is free, since it returns
+before anything attaches. An attach that fails leaves the conversation open: the
+delivery failed and nothing else about the user's Concierge changed.
 
 The message arrives as an ordinary turn in the Concierge panel, so the user reads
 it, prefixed by a header naming the sending workspace, tab, and session id —
