@@ -624,6 +624,21 @@
 }
 
 /*
+ * Continuous ("iOS-style") corners, applied on top of whatever `rounded-*`
+ * radius an element already carries.
+ *
+ * `superellipse()`'s argument is a log2 exponent, not the exponent itself, so
+ * the numbers run far tighter than they look: `round` is `superellipse(1)` and
+ * the `squircle` keyword computes to exactly the `superellipse(2)` written
+ * here. A larger argument is *squarer*, not rounder — `superellipse(4)` reads
+ * as a barely-softened square whatever radius it is given, which is why raising
+ * `rounded-*` against it appears to do nothing.
+ */
+@utility corner-squircle {
+	corner-shape: superellipse(2);
+}
+
+/*
  * The lit arc that sweeps the Concierge launcher bubble while it is hovered or
  * focused. A utility rather than an inline `bg-[conic-gradient(…)]` because the
  * stop list is unreadable spelled out in a class attribute, and because the
