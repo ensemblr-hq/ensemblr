@@ -6,8 +6,12 @@ import {
 	conciergeArtifactsQuery,
 } from '@/renderer/api/ensemblr';
 import { useWorkbenchLayoutRouteModelOptional } from '@/renderer/components/workbench-shell/shell-contexts';
-import { buildConciergeReferences } from '@/renderer/lib/concierge';
-import { fuzzyMatch } from '@/renderer/lib/workbench/fuzzy-score';
+import {
+	buildConciergeReferences,
+	closedChatRank,
+	rankConciergeReferences,
+	type ScoredConciergeReference,
+} from '@/renderer/lib/concierge';
 import type { ConciergeReferenceMatch } from '@/renderer/types/workbench';
 import type { ConciergeReference } from '@/shared/concierge-references';
 
@@ -21,12 +25,6 @@ const KIND_ORDER: Record<ConciergeReference['kind'], number> = {
 	project: 3,
 	workspace: 0,
 };
-
-/** One candidate paired with its score and the spans of its label that matched. */
-interface ScoredReference {
-	match: ConciergeReferenceMatch;
-	score: number;
-}
 
 /**
  * The Concierge's `@` catalogue: every project, workspace, and chat the app
@@ -62,39 +60,22 @@ export function useConciergeReferenceMatches(
 	);
 
 	return useMemo(
-		() => (enabled ? rankReferences(references, query) : []),
+		() =>
+			enabled
+				? rankConciergeReferences(references, query, {
+						compare: compareScored,
+						limit: REFERENCE_MATCH_LIMIT,
+					})
+				: [],
 		[enabled, query, references],
 	);
 }
 
-/**
- * Scores every candidate against the query and returns the best rows.
- * @param references - The catalogue.
- * @param query - The text after the `@`.
- * @returns The ranked, capped rows.
- */
-function rankReferences(
-	references: readonly ConciergeReference[],
-	query: string,
-): readonly ConciergeReferenceMatch[] {
-	const scored: ScoredReference[] = [];
-	for (const reference of references) {
-		const matched = fuzzyMatch(reference.label, query);
-		if (matched.score > 0) {
-			scored.push({
-				match: { labelRanges: matched.ranges, reference },
-				score: matched.score,
-			});
-		}
-	}
-	return scored
-		.sort(compareScored)
-		.slice(0, REFERENCE_MATCH_LIMIT)
-		.map((entry) => entry.match);
-}
-
 /** Ranks by score, then by kind, then by label so the order never wobbles. */
-function compareScored(left: ScoredReference, right: ScoredReference): number {
+function compareScored(
+	left: ScoredConciergeReference,
+	right: ScoredConciergeReference,
+): number {
 	if (left.score !== right.score) {
 		return right.score - left.score;
 	}
@@ -104,14 +85,8 @@ function compareScored(left: ScoredReference, right: ScoredReference): number {
 	if (kinds !== 0) {
 		return kinds;
 	}
-	const liveness = closedRank(left) - closedRank(right);
+	const liveness = closedChatRank(left) - closedChatRank(right);
 	return liveness === 0
 		? left.match.reference.label.localeCompare(right.match.reference.label)
 		: liveness;
-}
-
-/** Sinks a closed chat below an open one, leaving every other kind level. */
-function closedRank(entry: ScoredReference): number {
-	const { reference } = entry.match;
-	return reference.kind === 'chat' && reference.state === 'closed' ? 1 : 0;
 }

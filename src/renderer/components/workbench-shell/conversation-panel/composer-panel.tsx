@@ -194,8 +194,10 @@ function ComposerPanelBody({
 
 						<ComposerAutocompletePopover
 							activeIndex={state.activeIndex}
+							chatMatches={state.chatMatches}
 							kind={state.autocomplete.kind}
 							mentionMatches={state.mentionMatches}
+							onChatSelect={state.onChatReferenceSelect}
 							onHover={state.setActiveIndex}
 							onMentionSelect={state.onMentionSelect}
 							onOpenChange={(open) => {

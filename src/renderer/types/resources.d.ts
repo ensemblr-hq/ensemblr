@@ -2530,6 +2530,7 @@ export default interface Resources {
 			tooltip: 'Add attachments, link issues, and more';
 		};
 		autocomplete: {
+			'closed-chat': 'closed';
 			'closed-chat-in': '{{workspace}} · closed';
 			'no-commands': 'No matching commands';
 			'no-files': 'No matching files';

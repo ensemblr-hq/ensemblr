@@ -1,4 +1,5 @@
 import type { AgentProviderId } from '@/shared/agent-provider';
+import type { ConciergeReference } from '@/shared/concierge-references';
 import type { ModelVendorId } from '@/shared/ipc/contracts/agent-models';
 import type {
 	AgentPlanLimitStatusWire,
@@ -390,6 +391,12 @@ export interface ComposerShellState {
 	activeAgentSessionId: string | null;
 	availableModels: readonly ComposerModelOption[];
 	availableThinkingLevels: readonly ComposerThinkingOption[];
+	/**
+	 * The other chats of this workspace, for the `@` menu to offer beside its
+	 * files. Scoped to the workspace and stripped of this chat's own tab, so the
+	 * menu never offers a conversation the agent cannot reach or one it is in.
+	 */
+	chatReferences: readonly ConciergeReference[];
 	contextUsage: ComposerContextUsage | null;
 	disabled: boolean;
 	disabledReason: string | null;

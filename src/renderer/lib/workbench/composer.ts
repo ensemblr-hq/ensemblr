@@ -15,6 +15,7 @@ import {
 	type AgentProviderId,
 	normalizeAgentProviderId,
 } from '@/shared/agent-provider';
+import type { ConciergeReference } from '@/shared/concierge-references';
 import type { AgentModelCatalog } from '@/shared/ipc/contracts/agent-models';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
@@ -160,6 +161,7 @@ export function getComposerState({
 	activeAgentSessionId,
 	availableModels,
 	availableThinkingLevels,
+	chatReferences,
 	contextUsage,
 	isStreaming,
 	liveAgentSessionId,
@@ -184,6 +186,7 @@ export function getComposerState({
 	activeSession: SessionTabModel;
 	availableModels: readonly ComposerModelOption[];
 	availableThinkingLevels: readonly ComposerThinkingOption[];
+	chatReferences?: readonly ConciergeReference[];
 	contextUsage?: ComposerContextUsage | null;
 	isStreaming: boolean;
 	liveAgentSessionId?: string | null;
@@ -219,6 +222,7 @@ export function getComposerState({
 		activeAgentSessionId,
 		availableModels,
 		availableThinkingLevels,
+		chatReferences: chatReferences ?? [],
 		contextUsage: contextUsage ?? null,
 		isStreaming,
 		liveAgentSessionId: liveAgentSessionId ?? null,

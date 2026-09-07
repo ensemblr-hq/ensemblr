@@ -38,6 +38,7 @@ import type {
 	ComposerDraftSegment,
 	ComposerSendIntent,
 	ComposerShellState,
+	ConciergeReferenceMatch,
 	FollowUpQueueHoldReason,
 	LinkedDirectory,
 	MentionMatch,
@@ -46,6 +47,7 @@ import type {
 	WorkspaceFileSummary,
 	WorkspaceLinkedIssueSummary,
 } from '@/renderer/types/workbench';
+import type { ConciergeReference } from '@/shared/concierge-references';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 import type { RecordLinkedDirectoryFailureCode } from '@/shared/ipc/contracts/linked-directories';
 import type { RepositoryIssueWire } from '@/shared/ipc/contracts/workspace-sources';
@@ -107,6 +109,8 @@ export interface ComposerStateApi {
 	canSubmit: boolean;
 	/** True when a send is allowed even while the agent is working (steer / follow-up). */
 	canSend: boolean;
+	/** This workspace's other chats, ranked for the `@` menu above its files. */
+	chatMatches: readonly ConciergeReferenceMatch[];
 	/** Takes over a paste the editor should not inline; true when it did. */
 	consumePastedTransfer: (data: DataTransfer) => boolean;
 	/** Takes over a drop onto the editor; true when it carried files. */
@@ -143,6 +147,7 @@ export interface ComposerStateApi {
 	/** Send the current draft to the agent as a follow-up (Cmd+J). */
 	queueCurrent: () => void;
 	mentionMatches: readonly MentionMatch[];
+	onChatReferenceSelect: (reference: ConciergeReference) => void;
 	onMentionSelect: (entry: WorkspaceFileSummary) => void;
 	onSlashSelect: (command: string, autoSubmit: boolean) => void;
 	pending: boolean;
@@ -404,9 +409,11 @@ export function useComposerState({
 		autocompleteActive,
 		autocompleteKind,
 		autocompleteTotal,
+		chatMatches,
 		confirmAutocomplete,
 		dismissAutocomplete,
 		mentionMatches,
+		onChatReferenceSelect,
 		onMentionSelect,
 		onSlashSelect,
 		setActiveIndex,
@@ -514,6 +521,7 @@ export function useComposerState({
 		autocompleteTotal,
 		canSubmit,
 		canSend,
+		chatMatches,
 		consumeDroppedTransfer,
 		consumePastedTransfer,
 		dismissAutocomplete,
@@ -536,6 +544,7 @@ export function useComposerState({
 		linkDirectory,
 		linkedDirectories,
 		mentionMatches,
+		onChatReferenceSelect,
 		onMentionSelect,
 		onSlashSelect,
 		pending,

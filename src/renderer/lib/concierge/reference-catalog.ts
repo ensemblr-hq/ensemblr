@@ -175,16 +175,50 @@ export function conciergeReferenceTitle(reference: ConciergeReference): string {
 }
 
 /**
+ * The reference one chat tab stands for, or null when the tab is not one to
+ * point at.
+ *
+ * Two kinds of row are left out here. A tab that is not a conversation — a file,
+ * a diff, a terminal — is a view of something rather than something to point at,
+ * and a file tab already has the path chip. And a chat nobody has named yet
+ * carries a blank title by design, so the row would read as an empty line: the
+ * menu exists to be recognized by name, and a run of nameless rows is worse than
+ * none, since the tab is still one click away in its own workspace.
+ *
+ * Exported because the workbench composer's `@` menu builds the same reference
+ * over one workspace's tabs, and a second copy of this mapping would be a chip
+ * that serializes differently depending on which menu minted it.
+ * @param tab - The chat tab the row would stand for.
+ * @param state - Whether the tab is open or closed.
+ * @param workspace - Name of the workspace holding it, for the chip's tooltip.
+ * @returns The reference, or null for a tab no menu should offer.
+ */
+export function chatTabReference(
+	tab: ChatTabWire,
+	state: 'closed' | 'open',
+	workspace: string,
+): ConciergeReference | null {
+	const label = tab.fullTitle || tab.title;
+	return tab.kind === 'chat' && label
+		? {
+				agentSessionId: tab.agentSessionId,
+				chatTabId: tab.id,
+				kind: 'chat',
+				label,
+				role: isSubAgentTab(tab) ? 'subagent' : 'orchestrator',
+				state,
+				workspace,
+				workspaceId: tab.workspaceId,
+			}
+		: null;
+}
+
+/**
  * The chat references one half of the listing contributes.
  *
- * Three kinds of row are left out. A tab that is not a conversation — a file, a
- * diff, a terminal — is a view of something rather than something to point at,
- * and a file tab already has the path chip. A tab whose workspace the shell does
- * not show belongs to an archived one, which still has rows in the database and
- * would navigate nowhere. And a chat nobody has named yet carries a blank title
- * by design, so the row would read as an empty line: the menu exists to be
- * recognized by name, and a run of nameless rows is worse than none, since the
- * tab is still one click away in its own workspace.
+ * On top of what {@link chatTabReference} drops, a tab whose workspace the shell
+ * does not show is left out: it belongs to an archived one, which still has rows
+ * in the database and would navigate nowhere.
  * @param tabs - Chat tabs from one half of the listing.
  * @param state - Whether these tabs are open or closed.
  * @param workspaceNames - Workspace id to name, for the chip's tooltip.
@@ -197,22 +231,10 @@ function chatReferences(
 ): readonly ConciergeReference[] {
 	return tabs.flatMap((tab) => {
 		const workspace = workspaceNames.get(tab.workspaceId);
-		const label = tab.fullTitle || tab.title;
-		return tab.kind === 'chat' && workspace !== undefined && label
-			? [
-					{
-						agentSessionId: tab.agentSessionId,
-						chatTabId: tab.id,
-						kind: 'chat' as const,
-						label,
-						role: isSubAgentTab(tab)
-							? ('subagent' as const)
-							: ('orchestrator' as const),
-						state,
-						workspace,
-						workspaceId: tab.workspaceId,
-					},
-				]
-			: [];
+		if (workspace === undefined) {
+			return [];
+		}
+		const reference = chatTabReference(tab, state, workspace);
+		return reference ? [reference] : [];
 	});
 }

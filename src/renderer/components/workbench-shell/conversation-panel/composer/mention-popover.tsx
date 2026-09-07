@@ -32,11 +32,14 @@ const LOADING_PLACEHOLDER_ROWS = 5;
 /** Props for the textarea-anchored @ and / autocomplete popover. */
 interface ComposerAutocompletePopoverProps {
 	activeIndex: number;
+	/** This workspace's other chats, offered above the files of a `mention` menu. */
+	chatMatches?: readonly ConciergeReferenceMatch[];
 	children: ReactNode;
 	/** Projects, workspaces, and chats for an `entity` menu; empty otherwise. */
 	entityMatches?: readonly ConciergeReferenceMatch[];
 	kind: AutocompleteKind;
 	mentionMatches: readonly MentionMatch[];
+	onChatSelect?: (reference: ConciergeReference) => void;
 	onEntitySelect?: (reference: ConciergeReference) => void;
 	onHover: (index: number) => void;
 	onMentionSelect: (entry: WorkspaceFileSummary) => void;
@@ -86,21 +89,32 @@ function AutocompletePlaceholderRows(): ReactNode {
 	));
 }
 
-/** Renders workspace file autocomplete rows. */
+/**
+ * Renders the `@` menu: this workspace's other chats, then its files, over one
+ * index space so the highlight steps through both without a seam.
+ *
+ * The empty state still names only files. A workspace with one chat tab open has
+ * no others to offer, which is the common case, so copy naming a second list
+ * would report a shortfall in the menu rather than in the query.
+ */
 function renderMentionRows({
 	activeIndex,
+	chatMatches,
 	matches,
+	onChatSelect,
 	onHover,
 	onSelect,
 	t,
 }: {
 	activeIndex: number;
+	chatMatches: readonly ConciergeReferenceMatch[];
 	matches: readonly MentionMatch[];
+	onChatSelect: (reference: ConciergeReference) => void;
 	onHover: (index: number) => void;
 	onSelect: (entry: WorkspaceFileSummary) => void;
 	t: TFunction;
 }): ReactNode {
-	if (matches.length === 0) {
+	if (chatMatches.length === 0 && matches.length === 0) {
 		return (
 			<div className='px-2 py-1.5 text-muted-foreground text-xs'>
 				{t('workbench:autocomplete.no-files', 'No matching files')}
@@ -108,23 +122,40 @@ function renderMentionRows({
 		);
 	}
 
-	return matches.map((match, index) => (
-		<AutocompleteRow
-			active={index === activeIndex}
-			icon={<WorkspaceFileIcon file={match.entry} />}
-			key={match.entry.id}
-			onHover={() => onHover(index)}
-			onSelect={() => onSelect(match.entry)}
-			primary={
-				<MatchHighlight ranges={match.nameRanges} text={match.entry.name} />
-			}
-			secondary={
-				match.entry.path === match.entry.name ? undefined : (
-					<MatchHighlight ranges={match.pathRanges} text={match.entry.path} />
-				)
-			}
-		/>
-	));
+	return [
+		...chatMatches.map((match, index) =>
+			referenceRow({
+				active: index === activeIndex,
+				match,
+				onHover: () => onHover(index),
+				onSelect: () => onChatSelect(match.reference),
+				secondary: chatRowSecondary(match.reference, t),
+			}),
+		),
+		...matches.map((match, index) => {
+			const row = index + chatMatches.length;
+			return (
+				<AutocompleteRow
+					active={row === activeIndex}
+					icon={<WorkspaceFileIcon file={match.entry} />}
+					key={match.entry.id}
+					onHover={() => onHover(row)}
+					onSelect={() => onSelect(match.entry)}
+					primary={
+						<MatchHighlight ranges={match.nameRanges} text={match.entry.name} />
+					}
+					secondary={
+						match.entry.path === match.entry.name ? undefined : (
+							<MatchHighlight
+								ranges={match.pathRanges}
+								text={match.entry.path}
+							/>
+						)
+					}
+				/>
+			);
+		}),
+	];
 }
 
 /** The glyph that says what an entity row stands for. */
@@ -212,22 +243,78 @@ function renderEntityRows({
 		);
 	}
 
-	return matches.map((match, index) => (
+	return matches.map((match, index) =>
+		referenceRow({
+			active: index === activeIndex,
+			match,
+			onHover: () => onHover(index),
+			onSelect: () => onSelect(match.reference),
+			secondary: entityRowSecondary(match.reference, t),
+		}),
+	);
+}
+
+/**
+ * What a chat row says under its title in the workbench `@` menu, where the
+ * whole list is one workspace's own chats.
+ *
+ * Only a closed chat has anything to add. The Concierge's menu qualifies every
+ * chat with its workspace because it draws them from all of them; repeating the
+ * one workspace the user is already inside would spend the row's second column
+ * on a word that is the same on every line.
+ * @param reference - The chat the row stands for.
+ * @param t - Translator for the closed marker.
+ * @returns The secondary text, or undefined for a chat that is still open.
+ */
+function chatRowSecondary(
+	reference: ConciergeReference,
+	t: TFunction,
+): ReactNode {
+	if (reference.kind !== 'chat' || reference.state !== 'closed') {
+		return undefined;
+	}
+	return (
+		<span className='truncate'>
+			{t('workbench:autocomplete.closed-chat', 'closed')}
+		</span>
+	);
+}
+
+/**
+ * One reference row, shared by the Concierge's `entity` menu and the workbench
+ * `@` menu's chat section so a chat reads the same in both.
+ * @param input - The row's match, highlight state, and the sinks it writes to.
+ * @returns The row.
+ */
+function referenceRow({
+	active,
+	match,
+	onHover,
+	onSelect,
+	secondary,
+}: {
+	active: boolean;
+	match: ConciergeReferenceMatch;
+	onHover: () => void;
+	onSelect: () => void;
+	secondary: ReactNode;
+}): ReactNode {
+	return (
 		<AutocompleteRow
-			active={index === activeIndex}
+			active={active}
 			icon={<EntityRowIcon reference={match.reference} />}
 			key={`${match.reference.kind}:${conciergeReferenceId(match.reference)}`}
-			onHover={() => onHover(index)}
-			onSelect={() => onSelect(match.reference)}
+			onHover={onHover}
+			onSelect={onSelect}
 			primary={
 				<MatchHighlight
 					ranges={match.labelRanges}
 					text={match.reference.label}
 				/>
 			}
-			secondary={entityRowSecondary(match.reference, t)}
+			secondary={secondary}
 		/>
-	));
+	);
 }
 
 /** Renders slash command autocomplete rows. */
@@ -307,10 +394,12 @@ function getRowCount(
  */
 export function ComposerAutocompletePopover({
 	activeIndex,
+	chatMatches = [],
 	children,
 	entityMatches = [],
 	kind,
 	mentionMatches,
+	onChatSelect,
 	onEntitySelect,
 	onHover,
 	onMentionSelect,
@@ -323,15 +412,19 @@ export function ComposerAutocompletePopover({
 	const open = kind !== null;
 	const rowCount = getRowCount(
 		kind,
-		kind === 'entity' ? entityMatches.length : mentionMatches.length,
+		kind === 'entity'
+			? entityMatches.length
+			: chatMatches.length + mentionMatches.length,
 		slashMatches.length,
 		slashLoading,
 	);
 	const rows = renderRows({
 		activeIndex,
+		chatMatches,
 		entityMatches,
 		kind,
 		mentionMatches,
+		onChatSelect,
 		onEntitySelect,
 		onHover,
 		onMentionSelect,
@@ -370,9 +463,11 @@ export function ComposerAutocompletePopover({
  */
 function renderRows({
 	activeIndex,
+	chatMatches,
 	entityMatches,
 	kind,
 	mentionMatches,
+	onChatSelect,
 	onEntitySelect,
 	onHover,
 	onMentionSelect,
@@ -382,9 +477,11 @@ function renderRows({
 	t,
 }: {
 	activeIndex: number;
+	chatMatches: readonly ConciergeReferenceMatch[];
 	entityMatches: readonly ConciergeReferenceMatch[];
 	kind: AutocompleteKind;
 	mentionMatches: readonly MentionMatch[];
+	onChatSelect?: (reference: ConciergeReference) => void;
 	onEntitySelect?: (reference: ConciergeReference) => void;
 	onHover: (index: number) => void;
 	onMentionSelect: (entry: WorkspaceFileSummary) => void;
@@ -405,7 +502,9 @@ function renderRows({
 	if (kind === 'mention') {
 		return renderMentionRows({
 			activeIndex,
+			chatMatches,
 			matches: mentionMatches,
+			onChatSelect: onChatSelect ?? noSelection,
 			onHover,
 			onSelect: onMentionSelect,
 			t,
