@@ -1,7 +1,7 @@
 {
 	"name": "ensemblr",
 	"productName": "Ensemblr",
-	"version": "0.1.6",
+	"version": "0.1.7",
 	"description": "A desktop workbench for isolated, multi-agent coding workflows.",
 	"homepage": "https://www.ensemblr.dev",
 	"repository": {
