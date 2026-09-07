@@ -67,7 +67,8 @@ server** (`127.0.0.1`, ephemeral port). Two transports on that server feed the s
 - **Harness bridge**: `mcp-endpoint.ts` builds a stateless `McpServer` per request
   (`@modelcontextprotocol/sdk`) whose tools forward to the service under the request's bearer
   token. Harnesses point at it with the documented `.mcp.json` `{type:'http', url, headers}` entry
-  (`buildHarnessMcpConfig`); credentials are already in their env.
+  (`buildHarnessLaunchDecoration` in `src/main/agent-control/harness-launch-config.ts`);
+  credentials are already in their env.
 
 Both transports call **identical** service ops with the **same** result envelope, so the capability
 set is defined once (`src/shared/agent-control/`).
@@ -254,9 +255,9 @@ as the whole set. Their argument shapes live in
   `origin` from the caller. Used only for guardrails, never for cleanup.
 
 ### 4. Recursion guardrails — `src/main/agent-control/guardrails.ts`
-- **Max depth:** deny spawn ops when `origin.depth >= MAX_SPAWN_DEPTH` (config, default **1**; see `DEFAULT_GUARDRAIL_CONFIG` in `src/main/agent-control/guardrails.ts`).
+- **Max depth:** deny spawn ops when `origin.depth >= maxSpawnDepth` (config, default **1**; see `DEFAULT_GUARDRAIL_CONFIG` in `src/main/agent-control/guardrails.ts`).
 - **Quota + rate:** per-session counters — max N total spawns, M per minute.
-- **Wait timeout:** any `wait:true` op resolves with a `timeout` result after `WAIT_TIMEOUT_MS`
+- **Wait timeout:** any `wait:true` op resolves with a `timeout` result after `waitTimeoutMs`
   (default 5 min); the child keeps running detached.
 - **Deadlock check:** refuse a `wait:true` whose target session is an ancestor in the same
   lineage (cheap cycle walk over `parentSessionId`).

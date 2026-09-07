@@ -927,7 +927,8 @@ strands an overnight run when nobody is. `afkModeControlOpDenial` in
 instead — take the most defensible reading, act on it, record the assumption —
 and `buildAfkDirective` puts the same instruction in the turn's preamble so the
 agent is not left discovering the refusal by trial. Claude Code ships its own
-`AskUserQuestion`, which never touches this server; `buildAfkHooks` withholds it
+`AskUserQuestion`, which never touches this server; `withAfkHooks` in
+`src/main/claude-agent/claude-afk-mode.ts` withholds it
 with a `PreToolUse` hook rather than a `disallowedTools` entry, because the SDK
 fixes that list when `query()` opens and the chip moves per turn.
 
@@ -1310,7 +1311,8 @@ renderer-local mutations invalidate, and the client refetches neither on an
 interval nor on window focus — so an agent's write would otherwise sit invisible
 until the panel remounted. `addDiffComments` broadcasts on
 `ensemblr:agent-control-review-comments-changed`, which the renderer turns into a
-cache invalidation for that workspace, the same shape `tabsChanged` already uses.
+cache invalidation for that workspace, the same shape `agentControlTabsChanged`
+already uses.
 
 **A comment op lands the user in Checks.** Comments render in two places: inline
 on their lines in Changes, and as a list in Checks, which is the view that
