@@ -65,6 +65,64 @@ describe('afk delivery loop', () => {
 		expect(directive).not.toContain('harness launched into this checkout');
 	});
 
+	// The scope gate is binary — change or not — and a documentation edit clears
+	// it, then takes a plan, a second orchestrator, and however many fix rounds it
+	// earns to be told what one reading of the diff already said.
+	it('sizes the loop to the change before the steps run', () => {
+		const sizing = directive.indexOf('Size the loop to the change');
+		expect(sizing).toBeGreaterThan(-1);
+		expect(sizing).toBeLessThan(directive.indexOf('**1.'));
+		expect(directive).toContain('short path');
+		expect(directive).toContain('steps 1, 3, and 4 do not run');
+	});
+
+	// Stated as evidence rather than as a list of small-looking task types: a
+	// one-word label change is short and a fifty-line feature in one file is not,
+	// so a size heuristic would sort both the wrong way.
+	it('defines the short path by what settles the change rather than by its size', () => {
+		expect(directive).toContain(
+			'the whole diff fits in one reading of your own',
+		);
+		expect(directive).toContain('the shape was decided before you started');
+		expect(directive).toContain('however few lines they end up being');
+	});
+
+	// The short path trades the second reader for the agent's own reading, not for
+	// shipping something nobody read.
+	it('replaces the second reader with a reading rather than with nothing', () => {
+		expect(directive).toContain('read the diff you produced from the top');
+		expect(directive).toContain('That reading is not a formality');
+		expect(directive).toContain(
+			'still committed, pushed, and opened as a pull request',
+		);
+	});
+
+	// A model that cannot decide must not decide in favour of the cheaper path,
+	// and one that finds mid-build that it guessed wrong has to be able to
+	// escalate — while one already in the full loop must not shed it for speed.
+	it('breaks the tie towards the full loop and only escalates from there', () => {
+		expect(directive).toContain('it is on the full loop');
+		expect(directive).toContain('pick the loop up at step 1');
+		expect(directive).toContain('does not drop out of it to save time');
+	});
+
+	// The scope gate answers this one first and answers it "open nothing", so a
+	// short-path example naming it too would have the two gates order opposite
+	// things — and neither the tie-break nor the escalation clause arbitrates
+	// whether the loop applies at all, only which path applies inside it.
+	it('leaves the user-named correction to the scope gate alone', () => {
+		const claims = directive.split(
+			'correction the user asked for by name',
+		).length;
+		expect(claims).toBe(2);
+		expect(directive).toContain(
+			'a one-line correction the user asked for by name',
+		);
+		expect(directive).toContain(
+			'a rename the compiler follows end to end — those are the short path',
+		);
+	});
+
 	// The five steps in order. Asserted by their leading numbers rather than by
 	// prose so a rewording does not silently drop one.
 	it('runs plan, build, review, fix, and ship in that order', () => {
@@ -181,9 +239,13 @@ describe('afk delivery loop', () => {
 		expect(directive).toContain('Never merge');
 	});
 
-	it('withholds the pull request while real problems stand', () => {
+	// Stated for both entries rather than for the loop alone. It is the only
+	// clause that stops a broken change being pushed, and a short-path run whose
+	// own reading turned up something it could not settle never entered a loop
+	// for a loop-shaped condition to be about.
+	it('withholds the pull request while real problems stand, on either path', () => {
 		expect(directive).toContain(
-			'If the loop ended with real problems still standing, do not open the pull request',
+			'If real problems are still standing — the loop ended with them, or your own reading found one you could not settle — do not open the pull request',
 		);
 	});
 
@@ -197,6 +259,21 @@ describe('afk delivery loop', () => {
 	it('asks for the honest report the user comes back to', () => {
 		expect(directive).toContain('final message');
 		expect(directive).toContain('ensemblr_set_summary');
+	});
+
+	// A short-path run reports one build and no rounds, which is what a full-loop
+	// run that converged immediately also reports. Naming the path is the only
+	// thing that tells the user which of the two they are reading.
+	it('has the report name the path the change was sized onto', () => {
+		expect(directive).toContain('which path you sized the change onto and why');
+	});
+
+	// Step 5 used to open on the loop having ended clean, which a short-path change
+	// never entered.
+	it('lets step 5 be reached from either path', () => {
+		expect(directive).toContain(
+			"the loop ended clean, or the short path's own reading came back clean",
+		);
 	});
 
 	describe('a root delegating through its own runtime', () => {
@@ -228,6 +305,13 @@ describe('afk delivery loop', () => {
 			expect(nativeDirective).toContain('Steps 1 to 4 are a loop');
 		});
 
+		// Which steps a change earns is a question about the change, not about how
+		// this session spawns, so the sizing gate is the same on both mechanisms.
+		it('sizes the loop the same way', () => {
+			expect(nativeDirective).toContain('Size the loop to the change');
+			expect(nativeDirective).toContain('steps 1, 3, and 4 do not run');
+		});
+
 		// Nothing is still open here to follow up, so the co-tenancy sentence the
 		// other mechanism needs would be an instruction against a conversation this
 		// caller never opened.
@@ -249,6 +333,13 @@ describe('afk delivery loop', () => {
 			expect(subagentDirective).not.toContain('**5.');
 			expect(subagentDirective).not.toContain('ensemblr_start_conversation');
 			expect(subagentDirective).toContain('Nested delegation is blocked');
+		});
+
+		// It never runs the loop, so there is nothing for it to size, and a short
+		// path that ended in a pull request is exactly what its own body forbids.
+		it('reads no sizing gate either', () => {
+			expect(subagentDirective).not.toContain('short path');
+			expect(subagentDirective).not.toContain('Size the loop');
 		});
 
 		// Named as what the child does not do rather than as what its parent does:

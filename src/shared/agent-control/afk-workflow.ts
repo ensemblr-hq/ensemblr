@@ -15,6 +15,14 @@
  * for a change, and the change is one this workspace's branch would carry — and
  * says plainly what to do when neither holds.
  *
+ * A sizing gate follows it, on a different axis. The scope gate asks whether the
+ * turn is a change at all; {@link RIGHT_SIZE} asks how much of the loop that
+ * change has earned, and lets one whose correctness the agent can settle by
+ * reading its own diff skip the plan, the second reader, and the fix rounds.
+ * Both are gates against the same failure — apparatus spent on work that did not
+ * ask for it — and both run before the steps, because a model that has read five
+ * numbered steps has already started step one.
+ *
  * Every step in it exists because of what an unattended run loses. Planning
  * first, because nobody will catch the wrong approach at message three and the
  * cost of finding out at hour two is the whole run. A review by an agent that
@@ -57,18 +65,18 @@ export const AFK_WORKFLOW_HEADER = 'UNATTENDED DELIVERY LOOP';
  * Stated before the steps rather than after them because a model that has read
  * five numbered steps has already started step one.
  *
- * The second gate covers the agents this block reaches by inheritance rather
- * than by being asked for. A review opened by `startReview` and a peer opened by
- * `startConversation` both inherit the caller's AFK mode, so both read this
- * block on every turn — and the turn where one is asked to fix what it found is
- * a change to the codebase by the first gate's own definition. Without the
- * second gate that turn ends in a commit and a pull request from an agent whose
- * opening brief forbids both, racing the orchestrator that owns them. Written as
- * scope prose rather than enforced by role because both are spawned as roots and
- * hold no role the app can read.
+ * Its second paragraph covers the agents this block reaches by inheritance
+ * rather than by being asked for. A review opened by `startReview` and a peer
+ * opened by `startConversation` both inherit the caller's AFK mode, so both read
+ * this block on every turn — and the turn where one is asked to fix what it
+ * found is a change to the codebase by the first paragraph's own definition.
+ * Without the second that turn ends in a commit and a pull request from an agent
+ * whose opening brief forbids both, racing the orchestrator that owns them.
+ * Written as scope prose rather than enforced by role because both are spawned
+ * as roots and hold no role the app can read.
  *
- * Those two are the gate's only examples, and that is a completeness claim
- * rather than an omission. The gate is self-checking — it asks what this
+ * Those two are that paragraph's only examples, and that is a completeness claim
+ * rather than an omission. It is self-checking — it asks what this
  * conversation's own brief said — so an example only works for a reader who can
  * match it. A harness is a root in the same position on the role axis, but
  * nothing above it names a committer: `harnessAwareness` makes it the committer
@@ -77,6 +85,49 @@ export const AFK_WORKFLOW_HEADER = 'UNATTENDED DELIVERY LOOP';
 const SCOPE = `This applies when the task in front of you is a **change to this codebase** that this workspace's branch would carry — a feature, a fix, a refactor, a migration. It does not apply to a question, an investigation, a review of somebody else's work, or a one-line correction the user asked for by name. Answer those directly, and skip the rest of this block; opening a pull request for work nobody asked to have shipped is worse than not doing it.
 
 It also does not apply when this conversation's own opening brief named another orchestrator in this workspace as the committer — as it does for a reviewer, and for a peer opened to take half the work. That brief wins outright over every step below, including on a follow-up asking you to fix what you found: make the change, leave it in the working tree, and say what you touched. Committing, pushing, or opening a pull request from there would move HEAD underneath the agent already doing those things for both of you.`;
+
+/**
+ * How much of the loop a change earns, and what replaces the parts it does not.
+ *
+ * The scope gate above is binary — inside the loop or outside it — and that is
+ * one axis short. A documentation edit, a version bump, and a rename are all
+ * changes this workspace's branch would carry, so they clear that gate and then
+ * take the whole apparatus: a written plan, a second orchestrator opened over
+ * the diff, and however many fix rounds it earns. Nothing in that is wrong, and
+ * all of it is spent to be told what one reading of the diff already said.
+ *
+ * The criterion is whether the agent can settle the change's correctness on its
+ * own. That is what the second reader exists to supply and what a plan exists to
+ * protect, so where reading the diff and running the repository's checks
+ * genuinely establish it, both are ceremony. Stated as three conditions rather
+ * than as a list of small-looking task types, because "small" is a judgement
+ * about the diff and the conditions are about the evidence — a one-word label
+ * change is short, and a fifty-line feature that happens to be one file is not.
+ *
+ * The examples deliberately omit the correction the user asked for by name,
+ * which {@link SCOPE} already routes out of the loop entirely. Listing it here
+ * would have the two gates answer one task with "open nothing" and "commit,
+ * push, and open a pull request" — and neither the tie-break below nor the
+ * escalation clause resolves a disagreement about whether the loop applies at
+ * all, because both are about which path a change inside it takes.
+ *
+ * Two asymmetries hold it in place. The tie goes to the full loop, so a model
+ * that cannot decide does not decide in favour of the cheaper path. And the
+ * judgement only moves upward: a run that discovers mid-build that it was on the
+ * wrong path escalates, while one already inside the full loop never drops out
+ * of it, because by then a reviewer is already reading.
+ *
+ * What does not become optional is the delivery: step 5 and the report run on
+ * both paths. The short path trades the second reader for the agent's own
+ * reading of the diff, not for shipping something nobody read.
+ */
+const RIGHT_SIZE = `**Size the loop to the change before you start it.** Everything below is written for a change whose correctness you cannot settle on your own — a feature, a refactor, a migration, anything whose effect you have to reason about rather than read. Not every task AFK is turned on for is one of those, and running five steps and a second reader over a documentation edit spends an hour of the run to be told what your own reading of the diff already told you.
+
+A change takes the **short path** when all three of these hold: the whole diff fits in one reading of your own; its correctness is settled by that reading plus whatever this repository uses to check a change, rather than by behaviour you would have to reason about to see; and the shape was decided before you started, because the user named it or because the repository leaves one way to do it. Documentation, comments, a translation of copy that already exists, a version or dependency bump, formatting, a rename the compiler follows end to end — those are the short path. A feature, a refactor, a migration, a bug whose cause you still have to find, and anything handed to you in one sentence that you had to design yourself are not, however few lines they end up being.
+
+**On the short path, steps 1, 3, and 4 do not run** — no written plan, no second reader, no fix rounds. Make the change; run whatever this repository uses to check it; then read the diff you produced from the top, as though somebody else had written it and you were looking for what they got wrong. That reading is not a formality: it is the whole of what you traded the second reader for, and it is what has to catch a claim the code no longer supports, a path that does not exist, a value left unfilled. Then go to step 5. The change is still committed, pushed, and opened as a pull request, and the report still carries everything asked for below.
+
+**When you cannot tell which path a change is on, it is on the full loop**, and that judgement only ever moves the same way. Take it again while you build: a diff that outgrows one reading, a check that fails for a reason you did not predict, or a repair that turns out to need a design call all mean the short path was the wrong call — say so in the conversation and pick the loop up at step 1. A run already inside the full loop does not drop out of it to save time, because by then the second reader is already reading.`;
 
 /**
  * Why an unattended run delegates more than an attended one, and what it must
@@ -239,10 +290,22 @@ Three things end it. A round that comes back with nothing you agree needs fixing
 When re-planning does not break the circle either, stop. An honest report of a change that did not converge is worth more than another six rounds against the same wall, and spending the night on one finding is the outcome this loop exists to prevent.`;
 }
 
-/** Step five, and the two hard limits on it. */
-const SHIP = `**5. Open the pull request — and never merge it.** Once the loop has ended clean, commit the work following this repository's commit conventions, push the branch, and open the pull request. Turning AFK on for a change *is* the request for one, so this is the one outward-facing step the block above has already asked for and it needs no further permission — but it is the end of your authority. Never merge, never force-push over somebody else's work, never close or reopen anything. A branch that already has an open pull request gets that one updated rather than a second one opened.
+/**
+ * Step five, and the two hard limits on it.
+ *
+ * Both of its conditions name both ways a change arrives here, because
+ * {@link RIGHT_SIZE} routes a short-path change straight into a step whose
+ * original wording waited on a loop it never entered. The withholding clause
+ * needs that as much as the opening one does: it is the only thing that stops a
+ * change with real problems in it being pushed, and a short-path run whose own
+ * reading turned one up has no loop for a loop-shaped condition to be about.
+ * `RIGHT_SIZE`'s escalation clause does not cover it either — that fires on a
+ * diff outgrowing one reading, an *unpredicted* check failure, or a repair
+ * needing a design call, none of which a foreseen but unresolvable problem is.
+ */
+const SHIP = `**5. Open the pull request — and never merge it.** Once the change is done — the loop ended clean, or the short path's own reading came back clean — commit the work following this repository's commit conventions, push the branch, and open the pull request. Turning AFK on for a change *is* the request for one, so this is the one outward-facing step the block above has already asked for and it needs no further permission — but it is the end of your authority. Never merge, never force-push over somebody else's work, never close or reopen anything. A branch that already has an open pull request gets that one updated rather than a second one opened.
 
-If the loop ended with real problems still standing, do not open the pull request. Leave the work committed on the branch, and report what is unresolved.`;
+If real problems are still standing — the loop ended with them, or your own reading found one you could not settle — do not open the pull request. Leave the work committed on the branch, and report what is unresolved.`;
 
 /**
  * The report, and the two things that end a run early.
@@ -256,7 +319,7 @@ const REPORT = `**Stop on a hard block, and say so.** A hard block is something 
 
 Being unsure is not a hard block. An ambiguous requirement, a missing convention, a choice between two reasonable designs: decide it yourself, on the most defensible reading, and record it. That is what the rest of this mode is for.
 
-**Your final message is the whole account of the run.** It carries what you built, the approach you chose and what you rejected, how many rounds the loop ran and what each one moved, every decision you made on the user's behalf, every review finding you disagreed with and why, what you could not finish and what stopped you, and the pull request if you opened one. Be honest about the parts you are least sure of — a run reported as clean that was not is worse than one that names its own weak spots. Put the same thing in \`ensemblr_set_summary\`, which is what the user reads first.`;
+**Your final message is the whole account of the run.** It carries what you built, which path you sized the change onto and why, the approach you chose and what you rejected, how many rounds the loop ran and what each one moved, every decision you made on the user's behalf, every review finding you disagreed with and why, what you could not finish and what stopped you, and the pull request if you opened one. Be honest about the parts you are least sure of — a run reported as clean that was not is worse than one that names its own weak spots. Put the same thing in \`ensemblr_set_summary\`, which is what the user reads first.`;
 
 /**
  * What a spawned sub-agent reads instead of the loop.
@@ -345,6 +408,8 @@ export function buildAfkWorkflowDirective({
 		return `${AFK_WORKFLOW_HEADER} — ${SUBAGENT_BODY}`;
 	}
 	return `${AFK_WORKFLOW_HEADER} — ${SCOPE}
+
+${RIGHT_SIZE}
 
 ${delegateFor(delegation)}
 
