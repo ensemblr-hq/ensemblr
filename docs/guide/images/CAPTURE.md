@@ -43,12 +43,12 @@ inside the app.
   at 2×. To go higher, capture on a display with a larger backing store; there is
   no software lever.
 - **Budget: 600 KB per image, 9 MB for this directory.** The set in place is
-  8.0 MB across twenty-three shots, averaging 356 KB — roughly nine times what
+  8.3 MB across twenty-four shots, averaging 355 KB — roughly nine times what
   the downscaled set cost, for four times the pixels and no lossy step. The two
-  create-workspace dialogs are the heaviest at ~550 KB, because a long list of
-  distinct rows is the worst case for PNG. There is about a megabyte of headroom
-  left, so the next shot added is the one that has to justify itself against
-  dropping another.
+  create-workspace dialogs are the heaviest at 560 KB and 550 KB, because a long
+  list of distinct rows is the worst case for PNG. There is about two thirds of
+  a megabyte of headroom left, so the next shot added is the one that has to
+  justify itself against dropping another.
 
 ### Processing a raw capture
 
@@ -89,6 +89,7 @@ by the two commands above.
 | `06-afk-report.png` | `afk-mode-report` | `README.md`, `06-agents.md` | What the run left behind: the report with its decisions and the finding it argued with, the Review chat in the strip, and the open pull request in the header. The settled counterpart to `06-afk-mode.png` — deliberately a finished turn, because the report is the subject. |
 | `06-chat-light.png` | `workspace-mid-turn-light` | `11-app-settings.md` | The same workspace and the same turn as `06-chat.png`, on the light theme — the shot the Appearance section points at. |
 | `06-concierge.png` | `concierge` | `README.md`, `06-agents.md` | The Concierge panel open over the board, reading across every workspace at once. |
+| `06-concierge-delegation.png` | `concierge-delegation` | `README.md`, `06-agents.md` | The other half of what the Concierge is: open over one workspace, mid-turn, having replayed another workspace's transcript and read its diff, now starting a chat in a workspace in the *other* repository. Deliberately mid-turn — a finished turn folds the tool cards into a summary row, and the cards are the subject. |
 | `07-dock-run-scripts.png` | `dock-run-picker` | `README.md`, `07-terminals-and-run-scripts.md` | The dock with a run script running **and** the run-script picker open, so the named scripts and their icons are legible. |
 | `08-changes.png` | `review-changes` | `README.md`, `08-reviewing-changes.md` | The diff viewer with an inline review comment thread open. |
 | `08-pr.png` | `checks-pull-request` | `08-reviewing-changes.md` | The Checks tab with the PR title and description editor filled in, over its check runs. |

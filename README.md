@@ -13,6 +13,11 @@ permission-gated surface is **Ensemblr Control**, and the worktree manager under
 safe — every stream of work gets its own git worktree, branch, and review path, so a fan-out of agents
 cannot collide.
 
+**One agent sits above all of it.** The [**Concierge**](#the-concierge--one-agent-above-every-workspace)
+belongs to no workspace: it reads across every project you have open, remembers what it learns between
+conversations, and never writes a file itself — real change is delegated to an orchestrator it spawns into
+the workspace that needs it.
+
 **macOS on Apple silicon, or Linux on x86-64. Bring your own agent CLI — Pi or Claude Code, one is enough.
 `git` and an authenticated `gh` are required.**
 
@@ -189,15 +194,6 @@ tree stays one level deep. Depth, spawn count, and spawn rate are capped. Linear
 sub-agents, and nothing at any depth can move an issue to a completed or canceled state: agent work stops
 at In Review, enforced in code rather than in a prompt.
 
-**The Concierge sits above every workspace.** One panel, opened from a floating launcher rather
-than a workspace's own chat strip, that reads across every project and workspace you have open —
-files, diffs, review comments, terminal output, the board, Linear — and remembers what it learns
-between conversations in a memory of its own. It never writes a file itself: real change is
-delegated to an orchestrator it spawns into the workspace that needs it, so the containment that
-keeps one workspace from touching another also keeps the Concierge from becoming a way around it.
-
-![The Concierge panel floating over the dashboard board, answering a question about where every workspace stands.](./docs/guide/images/06-concierge.png)
-
 **Two agent runtimes, one chat surface.** Pi runs as a CLI in RPC mode; Claude Code is driven through the
 Agent SDK against *your own* `claude` binary — Ensemblr ships none. Both share the same timeline, tool
 cards, model and thinking pickers, tool-approval prompts, git-backed checkpoints, session branching, and
@@ -244,6 +240,48 @@ agents write back. A user-facing string a change adds ships translated in the sa
 The scope rests on **five commitments**: the agent can drive the app under permission; isolation is the
 product; the agent runtime is pluggable and never privileged; review is local-first and ends in GitHub;
 configuration is committed, legible, and ours.
+
+---
+
+## The Concierge — one agent above every workspace
+
+Every other agent in Ensemblr lives *inside* a workspace and can see exactly that one. The **Concierge**
+does not. It runs above every project, in a folder of its own under the Ensemblr root, and it is the only
+agent that can answer a question about all of your work at once — which workspaces have something waiting,
+what a running agent actually did, where a body of work stands.
+
+Open it with `⌘⇧C`, from View ▸ Concierge, or from the round launcher floating over the window. It is a
+**panel** rather than a chat tab: drag it where you want it, maximize it with `⌘⇧M`, dismiss it with `⎋`.
+It belongs to the app rather than to a workspace, so it is the same conversation whichever project you
+happen to be looking at. It runs on the same two runtimes as everything else — Pi or Claude Code — under a
+model setting of its own, because the model that suits supervising a dozen workspaces is not the one that
+suits editing a file in any of them.
+
+![The Concierge panel floating over the dashboard board, answering a question about where every workspace stands.](./docs/guide/images/06-concierge.png)
+
+**It reads everywhere.** Every workspace's files, diff, and review comments; any conversation in any
+workspace replayed with its tool calls and results; every terminal's output, the board, and Linear. A
+project, workspace, chat, or artifact it names in an answer renders as a chip you can click, and typing
+`@` in its composer ranks all four across the whole app rather than the one you are looking at.
+
+**It writes in one place — its own folder — and that is enforced per tool call rather than asked for in a
+prompt.** A write anywhere else is refused, `bash` is held to read-only commands, and it cannot open a
+terminal or launch a harness, because a shell is a write channel the read-only rules cannot see into. So
+when something actually needs changing, it spawns a **root orchestrator** into the workspace that needs it
+and briefs that agent — a peer that owns the task and fans out its own sub-agents, not a child of the
+Concierge. The containment that keeps one workspace from touching another is the same containment that
+keeps the Concierge from becoming a way around it.
+
+![The Concierge open over one workspace while it works on another: it has replayed that workspace's transcript and read its diff, and is now starting a chat in Rate limit headers, a workspace in the other repository.](./docs/guide/images/06-concierge-delegation.png)
+
+**Its memory outlives the conversation.** Its context does not survive a clear, so what it learns goes to
+one markdown file per fact under `memory/`, indexed in `MEMORY.md` and read back first next session. The
+test it applies is not whether a fact is useful but whether a tool could fetch it again — no workspace ids,
+no branch lists, no counts — because a memory that duplicates a tool call is worse than no memory at all:
+it will trust the file instead of making the call. Clearing hands you the fresh conversation immediately
+and leaves the retired one running one last turn, stripped of every control tool, to write its files.
+
+Full detail in [`docs/guide/06-agents.md`](./docs/guide/06-agents.md#the-concierge).
 
 ---
 
@@ -319,6 +357,7 @@ Full glossary in [`CONTEXT.md`](./CONTEXT.md); the user-facing tour is
 | **Workspace** | An isolated project copy for one stream of work — its own branch, working tree, agent sessions, run state, and review path. |
 | **Agent Runtime** | A coding agent Ensemblr drives on its own chat surface — Pi or Claude Code — selected per conversation. |
 | **Harness** | A coding-agent CLI launched in a workspace terminal tab as its native TUI, rather than on the chat surface. |
+| **Concierge** | The one agent that belongs to no workspace: it reads across every project at once, writes only inside its own folder, and delegates real change to an orchestrator it spawns into the workspace that needs it. |
 | **Ensemblr Control** | The permission-gated surface that lets an agent drive the app itself, through the `ensemblr_*` tools. |
 | **Review Flow** | Inspect changes, run checks, create a PR, merge accepted work, or archive rejected work. |
 

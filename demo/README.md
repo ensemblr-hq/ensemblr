@@ -36,6 +36,7 @@ enforces it in both directions.
 | `create-workspace-branches` | The same dialog on Branches, held branch against free ones |
 | `linear-issues` | The Linear view, grouped by state |
 | `concierge` | The Concierge panel open over the board |
+| `concierge-delegation` | The Concierge over one workspace, briefing an agent into another |
 | `onboarding-welcome` | The setup wizard's welcome screen and language picker |
 | `onboarding-agent-cli` | The wizard's either-or agent-CLI gate, one runtime missing |
 | `settings-providers` | Settings → Providers with both runtimes healthy |

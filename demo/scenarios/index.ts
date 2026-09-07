@@ -5,6 +5,7 @@ import board from './board.ts';
 import boardCardMenu from './board-card-menu.ts';
 import checksPullRequest from './checks-pull-request.ts';
 import concierge from './concierge.ts';
+import conciergeDelegation from './concierge-delegation.ts';
 import createWorkspaceBranches from './create-workspace-branches.ts';
 import createWorkspaceSources from './create-workspace-sources.ts';
 import dockRunPicker from './dock-run-picker.ts';
@@ -46,6 +47,7 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
 	createWorkspaceBranches,
 	linearIssues,
 	concierge,
+	conciergeDelegation,
 	onboardingWelcome,
 	onboardingAgentCli,
 	settingsProviders,

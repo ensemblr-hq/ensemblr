@@ -196,6 +196,8 @@ channel rather than asked for in the prompt:
   of its own to default to, so an op that names none is refused rather than
   guessed at.
 
+![The Concierge open over one workspace while it works on another: it has replayed that workspace's transcript and read its diff, and is now starting a chat in Rate limit headers, a workspace in the other repository.](./images/06-concierge-delegation.png)
+
 ### Everything it names, you can click
 
 A project, a workspace, a chat, or an artifact the Concierge mentions in its answers renders as a
