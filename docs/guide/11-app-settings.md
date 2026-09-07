@@ -119,10 +119,12 @@ named — declining leaves the update staged. A release build only ever updates 
 another release and Ensemblr Canary only ever to a newer nightly; a copy running
 outside `/Applications` says so rather than failing quietly.
 
-**On Linux it checks but never installs.** The same schedule runs and this pane
-reports the same states, but a newer version is reported with a link to the
-release page instead of downloaded — the AppImage is a file you placed yourself,
-often somewhere read-only.
+**On Linux it installs when it can.** Running as an AppImage in a directory
+Ensemblr can write, this pane reports the same states as on macOS: the newer
+build is downloaded, checked against the checksum GitHub publishes for it, and
+swapped in on restart. A build not running as an AppImage, one somewhere
+read-only, and a release with no published checksum each get a link to the
+release page instead.
 
 **Turn `Update Ensemblr automatically` off when something else owns this copy** —
 a Homebrew cask, or any package manager you would rather do the upgrading. Off

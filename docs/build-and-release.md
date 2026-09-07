@@ -840,7 +840,8 @@ Adding another unbundled or native dependency means updating **both**
 
 - [ADR 0054](./adr/0054-build-releases-in-ci-and-reserve-the-nightly-tag.md) — why releases build in CI, the reserved tag namespace, and the shared channel state.
 - [ADR 0055](./adr/0055-resolve-updates-in-app-against-the-github-releases-api.md) — why the in-app updater resolves its own feed, and why `update.electronjs.org` cannot serve either channel.
-- [ADR 0056](./adr/0056-ship-a-linux-amd64-appimage.md) — why the Linux artifact is an AppImage, why its window controls are app-drawn, and why it checks for updates but never installs one.
+- [ADR 0056](./adr/0056-ship-a-linux-amd64-appimage.md) — why the Linux artifact is an AppImage, and why its window controls are app-drawn. Its updates-never-install rule is amended by ADR 0065 below.
+- [ADR 0065](./adr/0065-install-linux-updates-in-app-by-swapping-the-appimage.md) — why a Linux build now stages a checksum-verified AppImage and swaps it in on restart, and when it still only links at the release page.
 - [ADR 0031](./adr/0031-strip-launch-context-env-and-single-instance-lock.md), [ADR 0032](./adr/0032-channel-scoped-bundle-identity.md) — the Dock-flash fixes.
 - [ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) — why the Claude binary is not packaged.
 - [`../.claude/rules/stack.md`](../.claude/rules/stack.md) — the pinned versions, the two `external` packages, and the `legacy-peer-deps` constraint.

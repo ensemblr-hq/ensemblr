@@ -872,6 +872,11 @@ export const APP_FAILURE_TEXT: Record<
 			'errors:failure.update-unsupported-build',
 			'This build cannot update itself.',
 		),
+	'update-verification-failed': (t) =>
+		t(
+			'errors:failure.update-verification-failed',
+			'The downloaded update did not match the checksum GitHub published for it, so it was discarded.',
+		),
 	'url-invalid': (t) =>
 		t('errors:failure.url-invalid', 'That repository URL is not valid.'),
 	'url-required': (t) =>
