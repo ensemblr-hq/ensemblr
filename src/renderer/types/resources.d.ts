@@ -1013,6 +1013,7 @@ export default interface Resources {
 				'branch-dropped': 'Its local branch was deleted, so restoring the workspace will not bring back commits you never pushed.';
 				reclaimed: 'Reclaimed {{size}} of disk.';
 				title: 'Workspace archived.';
+				'title-named': 'Archived {{workspaceName}}.';
 			};
 			failed: {
 				title: 'Archiving the workspace failed.';

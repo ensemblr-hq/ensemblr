@@ -540,7 +540,6 @@
 	--color-code-border: var(--ensemblr-code-border);
 	--color-terminal: var(--ensemblr-terminal);
 	--color-terminal-foreground: var(--ensemblr-terminal-foreground);
-	--color-terminal-muted: var(--ensemblr-terminal-muted);
 	--color-terminal-border: var(--ensemblr-terminal-border);
 	--color-diff-addition: var(--ensemblr-diff-addition);
 	--color-diff-addition-foreground: var(--ensemblr-diff-addition-foreground);

@@ -16,6 +16,8 @@ export interface ArchivedWorkspace {
 	/** Disk the worktree removal freed, or null when it could not be measured. */
 	bytesFreed: number | null;
 	workspaceId: string;
+	/** Name the archive reported back, or null when it returned no snapshot. */
+	workspaceName: string | null;
 }
 
 /**

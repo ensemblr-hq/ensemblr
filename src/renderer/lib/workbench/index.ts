@@ -1,5 +1,9 @@
 export { isWorkbenchActiveView } from './active-view';
 export { buildAddProjectMenuModel } from './add-project-menu';
+export {
+	archivedWorkspaceTitle,
+	reclaimedDiskDescription,
+} from './archive-announcement';
 export { getChecksPanelState } from './checks-panel-state';
 export {
 	getComposerState,
@@ -22,7 +26,6 @@ export {
 	getCompactFileDirectory,
 	listDirectoryPaths,
 } from './file-tree';
-export { reclaimedDiskDescription } from './format-bytes';
 export { harnessIconClassName, harnessIconName } from './harness-icons';
 export { healthTone } from './health-tone';
 export {

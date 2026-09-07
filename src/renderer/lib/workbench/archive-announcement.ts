@@ -49,10 +49,38 @@ function formatBytes(bytes: number | null, language: string): string | null {
 }
 
 /**
- * Words the disk an archive gave back, for the sentence under "Workspace
- * archived." A measurement that did not complete returns undefined rather than
- * a zero, so the toast simply says nothing about size — `du` failing is not
- * news the user can act on.
+ * Names the workspace an archive just took away, so the toast identifies which
+ * one it was — several can be archived in a row, and the row that vanished from
+ * the sidebar is the only other evidence.
+ *
+ * The archive result carries the name, so it is only missing when the main
+ * process reported no snapshot at all; that case falls back to the nameless
+ * headline rather than interpolating an empty string.
+ * @param options - The archived workspace's name, and the translator.
+ * @returns The toast headline.
+ */
+export function archivedWorkspaceTitle({
+	t,
+	workspaceName,
+}: {
+	t: TFunction;
+	workspaceName: string | null;
+}): string {
+	if (!workspaceName) {
+		return t('errors:workspace-archive.archived.title', 'Workspace archived.');
+	}
+	return t(
+		'errors:workspace-archive.archived.title-named',
+		'Archived {{workspaceName}}.',
+		{ workspaceName },
+	);
+}
+
+/**
+ * Words the disk an archive gave back, for the sentence under the headline
+ * above. A measurement that did not complete returns undefined rather than a
+ * zero, so the toast simply says nothing about size — `du` failing is not news
+ * the user can act on.
  * @param options - Bytes freed, the active language tag, and the translator.
  * @returns The description, or undefined when there is no size to report.
  */

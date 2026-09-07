@@ -21,7 +21,10 @@ import {
 import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
 import { failureText } from '@/renderer/lib/failure-text';
 import { i18n } from '@/renderer/lib/i18n';
-import { reclaimedDiskDescription } from '@/renderer/lib/workbench';
+import {
+	archivedWorkspaceTitle,
+	reclaimedDiskDescription,
+} from '@/renderer/lib/workbench';
 import {
 	ReviewActionError,
 	showReviewActionError,
@@ -239,7 +242,10 @@ export function useReviewMutations({
 				});
 				await removeWorkspace.archived(archivedWorkspaceId);
 				toast.success(
-					t('errors:workspace-archive.archived.title', 'Workspace archived.'),
+					archivedWorkspaceTitle({
+						t,
+						workspaceName: result.workspace?.name ?? null,
+					}),
 					{
 						description: reclaimedDiskDescription({
 							bytesFreed: result.workspace?.bytesFreed ?? null,

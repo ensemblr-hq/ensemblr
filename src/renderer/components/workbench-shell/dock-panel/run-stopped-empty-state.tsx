@@ -20,11 +20,11 @@ export function RunStoppedEmptyState({
 	const { t } = useTranslation();
 
 	return (
-		<div className='terminal-surface flex h-full items-center justify-center p-4'>
+		<div className='flex h-full items-center justify-center bg-sidebar p-4'>
 			<div className='flex flex-col items-center gap-5 text-center'>
 				<PlayIcon
 					aria-hidden='true'
-					className='size-12 fill-current text-terminal-muted'
+					className='size-12 fill-current text-muted-foreground'
 					strokeWidth={0}
 				/>
 				<div className='flex flex-col items-center gap-2'>
@@ -35,11 +35,11 @@ export function RunStoppedEmptyState({
 						variant='outline'
 					>
 						{t('workbench:run-script.start', 'Start Run')}
-						<span className='text-terminal-muted'>
+						<span className='text-muted-foreground'>
 							{formatShortcut('run.start')}
 						</span>
 					</Button>
-					<p className='text-terminal-muted text-xs'>
+					<p className='text-muted-foreground text-xs'>
 						{t(
 							'workbench:run-script.stopped-caption',
 							'Test your changes here.',
