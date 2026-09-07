@@ -144,16 +144,22 @@ whole-token match that reopens the holes above:
   reads. A set with no short flag in it cannot trip the cluster scan.
 - **`FlagGuard.valueLetters` names the short letters of one command that consume
   their value attached**, stopping the scan where the value starts: `-t`/`-e` on
-  `fd`, `-I` on `tree`, and `-I`/`-d`/`-f`/`-r`/`-v` on `date`. Its two
+  `fd`, `-I`/`-P` on `tree`, and `-I`/`-d`/`-f`/`-r`/`-v` on `date`. Its two
   directions are not symmetric — **a letter left out over-blocks a read-only
-  command, a letter wrongly added under-blocks a writing one** — so a letter is
-  listed only after the command is confirmed to take a value on it, never to
-  quiet an unchecked false positive. That confirmation is read per platform as
-  well as per command, because Linux is a first-class target here rather than a
-  port: `date -d` is GNU-only, so a table written against macOS alone denies
-  `date -dyesterday` on the platform where it is the working spelling, while
-  `-v` is BSD-only and the `-s` it could otherwise have hidden does not exist on
-  that binary at all.
+  command, a letter wrongly added under-blocks a writing one** — so the bar for
+  adding one is evidence, never a false positive somebody wanted quiet.
+
+  The table holds two grades of that evidence and the JSDoc says which is which,
+  because a rule with a silent exception is worse than one that names it. The
+  `fd` and `date` letters were **measured** against the installed binaries, and
+  that measurement is read per platform as well as per command, because Linux is
+  a first-class target here rather than a port: `date -d` is GNU-only, so a table
+  written against macOS alone denies `date -dyesterday` on the platform where it
+  is the working spelling, while `-v` is BSD-only and the `-s` it could otherwise
+  have hidden does not exist on that binary at all. The `tree` letters rest on
+  the **documented interface alone**, because tree is not installed on the
+  machines this was written on — a weaker bar, taken because both are
+  unambiguous in every tree manual and `-o` is the only letter `tree` guards.
 
 ### 4. Agent-control ops are gated by op and role, as a pure function
 

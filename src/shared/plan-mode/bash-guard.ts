@@ -242,8 +242,18 @@ const ASSIGNMENT_PREFIX = /^([A-Za-z_][A-Za-z0-9_]*)=/;
  * rest of their token as a value, which stops the cluster scan before it reads
  * that value as more flags. Its two directions are not symmetric: a letter left
  * out over-blocks a read-only command, while a letter wrongly added under-blocks
- * a writing one. Only list a letter after confirming the command takes a value
- * on it, and never widen it to quiet a false positive nobody has checked.
+ * a writing one, so the bar for adding one is evidence rather than a false
+ * positive somebody wanted quiet.
+ *
+ * The table holds two grades of that evidence, and they are not interchangeable.
+ * `fd -e`/`-t` and `date -I`/`-d`/`-f`/`-r`/`-v` were **measured** against the
+ * installed binaries: each answers `option requires an argument` bare, and each
+ * swallows a guarded letter into its value rather than letting it through.
+ * `tree -I`/`-P` rest on tree's **documented interface alone**, because tree is
+ * not installed on the machines this was written on — a weaker bar, taken
+ * because both are unambiguous in every tree manual and the only letter `tree`
+ * guards is `-o`. Measure a letter wherever the binary is there to answer, and
+ * say here when it was not.
  */
 interface FlagGuard {
 	flags: ReadonlySet<string>;
@@ -263,14 +273,15 @@ const SORT_OUTPUT_FILE_GUARD: FlagGuard = {
 };
 
 /**
- * {@link SORT_OUTPUT_FILE_GUARD} for `tree`, whose `-I <pattern>` excludes
- * matching files and takes its value attached, so `tree -Iout` is a pattern
- * rather than the `-o` that writes one.
+ * {@link SORT_OUTPUT_FILE_GUARD} for `tree`, whose two pattern flags take their
+ * value attached — `-I` excludes matching files and `-P` lists only those that
+ * match — so `tree -Iout` and `tree -Pfoo` are patterns rather than the `-o`
+ * that writes a file.
  */
 const TREE_OUTPUT_FILE_GUARD: FlagGuard = {
 	flags: new Set(['--output', '-o']),
 	label: 'writes its output to a file',
-	valueLetters: new Set(['I']),
+	valueLetters: new Set(['I', 'P']),
 };
 
 /**
@@ -474,15 +485,26 @@ function evaluateFind(args: readonly string[]): BashGuardVerdict {
  * file rather than a second input. `uniq in.txt notes.md` truncates `notes.md`
  * with no shell redirection for the `>` scan to catch, while the piped and
  * single-file forms only read.
+ *
+ * `--` ends the options, and everything after it is an operand however it is
+ * spelled. Counting a leading dash as a flag past that point read
+ * `uniq -- -input output` as one positional and let it truncate `output`, which
+ * was verified against a file actually named `-input`.
  * @param args - Tokens after the `uniq` head word.
  * @returns Allowed while at most one positional names a file.
  */
 function evaluateUniq(args: readonly string[]): BashGuardVerdict {
 	let positionals = 0;
+	let optionsEnded = false;
 	let index = 0;
 	while (index < args.length) {
 		const token = args[index] ?? '';
-		if (!token.startsWith('-') || token === '-') {
+		if (!optionsEnded && token === '--') {
+			optionsEnded = true;
+			index += 1;
+			continue;
+		}
+		if (optionsEnded || !token.startsWith('-') || token === '-') {
 			positionals += 1;
 			index += 1;
 			continue;
@@ -533,6 +555,14 @@ function skipGitGlobalFlags(args: readonly string[]): GitGlobals {
  * Scanning the raw list reads a value as an argument of its own, and a sort key
  * is spelled like a flag cluster: `--sort -committerdate` put a `c` in front of
  * the classifier, which matched the `-c` that copies a ref and denied a listing.
+ *
+ * The match runs through {@link guardedFlagIn} so an abbreviation consumes its
+ * value too — git accepts `--forma '%(refname)'`, and matching the token exactly
+ * read the format string as a second argument. Skipping is safe on the same
+ * terms it is correct: every flag here consumes the next token in git as well,
+ * including `--contains` and `--merged`, whose arguments are documented optional
+ * but are taken from argv unless the flag is last. An attached `--format=…`
+ * carries its own value and consumes nothing.
  * @param rest - Tokens after the subcommand.
  * @returns The tokens that are the command's own.
  */
@@ -542,7 +572,10 @@ function refArgumentsWithoutValues(rest: readonly string[]): string[] {
 	while (index < rest.length) {
 		const token = rest[index] ?? '';
 		own.push(token);
-		index += GIT_BRANCH_VALUE_FLAGS.has(token) ? 2 : 1;
+		const consumesValue =
+			!token.includes('=') &&
+			guardedFlagIn(token, GIT_BRANCH_VALUE_FLAGS) !== null;
+		index += consumesValue ? 2 : 1;
 	}
 	return own;
 }

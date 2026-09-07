@@ -92,6 +92,8 @@ const ALLOWED = [
 	'uniq -f 1 in.txt',
 	'uniq -f1 in.txt',
 	'uniq -w 3 in.txt',
+	// One operand after `--` is still one operand.
+	'uniq -- in.txt',
 	// A short flag's attached value is a value, not more clustered flags:
 	// `git diff -O<file>` reads an orderfile, where `-o` would write one.
 	'git diff -O/tmp/orderfile HEAD',
@@ -109,11 +111,16 @@ const ALLOWED = [
 	'git for-each-ref --sort -committerdate',
 	'git branch --sort -committerdate',
 	// A value-taking short letter ends the cluster scan for its own command:
-	// `-t`/`-e` on `fd`, `-I` on `date` and `tree`.
+	// `-t`/`-e` on `fd`, `-I` on `date`, `-I`/`-P` on `tree`.
 	'fd -tx',
 	'fd -exml',
 	'date -Iseconds',
 	'tree -Inode_modules .',
+	'tree -Pfoo .',
+	// git accepts any unambiguous truncation, so an abbreviated value flag
+	// consumes its value too: both of these print refs and write nothing.
+	'git branch --forma "%(refname:short)"',
+	'git branch --forma -d',
 	// `date -d` is GNU-only, so a table written against macOS alone would deny
 	// the form that works on Linux, a first-class target. Verified against
 	// `gdate`: `-d` consumes its value rather than falling through to `-s`.
@@ -256,6 +263,15 @@ const DENIED = [
 	'uniq in.txt notes.md',
 	'uniq -c in.txt notes.md',
 	'uniq -f 1 in.txt notes.md',
+	// After `--` a leading dash is an operand, not a flag. Verified against a
+	// file actually named `-input`: this wrote the deduplicated contents to
+	// `output`, past a scan that had counted only one positional.
+	'uniq -- -input output',
+	'uniq -f 1 -- a b',
+	'uniq -- - output',
+	// Over-blocked rather than parsed: after `--`, `-f` is an input name and `1`
+	// a second operand, which is the safe direction to be wrong in.
+	'uniq -- -f 1 a',
 	// Short flags cluster and take attached values, so a guarded flag hides in
 	// both forms. Every one of these was verified to execute.
 	'sort -o/tmp/out in.txt',
@@ -283,6 +299,11 @@ const DENIED = [
 	'git branch --unset-upst',
 	'git branch --set-upstream-t=origin/master',
 	'git branch --del feature',
+	// An abbreviated value flag consumes its value, but a bare name after that
+	// value still creates a ref, and an abbreviation that is ambiguous between a
+	// listing flag and a mutating one is refused on the mutating reading.
+	'git branch --forma "%(refname)" newbranch',
+	'git branch --m -D feature',
 	'fd --exe rm .',
 ];
 
