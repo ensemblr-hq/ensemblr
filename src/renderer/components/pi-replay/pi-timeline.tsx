@@ -46,7 +46,10 @@ export function PiTimeline({
 					/>
 				) : null}
 			</ConversationContent>
-			<ConversationScrollButton />
+			<ConversationScrollButton
+				columnClassName='mx-auto w-full max-w-3xl px-4'
+				insetClassName='px-0'
+			/>
 		</Conversation>
 	);
 }

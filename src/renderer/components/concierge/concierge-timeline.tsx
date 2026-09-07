@@ -215,7 +215,12 @@ export function ConciergeTimeline({
 									<ChatWorkingIndicator startMs={pendingStartMs} />
 								)}
 							</ConversationContent>
-							<ConversationScrollButton />
+							<ConversationScrollButton
+								columnClassName={
+									centered ? 'mx-auto w-full max-w-4xl' : 'w-full'
+								}
+								insetClassName={centered ? 'px-4' : 'px-3'}
+							/>
 						</Conversation>
 					</TextContextMenu>
 				</MarkdownDocumentScopeProvider>

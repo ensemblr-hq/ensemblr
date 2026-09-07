@@ -126,12 +126,33 @@ const renderConversationContentChildren = (
 	return children;
 };
 
-/** Props for ConversationScrollButton — the underlying Button props. */
-type ConversationScrollButtonProps = ComponentProps<typeof Button>;
+/**
+ * Props for ConversationScrollButton — the underlying Button props, plus the
+ * two boxes that place the floating button. `className` styles the button and
+ * cannot move it; the wrapper classes are what position it.
+ */
+type ConversationScrollButtonProps = ComponentProps<typeof Button> & {
+	/** The centered measure inside the inset — the surface's own composer column. */
+	columnClassName?: string;
+	/** Padding across the panel's full width — the surface's own composer inset. */
+	insetClassName?: string;
+};
 
-/** Floating button that scrolls the conversation to the bottom; hidden while already at the bottom. */
+/**
+ * Floating squircle that scrolls the conversation to the bottom; hidden while
+ * already at the bottom. Its wrapper is two nested boxes repeating whichever
+ * pair the surface's composer uses — an inset across the panel's full width,
+ * then a centered measure inside it — so the button sits flush with the
+ * composer's left edge and mirrors the unread pill anchored to its right. The
+ * defaults are the workbench composer's box; a surface laid out differently
+ * passes its own, and one with no composer passes its transcript column. The
+ * nesting is load-bearing: an inset outside the measure and one inside it put
+ * that left edge in different places once the panel outgrows the measure.
+ */
 export const ConversationScrollButton = ({
 	className,
+	columnClassName = 'mx-auto w-full max-w-4xl',
+	insetClassName = 'px-4',
 	...props
 }: ConversationScrollButtonProps) => {
 	const { t } = useTranslation();
@@ -143,23 +164,32 @@ export const ConversationScrollButton = ({
 
 	return (
 		!isAtBottom && (
-			<Button
-				aria-label={t(
-					'common:conversation.scroll-to-newest',
-					'Scroll to newest message',
-				)}
+			<div
 				className={cn(
-					'absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full dark:bg-background dark:hover:bg-muted',
-					className,
+					'pointer-events-none absolute inset-x-0 bottom-1',
+					insetClassName,
 				)}
-				onClick={handleScrollToBottom}
-				size='icon'
-				type='button'
-				variant='outline'
-				{...props}
 			>
-				<ArrowDownIcon className='size-4' />
-			</Button>
+				<div className={cn('flex', columnClassName)}>
+					<Button
+						aria-label={t(
+							'common:conversation.scroll-to-newest',
+							'Scroll to newest message',
+						)}
+						className={cn(
+							'corner-squircle pointer-events-auto rounded-2xl dark:bg-background dark:hover:bg-muted',
+							className,
+						)}
+						onClick={handleScrollToBottom}
+						size='icon'
+						type='button'
+						variant='outline'
+						{...props}
+					>
+						<ArrowDownIcon className='size-4' />
+					</Button>
+				</div>
+			</div>
 		)
 	);
 };
