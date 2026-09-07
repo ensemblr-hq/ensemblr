@@ -96,6 +96,14 @@ export interface TerminalSessionSnapshot {
 	 * scripts is live and gate the Run button on it.
 	 */
 	scriptName: string | null;
+	/**
+	 * Absolute path of the shell binary the PTY spawned. An interactive terminal
+	 * runs the user's own login shell, which may be one — fish — whose syntax a
+	 * POSIX command does not survive; a session carrying a command runs a POSIX
+	 * shell instead, since repository scripts routinely use constructs fish
+	 * rejects. Read it before composing input for a session you did not spawn.
+	 */
+	shell: string;
 	status: TerminalSessionStatus;
 	title: string;
 	/**

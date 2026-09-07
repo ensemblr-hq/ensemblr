@@ -51,7 +51,7 @@ fails, surfaces an error, and leaves the file byte-for-byte intact.
 
 | Key | Type | What it does |
 | --- | --- | --- |
-| `environment_variables` | table | Repository-scoped env vars, passed to agent sessions, scripts, and terminals. Names must be valid POSIX identifiers. |
+| `environment_variables` | table | Repository-scoped env vars, assembled into the environment of terminals and scripts — an agent session's own shell tool does not carry them. Names must be valid POSIX identifiers. |
 | `file_include_globs` | array of strings | Gitignore-style patterns for untracked files copied into every new workspace. Defaults to `[".env*"]`. |
 
 **Never put a secret in `environment_variables`** — the file is committed. Link
@@ -222,8 +222,13 @@ SQLite with its secret in the macOS Keychain.
 | `project_name` | string | Display name, so the pane can name the project before a fetch. |
 
 Values resolve live at every launch, so a rotated secret takes effect on the
-next terminal, script, or agent started. Keys the app does not model survive a
-rewrite untouched.
+next terminal or script started. Keys the app does not model survive a rewrite
+untouched.
+
+**These secrets reach terminals and scripts only.** An agent session is spawned
+with the login shell's environment plus its control token, so an agent's own
+shell tool has none of them — a command needing one has to run through
+`ensemblr_start_terminal` and `ensemblr_write_terminal`.
 
 ## `~/.config/ensemblr/config.json`
 

@@ -108,6 +108,47 @@ why `ensemblr_get_workspace_diff` takes `stat: true` (which files changed, and
 how large) and `filePath` (one file at a time) — call it with `stat: true`
 first, then read what you actually need.
 
+## Terminals
+
+A terminal you open is a tab in the user's dock, and only they can take it away
+unless you close it yourself. Four habits keep that surface honest.
+
+**Know when you need one.** Your own shell tool is right for a command you just
+want the output of. An Ensemblr terminal is for a long-lived process the user
+should watch and keep, an interactive session they may take over, and anything
+needing the workspace's own environment.
+
+**The workspace environment lives in terminals and nowhere else.** The values
+under `environment_variables`, the Keychain-backed rows in Settings, and every
+secret a linked Infisical project supplies are assembled for terminals and
+scripts. They are *not* in the environment your own shell tool runs under — an
+agent session is spawned with the login shell's environment plus its control
+token, and nothing else. So a command needing an Infisical secret fails in your
+shell and succeeds in an Ensemblr terminal. Run it there, and never echo a
+resolved secret into an answer, a file, or a commit.
+
+**Reuse before you start.** `ensemblr_list_terminals` reports each terminal's
+`kind`, `status`, `scriptName`, the `shell` it runs, and `foregroundCommand` —
+the command occupying it, `null` when the shell itself is at its prompt. A
+`terminal` row that is `running` with a null `foregroundCommand` is idle and
+yours to write into. Starting a second one beside it is how a dock fills up.
+
+**Write in that terminal's shell.** `ensemblr_start_terminal` and
+`ensemblr_list_terminals` both report `shell`. An interactive terminal runs the
+user's login shell, which need not be POSIX: under fish, `VAR=x cmd` and
+`export VAR=x` are errors, and the equivalents are `env VAR=x cmd` and
+`set -x VAR x`. Input is typed at the prompt rather than run for you, so end a
+command with a newline.
+
+**Clean up what you opened.** `ensemblr_stop_terminal` stops a terminal and
+leaves its tab so the output stays readable; add `close: true` once you are done
+reading to take the tab away too. Closing needs `terminalId` and applies to an
+interactive terminal only — a script or harness session is refused. So is a
+close on any terminal your session did not itself start: that one comes back
+`denied-scope`, because closing discards the scrollback for good. An ordinary
+stop is recoverable and is not gated that way, so it is still on you not to stop
+a terminal somebody else is using.
+
 ## Delegation
 
 Do the work yourself by default. Delegate only when the task genuinely splits

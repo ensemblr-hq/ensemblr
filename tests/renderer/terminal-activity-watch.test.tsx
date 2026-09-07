@@ -39,6 +39,7 @@ function createSession(
 		restored: false,
 		rows: 24,
 		scriptName: null,
+		shell: '/bin/zsh',
 		status: 'running',
 		title: 'Terminal',
 		titleIsDefault: false,

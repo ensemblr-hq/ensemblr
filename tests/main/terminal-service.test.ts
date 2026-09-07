@@ -959,8 +959,8 @@ test('interactive sessions use the user shell; script commands use the script sh
 		workspaceEnvironmentService: createWorkspaceEnvironmentStub(),
 	});
 
-	await service.create({ workspaceId: WORKSPACE_ID });
-	await service.create({
+	const interactive = await service.create({ workspaceId: WORKSPACE_ID });
+	const script = await service.create({
 		command: 'bun install',
 		kind: 'setup-script',
 		workspaceId: WORKSPACE_ID,
@@ -968,6 +968,10 @@ test('interactive sessions use the user shell; script commands use the script sh
 
 	assert.deepEqual(spawnedFiles, ['/usr/local/bin/fish', '/bin/zsh']);
 	assert.deepEqual(spawnedArgs, [['-l'], ['-c', 'bun install']]);
+	// The snapshot is where an agent reads which syntax its input has to be in,
+	// so it has to name the shell actually spawned rather than a default.
+	assert.equal(interactive.session?.shell, '/usr/local/bin/fish');
+	assert.equal(script.session?.shell, '/bin/zsh');
 	assert.equal(spawnedEnvs[0]?.COLORTERM, 'truecolor');
 	assert.equal(spawnedEnvs[0]?.TERM_PROGRAM, 'Ensemblr');
 	assert.ok(spawnedEnvs[0]?.LANG);
