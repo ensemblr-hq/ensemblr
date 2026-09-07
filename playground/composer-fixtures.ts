@@ -106,6 +106,7 @@ export function useComposerStub({
 			activeAgentSessionId: 'playground-session',
 			availableModels: MODELS,
 			availableThinkingLevels: THINKING_LEVELS,
+			chatReferences: [],
 			contextUsage: { maxTokens: 200_000, usedTokens: 48_000 },
 			disabled,
 			disabledReason: null,

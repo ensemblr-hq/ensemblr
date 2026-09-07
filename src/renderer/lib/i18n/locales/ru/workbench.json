@@ -101,6 +101,7 @@
 		"tooltip": "Добавить файлы, прикрепить задачи и другое"
 	},
 	"autocomplete": {
+		"closed-chat": "закрыт",
 		"closed-chat-in": "{{workspace}} · закрыт",
 		"no-commands": "Команды не найдены",
 		"no-files": "Файлы не найдены",

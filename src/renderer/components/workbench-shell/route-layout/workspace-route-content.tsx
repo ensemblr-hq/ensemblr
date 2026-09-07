@@ -7,6 +7,7 @@ import { CloseRunningChatDialog } from '@/renderer/components/workbench-shell/co
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import { WorkspaceWorkbenchContent } from '@/renderer/components/workbench-shell/workspace-content';
 import { useAskAgentSetupScript } from '@/renderer/hooks/workbench-shell/composer/use-ask-agent-setup-script';
+import { useWorkspaceChatReferences } from '@/renderer/hooks/workbench-shell/composer/use-workspace-chat-references';
 import { useChatRouteRepair } from '@/renderer/hooks/workbench-shell/route-layout/use-chat-route-repair';
 import { useGuardedSessionClose } from '@/renderer/hooks/workbench-shell/route-layout/use-guarded-session-close';
 import { useLiveWorkspaceModel } from '@/renderer/hooks/workbench-shell/route-layout/use-live-workspace-model';
@@ -171,11 +172,17 @@ export function WorkspaceRouteContent({
 		sessionNavigation,
 		workspaceId: activeWorkspace.id,
 	});
+	const chatReferences = useWorkspaceChatReferences({
+		excludeChatTabId: activeSession.chatTabId,
+		workspaceId: activeWorkspace.id,
+		workspaceName: activeWorkspace.name,
+	});
 	const composer = getComposerState({
 		activeAgentSessionId: agentComposer.activeSessionId,
 		activeSession,
 		availableModels: agentComposer.availableModels,
 		availableThinkingLevels: agentComposer.availableThinkingLevels,
+		chatReferences,
 		contextUsage: agentComposer.contextUsage,
 		isStreaming: agentComposer.isStreaming,
 		liveAgentSessionId: agentComposer.liveSessionId,

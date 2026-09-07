@@ -3,9 +3,11 @@ import { type RefObject, useCallback, useState } from 'react';
 
 import type { ComposerEditorHandle } from '@/renderer/components/workbench-shell/conversation-panel/composer/editor';
 import { detectAutocomplete } from '@/renderer/hooks/workbench-shell/composer/use-autocomplete';
+import { useChatReferenceMatches } from '@/renderer/hooks/workbench-shell/composer/use-chat-reference-matches';
 import { useMentionMatches } from '@/renderer/hooks/workbench-shell/composer/use-mention-matches';
 import { useSlashCommands } from '@/renderer/hooks/workbench-shell/composer/use-slash-commands';
 import { useSlashMatches } from '@/renderer/hooks/workbench-shell/composer/use-slash-matches';
+import { conciergeReferenceAttachment } from '@/renderer/lib/concierge';
 import {
 	mentionReplacementRange,
 	resolveComposerProvider,
@@ -21,6 +23,7 @@ import type {
 	ComposerShellState,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
+import type { ConciergeReference } from '@/shared/concierge-references';
 
 /** Default empty autocomplete state — caret outside any `@` or `/` token. */
 const EMPTY_AUTOCOMPLETE: AutocompleteState = {
@@ -50,6 +53,11 @@ function stepActiveIndex(stored: number, delta: number, total: number): number {
  * A `/`-command picked on an otherwise empty draft submits straight away; every
  * other pick rewrites the token in place — a mention becomes a chip sitting
  * where the token was, so the attachment stays in the sentence.
+ *
+ * The `@` menu offers two lists over one index space: this workspace's other
+ * chats first, then its files. Chats lead because the file list is ranked eighty
+ * deep and hierarchically, so a chat placed after it would never be reached,
+ * where a file placed after five chats is one page of the menu away.
  * @param input - The live draft, the composer shell, and the sinks a pick writes to
  * @returns The open state, the match lists, and the handlers the editor binds to
  */
@@ -75,6 +83,10 @@ export function useComposerAutocomplete({
 
 	const mentionMatches = useMentionMatches(
 		composer.workspaceFiles,
+		mentionOpen ? autocomplete.query : '',
+	);
+	const chatMatches = useChatReferenceMatches(
+		composer.chatReferences,
 		mentionOpen ? autocomplete.query : '',
 	);
 	const slashCatalogue = useSlashCommands(
@@ -125,6 +137,20 @@ export function useComposerAutocomplete({
 		[autocomplete, dismissAutocomplete, editorRef, setAttachmentError, value],
 	);
 
+	const onChatReferenceSelect = useCallback(
+		(reference: ConciergeReference) => {
+			setAttachmentError(null);
+			const range = mentionReplacementRange(value, autocomplete);
+			editorRef.current?.replaceRangeWithAttachment(
+				range.start,
+				range.end,
+				conciergeReferenceAttachment(reference),
+			);
+			dismissAutocomplete();
+		},
+		[autocomplete, dismissAutocomplete, editorRef, setAttachmentError, value],
+	);
+
 	const onSlashSelect = useCallback(
 		(command: string, autoSubmit: boolean) => {
 			recordSlashUsage((usage) =>
@@ -153,7 +179,7 @@ export function useComposerAutocomplete({
 
 	const autocompleteKind: AutocompleteKind = autocomplete.kind;
 	const autocompleteTotal = mentionOpen
-		? mentionMatches.length
+		? chatMatches.length + mentionMatches.length
 		: slashMatches.length * Number(slashOpen);
 	// The list can shrink under a stored index — a mention list narrows while the
 	// token is untouched — which would strand the highlight off the end and make
@@ -167,7 +193,12 @@ export function useComposerAutocomplete({
 
 	const confirmAutocomplete = useCallback(() => {
 		if (mentionOpen) {
-			const match = mentionMatches[safeActiveIndex];
+			const chat = chatMatches[safeActiveIndex];
+			if (chat) {
+				onChatReferenceSelect(chat.reference);
+				return;
+			}
+			const match = mentionMatches[safeActiveIndex - chatMatches.length];
 			if (match) {
 				onMentionSelect(match.entry);
 			}
@@ -178,8 +209,10 @@ export function useComposerAutocomplete({
 			onSlashSelect(match.item.command, match.item.autoSubmit);
 		}
 	}, [
+		chatMatches,
 		mentionOpen,
 		mentionMatches,
+		onChatReferenceSelect,
 		onMentionSelect,
 		onSlashSelect,
 		safeActiveIndex,
@@ -192,9 +225,11 @@ export function useComposerAutocomplete({
 		autocompleteActive: autocompleteKind !== null && autocompleteTotal > 0,
 		autocompleteKind,
 		autocompleteTotal,
+		chatMatches,
 		confirmAutocomplete,
 		dismissAutocomplete,
 		mentionMatches,
+		onChatReferenceSelect,
 		onMentionSelect,
 		onSlashSelect,
 		setActiveIndex,
