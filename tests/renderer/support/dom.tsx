@@ -8,6 +8,8 @@ import { type RenderResult, render } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
 import { TooltipProvider } from '@/renderer/components/ui/tooltip';
 
+export { installLocalStorage } from './web-storage';
+
 /** A QueryClient tuned for tests: no retries, no background refetch churn. */
 export function createTestQueryClient(): QueryClient {
 	return new QueryClient({
@@ -51,38 +53,6 @@ export function installEnsemblrApi(api: Record<string, unknown>): void {
 /** Removes the stub bridge so a later test starts without one. */
 export function clearEnsemblrApi(): void {
 	(window as unknown as { ensemblr?: unknown }).ensemblr = undefined;
-}
-
-/**
- * Installs a fresh Map-backed `window.localStorage`, so a test that asserts on
- * stored values owns the whole store. Reinstalling resets it.
- *
- * happy-dom ships no `localStorage` of its own; what a test sees without this is
- * whatever the host Node exposes as a process global, which is a real store on
- * Node 24 and nothing at all on some later versions. The shared setup empties
- * that before every test, so this is for tests that want their own object rather
- * than for isolation.
- */
-export function installLocalStorage(): void {
-	const items = new Map<string, string>();
-	const storage: Storage = {
-		clear: () => items.clear(),
-		getItem: (key) => items.get(key) ?? null,
-		key: (index) => Array.from(items.keys())[index] ?? null,
-		get length() {
-			return items.size;
-		},
-		removeItem: (key) => {
-			items.delete(key);
-		},
-		setItem: (key, value) => {
-			items.set(key, value);
-		},
-	};
-	Object.defineProperty(window, 'localStorage', {
-		configurable: true,
-		value: storage,
-	});
 }
 
 /**
