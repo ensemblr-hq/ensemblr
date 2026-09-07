@@ -55,10 +55,16 @@ export type TitlePair = readonly [() => string, () => string];
  * object's noun, because a workspace agent steers a child it owns and a peer or
  * the Review conversation with the same op.
  *
+ * Only a child the caller owns earns the sub-agent noun in
+ * {@link EnsemblrToolLabel.title}. Everything else — a peer, the Review
+ * conversation, a batch mixing the two roles, an id no longer in the catalogue —
+ * reads as a chat, which is the word the user sees in the tab strip and the one
+ * true of every conversation the app runs.
+ *
  * Two shapes, because the role is reachable two ways. A spawn already carries the
  * answer in its own arguments — `peer: true` is what made the thing a root — and
- * so resolves for certain, which is why it declares no unresolved wording. A tool
- * handed session ids has to look them up, and a lookup can come up empty.
+ * so resolves for certain. A tool handed session ids has to look them up, and a
+ * lookup can come up empty.
  */
 type TargetNaming =
 	| {
@@ -67,7 +73,7 @@ type TargetNaming =
 			 * rather than a child.
 			 */
 			peerFlagKey: string;
-			orchestrator: TitlePair;
+			chat: TitlePair;
 	  }
 	| {
 			/**
@@ -81,13 +87,8 @@ type TargetNaming =
 			 * and those are children by construction.
 			 */
 			sessionKeys: readonly string[];
-			/** Every named target resolved to a root orchestrator. */
-			orchestrator: TitlePair;
-			/**
-			 * Nothing resolved, or a batch mixed the two roles — no single noun is
-			 * true of the set, so the row says only that it acted on a chat.
-			 */
-			unresolved: TitlePair;
+			/** Anything the call named that is not wholly the caller's own children. */
+			chat: TitlePair;
 	  };
 
 /**
@@ -377,31 +378,19 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		],
 		glyph: 'bot',
 		target: {
-			orchestrator: [
+			chat: [
 				() =>
 					i18n.t(
-						'workbench:control-tool.get-conversation-status.orchestrator.done',
-						'Checked an orchestrator',
-					),
-				() =>
-					i18n.t(
-						'workbench:control-tool.get-conversation-status.orchestrator.running',
-						'Checking an orchestrator',
-					),
-			],
-			sessionKeys: ['agentSessionId'],
-			unresolved: [
-				() =>
-					i18n.t(
-						'workbench:control-tool.get-conversation-status.unresolved.done',
+						'workbench:control-tool.get-conversation-status.chat.done',
 						'Checked a chat',
 					),
 				() =>
 					i18n.t(
-						'workbench:control-tool.get-conversation-status.unresolved.running',
+						'workbench:control-tool.get-conversation-status.chat.running',
 						'Checking a chat',
 					),
 			],
+			sessionKeys: ['agentSessionId'],
 		},
 		title: [
 			() =>
@@ -448,31 +437,19 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		],
 		glyph: 'bot',
 		target: {
-			orchestrator: [
+			chat: [
 				() =>
 					i18n.t(
-						'workbench:control-tool.get-last-message.orchestrator.done',
-						"Read an orchestrator's report",
-					),
-				() =>
-					i18n.t(
-						'workbench:control-tool.get-last-message.orchestrator.running',
-						"Reading an orchestrator's report",
-					),
-			],
-			sessionKeys: ['agentSessionId'],
-			unresolved: [
-				() =>
-					i18n.t(
-						'workbench:control-tool.get-last-message.unresolved.done',
+						'workbench:control-tool.get-last-message.chat.done',
 						"Read a chat's report",
 					),
 				() =>
 					i18n.t(
-						'workbench:control-tool.get-last-message.unresolved.running',
+						'workbench:control-tool.get-last-message.chat.running',
 						"Reading a chat's report",
 					),
 			],
+			sessionKeys: ['agentSessionId'],
 		},
 		title: [
 			() =>
@@ -724,12 +701,12 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 			() =>
 				i18n.t(
 					'workbench:control-tool.notify-orchestrator.done',
-					'Notified the orchestrator',
+					'Notified the parent chat',
 				),
 			() =>
 				i18n.t(
 					'workbench:control-tool.notify-orchestrator.running',
-					'Notifying the orchestrator',
+					'Notifying the parent chat',
 				),
 		],
 	},
@@ -758,31 +735,19 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		],
 		glyph: 'bot',
 		target: {
-			orchestrator: [
+			chat: [
 				() =>
 					i18n.t(
-						'workbench:control-tool.read-conversation.orchestrator.done',
-						"Read an orchestrator's transcript",
-					),
-				() =>
-					i18n.t(
-						'workbench:control-tool.read-conversation.orchestrator.running',
-						"Reading an orchestrator's transcript",
-					),
-			],
-			sessionKeys: ['agentSessionId'],
-			unresolved: [
-				() =>
-					i18n.t(
-						'workbench:control-tool.read-conversation.unresolved.done',
+						'workbench:control-tool.read-conversation.chat.done',
 						"Read a chat's transcript",
 					),
 				() =>
 					i18n.t(
-						'workbench:control-tool.read-conversation.unresolved.running',
+						'workbench:control-tool.read-conversation.chat.running',
 						"Reading a chat's transcript",
 					),
 			],
+			sessionKeys: ['agentSessionId'],
 		},
 		title: [
 			() =>
@@ -828,31 +793,19 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		],
 		glyph: 'send',
 		target: {
-			orchestrator: [
+			chat: [
 				() =>
 					i18n.t(
-						'workbench:control-tool.send-follow-up.orchestrator.done',
-						'Steered an orchestrator',
-					),
-				() =>
-					i18n.t(
-						'workbench:control-tool.send-follow-up.orchestrator.running',
-						'Steering an orchestrator',
-					),
-			],
-			sessionKeys: ['agentSessionId'],
-			unresolved: [
-				() =>
-					i18n.t(
-						'workbench:control-tool.send-follow-up.unresolved.done',
+						'workbench:control-tool.send-follow-up.chat.done',
 						'Steered a chat',
 					),
 				() =>
 					i18n.t(
-						'workbench:control-tool.send-follow-up.unresolved.running',
+						'workbench:control-tool.send-follow-up.chat.running',
 						'Steering a chat',
 					),
 			],
+			sessionKeys: ['agentSessionId'],
 		},
 		title: [
 			() =>
@@ -931,16 +884,16 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		detailKeys: ['title'],
 		glyph: 'bot',
 		target: {
-			orchestrator: [
+			chat: [
 				() =>
 					i18n.t(
-						'workbench:control-tool.start-conversation.orchestrator.done',
-						'Started an orchestrator',
+						'workbench:control-tool.start-conversation.chat.done',
+						'Started a chat',
 					),
 				() =>
 					i18n.t(
-						'workbench:control-tool.start-conversation.orchestrator.running',
-						'Starting an orchestrator',
+						'workbench:control-tool.start-conversation.chat.running',
+						'Starting a chat',
 					),
 			],
 			peerFlagKey: 'peer',
@@ -1006,31 +959,19 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		],
 		glyph: 'hourglass',
 		target: {
-			orchestrator: [
+			chat: [
 				() =>
 					i18n.t(
-						'workbench:control-tool.wait-for-agents.orchestrator.done',
-						'Waited for orchestrators',
+						'workbench:control-tool.wait-for-agents.chat.done',
+						'Waited for chats',
 					),
 				() =>
 					i18n.t(
-						'workbench:control-tool.wait-for-agents.orchestrator.running',
-						'Waiting for orchestrators',
+						'workbench:control-tool.wait-for-agents.chat.running',
+						'Waiting for chats',
 					),
 			],
 			sessionKeys: ['targets.*'],
-			unresolved: [
-				() =>
-					i18n.t(
-						'workbench:control-tool.wait-for-agents.unresolved.done',
-						'Waited for the chats',
-					),
-				() =>
-					i18n.t(
-						'workbench:control-tool.wait-for-agents.unresolved.running',
-						'Waiting for the chats',
-					),
-			],
 		},
 		title: [
 			() =>
