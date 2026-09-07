@@ -9,7 +9,6 @@ const ALLOWED = [
 	'grep -rn "planMode" src',
 	'head -20 README.md',
 	'jq .name package.json',
-	'FOO=bar ls',
 	'wc -l src/main/main.ts 2>/dev/null',
 	'ls 2>&1 | grep src',
 	'cat package.json >/dev/null 2>&1',
@@ -83,6 +82,56 @@ const ALLOWED = [
 	'git stash list',
 	'git stash show -p',
 	'git remote get-url origin',
+	// `uniq` writes only when it is given a second positional; the piped and
+	// single-file forms an agent actually reaches for still read.
+	'uniq -c',
+	'sort access.log | uniq -c',
+	'uniq in.txt',
+	'uniq -',
+	// `-f`/`-s`/`-w` take a count, so the token after one is not a second file.
+	'uniq -f 1 in.txt',
+	'uniq -f1 in.txt',
+	'uniq -w 3 in.txt',
+	// One operand after `--` is still one operand.
+	'uniq -- in.txt',
+	// A short flag's attached value is a value, not more clustered flags:
+	// `git diff -O<file>` reads an orderfile, where `-o` would write one.
+	'git diff -O/tmp/orderfile HEAD',
+	'git diff -O /tmp/orderfile HEAD',
+	'date -u +%s',
+	'git branch -rv',
+	// git has no short output flag at all — `git diff -o` answers `invalid
+	// option` — so nothing a read-only subcommand spells with a single dash may
+	// be read as one. Each of these is a `-o`/`-c` collision inside a value.
+	'git status -uno',
+	'git status -uall',
+	'git ls-files -o',
+	'git log -Sneedle',
+	'git log -Sconsole.log',
+	'git for-each-ref --sort -committerdate',
+	'git branch --sort -committerdate',
+	// A value-taking short letter ends the cluster scan for its own command:
+	// `-t`/`-e` on `fd`, `-I` on `date`, `-I`/`-P` on `tree`.
+	'fd -tx',
+	'fd -exml',
+	'date -Iseconds',
+	'tree -Inode_modules .',
+	'tree -Pfoo .',
+	// git accepts any unambiguous truncation, so an abbreviated value flag
+	// consumes its value too: both of these print refs and write nothing.
+	'git branch --forma "%(refname:short)"',
+	'git branch --forma -d',
+	// `date -d` is GNU-only, so a table written against macOS alone would deny
+	// the form that works on Linux, a first-class target. Verified against
+	// `gdate`: `-d` consumes its value rather than falling through to `-s`.
+	'date -dyesterday',
+	'date -r1700000000',
+	'date -v-1d',
+	// `--type fx` is not a filetype fd accepts, so this runs nothing at all —
+	// `-t` swallowing the `x` is what `fd -tx` needs to stay readable.
+	'fd -tfx rm',
+	// A scratch directory whose path spells `-o` is still a path.
+	'sort -T/tmp/sort-work in.txt',
 ];
 
 const DENIED = [
@@ -190,6 +239,72 @@ const DENIED = [
 	'git branch --unset-upstream',
 	'git branch --edit-description',
 	'git branch -c old new',
+	// A leading assignment is `env` without the word: git resolves several of
+	// these to a program it then runs during an otherwise read-only subcommand.
+	// Verified to execute with no terminal attached and nothing placed on disk
+	// beforehand, which is what makes the head word alone a false reading.
+	`GIT_EXTERNAL_DIFF='sh -c "touch /tmp/pwned"' git diff HEAD~1`,
+	'GIT_CONFIG_GLOBAL=./evil.ini git status',
+	'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.external GIT_CONFIG_VALUE_0=./evil.sh git diff',
+	'GIT_SSH_COMMAND=./evil.sh git ls-remote',
+	'GIT_PAGER=./evil.sh git log',
+	// `PATH` and `LD_PRELOAD` redirect the binary itself, and a hostile
+	// repository ships the executable they point at.
+	'PATH=./tools ls',
+	'LD_PRELOAD=./evil.so ls',
+	// No safe-list: the deny side is unbounded across every allowlisted binary,
+	// so an assignment that looks harmless is refused with the rest.
+	'FOO=bar ls',
+	'LC_ALL=C sort in.txt',
+	// Each chained segment is classified on its own, so an assignment cannot
+	// hide behind a leading read.
+	'cd /tmp && FOO=1 ls',
+	// `uniq` truncates its second positional with no redirection to notice.
+	'uniq in.txt notes.md',
+	'uniq -c in.txt notes.md',
+	'uniq -f 1 in.txt notes.md',
+	// After `--` a leading dash is an operand, not a flag. Verified against a
+	// file actually named `-input`: this wrote the deduplicated contents to
+	// `output`, past a scan that had counted only one positional.
+	'uniq -- -input output',
+	'uniq -f 1 -- a b',
+	'uniq -- - output',
+	// Over-blocked rather than parsed: after `--`, `-f` is an input name and `1`
+	// a second operand, which is the safe direction to be wrong in.
+	'uniq -- -f 1 a',
+	// Short flags cluster and take attached values, so a guarded flag hides in
+	// both forms. Every one of these was verified to execute.
+	'sort -o/tmp/out in.txt',
+	'sort -no /tmp/out in.txt',
+	'sort -no/tmp/out in.txt',
+	'tree -Lo out.txt',
+	'fd -Hx rm .',
+	'date -s2020-01-01',
+	'date --set=2020-01-01',
+	'git grep -iO vim planMode',
+	'git grep -Ovim planMode',
+	'git diff --output=/tmp/out HEAD',
+	'git log --output=/tmp/out',
+	'git branch -rd origin/feature',
+	// git's parse-options and getopt_long both accept any unambiguous
+	// truncation of a long flag, so the guard has to as well. `sort --out=` was
+	// verified to write the file and `git branch --unset-upst` to parse.
+	'sort --out=/tmp/out in.txt',
+	'sort --outp=/tmp/out in.txt',
+	'sort --outpu /tmp/out in.txt',
+	'tree --outp=/tmp/out',
+	'date --se=2020-01-01',
+	'git diff --outpu=/tmp/out HEAD',
+	'git --exec-pa=/tmp log',
+	'git branch --unset-upst',
+	'git branch --set-upstream-t=origin/master',
+	'git branch --del feature',
+	// An abbreviated value flag consumes its value, but a bare name after that
+	// value still creates a ref, and an abbreviation that is ambiguous between a
+	// listing flag and a mutating one is refused on the mutating reading.
+	'git branch --forma "%(refname)" newbranch',
+	'git branch --m -D feature',
+	'fd --exe rm .',
 ];
 
 describe('isReadOnlyBashCommand', () => {
@@ -249,6 +364,46 @@ describe('isReadOnlyBashCommand', () => {
 
 	it('allows `rg -o`, whose `-o` is `--only-matching`, not an output file', () => {
 		expect(isReadOnlyBashCommand('rg -o "\\w+" src')).toEqual({ ok: true });
+	});
+
+	it('names the variable an assignment set, not the head word it hid behind', () => {
+		const verdict = isReadOnlyBashCommand(
+			'GIT_EXTERNAL_DIFF=./evil.sh git diff HEAD~1',
+		);
+		expect(verdict.ok).toBe(false);
+		if (!verdict.ok) {
+			expect(verdict.reason).toContain('GIT_EXTERNAL_DIFF');
+			expect(verdict.reason).not.toContain('read-only git subcommand');
+		}
+	});
+
+	it('says `uniq` writes its second argument rather than reading it', () => {
+		const verdict = isReadOnlyBashCommand('uniq in.txt notes.md');
+		expect(verdict.ok).toBe(false);
+		if (!verdict.ok) {
+			expect(verdict.reason).toContain('writes its second argument');
+		}
+	});
+
+	it('names the whole flag an abbreviation stood for', () => {
+		const verdict = isReadOnlyBashCommand('sort --outp=/tmp/out in.txt');
+		expect(verdict.ok).toBe(false);
+		if (!verdict.ok) {
+			expect(verdict.reason).toContain('sort --output');
+		}
+	});
+
+	it('reads `git status -uno` as untracked-files mode, not an output file', () => {
+		expect(isReadOnlyBashCommand('git status -uno')).toEqual({ ok: true });
+		expect(isReadOnlyBashCommand('git status --output=/tmp/x').ok).toBe(false);
+	});
+
+	it('names the short flag a cluster carried, not the whole cluster', () => {
+		const verdict = isReadOnlyBashCommand('sort -no /tmp/out in.txt');
+		expect(verdict.ok).toBe(false);
+		if (!verdict.ok) {
+			expect(verdict.reason).toContain('sort -o');
+		}
 	});
 
 	it('blames the chained command, not the `cd` that preceded it', () => {

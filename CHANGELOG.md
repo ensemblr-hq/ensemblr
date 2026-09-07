@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Plan Mode and the Concierge could be talked past with a leading environment assignment.** The
+  `bash` guard dropped `NAME=value` tokens to reach the head word without ever inspecting them, so it
+  judged a command by a word that was not the thing being run. `GIT_EXTERNAL_DIFF='sh -c …' git diff`
+  and `GIT_CONFIG_GLOBAL=… git status` both reached arbitrary execution while the gate read them as
+  read-only git inspection, and `PATH=` redirects the binary itself — which a hostile repository can
+  supply, because git preserves the exec bit. A leading assignment is now refused outright, with no
+  safe-list: the deny side is unbounded across every allowlisted binary, so there is no allowed subset
+  to enumerate, and the refusal names the variable and says to re-run without it. Three sibling holes
+  in the same classifier went with it — `uniq <in> <out>` truncates its second operand with no
+  redirection for the `>` scan to catch, and does so past a `--` as well; flag guards compared whole
+  tokens, so `sort -o/tmp/x`, `sort -no /tmp/x`, `fd -Hx` and `git grep -iO` walked through them; and
+  both git's parse-options and `getopt_long` accept any unambiguous truncation, so `sort --out=` wrote
+  a file and `git branch --unset-upst` cleared a branch's upstream. Matching every spelling costs
+  precision, so each guard's flags are scoped to the command that really has them — git's output guard
+  is long-only, since git has no short output flag anywhere — and a per-command table of value-taking
+  letters stops the scan where an attached value begins, which keeps `git status -uno`, `git log -S`
+  and `date -Iseconds` readable. Only Pi Plan Mode and the Concierge were exposed: the `read-only`
+  workspace mode withholds the shell outright on both runtimes, and Claude Code's plan mode is its own
+  native gate. ADR 0044 §3 records the decisions and the false-positive discipline they rest on.
+  Reported privately under `SECURITY.md`. (#491)
+
 ## [0.1.6] - 2026-09-07
 
 **Linux updates now install in the app instead of sending the user to a release page, and an agent

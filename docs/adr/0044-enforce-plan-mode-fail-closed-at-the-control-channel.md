@@ -111,10 +111,55 @@ invisible to a classifier that only reads tokens. `git branch` is denied a bare
 name and the flags that reset, retarget, or rename a ref, while its listing forms
 still pass.
 
-The corresponding false-positive discipline matters as much: the `-o/--output`
-output-file check is scoped to `sort` and `tree`, so `grep -o` and `rg -o`
-(`--only-matching`, read-only) are not wrongly blocked. A guard that blocks
-reading is a guard users turn off.
+**A leading `FOO=bar` is denied outright, with no safe-list.** Stripping the
+assignments to reach the head word read `GIT_EXTERNAL_DIFF='sh -c …' git diff` as
+`git diff`, and the program it names runs during that inspecting subcommand.
+`GIT_CONFIG_GLOBAL`, `GIT_CONFIG_COUNT`, `GIT_SSH_COMMAND` and `GIT_PAGER` do the
+same, and `PATH` and `LD_PRELOAD` redirect the binary itself — so an assignment is
+`env` without the word, and `env` was already denied. There is no allowed subset
+to enumerate: the deny side is unbounded across every allowlisted binary, so
+`LC_ALL=C sort` loses too and the reason tells the agent to re-run without it.
+
+**A flag is matched in every spelling its command accepts**, because matching the
+whole token missed three of them. Short options cluster and take their value
+attached, so `sort -no /tmp/out` and `sort -o/tmp/out` both wrote a file past a
+guard that only knew `-o`; and both git's parse-options and getopt_long accept
+any unambiguous truncation, so `sort --out=` wrote one and `git branch
+--unset-upst` retargeted a ref. The guard therefore splits `--flag=value` at the
+`=`, prefix-matches an abbreviation against the canonical long name, and scans a
+single-dash token letter by letter.
+
+The corresponding false-positive discipline matters as much — a guard that blocks
+reading is a guard users turn off — and the letter-by-letter scan is what put it
+under pressure, because an attached value is letters too: `git status -uno`,
+`git log -S<term>` and `date -Iseconds` are all read-only commands carrying a
+guarded letter inside a value. Two rules keep them readable rather than a
+whole-token match that reopens the holes above:
+
+- **Each guard's flag set is scoped to the command that really has that flag.**
+  `-o/--output` is guarded on `sort` and `tree`, where it writes; `grep -o` and
+  `rg -o` mean `--only-matching` and are not guarded at all; and git's own
+  output guard is **long-only**, because git has no short output flag anywhere —
+  `git diff -o` answers `invalid option`, and `-O<file>` is an orderfile it
+  reads. A set with no short flag in it cannot trip the cluster scan.
+- **`FlagGuard.valueLetters` names the short letters of one command that consume
+  their value attached**, stopping the scan where the value starts: `-t`/`-e` on
+  `fd`, `-I`/`-P` on `tree`, and `-I`/`-d`/`-f`/`-r`/`-v` on `date`. Its two
+  directions are not symmetric — **a letter left out over-blocks a read-only
+  command, a letter wrongly added under-blocks a writing one** — so the bar for
+  adding one is evidence, never a false positive somebody wanted quiet.
+
+  The table holds two grades of that evidence and the JSDoc says which is which,
+  because a rule with a silent exception is worse than one that names it. The
+  `fd` and `date` letters were **measured** against the installed binaries, and
+  that measurement is read per platform as well as per command, because Linux is
+  a first-class target here rather than a port: `date -d` is GNU-only, so a table
+  written against macOS alone denies `date -dyesterday` on the platform where it
+  is the working spelling, while `-v` is BSD-only and the `-s` it could otherwise
+  have hidden does not exist on that binary at all. The `tree` letters rest on
+  the **documented interface alone**, because tree is not installed on the
+  machines this was written on — a weaker bar, taken because both are
+  unambiguous in every tree manual and `-o` is the only letter `tree` guards.
 
 ### 4. Agent-control ops are gated by op and role, as a pure function
 
@@ -257,7 +302,14 @@ rather than from a database migration.
   silent hole until someone notices. `tests/shared/plan-mode-bash-guard.test.ts`
   and `plan-mode-shell-lexer.test.ts` carry the regression cases; the flag-guard
   entries for `fd`, `rg`, `find`, and `date` are there because each was found
-  after the fact.
+  after the fact, as are the assignment denial, the clustered and abbreviated
+  flag spellings, and `uniq <in> <out>`.
+- **The ALLOWED list is load-bearing, not decoration.** Every tightening of the
+  matcher has cost read-only commands on the way past — the letter-by-letter scan
+  took `git status -uno`, `git log -S<term>` and `date -Iseconds` with it before
+  the two rules above went in — and only a command written down as allowed makes
+  that visible. Add the read-only forms a change nearly broke, not just the
+  writing form it set out to catch.
 - **Nothing about planning state is persisted server-side.** No table, no
   migration, no column. The cost is that main's view of who is planning is only
   as good as the renderer's next message; the benefit is that a toggle the user
