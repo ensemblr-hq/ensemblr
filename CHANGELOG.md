@@ -9,6 +9,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-09-07
+
+**The composer's `@` menu now reaches this workspace's other chats, and the app's own jargon stops
+leaking into the rows the user reads.** Pointing an agent at a sibling conversation used to mean
+pasting a session id by hand; it is now a menu row that costs the prompt about 150 bytes instead of an
+inlined transcript. Alongside it, "orchestrator" leaves every timeline label in favour of "chat" —
+only a child the caller owns keeps the sub-agent noun — and the unattended delivery loop grows a
+sizing gate so a version bump or a locale fill no longer takes the whole plan-review-fix apparatus to
+arrive somewhere the agent could have reached by reading its own diff.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.5) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.5/Ensemblr-0.1.5-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.5/Ensemblr-0.1.5-x64.AppImage)
+
+### Added
+
+- **The composer's `@` menu now lists this workspace's other chats, above its files.** The menu
+  offered files and nothing else, so handing an agent a sibling conversation meant pasting a session
+  id by hand. The machinery already existed — the Concierge's `ConciergeReference` of kind `chat`,
+  serialized into a `<referenced_chat />` prompt block — but only over an app-wide catalogue, which is
+  the wrong scope for a workbench agent: it can reach only a conversation it shares a checkout with.
+  Chats lead the one index space because the file list is ranked eighty deep and hierarchically, so a
+  chat placed after it would never be reached, where a file placed after at most five chats is one
+  page away. A typed query has to hit a contiguous run of a chat's label — `fuzzyMatch` otherwise
+  falls back to a subsequence walk that finds `src` inside `Ship the release candidate` and scores it
+  4 against the 1000 an exact directory match earns, and pinned above the files that weak row would
+  steal the highlight from the exact one below it; a bare `@` is exempt and lists every chat, which is
+  what shows the rows exist at all. The composer's own tab is dropped, since a chat cannot be handed
+  itself. Nothing new crosses to the agent: `serializeComposerDraft` already emitted
+  `formatConciergeReferenceBlock`, so the block carries the `agentSessionId` that
+  `ensemblr_read_conversation` takes and costs the prompt roughly 150 bytes rather than an inlined
+  transcript. The scoring walk both menus share now lives in one module, with ordering and cap left to
+  the caller. (#474)
+
+### Changed
+
+- **Every timeline target is named a chat rather than an orchestrator.** "Orchestrator" is app jargon
+  and it was leaking into rows the user reads — "Steered an orchestrator", "Waited for
+  orchestrators". Only a child the caller owns keeps the sub-agent noun; a peer, the Review
+  conversation, a mixed batch, and an id the catalogue no longer holds all read as a chat. The two
+  branches had already converged: `TargetNaming`'s `orchestrator` and `unresolved` pairs held
+  byte-identical wording in all three locales once `orchestrator` was softened, so they collapse into
+  one `chat` pair instead of two catalogue keys that would have to move in lockstep forever — which
+  also drops a branch in `targetTitles` whose arms were indistinguishable, and 10 keys per locale.
+  `notify-orchestrator` reads "Notified the parent chat", keeping the upward direction without the
+  jargon; `wait-for-agents` loses its definite article on the workspace surface while the Concierge
+  surface keeps "the chats", where the reader has just watched that set spawn. Greek and Russian are
+  unchanged for that article — Greek's own sibling is already articled and Russian has no articles.
+  The glossary retires Orchestrator as a translatable term and records why; the role survives in the
+  code, where `TimelineAgentRole` still needs it. Also resyncs two `en` values that had drifted from
+  their call sites, which plain `i18n:extract` does not update. (#475)
+
+- **The unattended delivery loop is now sized to the change.** ADR 0061 gated the AFK loop on one
+  question — is this turn a change this workspace's branch would carry? — and that gate was an axis
+  short: a documentation edit, a version bump, or a locale fill all clear it and then take the whole
+  apparatus, a written plan and a second orchestrator opened over the diff and however many fix rounds
+  the cycle earns, to arrive at a change the agent could have established was right by reading its own
+  diff. A sizing gate now runs ahead of the steps. A change takes the short path when all three hold:
+  the whole diff fits in one reading, that reading plus the repository's checks settle its
+  correctness, and the shape was decided before the agent started. On the short path the plan, the
+  review, and the fix rounds do not run; the change is still built, checked, committed, pushed, and
+  opened as a pull request. The criterion is evidence rather than size — a one-word label change is
+  short and a fifty-line feature in one file is not, and a size heuristic sorts both the wrong way —
+  held in place by two asymmetries: the tie goes to the full loop, and the judgement only ever moves
+  upward. The report now names which path the change was sized onto, because a short-path run and a
+  full-loop run that converged on round one otherwise read identically. (#473)
+
+- **`docs/` pinned to the published 0.1.4 assets.** The four files that quietly point at the previous
+  release are updated only once the tag exists and the real asset names can be read back off it, per
+  `docs/build-and-release.md`'s own "never string-replace" instruction: `docs/README.md`,
+  `docs/guide/README.md`, `docs/guide/01-install.md`, and the illustrative examples in
+  `docs/build-and-release.md`. Every asset URL was confirmed to resolve before the change landed.
+  (#472)
+
 ## [0.1.4] - 2026-09-06
 
 **The unattended (AFK) delivery loop is now complete, end to end.** A chat can be told the user is
