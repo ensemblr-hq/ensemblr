@@ -45,6 +45,35 @@ import {
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 
 /**
+ * Drops a control's text label once the dashboard header's container no longer
+ * seats the whole toolbar, leaving the icon — and, on a facet holding a
+ * selection, its count — to stand in for it. Every collapsed control names
+ * itself through `aria-label` and `title`, so nothing becomes unreadable.
+ * Only a host that declares `@container/dashboard-header` collapses anything;
+ * anywhere else the named query never matches and the labels always show.
+ */
+const COLLAPSE_LABEL_TO_ICON = '@max-2xl/dashboard-header:hidden';
+
+/**
+ * The facet's selection count, which takes the collapsed label's place so the
+ * row still says a filter is active. The plural noun stays in the label rather
+ * than being concatenated onto this number.
+ */
+const REVEAL_WHEN_LABEL_COLLAPSED = 'hidden @max-2xl/dashboard-header:inline';
+
+/**
+ * Collapses the sort control to its icon at the same width. The value is
+ * squeezed to nothing rather than hidden because Radix lays an item-aligned menu
+ * out from `getBoundingClientRect()` on the value node, and a `display: none`
+ * one reports zeros — which makes it read the trigger's whole distance from the
+ * window's left edge as menu width, opening a menu as wide as the window at
+ * exactly the sizes this collapse exists for. The class rides a wrapper because
+ * Radix drops `className` from `SelectValue` to keep that node measurable.
+ */
+const COLLAPSE_SORT_VALUE_TO_ICON =
+	'@max-2xl/dashboard-header:w-0 @max-2xl/dashboard-header:overflow-hidden';
+
+/**
  * Localized name of a card source, as the source facet lists it.
  * @param t - Translator bound to the active language.
  * @param source - The source to label.
@@ -112,7 +141,7 @@ export function BoardToolbar({
 
 	return (
 		<div className='ml-auto flex min-w-0 items-center gap-1.5'>
-			<div className='relative'>
+			<div className='relative w-44 min-w-24'>
 				<SearchIcon
 					aria-hidden='true'
 					className='pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground'
@@ -122,13 +151,14 @@ export function BoardToolbar({
 						'workbench:dashboard.toolbar.search-aria',
 						'Filter board cards',
 					)}
-					className='h-7 w-44 pl-7 text-xs'
+					className='h-7 pl-7 text-xs'
 					onChange={(event) => setQuery(event.target.value)}
 					placeholder={t('workbench:dashboard.toolbar.search', 'Filter cards…')}
 					value={filters.query}
 				/>
 			</div>
 			<BoardFacetPopover
+				count={filters.repoIds.length}
 				icon={
 					<FolderGit2Icon
 						aria-hidden='true'
@@ -162,6 +192,7 @@ export function BoardToolbar({
 				))}
 			</BoardFacetPopover>
 			<BoardFacetPopover
+				count={filters.sources.length}
 				icon={
 					<LayersIcon
 						aria-hidden='true'
@@ -198,14 +229,17 @@ export function BoardToolbar({
 			>
 				<SelectTrigger
 					aria-label={t('workbench:dashboard.toolbar.sort-aria', 'Sort cards')}
-					className='h-7 gap-1.5 text-xs'
+					className='h-7 shrink-0 gap-1.5 text-xs'
 					size='sm'
+					title={boardSortLabel(t, filters.sort)}
 				>
 					<ArrowUpDownIcon
 						aria-hidden='true'
 						className='size-3.5 text-muted-foreground'
 					/>
-					<SelectValue />
+					<span className={COLLAPSE_SORT_VALUE_TO_ICON}>
+						<SelectValue />
+					</span>
 				</SelectTrigger>
 				<SelectContent>
 					{BOARD_SORT_MODES.map((sort) => (
@@ -247,18 +281,24 @@ export function BoardToolbar({
 	);
 }
 
-/** Popover wrapping one multi-select facet's searchable option list. */
-function BoardFacetPopover({
-	children,
-	icon,
-	label,
-	searchPlaceholder,
-}: {
+/** Shape of a {@link BoardFacetPopover} facet. */
+interface BoardFacetPopoverProps {
 	children: ReactNode;
+	/** How many options the facet holds selected, which its label already states. */
+	count: number;
 	icon: ReactNode;
 	label: string;
 	searchPlaceholder: string;
-}) {
+}
+
+/** Popover wrapping one multi-select facet's searchable option list. */
+function BoardFacetPopover({
+	children,
+	count,
+	icon,
+	label,
+	searchPlaceholder,
+}: BoardFacetPopoverProps) {
 	const { t } = useTranslation();
 	const [open, setOpen] = useState(false);
 
@@ -266,12 +306,19 @@ function BoardFacetPopover({
 		<Popover onOpenChange={setOpen} open={open}>
 			<PopoverTrigger asChild>
 				<Button
+					aria-label={label}
 					className='h-7 shrink-0 gap-1.5 px-2 font-medium text-xs'
 					size='sm'
+					title={label}
 					variant='ghost'
 				>
 					{icon}
-					<span className='max-w-32 truncate'>{label}</span>
+					<span className={cn('max-w-32 truncate', COLLAPSE_LABEL_TO_ICON)}>
+						{label}
+					</span>
+					{count > 0 ? (
+						<span className={REVEAL_WHEN_LABEL_COLLAPSED}>{count}</span>
+					) : null}
 				</Button>
 			</PopoverTrigger>
 			<PopoverContent align='end' className='w-56 overflow-hidden p-0'>

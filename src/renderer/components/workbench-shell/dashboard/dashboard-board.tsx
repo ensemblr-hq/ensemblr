@@ -12,6 +12,7 @@ import {
 import { ShellScreen } from '@/renderer/components/workbench-shell/shell-screen';
 import { useBoardDragMonitor } from '@/renderer/hooks/workbench-shell/dashboard/use-board-drag';
 import { useBoardIssues } from '@/renderer/hooks/workbench-shell/dashboard/use-board-issues';
+import { cn } from '@/renderer/lib/utils';
 import { filterBoardCards } from '@/renderer/lib/workbench/filter-board-cards';
 import { groupBoardCards } from '@/renderer/lib/workbench/group-board-cards';
 import { planBoardDrop } from '@/renderer/lib/workbench/plan-board-drop';
@@ -39,6 +40,17 @@ import {
 	BoardWorkspaceMenuProvider,
 	useBoardWorkspaceMenu,
 } from './board-workspace-menu';
+
+/**
+ * Drops the "Dashboard" heading one step before any toolbar control collapses.
+ * It is the row's most expendable element — the nav sidebar already marks
+ * Dashboard as the active route — and the toolbar needs around 38rem with every
+ * label showing, so the heading and its gap stop fitting beside it below 48rem.
+ * Container width rather than viewport width because neither the sidebar nor the
+ * window controls leave this row what the window is wide: a 48rem window gives
+ * it around 37rem with the sidebar offcanvas, and 30rem once that opens.
+ */
+const COLLAPSE_HEADER_TITLE = '@max-3xl/dashboard-header:hidden';
 
 /**
  * Dashboard Kanban board. Backlog holds the work that has no workspace yet —
@@ -181,15 +193,17 @@ export function DashboardBoard() {
 		<ShellScreen>
 			<header className='native-toolbar flex shrink-0 items-center gap-2.5 overflow-hidden border-border border-b px-4 font-medium text-sm'>
 				<SidebarTrigger className='sidebar-collapsed-trigger' />
-				<span className='shrink-0'>
-					{t('workbench:dashboard.title', 'Dashboard')}
-				</span>
-				<BoardToolbar
-					filters={boardFilters}
-					isRefreshing={isRefreshing}
-					onRefresh={handleRefresh}
-					projects={model.displayProjects}
-				/>
+				<div className='@container/dashboard-header flex min-w-0 flex-1 items-center gap-2.5'>
+					<span className={cn('shrink-0', COLLAPSE_HEADER_TITLE)}>
+						{t('workbench:dashboard.title', 'Dashboard')}
+					</span>
+					<BoardToolbar
+						filters={boardFilters}
+						isRefreshing={isRefreshing}
+						onRefresh={handleRefresh}
+						projects={model.displayProjects}
+					/>
+				</div>
 			</header>
 			<BoardWorkspaceMenuProvider controller={workspaceMenu}>
 				<div className='sleek-scrollbar min-h-0 flex-1 overflow-x-auto p-4'>
