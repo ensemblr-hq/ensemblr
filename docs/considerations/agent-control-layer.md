@@ -77,12 +77,12 @@ set is defined once (`src/shared/agent-control/`).
 `ensemblr_*` orchestration tools, coupled to the tools actually being available: Pi via the
 extension's `before_agent_start` hook appending to the system prompt (fires only when the extension
 loaded); harnesses via the MCP server's `instructions` field (surfaced by MCP clients). Two role
-variants (`ORCHESTRATOR_AWARENESS` / `SUBAGENT_AWARENESS` in `src/shared/agent-control/awareness.ts`)
+variants (`orchestratorAwareness` / `subagentAwareness` in `src/shared/agent-control/awareness.ts`)
 are selected by lineage depth (`roleForDepth`); the Pi extension embeds byte-identical copies and a
 parity test guards drift (#168). See [`agent-orchestration-playbook.md`](./agent-orchestration-playbook.md).
 
 > **Superseded by #191/#192.** Two axes were added on top of role. Plan Mode gives a second pair of
-> playbooks — `PLAN_MODE_ORCHESTRATOR_AWARENESS` / `PLAN_MODE_SUBAGENT_AWARENESS` — which *replace*
+> playbooks — `planModeOrchestratorAwareness` / `planModeSubagentAwareness` — which *replace*
 > the role variant for as long as the conversation is planning, and are consumed only by the Pi
 > extension (an MCP-only runtime has its system prompt fixed at session open). And role is no longer
 > read from depth alone: `resolveAgentRole(marked, depth)` prefers the durable sub-agent marker on

@@ -40,7 +40,7 @@ tell you which caller you are looking at:
 | Species | `harness` | agent runtime `claude` (`AgentProviderId`, alongside `pi`) |
 | Permissions | always `--dangerously-skip-permissions` (see below) | honours the workspace permission mode, like Pi |
 | Control origin | the workspace-level origin `ws:<id>`, shared with every terminal | its own per-session origin, with lineage (`parentSessionId`, `depth`) |
-| Playbook | `HARNESS_AWARENESS` | `ORCHESTRATOR_AWARENESS` / `SUBAGENT_AWARENESS` |
+| Playbook | `harnessAwareness` | `orchestratorAwareness` / `subagentAwareness` |
 | Shipped skill | `--plugin-dir <bundle>` | SDK `plugins: [{ type: 'local', … }]` |
 | Control tools | no chat-tab tools | full `ensemblr_*` set over the same MCP endpoint |
 | Spawning children | must pass `model` — the app cannot tell its runtime | may omit `model`; the child is pinned to the `claude` runtime |
@@ -54,8 +54,8 @@ a root or a spawned child), never from the runtime's name. That is the whole
 reason a first-class runtime can be added without touching the withholding
 policy.
 
-**Plan Mode is Pi-only.** `PLAN_MODE_ORCHESTRATOR_AWARENESS` and
-`PLAN_MODE_SUBAGENT_AWARENESS` are consumed solely by the shipped Pi extension,
+**Plan Mode is Pi-only.** `planModeOrchestratorAwareness` and
+`planModeSubagentAwareness` are consumed solely by the shipped Pi extension,
 which resolves this turn's Plan Mode over `getSessionBrief` and swaps the
 playbook. A runtime whose only channel is MCP has its system prompt fixed at
 session open (`systemPromptAppend` in
@@ -152,7 +152,7 @@ same `timeout` — and that path is the one that also holds
 [`agent-control.md`](./agent-control.md#how-the-questionnaire-behaves) for why
 raising it is the defence and progress notifications are only the second line.
 
-The playbook is `HARNESS_AWARENESS` (`src/shared/agent-control/awareness.ts`),
+The playbook is `harnessAwareness` (`src/shared/agent-control/awareness.ts`),
 rewritten to `<userData>/harness-instructions/AGENTS.md` on every harness launch
 — through a staging file and a rename, so a harness still reading the file
 during another launch never sees a half-written prompt. It is a shorter,
@@ -167,7 +167,7 @@ in `resources/agent-skills/`, packaged as an `extraResource` and resolved by
 turn cannot go without; the skill is read on demand and carries the
 `.ensemblr/settings.toml` key reference, the run-script shape, and the failure
 vocabulary — none of which is worth paying for every turn. Only Claude Code
-reads it here, so `HARNESS_AWARENESS` names it conditionally rather than
+reads it here, so `harnessAwareness` names it conditionally rather than
 promising a skill Codex and Vibe will never see.
 
 > Vibe fails silently when the control server is unreachable — no error, no

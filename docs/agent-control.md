@@ -220,7 +220,7 @@ are enforced:
 `NATIVE_DELEGATION_WITHHELD_OPS` is the third axis: `spawnChatTab`,
 `startConversation`, `sendFollowUp`, `waitForAgents`, and `listModels`. The
 conversation reads and `closeTab` stay — they act on tabs the user already has
-open, not only on children. `NATIVE_ORCHESTRATOR_AWARENESS` is the matching
+open, not only on children. `nativeOrchestratorAwareness` is the matching
 playbook, which names the runtime's own tool and says once that the spawn ops are
 absent rather than leaving it to be discovered.
 
@@ -235,7 +235,7 @@ the harness's own vocabulary, and inverts across the mechanism: the `ensemblr`
 root is told which ops replaced its denied tool, the `native` root is told its
 workflow's fan-out is the right one here, and an investigator is told it holds
 neither. It rides `readTurnPreamble`, so Pi never sees it — Pi gets
-`PLAN_MODE_ORCHESTRATOR_AWARENESS` instead. See
+`planModeOrchestratorAwareness` instead. See
 [ADR 0057](./adr/0057-answer-the-harness-plan-workflow-in-the-per-turn-preamble.md).
 
 **The mechanism is pinned at session open**, on `AgentControlOrigin.delegation`.
@@ -398,7 +398,7 @@ than queued or opened: queueing delivers stale context into a conversation that
 has since been cleared, and opening one would invent a conversation nobody asked
 for and nobody would think to read. The refusal says to put it in the agent's
 last message instead. See
-[ADR 0065](./adr/0065-reach-the-concierge-conversation-not-its-runtime-attachment.md).
+[ADR 0066](./adr/0066-reach-the-concierge-conversation-not-its-runtime-attachment.md).
 
 Because attaching can start a runtime process, the per-session and per-minute
 allowances are charged for a delivered message and for a `failed` one alike —
