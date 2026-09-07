@@ -17,7 +17,12 @@ import type {
 
 import { $isAttachmentNode, type AttachmentNode } from './attachment-node';
 
-/** What separates two top-level blocks in the linearized draft. */
+/**
+ * What separates two top-level blocks in the linearized draft. The tray is what
+ * first gives the draft more than one block — everything else the composer
+ * holds is a single paragraph — so a chip standing above the typed text is the
+ * only thing that puts this in the text at all.
+ */
 const BLOCK_SEPARATOR = '\n';
 
 /** One leaf node's span in the linearized draft. */
@@ -35,7 +40,13 @@ export interface LinearizedDraft {
 	caret: number;
 	/** Text runs and chips interleaved, in the order they sit in the document. */
 	segments: readonly ComposerDraftSegment[];
-	/** Plain text of the draft, with each chip standing in as one space. */
+	/**
+	 * Plain text of the draft, with each chip standing in as one space and a
+	 * {@link BLOCK_SEPARATOR} between top-level blocks — so a tray chip
+	 * contributes its space plus the newline dividing it from the block after
+	 * it. Those newlines are load-bearing for the offsets `segments` and `caret`
+	 * are measured in; the prompt serializer trims them back out of each run.
+	 */
 	text: string;
 }
 

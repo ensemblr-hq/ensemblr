@@ -9,6 +9,12 @@ Accepted
 Supersedes the pasted-image attachment model from `1cbf07c` (#99) and the
 Linear-only issue picker that inlined a one-line context block.
 
+Amended by [0067](./0067-stand-stored-text-chips-in-a-tray-above-the-draft.md),
+which stands the stored-text chip in a tray above the draft rather than inline in
+it. Decision 2's "a chip has to be a node" and the one ordered list of decision 1
+both stand; what 0067 narrows is that a mixed batch no longer sends in attach
+order, because a tray chip is pinned ahead of the typed text.
+
 ## Context
 
 The composer had accumulated three parallel ways to give an agent something to

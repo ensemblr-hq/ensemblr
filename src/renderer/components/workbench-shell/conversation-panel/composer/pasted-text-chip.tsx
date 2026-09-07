@@ -72,7 +72,7 @@ export function PastedTextChip({
 		'line-clamp-2 w-full whitespace-pre-wrap break-all px-1.5 pt-1 text-left font-mono text-muted-foreground text-xs leading-snug';
 
 	return (
-		<span className='group/chip inline-flex max-w-xs flex-col overflow-hidden rounded-md border border-border bg-background align-bottom'>
+		<span className='group/chip inline-flex max-w-xs flex-col overflow-hidden rounded-md border border-border bg-background'>
 			{onActivate ? (
 				<button
 					aria-label={t('common:actions.open-named', 'Open {{label}}', {

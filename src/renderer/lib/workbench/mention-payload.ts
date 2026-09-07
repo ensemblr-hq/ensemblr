@@ -144,9 +144,10 @@ export function serializeLinkedDirectories(
 
 /**
  * Formats the composer draft into the text payload sent to the agent, keeping
- * the order the user arranged it in: each typed run and each attachment block
- * lands where its chip sat in the sentence, rather than every attachment being
- * hoisted to one end of the message.
+ * the order the user arranged it in rather than hoisting every attachment to
+ * one end of the message: an inline chip's block lands where its chip sits in
+ * the sentence, and a tray chip's block lands ahead of the typed text, which is
+ * where the tray stands it.
  *
  * Text files are read over IPC and inlined in an `<attached_file>` block; images,
  * binaries, and externally referenced paths get a placeholder so the agent sees

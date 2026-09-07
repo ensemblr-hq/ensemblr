@@ -6,9 +6,14 @@ import {
 	$getSelection,
 	$isRangeSelection,
 	COMMAND_PRIORITY_CRITICAL,
+	DELETE_CHARACTER_COMMAND,
+	DELETE_LINE_COMMAND,
+	DELETE_WORD_COMMAND,
 	DRAGOVER_COMMAND,
 	DROP_COMMAND,
 	type EditorState,
+	type LexicalCommand,
+	type LexicalNode,
 	PASTE_COMMAND,
 } from 'lexical';
 import { type RefObject, useEffect } from 'react';
@@ -16,7 +21,11 @@ import { type RefObject, useEffect } from 'react';
 import { isReferenceAttachment } from '@/renderer/lib/workbench/composer-attachments';
 import type { ComposerAttachment } from '@/renderer/types/workbench';
 
-import { $createAttachmentNode } from './attachment-node';
+import {
+	$createAttachmentNode,
+	$isAttachmentNode,
+	isTrayChip,
+} from './attachment-node';
 import {
 	$findAttachmentNode,
 	$linearizeDraft,
@@ -38,6 +47,81 @@ function $isDuplicateChip(attachment: ComposerAttachment): boolean {
 		!isReferenceAttachment(attachment) &&
 		$findAttachmentNode(attachment.id) !== null
 	);
+}
+
+/**
+ * Adds a chip to the tray — the run of tray chips at the very top of the draft —
+ * after the ones already there, rather than at the caret. The tray reads as one
+ * row above the typed text, so a chip attached later belongs at the end of it
+ * rather than in the middle of whatever sentence the caret sits in. Must run
+ * inside an editor update.
+ * @param attachment - The attachment the chip stands for
+ */
+function $insertTrayChip(attachment: ComposerAttachment): void {
+	const root = $getRoot();
+	let index = 0;
+	for (const child of root.getChildren()) {
+		if (!($isAttachmentNode(child) && isTrayChip(child.getAttachment()))) {
+			break;
+		}
+		index += 1;
+	}
+	root.splice(index, 0, [$createAttachmentNode(attachment)]);
+}
+
+/**
+ * Every command Lexical funnels a backward delete into, whichever chord or
+ * input event started it. Each carries `true` for backward and `false` for
+ * forward, so a handler registered here answers for both directions.
+ */
+const BACKWARD_DELETE_COMMANDS: readonly LexicalCommand<boolean>[] = [
+	DELETE_CHARACTER_COMMAND,
+	DELETE_LINE_COMMAND,
+	DELETE_WORD_COMMAND,
+];
+
+/**
+ * Whether a node is the first thing inside a block, so an offset of zero in it
+ * is the block's own start rather than a position after something else.
+ * @param node - The node the caret sits in
+ * @param block - The top-level block the caret sits in
+ * @returns True when nothing in the block precedes the node
+ */
+function $isFirstDescendant(node: LexicalNode, block: LexicalNode): boolean {
+	let current: LexicalNode | null = node;
+	while (current && current !== block) {
+		if (current.getPreviousSibling() !== null) {
+			return false;
+		}
+		current = current.getParent();
+	}
+	return current === block;
+}
+
+/**
+ * Whether the caret sits at the very start of its block with nothing behind that
+ * block but the tray. Lexical's own backward delete walks out of the block and
+ * takes its previous sibling, which for the draft's first block is the last tray
+ * chip — so a backward delete at the start of the sentence would silently empty
+ * the tray, and one on an empty draft would delete the paragraph and leave
+ * nowhere to type. Must run inside an editor read or update.
+ * @returns True when a backward delete here would reach into the tray
+ */
+function $isCaretAgainstTray(): boolean {
+	const selection = $getSelection();
+	if (!($isRangeSelection(selection) && selection.isCollapsed())) {
+		return false;
+	}
+	const { focus } = selection;
+	const block = focus.getNode().getTopLevelElement();
+	if (!block) {
+		return false;
+	}
+	const behind = block.getPreviousSibling();
+	if (!($isAttachmentNode(behind) && isTrayChip(behind.getAttachment()))) {
+		return false;
+	}
+	return focus.offset === 0 && $isFirstDescendant(focus.getNode(), block);
 }
 
 /**
@@ -152,6 +236,43 @@ export function TransferPlugin({
 }
 
 /**
+ * Keeps a backward delete at the start of the draft from reaching into the
+ * tray. The tray stands above the sentence rather than in it, so the chip a
+ * backward delete would take is not the one the caret appears to be against —
+ * and with several chips up there, which one goes is neither visible nor
+ * guessable. They come off with their own control instead.
+ *
+ * Guarding these three commands rather than `KEY_BACKSPACE_COMMAND` is what
+ * makes that hold for every way of asking. Lexical routes a bare Backspace
+ * through the keystroke command, but sends ⌥⌫ and ⌃⌫ straight to
+ * `DELETE_WORD_COMMAND`, ⌘⌫ to `DELETE_LINE_COMMAND`, and ⌃H and the
+ * `deleteContentBackward` input event iOS and Android deliver instead of a
+ * keystroke straight to `DELETE_CHARACTER_COMMAND`. Every one of those callers
+ * has already called `preventDefault` on the event it came from by the time the
+ * command runs, so refusing the command is the whole of the guard.
+ */
+export function TrayGuardPlugin() {
+	const [editor] = useLexicalComposerContext();
+
+	useEffect(() => {
+		const unregister = BACKWARD_DELETE_COMMANDS.map((command) =>
+			editor.registerCommand(
+				command,
+				(isBackward) => isBackward && $isCaretAgainstTray(),
+				COMMAND_PRIORITY_CRITICAL,
+			),
+		);
+		return () => {
+			for (const dispose of unregister) {
+				dispose();
+			}
+		};
+	}, [editor]);
+
+	return null;
+}
+
+/**
  * Hands the composer hooks a handle onto the editor, so every write to the
  * draft goes through one narrow surface and Lexical stays inside this folder.
  */
@@ -194,6 +315,14 @@ export function EditorHandlePlugin({
 				editor.focus();
 			},
 			insertAttachment(attachment: ComposerAttachment) {
+				if (isTrayChip(attachment)) {
+					editor.update(() => {
+						if (!$isDuplicateChip(attachment)) {
+							$insertTrayChip(attachment);
+						}
+					});
+					return;
+				}
 				insertAtSelection(() => {
 					if ($isDuplicateChip(attachment)) {
 						return;
@@ -232,6 +361,11 @@ export function EditorHandlePlugin({
 					}
 					if ($isDuplicateChip(attachment)) {
 						selection.insertText('');
+						return;
+					}
+					if (isTrayChip(attachment)) {
+						selection.insertText('');
+						$insertTrayChip(attachment);
 						return;
 					}
 					selection.insertNodes([$createAttachmentNode(attachment)]);

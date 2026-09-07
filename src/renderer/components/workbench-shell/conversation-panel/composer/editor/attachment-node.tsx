@@ -27,20 +27,29 @@ export type SerializedAttachmentNode = Spread<
 const ATTACHMENT_TEXT_CONTENT = ' ';
 
 /**
- * Whether a chip is taller than one line of text, which decides how its host
- * element is sized. Only the stored-text chip is — it stacks a two-line preview
- * over its meta row, where every other chip is a single row of label.
+ * Whether a chip stands above the draft rather than in it. Only the stored-text
+ * chip does: it stacks a two-line preview over its meta row, so inline it
+ * inflates the line box and the sentence wraps around a block three lines tall.
+ * Every other chip is a single row of label and reads as a word in the sentence.
  * @param attachment - The attachment behind the chip
- * @returns True when the host must grow to the chip instead of clipping it
+ * @returns True when the chip belongs in the tray above the typed text
  */
-function isMultiLineChip(attachment: ComposerAttachment): boolean {
+export function isTrayChip(attachment: ComposerAttachment): boolean {
 	return attachment.kind === 'pasted-text';
 }
 
 /**
- * One composer attachment living inline in the draft, at the position the user
- * put it. Decorator rather than text so the whole chip is one unit to the caret:
- * arrow keys step over it and Backspace deletes it whole.
+ * One composer attachment in the draft, at the position the user put it.
+ * Decorator rather than text so the whole chip is one unit to the caret. An
+ * inline chip sits in the sentence, where arrow keys step over it and Backspace
+ * deletes it whole; a {@link isTrayChip} one is a block of its own above the
+ * typed text and is removed by its own control rather than by editing the
+ * sentence.
+ *
+ * Lexical's own backward delete does not respect that boundary — from the start
+ * of the first block it walks out and takes the previous sibling, which is the
+ * last tray chip — so `TrayGuardPlugin` refuses every backward delete that
+ * would reach across it, not just the one a bare Backspace asks for.
  */
 export class AttachmentNode extends DecoratorNode<ReactNode> {
 	__attachment: ComposerAttachment;
@@ -104,16 +113,20 @@ export class AttachmentNode extends DecoratorNode<ReactNode> {
 	 * every `vertical-align` keyword does, since the chip is taller than the
 	 * text's em box.
 	 *
-	 * A stored-text chip is nearly three lines tall, so that host would leave it
-	 * overflowing half its height above the line — where the draft's own scroll
-	 * container clips it. Such a chip sizes its host instead, growing the line
-	 * box to fit.
-	 * @returns An inline span hosting the chip, sized to the line or to the chip
+	 * A tray chip is a root-level block, so it needs no line-box sizing at all.
+	 * Its host is still `inline-flex` rather than a block: that is what lets the
+	 * run of tray chips share one wrapping row above the paragraph instead of
+	 * each taking a line of its own. It is top-aligned for a different reason
+	 * than the one-row chip — an `inline-flex` column takes its baseline from its
+	 * first flex item, so the chip's baseline lands inside its preview's opening
+	 * line and the editor's own strut, which is taller above the baseline than
+	 * that, would pad the row from above.
+	 * @returns A span hosting the chip, sized to the line or laid out in the tray
 	 */
 	createDOM(): HTMLElement {
 		const host = document.createElement('span');
-		host.className = isMultiLineChip(this.__attachment)
-			? 'mx-0.5 inline-flex max-w-full items-center align-middle'
+		host.className = isTrayChip(this.__attachment)
+			? 'mt-0.5 mr-1 mb-1 inline-flex max-w-full items-center align-top'
 			: 'mx-0.5 inline-flex h-[1.625em] max-w-full items-center align-top';
 		return host;
 	}
@@ -123,9 +136,14 @@ export class AttachmentNode extends DecoratorNode<ReactNode> {
 		return false;
 	}
 
-	/** Chips sit in the sentence, not on their own line. */
-	isInline(): true {
-		return true;
+	/**
+	 * Whether the chip sits in the sentence. A tray chip does not: it is a block
+	 * above the typed text, so the caret never steps into a chip three lines tall
+	 * and no sentence has to wrap around one.
+	 * @returns True for every chip but a tray chip
+	 */
+	isInline(): boolean {
+		return !isTrayChip(this.__attachment);
 	}
 
 	/**

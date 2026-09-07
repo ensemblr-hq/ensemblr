@@ -12,7 +12,9 @@ import type { AutocompleteKind } from '@/renderer/types/workbench';
  * Each binding returns `false` when it does not apply, which hands the key back
  * to the editor's own handling — that is how Enter still inserts a newline with
  * no autocomplete open. Backspace is not bound: an attachment is a node in the
- * document now, so the editor already deletes a whole chip on its own.
+ * document now, so the editor already deletes an inline chip whole on its own,
+ * and holds a tray chip back from Backspace entirely because the tray is not
+ * part of the sentence.
  * @param input - What is currently open, what can be acted on, and the actions
  * @returns The keydown handler to bind to the editor
  */
