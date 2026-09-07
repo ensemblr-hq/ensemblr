@@ -120,7 +120,12 @@ function GhostLayer({
 	);
 }
 
-/** Dot-matrix wordmark used by the dashboard welcome screen. */
+/**
+ * Dot-matrix wordmark used by the welcome and onboarding screens. It fills the
+ * width its container gives it and derives its height from the glyph grid's
+ * aspect ratio, so it can never outrun the pane it sits in — callers set the
+ * measure with `max-w-*` on the wordmark or on its wrapper.
+ */
 export function WelcomeWordmark({ className }: { className?: string }) {
 	const [glitching, setGlitching] = useState(false);
 
@@ -177,10 +182,7 @@ export function WelcomeWordmark({ className }: { className?: string }) {
 	return (
 		<span
 			aria-label='Ensemblr'
-			className={cn(
-				'relative inline-flex h-16 text-foreground sm:h-20',
-				className,
-			)}
+			className={cn('relative flex h-auto w-full text-foreground', className)}
 			role='img'
 			style={{ aspectRatio: `${TOTAL_WIDTH} / ${GLYPH_HEIGHT}` }}
 		>
