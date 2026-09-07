@@ -48,6 +48,7 @@ each exposing its public surface through `index.ts`.
 | Agent → app control | `agent-control/` | Loopback control server, MCP endpoint, ports/adapters, guardrails, origin registry |
 | Shipped Agent Skills | `agent-skills/` | Where the bundled skills live on disk, each addressed as a Pi skill directory and as a Claude plugin root. Two roots ship: `resources/agent-skills/` always, and `resources/agent-skills-architecture/` only while the Experimental architecture-diagram switch is on |
 | Plan mode | `plan-mode/` | Per-session plan registry, plan-file writing, plan submission — the enforcement classifiers live in `src/shared/plan-mode/` |
+| AFK Mode | `afk-mode/` | The per-session registry of which chats the user has stepped away from, which the IPC layer writes and the control layer reads (ADR&nbsp;0060) |
 | App lifecycle | `app/` | `BrowserWindow` creation, window state, and the quit guard + coordinator that confirm a quit while agents are still running |
 | Architecture diagram | `architecture/` | The committed `.ensemblr/architecture.json` document — the file reader/writer, the service the control ops and the diagram pane read through, and the staleness gate that decides whether the per-turn upkeep block asks an agent to redraw. Nothing derives a diagram; an agent authors it through the control op |
 | Chat tabs | `chat-tabs/` | Tab service, preview slot, placeholder-chat policy, terminal-session persistence |
@@ -100,7 +101,7 @@ A new feature is split across these buckets, not given a folder of its own.
 | `lib/` | Runtime helpers grouped by concern | `workbench/`, `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `dictation/`, `i18n/` (i18next instance + bundled `locales/`), `onboarding/`, `instrumentation/`, `ask-user-question/`, `welcome/`, `notification-sound/` (the bundled chime and its player), `concierge/`, `architecture-diagram/` (the layout engine that compiles the stored document into a drawn canvas), plus the code→`t()` mappers `failure-text/`, `agent-failure-text/`, `setup-check-text/`, `provider-check-text/`, `plan-limit-text/`, `github-owner-text/` |
 | `fixtures/` | Fixture/demo data production code may still consume | `workbench/` |
 | `routing/` | TanStack Router file routes + generated tree | `routes/` |
-| `state/` | Durable Jotai state | `workspace/`, `composer/`, `pi/`, `plan-mode/`, `preferences/`, `dialogs/`, `recents/`, `sidebar/`, `settings-ui/`, `slash-commands/`, `tool-approval/`, `ask-user-question/`, `conversation-scroll/`, `menu-commands/`, `linear/`, `unread/`, `updates/`, `concierge/` |
+| `state/` | Durable Jotai state | `workspace/`, `composer/`, `pi/`, `plan-mode/`, `afk-mode/`, `preferences/`, `dialogs/`, `recents/`, `sidebar/`, `settings-ui/`, `slash-commands/`, `tool-approval/`, `ask-user-question/`, `conversation-scroll/`, `menu-commands/`, `linear/`, `review-launch/`, `unread/`, `updates/`, `window-chrome/`, `concierge/` |
 | `styles/` | CSS entrypoint (`index.css`) and font assets | — |
 | `types/` | Exported renderer types and ambient declarations | `workbench/`, `workbench-shell/`, `components/`, `onboarding/` |
 
@@ -128,13 +129,13 @@ The only code both processes may import. Two shapes coexist:
 
 - **Single-file concerns** — plain root modules (`config.ts`, `permissions.ts`,
   `github.ts`, `slug.ts`, `menu-commands.ts`, `concierge-references.ts`,
-  `window-chrome.ts`, …); 37 `.ts` files sit at the shared root in total.
+  `window-chrome.ts`, …); 41 `.ts` files sit at the shared root in total.
 - **Multi-file concerns** — an implementation directory behind a stable
   entrypoint, in one of two forms:
-  - `<concern>/index.ts` — `ipc/` (42 contract modules under `ipc/contracts/`,
+  - `<concern>/index.ts` — `ipc/` (43 contract modules under `ipc/contracts/`,
     plus `channels.ts` and `handler-map.ts`), `pi-rpc/`, `keymap/`.
-  - `<concern>.ts` + `<concern>/` — `agent-control`, `agent-failure`,
-    `architecture-diagram`, `plan-mode`, `scripts`, `terminal`. This is the form
+  - `<concern>.ts` + `<concern>/` — `afk-mode`, `agent-control`, `agent-failure`,
+    `architecture-diagram`, `plan-mode`, `review-brief`, `scripts`, `terminal`. This is the form
     `electron --test` can resolve, so prefer it for anything the main-process
     suites import.
 
@@ -201,9 +202,9 @@ migration ids, so a new migration must be added to both.
 
 | Suite | Runner | Count |
 | --- | --- | --- |
-| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 236 files |
-| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 381 files (50 under `dom/`) |
-| `tests/shared/**` | Vitest | 42 files |
+| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 253 files |
+| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 407 files (55 under `dom/`) |
+| `tests/shared/**` | Vitest | 48 files |
 
 See [`onboarding.md`](./onboarding.md#6-running-the-tests) for which runner a new
 test should use.

@@ -180,7 +180,7 @@ three orchestrating playbooks say so and a parity test pins it.
      `timeoutMs` can only ask for *less* (`Math.min`), so a child doing real work outlives it
      routinely. The result carries a `note` naming the resume call, because an orchestrator reads a
      bare boolean as something to report to the user or work around — same reason a shortened
-     report carries its own re-fetch pointer. See `resumeWaitNote`
+     report carries its own re-fetch pointer. See `waitOutcome`
      (`src/main/agent-control/agent-control-service.ts`).
    - A child that hits a decision point calls `ensemblr_notify_orchestrator` (`need_decision` /
      `blocked`), which wakes the wait immediately **in either mode**. `waitAllSatisfied`
