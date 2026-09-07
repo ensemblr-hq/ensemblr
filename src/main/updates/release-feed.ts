@@ -48,6 +48,12 @@ const releaseSchema = z.object({
 	assets: z
 		.object({
 			browser_download_url: z.url(),
+			// GitHub computes this over what it actually stored, as `sha256:<hex>`,
+			// and `.github/workflows/release.yml` already reads it to bump the
+			// Homebrew cask. Optional because it postdates the API: a release old
+			// enough to lack one is simply not verifiable, and a Linux build then
+			// declines to install it rather than trusting the bytes.
+			digest: z.string().nullish(),
 			name: z.string(),
 		})
 		.array(),
@@ -66,10 +72,27 @@ const feedDocumentSchema = z.object({
 /** One GitHub release, narrowed to the fields this resolver trusts. */
 type Release = z.infer<typeof releaseSchema>;
 
+/**
+ * The Linux artifact a release ships, with the checksum that proves a download
+ * of it is the file GitHub stored. Both are needed to install: an asset whose
+ * digest GitHub did not publish cannot be verified, so it is carried as `null`
+ * and the build falls back to linking at the release page.
+ */
+export interface LinuxUpdateAsset {
+	/** GitHub's `sha256:<hex>` digest for the asset. */
+	digest: string;
+	url: string;
+}
+
 /** A release newer than the running build, and where each platform goes next. */
 export interface UpdateCandidate {
 	/** Feed document URL Squirrel is pointed at on macOS. */
 	feedUrl: string;
+	/**
+	 * The `.AppImage` this release ships and its checksum, for a Linux build that
+	 * may install. Null off Linux, and on a release whose asset carries no digest.
+	 */
+	linuxAsset: LinuxUpdateAsset | null;
 	notes: string | null;
 	/** The release's page, which a check-only build links to instead of installing. */
 	releaseUrl: string;
@@ -98,25 +121,37 @@ export interface ReleaseFeed {
 }
 
 /**
- * Reports whether a release carries an artifact the running platform could
- * actually install, so a version is never offered against a release that
- * published nothing for it. A release with no assets at all ships nothing for
- * Linux either, and the suffix is matched case-insensitively because the
- * capitalisation of `.AppImage` is a convention rather than a guarantee.
+ * Finds the release's `.AppImage`, which is both what proves the release
+ * shipped something a Linux user can install and what a Linux build that may
+ * install actually downloads. The suffix is matched case-insensitively because
+ * the capitalisation of `.AppImage` is a convention rather than a guarantee.
  * @param release - The release to inspect
- * @param platform - The running platform
- * @returns True when the release ships something for that platform
+ * @returns The asset, or null when the release shipped none
  */
-function carriesPlatformArtifact(
-	release: Release,
-	platform: NodeJS.Platform,
-): boolean {
-	if (platform !== 'linux') {
-		return true;
-	}
-	return release.assets.some((asset) =>
-		asset.name.toLowerCase().endsWith(APPIMAGE_ASSET_SUFFIX),
+function findAppImageAsset(release: Release): Release['assets'][number] | null {
+	return (
+		release.assets.find((asset) =>
+			asset.name.toLowerCase().endsWith(APPIMAGE_ASSET_SUFFIX),
+		) ?? null
 	);
+}
+
+/**
+ * Narrows a release asset to one a Linux build may install, which means one
+ * GitHub published a checksum for. Without a digest there is nothing to verify
+ * the download against, and an unverified AppImage must not be written over the
+ * running one — so the candidate carries null and the surface links at the
+ * release page instead.
+ * @param asset - The `.AppImage` asset, when the release shipped one
+ * @returns The installable asset, or null when it is absent or unverifiable
+ */
+function toLinuxUpdateAsset(
+	asset: Release['assets'][number] | null,
+): LinuxUpdateAsset | null {
+	if (!asset?.digest) {
+		return null;
+	}
+	return { digest: asset.digest, url: asset.browser_download_url };
 }
 
 /** Options for {@link createReleaseFeed}. */
@@ -383,7 +418,8 @@ export function createReleaseFeed({
 		// platform can install is simply not an update for it — rather than a
 		// release whose missing macOS artifact is reported to a Linux user as a
 		// broken feed.
-		if (!carriesPlatformArtifact(release, platform)) {
+		const appImage = findAppImageAsset(release);
+		if (platform === 'linux' && !appImage) {
 			return { candidate: null, status: 'ok' };
 		}
 		const asset = release.assets.find(
@@ -403,6 +439,7 @@ export function createReleaseFeed({
 		return {
 			candidate: {
 				feedUrl: asset.browser_download_url,
+				linuxAsset: platform === 'linux' ? toLinuxUpdateAsset(appImage) : null,
 				notes: read.value.notes ?? null,
 				releaseUrl: release.html_url,
 				version: read.value.name,

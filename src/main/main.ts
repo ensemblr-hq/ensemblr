@@ -4,7 +4,6 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import {
 	app,
-	autoUpdater,
 	BrowserWindow,
 	dialog,
 	ipcMain,
@@ -100,6 +99,7 @@ import { createMainWindow } from './app/main-window';
 import type { QuitExit } from './app/quit-coordinator';
 import { createQuitCoordinator } from './app/quit-coordinator';
 import { createQuitGuard } from './app/quit-guard';
+import { relaunchOptions } from './app/relaunch-target';
 import { resolveUserDataDirectory } from './app/user-data-location';
 import { resolveWindowBackgroundColor } from './app/window-background';
 import { trackWindowChrome } from './app/window-chrome';
@@ -1944,11 +1944,11 @@ function beginAgentShutdown(exit: QuitExit): void {
 			new Promise((resolve) => setTimeout(resolve, 3000)),
 		]);
 		if (exit === 'install-update') {
-			autoUpdater.quitAndInstall();
+			updates.finishInstall();
 			return;
 		}
 		if (exit === 'relaunch') {
-			app.relaunch();
+			app.relaunch(relaunchOptions());
 		}
 		app.quit();
 	})();
@@ -1960,7 +1960,7 @@ const quitCoordinator = createQuitCoordinator({
 	quit: () => app.quit(),
 });
 
-const updateService = createAppUpdateService({
+const updates = createAppUpdateService({
 	broadcast: (snapshot) =>
 		broadcastToAllWindows(IPC_CHANNELS.updateStatusChanged, {
 			snapshot,
@@ -1968,6 +1968,7 @@ const updateService = createAppUpdateService({
 	isEnabled: () => appSettingsService.read().general.automaticUpdates,
 	requestInstall: quitCoordinator.requestInstallUpdate,
 });
+const updateService = updates.service;
 
 // Quitting kills every in-flight turn, so nothing is torn down until the guard
 // has had its say. Both phases defer the real quit and re-issue it themselves,

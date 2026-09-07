@@ -3,7 +3,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { ReleaseFeed } from '../../src/main/updates/release-feed';
 import type { UpdateServiceOptions } from '../../src/main/updates/update-service';
 import { createUpdateService } from '../../src/main/updates/update-service';
-import type { UpdateStatusSnapshot } from '../../src/shared/ipc/contracts/update';
+import type {
+	UpdateFailureCode,
+	UpdateStatusSnapshot,
+} from '../../src/shared/ipc/contracts/update';
 
 /** A feed that always offers one newer build, and records how often it was asked. */
 function offeringFeed(
@@ -17,6 +20,7 @@ function offeringFeed(
 			return {
 				candidate: {
 					feedUrl: 'https://example.invalid/update-darwin-arm64.json',
+					linuxAsset: null,
 					notes: null,
 					releaseUrl: 'https://example.invalid/releases/tag/v0.2.0',
 					version,
@@ -34,15 +38,20 @@ function offeringFeed(
 function harness(overrides: Partial<UpdateServiceOptions> = {}) {
 	const armed: string[] = [];
 	const broadcasts: UpdateStatusSnapshot[] = [];
+	const discards: number[] = [];
 	const installs: number[] = [];
 	let enabled = true;
 	let handlers: Parameters<UpdateServiceOptions['onUpdaterEvent']>[0] | null =
 		null;
 
 	const service = createUpdateService({
-		armUpdater: (feedUrl) => armed.push(feedUrl),
+		armUpdater: (candidate) => {
+			armed.push(candidate.feedUrl);
+			return 'armed';
+		},
 		broadcast: (snapshot) => broadcasts.push(snapshot),
 		channel: 'release',
+		discardStaged: () => discards.push(1),
 		getCurrentVersion: () => '0.1.0',
 		isEnabled: () => enabled,
 		onUpdaterEvent: (next) => {
@@ -57,8 +66,10 @@ function harness(overrides: Partial<UpdateServiceOptions> = {}) {
 	return {
 		armed,
 		broadcasts,
+		discards,
 		fireDownloaded: () => handlers?.onDownloaded(),
-		fireError: () => handlers?.onError(new Error('Squirrel gave up')),
+		fireError: (code?: UpdateFailureCode) =>
+			handlers?.onError(new Error('Squirrel gave up'), code),
 		installs,
 		service,
 		setEnabled: (value: boolean) => {
@@ -155,6 +166,27 @@ describe('createUpdateService — the automatic-updates setting', () => {
 
 		expect(h.service.snapshot().state).toBe('disabled');
 		expect(h.service.snapshot().availableVersion).toBeNull();
+		expect(h.discards).toEqual([1]);
+	});
+
+	test('a check that finds nothing newer throws away anything still staged', async () => {
+		const h = harness({
+			releaseFeed: { resolve: async () => ({ candidate: null, status: 'ok' }) },
+		});
+
+		await h.service.checkNow();
+
+		expect(h.service.snapshot().state).toBe('idle');
+		expect(h.discards).toEqual([1]);
+	});
+
+	test('a check that finds something newer stages it rather than discarding', async () => {
+		const h = harness();
+
+		await h.service.checkNow();
+
+		expect(h.service.snapshot().state).toBe('downloading');
+		expect(h.discards).toEqual([]);
 	});
 
 	test('a download that lands after the switch went off is dropped', async () => {
@@ -292,6 +324,7 @@ describe('createUpdateService — a build that may check but not install', () =>
 						: {
 								candidate: {
 									feedUrl: 'https://example.invalid/update.json',
+									linuxAsset: null,
 									notes: null,
 									releaseUrl: 'https://example.invalid/releases/tag/v0.2.0',
 									version: '0.2.0',
@@ -333,5 +366,78 @@ describe('createUpdateService — a build that may check but not install', () =>
 			availableVersion: null,
 			state: 'error',
 		});
+	});
+});
+
+describe('createUpdateService — what the installer does with a candidate', () => {
+	test('an installer that declines this release offers it instead of erroring', async () => {
+		const h = harness({ armUpdater: () => 'declined' });
+
+		const snapshot = await h.service.checkNow();
+
+		expect(snapshot).toMatchObject({
+			availableVersion: '0.2.0',
+			failure: null,
+			releaseUrl: 'https://example.invalid/releases/tag/v0.2.0',
+			state: 'available',
+		});
+	});
+
+	test('a declined release is still offered on the next check', async () => {
+		const h = harness({ armUpdater: () => 'declined' });
+		await h.service.checkNow();
+
+		const second = await h.service.checkNow();
+
+		expect(second).toMatchObject({
+			availableVersion: '0.2.0',
+			state: 'available',
+		});
+	});
+
+	test('an installer that throws reports the build as unable to update', async () => {
+		const h = harness({
+			armUpdater: () => {
+				throw new Error('this build is not signed');
+			},
+		});
+
+		const snapshot = await h.service.checkNow();
+
+		expect(snapshot).toMatchObject({
+			failure: { code: 'update-unsupported-build' },
+			state: 'error',
+		});
+		expect(snapshot.failure?.message).toContain('this build is not signed');
+	});
+
+	test('a verification failure is not filed as a download that did not finish', () => {
+		const h = harness();
+		h.service.start();
+
+		h.fireError('update-verification-failed');
+
+		expect(h.service.snapshot()).toMatchObject({
+			failure: { code: 'update-verification-failed' },
+			state: 'error',
+		});
+		expect(h.service.snapshot().failure?.message).toContain(
+			'failed verification',
+		);
+	});
+
+	test('a download failure with no code still reads as a download failure', () => {
+		const h = harness();
+		h.service.start();
+
+		h.fireError();
+
+		expect(h.service.snapshot()).toMatchObject({
+			failure: { code: 'update-download-failed' },
+			state: 'error',
+		});
+		expect(h.service.snapshot().failure?.message).toContain(
+			'could not be downloaded',
+		);
 	});
 });

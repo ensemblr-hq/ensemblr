@@ -12,7 +12,8 @@ export type UpdateFailureCode =
 	| 'update-feed-unreachable'
 	| 'update-install-failed'
 	| 'update-not-in-applications'
-	| 'update-unsupported-build';
+	| 'update-unsupported-build'
+	| 'update-verification-failed';
 
 /** Typed failure envelope carried on an errored update status. */
 export interface UpdateFailure {

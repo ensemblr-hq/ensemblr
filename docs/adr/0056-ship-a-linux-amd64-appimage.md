@@ -158,6 +158,12 @@ an ordinary decorated one.
 
 ### Updates notify, they do not install
 
+**Amended by [ADR 0065](0065-install-linux-updates-in-app-by-swapping-the-appimage.md)
+(2026-09-07).** A Linux build running as an AppImage whose directory it can write
+now installs updates itself, by staging a verified download and renaming it over
+the running file. `check-only` survives as the fallback for every case that
+cannot swap, so the paragraphs below describe the floor rather than the rule.
+
 `checkUpdatePreconditions` now returns a capability rather than a bare failure:
 `install` on darwin, `check-only` on Linux, `none` otherwise. A check-only build
 resolves the same GitHub-releases feed, reports the newer version, and links to

@@ -14,6 +14,7 @@ function release(
 	tag: string,
 	options: {
 		appImage?: boolean;
+		appImageDigest?: string | null;
 		appImageName?: string;
 		draft?: boolean;
 		feedUrl?: string | null;
@@ -21,6 +22,10 @@ function release(
 	} = {},
 ) {
 	const appImageName = options.appImageName ?? 'Ensemblr-x86_64.AppImage';
+	const appImageDigest =
+		options.appImageDigest === undefined
+			? `sha256:${'a'.repeat(64)}`
+			: options.appImageDigest;
 	const feedUrl =
 		options.feedUrl === undefined
 			? `https://github.com/${SLUG}/releases/download/${tag}/${UPDATE_FEED_ASSET_NAME}`
@@ -35,6 +40,7 @@ function release(
 				? [
 						{
 							browser_download_url: `https://github.com/${SLUG}/releases/download/${tag}/${appImageName}`,
+							...(appImageDigest ? { digest: appImageDigest } : {}),
 							name: appImageName,
 						},
 					]
@@ -228,6 +234,10 @@ describe('createReleaseFeed — platform artifacts', () => {
 
 		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
 			candidate: {
+				linuxAsset: {
+					digest: `sha256:${'a'.repeat(64)}`,
+					url: `https://github.com/${SLUG}/releases/download/v0.2.0/Ensemblr-x86_64.AppImage`,
+				},
 				releaseUrl: `https://github.com/${SLUG}/releases/tag/v0.2.0`,
 				version: '0.2.0',
 			},
@@ -495,6 +505,44 @@ describe('createReleaseFeed — failures and caching', () => {
 		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
 			failure: { code: 'update-feed-malformed' },
 			status: 'error',
+		});
+	});
+
+	test('Linux carries no installable asset when GitHub published no digest', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: {
+				body: [release('v0.2.0', { appImage: true, appImageDigest: null })],
+			},
+			[`https://github.com/${SLUG}/releases/download/v0.2.0/${UPDATE_FEED_ASSET_NAME}`]:
+				{ body: feedDocument('0.2.0') },
+		});
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'linux',
+			repositorySlug: SLUG,
+		});
+
+		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
+			candidate: { linuxAsset: null, version: '0.2.0' },
+			status: 'ok',
+		});
+	});
+
+	test('darwin carries no Linux asset even when the release ships one', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: { body: [release('v0.2.0', { appImage: true })] },
+			[`https://github.com/${SLUG}/releases/download/v0.2.0/${UPDATE_FEED_ASSET_NAME}`]:
+				{ body: feedDocument('0.2.0') },
+		});
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
+
+		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
+			candidate: { linuxAsset: null, version: '0.2.0' },
+			status: 'ok',
 		});
 	});
 

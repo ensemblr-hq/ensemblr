@@ -142,14 +142,23 @@ the background, and then offers to restart into it — you choose when. **Settin
 General** shows the running version and the updater's state, and
 **Ensemblr → Check for Updates…** runs a check on the spot.
 
-**On Linux it checks but never installs.** The same schedule runs and the same
-places report the result, but a newer version is reported with a link to the
-release page rather than downloaded — the AppImage is a file you placed yourself,
-often somewhere read-only, and replacing it is not Ensemblr's to do. The
-[install script](#install-script-linux) is the other end of that pointer:
-`curl -fsSL https://www.ensemblr.dev/update.sh | sh` swaps the file and its
-launcher entry in place. Otherwise download the new AppImage and swap it in
-yourself.
+**On Linux it installs when it can.** Running as an AppImage in a directory
+Ensemblr can write — which is what the [install script](#install-script-linux)
+gives you — a newer version is downloaded, checked against the SHA-256 checksum
+GitHub publishes for it, and staged. Restarting swaps it in. The old file is
+replaced by an atomic rename, so the copy you are running keeps working right up
+to the restart, and a download whose checksum does not match is discarded rather
+than installed.
+
+It also keeps the install script's records straight: if `install.sh` put the
+AppImage there, the version it recorded is rewritten to match, so a later
+`update.sh` does not re-download what Ensemblr already applied.
+
+**It falls back to a link where it cannot.** A build not running as an AppImage,
+one in a read-only or root-owned directory, and a release with no published
+checksum are all reported with a link to the release page instead. So is every
+build once you turn **Update Ensemblr automatically** off — which is the switch
+to use if a package manager owns your copy.
 
 Restarting goes through the same confirmation that guards ⌘Q: if agents are still
 working, Ensemblr asks before interrupting them, and declining leaves the

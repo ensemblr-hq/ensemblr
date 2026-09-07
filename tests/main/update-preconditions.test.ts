@@ -8,6 +8,8 @@ function inputs(
 	overrides: Partial<UpdatePreconditionInputs> = {},
 ): UpdatePreconditionInputs {
 	return {
+		appImageDirectoryWritable: false,
+		appImagePath: null,
 		channel: 'release',
 		inApplicationsFolder: true,
 		packaged: true,
@@ -31,19 +33,48 @@ describe('checkUpdatePreconditions', () => {
 		});
 	});
 
-	test('a packaged Linux build may check but not install', () => {
+	test('a Linux build running from a writable AppImage may install', () => {
+		expect(
+			checkUpdatePreconditions(
+				inputs({
+					appImageDirectoryWritable: true,
+					appImagePath: '/home/dev/.local/share/ensemblr/Ensemblr.AppImage',
+					platform: 'linux',
+				}),
+			),
+		).toEqual({ capability: 'install', failure: null });
+	});
+
+	test('a Linux build not running as an AppImage may check but not install', () => {
 		expect(checkUpdatePreconditions(inputs({ platform: 'linux' }))).toEqual({
 			capability: 'check-only',
 			failure: null,
 		});
 	});
 
+	test('a Linux build whose AppImage directory is read-only may only check', () => {
+		expect(
+			checkUpdatePreconditions(
+				inputs({
+					appImageDirectoryWritable: false,
+					appImagePath: '/opt/ensemblr/Ensemblr.AppImage',
+					platform: 'linux',
+				}),
+			),
+		).toEqual({ capability: 'check-only', failure: null });
+	});
+
 	test('a Linux build is not held to the /Applications rule', () => {
 		expect(
 			checkUpdatePreconditions(
-				inputs({ inApplicationsFolder: false, platform: 'linux' }),
+				inputs({
+					appImageDirectoryWritable: true,
+					appImagePath: '/home/dev/.local/share/ensemblr/Ensemblr.AppImage',
+					inApplicationsFolder: false,
+					platform: 'linux',
+				}),
 			),
-		).toEqual({ capability: 'check-only', failure: null });
+		).toEqual({ capability: 'install', failure: null });
 	});
 
 	test('the dev channel refuses — it publishes no releases to read', () => {

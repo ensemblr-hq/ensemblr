@@ -1,4 +1,10 @@
 export type {
+	AppImageInstaller,
+	AppImageInstallerOptions,
+} from './appimage-installer';
+export { createAppImageInstaller } from './appimage-installer';
+export type {
+	LinuxUpdateAsset,
 	ReleaseFeed,
 	ReleaseFeedResult,
 	UpdateCandidate,
@@ -16,5 +22,5 @@ export type {
 export { checkUpdatePreconditions } from './update-preconditions';
 export type { UpdaterEventHandlers, UpdateService } from './update-service';
 export { createUpdateService } from './update-service';
-export type { AppUpdateServiceOptions } from './updater-port';
+export type { AppUpdateBinding, AppUpdateServiceOptions } from './updater-port';
 export { createAppUpdateService } from './updater-port';
