@@ -91,8 +91,13 @@ export function writeCachedAgentModels(
 	if (!store) {
 		return;
 	}
+	const stored: AgentModelCatalog = {
+		defaultModelId: result.defaultModelId,
+		defaultThinkingLevel: result.defaultThinkingLevel,
+		models: result.models,
+	};
 	try {
-		store.setItem(CACHE_KEY, JSON.stringify(result));
+		store.setItem(CACHE_KEY, JSON.stringify(stored));
 	} catch {
 		// Quota/serialisation failure must not break the query flow.
 	}
