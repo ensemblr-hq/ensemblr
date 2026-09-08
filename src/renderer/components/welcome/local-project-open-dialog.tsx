@@ -12,8 +12,8 @@ import { Spinner } from '@/renderer/components/ui/spinner';
 
 const STILL_WORKING_DELAY_MS = 10_000;
 
-/** Dialog body that reports import progress and escalates to a "still working" note after a delay. */
-function ImportDialogBody() {
+/** Dialog body that reports local-project opening progress after a delay. */
+function LocalProjectOpenDialogBody() {
 	const { t } = useTranslation();
 	const [stillWorking, setStillWorking] = useState(false);
 
@@ -30,17 +30,17 @@ function ImportDialogBody() {
 			<Spinner className='mt-0.5 size-5 shrink-0 text-muted-foreground' />
 			<DialogHeader className='gap-2'>
 				<DialogTitle>
-					{t('common:local-import.title', 'Opening local project…')}
+					{t('common:local-project-open.title', 'Opening local project…')}
 				</DialogTitle>
 				<DialogDescription>
 					{stillWorking
 						? t(
-								'common:local-import.still-working',
-								'Still working — large repositories with deep history can take a minute or two. The window will switch as soon as the workspace is ready.',
+								'common:local-project-open.still-working',
+								'Still working — creating the first workspace can take a minute or two. The window will switch as soon as it is ready.',
 							)
 						: t(
-								'common:local-import.description',
-								'Ensemblr is cloning the tracked git files into your managed repos folder, then creating the first workspace.',
+								'common:local-project-open.description',
+								'Ensemblr is registering this folder as your project root, then creating the first workspace.',
 							)}
 				</DialogDescription>
 			</DialogHeader>
@@ -48,12 +48,12 @@ function ImportDialogBody() {
 	);
 }
 
-/** Modal progress indicator shown while Ensemblr imports a local project. */
-export function LocalProjectImportDialog({ open }: { open: boolean }) {
+/** Modal progress indicator shown while Ensemblr opens a local project. */
+export function LocalProjectOpenDialog({ open }: { open: boolean }) {
 	return (
 		<Dialog open={open}>
 			<DialogContent className='sm:max-w-md' showCloseButton={false}>
-				{open ? <ImportDialogBody /> : null}
+				{open ? <LocalProjectOpenDialogBody /> : null}
 			</DialogContent>
 		</Dialog>
 	);

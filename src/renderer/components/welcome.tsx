@@ -15,7 +15,7 @@ import { openLocalProjectFlow } from '@/renderer/lib/workbench/open-local-projec
 import { SHELL_FLOATING_TRIGGER_CLASS } from '@/renderer/lib/workbench/shell-inset';
 import {
 	cloneDialogOpenAtom,
-	localProjectImportDialogOpenAtom,
+	localProjectOpenDialogOpenAtom,
 	quickStartDialogOpenAtom,
 } from '@/renderer/state/dialogs';
 import { lastWorkspaceSelectionAtom } from '@/renderer/state/workspace';
@@ -29,10 +29,8 @@ export function Welcome() {
 	const navigate = useNavigate();
 	const router = useRouter();
 	const setCloneOpen = useSetAtom(cloneDialogOpenAtom);
-	const localProjectImportOpen = useAtomValue(localProjectImportDialogOpenAtom);
-	const setLocalProjectImportOpen = useSetAtom(
-		localProjectImportDialogOpenAtom,
-	);
+	const localProjectOpen = useAtomValue(localProjectOpenDialogOpenAtom);
+	const setLocalProjectOpen = useSetAtom(localProjectOpenDialogOpenAtom);
 	const setQuickStartOpen = useSetAtom(quickStartDialogOpenAtom);
 	const setLastWorkspaceSelection = useSetAtom(lastWorkspaceSelectionAtom);
 	// Warm the GitHub repo-list cache so CloneGithubDialog opens with
@@ -48,9 +46,9 @@ export function Welcome() {
 			navigate,
 			router,
 			setLastWorkspaceSelection,
-			setLocalProjectImportOpen,
+			setLocalProjectOpen,
 		});
-	}, [navigate, router, setLastWorkspaceSelection, setLocalProjectImportOpen]);
+	}, [navigate, router, setLastWorkspaceSelection, setLocalProjectOpen]);
 
 	return (
 		<ShellScreen className='min-h-0 items-center overflow-auto px-8 py-10'>
@@ -69,7 +67,7 @@ export function Welcome() {
 				<WelcomeWordmark className='blur-[0.046875rem]' />
 				<div className='grid w-full grid-cols-3 gap-3'>
 					<WelcomeActionCard
-						disabled={localProjectImportOpen}
+						disabled={localProjectOpen}
 						icon={FolderIcon}
 						label={t('common:welcome.open-project', 'Open project')}
 						onClick={onOpenLocalProject}

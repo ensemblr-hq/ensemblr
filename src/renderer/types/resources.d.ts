@@ -126,9 +126,9 @@ export default interface Resources {
 				'too-long': 'Workspace names must be {{max}} characters or fewer.';
 			};
 		};
-		'local-import': {
-			description: 'Ensemblr is cloning the tracked git files into your managed repos folder, then creating the first workspace.';
-			'still-working': 'Still working — large repositories with deep history can take a minute or two. The window will switch as soon as the workspace is ready.';
+		'local-project-open': {
+			description: 'Ensemblr is registering this folder as your project root, then creating the first workspace.';
+			'still-working': 'Still working — creating the first workspace can take a minute or two. The window will switch as soon as it is ready.';
 			title: 'Opening local project…';
 		};
 		'message-image': {
@@ -873,14 +873,14 @@ export default interface Resources {
 			'bridge-unavailable': {
 				title: 'Preload bridge is unavailable in this context.';
 			};
-			'import-failed': {
-				title: 'The repository could not be imported.';
-			};
 			opened: {
 				title: 'Opened {{name}}.';
 			};
-			'seed-failed': {
-				title: "Imported {{name}} but couldn't open a workspace.";
+			'registration-failed': {
+				title: 'The repository could not be registered.';
+			};
+			'registration-seed-failed': {
+				title: "Registered {{name}} but couldn't open a workspace.";
 			};
 			unexpected: {
 				title: 'The local project could not be opened.';

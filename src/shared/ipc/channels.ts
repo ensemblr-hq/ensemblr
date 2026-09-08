@@ -112,7 +112,6 @@ export const IPC_CHANNELS = {
 	checkForUpdates: 'ensemblr:check-for-updates',
 	installUpdate: 'ensemblr:install-update',
 	updateStatusChanged: 'ensemblr:update-status-changed',
-	importLocalRepository: 'ensemblr:import-local-repository',
 	infisicalAccounts: 'ensemblr:infisical-accounts',
 	infisicalAddAccount: 'ensemblr:infisical-add-account',
 	infisicalClearLink: 'ensemblr:infisical-clear-link',

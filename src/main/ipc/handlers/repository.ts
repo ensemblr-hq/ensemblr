@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import type { AppLanguage } from '../../../shared/i18n.ts';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type {
 	GithubOwnerListResult,
@@ -32,7 +33,6 @@ import type {
 	GithubOwnerListService,
 	ListAllWorkspacesService,
 	ListArchivedWorkspacesService,
-	LocalRepositoryImportService,
 	LocalRepositoryRegistrationService,
 	QuickStartProjectService,
 	RenameWorkspaceService,
@@ -56,6 +56,7 @@ import {
 	parseUnarchiveWorkspaceRequest,
 } from '../request-schemas.ts';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
+import { localProjectPickerStrings } from './local-project-picker-strings.ts';
 
 /** Service dependencies used by the local-repository IPC handlers. */
 interface RepositoryHandlersOptions {
@@ -66,9 +67,10 @@ interface RepositoryHandlersOptions {
 	deleteRepositoryService: DeleteRepositoryService;
 	deleteWorkspaceService: DeleteWorkspaceService;
 	githubOwnerListService: GithubOwnerListService;
+	/** Reads the app's resolved UI language when the native picker opens. */
+	getLanguage: () => AppLanguage;
 	listAllWorkspacesService: ListAllWorkspacesService;
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
-	localRepositoryImportService: LocalRepositoryImportService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	quickStartProjectService: QuickStartProjectService;
 	renameWorkspaceService: RenameWorkspaceService;
@@ -79,8 +81,7 @@ interface RepositoryHandlersOptions {
 }
 
 /**
- * Registers IPC handlers for picking, importing, registering, and quick-starting
- * local repositories.
+ * Registers IPC handlers for picking, registering, and quick-starting local repositories.
  * @param options - Required services.
  */
 export function registerRepositoryHandlers({
@@ -91,9 +92,9 @@ export function registerRepositoryHandlers({
 	deleteRepositoryService,
 	deleteWorkspaceService,
 	githubOwnerListService,
+	getLanguage,
 	listAllWorkspacesService,
 	listArchivedWorkspacesService,
-	localRepositoryImportService,
 	localRepositoryRegistrationService,
 	quickStartProjectService,
 	renameWorkspaceService,
@@ -106,19 +107,9 @@ export function registerRepositoryHandlers({
 		IPC_CHANNELS.selectLocalRepository,
 		(event): Promise<LocalRepositorySelectionResult> =>
 			showDirectorySelectionDialog(event, {
-				buttonLabel: 'Open project',
-				message: 'Select an existing local git project to copy into Ensemblr.',
+				...localProjectPickerStrings(getLanguage()),
 				properties: ['openDirectory'],
-				title: 'Open local project',
 			}),
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.importLocalRepository,
-		(_event, raw: unknown): Promise<RegisterLocalRepositoryResult> =>
-			localRepositoryImportService.importRepository(
-				parseRegisterLocalRepositoryRequest(raw),
-			),
 	);
 
 	ipcMain.handle(

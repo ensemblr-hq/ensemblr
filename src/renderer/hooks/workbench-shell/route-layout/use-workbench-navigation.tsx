@@ -11,7 +11,7 @@ import {
 import { openLocalProjectFlow } from '@/renderer/lib/workbench/open-local-project-flow';
 import {
 	cloneDialogOpenAtom,
-	localProjectImportDialogOpenAtom,
+	localProjectOpenDialogOpenAtom,
 	quickStartDialogOpenAtom,
 } from '@/renderer/state/dialogs';
 import { recentProjectsAtom } from '@/renderer/state/recents';
@@ -58,7 +58,7 @@ interface WorkbenchNavigationResult {
 
 /**
  * Owns the workbench navigation callbacks (static + workspace routing), the
- * add-project menu wiring, and the local-project import flow.
+ * add-project menu wiring, and the local-project opening flow.
  */
 export function useWorkbenchNavigation({
 	displayProjects,
@@ -71,9 +71,7 @@ export function useWorkbenchNavigation({
 	const navigate = useNavigate();
 	const router = useRouter();
 	const setLastWorkspaceSelection = useSetAtom(lastWorkspaceSelectionAtom);
-	const setLocalProjectImportOpen = useSetAtom(
-		localProjectImportDialogOpenAtom,
-	);
+	const setLocalProjectOpen = useSetAtom(localProjectOpenDialogOpenAtom);
 	const recentProjects = useAtomValue(recentProjectsAtom);
 	const reviewTabsByWorkspace = useAtomValue(activeReviewTabByWorkspaceAtom);
 	const dockTabsByWorkspace = useAtomValue(activeDockTabByWorkspaceAtom);
@@ -165,7 +163,7 @@ export function useWorkbenchNavigation({
 					navigate,
 					router,
 					setLastWorkspaceSelection,
-					setLocalProjectImportOpen,
+					setLocalProjectOpen,
 				});
 				return;
 			}
@@ -178,7 +176,7 @@ export function useWorkbenchNavigation({
 			router,
 			setCloneDialogOpen,
 			setLastWorkspaceSelection,
-			setLocalProjectImportOpen,
+			setLocalProjectOpen,
 			setQuickStartDialogOpen,
 		],
 	);

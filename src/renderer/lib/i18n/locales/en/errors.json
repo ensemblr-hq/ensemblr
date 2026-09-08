@@ -404,14 +404,14 @@
 		"bridge-unavailable": {
 			"title": "Preload bridge is unavailable in this context."
 		},
-		"import-failed": {
-			"title": "The repository could not be imported."
-		},
 		"opened": {
 			"title": "Opened {{name}}."
 		},
-		"seed-failed": {
-			"title": "Imported {{name}} but couldn't open a workspace."
+		"registration-failed": {
+			"title": "The repository could not be registered."
+		},
+		"registration-seed-failed": {
+			"title": "Registered {{name}} but couldn't open a workspace."
 		},
 		"unexpected": {
 			"title": "The local project could not be opened."

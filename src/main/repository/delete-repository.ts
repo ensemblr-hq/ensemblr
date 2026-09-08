@@ -66,14 +66,15 @@ interface SourceWorkspace {
 
 /**
  * Builds the service that destructively removes a repository and every child
- * workspace from Ensemblr. Worktrees are wiped, branches are dropped, the
- * SQLite rows are deleted, and the repository's leftover workspace directory is
- * cleared.
+ * workspace from Ensemblr. Worktrees and SQLite rows are removed, but branch
+ * deletion, private-ref cleanup and archive markers are restricted to managed
+ * repositories. External project folders and their refs remain owned by the user.
  *
  * The repository folder itself is removed only when the request asks for it and
- * the folder lives inside the managed `repos/` root; otherwise it is left in
- * place and tagged with a sentinel so the shared-root reconciler does not
- * resurrect it.
+ * the folder lives inside the managed `repos/` root. A retained managed folder
+ * gets a sentinel so the shared-root reconciler does not resurrect it.
+ * @param options - Persistence, Git, managed-root and workspace teardown services.
+ * @returns The repository removal service.
  */
 export function createDeleteRepositoryService({
 	databaseService,
@@ -82,154 +83,314 @@ export function createDeleteRepositoryService({
 	workspaceTeardownService,
 }: CreateDeleteRepositoryServiceOptions): DeleteRepositoryService {
 	return {
-		delete: async (request) => {
-			const database = databaseService.getConnection()?.database;
-			if (!database) {
-				return failure({
-					code: 'database-unavailable',
-					message: 'SQLite is unavailable; the repository was not deleted.',
-					severity: 'error',
-				});
-			}
-
-			const repositoryId =
-				typeof request.repositoryId === 'string'
-					? request.repositoryId.trim()
-					: '';
-			if (!repositoryId) {
-				return failure({
-					code: 'repository-id-required',
-					message: 'A repository id is required to delete a repository.',
-					severity: 'error',
-				});
-			}
-
-			const source = readRepository(database, repositoryId);
-			if (!source) {
-				return failure({
-					code: 'repository-not-found',
-					message: `No repository is registered with id ${repositoryId}.`,
-					severity: 'error',
-				});
-			}
-
-			const diagnostics: DeleteRepositoryDiagnostic[] = [];
-
-			for (const workspace of source.workspaces) {
-				const teardown = await workspaceTeardownService.teardown({
-					workspaceId: workspace.id,
-					workspacePath: workspace.path,
-				});
-				for (const message of teardown.failures) {
-					diagnostics.push({
-						code: 'workspace-cleanup-failed',
-						message,
-						severity: 'warning',
-						workspaceId: workspace.id,
-					});
-				}
-
-				// The whole repository is going, so a `git worktree lock` on one of its
-				// workspaces is unlocked rather than worked around.
-				const worktreeOutcome = await runWorktreeRemove({
-					localCommandService,
-					deletingWorkspace: true,
-					repositoryPath: source.path,
-					workspacePath: workspace.path,
-				});
-				if (worktreeOutcome.status !== 'success') {
-					diagnostics.push({
-						code: 'workspace-cleanup-failed',
-						message: worktreeOutcome.message,
-						path: workspace.path,
-						severity: 'warning',
-						workspaceId: workspace.id,
-					});
-				}
-
-				if (workspace.branchName) {
-					const branchOutcome = await runBranchDelete({
-						branchName: workspace.branchName,
-						localCommandService,
-						repositoryPath: source.path,
-					});
-					if (branchOutcome.status === 'failure') {
-						diagnostics.push({
-							code: 'workspace-cleanup-failed',
-							message: branchOutcome.message,
-							severity: 'warning',
-							workspaceId: workspace.id,
-						});
-					}
-				}
-			}
-
-			try {
-				deleteRepositoryRows({ database, repositoryId: source.id });
-			} catch (error) {
-				diagnostics.push({
-					code: 'repository-delete-failed',
-					message:
-						error instanceof Error
-							? error.message
-							: 'Failed to delete the repository row.',
-					severity: 'error',
-				});
-				return {
-					diagnostics,
-					repository: null,
-					status: 'failure',
-					workspacesDeleted: 0,
-				};
-			}
-
-			await removeWorkspacesDirectory({
-				diagnostics,
-				repositorySlug: source.slug,
+		delete: (request) =>
+			deleteRepository({
+				databaseService,
+				localCommandService,
+				request,
 				rootDirectoryService,
-			});
+				workspaceTeardownService,
+			}),
+	};
+}
 
-			const folderDeleted =
-				request.deleteFolder === true &&
-				(await removeRepositoryFolder({
+/**
+ * Removes a registered repository while retaining the ownership boundary between
+ * Ensemblr-managed repositories and external projects.
+ * @param options - The deletion request and services it needs to remove state.
+ * @returns The deletion result with best-effort cleanup diagnostics.
+ */
+async function deleteRepository({
+	databaseService,
+	localCommandService,
+	request,
+	rootDirectoryService,
+	workspaceTeardownService,
+}: CreateDeleteRepositoryServiceOptions & {
+	request: DeleteRepositoryRequest;
+}): Promise<DeleteRepositoryResult> {
+	const database = databaseService.getConnection()?.database;
+	if (!database) {
+		return failure({
+			code: 'database-unavailable',
+			message: 'SQLite is unavailable; the repository was not deleted.',
+			severity: 'error',
+		});
+	}
+
+	const repositoryId =
+		typeof request.repositoryId === 'string' ? request.repositoryId.trim() : '';
+	if (!repositoryId) {
+		return failure({
+			code: 'repository-id-required',
+			message: 'A repository id is required to delete a repository.',
+			severity: 'error',
+		});
+	}
+
+	const source = readRepository(database, repositoryId);
+	if (!source) {
+		return failure({
+			code: 'repository-not-found',
+			message: `No repository is registered with id ${repositoryId}.`,
+			severity: 'error',
+		});
+	}
+
+	const diagnostics: DeleteRepositoryDiagnostic[] = [];
+	const ownershipRefusal = repositoryFolderRefusal({
+		repositoryPath: source.path,
+		rootDirectoryService,
+	});
+
+	for (const workspace of source.workspaces) {
+		await removeManagedWorktree({
+			diagnostics,
+			localCommandService,
+			repositoryPath: source.path,
+			workspace,
+			workspaceTeardownService,
+		});
+		if (ownershipRefusal === null) {
+			await removeManagedRepositoryWorkspaceBranch({
+				diagnostics,
+				localCommandService,
+				repositoryPath: source.path,
+				workspace,
+			});
+		}
+	}
+
+	if (
+		!removeApplicationRecords({
+			database,
+			diagnostics,
+			repositoryId: source.id,
+		})
+	) {
+		return {
+			diagnostics,
+			repository: null,
+			status: 'failure',
+			workspacesDeleted: 0,
+		};
+	}
+
+	await removeWorkspacesDirectory({
+		diagnostics,
+		repositorySlug: source.slug,
+		rootDirectoryService,
+	});
+
+	const folderDeleted =
+		ownershipRefusal === null
+			? await cleanUpManagedRepository({
 					diagnostics,
+					deleteFolder: request.deleteFolder === true,
+					localCommandService,
 					repositoryPath: source.path,
 					rootDirectoryService,
-				}));
-
-			if (!folderDeleted) {
-				// The refs only need purging while a `.git` survives to hold them, and
-				// only then is the sentinel what stops the next launch re-adopting the
-				// folder as a brand-new repository.
-				await runEnsemblrRefPurge({
-					localCommandService,
+				})
+			: await preserveExternalRepositoryFolder({
+					diagnostics,
+					deleteFolder: request.deleteFolder === true,
+					ownershipRefusal,
 					repositoryPath: source.path,
 				});
-				writeArchivedMarker({ diagnostics, repositoryPath: source.path });
-			}
 
-			await removeArchivedContextsForRepository({
-				diagnostics,
-				rootDirectoryService,
-				repositorySlug: source.slug,
-			});
+	await removeArchivedContextsForRepository({
+		diagnostics,
+		rootDirectoryService,
+		repositorySlug: source.slug,
+	});
 
-			const repository: DeletedRepositorySnapshot = {
-				deletedWorkspaceIds: source.workspaces.map((w) => w.id),
-				folderDeleted,
-				id: source.id,
-				name: source.name,
-				path: source.path,
-			};
-
-			return {
-				diagnostics,
-				repository,
-				status: 'success',
-				workspacesDeleted: source.workspaces.length,
-			};
-		},
+	const repository: DeletedRepositorySnapshot = {
+		deletedWorkspaceIds: source.workspaces.map((w) => w.id),
+		folderDeleted,
+		id: source.id,
+		name: source.name,
+		path: source.path,
 	};
+
+	return {
+		diagnostics,
+		repository,
+		status: 'success',
+		workspacesDeleted: source.workspaces.length,
+	};
+}
+
+/**
+ * Tears down an Ensemblr-managed worktree without touching its repository's
+ * branches, private refs, folder, or archive marker.
+ * @param options - Diagnostics, Git services, and the workspace to remove.
+ */
+async function removeManagedWorktree({
+	diagnostics,
+	localCommandService,
+	repositoryPath,
+	workspace,
+	workspaceTeardownService,
+}: {
+	diagnostics: DeleteRepositoryDiagnostic[];
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+	workspace: SourceWorkspace;
+	workspaceTeardownService: WorkspaceTeardownService;
+}): Promise<void> {
+	const teardown = await workspaceTeardownService.teardown({
+		workspaceId: workspace.id,
+		workspacePath: workspace.path,
+	});
+	for (const message of teardown.failures) {
+		diagnostics.push({
+			code: 'workspace-cleanup-failed',
+			message,
+			severity: 'warning',
+			workspaceId: workspace.id,
+		});
+	}
+
+	const worktreeOutcome = await runWorktreeRemove({
+		localCommandService,
+		deletingWorkspace: true,
+		repositoryPath,
+		workspacePath: workspace.path,
+	});
+	if (worktreeOutcome.status !== 'success') {
+		diagnostics.push({
+			code: 'workspace-cleanup-failed',
+			message: worktreeOutcome.message,
+			path: workspace.path,
+			severity: 'warning',
+			workspaceId: workspace.id,
+		});
+	}
+}
+
+/**
+ * Deletes one workspace branch only for a repository Ensemblr owns.
+ * @param options - Diagnostics, Git services, and the managed workspace branch.
+ */
+async function removeManagedRepositoryWorkspaceBranch({
+	diagnostics,
+	localCommandService,
+	repositoryPath,
+	workspace,
+}: {
+	diagnostics: DeleteRepositoryDiagnostic[];
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+	workspace: SourceWorkspace;
+}): Promise<void> {
+	if (!workspace.branchName) {
+		return;
+	}
+
+	const branchOutcome = await runBranchDelete({
+		branchName: workspace.branchName,
+		localCommandService,
+		repositoryPath,
+	});
+	if (branchOutcome.status === 'failure') {
+		diagnostics.push({
+			code: 'workspace-cleanup-failed',
+			message: branchOutcome.message,
+			severity: 'warning',
+			workspaceId: workspace.id,
+		});
+	}
+}
+
+/**
+ * Deletes application records after their managed worktrees have been removed.
+ * @param options - Database, diagnostics sink, and repository identifier.
+ * @returns Whether the database transaction completed.
+ */
+function removeApplicationRecords({
+	database,
+	diagnostics,
+	repositoryId,
+}: {
+	database: DatabaseSync;
+	diagnostics: DeleteRepositoryDiagnostic[];
+	repositoryId: string;
+}): boolean {
+	try {
+		deleteRepositoryRows({ database, repositoryId });
+		return true;
+	} catch (error) {
+		diagnostics.push({
+			code: 'repository-delete-failed',
+			message:
+				error instanceof Error
+					? error.message
+					: 'Failed to delete the repository row.',
+			severity: 'error',
+		});
+		return false;
+	}
+}
+
+/**
+ * Cleans managed-only repository state while preserving the folder unless the
+ * request explicitly removes it.
+ * @param options - Managed repository cleanup services and deletion intent.
+ * @returns Whether the managed repository folder was removed.
+ */
+async function cleanUpManagedRepository({
+	diagnostics,
+	deleteFolder,
+	localCommandService,
+	repositoryPath,
+	rootDirectoryService,
+}: {
+	diagnostics: DeleteRepositoryDiagnostic[];
+	deleteFolder: boolean;
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+	rootDirectoryService: EnsemblrRootDirectoryService;
+}): Promise<boolean> {
+	const folderDeleted =
+		deleteFolder &&
+		(await removeRepositoryFolder({
+			diagnostics,
+			repositoryPath,
+			rootDirectoryService,
+		}));
+	if (!folderDeleted) {
+		await runEnsemblrRefPurge({ localCommandService, repositoryPath });
+		writeArchivedMarker({ diagnostics, repositoryPath });
+	}
+	return folderDeleted;
+}
+
+/**
+ * Reports an attempted external-folder deletion without deleting, moving, or
+ * marking the user-owned project.
+ * @param options - External repository path, deletion intent, and diagnostics.
+ * @returns Always false because external folders remain user-owned.
+ */
+async function preserveExternalRepositoryFolder({
+	diagnostics,
+	deleteFolder,
+	ownershipRefusal,
+	repositoryPath,
+}: {
+	diagnostics: DeleteRepositoryDiagnostic[];
+	deleteFolder: boolean;
+	ownershipRefusal: string;
+	repositoryPath: string;
+}): Promise<boolean> {
+	if (deleteFolder) {
+		diagnostics.push({
+			code: 'repository-folder-external',
+			message: ownershipRefusal,
+			path: repositoryPath,
+			severity: 'warning',
+		});
+	}
+	return false;
 }
 
 /**
@@ -354,6 +515,28 @@ async function removeWorkspacesDirectory({
 }
 
 /**
+ * Determines whether the project folder belongs to the managed repositories root.
+ * @param options - Project path and the current managed-root service.
+ * @returns The ownership refusal, or null when this is a managed repository.
+ */
+function repositoryFolderRefusal({
+	repositoryPath,
+	rootDirectoryService,
+}: {
+	repositoryPath: string;
+	rootDirectoryService: EnsemblrRootDirectoryService;
+}): string | null {
+	const repositoriesPath = rootDirectoryService.getSnapshot()?.repositoriesPath;
+	return repositoriesPath
+		? containmentRefusal({
+				candidatePath: repositoryPath,
+				expectedDepth: MANAGED_CHILD_DEPTH,
+				root: repositoriesPath,
+			})
+		: 'The managed repositories directory is unavailable, so the repository folder was left on disk.';
+}
+
+/**
  * Removes the repository folder itself, but only when it lives inside the
  * managed `repos/` root.
  *
@@ -362,7 +545,7 @@ async function removeWorkspacesDirectory({
  * that separates a folder Ensemblr owns from the user's own checkout. It
  * resolves both sides, so neither a row pointing through a symlink nor a
  * symlink planted in `repos/` can walk the removal out of the managed tree. A
- * refusal is reported and the caller falls back to the sentinel.
+ * refusal is reported; external folders never receive an archive sentinel.
  * @param options - Diagnostics sink, the repository path, and the root service
  * @returns True when the folder is gone
  */
@@ -375,16 +558,10 @@ async function removeRepositoryFolder({
 	repositoryPath: string;
 	rootDirectoryService: EnsemblrRootDirectoryService;
 }): Promise<boolean> {
-	const snapshot = rootDirectoryService.getSnapshot();
-	const repositoriesPath = snapshot?.repositoriesPath;
-
-	const refusal = repositoriesPath
-		? containmentRefusal({
-				candidatePath: repositoryPath,
-				expectedDepth: MANAGED_CHILD_DEPTH,
-				root: repositoriesPath,
-			})
-		: 'The managed repositories directory is unavailable, so the repository folder was left on disk.';
+	const refusal = repositoryFolderRefusal({
+		repositoryPath,
+		rootDirectoryService,
+	});
 
 	if (refusal !== null) {
 		diagnostics.push({

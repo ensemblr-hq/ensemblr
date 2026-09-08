@@ -8,7 +8,7 @@ import {
 } from '@/renderer/api/ensemblr-queries';
 import { ConciergeLauncher } from '@/renderer/components/concierge';
 import { CloneGithubDialog } from '@/renderer/components/welcome/clone-github-dialog';
-import { LocalProjectImportDialog } from '@/renderer/components/welcome/local-project-import-dialog';
+import { LocalProjectOpenDialog } from '@/renderer/components/welcome/local-project-open-dialog';
 import { QuickStartDialog } from '@/renderer/components/welcome/quick-start-dialog';
 import { WorkbenchFrame } from '@/renderer/components/workbench-shell/frame';
 import {
@@ -30,7 +30,7 @@ import {
 } from '@/renderer/lib/workbench';
 import {
 	cloneDialogOpenAtom,
-	localProjectImportDialogOpenAtom,
+	localProjectOpenDialogOpenAtom,
 	quickStartDialogOpenAtom,
 } from '@/renderer/state/dialogs';
 import type { WorkbenchShellRouteState } from '@/renderer/types/components';
@@ -56,7 +56,7 @@ export function WorkbenchShellLayout() {
 	useReconcileUnreadChats(model.displayProjects);
 	useReconcileWorkspaceState();
 	const [cloneOpen, setCloneOpen] = useAtom(cloneDialogOpenAtom);
-	const [localProjectImportOpen] = useAtom(localProjectImportDialogOpenAtom);
+	const [localProjectOpen] = useAtom(localProjectOpenDialogOpenAtom);
 	const [quickStartOpen, setQuickStartOpen] = useAtom(quickStartDialogOpenAtom);
 	// Warm the GitHub owner cache for QuickStartDialog, which is hosted here and
 	// blocks Create until the list lands. Two `gh` round trips, once per session
@@ -93,7 +93,7 @@ export function WorkbenchShellLayout() {
 					</WorkbenchLayoutModelProvider>
 				</WorkbenchFrame>
 				<CloneGithubDialog onOpenChange={setCloneOpen} open={cloneOpen} />
-				<LocalProjectImportDialog open={localProjectImportOpen} />
+				<LocalProjectOpenDialog open={localProjectOpen} />
 				<QuickStartDialog
 					onOpenChange={setQuickStartOpen}
 					open={quickStartOpen}
@@ -123,6 +123,7 @@ function useWorkbenchShellRouteState(): WorkbenchShellRouteState {
 		select: (matches) =>
 			packWorkbenchShellRouteState(
 				matches.map((match) => ({
+					// SAFETY: Router params are string-valued records; the generated route union is wider than this packer accepts.
 					params: match.params as unknown as Record<string, unknown>,
 					staticData: match.staticData,
 				})),

@@ -43,13 +43,13 @@ export function quickStartProject(
 	);
 }
 
-/** Copies a selected local repository into managed repos and registers it. */
-export function importLocalRepository(
+/** Registers a selected local repository at its existing path. */
+export function registerLocalRepository(
 	request: RegisterLocalRepositoryRequest,
 ): Promise<RegisterLocalRepositoryResult> {
 	return profileElectronIpcCall(
-		{ channel: 'ensemblr:import-local-repository', usesDatabase: true },
-		() => getEnsemblrApi().importLocalRepository(request),
+		{ channel: 'ensemblr:register-local-repository', usesDatabase: true },
+		() => getEnsemblrApi().registerLocalRepository(request),
 	);
 }
 

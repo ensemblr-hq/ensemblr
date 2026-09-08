@@ -30,6 +30,7 @@ import {
 	probeGitRepository,
 } from './git-probe.ts';
 import { normalizeRemoteUrl } from './github-url.ts';
+import { canonicalPath } from './managed-path.ts';
 import { toSlug } from './slug.ts';
 
 /** Public surface of the local repository registration service. */
@@ -134,7 +135,7 @@ export async function registerLocalRepository({
 		});
 	}
 
-	const repositoryPath = path.resolve(rawPath);
+	const repositoryPath = canonicalPath(rawPath);
 
 	const writableDiagnostic = assertWritablePath(repositoryPath);
 
