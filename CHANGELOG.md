@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-09-08
+
+Ensemblr 0.1.10 makes local projects and linked directories more dependable, restores Pi command
+discovery across installations, and improves agent-session recovery.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.10) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.10/Ensemblr-0.1.10-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.10/Ensemblr-0.1.10-x64.AppImage)
+
+### Fixed
+
+- **Open Local Project now uses the selected checkout in place.** Its Git state and repository
+  settings remain authoritative instead of being cloned under Ensemblr. Removing the project cleans
+  Ensemblr's managed records and worktrees without deleting the original folder, branches, or refs.
+  Repository settings also show the actual managed workspace path. (#507, #509)
+- **Linked directories now reliably reach agents.** A send carries one snapshot of the chat's grants
+  through IPC and runtime setup, sent messages retain their directory references, and a changed grant
+  resumes the idle runtime before the next prompt. The composer notice is clearer and less repetitive.
+  (#506, #508)
+- **Pi skills, prompt templates, and extension slash commands are discovered through the configured
+  executable's RPC interface.** Discovery no longer depends on where Homebrew or another installer
+  placed Pi's SDK, and cleanup preserves a completed discovery result. (#504)
+- **Delegation excludes hidden models** from both model selection and fallback choices. (#503)
+- **Pi sessions settle after an oversized completion frame is dropped** instead of remaining stuck in
+  a running state. (#503)
+
 ## [0.1.9] - 2026-09-08
 
 Agents can now read context usage over the control layer — their own conversation, or a child's,

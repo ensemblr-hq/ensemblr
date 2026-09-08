@@ -630,15 +630,17 @@ hint for that reason.
 
 To let an agent read something outside its workspace — a sibling repository, a
 design folder — link the directory. This is a **grant**, not an attachment:
-nothing is copied and nothing is serialized, the agent is simply allowed to read
-there. The grant is held per chat and sticks across sends.
+nothing is copied. Each prompt announces the linked paths to the runtime, and
+sent messages retain linked-directory references. The grant is held per chat and
+sticks across sends.
 
 Two deliberate behaviours:
 
 - **Symlinks are not resolved.** The path you picked is the path that is granted.
-- **A directory linked mid-session is pending** until the chat reopens, and the
-  composer says so. The runtime takes its roots at launch, so the honest answer
-  is to tell you rather than let the agent hit an unexplained denial.
+- **A directory changed during an active turn applies before the next send.**
+  Once the chat is idle, Ensemblr resumes its runtime with the new roots before
+  delivering that prompt; the composer reports the transition instead of letting
+  the agent hit an unexplained denial.
 
 ## When a turn fails
 
