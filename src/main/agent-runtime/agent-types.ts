@@ -268,6 +268,25 @@ export interface AgentSubmitRequest {
 	streamingBehavior?: 'steer' | 'followUp';
 }
 
+/** Describes whether a failed submit was rejected or left delivery-ambiguous. */
+export type AgentSubmitFailureDisposition = 'rejected' | 'unconfirmed';
+
+/** Provider-neutral submit failure carrying a lifecycle-safe disposition. */
+export class AgentSubmitError extends Error {
+	readonly disposition: AgentSubmitFailureDisposition;
+
+	/**
+	 * Creates a submit failure that lets lifecycle code choose safe recovery.
+	 * @param message - Provider-neutral diagnostic for the caller.
+	 * @param disposition - Whether delivery was rejected or remains unconfirmed.
+	 */
+	constructor(message: string, disposition: AgentSubmitFailureDisposition) {
+		super(message);
+		this.name = 'AgentSubmitError';
+		this.disposition = disposition;
+	}
+}
+
 /** Acknowledgement returned synchronously after a successful submit. */
 export interface AgentSubmitAcknowledgement {
 	acceptedAt: string;

@@ -282,38 +282,50 @@ export function useAgentTurns({
 			// won't match and both render.
 			const optimisticEntry = optimistic.push(promptToSend);
 
-			const resolved = await ensureSession(
-				trimmed,
-				turn,
-				options?.linkedDirectories,
-			);
-			if (!resolved.sessionId) {
-				const error =
-					resolved.error ??
-					t(
-						'workbench:composer.session-open-failed',
-						'Unable to open an agent session.',
-					);
-				setLastError(error);
-				optimistic.remove(optimisticEntry.id);
-				return { error };
-			}
-
-			const turnSessionId = resolved.sessionId;
-			const result = await inFlight.track(turnSessionId, () =>
-				submitMutation.mutateAsync({
-					prompt: promptToSend,
-					sessionId: turnSessionId,
-					streamingBehavior: options?.streamingBehavior,
+			try {
+				const resolved = await ensureSession(
+					trimmed,
 					turn,
-				}),
-			);
-			if (result.error) {
-				setLastError(result.error);
+					options?.linkedDirectories,
+				);
+				if (!resolved.sessionId) {
+					const error =
+						resolved.error ??
+						t(
+							'workbench:composer.session-open-failed',
+							'Unable to open an agent session.',
+						);
+					setLastError(error);
+					optimistic.remove(optimisticEntry.id);
+					return { error };
+				}
+
+				const turnSessionId = resolved.sessionId;
+				const result = await inFlight.track(turnSessionId, () =>
+					submitMutation.mutateAsync({
+						prompt: promptToSend,
+						sessionId: turnSessionId,
+						streamingBehavior: options?.streamingBehavior,
+						turn,
+					}),
+				);
+				if (result.error) {
+					const error =
+						result.errorCode === 'delivery-unconfirmed'
+							? t(
+									'workbench:composer.delivery-unconfirmed',
+									'The session stopped; delivery is unconfirmed. Review the message before sending it again.',
+								)
+							: result.error;
+					setLastError(error);
+					optimistic.remove(optimisticEntry.id);
+					return { error };
+				}
+				return {};
+			} catch (cause) {
 				optimistic.remove(optimisticEntry.id);
-				return { error: result.error };
+				throw cause;
 			}
-			return {};
 		},
 		[
 			activeSessionId,

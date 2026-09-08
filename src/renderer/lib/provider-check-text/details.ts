@@ -171,6 +171,17 @@ export const PROVIDER_DETAIL_TEXT: Record<
 			'Startup produced a valid {{frameType}} frame.',
 			params,
 		),
+	'pi-version-unparseable': (t) =>
+		t(
+			'settings:providers.detail.pi-version-unparseable',
+			'Pi version could not be read. Ensemblr requires Pi 0.80.4 or newer.',
+		),
+	'pi-version-unsupported': (t, params) =>
+		t(
+			'settings:providers.detail.pi-version-unsupported',
+			'Pi is too old. Ensemblr requires version {{minimumVersion}} or newer.',
+			params,
+		),
 	'version-command-failed': (t, params) =>
 		t(
 			'settings:providers.detail.version-command-failed',

@@ -15,7 +15,9 @@ import type {
 	AgentSubmitAcknowledgement,
 	AgentSubmitRequest,
 } from '../agent-runtime/agent-types.ts';
+import { AgentSubmitError } from '../agent-runtime/agent-types.ts';
 import { bindChildStreams } from './cli-rpc/child-streams.ts';
+import { createCommandAcknowledgements } from './cli-rpc/command-acknowledgements.ts';
 import { createKillTimer } from './cli-rpc/kill-timer.ts';
 import { createPiRpcLineStream } from './cli-rpc/line-stream-handlers.ts';
 import { createListenerFanout } from './cli-rpc/listener-fanout.ts';
@@ -117,7 +119,7 @@ export interface CreatePiCliRpcAdapterOptions {
  * Lifecycle:
  *  - `createSession` spawns the child, attaches JSONL parsing on stdout and a
  *    ring-buffered stderr capture, and emits a `metadata` event.
- *  - `submit` writes a request frame to stdin. Parsed events stream out
+ *  - `submit` waits for Pi's prompt acceptance. Parsed events stream out
  *    asynchronously through the listener fan-out.
  *  - `abort` sends SIGINT then SIGKILL after a grace window.
  *  - `close` waits for graceful exit, then SIGTERM/SIGKILL if needed.
@@ -393,6 +395,7 @@ function createCliRpcSession({
 
 	patchMetadata({ status: 'starting' });
 
+	const acknowledgements = createCommandAcknowledgements();
 	const pendingStatsIds = new Set<string>();
 	const pendingStateResolvers = new Map<string, (data: unknown) => void>();
 	const unechoedPrompts: UnechoedPrompt[] = [];
@@ -462,7 +465,9 @@ function createCliRpcSession({
 			if (closed) {
 				return;
 			}
-			handleProtocolFrame(frame);
+			if (!acknowledgements.handleResponse(frame)) {
+				handleProtocolFrame(frame);
+			}
 		},
 		onRawLine: (line) => emitRawFrame('rx', line),
 	});
@@ -531,6 +536,9 @@ function createCliRpcSession({
 			return;
 		}
 		closed = true;
+		acknowledgements.rejectAll(
+			new Error('Pi RPC session closed before command acceptance.'),
+		);
 		// Ahead of the shutdown event so the timeline renders a rescued prompt above
 		// the marker that ended its turn rather than after it.
 		flushUnechoedPrompts();
@@ -715,14 +723,38 @@ function createCliRpcSession({
 		// accepts them needs no client change.
 		const frame = {
 			attachments: request.attachments ?? [],
+			id: turnId,
 			message: request.prompt,
 			turnId,
 			type: 'prompt' as const,
 		};
-		await writeFrame(frame);
-		unechoedPrompts.push({ flushed: false, prompt: request.prompt, turnId });
-		setStatus('streaming');
-		return { acceptedAt, turnId };
+		const pendingPrompt = { flushed: false, prompt: request.prompt, turnId };
+		unechoedPrompts.push(pendingPrompt);
+		try {
+			await acknowledgements.send(frame, writeFrame);
+		} catch (cause) {
+			const index = unechoedPrompts.indexOf(pendingPrompt);
+			if (index >= 0) {
+				unechoedPrompts.splice(index, 1);
+			}
+			if (
+				cause instanceof Error &&
+				cause.message.includes('delivery is unconfirmed')
+			) {
+				throw new AgentSubmitError(
+					'Prompt delivery could not be confirmed; the Pi session was quarantined.',
+					'unconfirmed',
+				);
+			}
+			if (cause instanceof AgentSubmitError) {
+				throw cause;
+			}
+			throw new AgentSubmitError(
+				cause instanceof Error ? cause.message : String(cause),
+				'rejected',
+			);
+		}
+		return { acceptedAt: now().toISOString(), turnId };
 	};
 
 	/**
@@ -737,6 +769,9 @@ function createCliRpcSession({
 			return;
 		}
 		pendingShutdownReason = 'aborted';
+		acknowledgements.rejectAll(
+			new Error('Pi RPC session aborted before command acceptance.'),
+		);
 		flushUnechoedPrompts();
 		emitError('adapter-failure', 'Pi RPC session aborted.', reason, true);
 		sendSignal('SIGINT');

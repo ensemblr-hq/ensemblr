@@ -459,6 +459,8 @@
 			"pi-models-unverified": "Provider and model readiness could not be verified.",
 			"pi-rpc-invalid": "{{provider}} RPC startup did not produce valid JSONL.",
 			"pi-rpc-ready": "Startup produced a valid {{frameType}} frame.",
+			"pi-version-unparseable": "Pi version could not be read. Ensemblr requires Pi 0.80.4 or newer.",
+			"pi-version-unsupported": "Pi is too old. Ensemblr requires version {{minimumVersion}} or newer.",
 			"version-command-failed": "{{command}} --version failed: {{message}}",
 			"version-command-failed-unknown": "{{command}} --version failed for an unknown reason."
 		},

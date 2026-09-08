@@ -19,6 +19,7 @@ import {
 	snapshotToWire,
 } from '../../agent-runtime/agent-session-service.ts';
 import { AgentSessionServiceError } from '../../agent-runtime/agent-session-service-error.ts';
+import { AgentSubmitError } from '../../agent-runtime/agent-types.ts';
 import type { QueueProvisionalNamingPort } from '../../agent-runtime/naming/provisional-workspace-naming';
 import type { PiExecutableService } from '../../pi-runtime';
 import { isBlockedByPiExecutable } from '../../pi-runtime/pi-executable-gate.ts';
@@ -232,6 +233,10 @@ export function registerAgentSessionHandlers({
 				return acknowledgement;
 			} catch (cause) {
 				return {
+					...(cause instanceof AgentSubmitError &&
+					cause.disposition === 'unconfirmed'
+						? { errorCode: 'delivery-unconfirmed' as const }
+						: {}),
 					error: cause instanceof Error ? cause.message : 'Submit failed.',
 				};
 			}

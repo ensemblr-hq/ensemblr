@@ -6,6 +6,7 @@ import {
 	updateAgentSession,
 	updateTurn,
 } from '../../storage/repositories/agent-session-repository.ts';
+import type { AgentSession } from '../agent-client.ts';
 import type { AgentSessionEventSink } from '../agent-session-types.ts';
 import type {
 	AgentEvent,
@@ -46,6 +47,7 @@ interface RuntimeEventHandler {
 		branchId: string;
 		database: DatabaseSync;
 		event: AgentEvent;
+		runtimeSession?: AgentSession;
 		sessionId: string;
 	}) => void;
 }
@@ -235,14 +237,24 @@ export function createRuntimeEventHandler({
 		branchId,
 		database,
 		event,
+		runtimeSession,
 		sessionId,
 	}: {
 		branchId: string;
 		database: DatabaseSync;
 		event: AgentEvent;
+		runtimeSession?: AgentSession;
 		sessionId: string;
 	}): void => {
-		const active = activeSessions.get(sessionId);
+		const activeCandidate = activeSessions.get(sessionId);
+		if (
+			runtimeSession &&
+			activeCandidate &&
+			activeCandidate.agentRuntimeSession !== runtimeSession
+		) {
+			return;
+		}
+		const active = activeCandidate;
 
 		if (tryBroadcastDelta({ active, branchId, event, sessionId })) {
 			return;

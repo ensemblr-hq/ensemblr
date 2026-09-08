@@ -459,6 +459,8 @@
 			"pi-models-unverified": "Η ετοιμότητα παρόχων και μοντέλων δεν επαληθεύτηκε.",
 			"pi-rpc-invalid": "Η εκκίνηση RPC του {{provider}} δεν παρήγαγε έγκυρο JSONL.",
 			"pi-rpc-ready": "Η εκκίνηση παρήγαγε έγκυρο πλαίσιο {{frameType}}.",
+			"pi-version-unparseable": "Δεν ήταν δυνατή η ανάγνωση της έκδοσης του Pi. Το Ensemblr απαιτεί Pi 0.80.4 ή νεότερο.",
+			"pi-version-unsupported": "Η έκδοση του Pi είναι πολύ παλιά. Το Ensemblr απαιτεί την έκδοση {{minimumVersion}} ή νεότερη.",
 			"version-command-failed": "{{command}} --version απέτυχε: {{message}}",
 			"version-command-failed-unknown": "{{command}} --version απέτυχε για άγνωστο λόγο."
 		},

@@ -62,6 +62,7 @@ const PARAMS = {
 	masked: 1,
 	message: 'boom',
 	modelCount: 9,
+	minimumVersion: '0.80.4',
 	organization: 'Acme',
 	organizations: 'Acme, Client Co',
 	path: '/opt/homebrew/bin/pi',

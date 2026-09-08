@@ -2084,6 +2084,8 @@ export default interface Resources {
 				'pi-models-unverified': 'Provider and model readiness could not be verified.';
 				'pi-rpc-invalid': '{{provider}} RPC startup did not produce valid JSONL.';
 				'pi-rpc-ready': 'Startup produced a valid {{frameType}} frame.';
+				'pi-version-unparseable': 'Pi version could not be read. Ensemblr requires Pi 0.80.4 or newer.';
+				'pi-version-unsupported': 'Pi is too old. Ensemblr requires version {{minimumVersion}} or newer.';
 				'version-command-failed': '{{command}} --version failed: {{message}}';
 				'version-command-failed-unknown': '{{command}} --version failed for an unknown reason.';
 			};
@@ -2633,6 +2635,7 @@ export default interface Resources {
 			'attachment-failed': 'Failed to attach selected file.';
 			'blocked-follow-up': 'Follow-ups are held while the agent works — sending or {{shortcut}} adds to the queue, and you send it from there once the agent finishes.';
 			'chat-initializing': 'Workspace chat tab is still initializing. Try again in a moment.';
+			'delivery-unconfirmed': 'The session stopped; delivery is unconfirmed. Review the message before sending it again.';
 			dictation: {
 				start: 'Dictate a prompt';
 				stop: 'Stop dictation';

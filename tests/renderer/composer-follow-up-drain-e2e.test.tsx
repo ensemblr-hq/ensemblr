@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr/query-keys';
 import type { ComposerEditorHandle } from '../../src/renderer/components/workbench-shell/conversation-panel/composer/editor';
 import { useComposerSubmit } from '../../src/renderer/hooks/workbench-shell/composer/use-composer-submit';
+import { useTimelineMessages } from '../../src/renderer/hooks/workbench-shell/timeline/use-timeline-messages';
 import { getComposerState } from '../../src/renderer/lib/workbench';
 import { useAgentComposerController } from '../../src/renderer/state/composer';
 import { appSettingsAtom } from '../../src/renderer/state/preferences';
@@ -105,16 +106,40 @@ function sessionAt(status: AgentSessionStatusWire): AgentSessionSnapshotWire {
  * only when the test says so, by flipping the row back and broadcasting the
  * status event main emits.
  * @param sessionReadDelayMs - Latency to give the session read, so a test can put a real gap between a submit landing and the renderer learning a turn started
+ * @param initialStatus - Session status visible when the bridge is installed
  */
-function installTurnBridge(sessionReadDelayMs = 0) {
-	let status: AgentSessionStatusWire = 'idle';
+function installTurnBridge(
+	sessionReadDelayMs = 0,
+	initialStatus: AgentSessionStatusWire = 'idle',
+) {
+	let status: AgentSessionStatusWire = initialStatus;
 	const listeners = new Set<(broadcast: unknown) => void>();
+	const publishStatus = (nextStatus: AgentSessionStatusWire) => {
+		status = nextStatus;
+		for (const listener of listeners) {
+			listener({
+				event: {
+					branchId: BRANCH_ID,
+					createdAt: '2026-08-14T00:00:02.000Z',
+					eventType: 'status',
+					id: 'event-drain',
+					ordinal: 1,
+					payload: null,
+					stream: 'agent',
+					turnId: 'turn-drain',
+				},
+				sessionId: SESSION_ID,
+				workspaceId: WORKSPACE_ID,
+			});
+		}
+	};
 	const submitAgentPrompt = vi.fn(
 		async (_request: SubmitAgentPromptRequest) => {
 			status = 'streaming';
 			return { acceptedAt: '2026-08-14T00:00:01.000Z', turnId: 'turn-drain' };
 		},
 	);
+	const openAgentSession = vi.fn(async () => ({ session: sessionAt(status) }));
 
 	installEnsemblrApi({
 		listAgentModels: vi.fn(async () => CATALOG),
@@ -127,31 +152,16 @@ function installTurnBridge(sessionReadDelayMs = 0) {
 			listeners.add(listener);
 			return () => listeners.delete(listener);
 		}),
-		openAgentSession: vi.fn(async () => ({ session: sessionAt(status) })),
+		openAgentSession,
 		submitAgentPrompt,
 	});
 
 	return {
 		/** Ends the running turn exactly as main does: persist, then broadcast. */
-		endTurn: () => {
-			status = 'idle';
-			for (const listener of listeners) {
-				listener({
-					event: {
-						branchId: BRANCH_ID,
-						createdAt: '2026-08-14T00:00:02.000Z',
-						eventType: 'status',
-						id: 'event-drain',
-						ordinal: 1,
-						payload: null,
-						stream: 'agent',
-						turnId: 'turn-drain',
-					},
-					sessionId: SESSION_ID,
-					workspaceId: WORKSPACE_ID,
-				});
-			}
-		},
+		endTurn: () => publishStatus('idle'),
+		/** Closes the session exactly as main does: persist, then broadcast. */
+		closeSession: () => publishStatus('errored'),
+		openAgentSession,
 		submitAgentPrompt,
 	};
 }
@@ -193,14 +203,35 @@ function MountedComposer({
 	return null;
 }
 
+/** Publishes timeline state so tests can assert the live timer's mount window. */
+function TimelineProbe({
+	isStreaming,
+	publishPendingStartMs,
+}: {
+	isStreaming: boolean;
+	publishPendingStartMs: (pendingStartMs: number | null) => void;
+}) {
+	const { pendingStartMs } = useTimelineMessages({
+		chatTabId: CHAT_TAB_ID,
+		events: [],
+		isStreaming,
+	});
+	useEffect(() => {
+		publishPendingStartMs(pendingStartMs);
+	}, [pendingStartMs, publishPendingStartMs]);
+	return null;
+}
+
 /** Stands in for `WorkspaceRouteContent` plus `ComposerSlot`. */
 function ChatHarness({
 	composerMounted,
 	publish,
+	publishPendingStartMs,
 	publishStreaming,
 }: {
 	composerMounted: boolean;
 	publish: (api: SubmitApi) => void;
+	publishPendingStartMs: (pendingStartMs: number | null) => void;
 	publishStreaming: (isStreaming: boolean) => void;
 }) {
 	const agentComposer = useAgentComposerController({
@@ -235,18 +266,26 @@ function ChatHarness({
 	useEffect(() => {
 		publishStreaming(composer.isStreaming);
 	});
-	return composerMounted ? (
-		<MountedComposer composer={composer} publish={publish} />
-	) : null;
+	return (
+		<>
+			<TimelineProbe
+				isStreaming={composer.isStreaming}
+				publishPendingStartMs={publishPendingStartMs}
+			/>
+			{composerMounted ? (
+				<MountedComposer composer={composer} publish={publish} />
+			) : null}
+		</>
+	);
 }
 
 /** Mounts the controller and the composer over a fresh store and query cache. */
-function mountChat() {
+function mountChat(initialStatus: AgentSessionStatusWire = 'idle') {
 	const client = createTestQueryClient();
 	client.setQueryData(ensemblrQueryKeys.agentModels(), CATALOG);
 	client.setQueryData(
 		ensemblrQueryKeys.agentSessionsForWorkspace(WORKSPACE_ID),
-		{ sessions: [sessionAt('idle')] },
+		{ sessions: [sessionAt(initialStatus)] },
 	);
 
 	const store = createStore();
@@ -263,7 +302,11 @@ function mountChat() {
 		setText: vi.fn(),
 	} as unknown as ComposerEditorHandle;
 
-	const latest = { streaming: false, submit: null as SubmitApi | null };
+	const latest = {
+		pendingStartMs: null as number | null,
+		streaming: false,
+		submit: null as SubmitApi | null,
+	};
 	const tree = (composerMounted: boolean) => (
 		<Provider store={store}>
 			<QueryClientProvider client={client}>
@@ -271,6 +314,9 @@ function mountChat() {
 					composerMounted={composerMounted}
 					publish={(api) => {
 						latest.submit = api;
+					}}
+					publishPendingStartMs={(pendingStartMs) => {
+						latest.pendingStartMs = pendingStartMs;
 					}}
 					publishStreaming={(isStreaming) => {
 						latest.streaming = isStreaming;
@@ -283,6 +329,7 @@ function mountChat() {
 	const view = render(tree(true));
 	return {
 		isStreaming: () => latest.streaming,
+		pendingStartMs: () => latest.pendingStartMs,
 		setComposerMounted: (mounted: boolean) => view.rerender(tree(mounted)),
 		submit: () => {
 			if (!latest.submit) {
@@ -307,6 +354,67 @@ afterEach(() => {
 });
 
 describe('a queue draining against the real streaming state', () => {
+	test('a rejected session open removes its optimistic prompt, stops its timer, and keeps the queue entry', async () => {
+		const { closeSession, endTurn, openAgentSession } = installTurnBridge(
+			0,
+			'streaming',
+		);
+		const chat = mountChat('streaming');
+
+		openAgentSession.mockImplementationOnce(async () => {
+			closeSession();
+			throw new Error('session closed');
+		});
+		act(() => {
+			send(chat, 'queued while working');
+		});
+
+		await act(async () => {
+			endTurn();
+			await settle();
+		});
+
+		await waitFor(() => expect(openAgentSession).toHaveBeenCalledTimes(1));
+		await waitFor(() =>
+			expect(chat.submit().queue.entries.map((entry) => entry.text)).toEqual([
+				'queued while working',
+			]),
+		);
+		await waitFor(() => expect(chat.pendingStartMs()).toBeNull());
+	});
+
+	test('a rejected submit removes its optimistic prompt, stops its timer, and keeps the queue entry', async () => {
+		const { closeSession, endTurn, submitAgentPrompt } = installTurnBridge(
+			0,
+			'streaming',
+		);
+		const chat = mountChat('streaming');
+
+		submitAgentPrompt.mockImplementationOnce(async () => {
+			closeSession();
+			throw new Error('session closed');
+		});
+		act(() => {
+			send(chat, 'queued while working');
+		});
+		expect(chat.submit().queue.entries.map((entry) => entry.text)).toEqual([
+			'queued while working',
+		]);
+
+		await act(async () => {
+			endTurn();
+			await settle();
+		});
+
+		await waitFor(() => expect(submitAgentPrompt).toHaveBeenCalledTimes(1));
+		await waitFor(() =>
+			expect(chat.submit().queue.entries.map((entry) => entry.text)).toEqual([
+				'queued while working',
+			]),
+		);
+		await waitFor(() => expect(chat.pendingStartMs()).toBeNull());
+	});
+
 	test('every queued message reaches the agent, one per turn', async () => {
 		const { endTurn, submitAgentPrompt } = installTurnBridge();
 		const chat = mountChat();

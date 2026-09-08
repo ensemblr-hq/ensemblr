@@ -68,6 +68,31 @@ install with `npm ls -g @earendil-works/pi-coding-agent`:
   provider-neutral — it caches the `AgentModelCatalog` that spans every runtime,
   not just Pi's.
 
+## Completion and delivery (Pi 0.80.4+)
+
+Current lifecycle handling targets Pi's `agent_settled` contract, introduced in
+0.80.4 and verified against the installed 0.85.1 RPC docs and implementation.
+Older Pi versions must be upgraded: `agent_end` is not a safe idle fallback,
+even with `willRetry: false`, because compaction or queued continuation may
+still follow.
+
+- `message_end` with `stopReason: error` records an unresolved provider failure,
+  not a fatal turn yet. Successful assistant completion or successful auto-retry
+  clears it. Only `agent_settled` surfaces an unresolved failure and marks idle.
+  This prevents recovered WebSocket errors from splitting a successful turn.
+- `agent_end` refreshes usage but never drains Ensemblr's Follow-Up Queue.
+  `agent_settled` is the only completion signal that does.
+- Ordinary `prompt` frames carry an RPC `id`. Submission waits up to ten seconds
+  for Pi's matching acceptance response; refusal, missing acknowledgement, or
+  runtime exit rejects the send so the existing composer queue restores and
+  pauses it. A timeout means delivery is **unconfirmed**, not proof it never
+  ran; Ensemblr does not automatically resend it. The lifecycle quarantines the
+  runtime with bounded termination, marks the uncertain turn failed, and closes
+  the session so an accepted-but-unreported command cannot leave the UI running
+  forever; the user must reopen the session before trying again.
+- `steer` and `follow_up` remain mid-turn injections, not ordinary queued sends.
+  They retain their existing write-based acknowledgement behavior.
+
 ## Framing
 
 - Strict JSONL: one JSON object per line on stdin (commands) and stdout
@@ -93,14 +118,14 @@ The complete set of frames Ensemblr actually writes to Pi stdin is
 frame (see "Aborting"). The rest of the table is Pi capability, not app usage.
 
 | Command | Shape | Notes |
-|---|---|---|
-| prompt | Pi contract: `{"type":"prompt","message":string}`. **Ensemblr sends** `{"type":"prompt","message":string,"turnId":string,"attachments":[]}` (`pi-cli-rpc-adapter.ts`). | `turnId`/`attachments` are client metadata Pi ignores today; `attachments` is always empty. No `images` field is sent — image/file attachments are serialized *into* `message` as text (see "Attachments"). `streamingBehavior` is **not** a prompt field: when set, the adapter emits a separate `steer`/`follow_up` frame instead (`"steer"\|"followUp"`). Pi rejects a `prompt` with `success:false` if it is already streaming (`rpc.md` "prompt"). |
+| --- | --- | --- |
+| prompt | Pi contract: `{"type":"prompt","message":string}`. **Ensemblr sends** `{"type":"prompt","id":string,"message":string,"turnId":string,"attachments":[]}` (`pi-cli-rpc-adapter.ts`). | `turnId`/`attachments` are client metadata Pi ignores today; `attachments` is always empty. No `images` field is sent — image/file attachments are serialized *into* `message` as text (see "Attachments"). `streamingBehavior` is **not** a prompt field: when set, the adapter emits a separate `steer`/`follow_up` frame instead (`"steer"\|"followUp"`). Pi rejects a `prompt` with `success:false` if it is already streaming (`rpc.md` "prompt"). |
 | steer | `{"type":"steer","message":string}` | Queued; delivered after current assistant turn's tool calls (`rpc.md` "steer") |
 | follow_up | `{"type":"follow_up","message":string}` | Delivered when agent fully stops (`rpc.md` "follow_up") |
 | get_session_stats | `{"type":"get_session_stats"}` | Token usage, cost, `contextUsage` — feeds the status bar. The app refreshes it on every `turn_end`/`agent_end` (`rpc.md` "get_session_stats"). |
 | set_model / set_thinking_level | `{"type":"set_model","provider","modelId"}` / `{"type":"set_thinking_level","level"}` | Written ahead of the next `prompt` only when the selection differs from what the runtime is already on. Thinking levels: `off,minimal,low,medium,high,xhigh` |
 | set_session_name | `{"type":"set_session_name","name":string}` | Renames the Pi session. Reached from `ensemblr_set_name` and from the app's own tab-naming path (`AgentClient.setSessionName`). |
-| get_state | `{"id":string,"type":"get_state"}` | Sent by `getState()`, which times out on its own (`STATE_TIMEOUT_MS`). Session *status* is still derived from the `agent_start`/`turn_start`/`agent_end` lifecycle rather than polled — the one live caller is `session-naming.ts`, reading the session's current name. |
+| get_state | `{"id":string,"type":"get_state"}` | Sent by `getState()`, which times out on its own (`STATE_TIMEOUT_MS`). Session *status* is derived from the `agent_start`/`turn_start`/`agent_settled` lifecycle rather than polled — the one live caller is `session-naming.ts`, reading the session's current name. |
 | abort / new_session | Pi capabilities, **not used by Ensemblr** | Abort is done by signal, not this frame. |
 
 Response frames: `{"id?":string,"type":"response","command":string,
@@ -114,9 +139,10 @@ post-acceptance failures arrive as events, never as a second response
 Documented event types (`rpc.md` "Events"):
 
 | Event | Payload highlights |
-|---|---|
+| --- | --- |
 | `agent_start` | none |
-| `agent_end` | `messages: AgentMessage[]` (everything generated this run) |
+| `agent_end` | `messages: AgentMessage[]` (everything generated this low-level run), `willRetry` |
+| `agent_settled` | Definitive completion after retries, compaction, and queued continuation |
 | `turn_start` | none |
 | `turn_end` | `message` (assistant `AgentMessage`), `toolResults` |
 | `message_start` / `message_end` | `message: AgentMessage` |
@@ -129,7 +155,8 @@ Documented event types (`rpc.md` "Events"):
 | `auto_retry_start` / `auto_retry_end` | attempt counters, delay, error text |
 | `extension_error` | `extensionPath`, `event`, `error` |
 
-> Ensemblr models **none** of `queue_update`, `compaction_*`, `auto_retry_*`, or
+> `auto_retry_*` is consumed by the adapter's pending-error lifecycle.
+> Ensemblr models **none** of `queue_update`, `compaction_*`, or
 > `extension_error` — they are Pi-runtime-provided but fall through the
 > unknown-frame fallback (`protocol-dispatch.ts`, `parse.ts`) and never appear in
 > the fixtures. Keep them documented as Pi-provided/unconsumed; do not treat them
@@ -150,6 +177,8 @@ response(prompt) → agent_start → turn_start
   → turn_end
   → (more turns if the model issued tool calls)
 → agent_end
+→ (automatic retry / compaction / queued continuation, if any)
+→ agent_settled
 ```
 
 `OBSERVED`: exact interleaving of `message_end` vs `tool_execution_start`,
@@ -243,7 +272,7 @@ full read of `dist/modes/rpc/rpc-types.d.ts` (`RpcCommand` union) and
 `{"type":"response","command":"<name>","success":false,"error":"Unknown command: <name>"}`.
 
 | Capability | Status | Evidence / mechanism |
-|---|---|---|
+| --- | --- | --- |
 | Model listing | **Supported** | `get_available_models` returned 8 models offline; `set_model`, `cycle_model` in `RpcCommand` |
 | Thinking levels | **Supported** | `set_thinking_level` / `cycle_thinking_level`; levels `off,minimal,low,medium,high,xhigh`; per-model `thinkingLevelMap` visible in `get_state` |
 | Context usage | **Supported** | `get_session_stats` (`contextUsage`) + `usage` on assistant messages |
