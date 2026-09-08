@@ -68,11 +68,6 @@ export type {
 } from './github-username.ts';
 export { createGithubUsernameResolver } from './github-username.ts';
 export type {
-	CreateLocalRepositoryImportServiceOptions,
-	LocalRepositoryImportService,
-} from './import-local-repository.ts';
-export { createLocalRepositoryImportService } from './import-local-repository.ts';
-export type {
 	CreateListAllWorkspacesServiceOptions,
 	ListAllWorkspacesService,
 } from './list-all-workspaces.ts';

@@ -182,7 +182,6 @@ import {
 	createGithubUsernameResolver,
 	createListAllWorkspacesService,
 	createListArchivedWorkspacesService,
-	createLocalRepositoryImportService,
 	createLocalRepositoryRegistrationService,
 	createQuickStartProjectService,
 	createRenameWorkspaceService,
@@ -919,11 +918,6 @@ const localRepositoryRegistrationService =
 	createLocalRepositoryRegistrationService({
 		databaseService,
 	});
-const localRepositoryImportService = createLocalRepositoryImportService({
-	localCommandService,
-	registrationService: localRepositoryRegistrationService,
-	rootDirectoryService,
-});
 const githubCloneService = createGithubCloneService({
 	databaseService,
 	registrationService: localRepositoryRegistrationService,
@@ -1832,6 +1826,7 @@ app.whenReady().then(() => {
 		dictationService,
 		environmentVariablesService,
 		getInfisicalService,
+		getLanguage: resolveAppLanguage,
 		githubCloneService,
 		githubOwnerListService,
 		githubRemoteBranchListService,
@@ -1843,7 +1838,6 @@ app.whenReady().then(() => {
 		listArchivedWorkspacesService,
 		listWorkspaceFilesService,
 		localCommandService,
-		localRepositoryImportService,
 		localRepositoryRegistrationService,
 		openTargetService,
 		piExecutableService,

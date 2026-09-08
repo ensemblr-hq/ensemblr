@@ -8,6 +8,14 @@ If the terms here are unfamiliar, read [`04-concepts.md`](./04-concepts.md)
 first — especially the difference between the **base branch** and the branch a
 workspace **owns**.
 
+## Opening a local project
+
+**Open local project** registers the folder you select as the project's root in
+place. Ensemblr does not copy or clone that checkout into its managed root.
+The project's existing files, git configuration, and `.ensemblr/settings.toml`
+stay at that path; only workspaces are created under Ensemblr's managed
+`workspaces/` directory.
+
 ## Creating a workspace
 
 The create dialog offers three tabs. Each lists things you can start work from:

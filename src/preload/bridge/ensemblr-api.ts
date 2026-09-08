@@ -210,8 +210,6 @@ export function createEnsemblrApi(): EnsemblrApi {
 		updateStatus: () => invoke('updateStatus'),
 		checkForUpdates: () => invoke('checkForUpdates'),
 		installUpdate: () => invoke('installUpdate'),
-		importLocalRepository: (request) =>
-			invoke('importLocalRepository', request),
 		infisicalAccounts: () => invoke('infisicalAccounts'),
 		infisicalAddAccount: (request) => invoke('infisicalAddAccount', request),
 		infisicalClearLink: (request) => invoke('infisicalClearLink', request),

@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import {
 	chmodSync,
 	mkdirSync,
 	mkdtempSync,
+	realpathSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -19,6 +22,7 @@ import type {
 	GitRepositoryProbe,
 	GitRepositoryProbeFn,
 } from '../../src/main/repository/git-probe.ts';
+import { probeGitRepository } from '../../src/main/repository/git-probe.ts';
 import {
 	createLocalRepositoryRegistrationService,
 	registerLocalRepository,
@@ -72,6 +76,45 @@ function gitProbeStub(
 
 const fixedNow = () => new Date('2026-06-07T12:00:00.000Z');
 
+function runGit(cwd: string, args: string[]): string {
+	return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+}
+
+test('registers a symlink-selected git root canonically and rejects its real path as a duplicate', async (t) => {
+	const directory = createFixtureDirectory(t);
+	const sourcePath = path.join(realpathSync(directory), 'source');
+	const selectedAliasPath = path.join(
+		realpathSync(directory),
+		'selected-alias',
+	);
+	mkdirSync(sourcePath);
+	runGit(sourcePath, ['init', '-b', 'master']);
+	symlinkSync(sourcePath, selectedAliasPath);
+	const database = createDatabaseFixture(t);
+
+	const first = await registerLocalRepository({
+		database,
+		gitProbe: probeGitRepository,
+		loadConfig: loadRepositoryConfig,
+		now: fixedNow,
+		request: { path: selectedAliasPath },
+	});
+
+	assert.equal(first.registered, true);
+	assert.equal(first.repository?.path, sourcePath);
+
+	const second = await registerLocalRepository({
+		database,
+		gitProbe: probeGitRepository,
+		loadConfig: loadRepositoryConfig,
+		now: fixedNow,
+		request: { path: sourcePath },
+	});
+
+	assert.equal(second.registered, false);
+	assert.equal(second.diagnostics[0]?.code, 'repository-already-registered');
+});
+
 test('registers a valid git repository and writes an absolute path', async (t) => {
 	const directory = createFixtureDirectory(t);
 	const database = createDatabaseFixture(t);
@@ -92,7 +135,7 @@ test('registers a valid git repository and writes an absolute path', async (t) =
 	assert.equal(result.registered, true);
 	assert.equal(result.diagnostics.length, 0);
 	assert.ok(result.repository);
-	assert.equal(result.repository?.path, path.resolve(directory));
+	assert.equal(result.repository?.path, realpathSync(directory));
 	assert.equal(result.repository?.defaultBranch, 'master');
 	assert.equal(
 		result.repository?.remoteUrl,
@@ -105,7 +148,7 @@ test('registers a valid git repository and writes an absolute path', async (t) =
 		.prepare(
 			'SELECT id, path, default_branch AS defaultBranch, metadata_json AS metadataJson FROM repositories WHERE path = ?',
 		)
-		.get(path.resolve(directory));
+		.get(realpathSync(directory));
 	assert.ok(
 		typeof rawRow === 'object' && rawRow !== null,
 		'expected a repositories row',
@@ -119,7 +162,7 @@ test('registers a valid git repository and writes an absolute path', async (t) =
 		'defaultBranch must be string|null',
 	);
 
-	assert.equal(row.path, path.resolve(directory));
+	assert.equal(row.path, realpathSync(directory));
 	assert.equal(row.defaultBranch, 'master');
 	const metadata = JSON.parse(row.metadataJson as string) as Record<
 		string,
@@ -253,7 +296,7 @@ test('honours an explicit name override so folder suffixes do not leak into the 
 	assert.equal(result.registered, true);
 	assert.equal(result.repository?.name, 'haartz-next');
 	assert.equal(result.repository?.slug, 'haartz-next');
-	assert.equal(result.repository?.path, suffixed);
+	assert.equal(result.repository?.path, realpathSync(suffixed));
 });
 
 test('rejects a re-add when another repository tracks the same remote URL', async (t) => {

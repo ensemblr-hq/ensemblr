@@ -394,10 +394,6 @@ export interface IpcHandlerMap {
 		GithubRepositoryListResult
 	>;
 	[IPC_CHANNELS.health]: IpcHandlerEntry<void, HealthSnapshot>;
-	[IPC_CHANNELS.importLocalRepository]: IpcHandlerEntry<
-		RegisterLocalRepositoryRequest,
-		RegisterLocalRepositoryResult
-	>;
 	[IPC_CHANNELS.initialShellSnapshot]: IpcHandlerEntry<
 		void,
 		InitialShellSnapshot

@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../../shared/i18n';
 import type { WindowChromeSnapshot } from '../../shared/window-chrome';
 import type { AfkModeRegistry } from '../afk-mode';
 import type {
@@ -45,7 +46,6 @@ import type {
 	GithubRepositoryListService,
 	ListAllWorkspacesService,
 	ListArchivedWorkspacesService,
-	LocalRepositoryImportService,
 	LocalRepositoryRegistrationService,
 	QuickStartProjectService,
 	RenameWorkspaceService,
@@ -133,6 +133,8 @@ interface RegisterIpcHandlersOptions {
 	environmentVariablesService: EnvironmentVariablesService;
 	/** Resolves the Infisical service, which is rebuilt when the database connection changes. */
 	getInfisicalService: () => InfisicalService | null;
+	/** Reads the app's resolved UI language for native dialogs. */
+	getLanguage: () => AppLanguage;
 	githubCloneService: GithubCloneService;
 	githubOwnerListService: GithubOwnerListService;
 	githubRemoteBranchListService: GithubRemoteBranchListService;
@@ -144,7 +146,6 @@ interface RegisterIpcHandlersOptions {
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
 	listWorkspaceFilesService: ListWorkspaceFilesService;
 	localCommandService: LocalCommandService;
-	localRepositoryImportService: LocalRepositoryImportService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	/** Holds the chat the renderer reports as on screen, read by the desktop notifier. */
 	activeChatStore: ActiveChatStore;
@@ -214,6 +215,7 @@ export function registerIpcHandlers({
 	dictationService,
 	environmentVariablesService,
 	getInfisicalService,
+	getLanguage,
 	githubCloneService,
 	githubOwnerListService,
 	githubRemoteBranchListService,
@@ -225,7 +227,6 @@ export function registerIpcHandlers({
 	listArchivedWorkspacesService,
 	listWorkspaceFilesService,
 	localCommandService,
-	localRepositoryImportService,
 	localRepositoryRegistrationService,
 	menuBarStore,
 	menuContextStore,
@@ -299,9 +300,9 @@ export function registerIpcHandlers({
 		deleteRepositoryService,
 		deleteWorkspaceService,
 		githubOwnerListService,
+		getLanguage,
 		listAllWorkspacesService,
 		listArchivedWorkspacesService,
-		localRepositoryImportService,
 		localRepositoryRegistrationService,
 		quickStartProjectService,
 		renameWorkspaceService,

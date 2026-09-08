@@ -215,6 +215,12 @@ async function advanceLocalBase({
 		localCommandService,
 		repositoryPath,
 	});
+	if (
+		currentBranch === baseBranch &&
+		!(await isWorktreeClean({ localCommandService, repositoryPath }))
+	) {
+		return { status: 'skipped' };
+	}
 	const advanced =
 		currentBranch === baseBranch
 			? await runGitSucceeds({
@@ -228,6 +234,38 @@ async function advanceLocalBase({
 					repositoryPath,
 				});
 	return advanced ? { status: 'synced' } : { status: 'skipped' };
+}
+
+/**
+ * Requires a clean checkout before a best-effort sync changes the user's files.
+ * @param options - Git command service and repository path.
+ * @returns True only when Git confirms there are no staged, unstaged or untracked changes.
+ */
+async function isWorktreeClean({
+	localCommandService,
+	repositoryPath,
+}: {
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+}): Promise<boolean> {
+	try {
+		const result = await localCommandService.run({
+			args: [
+				'--no-optional-locks',
+				'status',
+				'--porcelain=v1',
+				'--untracked-files=normal',
+				'--ignore-submodules=none',
+			],
+			command: 'git',
+			cwd: repositoryPath,
+			maxOutputBytes: 4 * 1024,
+			timeoutMs: GIT_BRANCH_TIMEOUT_MS,
+		});
+		return result.status === 'success' && result.stdout.trim() === '';
+	} catch {
+		return false;
+	}
 }
 
 /**

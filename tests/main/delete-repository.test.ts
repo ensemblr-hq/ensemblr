@@ -354,12 +354,24 @@ test('delete clears the workspaces directory even when the folder is kept', asyn
 	);
 });
 
-test('delete refuses to remove a repository folder outside the managed root', async (t) => {
+test('delete preserves an external checkout, its refs, and an adopted branch', async (t) => {
 	const harness = createHarness(t);
 	const outsidePath = mkdtempSync(path.join(tmpdir(), 'ensemblr-external-'));
 	t.after(() => rmSync(outsidePath, { force: true, recursive: true }));
 
 	runGit(outsidePath, ['init', '-b', 'main']);
+	runGit(outsidePath, ['config', 'user.email', 'test@ensemblr.dev']);
+	runGit(outsidePath, ['config', 'user.name', 'Ensemblr Test']);
+	writeFileSync(path.join(outsidePath, 'README.md'), '# external\n');
+	runGit(outsidePath, ['add', 'README.md']);
+	runGit(outsidePath, ['commit', '-m', 'init']);
+	runGit(outsidePath, ['branch', 'user-branch']);
+	runGit(outsidePath, [
+		'update-ref',
+		'refs/ensemblr/archived/workspace-x',
+		'HEAD',
+	]);
+
 	const timestamp = fixedNow().toISOString();
 	const database = harness.databaseService.getConnection()
 		?.database as DatabaseSync;
@@ -376,8 +388,21 @@ test('delete refuses to remove a repository folder outside the managed root', as
 			'main',
 			timestamp,
 			timestamp,
-			'{}',
+			'{"adoptionMode":"adopt-in-place"}',
 		);
+
+	const adopted = await createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	}).create({
+		branchPlan: { branch: 'user-branch', kind: 'adopt' },
+		name: 'user branch',
+		repositoryId: 'repository-external',
+	});
+	assert.equal(adopted.status, 'success');
+	assert.equal(adopted.workspace?.branchName, 'user-branch');
 
 	const service = createDeleteRepositoryService({
 		databaseService: harness.databaseService,
@@ -394,17 +419,24 @@ test('delete refuses to remove a repository folder outside the managed root', as
 	assert.equal(result.status, 'success');
 	assert.equal(result.repository?.folderDeleted, false);
 	assert.equal(existsSync(outsidePath), true);
+	assert.equal(existsSync(path.join(outsidePath, '.git')), true);
+	assert.equal(existsSync(path.join(outsidePath, 'README.md')), true);
 	assert.equal(
 		result.diagnostics.some(
 			(diagnostic) => diagnostic.code === 'repository-folder-external',
 		),
 		true,
 	);
+	assert.equal(existsSync(path.join(outsidePath, '.ensemblr-archived')), false);
 	assert.equal(
-		existsSync(path.join(outsidePath, '.ensemblr-archived')),
-		true,
-		'a refused folder still gets the sentinel so it is not re-adopted',
+		runGit(outsidePath, [
+			'show-ref',
+			'--verify',
+			'refs/ensemblr/archived/workspace-x',
+		]),
+		`${runGit(outsidePath, ['rev-parse', 'HEAD'])} refs/ensemblr/archived/workspace-x`,
 	);
+	assert.equal(listBranches(outsidePath).includes('user-branch'), true);
 });
 
 test('delete refuses a repository path that symlinks out of the managed root', async (t) => {
