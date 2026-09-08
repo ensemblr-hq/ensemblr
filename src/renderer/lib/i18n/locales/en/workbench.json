@@ -198,6 +198,7 @@
 		"attachment-failed": "Failed to attach selected file.",
 		"blocked-follow-up": "Follow-ups are held while the agent works — sending or {{shortcut}} adds to the queue, and you send it from there once the agent finishes.",
 		"chat-initializing": "Workspace chat tab is still initializing. Try again in a moment.",
+		"delivery-unconfirmed": "The session stopped; delivery is unconfirmed. Review the message before sending it again.",
 		"dictation": {
 			"start": "Dictate a prompt",
 			"stop": "Stop dictation",

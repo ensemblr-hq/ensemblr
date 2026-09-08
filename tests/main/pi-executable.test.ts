@@ -26,6 +26,7 @@ import {
 	resolvePiExecutable,
 	savePiExecutableOverride,
 } from '../../src/main/pi-runtime/pi-executable.ts';
+import { MINIMUM_PI_VERSION } from '../../src/main/pi-runtime/pi-version.ts';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import type { SettingsResolutionSnapshot } from '../../src/shared/ipc/index.ts';
 
@@ -113,12 +114,19 @@ function insertAppSetting({
 	value: unknown;
 }): void {
 	settingCounter += 1;
-	database
-		.prepare(
-			`INSERT INTO settings (id, scope, scope_id, key, value_json)
-			 VALUES (?, 'app', '', ?, ?)`,
-		)
-		.run(`pi-setting-${settingCounter}`, key, JSON.stringify(value));
+	const statement = database.prepare(
+		`INSERT INTO settings (id, scope, scope_id, key, value_json)
+		 VALUES (?, 'app', '', ?, ?)`,
+	);
+	const run = Reflect.get(statement, 'run');
+	if (typeof run !== 'function') {
+		throw new Error('SQLite statement cannot execute.');
+	}
+	Reflect.apply(run, statement, [
+		`pi-setting-${settingCounter}`,
+		key,
+		JSON.stringify(value),
+	]);
 }
 
 function createLocalCommandService({
@@ -210,6 +218,52 @@ function createLocalCommandResult(
 function formatCommandKey(command: string, args: string[]): string {
 	return [command, ...args].join(' ');
 }
+
+async function resolveVersionSnapshot(
+	t: TestContext,
+	versionOutput: string,
+): Promise<Awaited<ReturnType<typeof resolvePiExecutable>>> {
+	const homeDirectory = createDirectoryFixture(t);
+	const executablePath = createExecutable(
+		path.join(homeDirectory, 'bin', 'pi'),
+	);
+	return resolvePiExecutable({
+		homeDirectory,
+		localCommandService: createLocalCommandService({
+			probeResults: {
+				[formatCommandKey(executablePath, ['--version'])]: {
+					stdout: versionOutput,
+				},
+			},
+		}),
+		now: () => NOW,
+		settingsSnapshot: createSettingsSnapshot({
+			config: createConfig({ app: { pi: { executablePath } } }),
+			homeDirectory,
+		}),
+	});
+}
+
+test('accepts the minimum supported Pi version', async (t) => {
+	const snapshot = await resolveVersionSnapshot(
+		t,
+		`pi version ${MINIMUM_PI_VERSION}`,
+	);
+	assert.equal(snapshot.status, 'ok');
+	assert.equal(snapshot.diagnostics.length, 0);
+});
+
+test('rejects Pi versions older than the lifecycle contract', async (t) => {
+	const snapshot = await resolveVersionSnapshot(t, 'pi version 0.80.3');
+	assert.equal(snapshot.status, 'error');
+	assert.equal(snapshot.diagnostics[0]?.code, 'pi-version-unsupported');
+});
+
+test('rejects version output that cannot establish compatibility', async (t) => {
+	const snapshot = await resolveVersionSnapshot(t, 'Pi development build');
+	assert.equal(snapshot.status, 'error');
+	assert.equal(snapshot.diagnostics[0]?.code, 'pi-version-unparseable');
+});
 
 test('uses app.pi.executablePath from declarative config', async (t) => {
 	const homeDirectory = createDirectoryFixture(t);
@@ -405,13 +459,13 @@ test('warns when version and help probes fail for an executable candidate', asyn
 		settingsSnapshot: createSettingsSnapshot({ homeDirectory }),
 	});
 
-	assert.equal(snapshot.status, 'warning');
+	assert.equal(snapshot.status, 'error');
 	assert.equal(snapshot.probe?.status, 'failure');
 	assert.equal(
 		snapshot.diagnostics.some(
 			(diagnostic) =>
 				diagnostic.code === 'pi-executable-probe-unsupported' &&
-				diagnostic.severity === 'warning',
+				diagnostic.severity === 'error',
 		),
 		true,
 	);

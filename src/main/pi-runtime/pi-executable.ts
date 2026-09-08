@@ -27,6 +27,11 @@ import {
 	isBareCommand,
 } from './internal/configured-executable-path.ts';
 import { normalizeConfiguredPath } from './internal/normalize-configured-path.ts';
+import {
+	isSupportedPiVersion,
+	MINIMUM_PI_VERSION,
+	parsePiVersion,
+} from './pi-version.ts';
 
 /** Overall outcome of Pi executable discovery. */
 export type PiExecutableStatus = 'error' | 'ok' | 'warning';
@@ -645,15 +650,35 @@ async function createSnapshotForCandidate({
 		localCommandService,
 		probeTimeoutMs,
 	});
-	const status = probe.status === 'success' ? 'ok' : 'warning';
+	const probedVersion =
+		probe.status === 'success' && probe.kind === 'version'
+			? parsePiVersion(probe.detail)
+			: null;
+	const unsupportedVersion =
+		probe.status === 'success' &&
+		(probedVersion === null || !isSupportedPiVersion(probedVersion));
+	const status =
+		probe.status === 'success' && !unsupportedVersion ? 'ok' : 'error';
+
+	if (unsupportedVersion) {
+		diagnostics.push({
+			code: probedVersion ? 'pi-version-unsupported' : 'pi-version-unparseable',
+			message: probedVersion
+				? `Pi ${probe.detail.trim()} is unsupported; Ensemblr requires Pi ${MINIMUM_PI_VERSION} or newer.`
+				: `Pi version could not be read; Ensemblr requires Pi ${MINIMUM_PI_VERSION} or newer.`,
+			path: candidate.path,
+			severity: 'error',
+			source: candidate.source,
+		});
+	}
 
 	if (probe.status === 'failure') {
 		diagnostics.push({
 			code: 'pi-executable-probe-unsupported',
 			message:
-				'Pi executable is runnable, but --version and --help did not complete successfully.',
+				'Pi executable could not be verified; --version and --help did not complete successfully.',
 			path: candidate.path,
-			severity: 'warning',
+			severity: 'error',
 			source: candidate.source,
 		});
 	}

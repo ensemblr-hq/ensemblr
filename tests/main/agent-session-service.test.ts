@@ -17,6 +17,10 @@ import {
 	type AgentSessionEventSink,
 	createAgentSessionService,
 } from '../../src/main/agent-runtime/agent-session-service.ts';
+import {
+	type AgentEvent,
+	AgentSubmitError,
+} from '../../src/main/agent-runtime/agent-types.ts';
 import { createFakeAgentAdapter } from '../../src/main/agent-runtime/fake-agent-adapter.ts';
 import type {
 	SessionSummaryWriter,
@@ -97,6 +101,63 @@ function deferShutdownUntilExit(adapter: AgentAdapter): AgentAdapter {
 	};
 }
 
+// A runtime can reject a prompt before acceptance, as Pi does when it is busy.
+function deferFirstRejectedSubmit(adapter: AgentAdapter): {
+	adapter: AgentAdapter;
+	release: () => void;
+} {
+	let first = true;
+	let releaseFirst: (() => void) | null = null;
+	return {
+		adapter: {
+			createSession: async (input) => {
+				const session = await adapter.createSession(input);
+				return {
+					...session,
+					submit: async (request) => {
+						if (first) {
+							first = false;
+							await new Promise<void>((resolve) => {
+								releaseFirst = resolve;
+							});
+							throw new Error('Pi RPC prompt rejected before acceptance.');
+						}
+						return session.submit(request);
+					},
+				};
+			},
+			shutdown: adapter.shutdown,
+		},
+		release: () => releaseFirst?.(),
+	};
+}
+
+// A runtime can reject a prompt before acceptance, as Pi does when it is busy.
+function rejectSubmitForSession(
+	adapter: AgentAdapter,
+	shouldReject: (index: number) => boolean,
+	errorMessage: string,
+): AgentAdapter {
+	let created = 0;
+	return {
+		createSession: async (input) => {
+			const session = await adapter.createSession(input);
+			const index = created;
+			created += 1;
+			if (!shouldReject(index)) {
+				return session;
+			}
+			return {
+				...session,
+				submit: async () => {
+					throw new Error(errorMessage);
+				},
+			};
+		},
+		shutdown: adapter.shutdown,
+	};
+}
+
 // A runtime that refuses to die is exactly the case a stop cascade exists for,
 // so the fake has to be able to reject an abort the way a wedged child would.
 function rejectAbortForSession(
@@ -145,6 +206,7 @@ function resolveAdapter(
 		deferShutdown?: boolean;
 		refreshPlanUsage?: () => Promise<boolean>;
 		rejectAbortFor?: (index: number) => boolean;
+		rejectSubmitFor?: (index: number) => boolean;
 	},
 ): AgentAdapter {
 	if (options.refreshPlanUsage) {
@@ -152,6 +214,13 @@ function resolveAdapter(
 	}
 	if (options.rejectAbortFor) {
 		return rejectAbortForSession(fake.adapter, options.rejectAbortFor);
+	}
+	if (options.rejectSubmitFor) {
+		return rejectSubmitForSession(
+			fake.adapter,
+			options.rejectSubmitFor,
+			'Pi RPC prompt rejected before acceptance.',
+		);
 	}
 	return options.deferShutdown
 		? deferShutdownUntilExit(fake.adapter)
@@ -319,6 +388,7 @@ function createService(
 		eventSink?: AgentSessionEventSink;
 		refreshPlanUsage?: () => Promise<boolean>;
 		rejectAbortFor?: (index: number) => boolean;
+		rejectSubmitFor?: (index: number) => boolean;
 		resolveSpawnedChildren?: (sessionId: string) => readonly string[];
 		sessionSummaryWriter?: SessionSummaryWriter;
 	} = {},
@@ -1022,6 +1092,259 @@ test('submitPrompt creates a turn and forwards to the runtime session', async (t
 	const requests = runtime.getRequests();
 	assert.equal(requests.length, 1);
 	assert.equal(requests[0]?.prompt, 'hello pi');
+});
+
+test('rejected prompt finishes its turn and restores an idle session', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database, {
+		rejectSubmitFor: () => true,
+	});
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	await assert.rejects(
+		service.submitPrompt({ prompt: 'rejected', sessionId: snapshot.id }),
+		/Pi RPC prompt rejected/,
+	);
+
+	const session = getAgentSessionById({
+		database: fixture.database,
+		id: snapshot.id,
+	});
+	assert.equal(session?.status, 'idle');
+	const turns = listTurns({
+		branchId: snapshot.branchId,
+		database: fixture.database,
+	});
+	assert.equal(turns.length, 1);
+	assert.equal(turns[0]?.status, 'errored');
+	assert.ok(turns[0]?.completedAt);
+});
+
+test('ambiguous prompt timeout quarantines the runtime and closes the session', async (t) => {
+	const fixture = openFixture(t);
+	const fake = createFakeAgentAdapter();
+	const service = createService(fixture.database, {
+		adapter: {
+			createSession: async (input) => {
+				const session = await fake.adapter.createSession(input);
+				const controller = fake.getOpenSessions()[0];
+				if (!controller) {
+					throw new Error('Fake session controller was not created.');
+				}
+				return {
+					...session,
+					submit: async () => {
+						controller.emit({
+							at: new Date().toISOString(),
+							type: 'context-usage',
+							usage: {
+								contextWindow: 200_000,
+								percent: 20,
+								tokens: 40_000,
+							},
+						});
+						throw new AgentSubmitError(
+							'Prompt delivery could not be confirmed; the Pi session was quarantined.',
+							'unconfirmed',
+						);
+					},
+				};
+			},
+			shutdown: fake.adapter.shutdown,
+		},
+	}).service;
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	await assert.rejects(
+		service.submitPrompt({
+			prompt: 'possibly delivered',
+			sessionId: snapshot.id,
+		}),
+		/quarantined/,
+	);
+	assert.equal(
+		getAgentSessionById({ database: fixture.database, id: snapshot.id })
+			?.status,
+		'closed',
+	);
+	const turns = listTurns({
+		branchId: snapshot.branchId,
+		database: fixture.database,
+	});
+	assert.equal(turns[0]?.status, 'errored');
+	assert.ok(turns[0]?.completedAt);
+	assert.equal(fake.getOpenSessions().length, 0);
+});
+
+test('quarantine deletes a runtime when close resolves without shutdown', async (t) => {
+	const fixture = openFixture(t);
+	const fake = createFakeAgentAdapter();
+	const runtimes: object[] = [];
+	let emitLateEvent: ((event: AgentEvent) => void) | undefined;
+	const service = createService(fixture.database, {
+		adapter: {
+			createSession: async (input) => {
+				const session = await fake.adapter.createSession(input);
+				const controller = fake.getOpenSessions()[0];
+				if (!controller) {
+					throw new Error('Fake session controller was not created.');
+				}
+				emitLateEvent = (event) => controller.emit(event);
+				runtimes.push(session);
+				return {
+					...session,
+					close: async () => undefined,
+					submit: async () => {
+						controller.emit({
+							at: new Date().toISOString(),
+							type: 'context-usage',
+							usage: {
+								contextWindow: 200_000,
+								percent: 20,
+								tokens: 40_000,
+							},
+						});
+						throw new AgentSubmitError(
+							'Prompt delivery could not be confirmed; the Pi session was quarantined.',
+							'unconfirmed',
+						);
+					},
+				};
+			},
+			shutdown: fake.adapter.shutdown,
+		},
+	}).service;
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	await assert.rejects(
+		service.submitPrompt({
+			prompt: 'possibly delivered',
+			sessionId: snapshot.id,
+		}),
+		/quarantined/,
+	);
+	assert.equal(service.getSession(snapshot.id)?.runtimeOpen, false);
+	emitLateEvent?.({
+		at: new Date().toISOString(),
+		previous: 'starting',
+		status: 'streaming',
+		type: 'status',
+	});
+	assert.equal(service.getSession(snapshot.id)?.status, 'closed');
+
+	const reopened = await service.openSession({
+		executable: createReadyExecutable(),
+		resumeSessionId: snapshot.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	assert.equal(reopened.runtimeOpen, true);
+	assert.equal(service.getSession(snapshot.id)?.runtimeOpen, true);
+	assert.notEqual(runtimes[0], runtimes[1]);
+});
+
+test('retired runtime events cannot close a replacement session', async (t) => {
+	const fixture = openFixture(t);
+	const fake = createFakeAgentAdapter();
+	const listeners: Array<(event: AgentEvent) => void> = [];
+	const runtimes: object[] = [];
+	const service = createService(fixture.database, {
+		adapter: {
+			createSession: async (input) => {
+				const session = await fake.adapter.createSession(input);
+				runtimes.push(session);
+				return {
+					...session,
+					close: async () => undefined,
+					subscribe: (listener) => {
+						listeners.push(listener);
+						return { unsubscribe: () => undefined };
+					},
+				};
+			},
+			shutdown: fake.adapter.shutdown,
+		},
+	}).service;
+	const first = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const replacement = await service.openSession({
+		executable: createReadyExecutable(),
+		resumeSessionId: first.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const statusBeforeRetiredEvents = service.getSession(first.id)?.status;
+
+	listeners[0]?.({
+		at: new Date().toISOString(),
+		previous: 'starting',
+		status: 'idle',
+		type: 'status',
+	});
+	listeners[0]?.({
+		at: new Date().toISOString(),
+		reason: 'completed',
+		type: 'shutdown',
+	});
+
+	assert.equal(service.getSession(first.id)?.status, statusBeforeRetiredEvents);
+	assert.equal(service.getSession(first.id)?.runtimeOpen, true);
+	assert.equal(replacement.runtimeOpen, true);
+	assert.notEqual(runtimes[0], runtimes[1]);
+});
+
+test('a newer turn is not overwritten by an older rejected submit', async (t) => {
+	const fixture = openFixture(t);
+	const fake = createFakeAgentAdapter();
+	const deferred = deferFirstRejectedSubmit(fake.adapter);
+	const service = createService(fixture.database, {
+		adapter: deferred.adapter,
+	}).service;
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	const firstSubmit = service.submitPrompt({
+		prompt: 'first',
+		sessionId: snapshot.id,
+	});
+	await new Promise<void>((resolve) => setImmediate(resolve));
+	const secondSubmit = service.submitPrompt({
+		prompt: 'second',
+		sessionId: snapshot.id,
+	});
+	await secondSubmit;
+	deferred.release();
+	await assert.rejects(firstSubmit, /prompt rejected/);
+
+	const turns = listTurns({
+		branchId: snapshot.branchId,
+		database: fixture.database,
+	});
+	assert.equal(turns[0]?.status, 'errored');
+	assert.equal(turns[1]?.status, 'submitted');
+	assert.equal(
+		getAgentSessionById({ database: fixture.database, id: snapshot.id })
+			?.status,
+		'streaming',
+	);
 });
 
 test('runtime events are mirrored into agent_session_events', async (t) => {

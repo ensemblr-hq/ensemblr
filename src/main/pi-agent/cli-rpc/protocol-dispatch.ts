@@ -71,12 +71,8 @@ type FrameObject = Record<string, unknown>;
  * the deps so the adapter never has to thread it, yet shared across handlers.
  */
 interface DispatchState {
-	/**
-	 * Whether a model/provider error has already surfaced for the current prompt.
-	 * Pi auto-retries an errored `message_end` up to 3×; this collapses the
-	 * retries into one diagnostic and re-arms on the next user message.
-	 */
-	promptErrorEmitted: boolean;
+	/** Latest unresolved provider failure; only settlement makes it terminal. */
+	pendingError: string | null;
 }
 
 /**
@@ -243,9 +239,8 @@ function consumeEchoedPrompt(
 }
 
 /**
- * Projects a final `message_end` into a persisted message event and surfaces a
- * one-shot model/provider failure. Tool-result echoes are dropped (the
- * `tool_execution_end` frame already carries the structured result).
+ * Persists a completed message and retains provider failures until Pi settles.
+ * Tool-result echoes are dropped because tool execution already records them.
  * @param typed - The `message_end` frame.
  * @param deps - Session callbacks.
  * @param state - Per-prompt error-window tracking.
@@ -261,7 +256,7 @@ function handleMessageEnd(
 	}
 	const wireRole = isMessageRole(message.role) ? message.role : 'agent';
 	if (wireRole === 'user') {
-		state.promptErrorEmitted = false;
+		state.pendingError = null;
 		if (consumeEchoedPrompt(typed, message, deps.unechoedPrompts)) {
 			return;
 		}
@@ -282,17 +277,16 @@ function handleMessageEnd(
 		typeof message.stopReason === 'string' ? message.stopReason : null;
 	const errorMessage =
 		typeof message.errorMessage === 'string' ? message.errorMessage : null;
-	if (
-		wireRole !== 'user' &&
-		stopReason === 'error' &&
-		errorMessage &&
-		!state.promptErrorEmitted
-	) {
-		state.promptErrorEmitted = true;
-		// Fatal, not recoverable: the turn ended without an answer, and the
-		// timeline surfaces fatal errors only. Tagged recoverable it would vanish
-		// and leave the user staring at a turn that silently stopped.
-		deps.emitError('adapter-failure', errorMessage, undefined, false);
+	if (wireRole !== 'user') {
+		if (stopReason === 'error' && errorMessage) {
+			state.pendingError = errorMessage;
+		} else if (
+			stopReason === 'stop' ||
+			stopReason === 'length' ||
+			stopReason === 'toolUse'
+		) {
+			state.pendingError = null;
+		}
 	}
 }
 
@@ -389,15 +383,50 @@ function handleUnknown(typed: FrameObject, deps: ProtocolDispatchDeps): void {
 }
 
 /**
+ * Handles retry and definitive settlement frames that share pending-error state.
+ * @param typed - The parsed Pi frame.
+ * @param deps - Session callbacks.
+ * @param state - Per-session pending provider error.
+ * @returns Whether the frame was consumed by this handler.
+ */
+function handleRetryLifecycle(
+	typed: FrameObject,
+	deps: ProtocolDispatchDeps,
+	state: DispatchState,
+): boolean {
+	switch (typed.type) {
+		case 'auto_retry_start':
+			deps.setStatus('streaming');
+			return true;
+		case 'auto_retry_end':
+			if (typed.success === true) {
+				state.pendingError = null;
+			} else if (typeof typed.finalError === 'string' && typed.finalError) {
+				state.pendingError = typed.finalError;
+			}
+			return true;
+		case 'agent_settled':
+			if (state.pendingError !== null) {
+				deps.emitError('adapter-failure', state.pendingError, undefined, false);
+				state.pendingError = null;
+			}
+			deps.setStatus('idle');
+			return true;
+		default:
+			return false;
+	}
+}
+
+/**
  * Build the frame dispatcher that turns raw Pi RPC frames into session events,
- * routing by frame type and collapsing retried model errors into one diagnostic.
+ * distinguishing low-level run endings from definitive session settlement.
  * @param deps - Session callbacks and shared mutable turn-tracking sets.
  * @returns A handler that processes one raw frame per call.
  */
 export function createProtocolDispatcher(
 	deps: ProtocolDispatchDeps,
 ): ProtocolFrameHandler {
-	const state: DispatchState = { promptErrorEmitted: false };
+	const state: DispatchState = { pendingError: null };
 
 	return (frame: unknown): void => {
 		if (!frame || typeof frame !== 'object') {
@@ -411,6 +440,9 @@ export function createProtocolDispatcher(
 		}
 
 		const typed = frame as FrameObject;
+		if (handleRetryLifecycle(typed, deps, state)) {
+			return;
+		}
 		switch (typed.type) {
 			case 'session':
 				handleSession(typed, deps);
@@ -418,12 +450,6 @@ export function createProtocolDispatcher(
 			case 'response':
 				handleResponse(typed, deps);
 				return;
-			// A single `agent_start`…`agent_settled` wraps the whole prompt; inside it
-			// Pi emits one `turn_start`/`turn_end` per LLM call and an `agent_end`
-			// carrying every message in the low-level run. Keep accepting `agent_end`
-			// as the idle marker for older Pi-compatible runtimes. Current Pi follows
-			// it with the small `agent_settled` frame, which also recovers the status
-			// when a message-heavy aggregate `agent_end` exceeded the JSONL line cap.
 			case 'agent_start':
 			case 'turn_start':
 				deps.setStatus('streaming');
@@ -432,11 +458,7 @@ export function createProtocolDispatcher(
 				deps.requestContextUsage();
 				return;
 			case 'agent_end':
-				deps.setStatus('idle');
 				deps.requestContextUsage();
-				return;
-			case 'agent_settled':
-				deps.setStatus('idle');
 				return;
 			case 'message_start':
 				return;

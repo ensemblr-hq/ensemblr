@@ -84,20 +84,38 @@ function createExecutableCheck(
 				: 'failure';
 	const source = executable.source ?? 'unknown';
 	const canPickExecutable = status !== 'success' && !executable.setting?.locked;
+	const versionDiagnostic = executable.diagnostics.find(
+		(diagnostic) =>
+			diagnostic.code === 'pi-version-unsupported' ||
+			diagnostic.code === 'pi-version-unparseable',
+	);
+	const versionCode =
+		versionDiagnostic?.code === 'pi-version-unsupported' ||
+		versionDiagnostic?.code === 'pi-version-unparseable'
+			? versionDiagnostic.code
+			: null;
 
 	return {
-		...(status === 'failure'
-			? (upstreamDetail(firstErrorMessage(executable.diagnostics)) ??
-				authoredDetail(
-					'pi-executable-undiscovered',
-					`${PI_DESCRIPTOR.label} could not be discovered. Install it or select a compatible executable.`,
-					{ provider: PI_DESCRIPTOR.label },
-				))
-			: authoredDetail(
-					'pi-executable-resolved',
-					`${executable.displayPath} (${executable.source ?? 'unknown source'}).`,
-					{ path: executable.displayPath, source },
-				)),
+		...(versionCode && versionDiagnostic
+			? authoredDetail(
+					versionCode,
+					versionDiagnostic.message,
+					versionCode === 'pi-version-unsupported'
+						? { minimumVersion: '0.80.4' }
+						: undefined,
+				)
+			: status === 'failure'
+				? (upstreamDetail(firstErrorMessage(executable.diagnostics)) ??
+					authoredDetail(
+						'pi-executable-undiscovered',
+						`${PI_DESCRIPTOR.label} could not be discovered. Install it or select a compatible executable.`,
+						{ provider: PI_DESCRIPTOR.label },
+					))
+				: authoredDetail(
+						'pi-executable-resolved',
+						`${executable.displayPath} (${executable.source ?? 'unknown source'}).`,
+						{ path: executable.displayPath, source },
+					)),
 		id: 'executable',
 		label: `${PI_DESCRIPTOR.label} executable`,
 		logs: executable.probe

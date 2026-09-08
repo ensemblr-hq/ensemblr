@@ -13,6 +13,8 @@ import {
 	type AgentSessionBranchRow,
 	type AgentSessionRow,
 	createTurn,
+	getAgentSessionById,
+	getTurnById,
 	updateAgentSession,
 	updateTurn,
 } from '../storage/repositories/agent-session-repository.ts';
@@ -22,9 +24,10 @@ import type {
 	AgentSessionEventSink,
 	AgentSessionSnapshot,
 } from './agent-session-types.ts';
-import type { AgentContextUsage } from './agent-types.ts';
+import { type AgentContextUsage, AgentSubmitError } from './agent-types.ts';
 import type { SessionNamingInput } from './naming/session-naming.ts';
 import {
+	type ActiveSession,
 	type ActiveSessionMap,
 	isTurnInFlight,
 } from './session/active-session.ts';
@@ -241,6 +244,8 @@ export function createAgentSessionLifecycle({
 }: AgentSessionLifecycleOptions): AgentSessionLifecycle {
 	const activeSessions: ActiveSessionMap = new Map();
 
+	const quarantiningSessions = new Set<string>();
+
 	const summaryQueue = createSummaryQueue({
 		activeSessions,
 		now,
@@ -279,6 +284,7 @@ export function createAgentSessionLifecycle({
 					branchId,
 					database,
 					event,
+					runtimeSession,
 					sessionId,
 				});
 			}),
@@ -287,11 +293,147 @@ export function createAgentSessionLifecycle({
 	const openSession: AgentSessionLifecycle['openSession'] = (request) =>
 		opener.openSession({ database: requireDatabase(), request });
 
+	/**
+	 * Quarantines a runtime when prompt delivery cannot be confirmed.
+	 * @param active - The binding that owns the uncertain prompt.
+	 * @param database - Database holding the session and turn rows.
+	 * @param sessionId - Session whose runtime is being quarantined.
+	 * @param turnId - Turn whose delivery is uncertain.
+	 * @returns A promise that settles after the runtime is terminated.
+	 */
+	const quarantineUnconfirmedSubmit = async ({
+		active,
+		database,
+		sessionId,
+		turnId,
+	}: {
+		active: ActiveSession;
+		database: DatabaseSync;
+		sessionId: string;
+		turnId: string;
+	}): Promise<void> => {
+		const current = activeSessions.get(sessionId);
+		const ownsCurrentTurn =
+			!current ||
+			(current.agentRuntimeSession === active.agentRuntimeSession &&
+				current.activeTurnId === turnId);
+		if (!ownsCurrentTurn) {
+			const turnRow = getTurnById({ database, id: turnId });
+			if (
+				turnRow &&
+				turnRow.status !== 'completed' &&
+				turnRow.status !== 'errored'
+			) {
+				updateTurn({
+					database,
+					id: turnId,
+					patch: { completedAt: now().toISOString(), status: 'errored' },
+				});
+			}
+			return;
+		}
+		quarantiningSessions.add(sessionId);
+		try {
+			await active.agentRuntimeSession.close();
+		} catch {
+			// Quarantine still removes the binding; no automatic resend is safe.
+		} finally {
+			active.subscription.unsubscribe();
+			const currentAfterClose = activeSessions.get(sessionId);
+			const ownsTurnAfterClose =
+				!currentAfterClose ||
+				(currentAfterClose.agentRuntimeSession === active.agentRuntimeSession &&
+					currentAfterClose.activeTurnId === turnId);
+			const turnRow = getTurnById({ database, id: turnId });
+			if (
+				turnRow &&
+				turnRow.status !== 'completed' &&
+				turnRow.status !== 'errored'
+			) {
+				updateTurn({
+					database,
+					id: turnId,
+					patch: { completedAt: now().toISOString(), status: 'errored' },
+				});
+			}
+			if (ownsTurnAfterClose) {
+				updateAgentSession({
+					database,
+					id: sessionId,
+					patch: { closedAt: now().toISOString(), status: 'closed' },
+				});
+				activeSessions.delete(sessionId);
+			}
+			quarantiningSessions.delete(sessionId);
+		}
+	};
+
+	/** Rolls back a prompt rejected before runtime execution, without clobbering newer work. */
+	const recoverRejectedSubmit = async ({
+		active,
+		cause,
+		database,
+		previousStatus,
+		sessionId,
+		turnId,
+	}: {
+		active: ActiveSession;
+		cause: unknown;
+		database: DatabaseSync;
+		previousStatus: AgentSessionRow['status'];
+		sessionId: string;
+		turnId: string;
+	}): Promise<void> => {
+		if (
+			cause instanceof AgentSubmitError &&
+			cause.disposition === 'unconfirmed'
+		) {
+			await quarantineUnconfirmedSubmit({
+				active,
+				database,
+				sessionId,
+				turnId,
+			});
+			return;
+		}
+		const current = activeSessions.get(sessionId);
+		const currentRow = getAgentSessionById({ database, id: sessionId });
+		const turnRow = getTurnById({ database, id: turnId });
+		if (
+			!turnRow ||
+			(turnRow.status !== 'submitted' && turnRow.status !== 'streaming')
+		) {
+			return;
+		}
+		updateTurn({
+			database,
+			id: turnId,
+			patch: { completedAt: now().toISOString(), status: 'errored' },
+		});
+		if (
+			previousStatus !== 'streaming' &&
+			current?.activeTurnId === turnId &&
+			currentRow?.status === 'streaming'
+		) {
+			updateAgentSession({
+				database,
+				id: sessionId,
+				patch: { status: 'idle' },
+			});
+		}
+	};
+
 	const submitPrompt: AgentSessionLifecycle['submitPrompt'] = async (
 		request,
 	) => {
 		const database = requireDatabase();
 		const active = activeSessions.get(request.sessionId);
+		if (quarantiningSessions.has(request.sessionId)) {
+			throw new AgentSessionServiceError({
+				code: 'session-not-open',
+				message: `Agent session ${request.sessionId} is being quarantined.`,
+			});
+		}
 		if (!active) {
 			throw new AgentSessionServiceError({
 				code: 'session-not-open',
@@ -313,6 +455,11 @@ export function createAgentSessionLifecycle({
 			});
 		}
 
+		const previousStatus =
+			getAgentSessionById({
+				database,
+				id: request.sessionId,
+			})?.status ?? 'idle';
 		const turn = createTurn({
 			database,
 			input: {
@@ -323,11 +470,12 @@ export function createAgentSessionLifecycle({
 			},
 		});
 
-		activeSessions.set(request.sessionId, {
+		const turnActive: ActiveSession = {
 			...active,
 			activeTurnId: turn.id,
 			agentResponsePendingSummary: false,
-		});
+		};
+		activeSessions.set(request.sessionId, turnActive);
 		updateAgentSession({
 			database,
 			id: request.sessionId,
@@ -353,14 +501,25 @@ export function createAgentSessionLifecycle({
 			});
 		}
 
-		const acknowledgement = await active.agentRuntimeSession.submit({
-			modelOverride: request.model ?? undefined,
-			planMode: request.planMode ?? isPlanModeActive(request.sessionId),
-			afkMode: request.afkMode ?? isAfkModeActive(request.sessionId),
-			prompt: request.prompt,
-			thinkingLevel: request.thinkingLevel ?? undefined,
-		});
-		return acknowledgement;
+		try {
+			return await active.agentRuntimeSession.submit({
+				modelOverride: request.model ?? undefined,
+				planMode: request.planMode ?? isPlanModeActive(request.sessionId),
+				afkMode: request.afkMode ?? isAfkModeActive(request.sessionId),
+				prompt: request.prompt,
+				thinkingLevel: request.thinkingLevel ?? undefined,
+			});
+		} catch (cause) {
+			await recoverRejectedSubmit({
+				active: turnActive,
+				cause,
+				database,
+				previousStatus,
+				sessionId: request.sessionId,
+				turnId: turn.id,
+			});
+			throw cause;
+		}
 	};
 
 	/**

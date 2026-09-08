@@ -15,6 +15,7 @@ import { asModelVendorId } from '../../src/shared/ipc/contracts/agent-models';
 import type {
 	AgentSessionSnapshotWire,
 	SubmitAgentPromptRequest,
+	SubmitAgentPromptResult,
 } from '../../src/shared/ipc/contracts/agent-session';
 import {
 	clearEnsemblrApi,
@@ -79,7 +80,12 @@ function createOpenedSession(): AgentSessionSnapshotWire {
  * window between submitting and the session landing stays open while the active
  * tab changes underneath the route-level controller.
  */
-function installDeferredOpenBridge() {
+function installDeferredOpenBridge(
+	submitResult: SubmitAgentPromptResult = {
+		acceptedAt: '2026-01-01T00:00:01.000Z',
+		turnId: 'turn-pending-session-binding',
+	},
+) {
 	let release: (() => void) | null = null;
 	const openAgentSession = vi.fn(
 		() =>
@@ -88,10 +94,9 @@ function installDeferredOpenBridge() {
 			}),
 	);
 	const submitAgentPrompt = vi.fn(
-		async (_request: SubmitAgentPromptRequest) => ({
-			acceptedAt: '2026-01-01T00:00:01.000Z',
-			turnId: 'turn-pending-session-binding',
-		}),
+		async (
+			_request: SubmitAgentPromptRequest,
+		): Promise<SubmitAgentPromptResult> => submitResult,
 	);
 	installEnsemblrApi({
 		listAgentModels: vi.fn(async () => CATALOG),
@@ -254,6 +259,29 @@ describe('agent composer pending-session binding', () => {
 			thinkingLevel: 'medium',
 		});
 		expect(submitAgentPrompt.mock.calls[0]?.[0]).not.toHaveProperty('planMode');
+	});
+
+	test('translates unconfirmed delivery errors before showing them', async () => {
+		const { releaseOpen } = installDeferredOpenBridge({
+			error:
+				'Prompt delivery could not be confirmed; the Pi session was quarantined.',
+			errorCode: 'delivery-unconfirmed',
+		});
+		const { result } = renderControllerForTab(SUBMITTING_TAB_ID);
+
+		let submitted: Promise<unknown> | undefined;
+		await act(async () => {
+			submitted = result.current.onSubmit('review before retrying');
+			await flush();
+		});
+		releaseOpen();
+		await act(async () => {
+			await submitted;
+		});
+
+		expect(result.current.lastError).toBe(
+			'The session stopped; delivery is unconfirmed. Review the message before sending it again.',
+		);
 	});
 
 	test('a tab whose row has not loaded yet refuses to open a second session', async () => {

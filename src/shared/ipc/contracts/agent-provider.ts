@@ -63,6 +63,8 @@ export type AgentProviderDetailCode =
 	| 'pi-models-unverified'
 	| 'pi-rpc-invalid'
 	| 'pi-rpc-ready'
+	| 'pi-version-unparseable'
+	| 'pi-version-unsupported'
 	| 'version-command-failed'
 	| 'version-command-failed-unknown';
 

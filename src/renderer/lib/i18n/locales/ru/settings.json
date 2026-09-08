@@ -467,6 +467,8 @@
 			"pi-models-unverified": "Не удалось проверить готовность провайдеров и моделей.",
 			"pi-rpc-invalid": "Запуск RPC {{provider}} не выдал корректный JSONL.",
 			"pi-rpc-ready": "Запуск выдал корректный кадр {{frameType}}.",
+			"pi-version-unparseable": "Не удалось прочитать версию Pi. Ensemblr требует Pi 0.80.4 или новее.",
+			"pi-version-unsupported": "Версия Pi слишком старая. Ensemblr требует версию {{minimumVersion}} или новее.",
 			"version-command-failed": "{{command}} --version завершилась с ошибкой: {{message}}",
 			"version-command-failed-unknown": "{{command}} --version завершилась с ошибкой по неизвестной причине."
 		},

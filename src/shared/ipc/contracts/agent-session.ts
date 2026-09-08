@@ -167,6 +167,7 @@ export interface SubmitAgentPromptRequest {
 export interface SubmitAgentPromptResult {
 	acceptedAt?: string;
 	error?: string;
+	errorCode?: 'delivery-unconfirmed';
 	turnId?: string;
 }
 
