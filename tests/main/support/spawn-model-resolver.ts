@@ -28,11 +28,13 @@ export const modelOption = (input: {
  * the shipping resolution rules rather than a stub that agrees with itself.
  * @param models - The catalog rows both runtimes' models are drawn from.
  * @param defaultModelId - What the catalog itself calls default; the first row when omitted.
+ * @param readHiddenModelIds - Reads the model ids hidden from delegated spawns.
  * @returns The resolver, wired to a catalog that never shells out.
  */
 export function fakeSpawnModelResolver(
 	models: readonly AgentModelOption[],
 	defaultModelId?: string,
+	readHiddenModelIds: () => readonly string[] = () => [],
 ): SpawnModelResolver {
 	return createSpawnModelResolver({
 		catalog: {
@@ -41,8 +43,9 @@ export function fakeSpawnModelResolver(
 				defaultThinkingLevel: 'medium',
 				models,
 			}),
-			resolveAgentProvider: async (modelId) =>
+			resolveAgentProvider: async (modelId: string | null | undefined) =>
 				models.find((model) => model.id === modelId)?.agentProvider ?? null,
 		},
+		readHiddenModelIds,
 	});
 }

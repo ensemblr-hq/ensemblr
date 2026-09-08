@@ -397,6 +397,12 @@ const readArchitectureDiagramEnabled = (): boolean =>
 const readTuiHarnessesEnabled = (): boolean =>
 	appSettingsService.read().experimental.tuiHarnesses;
 /**
+ * Reads the model ids currently hidden from delegated spawn choices.
+ * @returns The latest hidden-model ids from app settings.
+ */
+const readHiddenModelIds = (): readonly string[] =>
+	appSettingsService.read().models.hiddenModels;
+/**
  * Reads the user's "Credit Ensemblr as a commit co-author" setting, which puts
  * the trailer block into the playbooks an agent receives. Read per call rather
  * than captured, and for the same reason the diagram flag is: the settings file
@@ -748,6 +754,7 @@ const agentModelCatalog = createAgentModelCatalog({
 });
 const spawnModelResolver = createSpawnModelResolver({
 	catalog: agentModelCatalog,
+	readHiddenModelIds,
 });
 /**
  * Resolves the binary a non-Pi agent runtime launches, so the executable the

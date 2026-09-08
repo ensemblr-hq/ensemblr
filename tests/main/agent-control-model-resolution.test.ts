@@ -65,6 +65,7 @@ const makeDeps = (input: {
 	conciergeSession?: CallerSession | null;
 	models?: typeof CATALOG;
 	openSession?: ReturnType<typeof vi.fn>;
+	readHiddenModelIds?: () => readonly string[];
 	piReady?: boolean;
 }): PortAdapterDeps =>
 	({
@@ -122,6 +123,7 @@ const makeDeps = (input: {
 		spawnModelResolver: fakeSpawnModelResolver(
 			input.models ?? CATALOG,
 			input.catalogDefaultModelId,
+			input.readHiddenModelIds,
 		),
 		terminalService: {},
 	}) as unknown as PortAdapterDeps;
@@ -137,6 +139,7 @@ const spawn = async (input: {
 	model?: string;
 	models?: typeof CATALOG;
 	piReady?: boolean;
+	readHiddenModelIds?: () => readonly string[];
 	thinkingLevel?: string;
 }): Promise<Record<string, unknown>> => {
 	const openSession: ReturnType<typeof vi.fn> = vi.fn(async () => ({
@@ -259,6 +262,29 @@ describe('a Pi orchestrator never spawns a Claude child', () => {
 		expect(request.provider).toBe('pi');
 	});
 
+	it('refuses an explicitly requested hidden model without opening a session', async () => {
+		const message = await refusal({
+			caller: { model: PI_MODEL, thinkingLevel: 'high' },
+			callerRuntime: 'pi',
+			model: PI_LOCAL_MODEL,
+			readHiddenModelIds: () => [PI_LOCAL_MODEL],
+		});
+
+		expect(message).toContain(PI_LOCAL_MODEL);
+		expect(message).toContain('No model');
+	});
+
+	it('still inherits an active hidden parent model when none is requested', async () => {
+		const request = await spawn({
+			caller: { model: PI_MODEL, thinkingLevel: 'high' },
+			callerRuntime: 'pi',
+			readHiddenModelIds: () => [PI_MODEL],
+		});
+
+		expect(request.model).toBe(PI_MODEL);
+		expect(request.provider).toBe('pi');
+	});
+
 	it('refuses a requested Claude model', async () => {
 		const message = await refusal({
 			caller: { model: PI_MODEL, thinkingLevel: 'high' },
@@ -276,6 +302,17 @@ describe('a Pi orchestrator never spawns a Claude child', () => {
 		const request = await spawn({
 			callerRuntime: 'pi',
 			catalogDefaultModelId: PI_LOCAL_MODEL,
+		});
+
+		expect(request.model).toBe(PI_LOCAL_MODEL);
+		expect(request.provider).toBe('pi');
+	});
+
+	it('skips a hidden catalog default when there is nothing to inherit', async () => {
+		const request = await spawn({
+			callerRuntime: 'pi',
+			catalogDefaultModelId: PI_MODEL,
+			readHiddenModelIds: () => [PI_MODEL],
 		});
 
 		expect(request.model).toBe(PI_LOCAL_MODEL);
@@ -564,6 +601,25 @@ describe('the model list a caller is served', () => {
 		createAgentControlPorts(
 			makeDeps({ catalogDefaultModelId }),
 		).conversations.listModels({ runtime });
+
+	it('reads hidden model settings live and excludes those rows', async () => {
+		let hiddenModels: readonly string[] = [CLAUDE_ANTHROPIC_MODEL];
+		const ports = createAgentControlPorts(
+			makeDeps({ readHiddenModelIds: () => hiddenModels }),
+		);
+
+		const hidden = await ports.conversations.listModels({ runtime: 'claude' });
+		hiddenModels = [];
+		const revealed = await ports.conversations.listModels({
+			runtime: 'claude',
+		});
+
+		expect(hidden.models.map((model) => model.id)).toEqual([CLAUDE_MODEL]);
+		expect(revealed.models.map((model) => model.id)).toEqual([
+			CLAUDE_MODEL,
+			CLAUDE_ANTHROPIC_MODEL,
+		]);
+	});
 
 	it('carries only the caller’s own runtime’s models', async () => {
 		const listing = await listFor('claude');

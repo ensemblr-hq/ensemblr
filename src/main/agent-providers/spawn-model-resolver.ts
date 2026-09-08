@@ -97,6 +97,8 @@ export interface SpawnModelResolver {
 /** Collaborators for {@link createSpawnModelResolver}. */
 export interface CreateSpawnModelResolverOptions {
 	catalog: AgentModelCatalogService;
+	/** Reads model ids the user currently excludes from delegated spawns. */
+	readHiddenModelIds: () => readonly string[];
 }
 
 /** Every known model plus the id the catalog itself calls default. */
@@ -124,6 +126,24 @@ async function readCatalog(
 		});
 		return { defaultModelId: null, models: [] };
 	}
+}
+
+/**
+ * Removes models the user has hidden from delegated spawn choices while
+ * retaining the catalog default id so normal fallback ordering still applies.
+ * @param snapshot - The complete global model catalog.
+ * @param hiddenModelIds - Model ids currently hidden in app settings.
+ * @returns The catalog available for explicit and fallback child selection.
+ */
+function withoutHiddenModels(
+	snapshot: CatalogSnapshot,
+	hiddenModelIds: readonly string[],
+): CatalogSnapshot {
+	const hidden = new Set(hiddenModelIds);
+	return {
+		defaultModelId: snapshot.defaultModelId,
+		models: snapshot.models.filter((model) => !hidden.has(model.id)),
+	};
 }
 
 /**
@@ -229,6 +249,7 @@ function pickThinkingLevel(input: {
  */
 export function createSpawnModelResolver({
 	catalog,
+	readHiddenModelIds,
 }: CreateSpawnModelResolverOptions): SpawnModelResolver {
 	const selectionFor = (input: {
 		model: AgentModelOption | undefined;
@@ -339,10 +360,11 @@ export function createSpawnModelResolver({
 	const resolveInherited = (input: {
 		caller: SpawnCallerIdentity;
 		catalog: CatalogSnapshot;
+		fallbackCatalog: CatalogSnapshot;
 		requestedThinkingLevel: string | null;
 		runtime: AgentProviderId;
 	}): SpawnModelResolution => {
-		const fallback = defaultModelFor(input.catalog, input.runtime);
+		const fallback = defaultModelFor(input.fallbackCatalog, input.runtime);
 		const inherited =
 			inheritableModel({
 				caller: input.caller,
@@ -366,7 +388,10 @@ export function createSpawnModelResolver({
 
 	return {
 		listModelsFor: async (runtime) => {
-			const snapshot = await readCatalog(catalog);
+			const snapshot = withoutHiddenModels(
+				await readCatalog(catalog),
+				readHiddenModelIds(),
+			);
 			return {
 				defaultModelId: defaultModelFor(snapshot, runtime)?.id ?? null,
 				models: modelsOn(snapshot, runtime),
@@ -379,10 +404,14 @@ export function createSpawnModelResolver({
 			requestedThinkingLevel,
 		}) => {
 			const snapshot = await readCatalog(catalog);
+			const availableSnapshot = withoutHiddenModels(
+				snapshot,
+				readHiddenModelIds(),
+			);
 			if (requestedModelId) {
 				return resolveRequested({
 					caller,
-					models: snapshot.models,
+					models: availableSnapshot.models,
 					requestedModelId,
 					requestedThinkingLevel,
 				});
@@ -397,6 +426,7 @@ export function createSpawnModelResolver({
 			return resolveInherited({
 				caller,
 				catalog: snapshot,
+				fallbackCatalog: availableSnapshot,
 				requestedThinkingLevel,
 				runtime: caller.runtime,
 			});
