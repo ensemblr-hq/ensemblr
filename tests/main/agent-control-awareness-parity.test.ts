@@ -451,6 +451,37 @@ describe('agent-control AWARENESS parity', () => {
 		expect(ORCHESTRATOR_AWARENESS).toContain('ensemblr_get_last_message');
 	});
 
+	// A finished child's tab is never closed by anything but the orchestrator that
+	// opened it, so a fan-out that only tidies at the end of a run — or not at all —
+	// leaves the user a strip of dead tabs around the one they work in.
+	it('tells every spawning role to close a child tab as that child settles', () => {
+		for (const playbook of [
+			ORCHESTRATOR_AWARENESS,
+			HARNESS_AWARENESS,
+			PLAN_MODE_ORCHESTRATOR_AWARENESS,
+		]) {
+			expect(playbook).toContain('ensemblr_close_tab');
+			expect(playbook).toContain('archived rather than deleted');
+			expect(playbook).toMatch(
+				/as (each child|it) settles|as its report lands/,
+			);
+		}
+	});
+
+	// `closeTab` takes a chat tab id and the spawn hands back two ids, so a loop
+	// that names only the session id leaves the closing id on the floor and makes
+	// tidying up cost a tab listing the orchestrator will not spend.
+	it('has every spawning role keep the chatTabId the spawn returns', () => {
+		for (const playbook of [
+			ORCHESTRATOR_AWARENESS,
+			HARNESS_AWARENESS,
+			PLAN_MODE_ORCHESTRATOR_AWARENESS,
+		]) {
+			expect(playbook).toContain('keep BOTH ids it hands back');
+			expect(playbook).toContain('the `chatTabId` you close its tab with');
+		}
+	});
+
 	// Nothing else in the loop prompts a check, so a cited claim flows into the
 	// answer — or into a plan — feeling verified because a child cited a path.
 	it('tells both orchestrator roles to check a load-bearing claim themselves', () => {

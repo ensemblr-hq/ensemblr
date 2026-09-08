@@ -144,7 +144,7 @@ a permission denial stays visible.
 | Keep your own ticket current | Unprompted, when the workspace was created from a Linear issue: read it before you change code, move it to a started state when you begin, and move it to `In Review` the turn the work becomes reviewable. The app names that issue in a per-turn **LINKED ISSUE** block cut to what your role and mode may actually do. |
 | Pick a model for a child | `ensemblr_list_models` |
 | Surface work to the user | `ensemblr_focus_tab`, `ensemblr_focus_dock_tab`, `ensemblr_focus_panel` |
-| Tidy up | `ensemblr_close_tab` |
+| Retire a finished child's tab | `ensemblr_close_tab`, by the `chatTabId` the spawn returned — as each child settles, not at the end of the run. Archived rather than deleted, and a follow-up reopens it. |
 
 ## Delegate → wait → evaluate → integrate
 
@@ -157,7 +157,8 @@ three orchestrating playbooks say so and a parity test pins it.
 
 1. **Spawn** each helper with `ensemblr_start_conversation` in its **own fresh tab** — pass a short,
    descriptive `title` and do **not** pass `chatTabId` (reusing a prior tab keeps its old title).
-   Omit `wait` and keep the returned `agentSessionId`. **Brief each child with what to deliver, not
+   Omit `wait` and keep **both** returned ids — the `agentSessionId` the wait and the follow-up take,
+   and the `chatTabId` `ensemblr_close_tab` takes. **Brief each child with what to deliver, not
    just what to look at:** the question it answers, the defaults it should assume rather than come
    back and ask about, and whether it reports inline (the default) or writes a file at a path the
    orchestrator names — a brief phrased as a noun ("produce a reference doc", "write up the
@@ -188,7 +189,9 @@ three orchestrating playbooks say so and a parity test pins it.
      without it a blocked child would hold its question until the 5-minute wait timeout while its
      siblings kept running. `progress` and `done` stay informational and never cut a wait short.
 3. **Evaluate.** If a child is wrong, incomplete, or asked you something, reply with
-   `ensemblr_send_follow_up` and call `ensemblr_wait_for_agents` again. Repeat until done.
+   `ensemblr_send_follow_up` and call `ensemblr_wait_for_agents` again. Repeat until done, then
+   **close that child's tab** with `ensemblr_close_tab` — as it settles, not at the end of the run.
+   See the note below on why closing early costs nothing.
 4. **Verify** at least one load-bearing claim per child before building on it. A report is a
    claim, not a fact the orchestrator checked; nothing else in the loop prompts a check, so a
    cited path reads as verified when nobody opened it. Both orchestrator playbooks now say so
@@ -205,6 +208,20 @@ three orchestrating playbooks say so and a parity test pins it.
 > `ensemblr_get_last_message` before reacting; `closed` means the child ended, not that its work was
 > lost, and `ensemblr_get_conversation_status` reports `hasFinalMessage: true` whenever that report is
 > still there. Never re-spawn a child to redo work whose report you can still read.
+
+> **Closing a finished child's tab costs nothing, and nothing else closes it.** A chat tab an agent
+> closes is archived, not deleted — `closeTab` ends at `markClosed`
+> (`src/main/chat-tabs/chat-tab-service.ts`), the transcript and the report stay on disk, and the tab
+> comes back from the chat history. Even the orchestrator can undo it without asking: `sendFollowUp`
+> calls `reopenClosedChatTab` before it submits (`src/main/agent-control/port-adapters.ts`), so
+> steering a child whose tab was closed puts the tab back before the turn streams into it. That is
+> what makes "close it as it settles" the default rather than a judgement call — the failure mode it
+> replaces is a fan-out of four leaving four dead tabs around the one the user works in, and a
+> multi-round run burying the strip. The exclusions are the tabs the orchestrator did not open for a
+> unit of work: the user's own, a peer orchestrator's (it outlives the turn), and the Review
+> conversation (it is the user's record of the review). Two hard edges of the op itself: it is a
+> no-op on an already-closed tab and on a workspace's **last** open chat, so neither can strand the
+> user with nothing on screen.
 
 > **`lastMessage` is a whole turn, not one message.** `findFinalTurnText`
 > (`src/main/agent-control/port-adapters.ts`) scans a branch newest-first, collects every assistant
@@ -518,6 +535,7 @@ free.
   deadlock).
 - **Writes** (spawn / close / launch / terminals / focus) act only on **your own workspace**;
   **reads** (including `wait_for_agents`) may span all open workspaces — inspect before acting.
-- **Clean up** scratch tabs you created (`ensemblr_close_tab`).
+- **Close the tabs you opened** once they have served their purpose (`ensemblr_close_tab`); a
+  conversation that outlives your turn stays open, and so does any tab you did not open.
 - Actions may **prompt the user for approval** depending on the workspace permission mode; expect
   and handle denials gracefully.
