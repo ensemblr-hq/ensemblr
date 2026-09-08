@@ -169,10 +169,11 @@ A blocking wait whose target is an ancestor of the caller is refused
 The loop is **delegate → wait → evaluate → integrate**:
 
 1. `ensemblr_start_conversation` per helper, each in a fresh tab with its own
-   `title`. Omit `chatTabId` — reusing a tab keeps its old title. Keep the
-   `agentSessionId` it returns. Brief each with *what to deliver*, the defaults
-   it should assume rather than ask about, and whether it reports inline or
-   writes a file at a path you name.
+   `title`. Omit `chatTabId` — reusing a tab keeps its old title. Keep **both**
+   ids it returns: the `agentSessionId` the wait and the follow-up take, and the
+   `chatTabId` `ensemblr_close_tab` takes. Brief each with *what to deliver*, the
+   defaults it should assume rather than ask about, and whether it reports inline
+   or writes a file at a path you name.
 2. `ensemblr_wait_for_agents` — `mode: "all"` blocks until every child settles;
    `mode: "first"` (the default) returns on the first. Never hand-roll a polling
    loop over `ensemblr_get_conversation_status`.
@@ -189,6 +190,15 @@ The loop is **delegate → wait → evaluate → integrate**:
 A child's last message is its report, and it is persisted permanently — it
 survives the child closing and an app restart. A `closed` or `idle` child is not
 lost work: read it with `ensemblr_get_last_message`.
+
+**Close each child's tab as it settles**, with `ensemblr_close_tab` and the
+`chatTabId` from step 1 — nothing else ever closes one, so a fan-out that tidies
+up only at the end of a run (or not at all) leaves the user a strip of dead tabs
+around the one they work in. It is reversible: a chat tab is archived rather than
+deleted, the report stays readable, `ensemblr_send_follow_up` puts the tab back
+on screen for another round, and the user reopens it from the chat history. Three
+stay open — the user's own tabs, a peer orchestrator's, and the Review
+conversation.
 
 **What a child runs on is two decisions, and `ensemblr_list_models` answers
 both.** Omit `model` and the child inherits yours; pass an id from that list to

@@ -264,7 +264,8 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 	{
 		name: 'ensemblr_close_tab',
 		op: 'closeTab',
-		description: 'Close a chat or terminal tab in the current workspace.',
+		description:
+			"Close a chat or terminal tab in the current workspace, named by `chatTabId` — for a child, the id `ensemblr_start_conversation` returned; otherwise the one `ensemblr_list_tabs` reports. Reach for it on a sub-agent tab you spawned the moment that child has settled and you have taken its report: nothing else ever closes one, so a fan-out leaves its tabs in the user's strip until you do. Closing is cheap and reversible — a chat tab is archived rather than deleted, its transcript and its final report survive, ensemblr_get_last_message still reads that report afterwards, ensemblr_send_follow_up puts the tab back on screen if you want another round from that child, and the user reopens it from the chat history. Close only what you opened for work that is now finished: the user's own tabs, a peer orchestrator's, and the Review conversation stay open. A workspace's last open chat tab is never closed: the op reports ok and leaves it in place, so nothing can strand the user with an empty strip.",
 		shape: { chatTabId: z.string() },
 	},
 	{
