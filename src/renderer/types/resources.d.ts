@@ -3713,6 +3713,13 @@ export default interface Resources {
 			bash: {
 				title: 'Bash';
 			};
+			'ctx-execute': {
+				'code-label': 'Code:';
+				title: 'Run code';
+			};
+			'ctx-execute-file': {
+				title: 'Process file';
+			};
 			diagnostics: {
 				clean: 'Diagnostics';
 				count_one: '{{count}} diagnostic';
@@ -3738,19 +3745,37 @@ export default interface Resources {
 			grep: {
 				title: 'Search';
 			};
+			'lens-diagnostics': {
+				mode: 'mode={{mode}}';
+				scope_one: 'mode={{mode}} · {{count}} path';
+				scope_other: 'mode={{mode}} · {{count}} paths';
+			};
 			list: {
 				title: 'List';
+			};
+			'module-report': {
+				exports_one: '{{count}} export';
+				exports_other: '{{count}} exports';
+				symbols_one: '{{count}} symbol';
+				symbols_other: '{{count}} symbols';
+				title: 'Module outline';
 			};
 			placeholder: {
 				'empty-pattern': '(empty)';
 				'no-command': '(no command)';
 				'no-path': '(no path)';
 			};
+			'project-report': {
+				title: 'Project overview';
+			};
 			read: {
 				image: 'Read image';
 				lines_one: 'Read {{count}} line';
 				lines_other: 'Read {{count}} lines';
 				title: 'Read';
+			};
+			'read-symbol': {
+				title: 'Read symbol';
 			};
 			reasoning: {
 				title: 'Thinking';
@@ -3762,6 +3787,9 @@ export default interface Resources {
 			subagent: {
 				named: 'Sub-agent: {{type}}';
 				title: 'Sub-agent';
+			};
+			'symbol-search': {
+				title: 'Search symbols';
 			};
 			task: {
 				'list-empty': 'No tasks';

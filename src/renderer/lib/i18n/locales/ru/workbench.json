@@ -1314,6 +1314,13 @@
 		"bash": {
 			"title": "Bash"
 		},
+		"ctx-execute": {
+			"code-label": "Код:",
+			"title": "Запуск кода"
+		},
+		"ctx-execute-file": {
+			"title": "Обработка файла"
+		},
 		"diagnostics": {
 			"clean": "Диагностика",
 			"count_one": "{{count}} диагностика",
@@ -1341,13 +1348,34 @@
 		"grep": {
 			"title": "Поиск"
 		},
+		"lens-diagnostics": {
+			"mode": "mode={{mode}}",
+			"scope_one": "mode={{mode}} · {{count}} путь",
+			"scope_few": "mode={{mode}} · {{count}} пути",
+			"scope_many": "mode={{mode}} · {{count}} путей",
+			"scope_other": "mode={{mode}} · {{count}} пути"
+		},
 		"list": {
 			"title": "Список"
+		},
+		"module-report": {
+			"exports_one": "{{count}} экспорт",
+			"exports_few": "{{count}} экспорта",
+			"exports_many": "{{count}} экспортов",
+			"exports_other": "{{count}} экспорта",
+			"symbols_one": "{{count}} символ",
+			"symbols_few": "{{count}} символа",
+			"symbols_many": "{{count}} символов",
+			"symbols_other": "{{count}} символа",
+			"title": "Структура модуля"
 		},
 		"placeholder": {
 			"empty-pattern": "(пусто)",
 			"no-command": "(нет команды)",
 			"no-path": "(нет пути)"
+		},
+		"project-report": {
+			"title": "Обзор проекта"
 		},
 		"read": {
 			"image": "Прочитано изображение",
@@ -1356,6 +1384,9 @@
 			"lines_many": "Прочитано {{count}} строк",
 			"lines_other": "Прочитано {{count}} строки",
 			"title": "Чтение"
+		},
+		"read-symbol": {
+			"title": "Чтение символа"
 		},
 		"reasoning": {
 			"title": "Размышление"
@@ -1367,6 +1398,9 @@
 		"subagent": {
 			"named": "Суб-агент: {{type}}",
 			"title": "Суб-агент"
+		},
+		"symbol-search": {
+			"title": "Поиск символов"
 		},
 		"task": {
 			"list_one": "{{count}} задача",
