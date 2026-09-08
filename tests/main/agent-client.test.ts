@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { AgentAdapter } from '../../src/main/agent-runtime/agent-adapter.ts';
+import type {
+	AgentAdapter,
+	AgentAdapterSession,
+} from '../../src/main/agent-runtime/agent-adapter.ts';
 import type { AgentClient } from '../../src/main/agent-runtime/agent-client.ts';
 import {
 	AgentClientError,
@@ -316,6 +319,100 @@ test('close is idempotent and unregisters the session exactly once', async () =>
 	await session.close();
 	await session.close();
 
+	assert.equal(client.listSessions().length, 0);
+	assert.equal(fake.getOpenSessions().length, 0);
+});
+
+test('rejects session operations while teardown is pending', async () => {
+	const fake = createFakeAgentAdapter({ now: () => NOW });
+	let releaseClose: (() => void) | null = null;
+	let resolveCloseStarted: (() => void) | null = null;
+	const closeStarted = new Promise<void>((resolve) => {
+		resolveCloseStarted = resolve;
+	});
+	const adapter: AgentAdapter = {
+		createSession: async (input) => {
+			const session = await fake.adapter.createSession(input);
+			const wrapped: AgentAdapterSession = {
+				...session,
+				close: async () => {
+					resolveCloseStarted?.();
+					await new Promise<void>((resolve) => {
+						releaseClose = resolve;
+					});
+					await session.close();
+				},
+			};
+			return wrapped;
+		},
+		shutdown: fake.adapter.shutdown,
+	};
+	const client = createAgentClient({ adapter, now: () => NOW });
+	const session = await client.createSession(baseRequest());
+
+	const close = session.close();
+	await closeStarted;
+	const unavailable = (error: unknown): boolean =>
+		error instanceof AgentClientError &&
+		error.code === 'session-closed' &&
+		error.message.includes('teardown is in progress');
+	assert.throws(() => session.getState(), unavailable);
+	assert.throws(() => session.setSessionName('blocked'), unavailable);
+	assert.throws(() => session.subscribe(() => undefined), unavailable);
+	await assert.rejects(
+		() => session.submit({ prompt: 'blocked' }),
+		unavailable,
+	);
+
+	const release = (): void => releaseClose?.();
+	release();
+	await close;
+	assert.equal(client.listSessions().length, 0);
+});
+
+test('serializes teardown and retains a session when close rejects', async () => {
+	const fake = createFakeAgentAdapter({ now: () => NOW });
+	let closeAttempts = 0;
+	const adapter: AgentAdapter = {
+		createSession: async (input) => {
+			const session = await fake.adapter.createSession(input);
+			const wrapped: AgentAdapterSession = {
+				...session,
+				close: async () => {
+					closeAttempts += 1;
+					if (closeAttempts === 1) {
+						throw new Error('child did not exit');
+					}
+					await session.close();
+				},
+			};
+			return wrapped;
+		},
+		shutdown: fake.adapter.shutdown,
+	};
+	const client = createAgentClient({ adapter, now: () => NOW });
+	const session = await client.createSession(baseRequest());
+
+	const firstAttempt = session.close();
+	const duplicateAttempt = session.abort('duplicate-stop');
+	const results = await Promise.allSettled([firstAttempt, duplicateAttempt]);
+	assert.equal(
+		closeAttempts,
+		1,
+		'concurrent teardown must call the adapter once',
+	);
+	assert.ok(results.every((result) => result.status === 'rejected'));
+	assert.equal(client.listSessions().length, 1);
+	assert.equal(fake.getOpenSessions().length, 1);
+
+	await session.getState();
+	await session.setSessionName('retryable');
+	const subscription = session.subscribe(() => undefined);
+	await session.submit({ prompt: 'retryable' });
+	subscription.unsubscribe();
+
+	await session.close();
+	assert.equal(closeAttempts, 2);
 	assert.equal(client.listSessions().length, 0);
 	assert.equal(fake.getOpenSessions().length, 0);
 });

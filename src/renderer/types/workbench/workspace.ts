@@ -387,6 +387,18 @@ export interface ComposerSubmitOutcome {
 	error?: string;
 }
 
+/**
+ * Settings snapshotted when the composer begins a send.
+ *
+ * `linkedDirectories` is optional for direct callers that do not own a composer
+ * snapshot; `useAgentTurns` then reads the current chat state before opening the
+ * session.
+ */
+export interface ComposerSubmitOptions {
+	linkedDirectories?: readonly string[];
+	streamingBehavior?: 'steer' | 'followUp';
+}
+
 export interface ComposerShellState {
 	activeAgentSessionId: string | null;
 	availableModels: readonly ComposerModelOption[];
@@ -424,7 +436,7 @@ export interface ComposerShellState {
 	onStop: () => Promise<void> | void;
 	onSubmit: (
 		prompt: string,
-		options?: { streamingBehavior?: 'steer' | 'followUp' },
+		options?: ComposerSubmitOptions,
 	) => Promise<ComposerSubmitOutcome>;
 	onThinkingChange: (thinkingLevel: string) => void;
 	placeholder: string;

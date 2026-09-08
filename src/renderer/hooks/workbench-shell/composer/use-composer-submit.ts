@@ -20,6 +20,7 @@ import {
 import type {
 	ComposerDraftSegment,
 	ComposerShellState,
+	ComposerSubmitOptions,
 	QueuedFollowUp,
 	QueuedFollowUpSource,
 } from '@/renderer/types/workbench';
@@ -235,13 +236,16 @@ export function useComposerSubmit({
 			outgoing: ComposerDraft,
 			options?: {
 				fromQueue?: boolean;
-				streamingBehavior?: 'steer' | 'followUp';
+				streamingBehavior?: ComposerSubmitOptions['streamingBehavior'];
 			},
 		): Promise<ComposerSendOutcome> => {
 			if (composer.disabled || pending || isEmptyDraft(outgoing)) {
 				return 'rejected';
 			}
 			const { fromQueue, streamingBehavior } = options ?? {};
+			const linkedDirectoryPaths = Object.freeze(
+				linkedDirectories.map((directory) => directory.path),
+			);
 			const draft = draftLifecycle(editorRef, outgoing, fromQueue);
 			setPending(true);
 			setAttachmentError(null);
@@ -250,7 +254,7 @@ export function useComposerSubmit({
 					segments: outgoing.segments,
 					workspaceCwd: composer.workspaceCwd,
 				});
-				const payload = [serializeLinkedDirectories(linkedDirectories), body]
+				const payload = [serializeLinkedDirectories(linkedDirectoryPaths), body]
 					.filter(Boolean)
 					.join('\n\n');
 				// Clear the composer before awaiting onSubmit. onSubmit renders an
@@ -259,10 +263,10 @@ export function useComposerSubmit({
 				draft.clear();
 				// A caller that reports no outcome has reported no failure; reading
 				// `.error` off it directly would throw and restore a draft that went.
-				const outcome = await composer.onSubmit(
-					payload,
-					streamingBehavior ? { streamingBehavior } : undefined,
-				);
+				const outcome = await composer.onSubmit(payload, {
+					linkedDirectories: linkedDirectoryPaths,
+					...(streamingBehavior ? { streamingBehavior } : {}),
+				});
 				if (outcome?.error) {
 					draft.restore();
 					setAttachmentError(outcome.error);

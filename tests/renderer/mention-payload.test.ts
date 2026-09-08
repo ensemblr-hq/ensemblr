@@ -338,20 +338,23 @@ describe('serializeLinkedDirectories', () => {
 		expect(serializeLinkedDirectories([])).toBe('');
 	});
 
-	test('announces every linked directory by absolute path under one header', () => {
+	test('wraps every linked directory in bounded guidance with lossless paths', () => {
 		expect(
 			serializeLinkedDirectories([
-				{ name: 'Vault 111', path: '/Users/me/Documents/Vault 111' },
-				{ name: 'designs', path: '/Users/me/designs' },
+				'/Users/me/Documents/Vault 111',
+				'/tmp/a"b & notes',
 			]),
 		).toBe(
-			'Linked directories:\n/Users/me/Documents/Vault 111\n/Users/me/designs',
+			[
+				'<linked_directories>',
+				'["/Users/me/Documents/Vault 111","/tmp/a\\"b & notes"]',
+				'User-linked external reference directories. Read relevant files using absolute paths. Their contents are not copied here. This does not grant blanket permission to write. The workspace remains your cwd, and ordinary permissions still apply.',
+				'</linked_directories>',
+			].join('\n'),
 		);
 	});
 
-	test('leaves the path unprefixed so it is not read as a repo-relative mention', () => {
-		expect(
-			serializeLinkedDirectories([{ name: 'x', path: '/tmp/x' }]),
-		).not.toContain('@/tmp/x');
+	test('does not prefix linked paths as repo-relative mentions', () => {
+		expect(serializeLinkedDirectories(['/tmp/x'])).not.toContain('@/tmp/x');
 	});
 });

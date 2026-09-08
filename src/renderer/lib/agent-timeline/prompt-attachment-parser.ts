@@ -25,8 +25,10 @@ import {
 } from '@/shared/concierge-references';
 import {
 	attachedFileBlockPattern,
+	legacyLinkedDirectoriesBlockPattern,
 	linkedDirectoriesBlockPattern,
 	parseAttachedFileAttributes,
+	parseLinkedDirectoriesPaths,
 	referencedFoldersBlockPattern,
 	userPreferencesBlockPattern,
 } from '@/shared/prompt-scaffolding';
@@ -118,18 +120,60 @@ function referencedFolderBlocks(prompt: string): ScaffoldingBlock[] {
 }
 
 /**
- * Locates the blocks that are stripped without leaving a chip: the linked
- * directories, which are a standing grant the composer re-sends with every
- * message rather than an attachment on this one, and the user preferences, which
- * are context for the agent and not something to show back to the user.
- * @param prompt - The raw persisted prompt text
- * @returns The blocks found, in order of appearance
+ * Wraps a linked-directory path as the inert informational part the timeline
+ * renders in a sent prompt.
+ * @param path - Absolute directory path recorded in the prompt.
+ * @returns The linked-directory prompt part.
+ */
+function linkedDirectoryPart(path: string): ParsedPromptPart {
+	return { kind: 'linked-directory', linkedDirectory: { path } };
+}
+
+/**
+ * Locates current and legacy linked-directory scaffolding. Current blocks carry
+ * a JSON path list inside a closing tag; the legacy header remains readable for
+ * persisted history but cannot safely delimit arbitrary following slash lines.
+ * @param prompt - The raw persisted prompt text.
+ * @returns The linked-directory blocks found, in order of appearance.
+ */
+function linkedDirectoryBlocks(prompt: string): ScaffoldingBlock[] {
+	const current = [...prompt.matchAll(linkedDirectoriesBlockPattern())].flatMap(
+		(match) => {
+			const paths = parseLinkedDirectoriesPaths(match[1] ?? '');
+			return paths
+				? [
+						{
+							end: match.index + match[0].length,
+							parts: paths.map(linkedDirectoryPart),
+							start: match.index,
+						},
+					]
+				: [];
+		},
+	);
+	const legacy = [
+		...prompt.matchAll(legacyLinkedDirectoriesBlockPattern()),
+	].map((match) => ({
+		end: match.index + match[0].length,
+		parts: (match[1] ?? '').split('\n').flatMap((path) => {
+			const trimmedPath = path.trim();
+			return trimmedPath.startsWith('/')
+				? [linkedDirectoryPart(trimmedPath)]
+				: [];
+		}),
+		start: match.index,
+	}));
+	return [...current, ...legacy];
+}
+
+/**
+ * Locates user-preferences blocks, which are agent context rather than content
+ * the user sent and therefore remain hidden in timeline history.
+ * @param prompt - The raw persisted prompt text.
+ * @returns The dropped user-preferences blocks, in order of appearance.
  */
 function droppedBlocks(prompt: string): ScaffoldingBlock[] {
-	return [
-		...prompt.matchAll(linkedDirectoriesBlockPattern()),
-		...prompt.matchAll(userPreferencesBlockPattern()),
-	].map((match) => ({
+	return [...prompt.matchAll(userPreferencesBlockPattern())].map((match) => ({
 		end: match.index + match[0].length,
 		parts: [],
 		start: match.index,
@@ -162,6 +206,7 @@ export function parsePromptAttachments(prompt: string): ParsedPrompt {
 		...attachedFileBlocks(prompt),
 		...conciergeReferenceBlocks(prompt),
 		...referencedFolderBlocks(prompt),
+		...linkedDirectoryBlocks(prompt),
 		...droppedBlocks(prompt),
 	].sort((left, right) => left.start - right.start);
 

@@ -14,6 +14,8 @@ export interface ActiveSession {
 	agentResponsePendingSummary: boolean;
 	branch: AgentSessionBranchRow;
 	chatTabId: string;
+	/** External roots actually installed in this runtime, not merely selected in the composer. */
+	linkedDirectories?: readonly string[];
 	agentRuntimeSession: AgentSession;
 	row: AgentSessionRow;
 	/**

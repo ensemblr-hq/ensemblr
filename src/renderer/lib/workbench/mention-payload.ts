@@ -4,12 +4,11 @@ import { isReferenceAttachment } from '@/renderer/lib/workbench/composer-attachm
 import type {
 	ComposerAttachment,
 	ComposerDraftSegment,
-	LinkedDirectory,
 } from '@/renderer/types/workbench';
 import { formatConciergeReferenceBlock } from '@/shared/concierge-references';
 import {
 	formatAttachedFileBlock,
-	LINKED_DIRECTORIES_HEADER,
+	formatLinkedDirectoriesBlock,
 	REFERENCED_FOLDERS_HEADER,
 } from '@/shared/prompt-scaffolding';
 
@@ -128,18 +127,11 @@ function truncateAttachmentContent(content: string): string {
  * access at session open, but nothing keeps an earlier turn's announcement in
  * the model's working context, and a path per line is a negligible share of the
  * prompt.
- * @param directories - The chat's linked directories.
+ * @param paths - Snapshotted absolute paths for the chat's linked directories.
  * @returns The header block, or an empty string when nothing is linked.
  */
-export function serializeLinkedDirectories(
-	directories: readonly LinkedDirectory[],
-): string {
-	if (directories.length === 0) {
-		return '';
-	}
-	return `${LINKED_DIRECTORIES_HEADER}\n${directories
-		.map((directory) => directory.path)
-		.join('\n')}`;
+export function serializeLinkedDirectories(paths: readonly string[]): string {
+	return paths.length === 0 ? '' : formatLinkedDirectoriesBlock(paths);
 }
 
 /**

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useStore } from 'jotai';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
 	ensemblrQueryKeys,
@@ -13,7 +14,10 @@ import { isPlaceholderChatTabId } from '@/renderer/lib/workbench/chat-tab-target
 import { useInFlightTurns } from '@/renderer/state/composer/in-flight-turns';
 import { useOptimisticPrompts } from '@/renderer/state/composer/optimistic-prompts';
 import { chatAppliedLinkedDirectoriesAtomFamily } from '@/renderer/state/preferences';
-import type { ComposerSubmitOutcome } from '@/renderer/types/workbench';
+import type {
+	ComposerSubmitOptions,
+	ComposerSubmitOutcome,
+} from '@/renderer/types/workbench';
 import type { PiStreamingBehavior } from '@/shared/ipc/contracts/agent-session';
 
 /**
@@ -66,10 +70,9 @@ export function useAgentTurns({
 	chatTabId: string;
 	isResolvingChatTab: boolean;
 	/**
-	 * Reads the chat's linked directories at open time. Only the open request
-	 * carries them: the runtimes that sandbox by working directory take their
-	 * extra roots at launch, so a per-turn field would promise a grant no submit
-	 * can make.
+	 * Reads the chat's linked directories before each send. Main reuses the live
+	 * runtime when the set is unchanged, or resumes its history with new roots
+	 * once idle; a grant is never merely promised by the prompt text.
 	 */
 	linkedDirectoriesRequest: () => readonly string[];
 	masterPrompt: string;
@@ -84,6 +87,7 @@ export function useAgentTurns({
 }) {
 	const queryClient = useQueryClient();
 	const store = useStore();
+	const { t } = useTranslation();
 	const inFlight = useInFlightTurns();
 	const optimistic = useOptimisticPrompts(chatTabId);
 	const [lastError, setLastError] = useState<string | null>(null);
@@ -178,38 +182,55 @@ export function useAgentTurns({
 	const isRealChatTabId = !isPlaceholderChatTabId(chatTabId);
 
 	/**
-	 * Resolves the session a turn will run on, opening one when the chat has none
-	 * and reopening the runtime when a persisted session's process has exited.
+	 * Resolves the session a turn will run on and reconciles directory grants
+	 * through main before submitting, including when its runtime is already open.
 	 * @param initialPrompt - First message, used for title and branch naming
 	 * @param turn - The snapshotted model, thinking level, and Plan Mode
+	 * @param linkedDirectories - Paths snapshotted by the composer, when available
 	 * @returns The session id to submit against, or the failure that stopped it
 	 */
 	const ensureSession = useCallback(
 		async (
 			initialPrompt: string,
 			turn: AgentTurnOptions,
+			linkedDirectories?: readonly string[],
 		): Promise<{ error?: string; sessionId?: string }> => {
-			const needsRuntimeResume =
-				persistedActiveSession !== undefined &&
-				!persistedActiveSession.runtimeOpen;
-			if (activeSessionId && !needsRuntimeResume) {
-				return { sessionId: activeSessionId };
-			}
 			const opened = await inFlight.track(chatTabId, () =>
 				openSessionMutation.mutateAsync({
 					chatTabId,
 					initialPrompt: activeSessionId ? null : initialPrompt,
-					linkedDirectories: linkedDirectoriesRequest(),
+					linkedDirectories: linkedDirectories ?? linkedDirectoriesRequest(),
 					resumeSessionId: activeSessionId,
 					turn,
 				}),
 			);
 			if (opened.error) {
+				if (opened.errorCode === 'linked-directories-busy') {
+					return {
+						error: t(
+							'workbench:composer.linked-directories-busy',
+							'Directory changes cannot apply while the agent is working. Send again once it is idle.',
+						),
+					};
+				}
+				if (opened.errorCode === 'linked-directories-cancelled') {
+					return {
+						error: t(
+							'workbench:composer.linked-directories-cancelled',
+							'Directory changes were canceled while stopping the agent. Send again once it is idle.',
+						),
+					};
+				}
 				return { error: opened.error };
 			}
 			return opened.session?.id
 				? { sessionId: opened.session.id }
-				: { error: 'Unable to open an agent session.' };
+				: {
+						error: t(
+							'workbench:composer.session-open-failed',
+							'Unable to open an agent session.',
+						),
+					};
 		},
 		[
 			activeSessionId,
@@ -217,22 +238,24 @@ export function useAgentTurns({
 			inFlight,
 			linkedDirectoriesRequest,
 			openSessionMutation,
-			persistedActiveSession,
+			t,
 		],
 	);
 
 	const onSubmit = useCallback(
 		async (
 			prompt: string,
-			options?: { streamingBehavior?: PiStreamingBehavior },
+			options?: ComposerSubmitOptions,
 		): Promise<ComposerSubmitOutcome> => {
 			const trimmed = prompt.trim();
 			if (!trimmed) {
 				return {};
 			}
 			if (!isRealChatTabId || isResolvingChatTab) {
-				const error =
-					'Workspace chat tab is still initializing. Try again in a moment.';
+				const error = t(
+					'workbench:composer.chat-initializing',
+					'Workspace chat tab is still initializing. Try again in a moment.',
+				);
 				setLastError(error);
 				return { error };
 			}
@@ -259,9 +282,18 @@ export function useAgentTurns({
 			// won't match and both render.
 			const optimisticEntry = optimistic.push(promptToSend);
 
-			const resolved = await ensureSession(trimmed, turn);
+			const resolved = await ensureSession(
+				trimmed,
+				turn,
+				options?.linkedDirectories,
+			);
 			if (!resolved.sessionId) {
-				const error = resolved.error ?? 'Unable to open an agent session.';
+				const error =
+					resolved.error ??
+					t(
+						'workbench:composer.session-open-failed',
+						'Unable to open an agent session.',
+					);
 				setLastError(error);
 				optimistic.remove(optimisticEntry.id);
 				return { error };
@@ -296,6 +328,7 @@ export function useAgentTurns({
 			afkModeRequest,
 			submitMutation,
 			thinkingLevel,
+			t,
 		],
 	);
 

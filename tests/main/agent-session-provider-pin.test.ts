@@ -220,6 +220,19 @@ async function openThroughIpc(
 }
 
 describe('main derives a session provider from its own merged catalog', () => {
+	it('carries linked directories through IPC for fresh and resumed chats', async () => {
+		const linkedDirectories = ['/Users/me/.claude', '/Users/me/My Notes'];
+		for (const resumeSessionId of [null, 'session-1']) {
+			const { openRequest, result } = await openThroughIpc({
+				linkedDirectories,
+				model: CLAUDE_MODEL,
+				resumeSessionId,
+			});
+			expect(result.error).toBeUndefined();
+			expect(openRequest?.linkedDirectories).toEqual(linkedDirectories);
+		}
+	});
+
 	it('opens a Claude session when the user picked a Claude model', async () => {
 		const { openRequest } = await openThroughIpc({ model: CLAUDE_MODEL });
 

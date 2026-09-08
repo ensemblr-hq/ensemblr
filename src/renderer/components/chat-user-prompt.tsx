@@ -115,6 +115,9 @@ function partIdentity(part: ParsedPromptPart): string {
 	if (part.kind === 'reference') {
 		return `ref:${part.reference.kind}:${conciergeReferenceId(part.reference)}`;
 	}
+	if (part.kind === 'linked-directory') {
+		return `linked-directory:${part.linkedDirectory.path}`;
+	}
 	return `file:${part.attachment.path}`;
 }
 
@@ -132,6 +135,7 @@ function partIdentity(part: ParsedPromptPart): string {
  * control that opens onto a read error.
  */
 function PromptParts({ parts }: { parts: readonly ParsedPromptPart[] }) {
+	const { t } = useTranslation();
 	const openFilePreview = useFilePreviewOpener();
 	const resolveWorkspacePath = useWorkspacePathResolver();
 	const referenceAccess = useConciergeReferenceAccess();
@@ -163,6 +167,25 @@ function PromptParts({ parts }: { parts: readonly ParsedPromptPart[] }) {
 										: undefined
 								}
 								title={reference.label}
+							/>
+						</span>
+					);
+				}
+				if (part.kind === 'linked-directory') {
+					const { path } = part.linkedDirectory;
+					return (
+						<span className={hostClassName} key={key}>
+							<ChatAttachmentChip
+								aria-label={t(
+									'workbench:timeline.user-prompt.linked-directory',
+									'Linked directory: {{path}}',
+									{ path },
+								)}
+								className={INLINE_CHIP_CLASS}
+								kind='linked-directory'
+								label={chipLabelForPath(path) || path}
+								role='img'
+								title={path}
 							/>
 						</span>
 					);

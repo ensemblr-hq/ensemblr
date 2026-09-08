@@ -47,26 +47,40 @@ export function ComposerNotices({
 				</div>
 			) : null}
 			{state.linkedDirectories.length > 0 ? (
-				<div className='flex flex-wrap items-end gap-1.5'>
-					{state.linkedDirectories.map((directory) => (
-						<LinkedDirectoryChip
-							key={directory.path}
-							name={directory.name}
-							onRemove={() => state.unlinkDirectory(directory.path)}
-							path={directory.path}
-							pending={pendingPaths.has(directory.path)}
-						/>
-					))}
+				<div className='flex flex-col gap-1'>
+					<div className='flex flex-wrap items-end gap-1.5'>
+						<span className='text-muted-foreground text-xs'>
+							{t(
+								'workbench:composer.linked-directories-label',
+								'Linked directories',
+							)}
+						</span>
+						{state.linkedDirectories.map((directory) => (
+							<LinkedDirectoryChip
+								key={directory.path}
+								name={directory.name}
+								onRemove={() => state.unlinkDirectory(directory.path)}
+								path={directory.path}
+								pending={pendingPaths.has(directory.path)}
+							/>
+						))}
+					</div>
+					<output className='text-muted-foreground text-xs'>
+						{t(
+							'workbench:composer.linked-directories-help',
+							'Linked directories stay available across prompts.',
+						)}
+					</output>
 				</div>
 			) : null}
 			{state.pendingLinkedDirectories.length > 0 ? (
 				<output className='text-muted-foreground text-xs'>
-					{t('workbench:composer.linked-directory-pending', {
+					{t('workbench:composer.linked-directory-pending-next-send', {
 						count: state.pendingLinkedDirectories.length,
 						defaultValue_one:
-							'The agent reads a newly linked directory from the next session — reopen this chat to give it access.',
+							'Directory changes apply automatically with the next send once the agent is idle.',
 						defaultValue_other:
-							'The agent reads newly linked directories from the next session — reopen this chat to give it access.',
+							'Directory changes apply automatically with the next send once the agent is idle.',
 					})}
 				</output>
 			) : null}

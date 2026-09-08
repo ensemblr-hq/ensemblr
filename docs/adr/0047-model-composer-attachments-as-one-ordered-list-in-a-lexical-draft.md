@@ -129,10 +129,22 @@ Two properties are deliberate:
 - **Symlinks are not resolved.** The path the user picked is the path that is
   granted. Resolving would silently widen or narrow the grant relative to what
   the user chose.
-- **A directory linked mid-session is marked pending**, and the composer says the
-  chat has to reopen. Claude takes those roots only at launch, so the honest
-  answer is to say so rather than let the agent hit an unexplained permission
-  denial.
+- **Directory changes apply before the next idle send.** Claude takes those roots
+  only at launch, so main compares the requested set to the live runtime's set.
+  An unchanged set reuses the runtime; additions or removals close and resume it
+  with the same conversation history. A working turn refuses the change rather
+  than being interrupted. The composer retains its draft on refusal and marks
+  new roots pending until an open succeeds.
+- **Every prompt announces linked references, and sent messages show them.** A
+  bounded prompt block names the absolute paths and explains that these are
+  external read references, not copied content, a new working directory, or
+  permission to edit outside the workspace. The composer labels its persistent
+  set separately from attachments so a retained link does not look unsent.
+
+The delivery hardening above amends the original manual-reopen behavior. Tests
+cover the complete open path (IPC, session service, runtime adapter), not just
+serialization or the SDK option in isolation: a field accepted at both ends can
+still be silently dropped between them.
 
 ## Consequences
 

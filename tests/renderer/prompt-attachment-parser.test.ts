@@ -16,10 +16,13 @@ function attachments(parts: readonly ParsedPromptPart[]) {
 	);
 }
 
-/** Reads a part back as the text or path it renders, whichever it carries. */
+/** Reads a part back as the text, label, or path it renders. */
 function partLabel(part: ParsedPromptPart): string {
 	if (part.kind === 'attachment') {
 		return part.attachment.path;
+	}
+	if (part.kind === 'linked-directory') {
+		return part.linkedDirectory.path;
 	}
 	return part.kind === 'text' ? part.text : part.reference.label;
 }
@@ -104,12 +107,44 @@ describe('parsePromptAttachments', () => {
 		expect(attachments(parts)[0]?.path).toBe('a"b.ts');
 	});
 
-	test('strips the linked-directories preamble without a chip per turn', () => {
+	test('renders explicit linked directories and keeps slash-prefixed body text', () => {
+		const prompt = [
+			'<linked_directories>',
+			'["/Users/me/Reference Notes", "/tmp/a&b"]',
+			'User-linked external reference directories. Read relevant files using absolute paths. Their contents are not copied here. This does not grant blanket permission to write. The workspace remains your cwd, and ordinary permissions still apply.',
+			'</linked_directories>',
+			'',
+			'Review /not-a-directory as part of my request.',
+		].join('\n');
+		const { parts } = parsePromptAttachments(prompt);
+		expect(parts).toMatchObject([
+			{
+				kind: 'linked-directory',
+				linkedDirectory: { path: '/Users/me/Reference Notes' },
+			},
+			{
+				kind: 'linked-directory',
+				linkedDirectory: { path: '/tmp/a&b' },
+			},
+			{ kind: 'text', text: 'Review /not-a-directory as part of my request.' },
+		]);
+	});
+
+	test('shows legacy linked-directory history as informational chips', () => {
 		const prompt =
 			'Linked directories:\n/Users/me/Vault\n/Users/me/designs\n\nCheck my notes.';
 		const { parts } = parsePromptAttachments(prompt);
-		expect(attachments(parts)).toEqual([]);
-		expect(texts(parts)).toEqual(['Check my notes.']);
+		expect(parts).toMatchObject([
+			{
+				kind: 'linked-directory',
+				linkedDirectory: { path: '/Users/me/Vault' },
+			},
+			{
+				kind: 'linked-directory',
+				linkedDirectory: { path: '/Users/me/designs' },
+			},
+			{ kind: 'text', text: 'Check my notes.' },
+		]);
 	});
 
 	test('keeps referenced folders as chips while dropping linked directories', () => {

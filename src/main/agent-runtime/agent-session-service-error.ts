@@ -18,5 +18,7 @@ export class AgentSessionServiceError extends Error {
  */
 export type AgentSessionServiceErrorCode =
 	| 'database-unavailable'
+	| 'linked-directories-busy'
+	| 'linked-directories-cancelled'
 	| 'provider-mismatch'
 	| 'session-not-open';

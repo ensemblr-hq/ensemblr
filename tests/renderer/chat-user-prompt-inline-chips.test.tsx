@@ -22,6 +22,16 @@ function folderBlock(path: string): string {
 	return `Referenced workspace folders:\n@${path}`;
 }
 
+/** Builds the bounded linked-directory context emitted with every sent prompt. */
+function linkedDirectoryBlock(paths: readonly string[]): string {
+	return [
+		'<linked_directories>',
+		JSON.stringify(paths),
+		'User-linked external reference directories. Read relevant files using absolute paths. Their contents are not copied here. This does not grant blanket permission to write. The workspace remains your cwd, and ordinary permissions still apply.',
+		'</linked_directories>',
+	].join('\n');
+}
+
 /**
  * The class tokens on an element, as exact names rather than one string: a
  * substring match cannot tell `ml-1` from `ml-1.5`.
@@ -208,5 +218,30 @@ describe('inline attachment chips', () => {
 
 		expect(classes(chipHost(container, 'src/main'))).not.toContain('mr-1');
 		expect(classes(chipHost(container, 'src/renderer'))).toContain('ml-1');
+	});
+
+	test('renders linked directories as informational, non-actionable chips', () => {
+		const path = '/Users/me/Reference Notes';
+		const container = renderPrompt(
+			linkedDirectoryBlock([path]),
+			'Review /not-a-directory too.',
+		);
+
+		const linkedDirectory = chip(container, path);
+		expect(linkedDirectory.textContent).toContain('Reference Notes');
+		expect(linkedDirectory).toHaveAttribute(
+			'aria-label',
+			`Linked directory: ${path}`,
+		);
+		expect(linkedDirectory).not.toBeInstanceOf(HTMLButtonElement);
+		expect(promptBody(container).textContent).toContain(
+			'Review /not-a-directory too.',
+		);
+	});
+
+	test('falls back to the full linked path when the root has no basename', () => {
+		const container = renderPrompt(linkedDirectoryBlock(['/']));
+
+		expect(chip(container, '/')).toHaveTextContent('/');
 	});
 });
