@@ -1,10 +1,14 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Trash2Icon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { invalidateWorkspaceListViews } from '@/renderer/api/ensemblr';
+import {
+	invalidateWorkspaceListViews,
+	repositoryWorkspaceNavigationQuery,
+	rootDirectoryQuery,
+} from '@/renderer/api/ensemblr';
 import { FilesToCopySetting } from '@/renderer/components/settings/repo-misc/files-to-copy-setting';
 import { PreviewUrlsSetting } from '@/renderer/components/settings/repo-misc/preview-urls-setting';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
@@ -52,6 +56,16 @@ function RepoMiscSettings() {
 	const { t } = useTranslation();
 	const { repoId } = Route.useParams();
 	const { resolved, project } = useRepoSettings(repoId);
+	const { data: rootData } = useQuery(rootDirectoryQuery);
+	const { data: repository } = useQuery({
+		...repositoryWorkspaceNavigationQuery,
+		select: (snapshot) =>
+			snapshot.repositories.find((entry) => entry.id === repoId),
+	});
+	const workspacesPath =
+		rootData?.workspacesPath && repository
+			? `${rootData.workspacesPath}/${repository.slug}`
+			: '—';
 	const save = useRepoSettingsWriter(repoId, project);
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
@@ -92,9 +106,7 @@ function RepoMiscSettings() {
 				label={t('settings:repo.workspaces-path.label', 'Workspaces path')}
 				stack
 			>
-				<SettingsCodeValue
-					value={project ? `${project.pathLabel} (workspaces)` : '—'}
-				/>
+				<SettingsCodeValue value={workspacesPath} />
 			</SettingRow>
 
 			<PreviewUrlsSetting
