@@ -326,6 +326,39 @@ describe('agent-control AWARENESS parity', () => {
 		}
 	});
 
+	// Observed: a normal Pi chat interpreted the standing "prefer" language as a
+	// reason to open a reviewer while packaging a one-file deletion. The review
+	// op belongs to an explicit user request or to the AFK workflow that introduced
+	// it, not to routine verification in every attended turn.
+	it('reserves agent-opened reviews for explicit requests and the AFK workflow', () => {
+		const reviewTool = TOOL_DEFS.find(
+			(def) => def.name === 'ensemblr_start_review',
+		)?.description;
+		const embeddedReviewTool = extractEmbeddedToolDescriptions(
+			readExtensionSource(),
+		).get('ensemblr_start_review');
+
+		expect(ORCHESTRATOR_AWARENESS).toContain(
+			'- Agent review (explicit request or AFK only):',
+		);
+		expect(ORCHESTRATOR_AWARENESS).not.toContain('- Get the change reviewed:');
+		for (const guidance of [
+			ORCHESTRATOR_AWARENESS,
+			reviewTool,
+			embeddedReviewTool,
+		]) {
+			expect(guidance).toContain('only when the user explicitly asks');
+			expect(guidance).toContain('AFK workflow');
+			expect(guidance).toContain('Do not start it as routine');
+			expect(guidance?.toLowerCase()).not.toContain(
+				'prefer it to reviewing your own work',
+			);
+			expect(guidance?.toLowerCase()).not.toContain(
+				'use it when a change is ready',
+			);
+		}
+	});
+
 	// Everything that is a property of the work rather than of the mechanism has
 	// to survive the swap, or picking the built-in tool quietly drops the rules
 	// that make a fan-out worth doing.
@@ -904,6 +937,17 @@ describe('agent-control AWARENESS parity', () => {
 		expect(ORCHESTRATOR_AWARENESS).toContain('ensemblr_notify_orchestrator');
 	});
 
+	it('prefers Luna or Terra over the separately limited Codex Spark allowance', () => {
+		for (const playbook of [
+			ORCHESTRATOR_AWARENESS,
+			PLAN_MODE_ORCHESTRATOR_AWARENESS,
+		]) {
+			expect(playbook).toContain('prefer Luna or Terra');
+			expect(playbook).toContain('Codex Spark');
+			expect(playbook).toContain('separate, limited usage allowance');
+		}
+	});
+
 	it('tells sub-agents to do the work themselves and escalate, not fan out', () => {
 		expect(SUBAGENT_AWARENESS).toContain('Do NOT spawn further sub-agents');
 		expect(SUBAGENT_AWARENESS).toContain('ensemblr_notify_orchestrator');
@@ -1436,8 +1480,10 @@ describe('the third-party CLI harness feature switch', () => {
 			planSubagent,
 			conciergeAwareness({ ...ALL_ON, tuiHarnesses: false }),
 		];
+		const sparkModelGuidance =
+			'Codex Spark has a separate, limited usage allowance: when selecting an OpenAI Codex model for a child, prefer Luna or Terra over Spark; if you are currently on Spark, name a returned Luna or Terra id rather than inheriting Spark. Use Spark only when the user explicitly asks for it.';
 		for (const playbook of playbooks) {
-			const lowered = playbook.toLowerCase();
+			const lowered = playbook.replace(sparkModelGuidance, '').toLowerCase();
 			expect(lowered).not.toContain('harness');
 			expect(lowered).not.toContain('claude code');
 			expect(lowered).not.toContain('codex');

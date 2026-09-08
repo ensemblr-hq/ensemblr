@@ -418,12 +418,12 @@ export function createProtocolDispatcher(
 			case 'response':
 				handleResponse(typed, deps);
 				return;
-			// A single `agent_start`…`agent_end` wraps the whole prompt; inside it Pi
-			// emits one `turn_start`/`turn_end` per LLM call. The session stays BUSY
-			// for the entire run, so only `agent_end` returns to idle — a per-turn
-			// `turn_end` must not, or the busy state (Stop button, live timer)
-			// collapses after the first tool round. Refresh the context meter on each
-			// turn boundary so the token gauge tracks every call.
+			// A single `agent_start`…`agent_settled` wraps the whole prompt; inside it
+			// Pi emits one `turn_start`/`turn_end` per LLM call and an `agent_end`
+			// carrying every message in the low-level run. Keep accepting `agent_end`
+			// as the idle marker for older Pi-compatible runtimes. Current Pi follows
+			// it with the small `agent_settled` frame, which also recovers the status
+			// when a message-heavy aggregate `agent_end` exceeded the JSONL line cap.
 			case 'agent_start':
 			case 'turn_start':
 				deps.setStatus('streaming');
@@ -434,6 +434,9 @@ export function createProtocolDispatcher(
 			case 'agent_end':
 				deps.setStatus('idle');
 				deps.requestContextUsage();
+				return;
+			case 'agent_settled':
+				deps.setStatus('idle');
 				return;
 			case 'message_start':
 				return;
