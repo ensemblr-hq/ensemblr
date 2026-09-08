@@ -22,8 +22,10 @@ import { readCachedAgentModels } from './agent-models-cache';
 import {
 	type AgentModelsPollState,
 	advanceAgentModelsPoll,
+	type CatalogReconciliationState,
 	initialAgentModelsPollState,
-	isMissingProviderSubset,
+	initialCatalogReconciliationState,
+	reconcileAgentModelCatalog,
 } from './agent-models-catalog';
 import {
 	ensemblrQueryKeys,
@@ -35,9 +37,30 @@ import {
 // models query is a singleton, so a single module-scoped state tracks it; each
 // `refetchInterval` evaluation advances it purely via `advanceAgentModelsPoll`.
 // This heals launch only: once it settles (or hits the ceiling) the poll does
-// not re-arm, so a mid-session `pi` restart relies on the subset fallback in
-// `queryFn`, not on renewed polling.
+// not re-arm. A provider-set reduction keeps the poll alive until the live
+// catalog repeats and is safe to accept as authoritative.
 let agentModelsPollState: AgentModelsPollState = initialAgentModelsPollState();
+
+/** Internal query data that scopes narrowing confirmation to the query lifecycle. */
+interface AgentModelsQueryData extends AgentModelCatalog {
+	reconciliationState: CatalogReconciliationState;
+}
+
+/** Wraps a catalog with its query-owned reconciliation progress. */
+function withReconciliationState(
+	catalog: AgentModelCatalog,
+	reconciliationState: CatalogReconciliationState,
+): AgentModelsQueryData {
+	return { ...catalog, reconciliationState };
+}
+
+/** Seeds cached models with fresh reconciliation progress for a new query lifecycle. */
+function initialAgentModelsQueryData(): AgentModelsQueryData | undefined {
+	const cached = readCachedAgentModels();
+	return cached
+		? withReconciliationState(cached, initialCatalogReconciliationState())
+		: undefined;
+}
 
 /**
  * Query options for the agent model catalog. Seeds from the localStorage cache
@@ -52,27 +75,39 @@ let agentModelsPollState: AgentModelsPollState = initialAgentModelsPollState();
  */
 export const agentModelsQuery = queryOptions({
 	/** Seeds the catalog from the localStorage cache for an instant first paint. */
-	initialData: () => readCachedAgentModels(),
+	initialData: initialAgentModelsQueryData,
 	initialDataUpdatedAt: 0,
 	/**
 	 * Fetches the live agent model catalog over IPC. Falls back to the cached
-	 * catalog on an empty result, and on a partial listing that merely drops
-	 * providers the cache already has (a cold-start race), so the picker is
-	 * never blanked by a transient sub-catalog.
+	 * catalog on an empty result. A listing that drops providers must repeat
+	 * before it replaces the cache, distinguishing a cold-start race from a
+	 * provider the user actually removed.
 	 */
-	queryFn: async (): Promise<AgentModelCatalog> => {
+	queryFn: async ({ client, queryKey }): Promise<AgentModelsQueryData> => {
 		const result = await profileElectronIpcCall(
 			{ channel: 'ensemblr:list-agent-models', usesDatabase: false },
 			() => getEnsemblrApi().listAgentModels(),
 		);
 		const cached = readCachedAgentModels();
 		if (result.models.length === 0) {
-			return cached ?? result;
+			return withReconciliationState(
+				cached ?? result,
+				initialCatalogReconciliationState(),
+			);
 		}
-		if (cached && isMissingProviderSubset(result, cached)) {
-			return cached;
+		const current = client.getQueryData<AgentModelsQueryData>(queryKey);
+		const reconciliation = reconcileAgentModelCatalog(
+			result,
+			cached,
+			current?.reconciliationState ?? initialCatalogReconciliationState(),
+		);
+		if (reconciliation.pendingNarrowing) {
+			agentModelsPollState = initialAgentModelsPollState();
 		}
-		return result;
+		return withReconciliationState(
+			reconciliation.catalog,
+			reconciliation.state,
+		);
 	},
 	queryKey: ensemblrQueryKeys.agentModels(),
 	// Poll after launch until the catalog settles, then stop. Repairs the case
@@ -91,8 +126,9 @@ export const agentModelsQuery = queryOptions({
 	// composer picker, default/review selects, visibility list. `id` and
 	// `provider` stay raw so resolution, matching, and search are unaffected.
 	/** Prettifies model display names for every consumer while leaving `id` and `provider` raw. */
-	select: (data: AgentModelCatalog): AgentModelCatalog => ({
-		...data,
+	select: (data: AgentModelsQueryData): AgentModelCatalog => ({
+		defaultModelId: data.defaultModelId,
+		defaultThinkingLevel: data.defaultThinkingLevel,
 		models: data.models.map((model) => ({
 			...model,
 			displayName: formatModelDisplayName(model.displayName),

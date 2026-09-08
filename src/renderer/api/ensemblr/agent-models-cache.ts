@@ -1,7 +1,5 @@
 import type { AgentModelCatalog } from '@/shared/ipc/contracts/agent-models';
 
-import { isMissingProviderSubset } from './agent-models-catalog';
-
 /**
  * localStorage persistence for the Pi model catalog so the picker/settings have
  * the last-known list available instantly on launch while a fresh
@@ -78,10 +76,9 @@ export function readCachedAgentModels(
 }
 
 /**
- * Persists a catalog. No-op for an empty list so a transient `pi` failure never
- * clobbers the last-known-good cache, and no-op for a partial listing that
- * merely drops providers the cache already has (a cold-start race) so a
- * sub-catalog never poisons the next launch's seed. Write errors are swallowed.
+ * Persists a non-empty reconciled catalog. The query owns transient partial-
+ * listing protection, so any result that reaches this boundary is authoritative
+ * and may retire providers from the prior cache. Write errors are swallowed.
  */
 export function writeCachedAgentModels(
 	result: AgentModelCatalog,
@@ -94,12 +91,13 @@ export function writeCachedAgentModels(
 	if (!store) {
 		return;
 	}
-	const existing = readCachedAgentModels(store);
-	if (existing && isMissingProviderSubset(result, existing)) {
-		return;
-	}
+	const stored: AgentModelCatalog = {
+		defaultModelId: result.defaultModelId,
+		defaultThinkingLevel: result.defaultThinkingLevel,
+		models: result.models,
+	};
 	try {
-		store.setItem(CACHE_KEY, JSON.stringify(result));
+		store.setItem(CACHE_KEY, JSON.stringify(stored));
 	} catch {
 		// Quota/serialisation failure must not break the query flow.
 	}

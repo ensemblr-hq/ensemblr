@@ -122,11 +122,11 @@ describe('agent-models-cache', () => {
 		expect(readCachedAgentModels(store)).toBeUndefined();
 	});
 
-	test('a partial listing that drops a provider does not poison the cache', () => {
+	test('an authoritative listing can retire a provider from the cache', () => {
 		const store = fakeStorage();
 		writeCachedAgentModels(TWO_PROVIDERS, store);
 		writeCachedAgentModels(PARTIAL, store);
-		expect(readCachedAgentModels(store)).toEqual(TWO_PROVIDERS);
+		expect(readCachedAgentModels(store)).toEqual(PARTIAL);
 	});
 
 	test('a listing that adds a provider overwrites the cache', () => {
