@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
 	ChildLike,
 	SpawnFn,
@@ -41,12 +41,14 @@ interface SpawnRecord {
 interface FakeChildOptions {
 	onRequest?: (request: Record<string, unknown>, child: FakeChild) => void;
 	closeOnKill?: NodeJS.Signals | null;
+	pid?: number;
 }
 
 /** Creates a controllable child-process-shaped transport for RPC failure tests. */
 function createFakeChild({
 	onRequest,
 	closeOnKill = 'SIGTERM',
+	pid,
 }: FakeChildOptions = {}): FakeChild {
 	const stdin = new PassThrough();
 	const stdout = new PassThrough();
@@ -86,7 +88,7 @@ function createFakeChild({
 			return true;
 		},
 		killSignals: () => signals.slice(),
-		pid: undefined,
+		pid,
 		stderr,
 		stdin,
 		stdinChunks: () => chunks.slice(),
@@ -764,6 +766,72 @@ process.stdin.on('end', shutdown);
 		});
 		await resolve({ spawn: recorder.spawn });
 		expect(recorder.records[0]?.detached).toBe(true);
+	});
+
+	it.skipIf(process.platform === 'win32')(
+		'does not signal a recycled POSIX group after close is observed',
+		async () => {
+			const pid = 71_234;
+			const processKill = vi.spyOn(process, 'kill').mockReturnValue(true);
+			try {
+				const recorder = createFakeSpawner({
+					onRequest: (request, child) =>
+						emitFrame(child, successFrame(request.id)),
+					pid,
+				});
+
+				await resolve({ spawn: recorder.spawn });
+
+				expect(processKill).not.toHaveBeenCalledWith(-pid, 'SIGKILL');
+				expect(recorder.children[0]?.killSignals()).toEqual([
+					'SIGTERM',
+					'SIGKILL',
+				]);
+			} finally {
+				processKill.mockRestore();
+			}
+		},
+	);
+
+	it('preserves a successful catalogue when process cleanup reaches its close deadline', async () => {
+		vi.useFakeTimers();
+		try {
+			const recorder = createFakeSpawner({
+				closeOnKill: null,
+				onRequest: (request, child) =>
+					emitFrame(
+						child,
+						successFrame(request.id, {
+							commands: [{ name: 'complete', source: 'skill' }],
+						}),
+					),
+			});
+			const resultPromise = resolve({
+				killGraceMs: 5,
+				spawn: recorder.spawn,
+				timeoutMs: 1000,
+			});
+
+			await vi.runAllTimersAsync();
+
+			await expect(resultPromise).resolves.toEqual({
+				commands: [
+					{
+						autoSubmit: false,
+						command: 'complete',
+						description: '',
+						source: 'skill',
+					},
+				],
+				error: null,
+				source: 'runtime',
+			});
+			expect(recorder.children[0]?.killSignals()).toContain('SIGTERM');
+			expect(recorder.children[0]?.killSignals()).toContain('SIGKILL');
+			expect(recorder.children[0]?.stdin.destroyed).toBe(true);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('returns static/error when the executable is not ready without spawning', async () => {

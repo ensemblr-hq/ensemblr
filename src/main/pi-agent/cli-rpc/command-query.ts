@@ -45,17 +45,26 @@ export function queryPiCommands({
 		const killTimer = createKillTimer();
 		let outcome: { data: unknown } | { error: Error } | undefined;
 		let settled = false;
+		let closeObserved = false;
 		let outputBytes = 0;
 		let closeTimer: NodeJS.Timeout | undefined;
 
 		/**
-		 * Gracefully signals only the direct child; force-kill reaches its group.
+		 * Gracefully signals only the direct child; force-kill may reach its group
+		 * until close is observed. Close follows exit and waits for inherited pipes,
+		 * so a wrapper can already be reaped while descendants still delay it. The
+		 * pre-close group signal remains to bound that cleanup despite its numeric
+		 * process-group identifier reuse tradeoff.
 		 * A dying wrapper closes stdin, so also signalling its descendants would
 		 * double-trigger their shutdown via SIGTERM and EOF.
 		 * @param signal - Termination signal for this discovery process only.
 		 */
 		const signalChild = (signal: NodeJS.Signals): void => {
-			signalQueryChild(child, detached && signal === 'SIGKILL', signal);
+			signalQueryChild(
+				child,
+				detached && signal === 'SIGKILL' && !closeObserved,
+				signal,
+			);
 		};
 
 		/** Releases timers and pipes exactly once, preserving the first outcome. */
@@ -91,12 +100,7 @@ export function queryPiCommands({
 			outcome = result;
 			clearTimeout(timeoutTimer);
 			killTimer.schedule(killGraceMs, () => signalChild('SIGKILL'));
-			closeTimer = setTimeout(() => {
-				outcome = {
-					error: new Error('Pi RPC process did not close after termination.'),
-				};
-				settle();
-			}, killGraceMs + CLOSE_GRACE_MS);
+			closeTimer = setTimeout(settle, killGraceMs + CLOSE_GRACE_MS);
 			signalChild('SIGTERM');
 		};
 
@@ -209,7 +213,10 @@ export function queryPiCommands({
 		child.stdout.on('error', onError);
 		child.stderr.on('error', onError);
 		child.on('error', onError);
-		child.once('close', settle);
+		child.once('close', () => {
+			closeObserved = true;
+			settle();
+		});
 		try {
 			child.stdin.write(`${JSON.stringify({ id, type: 'get_commands' })}\n`);
 		} catch {
