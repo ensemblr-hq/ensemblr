@@ -4,6 +4,7 @@ import { ArchiveToastScene } from './archive-toast-preview.tsx';
 import { CommentPreviewScene } from './comment-preview.tsx';
 import { ComposerScene } from './composer-preview.tsx';
 import { ComposerQueueScene } from './composer-queue-preview.tsx';
+import { ConciergeMarkScene } from './concierge-mark-preview.tsx';
 import { ConciergeScene } from './concierge-preview.tsx';
 import { ConflictsScene } from './conflicts-preview.tsx';
 import { ConversationScrollScene } from './conversation-scroll-preview.tsx';
@@ -97,6 +98,12 @@ export const SCENE_GROUPS = [
 				label: 'concierge',
 				render: () => <ConciergeScene />,
 				source: 'playground/concierge-preview.tsx',
+			},
+			{
+				id: 'concierge-mark',
+				label: 'concierge mark',
+				render: () => <ConciergeMarkScene />,
+				source: 'playground/concierge-mark-preview.tsx',
 			},
 		],
 	},
