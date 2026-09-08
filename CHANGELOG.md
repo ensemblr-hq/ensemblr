@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-09-08
+
+Agents can now read context usage over the control layer — their own conversation, or a child's,
+peer's, or reviewer's they are steering — instead of it existing only as a gauge for the user.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.9) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.9/Ensemblr-0.1.9-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.9/Ensemblr-0.1.9-x64.AppImage)
+
+### Added
+
+- **Agents can read context usage over the control layer.** `ensemblr_get_conversation_status` now
+  takes an optional `agentSessionId` — omitted, it reports the caller's own conversation — and every
+  conversation status carries `contextUsage` (`{ contextWindow, tokens, percent }`). Crossing 50%
+  full attaches a steering note scoped to what the caller can actually do about it: an orchestrator,
+  a harness, or the Concierge each see guidance for their own role. A terminal harness has no
+  conversation of its own — its control identity is shared by every terminal in a workspace — so it
+  is refused a self-status read with `not-found` rather than being promised one; the harness playbook
+  was corrected to stop advertising it after CodeRabbit flagged the mismatch. (#499)
+
 ## [0.1.8] - 2026-09-08
 
 A fan-out's finished sub-agent tabs now close themselves as each child settles, instead of leaving

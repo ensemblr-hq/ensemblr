@@ -533,7 +533,7 @@ you need to bisect a packaging break.
 **Write the notes and create the release. That is the whole ritual.**
 
 ```bash
-gh release create v0.1.8 --notes-file NOTES.md
+gh release create v0.1.9 --notes-file NOTES.md
 ```
 
 **Pass `--target master`, not `--target origin/master`, when the local checkout
@@ -584,7 +584,7 @@ returns `output.summary: null`, and the raw logs show only the unexpanded
 script. Every pinned line above derives from one fact, each asset's `name`:
 
 ```bash
-gh release view v0.1.8 --json assets -q '.assets[].name'
+gh release view v0.1.9 --json assets -q '.assets[].name'
 ```
 
 The version string is the tag with `v` stripped; each URL is
@@ -595,7 +595,7 @@ empty or partial asset list is not the signal to start editing — poll until al
 four are there. Then check the URLs actually resolve before opening the PR:
 
 ```bash
-gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.8 \
+gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.9 \
   --jq '.assets[] | "\(.name)\t\(.digest)"'
 ```
 
@@ -662,10 +662,10 @@ Squirrel.Mac feed the in-app updater reads:
 
 ```json
 {
-  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.8/Ensemblr-darwin-arm64-0.1.8.zip",
-  "name": "0.1.8",
+  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.9/Ensemblr-darwin-arm64-0.1.9.zip",
+  "name": "0.1.9",
   "notes": "…the release body…",
-  "pub_date": "2026-09-08T06:49:25Z"
+  "pub_date": "2026-09-08T09:26:28Z"
 }
 ```
 
