@@ -1149,6 +1149,35 @@ test('spawn throwing surfaces as spawn-error and shutdown(crashed)', async () =>
 	);
 });
 
+test('agent_settled finishes a run whose aggregate agent_end frame was oversized', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createPiCliRpcAdapter({
+		maxLineBytes: 256,
+		spawn: recorder.spawn,
+	});
+	const session = await adapter.createSession(buildInput());
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	child.emitStdout('{"type":"agent_start"}\n');
+	child.emitStdout(
+		'{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"done"}]}}\n',
+	);
+	child.emitStdout(
+		`${JSON.stringify({ type: 'agent_end', messages: ['x'.repeat(512)] })}\n`,
+	);
+	child.emitStdout('{"type":"agent_settled"}\n');
+
+	const assistantMessage = events.find(
+		(event) => event.type === 'message' && event.role === 'agent',
+	);
+	assert.ok(assistantMessage);
+	assert.equal(session.getMetadata().status, 'idle');
+	await adapter.shutdown();
+});
+
 test('oversize line drops cleanly and reports recoverable error', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createPiCliRpcAdapter({
