@@ -723,7 +723,7 @@ test('app quit surfaces a prompt pi never echoed instead of dropping it', async 
 	assert.ok(events.indexOf(flushed) < shutdownIndex);
 });
 
-test('a steer echo does not retire the plain prompt still awaiting its own', async () => {
+test('a steer echo does not duplicate the surfaced steer or retire the plain prompt', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createPiCliRpcAdapter({
 		killGraceMs: 5,
@@ -737,8 +737,8 @@ test('a steer echo does not retire the plain prompt still awaiting its own', asy
 
 	await session.submit({ prompt: 'okay howdy' });
 	await session.submit({ prompt: 'go this way', streamingBehavior: 'steer' });
-	// A steer is never queued, so echoing it must consume nothing: matching the
-	// queue positionally would retire 'okay howdy' here and lose it for good.
+	// The steer is surfaced optimistically, so its later echo must be dropped
+	// without retiring the plain prompt still waiting for its own echo.
 	child.emitStdout(
 		'{"type":"message_end","message":{"role":"user","content":[{"type":"text","text":"go this way"}]}}\n',
 	);
@@ -939,10 +939,38 @@ test('submit rejects with a typed error when the stdin pipe is dead', async () =
 	await adapter.shutdown();
 });
 
-test('submit with streamingBehavior:steer writes a steer frame, not a prompt', async () => {
+test('a later same-text prompt is not consumed by an old injection echo guard', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createPiCliRpcAdapter({
+		killGraceMs: 5,
+		spawn: recorder.spawn,
+	});
+	const session = await adapter.createSession(buildInput());
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	await session.submit({ prompt: 'repeat this', streamingBehavior: 'steer' });
+	await session.submit({ prompt: 'repeat this' });
+	child.emitStdout(
+		'{"type":"message_end","message":{"role":"user","content":[{"type":"text","text":"repeat this"}]}}\n',
+	);
+
+	const userMessages = events.filter(
+		(event): event is Extract<AgentEvent, { type: 'message' }> =>
+			event.type === 'message' && event.role === 'user',
+	);
+	assert.equal(userMessages.length, 2);
+	await adapter.shutdown();
+});
+
+test('submit with streamingBehavior:steer writes a steer frame and immediately surfaces it', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createPiCliRpcAdapter({ spawn: recorder.spawn });
 	const session = await adapter.createSession(buildInput());
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
 	await waitForMicrotasks();
 	const child = firstItem(recorder.getChildren());
 
@@ -953,13 +981,30 @@ test('submit with streamingBehavior:steer writes a steer frame, not a prompt', a
 	assert.match(chunks[0] ?? '', /"type":"steer"/);
 	assert.match(chunks[0] ?? '', /"message":"go this way"/);
 	assert.doesNotMatch(chunks[0] ?? '', /"type":"prompt"/);
+	assert.deepEqual(
+		events
+			.filter(
+				(event): event is Extract<AgentEvent, { type: 'message' }> =>
+					event.type === 'message' && event.role === 'user',
+			)
+			.map((event) => event.payload),
+		[
+			{
+				kind: 'message',
+				parts: [{ kind: 'text', text: 'go this way' }],
+				role: 'user',
+			},
+		],
+	);
 	await adapter.shutdown();
 });
 
-test('submit with streamingBehavior:followUp writes a follow_up frame', async () => {
+test('submit with streamingBehavior:followUp writes a follow_up frame and surfaces it', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createPiCliRpcAdapter({ spawn: recorder.spawn });
 	const session = await adapter.createSession(buildInput());
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
 	await waitForMicrotasks();
 	const child = firstItem(recorder.getChildren());
 
@@ -975,6 +1020,21 @@ test('submit with streamingBehavior:followUp writes a follow_up frame', async ()
 	assert.match(chunks[0] ?? '', /"type":"follow_up"/);
 	assert.match(chunks[0] ?? '', /"message":"and then this"/);
 	assert.doesNotMatch(chunks[0] ?? '', /"type":"set_model"/);
+	assert.deepEqual(
+		events
+			.filter(
+				(event): event is Extract<AgentEvent, { type: 'message' }> =>
+					event.type === 'message' && event.role === 'user',
+			)
+			.map((event) => event.payload),
+		[
+			{
+				kind: 'message',
+				parts: [{ kind: 'text', text: 'and then this' }],
+				role: 'user',
+			},
+		],
+	);
 	await adapter.shutdown();
 });
 
