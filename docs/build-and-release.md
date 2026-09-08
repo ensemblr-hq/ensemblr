@@ -533,8 +533,14 @@ you need to bisect a packaging break.
 **Write the notes and create the release. That is the whole ritual.**
 
 ```bash
-gh release create v0.1.7 --notes-file NOTES.md
+gh release create v0.1.8 --notes-file NOTES.md
 ```
+
+**Pass `--target master`, not `--target origin/master`, when the local checkout
+is on a different branch** — an Ensemblr workspace always is, since it checks
+out its own branch in its own worktree rather than `master` directly. The
+remote-tracking form is rejected outright (`HTTP 422: Release.target_commitish
+is invalid`); the GitHub API wants a bare branch name or a commit SHA.
 
 Add `--prerelease` for an `-alpha` / `-beta` / `-rc` tag; the workflow corrects
 the flag from the tag either way.
@@ -578,7 +584,7 @@ returns `output.summary: null`, and the raw logs show only the unexpanded
 script. Every pinned line above derives from one fact, each asset's `name`:
 
 ```bash
-gh release view v0.1.7 --json assets -q '.assets[].name'
+gh release view v0.1.8 --json assets -q '.assets[].name'
 ```
 
 The version string is the tag with `v` stripped; each URL is
@@ -589,7 +595,7 @@ empty or partial asset list is not the signal to start editing — poll until al
 four are there. Then check the URLs actually resolve before opening the PR:
 
 ```bash
-gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.7 \
+gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.8 \
   --jq '.assets[] | "\(.name)\t\(.digest)"'
 ```
 
@@ -656,10 +662,10 @@ Squirrel.Mac feed the in-app updater reads:
 
 ```json
 {
-  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.7/Ensemblr-darwin-arm64-0.1.7.zip",
-  "name": "0.1.7",
+  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.8/Ensemblr-darwin-arm64-0.1.8.zip",
+  "name": "0.1.8",
   "notes": "…the release body…",
-  "pub_date": "2026-09-07T18:26:48Z"
+  "pub_date": "2026-09-08T06:49:25Z"
 }
 ```
 
