@@ -48,13 +48,13 @@ export function ComposerNotices({
 			) : null}
 			{state.linkedDirectories.length > 0 ? (
 				<div className='flex flex-col gap-1'>
-					<div className='flex flex-wrap items-end gap-1.5'>
-						<span className='text-muted-foreground text-xs'>
-							{t(
-								'workbench:composer.linked-directories-label',
-								'Linked directories',
-							)}
-						</span>
+					<span className='text-muted-foreground text-xs'>
+						{t(
+							'workbench:composer.linked-directories-label',
+							'Linked directories',
+						)}
+					</span>
+					<div className='flex flex-wrap gap-1.5'>
 						{state.linkedDirectories.map((directory) => (
 							<LinkedDirectoryChip
 								key={directory.path}
@@ -65,12 +65,6 @@ export function ComposerNotices({
 							/>
 						))}
 					</div>
-					<output className='text-muted-foreground text-xs'>
-						{t(
-							'workbench:composer.linked-directories-help',
-							'Linked directories stay available across prompts.',
-						)}
-					</output>
 				</div>
 			) : null}
 			{state.pendingLinkedDirectories.length > 0 ? (

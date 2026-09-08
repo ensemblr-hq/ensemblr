@@ -247,6 +247,19 @@ function renderNotices(
 }
 
 describe('linked-directory chip', () => {
+	it('shows the label above the linked-directory chips without redundant help', () => {
+		renderNotices({ linkedDirectories: [VAULT] });
+
+		const label = screen.getByText('Linked directories');
+		const chip = screen.getByTitle(VAULT.path);
+
+		expect(label.parentElement).toHaveClass('flex-col');
+		expect(label.nextElementSibling).toContainElement(chip);
+		expect(
+			screen.queryByText('Linked directories stay available across prompts.'),
+		).not.toBeInTheDocument();
+	});
+
 	it('shows the name over the absolute path it granted', () => {
 		renderNotices({ linkedDirectories: [VAULT] });
 

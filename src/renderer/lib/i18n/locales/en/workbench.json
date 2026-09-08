@@ -212,7 +212,6 @@
 		"last-unread-tooltip-generic": "Jump to the newest unread chat",
 		"linked-directories-busy": "Directory changes cannot apply while the agent is working. Send again once it is idle.",
 		"linked-directories-cancelled": "Directory changes were canceled while stopping the agent. Send again once it is idle.",
-		"linked-directories-help": "Linked directories stay available across prompts.",
 		"linked-directories-label": "Linked directories",
 		"linked-directory-pending-next-send_one": "Directory changes apply automatically with the next send once the agent is idle.",
 		"linked-directory-pending-next-send_other": "Directory changes apply automatically with the next send once the agent is idle.",
