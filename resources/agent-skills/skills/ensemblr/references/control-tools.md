@@ -31,7 +31,11 @@ Control adds no capability of its own — it is a gate, not a feature.
 `ensemblr_get_conversation_status` is the only op whose target is optional, and
 that is what makes it the one way to learn your own context usage: omit
 `agentSessionId` and it reports **your own** conversation, since you do not know
-your own session id. Every status carries `contextUsage`
+your own session id. A terminal harness is the one caller that cannot — its
+control identity is minted per workspace and shared by every terminal in it, so
+there is no conversation behind it and the implicit read is refused with
+`not-found`; its own CLI tracks that window, and it names an `agentSessionId` to
+read a child, a peer, or the reviewer. Every status carries `contextUsage`
 (`{ contextWindow, tokens, percent }`, `percent` on a 0-100 scale), and it is
 null for a conversation with no runtime attached — closed, or from before a
 restart — which is a fact about the reading rather than an empty window.

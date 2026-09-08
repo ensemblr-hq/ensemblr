@@ -1158,7 +1158,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_get_conversation_status',
 		'getConversationStatus',
-		'Get the status of a conversation, whichever runtime it is on, plus `contextUsage` — how full its context window is, as `percent` of the window and the token counts behind it. Omit agentSessionId to read YOUR OWN conversation: that is the only way to learn how much room you have left, since you do not know your own session id. Pass one to read a child, a peer, or a reviewer. `contextUsage` is null when the conversation has no runtime attached (closed, or from before a restart), which is a fact about the reading rather than an empty window. A conversation at or past 50% is one to hand new work to a fresh agent rather than to keep loading.',
+		'Get the status of a conversation, whichever runtime it is on, plus `contextUsage` — how full its context window is, as `percent` of the window and the token counts behind it. Omit agentSessionId to read YOUR OWN conversation: that is the only way to learn how much room you have left, since you do not know your own session id. A terminal harness is the exception and is refused with not-found — its control identity is minted per workspace and shared by every terminal in it, so there is no conversation behind it, and its own CLI tracks that window. Pass an agentSessionId to read a child, a peer, or a reviewer. `contextUsage` is null when the conversation has no runtime attached (closed, or from before a restart), which is a fact about the reading rather than an empty window. A conversation at or past 50% is one to hand new work to a fresh agent rather than to keep loading.',
 		Type.Object({ agentSessionId: Type.Optional(Type.String()) }),
 	);
 	tool(

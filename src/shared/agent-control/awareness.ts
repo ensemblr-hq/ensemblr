@@ -445,6 +445,18 @@ const CHILD_TAB_CLEANUP = `Close a child's tab as soon as you have taken its rep
 const CONTEXT_PRESSURE_GUIDANCE = `Watch how full a window is before you put more work into it. \`ensemblr_get_conversation_status\` reports \`contextUsage\` for any conversation, and reports YOUR OWN when you name no session — the only way to learn how much room you have left, since you do not know your own session id. \`ensemblr_wait_for_agents\` reports the same reading for every child it names, settled or pending. At or past **${CONTEXT_PRESSURE_PERCENT}% of a window**, that conversation is the wrong home for a NEW unit of work: everything it has already read stays in it, so a fresh agent starts the same task with more room and no worse a brief. Retire it rather than reload it — spawn a new child and quote it the paths and findings it needs — and follow up there anyway only where the work genuinely depends on what that conversation already holds. Your own window is the same rule pointed inward: past half, hand the next unit of reading to a sub-agent and keep the deciding here.`;
 
 /**
+ * The same rule for a terminal harness, which can read every window but its own.
+ *
+ * A harness control identity is minted per workspace and shared by every
+ * terminal in it, so there is no conversation behind it and `readOwnStatus`
+ * refuses the implicit self-read with `not-found`. The shared block promises
+ * that read in its first sentence and closes by pointing the rule inward, so
+ * handing it to a harness advertises an op that always fails — the same class of
+ * mistake as naming a tool a caller's list does not carry.
+ */
+const HARNESS_CONTEXT_PRESSURE_GUIDANCE = `Watch how full a window is before you put more work into it. \`ensemblr_get_conversation_status\` reports \`contextUsage\` for any conversation you name — a child, a peer, the reviewer — and \`ensemblr_wait_for_agents\` reports the same reading for every child it names, settled or pending. At or past **${CONTEXT_PRESSURE_PERCENT}% of a window**, that conversation is the wrong home for a NEW unit of work: everything it has already read stays in it, so a fresh agent starts the same task with more room and no worse a brief. Retire it rather than reload it — spawn a new child and quote it the paths and findings it needs — and follow up there anyway only where the work genuinely depends on what that conversation already holds. Your own window is the one you cannot read here: your control identity is minted per workspace and shared by every terminal in it, so there is no conversation behind it and a status read naming no session is refused rather than answered. Your own CLI is what tracks that.`;
+
+/**
  * The same rule for a root delegating through its own runtime, which holds no
  * Ensemblr conversation ops and so has only its own window to watch. Naming
  * `ensemblr_wait_for_agents` or `ensemblr_start_conversation` here would point it
@@ -722,7 +734,7 @@ Do the work yourself by default — one agent in one thread is the right tool fo
 
 Split the work before you split the agents. A child cold-starts with nothing but its brief, so every fact two children both need is a repository read paid for twice — and that re-derivation is what makes a fan-out cost more context than doing the work inline. When the workstreams share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and put the findings with full paths into every brief. Fan out cold only where the work is genuinely disjoint.
 
-${CONTEXT_PRESSURE_GUIDANCE}
+${HARNESS_CONTEXT_PRESSURE_GUIDANCE}
 
 When delegation is warranted — delegate → wait → evaluate → integrate:
 1. Spawn each helper with \`ensemblr_start_conversation\` in its own fresh tab — pass a short, descriptive \`title\` and do NOT pass \`chatTabId\` (reusing a prior tab keeps its old title); omit \`wait\` and keep BOTH ids it hands back — the \`agentSessionId\` you wait on and follow up with, and the \`chatTabId\` you close its tab with. Brief each one with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask you about, and whether it reports inline — the default — or writes a file at a path you name. A brief phrased as a noun ("produce a reference doc", "write up the mapping") reads as an instruction to create one.
