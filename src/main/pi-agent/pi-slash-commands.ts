@@ -25,10 +25,16 @@ interface SdkSlashCommandInfo {
 	};
 }
 
+/** Opaque settings manager passed between Pi SDK factories. */
+type SdkSettingsManager = object;
+
+/** Opaque in-memory session manager passed into Pi session creation. */
+type SdkSessionManager = object;
+
 /** Static factory surface used from SDK classes without importing their types. */
 interface SdkStaticFactory {
-	create?: (...args: unknown[]) => unknown;
-	inMemory?: (...args: unknown[]) => unknown;
+	create?: (...args: unknown[]) => object;
+	inMemory?: (...args: unknown[]) => object;
 }
 
 /** Resource loader surface needed for command discovery. */
@@ -59,7 +65,7 @@ interface SdkModule {
 		additionalSkillPaths?: string[];
 		agentDir: string;
 		cwd: string;
-		settingsManager: unknown;
+		settingsManager: SdkSettingsManager;
 	}) => SdkResourceLoader;
 	ModelRegistry?: SdkStaticFactory;
 	SessionManager?: SdkStaticFactory;
@@ -203,7 +209,7 @@ function createSettingsManager(
 	sdk: SdkModule,
 	workspaceCwd: string,
 	packageRoot: string,
-): unknown {
+): SdkSettingsManager {
 	const settingsManager = sdk.SettingsManager?.create?.(
 		workspaceCwd,
 		getAgentDir(sdk),
@@ -232,7 +238,7 @@ function createSettingsManager(
 function createResourceLoader(
 	sdk: SdkModule,
 	workspaceCwd: string,
-	settingsManager: unknown,
+	settingsManager: SdkSettingsManager,
 	packageRoot: string,
 	shippedSkillPaths: readonly string[],
 ): SdkResourceLoader {
@@ -258,7 +264,10 @@ function createResourceLoader(
  * @param workspaceCwd - Workspace directory associated with the temporary session.
  * @returns SDK session manager instance.
  */
-function createSessionManager(sdk: SdkModule, workspaceCwd: string): unknown {
+function createSessionManager(
+	sdk: SdkModule,
+	workspaceCwd: string,
+): SdkSessionManager {
 	const sessionManager = sdk.SessionManager?.inMemory?.(workspaceCwd);
 	if (!sessionManager) {
 		throw new Error('Pi SDK is missing SessionManager.inMemory().');
@@ -391,7 +400,8 @@ function normalizeWorkspaceCwd(cwd: string | undefined): string {
 }
 
 /**
- * Locates the installed `@earendil-works/pi-coding-agent` package root.
+ * Locates the installed `@earendil-works/pi-coding-agent` package root in
+ * either an npm ancestor or a Homebrew keg's `libexec` dependency tree.
  * @param command - Resolved Pi executable path.
  * @returns Package root path, or null when unavailable.
  */
@@ -403,8 +413,20 @@ function findSdkPackageRoot(command: string): string | null {
 
 	let current = path.dirname(binPath);
 	for (let depth = 0; depth < 10; depth += 1) {
-		if (isPiSdkPackageRoot(current)) {
-			return current;
+		const candidates = [
+			current,
+			path.join(
+				current,
+				'libexec',
+				'lib',
+				'node_modules',
+				'@earendil-works',
+				'pi-coding-agent',
+			),
+		];
+		const packageRoot = candidates.find(isPiSdkPackageRoot);
+		if (packageRoot) {
+			return packageRoot;
 		}
 		const parent = path.dirname(current);
 		if (parent === current) {
