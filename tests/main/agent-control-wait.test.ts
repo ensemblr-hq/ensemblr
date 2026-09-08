@@ -8,6 +8,7 @@ import {
 	type OriginRegistry,
 } from '../../src/main/agent-control/index.ts';
 import type {
+	AgentControlContextUsage,
 	AgentControlConversationStatus,
 	WaitForAgentsResult,
 } from '../../src/shared/agent-control.ts';
@@ -28,11 +29,13 @@ const makeScheduler = (): WaitScheduler => {
 
 /**
  * Stub ports whose only live behavior is `getStatus` (driven by a per-session
- * status map) and `getLastMessage`. Everything else is a resolved no-op.
+ * status map and an optional per-session context reading) and `getLastMessage`.
+ * Everything else is a resolved no-op.
  */
 const makePorts = (
 	statuses: Map<string, string>,
 	lastMessage: (agentSessionId: string) => string = (id) => `msg:${id}`,
+	contextUsage: Map<string, AgentControlContextUsage> = new Map(),
 ): AgentControlPorts => ({
 	workspaces: {
 		listProjects: vi.fn().mockResolvedValue([]),
@@ -57,11 +60,18 @@ const makePorts = (
 				agentSessionId: string,
 			) => Promise<Omit<
 				AgentControlConversationStatus,
-				'hasFinalMessage'
+				'hasFinalMessage' | 'note'
 			> | null>
 		>(async (agentSessionId) => {
 			const status = statuses.get(agentSessionId);
-			return status ? { agentSessionId, status, runtimeOpen: true } : null;
+			return status
+				? {
+						agentSessionId,
+						contextUsage: contextUsage.get(agentSessionId) ?? null,
+						runtimeOpen: true,
+						status,
+					}
+				: null;
 		}),
 		hasFinalMessage: vi.fn().mockResolvedValue(false),
 		getLastMessage: vi.fn(async (agentSessionId: string) =>
@@ -165,6 +175,7 @@ const setup = (options: {
 	children: string[];
 	guardrails?: Parameters<typeof createGuardrails>[0];
 	lastMessage?: (agentSessionId: string) => string;
+	contextUsage?: Map<string, AgentControlContextUsage>;
 }) => {
 	const registry: OriginRegistry = createOriginRegistry({
 		generateToken: () => `tok-${Math.random()}`,
@@ -185,7 +196,11 @@ const setup = (options: {
 		}),
 	);
 	const service = createAgentControlService({
-		ports: makePorts(options.statuses, options.lastMessage),
+		ports: makePorts(
+			options.statuses,
+			options.lastMessage,
+			options.contextUsage,
+		),
 		originRegistry: registry,
 		guardrails: createGuardrails(options.guardrails),
 		scheduler: makeScheduler(),
@@ -406,7 +421,7 @@ describe('agent-control waitForAgents', () => {
 			expect(data.completed).toEqual([]);
 			expect(data.timedOut).toBe(false);
 			expect(data.pending).toEqual([
-				{ agentSessionId: 'c1', status: 'streaming' },
+				{ agentSessionId: 'c1', contextUsage: null, status: 'streaming' },
 			]);
 		}
 	});
@@ -478,7 +493,7 @@ describe('agent-control waitForAgents', () => {
 				'c2',
 			]);
 			expect(data.pending).toEqual([
-				{ agentSessionId: 'c1', status: 'streaming' },
+				{ agentSessionId: 'c1', contextUsage: null, status: 'streaming' },
 			]);
 		}
 	});
@@ -535,8 +550,8 @@ describe('agent-control waitForAgents', () => {
 				'c1',
 			]);
 			expect(data.pending).toEqual([
-				{ agentSessionId: 'c2', status: 'streaming' },
-				{ agentSessionId: 'c3', status: 'streaming' },
+				{ agentSessionId: 'c2', contextUsage: null, status: 'streaming' },
+				{ agentSessionId: 'c3', contextUsage: null, status: 'streaming' },
 			]);
 		}
 	});
@@ -668,6 +683,7 @@ describe('agent-control waitForAgents', () => {
 			expect(data.completed).toEqual([
 				{
 					agentSessionId: 'c1',
+					contextUsage: null,
 					status: 'idle',
 					lastMessage: 'msg:c1',
 					reportTruncated: false,
@@ -675,7 +691,7 @@ describe('agent-control waitForAgents', () => {
 				},
 			]);
 			expect(data.pending).toEqual([
-				{ agentSessionId: 'c2', status: 'streaming' },
+				{ agentSessionId: 'c2', contextUsage: null, status: 'streaming' },
 			]);
 		}
 		expect(reads).toEqual(['c1']);
@@ -706,6 +722,120 @@ describe('agent-control notifyOrchestrator', () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.code).toBe('not-found');
+		}
+	});
+});
+
+// The decision this reading informs — another round here, or a fresh child — is
+// taken exactly when a wait returns, so the wait has to carry it. It costs
+// nothing: the poll tick already calls `getStatus`.
+describe('agent-control waitForAgents: context usage', () => {
+	const roomy = { contextWindow: 200_000, percent: 9, tokens: 18_000 };
+	const crowded = { contextWindow: 200_000, percent: 77.2, tokens: 154_400 };
+
+	it('carries each child’s reading on both completed and pending', async () => {
+		const { service, master } = setup({
+			children: ['c1', 'c2'],
+			contextUsage: new Map([
+				['c1', crowded],
+				['c2', roomy],
+			]),
+			statuses: new Map([
+				['c1', 'idle'],
+				['c2', 'streaming'],
+			]),
+		});
+
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'first' },
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.completed[0]).toMatchObject({
+				agentSessionId: 'c1',
+				contextUsage: crowded,
+			});
+			expect(data.pending).toEqual([
+				{ agentSessionId: 'c2', contextUsage: roomy, status: 'streaming' },
+			]);
+		}
+	});
+
+	it('notes the crowded child and leaves the roomy one unnamed', async () => {
+		const { service, master } = setup({
+			children: ['c1', 'c2'],
+			contextUsage: new Map([
+				['c1', crowded],
+				['c2', roomy],
+			]),
+			statuses: new Map([
+				['c1', 'idle'],
+				['c2', 'idle'],
+			]),
+		});
+
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'all' },
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const { note } = result.data as WaitForAgentsResult;
+			expect(note).toContain('"c1" (77%)');
+			expect(note).not.toContain('c2');
+		}
+	});
+
+	it('says nothing when every child still has room', async () => {
+		const { service, master } = setup({
+			children: ['c1'],
+			contextUsage: new Map([['c1', roomy]]),
+			statuses: new Map([['c1', 'idle']]),
+		});
+
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'all' },
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect((result.data as WaitForAgentsResult).note).toBeUndefined();
+		}
+	});
+
+	// A timed-out wait already carries the "keep waiting" instruction. Losing it
+	// to the pressure note would read as a fault to report rather than a lap of
+	// the loop, which is the failure that note exists to prevent.
+	it('keeps the resume instruction alongside the pressure one', async () => {
+		const { service, master } = setup({
+			children: ['c1', 'c2'],
+			contextUsage: new Map([['c1', crowded]]),
+			statuses: new Map([
+				['c1', 'idle'],
+				['c2', 'streaming'],
+			]),
+		});
+
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'all', timeoutMs: 1_000 },
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.timedOut).toBe(true);
+			expect(data.note).toContain('Not a failure');
+			expect(data.note).toContain('Context pressure');
 		}
 	});
 });

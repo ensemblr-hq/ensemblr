@@ -72,6 +72,7 @@ import {
 	readAgentSummaryMarker,
 	withAgentSummaryMarker,
 } from './agent-summary.ts';
+import type { AgentContextUsage } from './agent-types.ts';
 import { decodeHtmlEntities } from './naming/decode-html-entities.ts';
 import {
 	sanitizeChatTitle,
@@ -188,6 +189,19 @@ export interface AgentSessionService {
 	 */
 	flushSummaryForChatTab: (chatTabId: string) => Promise<void>;
 	getSession: (sessionId: string) => AgentSessionSnapshot | null;
+	/**
+	 * How full a live session's context window is, as its runtime last reported
+	 * it, or null when the session has no runtime attached or has reported
+	 * nothing yet.
+	 *
+	 * Separate from {@link AgentSessionService.getSession} rather than a field on
+	 * the snapshot because only a live session has a reading:
+	 * `listSessionsForWorkspace` projects rows without consulting the active map,
+	 * so a snapshot field would read null for every listed session and lie in the
+	 * one place it would most be read. Serves from memory, so the agent-control
+	 * wait loop can call it per target per tick.
+	 */
+	getContextUsage: (sessionId: string) => AgentContextUsage | null;
 	listSessionsForWorkspace: (
 		workspaceId: string,
 	) => readonly AgentSessionSnapshot[];
@@ -371,6 +385,8 @@ export function createAgentSessionService({
 
 	return {
 		flushSummaryForChatTab: lifecycle.flushSummaryForChatTab,
+		getContextUsage: (sessionId) =>
+			lifecycle.getActiveSession(sessionId)?.contextUsage ?? null,
 		getSession: (sessionId) => {
 			const database = requireSessionDatabase();
 			const active = lifecycle.getActiveSession(sessionId);

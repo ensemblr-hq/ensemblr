@@ -20,6 +20,7 @@ import type {
 	CheckPlanModeToolArgs,
 	CloseTabArgs,
 	ConciergeMessageSender,
+	ContextPressureAudience,
 	ControlAudience,
 	ConversationRef,
 	CreateWorkspaceArgs,
@@ -46,6 +47,7 @@ import type {
 	MessageConciergeResult,
 	NotifyOrchestratorArgs,
 	OpenTabArgs,
+	OptionalConversationRef,
 	OrchestratorSignal,
 	PendingAgent,
 	ReadConversationArgs,
@@ -89,10 +91,13 @@ import {
 	buildSessionBriefNudge,
 	conciergeAwareness,
 	conciergeControlOpDenial,
+	delegateContextPressureNote,
 	isWriteOp,
+	ownContextPressureNote,
 	PEER_ORCHESTRATOR_LIMITS,
 	PLAN_REFINEMENT_DIRECTIVE,
 	resolveAgentRole,
+	resolveContextPressureAudience,
 	retiredControlOpDenial,
 	SET_SUMMARY_LIMITS,
 	subAgentControlOpDenial,
@@ -624,24 +629,13 @@ function stillRunning(
 			: [
 					{
 						agentSessionId: entry.agent.agentSessionId,
+						contextUsage: entry.agent.contextUsage,
 						status: entry.agent.status,
 					},
 				],
 	);
 }
 
-/**
- * Assembles a wait result, attaching the instruction that a timed-out wait is a
- * lap of the loop rather than a failure. A child doing real work outlives the
- * app's wait ceiling routinely, and a bare `timedOut: true` reads to an
- * orchestrator as something to report to the user or work around — so the call
- * that resumes the wait travels as prose, the same reason a shortened report
- * carries its own re-fetch pointer. The note echoes the caller's own mode, because
- * a caller that chose `first` to react to whichever child lands first did not ask
- * to start blocking on all of them.
- * @param outcome - The settled children, the ones still running, whether the window expired, and the mode the caller waited in.
- * @returns The wait result, with a resume note when one is warranted.
- */
 /**
  * The result of a wait with nothing to wait on. When the caller named its targets
  * and got none, that is a settled answer. When it let the default stand and the
@@ -662,6 +656,31 @@ function emptyWait(defaulted: boolean): WaitForAgentsResult {
 	};
 }
 
+/**
+ * Assembles a wait result, attaching the instruction that a timed-out wait is a
+ * lap of the loop rather than a failure and, beneath it, what to do about any
+ * child whose window has filled. A child doing real work outlives the app's wait
+ * ceiling routinely, and a bare `timedOut: true` reads to an orchestrator as
+ * something to report to the user or work around — so the call that resumes the
+ * wait travels as prose, the same reason a shortened report carries its own
+ * re-fetch pointer. The resume note echoes the caller's own mode, because a
+ * caller that chose `first` to react to whichever child lands first did not ask
+ * to start blocking on all of them.
+ *
+ * The pressure note is fixed at `spawns-tabs` rather than resolved per caller,
+ * and that is sound only because `waitForAgents` is withheld from the tool list
+ * of both audiences that could not act on it: it is in `SUBAGENT_UNUSABLE_OPS`
+ * and in `NATIVE_DELEGATION_WITHHELD_OPS`, so no caller that can see the op
+ * lacks the one this note names. A sub-agent may still *dispatch* it — unusable
+ * ops stay dispatchable so a stale caller meets an ordinary result rather than a
+ * denial — but with no children registered it lands in {@link emptyWait} and
+ * never reaches here. Take either withholding away and this hardcoded audience
+ * becomes wrong: the caller then has to be threaded through, the way
+ * `getConversationStatus` threads one — that op is held by every role, which is
+ * why it is the one that can mislead.
+ * @param outcome - The settled children, the ones still running, whether the window expired, and the mode the caller waited in.
+ * @returns The wait result, with the notes it earned.
+ */
 function waitOutcome(outcome: {
 	completed: readonly WaitedAgent[];
 	pending: readonly PendingAgent[];
@@ -669,16 +688,76 @@ function waitOutcome(outcome: {
 	mode: WaitMode;
 }): WaitForAgentsResult {
 	const { mode, ...result } = outcome;
-	if (!result.timedOut || result.pending.length === 0) {
-		return result;
+	const note = joinNotes([
+		resumeNote(result.pending, result.timedOut, mode),
+		delegateContextPressureNote(
+			[...result.completed, ...result.pending],
+			'spawns-tabs',
+		),
+	]);
+	return note ? { ...result, note } : result;
+}
+
+/**
+ * The reminder that a timed-out wait is a lap of the loop rather than a fault,
+ * naming the ids to wait on next.
+ * @param pending - Targets still running when the window closed.
+ * @param timedOut - Whether the window closing is why the wait returned.
+ * @param mode - The mode the caller waited in, so the resume call matches it.
+ * @returns The note, or null when nothing is still running to resume on.
+ */
+function resumeNote(
+	pending: readonly PendingAgent[],
+	timedOut: boolean,
+	mode: WaitMode,
+): string | null {
+	if (!timedOut || pending.length === 0) {
+		return null;
 	}
-	const targets = result.pending
+	const targets = pending
 		.map((entry) => `"${entry.agentSessionId}"`)
 		.join(', ');
-	return {
-		...result,
-		note: `Not a failure: the wait window expired while ${result.pending.length} child(ren) were still working. Keep waiting with ensemblr_wait_for_agents({ mode: "${mode}", targets: [${targets}] }).`,
-	};
+	return `Not a failure: the wait window expired while ${pending.length} child(ren) were still working. Keep waiting with ensemblr_wait_for_agents({ mode: "${mode}", targets: [${targets}] }).`;
+}
+
+/**
+ * Joins the notes a result earned into the single `note` field the contract
+ * carries, so a wait can report both a resume instruction and a context-pressure
+ * one without either shadowing the other.
+ * @param notes - Candidate notes, unearned ones already null.
+ * @returns The joined prose, or null when nothing was earned.
+ */
+function joinNotes(notes: readonly (string | null)[]): string | null {
+	const earned = notes.filter((note) => note !== null);
+	return earned.length > 0 ? earned.join('\n\n') : null;
+}
+
+/**
+ * Attaches the context-pressure advice to a status a caller is about to read,
+ * when the window it reports has filled past the threshold.
+ *
+ * The advice differs on two axes at once. Who is reading: a caller looking at
+ * its own window is told to move the next unit of reading out of this
+ * conversation, where one looking at a conversation it steers is told to brief a
+ * fresh child rather than follow up — a conversation cannot act on the advice
+ * meant for the other. And what the caller can do about it: `getConversationStatus`
+ * is held by every role, including the two that hold no spawn op, so naming one
+ * unconditionally would send a sub-agent or a natively-delegating root after a
+ * tool its list does not carry.
+ * @param status - The status about to be returned.
+ * @param audience - What the caller can do about a crowded window.
+ * @param own - Whether the caller is reading its own conversation.
+ * @returns The status, with a note when the reading earns one.
+ */
+function withContextPressure(
+	status: AgentControlConversationStatus,
+	audience: ContextPressureAudience,
+	own = false,
+): AgentControlConversationStatus {
+	const note = own
+		? ownContextPressureNote(status.contextUsage, audience)
+		: delegateContextPressureNote([status], audience);
+	return note ? { ...status, note } : status;
 }
 
 /**
@@ -2826,13 +2905,14 @@ export function createAgentControlService({
 	const settleTarget = async (
 		agentSessionId: string,
 	): Promise<{ agent: WaitedAgent; settled: boolean }> => {
-		const status = (await ports.conversations.getStatus(agentSessionId))
-			?.status;
+		const live = await ports.conversations.getStatus(agentSessionId);
+		const status = live?.status;
 		const signal = signalsByChild.get(agentSessionId) ?? null;
 		const terminal = status === undefined || TERMINAL_STATUSES.has(status);
 		return {
 			agent: {
 				agentSessionId,
+				contextUsage: live?.contextUsage ?? null,
 				status: status ?? 'unknown',
 				lastMessage: null,
 				reportTruncated: false,
@@ -3059,18 +3139,108 @@ export function createAgentControlService({
 		return ok(await ports.planMode.exit({ args, origin }));
 	};
 
+	/**
+	 * What this caller can actually do about a window that has filled, which is
+	 * the axis the pressure advice varies on. Costs the sub-agent marker read,
+	 * which is why it is resolved once per status call rather than per note.
+	 * @param origin - Resolved caller identity.
+	 * @returns The audience whose advice this caller can act on.
+	 */
+	const resolvePressureAudience = async (
+		origin: AgentControlOrigin,
+	): Promise<ContextPressureAudience> =>
+		resolveContextPressureAudience({
+			delegation: origin.delegation,
+			role: await resolveRole(origin),
+		});
+
+	/**
+	 * Reports one conversation's live status, with the context-pressure advice
+	 * attached when its window has filled past the threshold.
+	 * @param agentSessionId - The conversation to read.
+	 * @param audience - What the caller can do about a crowded window.
+	 * @param own - Whether this is the caller reading itself, which changes what
+	 *   the advice tells it to do about the reading.
+	 * @returns The status, or null when no such conversation exists.
+	 */
 	const readConversationStatus = async (
 		agentSessionId: string,
+		audience: ContextPressureAudience,
+		own = false,
 	): Promise<AgentControlResult<unknown>> => {
 		const status = await ports.conversations.getStatus(agentSessionId);
 		if (!status) {
 			return ok(null);
 		}
-		return ok({
-			...status,
-			hasFinalMessage:
-				await ports.conversations.hasFinalMessage(agentSessionId),
-		} satisfies AgentControlConversationStatus);
+		return ok(
+			withContextPressure(
+				{
+					...status,
+					hasFinalMessage:
+						await ports.conversations.hasFinalMessage(agentSessionId),
+				},
+				audience,
+				own,
+			),
+		);
+	};
+
+	/**
+	 * Reports the Concierge's own conversation, which no other path can reach: it
+	 * belongs to no workspace and has no row in the agent-session store, so the
+	 * ordinary lookup finds nothing for the one caller most likely to ask.
+	 *
+	 * `status` and `runtimeOpen` are stated rather than looked up, and are true by
+	 * construction — a conversation running this call is a conversation mid-turn
+	 * on an open runtime. `hasFinalMessage` reports false because this layer does
+	 * not read the Concierge's transcript store: it says "not known here" rather
+	 * than claiming a check that did not happen, and a conversation never needs
+	 * its own report anyway.
+	 * @param origin - Resolved caller identity, whose session id names the row.
+	 * @param audience - What the caller can do about a crowded window.
+	 * @returns The Concierge's own status.
+	 */
+	const readOwnConciergeStatus = (
+		origin: AgentControlOrigin,
+		audience: ContextPressureAudience,
+	): AgentControlResult<unknown> =>
+		ok(
+			withContextPressure(
+				{
+					agentSessionId: origin.sessionId,
+					contextUsage: ports.concierge?.describeContextUsage() ?? null,
+					hasFinalMessage: false,
+					runtimeOpen: true,
+					status: 'streaming',
+				},
+				audience,
+				true,
+			),
+		);
+
+	/**
+	 * Reports the caller's own conversation, for a status read that named no
+	 * session. This is the only way an agent learns how full its own window is:
+	 * it knows neither its own session id nor its own usage, and both halves of
+	 * that answer live here.
+	 * @param origin - Resolved caller identity.
+	 * @param audience - What the caller can do about a crowded window.
+	 * @returns The caller's own status, or a failure when it has no conversation.
+	 */
+	const readOwnStatus = async (
+		origin: AgentControlOrigin,
+		audience: ContextPressureAudience,
+	): Promise<AgentControlResult<unknown>> => {
+		if (origin.concierge) {
+			return readOwnConciergeStatus(origin, audience);
+		}
+		if (origin.species === 'harness') {
+			return fail(
+				'not-found',
+				'A terminal harness has no conversation of its own to report on: its control identity is minted per workspace and shared by every terminal in it. Name an agentSessionId to read a conversation you spawned or were given.',
+			);
+		}
+		return readConversationStatus(origin.sessionId, audience, true);
 	};
 
 	/**
@@ -3192,8 +3362,13 @@ export function createAgentControlService({
 			handleFocusPanel(origin, args as FocusPanelArgs),
 		focusTab: ({ args, origin }) =>
 			handleFocusTab(origin, args as FocusTabArgs),
-		getConversationStatus: ({ args }) =>
-			readConversationStatus((args as ConversationRef).agentSessionId),
+		getConversationStatus: async ({ args, origin }) => {
+			const named = (args as OptionalConversationRef).agentSessionId;
+			const audience = await resolvePressureAudience(origin);
+			return named
+				? readConversationStatus(named, audience)
+				: readOwnStatus(origin, audience);
+		},
 		getDiffComments: ({ args, origin }) =>
 			handleGetDiffComments(origin, args as GetDiffCommentsArgs),
 		getLastMessage: async ({ args }) =>

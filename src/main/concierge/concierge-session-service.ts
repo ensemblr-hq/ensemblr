@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
+import type { AgentControlContextUsage } from '../../shared/agent-control.ts';
 import { classifyAgentFailure } from '../../shared/agent-failure.ts';
 import {
 	type AgentProviderId,
@@ -176,6 +177,15 @@ export interface ConciergeSessionService {
 		request: ClearConciergeContextRequest,
 	) => Promise<ClearConciergeContextResult>;
 	contextPressure: () => ConciergeContextPressureWire;
+	/**
+	 * How full the live Concierge conversation's window is, in the shape the
+	 * agent-control layer reports every other conversation in. Exists for the
+	 * same reason {@link ConciergeSessionService.describeActiveSession} does: the
+	 * Concierge keeps its own session store, so `agentSessionService` holds no row
+	 * for it and a control read that resolved through there would find nothing.
+	 * Null when no conversation is attached or none has reported a reading.
+	 */
+	describeContextUsage: () => AgentControlContextUsage | null;
 	describeActiveSession: () => ConciergeSessionRuntimeChoice | null;
 	listEvents: (
 		request: ListConciergeEventsRequest,
@@ -1234,6 +1244,18 @@ export function createConciergeSessionService({
 				percent: active?.contextUsage?.percent ?? null,
 				usedTokens: active?.contextUsage?.usedTokens ?? null,
 			}),
+
+		describeContextUsage: (): AgentControlContextUsage | null => {
+			const usage = active?.contextUsage;
+			if (!usage || usage.maxTokens === null) {
+				return null;
+			}
+			return {
+				contextWindow: usage.maxTokens,
+				percent: usage.percent,
+				tokens: usage.usedTokens,
+			};
+		},
 
 		listEvents: ({
 			fromOrdinal,

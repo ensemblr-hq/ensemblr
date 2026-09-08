@@ -815,6 +815,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			}
 			return {
 				agentSessionId: snapshot.id,
+				contextUsage: deps.agentSessionService.getContextUsage(agentSessionId),
 				status: snapshot.status,
 				runtimeOpen: snapshot.runtimeOpen,
 			};

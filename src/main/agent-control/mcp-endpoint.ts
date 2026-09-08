@@ -37,6 +37,7 @@ import {
 	awarenessForAudience,
 	CONCIERGE_MESSAGE_LIMITS,
 	CONCIERGE_MESSAGE_REASONS,
+	CONTEXT_PRESSURE_PERCENT,
 	type ControlAudience,
 	EXIT_PLAN_MODE_LIMITS,
 	LINEAR_AGENT_LIMITS,
@@ -561,8 +562,9 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_get_conversation_status',
 		op: 'getConversationStatus',
 		description:
-			'Get the status of a conversation by session id, whichever runtime it is on.',
-		shape: { agentSessionId: z.string() },
+			'Get the status of a conversation, whichever runtime it is on, plus `contextUsage` — how full its context window is, as `percent` of the window and the token counts behind it. Omit agentSessionId to read YOUR OWN conversation: that is the only way to learn how much room you have left, since you do not know your own session id. Pass one to read a child, a peer, or a reviewer. `contextUsage` is null when the conversation has no runtime attached (closed, or from before a restart), which is a fact about the reading rather than an empty window. A conversation at or past ' +
+			`${CONTEXT_PRESSURE_PERCENT}% is one to hand new work to a fresh agent rather than to keep loading.`,
+		shape: { agentSessionId: z.string().optional() },
 	},
 	{
 		name: 'ensemblr_get_last_message',
@@ -598,7 +600,8 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_wait_for_agents',
 		op: 'waitForAgents',
 		description:
-			'Block until the agents you are waiting on finish or need a decision, then return each settled one\'s status and report (its whole final turn), plus `pending` naming the ones still running so you can wait on exactly those next. Prefer this over polling get_conversation_status. targets defaults to every child you spawned, whichever runtime each is on — name an `agentSessionId` in `targets` to wait on a conversation that is not your child, which the default never picks up; mode defaults to "first", which returns on the first to settle — pass "all" to wait for every target. A need_decision/blocked signal wakes the wait whatever the mode. reports: "brief" returns each report\'s opening plus a pointer to ensemblr_get_last_message for the rest, instead of every child\'s whole turn at once — worth it on a wide fan-out, where reading four full reports to use one line of each is what makes delegation cost you more context than doing the work inline.',
+			'Block until the agents you are waiting on finish or need a decision, then return each settled one\'s status and report (its whole final turn), plus `pending` naming the ones still running so you can wait on exactly those next. Prefer this over polling get_conversation_status. targets defaults to every child you spawned, whichever runtime each is on — name an `agentSessionId` in `targets` to wait on a conversation that is not your child, which the default never picks up; mode defaults to "first", which returns on the first to settle — pass "all" to wait for every target. A need_decision/blocked signal wakes the wait whatever the mode. reports: "brief" returns each report\'s opening plus a pointer to ensemblr_get_last_message for the rest, instead of every child\'s whole turn at once — worth it on a wide fan-out, where reading four full reports to use one line of each is what makes delegation cost you more context than doing the work inline. Every child reported, settled or pending, carries `contextUsage`: how full its own window is. A child at or past ' +
+			`${CONTEXT_PRESSURE_PERCENT}% is one to retire rather than reload — give the next unit of work to a fresh conversation, briefed with the paths and findings it needs, rather than following up there.`,
 		shape: {
 			targets: z.array(z.string()).optional(),
 			mode: z.enum(['first', 'all']).optional(),

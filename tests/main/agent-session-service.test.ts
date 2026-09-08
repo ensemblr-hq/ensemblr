@@ -245,6 +245,77 @@ test('getSession reports live status for an active session, not a frozen startin
 	);
 });
 
+// The agent-control wait loop polls this per target per tick, so the reading is
+// parked on the live session as the event arrives rather than scanned back out
+// of the transcript.
+test('getContextUsage reports the newest reading the runtime sent', async (t) => {
+	const fixture = openFixture(t);
+	const { fake, service } = createService(fixture.database);
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	assert.equal(
+		service.getContextUsage(snapshot.id),
+		null,
+		'a session that has reported nothing yet has no reading',
+	);
+
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(runtime, 'expected one open runtime session');
+	runtime.emit({
+		at: new Date().toISOString(),
+		type: 'context-usage',
+		usage: { contextWindow: 200_000, percent: 20, tokens: 40_000 },
+	});
+	await delay(10);
+	runtime.emit({
+		at: new Date().toISOString(),
+		type: 'context-usage',
+		usage: { contextWindow: 200_000, percent: 55, tokens: 110_000 },
+	});
+	await delay(10);
+
+	assert.deepEqual(service.getContextUsage(snapshot.id), {
+		contextWindow: 200_000,
+		percent: 55,
+		tokens: 110_000,
+	});
+});
+
+// Usage is a property of the running session rather than of the transcript it
+// leaves behind, so a closed one reports nothing rather than a stale reading.
+test('getContextUsage reports null once the session has shut down', async (t) => {
+	const fixture = openFixture(t);
+	const { fake, service } = createService(fixture.database);
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(runtime, 'expected one open runtime session');
+	runtime.emit({
+		at: new Date().toISOString(),
+		type: 'context-usage',
+		usage: { contextWindow: 200_000, percent: 55, tokens: 110_000 },
+	});
+	await delay(10);
+	assert.ok(service.getContextUsage(snapshot.id));
+
+	runtime.emit({
+		at: new Date().toISOString(),
+		reason: 'completed',
+		type: 'shutdown',
+	});
+	await delay(10);
+
+	assert.equal(service.getContextUsage(snapshot.id), null);
+});
+
 test('openSession binds an existing chat tab without opening a duplicate', async (t) => {
 	const fixture = openFixture(t);
 	const { service } = createService(fixture.database);

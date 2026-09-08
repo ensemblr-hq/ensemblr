@@ -22,8 +22,10 @@
  * cross-check the playbook prose against it.
  */
 
-import type { ControlAudience } from './awareness.ts';
+import type { AgentControlRole, ControlAudience } from './awareness.ts';
+import type { ContextPressureAudience } from './context-pressure.ts';
 import type { AgentControlOp } from './contracts.ts';
+import type { SubagentMechanism } from './subagent-mechanism.ts';
 
 /**
  * Ops denied to a spawned sub-agent, mapped to the reason handed back. Each
@@ -387,4 +389,32 @@ export function withheldControlOps(
 		...(audience.role === 'subagent' ? SUBAGENT_WITHHELD_OPS : []),
 		...(delegatesNatively ? NATIVE_DELEGATION_WITHHELD_OPS : []),
 	]);
+}
+
+/**
+ * Which delegation mechanism a caller can be told to reach for when a context
+ * window fills, which is the same question {@link withheldControlOps} answers
+ * about `startConversation` — so the two conditions are deliberately adjacent
+ * and must move together.
+ *
+ * The lineage axis is read first because it outranks the mechanism one: a
+ * sub-agent holds no spawn op whatever its session was opened with, since
+ * `SUBAGENT_WITHHELD_OPS` applies before `NATIVE_DELEGATION_WITHHELD_OPS` is
+ * even considered. The Concierge falls through to `spawns-tabs`, which is
+ * correct rather than incidental — `CONCIERGE_BLOCKED_OPS` does not deny it
+ * `startConversation`, because briefing workspace agents is most of what it
+ * does.
+ * @param audience - The caller's lineage role and delegation mechanism.
+ * @returns What that caller can do about a crowded window.
+ */
+export function resolveContextPressureAudience(audience: {
+	delegation: SubagentMechanism;
+	role: AgentControlRole;
+}): ContextPressureAudience {
+	if (audience.role === 'subagent') {
+		return 'cannot-delegate';
+	}
+	return audience.role === 'orchestrator' && audience.delegation === 'native'
+		? 'spawns-natively'
+		: 'spawns-tabs';
 }

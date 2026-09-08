@@ -275,6 +275,13 @@ export function createRuntimeEventHandler({
 			});
 		}
 
+		if (active && event.type === 'context-usage') {
+			activeSessions.set(sessionId, {
+				...active,
+				contextUsage: event.usage,
+			});
+		}
+
 		if (active && event.type === 'message' && event.role === 'agent') {
 			// Mark a summary as pending but defer the actual write to the next
 			// turn boundary (`status: 'idle'`) or shutdown — never mid-turn — so
