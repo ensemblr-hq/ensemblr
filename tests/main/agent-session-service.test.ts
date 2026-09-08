@@ -700,6 +700,45 @@ test('openSession resumes a closed persisted session before submit', async (t) =
 	assert.equal(runtime?.getRequests()[0]?.prompt, 'continue work');
 });
 
+test('a concurrent plain resume reports that the session is already opening', async (t) => {
+	const fixture = openFixture(t);
+	const fake = createFakeAgentAdapter();
+	const deferred = createDeferredSecondCreateAdapter(fake.adapter);
+	const { service } = createService(fixture.database, {
+		adapter: deferred.adapter,
+	});
+	const first = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.stopSession({ sessionId: first.id });
+
+	const firstResume = service.openSession({
+		executable: createReadyExecutable(),
+		resumeSessionId: first.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await deferred.createStarted;
+
+	await assert.rejects(
+		service.openSession({
+			executable: createReadyExecutable(),
+			resumeSessionId: first.id,
+			workspaceCwd: '/tmp/ensemblr/svc/ws',
+			workspaceId: fixture.workspaceId,
+		}),
+		{
+			code: 'session-not-open',
+			message: `Agent session ${first.id} is already opening.`,
+		},
+	);
+
+	deferred.releaseCreate();
+	await firstResume;
+});
+
 test('stop cancels a deferred replacement before it can launch a duplicate runtime', async (t) => {
 	const fixture = openFixture(t);
 	const fake = createFakeAgentAdapter();

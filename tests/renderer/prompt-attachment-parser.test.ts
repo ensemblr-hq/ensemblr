@@ -2,7 +2,10 @@ import { describe, expect, test } from 'vitest';
 
 import { parsePromptAttachments } from '../../src/renderer/lib/agent-timeline/prompt-attachment-parser';
 import type { ParsedPromptPart } from '../../src/renderer/types/agent-timeline';
-import { formatAttachedFileBlock } from '../../src/shared/prompt-scaffolding';
+import {
+	formatAttachedFileBlock,
+	formatLinkedDirectoriesBlock,
+} from '../../src/shared/prompt-scaffolding';
 
 /** The typed runs, in order. */
 function texts(parts: readonly ParsedPromptPart[]): string[] {
@@ -108,14 +111,10 @@ describe('parsePromptAttachments', () => {
 	});
 
 	test('renders explicit linked directories and keeps slash-prefixed body text', () => {
-		const prompt = [
-			'<linked_directories>',
-			'["/Users/me/Reference Notes", "/tmp/a&b"]',
-			'User-linked external reference directories. Read relevant files using absolute paths. Their contents are not copied here. This does not grant blanket permission to write. The workspace remains your cwd, and ordinary permissions still apply.',
-			'</linked_directories>',
-			'',
-			'Review /not-a-directory as part of my request.',
-		].join('\n');
+		const prompt = `${formatLinkedDirectoriesBlock([
+			'/Users/me/Reference Notes',
+			'/tmp/a&b',
+		])}\n\nReview /not-a-directory as part of my request.`;
 		const { parts } = parsePromptAttachments(prompt);
 		expect(parts).toMatchObject([
 			{

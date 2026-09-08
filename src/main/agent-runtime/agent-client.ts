@@ -193,14 +193,14 @@ export function createAgentClient({
 				(result): result is PromiseRejectedResult =>
 					result.status === 'rejected',
 			);
-			if (failure) {
-				throw failure.reason;
-			}
 			await Promise.all(
 				[...new Set(registry.values())].map((registered) =>
 					registered.shutdown(),
 				),
 			);
+			if (failure) {
+				throw failure.reason;
+			}
 		},
 	};
 }

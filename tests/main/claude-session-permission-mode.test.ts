@@ -253,6 +253,7 @@ describe('Claude session options: the workspace permission mode reaches the SDK'
 			'/Users/me/designs',
 		]);
 		expect(options[2]?.additionalDirectories).toBeUndefined();
+		expect(options[0]?.sessionId).toBeDefined();
 		expect(options[1]?.resume).toBe(options[0]?.sessionId);
 	});
 

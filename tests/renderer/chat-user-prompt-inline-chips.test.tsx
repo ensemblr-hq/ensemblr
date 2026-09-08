@@ -8,6 +8,7 @@ vi.mock('@iconify/react', () => ({
 }));
 
 import { ChatUserPrompt } from '../../src/renderer/components/chat-user-prompt';
+import { formatLinkedDirectoriesBlock } from '../../src/shared/prompt-scaffolding';
 import { renderWithProviders } from './support/dom';
 
 const BLOCK_SEPARATOR = '\n\n';
@@ -20,16 +21,6 @@ const BLOCK_SEPARATOR = '\n\n';
  */
 function folderBlock(path: string): string {
 	return `Referenced workspace folders:\n@${path}`;
-}
-
-/** Builds the bounded linked-directory context emitted with every sent prompt. */
-function linkedDirectoryBlock(paths: readonly string[]): string {
-	return [
-		'<linked_directories>',
-		JSON.stringify(paths),
-		'User-linked external reference directories. Read relevant files using absolute paths. Their contents are not copied here. This does not grant blanket permission to write. The workspace remains your cwd, and ordinary permissions still apply.',
-		'</linked_directories>',
-	].join('\n');
 }
 
 /**
@@ -223,7 +214,7 @@ describe('inline attachment chips', () => {
 	test('renders linked directories as informational, non-actionable chips', () => {
 		const path = '/Users/me/Reference Notes';
 		const container = renderPrompt(
-			linkedDirectoryBlock([path]),
+			formatLinkedDirectoriesBlock([path]),
 			'Review /not-a-directory too.',
 		);
 
@@ -240,7 +231,7 @@ describe('inline attachment chips', () => {
 	});
 
 	test('falls back to the full linked path when the root has no basename', () => {
-		const container = renderPrompt(linkedDirectoryBlock(['/']));
+		const container = renderPrompt(formatLinkedDirectoriesBlock(['/']));
 
 		expect(chip(container, '/')).toHaveTextContent('/');
 	});

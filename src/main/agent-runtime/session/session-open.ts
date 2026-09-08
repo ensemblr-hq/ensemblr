@@ -167,9 +167,10 @@ interface SessionOpener {
 	cancelReplacements: () => Promise<void>;
 }
 
-/** Cancellable replacement that swaps linked-directory roots on an idle runtime. */
+/** Cancellable in-flight resume classified for accurate concurrent-request errors. */
 interface ReplacementOperation {
 	cancelled: boolean;
+	isGrantChange: boolean;
 	promise: Promise<AgentSessionSnapshot> | null;
 }
 
@@ -235,8 +236,14 @@ export function createSessionOpener({
 			});
 		}
 		assertProviderPin({ pinned: row.provider, requested: request.provider });
-		if (replacingSessions.has(row.id)) {
-			throw linkedDirectoriesBusy();
+		const inFlight = replacingSessions.get(row.id);
+		if (inFlight) {
+			throw inFlight.isGrantChange
+				? linkedDirectoriesBusy()
+				: new AgentSessionServiceError({
+						code: 'session-not-open',
+						message: `Agent session ${row.id} is already opening.`,
+					});
 		}
 
 		const mainBranch = getMainBranchForSession({
@@ -284,6 +291,7 @@ export function createSessionOpener({
 		}
 		const replacement: ReplacementOperation = {
 			cancelled: false,
+			isGrantChange: Boolean(directoriesChanged),
 			promise: null,
 		};
 		replacingSessions.set(row.id, replacement);

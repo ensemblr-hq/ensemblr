@@ -435,6 +435,34 @@ test('shutdown closes every open session and propagates to the adapter', async (
 	assert.equal(fake.getShutdownCount(), 1);
 });
 
+test('shutdown reaches adapter cleanup before propagating a session close failure', async () => {
+	const fake = createFakeAgentAdapter({ now: () => NOW });
+	const closeFailure = new Error('child did not exit');
+	let adapterShutdowns = 0;
+	const adapter: AgentAdapter = {
+		createSession: async (input) => {
+			const session = await fake.adapter.createSession(input);
+			return {
+				...session,
+				close: async () => {
+					throw closeFailure;
+				},
+			};
+		},
+		shutdown: async () => {
+			adapterShutdowns += 1;
+			await fake.adapter.shutdown();
+		},
+	};
+	const client = createAgentClient({ adapter, now: () => NOW });
+	await client.createSession(baseRequest());
+
+	await assert.rejects(client.shutdown(), closeFailure);
+
+	assert.equal(adapterShutdowns, 1);
+	assert.equal(fake.getOpenSessions().length, 0);
+});
+
 test('rejects sessions when the executable is not ready', async () => {
 	const { client } = createClient();
 
