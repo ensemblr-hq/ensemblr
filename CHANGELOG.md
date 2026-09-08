@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-09-08
+
+A fan-out's finished sub-agent tabs now close themselves as each child settles, instead of leaving
+one dead tab per child in the tab strip. Elsewhere, the Code of Conduct and `SECURITY.md` contact
+emails now point at the project account, and `docs/` was re-audited against the repository.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.8) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.8/Ensemblr-0.1.8-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.8/Ensemblr-0.1.8-x64.AppImage)
+
+### Fixed
+
+- **A fan-out's finished sub-agent tabs now close themselves as each child settles.** Nothing in the
+  app ever closed one, and the playbook's only instruction — "clean up scratch tabs you created" —
+  read as tabs opened by accident rather than the children an orchestrator just waited on. The spawn
+  op also returns two ids and the playbook told every delegation loop to keep only one of them: the
+  `agentSessionId`, not the `chatTabId` that `ensemblr_close_tab` actually takes. Every delegation
+  loop (root orchestrator, harness, plan-mode investigators) now keeps both ids and closes each
+  child's tab in the evaluate step, as it settles rather than at the end of the run. Closing archives
+  the tab rather than deleting it, so a follow-up reopens it; the Review conversation's tab and a
+  peer's own tab stay explicitly excluded where they are introduced. (#496)
+
+### Changed
+
+- **The Code of Conduct enforcement contact and the `SECURITY.md` email fallback now point at
+  `howdy@ensemblr.dev`** instead of a personal address, so reports reach the project rather than an
+  individual. (#495)
+- **`docs/` re-audited against the repository and pinned to the assets v0.1.7 published.** Corrects
+  the ADR count, the `tests/renderer` file count, the sub-agent blocked-op count, the setup-check
+  count, the composer stored-text-chip tray behavior, the read-only bash classifier's newer cases,
+  and the version-pinned-lines table, with every rewritten install URL checked against the release's
+  asset list. (#494)
+
 ## [0.1.7] - 2026-09-07
 
 **Update to this release.** It closes a privately reported bypass of the `bash` command gate that
