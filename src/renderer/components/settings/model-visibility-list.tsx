@@ -56,6 +56,10 @@ export function ModelVisibilityList() {
 	const [query, setQuery] = useState('');
 
 	const models = useMemo(() => data?.models ?? [], [data]);
+	const modelIds = useMemo(
+		() => new Set(models.map((model) => model.id)),
+		[models],
+	);
 	const hiddenSet = useMemo(() => new Set(hidden), [hidden]);
 
 	const groups = useMemo(() => {
@@ -102,22 +106,22 @@ export function ModelVisibilityList() {
 	const hiddenCount = models.filter((model) => hiddenSet.has(model.id)).length;
 	const visibleCount = models.length - hiddenCount;
 
-	// Showing is always safe; hiding is blocked when it would leave the picker
-	// with no models (the UI also disables the last visible toggle).
+	/** Shows a hidden model or hides a visible model while retaining one choice. */
 	const toggle = (id: string) =>
 		setHidden((prev) => {
 			if (prev.includes(id)) {
 				return prev.filter((entry) => entry !== id);
 			}
-			if (models.length - prev.length <= 1) {
+			const hiddenCurrentIds = new Set(
+				prev.filter((entry) => modelIds.has(entry)),
+			);
+			if (models.length - hiddenCurrentIds.size <= 1) {
 				return prev;
 			}
 			return [...prev, id];
 		});
 
-	// Bulk hide/show a whole provider group. Operates on the rows currently
-	// shown under the header (the search-filtered set), and keeps ≥1 model
-	// visible overall just like the per-row toggle.
+	/** Toggles every search-visible model for one provider while retaining one choice. */
 	const toggleProvider = (group: ProviderGroup) => {
 		const ids = group.models.map((model) => model.id);
 		const idSet = new Set(ids);

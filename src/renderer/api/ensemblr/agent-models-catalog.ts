@@ -1,8 +1,8 @@
 import type { AgentModelCatalog } from '@/shared/ipc/contracts/agent-models';
 
 /**
- * Pure catalog reconciliation helpers shared by the Pi models query, its
- * localStorage cache, and the query-cache persistence subscription.
+ * Pure catalog reconciliation helpers used by the agent-models query before
+ * its accepted results reach the localStorage persistence subscription.
  *
  * On a cold launch `pi --list-models` resolves providers incrementally: the
  * network/subscription providers (Claude, GPT) can be absent from the first
@@ -21,8 +21,7 @@ function providerSet(result: AgentModelCatalog): ReadonlySet<string> {
 /**
  * True when `incoming` is missing at least one provider the `cached` catalog
  * has and introduces no provider of its own — i.e. a strictly narrower provider
- * set. Such a listing is a transient cold-start partial, not an authoritative
- * shrink, so callers keep the richer cached catalog instead.
+ * set. Callers temporarily mask this ambiguous shape until it repeats.
  * @param incoming - Freshly fetched catalog.
  * @param cached - Last-known-good cached catalog.
  * @returns Whether the incoming catalog drops providers without adding any.
@@ -42,6 +41,70 @@ export function isMissingProviderSubset(
 		}
 	}
 	return true;
+}
+
+/** Progress while confirming that a live provider-set reduction is authoritative. */
+export interface CatalogReconciliationState {
+	candidateKey: string | null;
+	matchingCandidates: number;
+}
+
+/** Number of identical live listings required before accepting a provider removal. */
+const NARROWING_CONFIRMATION_TARGET = 2;
+
+/** Returns the stable identity of one live catalog candidate. */
+function catalogCandidateKey(catalog: AgentModelCatalog): string {
+	return catalog.models
+		.map((model) => model.id)
+		.sort((left, right) => left.localeCompare(right))
+		.join('|');
+}
+
+/** Creates the zero state for catalog reconciliation. */
+export function initialCatalogReconciliationState(): CatalogReconciliationState {
+	return { candidateKey: null, matchingCandidates: 0 };
+}
+
+/**
+ * Masks one transient cold-start provider omission while allowing a repeated,
+ * stable live reduction to retire removed providers from the picker and cache.
+ * @param incoming - Latest non-empty catalog discovered from the runtimes.
+ * @param cached - Last catalog persisted by the renderer, if any.
+ * @param state - Prior provider-reduction confirmation state.
+ * @returns Catalog to expose, advanced state, and whether another poll is needed.
+ */
+export function reconcileAgentModelCatalog(
+	incoming: AgentModelCatalog,
+	cached: AgentModelCatalog | undefined,
+	state: CatalogReconciliationState,
+): {
+	catalog: AgentModelCatalog;
+	pendingNarrowing: boolean;
+	state: CatalogReconciliationState;
+} {
+	if (!cached || !isMissingProviderSubset(incoming, cached)) {
+		return {
+			catalog: incoming,
+			pendingNarrowing: false,
+			state: initialCatalogReconciliationState(),
+		};
+	}
+
+	const candidateKey = catalogCandidateKey(incoming);
+	const matchingCandidates =
+		state.candidateKey === candidateKey ? state.matchingCandidates + 1 : 1;
+	if (matchingCandidates >= NARROWING_CONFIRMATION_TARGET) {
+		return {
+			catalog: incoming,
+			pendingNarrowing: false,
+			state: initialCatalogReconciliationState(),
+		};
+	}
+	return {
+		catalog: cached,
+		pendingNarrowing: true,
+		state: { candidateKey, matchingCandidates },
+	};
 }
 
 /** Poll cadence, in ms, while the Pi catalog is still settling after launch. */
@@ -65,7 +128,9 @@ export function initialAgentModelsPollState(): AgentModelsPollState {
 
 /** Sorted, joined provider identifiers — a stable equality key for a catalog. */
 function providerKeyOf(result: AgentModelCatalog): string {
-	return [...providerSet(result)].sort().join('|');
+	return [...providerSet(result)]
+		.sort((left, right) => left.localeCompare(right))
+		.join('|');
 }
 
 /**
@@ -75,12 +140,10 @@ function providerKeyOf(result: AgentModelCatalog): string {
  * provider set has been non-empty and unchanged for {@link STABLE_POLL_TARGET}
  * polls, or the {@link MAX_POLLS} ceiling is hit.
  *
- * Settling is judged on the catalog the query *returns*, which is the
- * cache-masked value after `queryFn`'s subset fallback — not the raw `pi`
- * output. So the poll converges once the picker-visible catalog stabilises
- * (its whole point), even while live `pi` is still resolving providers behind
- * the fallback. The {@link MAX_POLLS} ceiling bounds the no-cache case where
- * nothing masks a persistently empty/partial listing.
+ * Settling is judged on the catalog the query returns. When reconciliation
+ * masks an ambiguous provider reduction, the query resets this state so the
+ * next poll can confirm or reject that live candidate. The {@link MAX_POLLS}
+ * ceiling bounds the no-cache case where the listing keeps changing.
  * @param data - The catalog the query currently exposes, if any.
  * @param state - The prior poll state.
  * @returns The next interval (or `false` to stop) plus the advanced state.

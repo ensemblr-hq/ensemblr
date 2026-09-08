@@ -4,8 +4,10 @@ import {
 	type AgentModelsPollState,
 	advanceAgentModelsPoll,
 	initialAgentModelsPollState,
+	initialCatalogReconciliationState,
 	isMissingProviderSubset,
 	PI_MODELS_POLL_MS,
+	reconcileAgentModelCatalog,
 } from '../../src/renderer/api/ensemblr/agent-models-catalog';
 import type { AgentModelCatalog } from '../../src/shared/ipc/contracts/agent-models';
 import { asModelVendorId } from '../../src/shared/ipc/contracts/agent-models';
@@ -55,6 +57,38 @@ describe('isMissingProviderSubset', () => {
 
 	test('allows a superset', () => {
 		expect(isMissingProviderSubset(FULL, MISSING_GPT)).toBe(false);
+	});
+});
+
+describe('reconcileAgentModelCatalog', () => {
+	test('accepts a stable live catalog after a provider is removed', () => {
+		const first = reconcileAgentModelCatalog(
+			MISSING_GPT,
+			FULL,
+			initialCatalogReconciliationState(),
+		);
+		expect(first.catalog).toEqual(FULL);
+		expect(first.pendingNarrowing).toBe(true);
+
+		const confirmed = reconcileAgentModelCatalog(
+			MISSING_GPT,
+			FULL,
+			first.state,
+		);
+		expect(confirmed.catalog).toEqual(MISSING_GPT);
+		expect(confirmed.pendingNarrowing).toBe(false);
+	});
+
+	test('keeps the cache when a missing provider appears on the next listing', () => {
+		const partial = reconcileAgentModelCatalog(
+			MISSING_GPT,
+			FULL,
+			initialCatalogReconciliationState(),
+		);
+		const recovered = reconcileAgentModelCatalog(FULL, FULL, partial.state);
+
+		expect(recovered.catalog).toEqual(FULL);
+		expect(recovered.pendingNarrowing).toBe(false);
 	});
 });
 

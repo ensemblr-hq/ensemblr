@@ -23,7 +23,8 @@ import {
 	type AgentModelsPollState,
 	advanceAgentModelsPoll,
 	initialAgentModelsPollState,
-	isMissingProviderSubset,
+	initialCatalogReconciliationState,
+	reconcileAgentModelCatalog,
 } from './agent-models-catalog';
 import {
 	ensemblrQueryKeys,
@@ -35,9 +36,10 @@ import {
 // models query is a singleton, so a single module-scoped state tracks it; each
 // `refetchInterval` evaluation advances it purely via `advanceAgentModelsPoll`.
 // This heals launch only: once it settles (or hits the ceiling) the poll does
-// not re-arm, so a mid-session `pi` restart relies on the subset fallback in
-// `queryFn`, not on renewed polling.
+// not re-arm. A provider-set reduction keeps the poll alive until the live
+// catalog repeats and is safe to accept as authoritative.
 let agentModelsPollState: AgentModelsPollState = initialAgentModelsPollState();
+let catalogReconciliationState = initialCatalogReconciliationState();
 
 /**
  * Query options for the agent model catalog. Seeds from the localStorage cache
@@ -56,9 +58,9 @@ export const agentModelsQuery = queryOptions({
 	initialDataUpdatedAt: 0,
 	/**
 	 * Fetches the live agent model catalog over IPC. Falls back to the cached
-	 * catalog on an empty result, and on a partial listing that merely drops
-	 * providers the cache already has (a cold-start race), so the picker is
-	 * never blanked by a transient sub-catalog.
+	 * catalog on an empty result. A listing that drops providers must repeat
+	 * before it replaces the cache, distinguishing a cold-start race from a
+	 * provider the user actually removed.
 	 */
 	queryFn: async (): Promise<AgentModelCatalog> => {
 		const result = await profileElectronIpcCall(
@@ -67,12 +69,19 @@ export const agentModelsQuery = queryOptions({
 		);
 		const cached = readCachedAgentModels();
 		if (result.models.length === 0) {
+			catalogReconciliationState = initialCatalogReconciliationState();
 			return cached ?? result;
 		}
-		if (cached && isMissingProviderSubset(result, cached)) {
-			return cached;
+		const reconciliation = reconcileAgentModelCatalog(
+			result,
+			cached,
+			catalogReconciliationState,
+		);
+		catalogReconciliationState = reconciliation.state;
+		if (reconciliation.pendingNarrowing) {
+			agentModelsPollState = initialAgentModelsPollState();
 		}
-		return result;
+		return reconciliation.catalog;
 	},
 	queryKey: ensemblrQueryKeys.agentModels(),
 	// Poll after launch until the catalog settles, then stop. Repairs the case
