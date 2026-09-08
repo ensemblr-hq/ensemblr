@@ -1,5 +1,10 @@
 import { Icon } from '@iconify/react';
-import { FolderGitIcon, GitBranchIcon, MessageSquareIcon } from 'lucide-react';
+import {
+	FolderGitIcon,
+	FolderSymlinkIcon,
+	GitBranchIcon,
+	MessageSquareIcon,
+} from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceFileIconName } from '@/renderer/lib/workbench';
@@ -17,6 +22,7 @@ export type ChatAttachmentChipKind =
 	| 'chat'
 	| 'file'
 	| 'folder'
+	| 'linked-directory'
 	| 'project'
 	| 'workspace';
 
@@ -34,6 +40,11 @@ function chipIcon(kind: ChatAttachmentChipKind, label: string): ReactNode {
 	}
 	if (kind === 'workspace') {
 		return <GitBranchIcon aria-hidden='true' className='size-3.5 shrink-0' />;
+	}
+	if (kind === 'linked-directory') {
+		return (
+			<FolderSymlinkIcon aria-hidden='true' className='size-3.5 shrink-0' />
+		);
 	}
 	if (kind === 'chat') {
 		return (

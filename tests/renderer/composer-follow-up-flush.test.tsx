@@ -178,7 +178,10 @@ describe('mid-turn routing', () => {
 		send('interrupt');
 
 		await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
-		expect(onSubmit.mock.calls[0]?.[1]).toEqual({ streamingBehavior: 'steer' });
+		expect(onSubmit.mock.calls[0]?.[1]).toEqual({
+			linkedDirectories: [],
+			streamingBehavior: 'steer',
+		});
 		expect(queued()).toHaveLength(0);
 	});
 
@@ -217,7 +220,9 @@ describe('mid-turn routing', () => {
 			send('now');
 
 			await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
-			expect(onSubmit.mock.calls[0]?.[1]).toBeUndefined();
+			expect(onSubmit.mock.calls[0]?.[1]).toEqual({
+				linkedDirectories: [],
+			});
 			expect(queued()).toHaveLength(0);
 		}
 	});

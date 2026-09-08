@@ -186,13 +186,21 @@ export function createAgentClient({
 		listSessions: () => [...sessions.values()],
 		shutdown: async () => {
 			const open = [...sessions.values()];
-			sessions.clear();
-			await Promise.all(open.map((session) => session.close()));
+			const results = await Promise.allSettled(
+				open.map((session) => session.close()),
+			);
+			const failure = results.find(
+				(result): result is PromiseRejectedResult =>
+					result.status === 'rejected',
+			);
 			await Promise.all(
 				[...new Set(registry.values())].map((registered) =>
 					registered.shutdown(),
 				),
 			);
+			if (failure) {
+				throw failure.reason;
+			}
 		},
 	};
 }
@@ -273,6 +281,7 @@ function wrapSession({
 	let closed = false;
 	let removed = false;
 	let shutdownSubscription: AgentSubscription | null = null;
+	let teardownPromise: Promise<void> | null = null;
 
 	const remove = (): void => {
 		if (removed) {
@@ -308,18 +317,32 @@ function wrapSession({
 				recoverable: false,
 			});
 		}
+		if (teardownPromise) {
+			throw new AgentClientError({
+				code: 'session-closed',
+				message: `Cannot ${operation} while agent session teardown is in progress.`,
+				recoverable: false,
+			});
+		}
 	};
 
-	const finalize = async (op: () => Promise<void>): Promise<void> => {
+	const finalize = (op: () => Promise<void>): Promise<void> => {
+		if (teardownPromise) {
+			return teardownPromise;
+		}
 		if (closed) {
-			return;
+			return Promise.resolve();
 		}
-		closed = true;
-		try {
-			await op();
-		} finally {
-			remove();
-		}
+		teardownPromise = (async () => {
+			try {
+				await op();
+				closed = true;
+				remove();
+			} finally {
+				teardownPromise = null;
+			}
+		})();
+		return teardownPromise;
 	};
 
 	return {
@@ -338,7 +361,7 @@ function wrapSession({
 		},
 		id: adapterSession.id,
 		refreshPlanUsage: async () => {
-			if (closed || !adapterSession.refreshPlanUsage) {
+			if (closed || teardownPromise || !adapterSession.refreshPlanUsage) {
 				return false;
 			}
 			return adapterSession.refreshPlanUsage();

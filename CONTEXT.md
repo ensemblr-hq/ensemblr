@@ -87,7 +87,7 @@ Anything the user pins into a composer draft as a chip — a workspace file or f
 _Avoid_: Upload, mention, context block
 
 **Linked Directory**:
-A read grant over a directory outside the workspace, held per chat, sticky across sends, and handed to the runtime when the session opens. It is a grant, not an attachment — nothing is copied or serialized, and symlinks are deliberately left unresolved.
+A read-reference grant over a directory outside the workspace, held per chat and sticky across sends. Every prompt announces its paths and each sent message shows the linked references; directory contents are never copied. Changed roots take effect by resuming the same chat's runtime before the next idle send, never by interrupting a working turn. Symlinks are deliberately left unresolved, the workspace stays the working directory, and linking does not authorize edits outside it.
 _Avoid_: Mounted folder, external workspace
 
 **Follow-Up Queue**:

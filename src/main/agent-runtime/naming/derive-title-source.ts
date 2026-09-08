@@ -8,6 +8,7 @@
 import { parseSlashCommand } from '../../../shared/pi-skill-invocation.ts';
 import {
 	attachedFileBlockPattern,
+	legacyLinkedDirectoriesBlockPattern,
 	linkedDirectoriesBlockPattern,
 	referencedFoldersBlockPattern,
 	userPreferencesBlockPattern,
@@ -27,6 +28,7 @@ export function stripPromptScaffolding(prompt: string): string {
 	return prompt
 		.replace(referencedFoldersBlockPattern(), '')
 		.replace(linkedDirectoriesBlockPattern(), '')
+		.replace(legacyLinkedDirectoriesBlockPattern(), '')
 		.replace(userPreferencesBlockPattern(), '')
 		.replace(attachedFileBlockPattern(), '')
 		.replace(/\n{3,}/g, '\n\n')

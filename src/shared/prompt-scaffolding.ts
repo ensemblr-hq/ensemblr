@@ -15,13 +15,15 @@ import {
 /** Header line the composer prepends before a list of `@folder` references. */
 export const REFERENCED_FOLDERS_HEADER = 'Referenced workspace folders:';
 
-/**
- * Header line before the absolute paths of directories linked to the chat.
- * Distinct from {@link REFERENCED_FOLDERS_HEADER} because these live outside the
- * workspace and are listed unprefixed and absolute — an `@path` would read as a
- * repo-relative mention the agent could not resolve.
- */
-export const LINKED_DIRECTORIES_HEADER = 'Linked directories:';
+/** Header used by the legacy absolute-path linked-directory preamble. */
+const LEGACY_LINKED_DIRECTORIES_HEADER = 'Linked directories:';
+
+/** Tag wrapping the current linked-directory prompt context. */
+const LINKED_DIRECTORIES_TAG = 'linked_directories';
+
+/** Agent guidance accompanying the linked-directory paths. */
+const LINKED_DIRECTORIES_INSTRUCTIONS =
+	'User-linked external reference directories. Read relevant files using absolute paths. Their contents are not copied here. This does not grant blanket permission to write. The workspace remains your cwd, and ordinary permissions still apply.';
 
 /** Tag wrapping the injected `general` master prompt (the user's preferences). */
 export const USER_PREFERENCES_TAG = 'user_preferences';
@@ -196,13 +198,54 @@ export function referencedFoldersBlockPattern(): RegExp {
 }
 
 /**
- * Fresh global regex matching a linked-directories block wherever it appears,
- * with the path lines in capture group 1.
- * @returns A new global `RegExp` for linked-directories blocks.
+ * Serializes linked directories into a bounded prompt block. JSON preserves
+ * every path byte while the fixed guidance explains that these are standing,
+ * read-oriented references rather than inlined attachments or a write grant.
+ * @param paths - Absolute linked-directory paths for this chat.
+ * @returns The linked-directory prompt block.
+ */
+export function formatLinkedDirectoriesBlock(paths: readonly string[]): string {
+	return `<${LINKED_DIRECTORIES_TAG}>\n${JSON.stringify(paths)}\n${LINKED_DIRECTORIES_INSTRUCTIONS}\n</${LINKED_DIRECTORIES_TAG}>`;
+}
+
+/**
+ * Fresh global regex matching current linked-directory blocks, with the JSON
+ * path array in capture group 1. A closing tag bounds the context so a slash in
+ * the following user message can never be consumed as another directory.
+ * @returns A new global `RegExp` for current linked-directory blocks.
  */
 export function linkedDirectoriesBlockPattern(): RegExp {
+	return /<linked_directories>\n(\[[^\n]*\])\n[\s\S]*?\n<\/linked_directories>/g;
+}
+
+/**
+ * Parses the JSON path-array capture from {@link linkedDirectoriesBlockPattern}.
+ * @param serializedPaths - The JSON line inside a linked-directory block.
+ * @returns The lossless paths, or null when the block is malformed.
+ */
+export function parseLinkedDirectoriesPaths(
+	serializedPaths: string,
+): readonly string[] | null {
+	try {
+		const parsed: unknown = JSON.parse(serializedPaths);
+		return Array.isArray(parsed) &&
+			parsed.every((path) => typeof path === 'string')
+			? parsed
+			: null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Fresh global regex matching the unbounded legacy header and absolute paths.
+ * New prompts use {@link linkedDirectoriesBlockPattern}; this survives only so
+ * persisted histories remain legible.
+ * @returns A new global `RegExp` for legacy linked-directory blocks.
+ */
+export function legacyLinkedDirectoriesBlockPattern(): RegExp {
 	return new RegExp(
-		`${LINKED_DIRECTORIES_HEADER}\\n((?:/[^\\n]+\\n?)+)\\s*`,
+		`${LEGACY_LINKED_DIRECTORIES_HEADER}\\n((?:/[^\\n]+\\n?)+)\\s*`,
 		'g',
 	);
 }

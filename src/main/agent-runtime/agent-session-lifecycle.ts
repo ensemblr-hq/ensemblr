@@ -458,27 +458,53 @@ export function createAgentSessionLifecycle({
 		}
 		stopped.add(request.sessionId);
 		const children = resolveSpawnedChildren?.(request.sessionId) ?? [];
+		let replacementFailed = false;
+		let replacementFailure: unknown = null;
+		try {
+			const replacementCancelled = await opener.cancelReplacement(
+				request.sessionId,
+			);
+			if (replacementCancelled && !activeSessions.has(request.sessionId)) {
+				const database = requireDatabase();
+				updateAgentSession({
+					database,
+					id: request.sessionId,
+					patch: { closedAt: now().toISOString(), status: 'closed' },
+				});
+			}
+		} catch (cause) {
+			replacementFailed = true;
+			replacementFailure = cause;
+		}
+		const hasRetryableActiveSession = activeSessions.has(request.sessionId);
 		try {
 			await abortActiveSession(request);
+			if (replacementFailed && !hasRetryableActiveSession) {
+				throw replacementFailure;
+			}
 		} finally {
-			await Promise.all(
-				children.map(async (sessionId) => {
-					try {
-						await stopSessionTree(
-							{ reason: ORCHESTRATOR_STOPPED_REASON, sessionId },
-							stopped,
-						);
-					} catch (cause) {
-						console.warn(
-							'[agent-session] could not stop a spawned sub-agent.',
-							{
-								cause: cause instanceof Error ? cause.message : String(cause),
-								sessionId,
-							},
-						);
-					}
-				}),
-			);
+			const childStops: Promise<void>[] = [];
+			for (const sessionId of children) {
+				childStops.push(
+					(async () => {
+						try {
+							await stopSessionTree(
+								{ reason: ORCHESTRATOR_STOPPED_REASON, sessionId },
+								stopped,
+							);
+						} catch (cause) {
+							console.warn(
+								'[agent-session] could not stop a spawned sub-agent.',
+								{
+									cause: cause instanceof Error ? cause.message : String(cause),
+									sessionId,
+								},
+							);
+						}
+					})(),
+				);
+			}
+			await Promise.all(childStops);
 		}
 	};
 
@@ -519,6 +545,15 @@ export function createAgentSessionLifecycle({
 			return { chatTabId: active.chatTabId };
 		},
 		shutdownActiveSessions: async () => {
+			// A linked-directory replacement owns the old runtime until its close
+			// settles. Cancel it before taking the shutdown snapshot, so it cannot
+			// launch a replacement after shutdown starts.
+			try {
+				await opener.cancelReplacements();
+			} catch {
+				// The active binding remains registered when close rejects; the client
+				// teardown below gets a chance to retry it.
+			}
 			const open = [...activeSessions.entries()];
 			// Flush owed summaries while sessions are still registered: once the
 			// map is cleared and the runtime closed, no shutdown event can drain
@@ -538,15 +573,24 @@ export function createAgentSessionLifecycle({
 			} catch {
 				// Database unavailable during teardown; skip the final flush.
 			}
-			activeSessions.clear();
-			for (const [, session] of open) {
-				session.subscription.unsubscribe();
+			const sessionCloses: Promise<void>[] = [];
+			for (const [sessionId, session] of open) {
+				sessionCloses.push(
+					(async () => {
+						try {
+							await session.agentRuntimeSession.close();
+							if (activeSessions.get(sessionId) === session) {
+								activeSessions.delete(sessionId);
+								session.subscription.unsubscribe();
+							}
+						} catch {
+							// A rejected close stays active and registered for a later retry;
+							// dropping it would lose track of a possibly-live child.
+						}
+					})(),
+				);
 			}
-			await Promise.all(
-				open.map(([, session]) =>
-					session.agentRuntimeSession.close().catch(() => undefined),
-				),
-			);
+			await Promise.all(sessionCloses);
 		},
 		stopSession,
 		submitPrompt,

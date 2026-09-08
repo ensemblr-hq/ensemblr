@@ -29,7 +29,11 @@ import type {
 	AgentSubscription,
 } from '../agent-types.ts';
 import type { SessionNamingInput } from '../naming/session-naming.ts';
-import type { ActiveSession, ActiveSessionMap } from './active-session.ts';
+import {
+	type ActiveSession,
+	type ActiveSessionMap,
+	isTurnInFlight,
+} from './active-session.ts';
 import {
 	type AgentControlWiring,
 	resolveAgentControlWiring,
@@ -57,6 +61,7 @@ interface OpenRequest {
 	executable: PiExecutableSnapshot;
 	initialPrompt?: string | null;
 	label?: string | null;
+	linkedDirectories?: readonly string[];
 	model?: string | null;
 	/** Spawning agent's session id when opened via the control layer, else absent. */
 	parentSessionId?: string | null;
@@ -156,6 +161,17 @@ interface SessionOpener {
 		database: DatabaseSync;
 		request: OpenRequest;
 	}) => Promise<AgentSessionSnapshot>;
+	/** Cancels and awaits a replacement currently opening this session. */
+	cancelReplacement: (sessionId: string) => Promise<boolean>;
+	/** Cancels and awaits every replacement currently opening a session. */
+	cancelReplacements: () => Promise<void>;
+}
+
+/** Cancellable in-flight resume classified for accurate concurrent-request errors. */
+interface ReplacementOperation {
+	cancelled: boolean;
+	isGrantChange: boolean;
+	promise: Promise<AgentSessionSnapshot> | null;
 }
 
 /**
@@ -182,13 +198,15 @@ export function createSessionOpener({
 	resolveTurnPreamble,
 	subscribeToRuntime,
 }: SessionOpenerOptions): SessionOpener {
+	const replacingSessions = new Map<string, ReplacementOperation>();
+
 	/**
 	 * Reopens a session that already exists, against the row that recorded it.
 	 * Everything an open decides, a resume inherits: the row fixes the provider
 	 * and cwd, its runtime-session id decides whether the runtime reloads history
 	 * or starts fresh, and a requested provider is checked against the pin rather
-	 * than coerced. A session already in the active map is only re-pointed at the
-	 * requesting chat tab, never opened a second time.
+	 * than coerced. Changed directory grants replace an idle runtime using its
+	 * existing history; a working runtime is never interrupted to apply a grant.
 	 * @param input - The workspace database and an open request naming `resumeSessionId`.
 	 * @returns Snapshot of the resumed session.
 	 */
@@ -218,6 +236,15 @@ export function createSessionOpener({
 			});
 		}
 		assertProviderPin({ pinned: row.provider, requested: request.provider });
+		const inFlight = replacingSessions.get(row.id);
+		if (inFlight) {
+			throw inFlight.isGrantChange
+				? linkedDirectoriesBusy()
+				: new AgentSessionServiceError({
+						code: 'session-not-open',
+						message: `Agent session ${row.id} is already opening.`,
+					});
+		}
 
 		const mainBranch = getMainBranchForSession({
 			database,
@@ -239,7 +266,14 @@ export function createSessionOpener({
 		});
 
 		const alreadyActive = activeSessions.get(row.id);
-		if (alreadyActive) {
+		const directoriesChanged =
+			alreadyActive &&
+			request.linkedDirectories !== undefined &&
+			!sameDirectories(
+				alreadyActive.linkedDirectories ?? [],
+				request.linkedDirectories,
+			);
+		if (alreadyActive && !directoriesChanged) {
 			activeSessions.set(row.id, {
 				...alreadyActive,
 				chatTabId: attachedTab.id,
@@ -252,83 +286,132 @@ export function createSessionOpener({
 			});
 		}
 
-		const { resumeRuntimeSession, runtimeSessionId } =
-			resolveRuntimeContinuity(row);
-		const startingRow =
-			updateAgentSession({
-				database,
-				id: row.id,
-				patch: {
-					closedAt: null,
-					lastError: null,
-					model: request.model ?? row.model,
-					runtimeSessionId,
-					status: 'starting',
-					thinkingLevel: request.thinkingLevel ?? row.thinkingLevel,
-				},
-			}) ?? row;
-
-		const runtimeSession = await createRuntimeSessionOrFail({
-			control: resolveAgentControlWiring({
-				isSpawnedSubAgent,
-				parentSessionId: request.parentSessionId ?? null,
+		if (directoriesChanged && isTurnInFlight(database, row.id)) {
+			throw linkedDirectoriesBusy();
+		}
+		const replacement: ReplacementOperation = {
+			cancelled: false,
+			isGrantChange: Boolean(directoriesChanged),
+			promise: null,
+		};
+		replacingSessions.set(row.id, replacement);
+		const replacementPromise = (async () => {
+			if (alreadyActive) {
+				// Keep the old binding registered until teardown succeeds. A rejected
+				// close still represents a possibly-live child and must be retryable.
+				await alreadyActive.agentRuntimeSession.close();
+				if (replacement.cancelled) {
+					throw replacementCancelled();
+				}
+				if (activeSessions.get(row.id) === alreadyActive) {
+					activeSessions.delete(row.id);
+					alreadyActive.subscription.unsubscribe();
+				}
+			}
+			if (replacement.cancelled) {
+				throw replacementCancelled();
+			}
+			const { resumeRuntimeSession, runtimeSessionId } =
+				resolveRuntimeContinuity(row);
+			const startingRow =
+				updateAgentSession({
+					database,
+					id: row.id,
+					patch: {
+						closedAt: null,
+						lastError: null,
+						model: request.model ?? row.model,
+						runtimeSessionId,
+						status: 'starting',
+						thinkingLevel: request.thinkingLevel ?? row.thinkingLevel,
+					},
+				}) ?? row;
+			const executable = await resolveSessionExecutable({
 				provider: row.provider,
-				readArchitectureDiagramEnabled,
-				readClaudeSubagentMode,
-				readTuiHarnessesEnabled,
-				resolveAgentControlEnv,
-				resolveTurnPreamble,
-				sessionId: row.id,
-				workspaceId: request.workspaceId,
-			}),
-			database,
-			modelOverride: request.model ?? row.model,
-			now,
-			agentClient,
-			permissionMode: resolvePermissionMode(),
-			planMode: request.planMode ?? isPlanModeActive(row.id),
-			afkMode: request.afkMode ?? isAfkModeActive(row.id),
-			// A chat is pinned to the provider its session was opened on; a resume
-			// never re-decides it.
-			provider: row.provider,
-			rowForErrorPatch: row,
-			sessionInput: {
-				agentSessionId: row.id,
-				executable: await resolveSessionExecutable({
+				requestExecutable: request.executable,
+				resolveProviderExecutable,
+			});
+			if (replacement.cancelled) {
+				throw replacementCancelled();
+			}
+
+			const runtimeSession = await createRuntimeSessionOrFail({
+				control: resolveAgentControlWiring({
+					isSpawnedSubAgent,
+					parentSessionId: request.parentSessionId ?? null,
 					provider: row.provider,
-					requestExecutable: request.executable,
-					resolveProviderExecutable,
+					readArchitectureDiagramEnabled,
+					readClaudeSubagentMode,
+					readTuiHarnessesEnabled,
+					resolveAgentControlEnv,
+					resolveTurnPreamble,
+					sessionId: row.id,
+					workspaceId: request.workspaceId,
 				}),
-				label: request.label ?? row.label ?? undefined,
-				resumeRuntimeSession,
-				runtimeSessionId,
-				workspaceCwd: row.cwd || request.workspaceCwd,
-			},
-			thinkingLevel: request.thinkingLevel ?? row.thinkingLevel,
-		});
+				database,
+				modelOverride: request.model ?? row.model,
+				now,
+				agentClient,
+				permissionMode: resolvePermissionMode(),
+				planMode: request.planMode ?? isPlanModeActive(row.id),
+				afkMode: request.afkMode ?? isAfkModeActive(row.id),
+				// A chat is pinned to the provider its session was opened on; a resume
+				// never re-decides it.
+				provider: row.provider,
+				rowForErrorPatch: row,
+				sessionInput: {
+					agentSessionId: row.id,
+					executable,
+					label: request.label ?? row.label ?? undefined,
+					linkedDirectories: request.linkedDirectories,
+					resumeRuntimeSession,
+					runtimeSessionId,
+					workspaceCwd: row.cwd || request.workspaceCwd,
+				},
+				thinkingLevel: request.thinkingLevel ?? row.thinkingLevel,
+			});
+			const subscription = subscribeToRuntime({
+				branchId: mainBranch.id,
+				database,
+				runtimeSession,
+				sessionId: row.id,
+			});
+			insertActiveSession({
+				activeSessions,
+				branch: mainBranch,
+				chatTabId: attachedTab.id,
+				database,
+				row: startingRow,
+				linkedDirectories: request.linkedDirectories,
+				runtimeSession,
+				subscription,
+			});
+			if (replacement.cancelled) {
+				await runtimeSession.close();
+				if (
+					activeSessions.get(row.id)?.agentRuntimeSession === runtimeSession
+				) {
+					activeSessions.delete(row.id);
+					subscription.unsubscribe();
+				}
+				throw replacementCancelled();
+			}
 
-		const subscription = subscribeToRuntime({
-			branchId: mainBranch.id,
-			database,
-			runtimeSession,
-			sessionId: row.id,
-		});
-		insertActiveSession({
-			activeSessions,
-			branch: mainBranch,
-			chatTabId: attachedTab.id,
-			database,
-			row: startingRow,
-			runtimeSession,
-			subscription,
-		});
-
-		return toSnapshot({
-			branchId: mainBranch.id,
-			database,
-			row: startingRow,
-			runtimeOpen: true,
-		});
+			return toSnapshot({
+				branchId: mainBranch.id,
+				database,
+				row: startingRow,
+				runtimeOpen: true,
+			});
+		})();
+		replacement.promise = replacementPromise;
+		try {
+			return await replacementPromise;
+		} finally {
+			if (replacingSessions.get(row.id) === replacement) {
+				replacingSessions.delete(row.id);
+			}
+		}
 	};
 
 	/**
@@ -407,6 +490,7 @@ export function createSessionOpener({
 					resolveProviderExecutable,
 				}),
 				label: request.label ?? undefined,
+				linkedDirectories: request.linkedDirectories,
 				resumeRuntimeSession: false,
 				runtimeSessionId,
 				workspaceCwd: request.workspaceCwd,
@@ -433,6 +517,7 @@ export function createSessionOpener({
 			chatTabId: attachedTab.id,
 			database,
 			row: startedRow,
+			linkedDirectories: request.linkedDirectories,
 			runtimeSession,
 			subscription,
 		});
@@ -458,7 +543,54 @@ export function createSessionOpener({
 		});
 	};
 
-	return { openSession };
+	/**
+	 * Cancels one replacement and waits until its old/new runtime is settled.
+	 * @param sessionId - Persisted session whose replacement should be canceled.
+	 * @returns Whether a replacement was found and awaited.
+	 */
+	const cancelReplacement = async (sessionId: string): Promise<boolean> => {
+		const replacement = replacingSessions.get(sessionId);
+		if (!replacement) {
+			return false;
+		}
+		replacement.cancelled = true;
+		if (replacement.promise) {
+			try {
+				await replacement.promise;
+			} catch (cause) {
+				if (!isReplacementCancellation(cause)) {
+					throw cause;
+				}
+			}
+		}
+		return true;
+	};
+
+	/** Cancels every replacement before lifecycle shutdown takes its snapshot. */
+	const cancelReplacements = async (): Promise<void> => {
+		const cancellations: Promise<void>[] = [];
+		for (const replacement of replacingSessions.values()) {
+			replacement.cancelled = true;
+			if (replacement.promise) {
+				cancellations.push(
+					replacement.promise.then(undefined, (cause) => {
+						if (!isReplacementCancellation(cause)) {
+							throw cause;
+						}
+					}),
+				);
+			}
+		}
+		const results = await Promise.allSettled(cancellations);
+		const failure = results.find(
+			(result): result is PromiseRejectedResult => result.status === 'rejected',
+		);
+		if (failure) {
+			throw failure.reason;
+		}
+	};
+
+	return { cancelReplacement, cancelReplacements, openSession };
 }
 
 /**
@@ -573,6 +705,7 @@ async function createRuntimeSessionOrFail({
 		agentSessionId: string;
 		executable: AgentExecutableSnapshot | null;
 		label?: string;
+		linkedDirectories?: readonly string[];
 		/** Whether the runtime already holds history under `runtimeSessionId`. */
 		resumeRuntimeSession: boolean;
 		/** The runtime's own id for the same session, handed to its CLI. */
@@ -589,6 +722,7 @@ async function createRuntimeSessionOrFail({
 			env: control.env,
 			executable: sessionInput.executable,
 			label: sessionInput.label,
+			linkedDirectories: sessionInput.linkedDirectories,
 			modelOverride,
 			permissionMode,
 			planMode,
@@ -616,6 +750,57 @@ async function createRuntimeSessionOrFail({
 }
 
 /**
+ * Compares directory grants without treating order or duplicates as a change.
+ * @param applied - Roots installed in the runtime.
+ * @param requested - Roots selected for the next turn.
+ * @returns Whether both sets grant the same roots.
+ */
+function sameDirectories(
+	applied: readonly string[],
+	requested: readonly string[],
+): boolean {
+	const roots = new Set(applied);
+	return (
+		roots.size === new Set(requested).size &&
+		requested.every((root) => roots.has(root))
+	);
+}
+
+/**
+ * Names a retryable grant change without interrupting a turn already in flight.
+ * @returns The service error translated by the composer.
+ */
+function linkedDirectoriesBusy(): AgentSessionServiceError {
+	return new AgentSessionServiceError({
+		code: 'linked-directories-busy',
+		message: 'Linked directory changes require an idle agent session.',
+	});
+}
+
+/**
+ * Describes a replacement canceled by an explicit stop or process shutdown.
+ * @returns Typed cancellation error for IPC translation.
+ */
+function replacementCancelled(): AgentSessionServiceError {
+	return new AgentSessionServiceError({
+		code: 'linked-directories-cancelled',
+		message: 'Agent session replacement was canceled during teardown.',
+	});
+}
+
+/**
+ * Recognizes the expected rejection from a canceled replacement operation.
+ * @param cause - Rejection raised while awaiting replacement cancellation.
+ * @returns Whether the rejection carries the cancellation service code.
+ */
+function isReplacementCancellation(cause: unknown): boolean {
+	return (
+		cause instanceof AgentSessionServiceError &&
+		cause.code === 'linked-directories-cancelled'
+	);
+}
+
+/**
  * Registers a freshly opened session in the active-session map, seeding its
  * branch, chat tab, runtime session, and event subscription.
  */
@@ -625,6 +810,7 @@ function insertActiveSession({
 	chatTabId,
 	database,
 	row,
+	linkedDirectories,
 	runtimeSession,
 	subscription,
 }: {
@@ -633,6 +819,7 @@ function insertActiveSession({
 	chatTabId: string;
 	database: DatabaseSync;
 	row: AgentSessionRow;
+	linkedDirectories?: readonly string[];
 	runtimeSession: AgentSession;
 	subscription: AgentSubscription;
 }): void {
@@ -641,6 +828,7 @@ function insertActiveSession({
 		agentResponsePendingSummary: false,
 		branch,
 		chatTabId,
+		linkedDirectories: [...new Set(linkedDirectories ?? [])],
 		contextUsage: null,
 		deltaCounter: 0,
 		lastBroadcastOrdinal: getMaxOrdinalForBranch({

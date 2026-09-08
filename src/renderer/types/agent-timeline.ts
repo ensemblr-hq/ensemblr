@@ -133,12 +133,18 @@ export interface ParsedPromptAttachment {
 	path: string;
 }
 
+/** One linked directory recorded with a prompt, which stays readable but inert. */
+export interface ParsedPromptLinkedDirectory {
+	path: string;
+}
+
 /**
- * One run of a parsed prompt: a stretch of the typed message, an attachment, or a
- * project/workspace/chat the Concierge was pointed at.
+ * One run of a parsed prompt: a stretch of the typed message, an attachment, a
+ * linked directory, or a project/workspace/chat the Concierge was pointed at.
  */
 export type ParsedPromptPart =
 	| { attachment: ParsedPromptAttachment; kind: 'attachment' }
+	| { kind: 'linked-directory'; linkedDirectory: ParsedPromptLinkedDirectory }
 	| { kind: 'reference'; reference: ConciergeReference }
 	| { kind: 'text'; text: string };
 

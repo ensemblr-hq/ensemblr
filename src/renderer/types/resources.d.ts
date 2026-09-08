@@ -2632,6 +2632,7 @@ export default interface Resources {
 			'aria-label': 'Agent composer';
 			'attachment-failed': 'Failed to attach selected file.';
 			'blocked-follow-up': 'Follow-ups are held while the agent works — sending or {{shortcut}} adds to the queue, and you send it from there once the agent finishes.';
+			'chat-initializing': 'Workspace chat tab is still initializing. Try again in a moment.';
 			dictation: {
 				start: 'Dictate a prompt';
 				stop: 'Stop dictation';
@@ -2644,8 +2645,12 @@ export default interface Resources {
 			'last-unread': 'Last unread';
 			'last-unread-tooltip': 'Jump to the newest unread chat in {{workspace}}';
 			'last-unread-tooltip-generic': 'Jump to the newest unread chat';
-			'linked-directory-pending_one': 'The agent reads a newly linked directory from the next session — reopen this chat to give it access.';
-			'linked-directory-pending_other': 'The agent reads newly linked directories from the next session — reopen this chat to give it access.';
+			'linked-directories-busy': 'Directory changes cannot apply while the agent is working. Send again once it is idle.';
+			'linked-directories-cancelled': 'Directory changes were canceled while stopping the agent. Send again once it is idle.';
+			'linked-directories-help': 'Linked directories stay available across prompts.';
+			'linked-directories-label': 'Linked directories';
+			'linked-directory-pending-next-send_one': 'Directory changes apply automatically with the next send once the agent is idle.';
+			'linked-directory-pending-next-send_other': 'Directory changes apply automatically with the next send once the agent is idle.';
 			model: {
 				pending: 'Model pending';
 			};
@@ -2661,6 +2666,7 @@ export default interface Resources {
 			'send-tooltip': 'Send message';
 			'send-tooltip-hold': 'Hold until you send it';
 			'send-tooltip-queue': 'Queue for when the agent finishes';
+			'session-open-failed': 'Unable to open an agent session.';
 			'setup-blocked': {
 				placeholder: 'Fix setup blockers before sending a prompt.';
 				reason_one: '{{count}} required setup check needs attention.';
@@ -3699,6 +3705,7 @@ export default interface Resources {
 			};
 			'turn-stopped': 'You stopped this turn';
 			'user-prompt': {
+				'linked-directory': 'Linked directory: {{path}}';
 				'show-less': 'Show less';
 				'show-more': 'Show more';
 			};

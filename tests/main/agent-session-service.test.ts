@@ -7,7 +7,10 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { AgentAdapter } from '../../src/main/agent-runtime/agent-adapter.ts';
+import type {
+	AgentAdapter,
+	AgentAdapterSession,
+} from '../../src/main/agent-runtime/agent-adapter.ts';
 import { createAgentClient } from '../../src/main/agent-runtime/agent-client.ts';
 import { WORKSPACE_REMOVED_STOP_REASON } from '../../src/main/agent-runtime/agent-session-lifecycle.ts';
 import {
@@ -155,9 +158,163 @@ function resolveAdapter(
 		: fake.adapter;
 }
 
+function createDeferredCloseAdapter(base: AgentAdapter): {
+	adapter: AgentAdapter;
+	closeStarted: Promise<void>;
+	releaseClose: () => void;
+} {
+	let firstClose = true;
+	let releaseClose: (() => void) | null = null;
+	let resolveCloseStarted: (() => void) | null = null;
+	const closeStarted = new Promise<void>((resolve) => {
+		resolveCloseStarted = resolve;
+	});
+	const adapter: AgentAdapter = {
+		createSession: async (input) => {
+			const session = await base.createSession(input);
+			const wrapped: AgentAdapterSession = {
+				...session,
+				close: async () => {
+					if (firstClose) {
+						firstClose = false;
+						resolveCloseStarted?.();
+						await new Promise<void>((resolve) => {
+							releaseClose = resolve;
+						});
+					}
+					await session.close();
+				},
+			};
+			return wrapped;
+		},
+		shutdown: base.shutdown,
+	};
+	return {
+		adapter,
+		closeStarted,
+		releaseClose: () => releaseClose?.(),
+	};
+}
+
+function createDeferredSecondCreateAdapter(
+	base: AgentAdapter,
+	failSecondClose = false,
+): {
+	adapter: AgentAdapter;
+	createStarted: Promise<void>;
+	releaseCreate: () => void;
+} {
+	let createCount = 0;
+	let releaseCreate: (() => void) | null = null;
+	let resolveCreateStarted: (() => void) | null = null;
+	const createStarted = new Promise<void>((resolve) => {
+		resolveCreateStarted = resolve;
+	});
+	const adapter: AgentAdapter = {
+		createSession: async (input) => {
+			createCount += 1;
+			if (createCount === 2) {
+				resolveCreateStarted?.();
+				await new Promise<void>((resolve) => {
+					releaseCreate = resolve;
+				});
+			}
+			const session = await base.createSession(input);
+			if (!failSecondClose || createCount !== 2) {
+				return session;
+			}
+			let firstClose = true;
+			return {
+				...session,
+				close: async () => {
+					if (firstClose) {
+						firstClose = false;
+						throw new Error('replacement child did not exit');
+					}
+					await session.close();
+				},
+			};
+		},
+		shutdown: base.shutdown,
+	};
+	return {
+		adapter,
+		createStarted,
+		releaseCreate: () => releaseCreate?.(),
+	};
+}
+
+function createDeferredReplacementPairAdapter(base: AgentAdapter): {
+	adapter: AgentAdapter;
+	firstCreateStarted: Promise<void>;
+	releaseFirstCreate: () => void;
+	firstCleanupFailed: Promise<void>;
+	secondCreateStarted: Promise<void>;
+	releaseSecondCreate: () => void;
+} {
+	let createCount = 0;
+	let releaseFirstCreate: (() => void) | null = null;
+	let releaseSecondCreate: (() => void) | null = null;
+	let resolveFirstCreateStarted: (() => void) | null = null;
+	let resolveSecondCreateStarted: (() => void) | null = null;
+	let resolveFirstCleanupFailed: (() => void) | null = null;
+	const firstCreateStarted = new Promise<void>((resolve) => {
+		resolveFirstCreateStarted = resolve;
+	});
+	const firstCleanupFailed = new Promise<void>((resolve) => {
+		resolveFirstCleanupFailed = resolve;
+	});
+	const secondCreateStarted = new Promise<void>((resolve) => {
+		resolveSecondCreateStarted = resolve;
+	});
+	const adapter: AgentAdapter = {
+		createSession: async (input) => {
+			const currentCreate = ++createCount;
+			if (currentCreate === 3) {
+				resolveFirstCreateStarted?.();
+				await new Promise<void>((resolve) => {
+					releaseFirstCreate = resolve;
+				});
+			}
+			if (currentCreate === 4) {
+				resolveSecondCreateStarted?.();
+				await new Promise<void>((resolve) => {
+					releaseSecondCreate = resolve;
+				});
+			}
+			const session = await base.createSession(input);
+			if (currentCreate !== 3) {
+				return session;
+			}
+			let firstClose = true;
+			return {
+				...session,
+				close: async () => {
+					if (firstClose) {
+						firstClose = false;
+						resolveFirstCleanupFailed?.();
+						throw new Error('replacement child did not exit');
+					}
+					await session.close();
+				},
+			};
+		},
+		shutdown: base.shutdown,
+	};
+	return {
+		adapter,
+		firstCreateStarted,
+		releaseFirstCreate: () => releaseFirstCreate?.(),
+		firstCleanupFailed,
+		secondCreateStarted,
+		releaseSecondCreate: () => releaseSecondCreate?.(),
+	};
+}
+
 function createService(
 	database: DatabaseSync,
 	options: {
+		adapter?: AgentAdapter;
 		deferShutdown?: boolean;
 		eventSink?: AgentSessionEventSink;
 		refreshPlanUsage?: () => Promise<boolean>;
@@ -168,7 +325,7 @@ function createService(
 ) {
 	const fake = createFakeAgentAdapter();
 	const agentClient = createAgentClient({
-		adapter: resolveAdapter(fake, options),
+		adapter: options.adapter ?? resolveAdapter(fake, options),
 	});
 	const service = createAgentSessionService({
 		databaseService: {
@@ -541,6 +698,306 @@ test('openSession resumes a closed persisted session before submit', async (t) =
 	assert.equal(resumed.runtimeOpen, true);
 	assert.equal(runtime?.getMetadata().sessionId, nativeSessionId);
 	assert.equal(runtime?.getRequests()[0]?.prompt, 'continue work');
+});
+
+test('a concurrent plain resume reports that the session is already opening', async (t) => {
+	const fixture = openFixture(t);
+	const fake = createFakeAgentAdapter();
+	const deferred = createDeferredSecondCreateAdapter(fake.adapter);
+	const { service } = createService(fixture.database, {
+		adapter: deferred.adapter,
+	});
+	const first = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.stopSession({ sessionId: first.id });
+
+	const firstResume = service.openSession({
+		executable: createReadyExecutable(),
+		resumeSessionId: first.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await deferred.createStarted;
+
+	await assert.rejects(
+		service.openSession({
+			executable: createReadyExecutable(),
+			resumeSessionId: first.id,
+			workspaceCwd: '/tmp/ensemblr/svc/ws',
+			workspaceId: fixture.workspaceId,
+		}),
+		{
+			code: 'session-not-open',
+			message: `Agent session ${first.id} is already opening.`,
+		},
+	);
+
+	deferred.releaseCreate();
+	await firstResume;
+});
+
+test('stop cancels a deferred replacement before it can launch a duplicate runtime', async (t) => {
+	const fixture = openFixture(t);
+	const fake = createFakeAgentAdapter();
+	const deferred = createDeferredCloseAdapter(fake.adapter);
+	const { service } = createService(fixture.database, {
+		adapter: deferred.adapter,
+	});
+	const first = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	const replacement = service.openSession({
+		executable: createReadyExecutable(),
+		linkedDirectories: ['/tmp/notes'],
+		resumeSessionId: first.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await deferred.closeStarted;
+	const stop = service.stopSession({ sessionId: first.id });
+	await delay(5);
+	assert.equal(fake.getOpenSessions().length, 1);
+	deferred.releaseClose();
+
+	await stop;
+	await assert.rejects(replacement, {
+		code: 'linked-directories-cancelled',
+	});
+	assert.equal(fake.getOpenSessions().length, 0);
+	assert.equal(
+		getAgentSessionById({ database: fixture.database, id: first.id })?.status,
+		'closed',
+	);
+});
+
+test('shutdown cancels a deferred replacement without launching a replacement', async (t) => {
+	const fixture = openFixture(t);
+	const fake = createFakeAgentAdapter();
+	const deferred = createDeferredCloseAdapter(fake.adapter);
+	const { service } = createService(fixture.database, {
+		adapter: deferred.adapter,
+	});
+	const first = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	const replacement = service.openSession({
+		executable: createReadyExecutable(),
+		linkedDirectories: ['/tmp/notes'],
+		resumeSessionId: first.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await deferred.closeStarted;
+	const shutdown = service.shutdown();
+	await delay(5);
+	assert.equal(fake.getOpenSessions().length, 1);
+	deferred.releaseClose();
+
+	await shutdown;
+	await assert.rejects(replacement, {
+		code: 'linked-directories-cancelled',
+	});
+	assert.equal(fake.getOpenSessions().length, 0);
+});
+
+test('replacement preserves the native runtime history id', async (t) => {
+	const fixture = openFixture(t);
+	const fake = createFakeAgentAdapter();
+	const deferred = createDeferredCloseAdapter(fake.adapter);
+	const { service } = createService(fixture.database, {
+		adapter: deferred.adapter,
+	});
+	const first = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const firstRuntime = fake.getOpenSessions()[0];
+	assert.ok(firstRuntime);
+
+	const replacement = service.openSession({
+		executable: createReadyExecutable(),
+		linkedDirectories: ['/tmp/notes'],
+		resumeSessionId: first.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await deferred.closeStarted;
+	deferred.releaseClose();
+	await replacement;
+
+	const secondRuntime = fake.getOpenSessions()[0];
+	assert.ok(secondRuntime);
+	assert.equal(
+		secondRuntime.getSessionRequest().runtimeSessionId,
+		firstRuntime.getSessionRequest().runtimeSessionId,
+	);
+});
+
+test('shutdown cancels deferred replacement creation before it becomes active', async (t) => {
+	const fixture = openFixture(t);
+	const fake = createFakeAgentAdapter();
+	const deferred = createDeferredSecondCreateAdapter(fake.adapter);
+	const { service } = createService(fixture.database, {
+		adapter: deferred.adapter,
+	});
+	const first = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	const replacement = service.openSession({
+		executable: createReadyExecutable(),
+		linkedDirectories: ['/tmp/notes'],
+		resumeSessionId: first.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await deferred.createStarted;
+	const shutdown = service.shutdown();
+	deferred.releaseCreate();
+
+	await shutdown;
+	await assert.rejects(replacement, {
+		code: 'linked-directories-cancelled',
+	});
+	assert.equal(fake.getOpenSessions().length, 0);
+});
+
+test('stop retries a canceled replacement runtime whose cleanup close fails', async (t) => {
+	const fixture = openFixture(t);
+	const fake = createFakeAgentAdapter();
+	const deferred = createDeferredSecondCreateAdapter(fake.adapter, true);
+	const { service } = createService(fixture.database, {
+		adapter: deferred.adapter,
+	});
+	const first = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	const replacement = service.openSession({
+		executable: createReadyExecutable(),
+		linkedDirectories: ['/tmp/notes'],
+		resumeSessionId: first.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await deferred.createStarted;
+	const stop = service.stopSession({ sessionId: first.id });
+	deferred.releaseCreate();
+
+	await stop;
+	await assert.rejects(replacement, {
+		message: 'replacement child did not exit',
+	});
+	assert.equal(fake.getOpenSessions().length, 0);
+	assert.equal(
+		getAgentSessionById({ database: fixture.database, id: first.id })?.status,
+		'closed',
+	);
+});
+
+test('shutdown retries a canceled replacement runtime whose cleanup close fails', async (t) => {
+	const fixture = openFixture(t);
+	const fake = createFakeAgentAdapter();
+	const deferred = createDeferredSecondCreateAdapter(fake.adapter, true);
+	const { service } = createService(fixture.database, {
+		adapter: deferred.adapter,
+	});
+	const first = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	const replacement = service.openSession({
+		executable: createReadyExecutable(),
+		linkedDirectories: ['/tmp/notes'],
+		resumeSessionId: first.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await deferred.createStarted;
+	const shutdown = service.shutdown();
+	deferred.releaseCreate();
+
+	await shutdown;
+	await assert.rejects(replacement, {
+		message: 'replacement child did not exit',
+	});
+	assert.equal(fake.getOpenSessions().length, 0);
+	assert.equal(
+		getAgentSessionById({ database: fixture.database, id: first.id })?.status,
+		'closed',
+	);
+});
+
+test('shutdown waits for every canceled replacement before retrying cleanup', async (t) => {
+	const fixture = openFixture(t);
+	const fake = createFakeAgentAdapter();
+	const deferred = createDeferredReplacementPairAdapter(fake.adapter);
+	const { service } = createService(fixture.database, {
+		adapter: deferred.adapter,
+	});
+	const first = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const second = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	const firstReplacement = service.openSession({
+		executable: createReadyExecutable(),
+		linkedDirectories: ['/tmp/notes'],
+		resumeSessionId: first.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await deferred.firstCreateStarted;
+	const secondReplacement = service.openSession({
+		executable: createReadyExecutable(),
+		linkedDirectories: ['/tmp/docs'],
+		resumeSessionId: second.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await deferred.secondCreateStarted;
+
+	const firstFailure = assert.rejects(firstReplacement, {
+		message: 'replacement child did not exit',
+	});
+	const secondFailure = assert.rejects(secondReplacement, {
+		code: 'linked-directories-cancelled',
+	});
+	let shutdownSettled = false;
+	const shutdown = service.shutdown().finally(() => {
+		shutdownSettled = true;
+	});
+	deferred.releaseFirstCreate();
+	await deferred.firstCleanupFailed;
+	assert.equal(shutdownSettled, false);
+	assert.equal(fake.getOpenSessions().length, 1);
+
+	deferred.releaseSecondCreate();
+	await shutdown;
+	await Promise.all([firstFailure, secondFailure]);
+	assert.equal(fake.getOpenSessions().length, 0);
 });
 
 test('submitPrompt creates a turn and forwards to the runtime session', async (t) => {

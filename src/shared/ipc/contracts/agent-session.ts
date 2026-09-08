@@ -110,7 +110,8 @@ export interface OpenAgentSessionRequest {
 	 * Absolute paths outside the workspace this chat may read. The renderer's
 	 * per-chat setting is the durable source and re-sends this on every open;
 	 * runtimes that sandbox by working directory grant them at launch, which is
-	 * why a directory linked mid-session only takes effect on the next open.
+	 * why changed roots resume an idle runtime before the next send. An omitted
+	 * set leaves a live runtime unchanged; an empty set removes its extra roots.
 	 */
 	linkedDirectories?: readonly string[];
 	/**
@@ -136,6 +137,7 @@ export interface OpenAgentSessionRequest {
 /** Result of opening or attaching an agent session. */
 export interface OpenAgentSessionResult {
 	error?: string;
+	errorCode?: 'linked-directories-busy' | 'linked-directories-cancelled';
 	session?: AgentSessionSnapshotWire;
 }
 

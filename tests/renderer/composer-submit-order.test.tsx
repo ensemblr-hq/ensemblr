@@ -6,6 +6,7 @@ import { createRef, type PropsWithChildren } from 'react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { ReadWorkspaceFileResult } from '../../src/shared/ipc/contracts/workspace-files';
+import { formatLinkedDirectoriesBlock } from '../../src/shared/prompt-scaffolding';
 
 const readWorkspaceFile =
 	vi.fn<(request: { path: string }) => Promise<ReadWorkspaceFileResult>>();
@@ -80,6 +81,10 @@ async function submit(
 	});
 
 	expect(onSubmit).toHaveBeenCalledTimes(1);
+	expect(store.get(chatLinkedDirectoriesAtomFamily(CHAT_TAB_ID))).toEqual(
+		linked,
+	);
+	expect(editorRef.current.clear).toHaveBeenCalledTimes(1);
 	return onSubmit.mock.calls[0]?.[0] as string;
 }
 
@@ -125,7 +130,7 @@ describe('composer send order', () => {
 
 		expect(prompt).toBe(
 			[
-				'Linked directories:\n/Users/me/Vault',
+				formatLinkedDirectoriesBlock(['/Users/me/Vault']),
 				'read',
 				'<attached_file path="notes.md">\nbody of notes.md\n</attached_file>',
 			].join('\n\n'),

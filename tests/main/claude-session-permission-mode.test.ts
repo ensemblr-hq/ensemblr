@@ -25,7 +25,10 @@ import {
 	createEnsemblrDatabaseService,
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
-import { createAgentSession } from '../../src/main/storage/repositories/agent-session-repository.ts';
+import {
+	createAgentSession,
+	updateAgentSession,
+} from '../../src/main/storage/repositories/agent-session-repository.ts';
 import type { PermissionMode } from '../../src/shared/permissions.ts';
 import { CONTEXT_USAGE } from './helpers/claude-context-usage.ts';
 
@@ -128,7 +131,12 @@ async function openClaudeSessions({
 }: {
 	canUseTool?: ClaudeApprovalGate;
 	mode: () => PermissionMode;
-	opens: ReadonlyArray<{ planMode?: boolean }>;
+	opens: ReadonlyArray<{
+		planMode?: boolean;
+		linkedDirectories?: readonly string[];
+		resumePrevious?: boolean;
+		busy?: boolean;
+	}>;
 	planMode?: (sessionId: string) => boolean;
 }): Promise<{ options: readonly Options[]; sessionIds: readonly string[] }> {
 	const database = openTestDatabase();
@@ -160,12 +168,22 @@ async function openClaudeSessions({
 	});
 
 	const sessionIds: string[] = [];
-	for (const open of opens) {
+	for (const { resumePrevious, busy, ...open } of opens) {
+		const previousId = sessionIds.at(-1);
+		if (busy && previousId) {
+			updateAgentSession({
+				database,
+				id: previousId,
+				patch: { status: 'streaming' },
+			});
+		}
 		const snapshot = await opener.openSession({
 			database,
 			request: {
 				executable: createReadyExecutable(),
 				provider: 'claude',
+				...open,
+				resumeSessionId: resumePrevious ? previousId : undefined,
 				workspaceCwd: WORKSPACE_CWD,
 				workspaceId: WORKSPACE_ID,
 				...(open.planMode === undefined ? {} : { planMode: open.planMode }),
@@ -216,6 +234,73 @@ function systemPromptAppendOf(options: Options): string | undefined {
 }
 
 describe('Claude session options: the workspace permission mode reaches the SDK', () => {
+	it('applies additions and removals by resuming the same idle chat', async () => {
+		const { options, sessionIds } = await openClaudeSessions({
+			mode: () => 'approval-required',
+			opens: [
+				{ linkedDirectories: ['/Users/me/notes'] },
+				{
+					linkedDirectories: ['/Users/me/notes', '/Users/me/designs'],
+					resumePrevious: true,
+				},
+				{ linkedDirectories: [], resumePrevious: true },
+			],
+		});
+		expect(new Set(sessionIds).size).toBe(1);
+		expect(options).toHaveLength(3);
+		expect(options[1]?.additionalDirectories).toEqual([
+			'/Users/me/notes',
+			'/Users/me/designs',
+		]);
+		expect(options[2]?.additionalDirectories).toBeUndefined();
+		expect(options[0]?.sessionId).toBeDefined();
+		expect(options[1]?.resume).toBe(options[0]?.sessionId);
+	});
+
+	it('does not restart an unchanged grant or an open that states no opinion', async () => {
+		const { options } = await openClaudeSessions({
+			mode: () => 'read-only',
+			opens: [
+				{ linkedDirectories: ['/Users/me/a', '/Users/me/b'] },
+				{
+					linkedDirectories: ['/Users/me/b', '/Users/me/a'],
+					resumePrevious: true,
+				},
+				{ resumePrevious: true },
+			],
+		});
+		expect(options).toHaveLength(1);
+	});
+
+	it('refuses changed grants while a turn is running', async () => {
+		await expect(
+			openClaudeSessions({
+				mode: () => 'approval-required',
+				opens: [
+					{},
+					{
+						linkedDirectories: ['/Users/me/notes'],
+						resumePrevious: true,
+						busy: true,
+					},
+				],
+			}),
+		).rejects.toMatchObject({ code: 'linked-directories-busy' });
+	});
+
+	it('grants linked directories on a fresh chat without relaxing permissions', async () => {
+		const linkedDirectories = ['/Users/me/.claude', '/Users/me/My Notes'];
+		const {
+			options: [options],
+		} = await openClaudeSessions({
+			mode: () => 'read-only',
+			opens: [{ linkedDirectories }],
+		});
+		expect(options?.additionalDirectories).toEqual(linkedDirectories);
+		expect(options?.permissionMode).toBe('plan');
+		expect(options?.disallowedTools).toContain('Write');
+	});
+
 	it('leaves a workspace-trusted workspace exactly as permissive as it is today', async () => {
 		const options = await openClaudeSession({ mode: 'workspace-trusted' });
 
@@ -501,6 +586,7 @@ describe('Pi sessions are untouched by the permission mode', () => {
  */
 async function resumeClaudeSessionThroughService(
 	mode: PermissionMode,
+	linkedDirectories?: readonly string[],
 ): Promise<Options> {
 	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-perm-svc-'));
 	const databaseService = createEnsemblrDatabaseService({
@@ -557,6 +643,7 @@ VALUES ('${WORKSPACE_ID}', 'repo-perm', 'perm', 'Perm', '${WORKSPACE_CWD}');
 	await service.openSession({
 		executable: createReadyExecutable(),
 		resumeSessionId: session.id,
+		linkedDirectories,
 		workspaceCwd: WORKSPACE_CWD,
 		workspaceId: WORKSPACE_ID,
 	});
@@ -569,6 +656,16 @@ VALUES ('${WORKSPACE_ID}', 'repo-perm', 'perm', 'Perm', '${WORKSPACE_CWD}');
 }
 
 describe('the whole composition: service to SDK', () => {
+	it('restores linked directories on resume through the service and client', async () => {
+		const linkedDirectories = ['/Users/me/.claude'];
+		const options = await resumeClaudeSessionThroughService(
+			'approval-required',
+			linkedDirectories,
+		);
+		expect(options.additionalDirectories).toEqual(linkedDirectories);
+		expect(options.permissionMode).toBe('default');
+	});
+
 	it('carries a read-only workspace all the way into the query options', async () => {
 		const options = await resumeClaudeSessionThroughService('read-only');
 

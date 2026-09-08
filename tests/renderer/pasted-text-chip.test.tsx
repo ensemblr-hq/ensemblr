@@ -273,7 +273,9 @@ describe('linked-directory chip', () => {
 	it('warns only while a directory is linked after the session opened', () => {
 		renderNotices({ linkedDirectories: [VAULT] });
 
-		expect(screen.queryByText(/from the next session/)).not.toBeInTheDocument();
+		expect(
+			screen.queryByText(/next send once the agent is idle/),
+		).not.toBeInTheDocument();
 	});
 
 	it('explains that a directory linked mid-session is not readable yet', () => {
@@ -282,6 +284,8 @@ describe('linked-directory chip', () => {
 			pendingLinkedDirectories: [VAULT],
 		});
 
-		expect(screen.getByText(/from the next session/)).toBeInTheDocument();
+		expect(
+			screen.getByText(/next send once the agent is idle/),
+		).toBeInTheDocument();
 	});
 });

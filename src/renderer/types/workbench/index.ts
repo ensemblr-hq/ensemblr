@@ -74,6 +74,7 @@ export type {
 	ComposerModelOption,
 	ComposerPlanUsage,
 	ComposerShellState,
+	ComposerSubmitOptions,
 	ComposerSubmitOutcome,
 	ComposerThinkingOption,
 	DockTabId,

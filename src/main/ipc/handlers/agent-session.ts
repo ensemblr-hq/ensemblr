@@ -18,6 +18,7 @@ import {
 	type AgentSessionService,
 	snapshotToWire,
 } from '../../agent-runtime/agent-session-service.ts';
+import { AgentSessionServiceError } from '../../agent-runtime/agent-session-service-error.ts';
 import type { QueueProvisionalNamingPort } from '../../agent-runtime/naming/provisional-workspace-naming';
 import type { PiExecutableService } from '../../pi-runtime';
 import { isBlockedByPiExecutable } from '../../pi-runtime/pi-executable-gate.ts';
@@ -156,6 +157,7 @@ export function registerAgentSessionHandlers({
 					executable,
 					initialPrompt: request.initialPrompt ?? null,
 					label: request.label,
+					linkedDirectories: request.linkedDirectories,
 					model: request.model ?? null,
 					planMode: request.planMode,
 					...(provider ? { provider } : {}),
@@ -181,6 +183,11 @@ export function registerAgentSessionHandlers({
 				return { session: snapshotToWire(snapshot) };
 			} catch (cause) {
 				return {
+					...(cause instanceof AgentSessionServiceError &&
+					(cause.code === 'linked-directories-busy' ||
+						cause.code === 'linked-directories-cancelled')
+						? { errorCode: cause.code }
+						: {}),
 					error:
 						cause instanceof Error
 							? cause.message

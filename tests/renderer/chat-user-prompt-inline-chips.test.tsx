@@ -8,6 +8,7 @@ vi.mock('@iconify/react', () => ({
 }));
 
 import { ChatUserPrompt } from '../../src/renderer/components/chat-user-prompt';
+import { formatLinkedDirectoriesBlock } from '../../src/shared/prompt-scaffolding';
 import { renderWithProviders } from './support/dom';
 
 const BLOCK_SEPARATOR = '\n\n';
@@ -208,5 +209,30 @@ describe('inline attachment chips', () => {
 
 		expect(classes(chipHost(container, 'src/main'))).not.toContain('mr-1');
 		expect(classes(chipHost(container, 'src/renderer'))).toContain('ml-1');
+	});
+
+	test('renders linked directories as informational, non-actionable chips', () => {
+		const path = '/Users/me/Reference Notes';
+		const container = renderPrompt(
+			formatLinkedDirectoriesBlock([path]),
+			'Review /not-a-directory too.',
+		);
+
+		const linkedDirectory = chip(container, path);
+		expect(linkedDirectory.textContent).toContain('Reference Notes');
+		expect(linkedDirectory).toHaveAttribute(
+			'aria-label',
+			`Linked directory: ${path}`,
+		);
+		expect(linkedDirectory).not.toBeInstanceOf(HTMLButtonElement);
+		expect(promptBody(container).textContent).toContain(
+			'Review /not-a-directory too.',
+		);
+	});
+
+	test('falls back to the full linked path when the root has no basename', () => {
+		const container = renderPrompt(formatLinkedDirectoriesBlock(['/']));
+
+		expect(chip(container, '/')).toHaveTextContent('/');
 	});
 });

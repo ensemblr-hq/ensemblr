@@ -9,10 +9,22 @@ import {
 } from '../../src/renderer/lib/workbench/action-prompts';
 import {
 	formatAttachedFileBlock,
+	formatLinkedDirectoriesBlock,
 	REFERENCED_FOLDERS_HEADER,
 } from '../../src/shared/prompt-scaffolding';
 
 describe('stripPromptScaffolding', () => {
+	test('strips current and legacy linked references from titles', () => {
+		for (const block of [
+			formatLinkedDirectoriesBlock(['/outside/notes']),
+			'Linked directories:\n/outside/notes',
+		]) {
+			expect(stripPromptScaffolding(`${block}\n\nRead the notes`)).toBe(
+				'Read the notes',
+			);
+		}
+	});
+
 	test('returns plain typed text untouched', () => {
 		expect(stripPromptScaffolding('Fix the login redirect bug')).toBe(
 			'Fix the login redirect bug',

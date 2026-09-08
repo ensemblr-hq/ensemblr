@@ -127,6 +127,7 @@ describe('sending now instead of queueing', () => {
 		await sendNow();
 
 		expect(onSubmit).toHaveBeenCalledWith('urgent', {
+			linkedDirectories: [],
 			streamingBehavior: 'steer',
 		});
 		expect(queued()).toEqual([]);
@@ -141,6 +142,7 @@ describe('sending now instead of queueing', () => {
 		await sendNow();
 
 		expect(onSubmit).toHaveBeenCalledWith('urgent', {
+			linkedDirectories: [],
 			streamingBehavior: 'steer',
 		});
 		expect(queued()).toEqual([]);
@@ -156,7 +158,9 @@ describe('sending now instead of queueing', () => {
 
 		await sendNow();
 
-		expect(onSubmit).toHaveBeenCalledWith('urgent', undefined);
+		expect(onSubmit).toHaveBeenCalledWith('urgent', {
+			linkedDirectories: [],
+		});
 	});
 
 	test('an empty box sends nothing', async () => {
