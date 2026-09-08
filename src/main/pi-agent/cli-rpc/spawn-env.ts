@@ -23,6 +23,8 @@ export type SpawnFn = (input: {
 	command: string;
 	cwd: string;
 	env: NodeJS.ProcessEnv;
+	/** Isolate a short-lived query's process group so wrappers can be reaped. */
+	detached?: boolean;
 }) => ChildLike;
 
 /**
@@ -35,14 +37,17 @@ export function defaultSpawn({
 	command,
 	cwd,
 	env,
+	detached,
 }: {
 	args: readonly string[];
 	command: string;
 	cwd: string;
 	env: NodeJS.ProcessEnv;
+	detached?: boolean;
 }): ChildLike {
 	return nodeSpawn(command, Array.from(args), {
 		cwd,
+		detached,
 		env,
 		shell: false,
 		stdio: ['pipe', 'pipe', 'pipe'],

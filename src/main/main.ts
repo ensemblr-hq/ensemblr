@@ -807,6 +807,7 @@ const agentProviderService = createAgentProviderService({
 				await piExecutableService.getSnapshot(),
 				cwd,
 				readAgentSkillBundle().skillDirectories,
+				{ resolveBaseEnv: resolveAgentSpawnEnv },
 			),
 	},
 });

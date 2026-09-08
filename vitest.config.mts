@@ -237,6 +237,7 @@ export default defineConfig({
 						'tests/main/agent-control-frontier-model-gate.test.ts',
 						'tests/main/agent-provider-handlers.test.ts',
 						'tests/main/pi-provider-readiness-probe.test.ts',
+						'tests/main/pi-slash-commands.test.ts',
 						'tests/main/claude-readiness.test.ts',
 						'tests/main/claude-subagent-mode.test.ts',
 						'tests/main/claude-agent-control-wiring.test.ts',
