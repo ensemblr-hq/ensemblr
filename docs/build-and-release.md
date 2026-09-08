@@ -717,15 +717,15 @@ mistake to anyone who did not hit the underlying constraint:
 | --- | --- |
 | `depends_on macos: :ventura` | Electron 44's floor, per the `44-x-y` branch README — Electron 44 removed macOS 12 support, so the `:monterey` this stanza carried under Electron 43 now offers the build to machines that cannot run it. Homebrew deprecated the `">= :ventura"` string form; `brew style` rewrites it. Re-read the branch README on every Electron major: the floor moves without a release note. |
 | `auto_updates true` | The in-app updater owns the bundle. `brew upgrade` therefore skips it, and only `--greedy` overrides that. Two updaters writing one bundle is how an install gets corrupted. |
-| a custom `:github_releases` livecheck | Every release is flagged `--prerelease`, so `:github_latest` finds nothing at all. The block accepts prereleases and keys off a leading `v`, which is also what excludes the rolling `nightly` tag. |
+| a custom `:github_releases` livecheck | The block accepts tagged prereleases but keys off a leading `v`, which excludes the rolling `nightly` tag and keeps the cask on the highest semver release. |
 | `zap trash:` without the root directory | The root (`~/Ensemblr` by default) holds cloned repositories and worktrees. A `zap` that took it would delete the user's work. |
 
 The tap's own CI runs `brew style`, `brew audit`, `brew fetch` (which is what
 catches a bump that wrote one of the two stanzas and not the other), and a
 `brew livecheck` that fails if it resolves nothing. The audit excludes exactly
-one check, `github_prerelease_version`: it enforces homebrew-cask's policy
-against shipping prereleases, which every Ensemblr release is until 1.0.
-Submitting to homebrew-cask upstream is out of scope for that same reason.
+one check, `github_prerelease_version`, so an intentionally shipped
+`-alpha` / `-beta` / `-rc` cask can pass; stable releases do not depend on that
+exception.
 
 ### Repository secrets
 
