@@ -6,6 +6,7 @@
  */
 import type {
 	AddDiffCommentsResult,
+	AgentControlContextUsage,
 	AgentControlConversationStatus,
 	AgentControlModelList,
 	AgentControlProjectInfo,
@@ -302,14 +303,24 @@ export interface ConversationPort {
 		signal?: AbortSignal,
 	) => Promise<'completed' | 'timeout'>;
 	/**
-	 * Live conversation status. Reads the in-memory snapshot only, with no
-	 * persisted-event scan, so the `waitForAgents` poll loop can call it every
-	 * tick; pair it with {@link ConversationPort.hasFinalMessage} when a caller
-	 * needs the full {@link AgentControlConversationStatus}.
+	 * Live conversation status, including how full its context window is. Reads
+	 * the in-memory snapshot only, with no persisted-event scan, so the
+	 * `waitForAgents` poll loop can call it every tick; pair it with {@link
+	 * ConversationPort.hasFinalMessage} when a caller needs the full {@link
+	 * AgentControlConversationStatus}.
+	 *
+	 * `contextUsage` is null whenever no runtime is attached, because usage is
+	 * tracked against the running session. That is the honest answer rather than
+	 * a gap: the decision it informs — another round here, or a fresh
+	 * conversation — is taken about a child that has gone idle, and an idle child
+	 * still has its runtime.
 	 */
 	getStatus: (
 		agentSessionId: string,
-	) => Promise<Omit<AgentControlConversationStatus, 'hasFinalMessage'> | null>;
+	) => Promise<Omit<
+		AgentControlConversationStatus,
+		'hasFinalMessage' | 'note'
+	> | null>;
 	/**
 	 * Whether a persisted assistant answer exists for the conversation. Scans
 	 * stored events, so it stays off the poll loop and is resolved only for the
@@ -530,6 +541,14 @@ export interface ConciergePort {
 		model: string | null;
 		thinkingLevel: string | null;
 	} | null;
+	/**
+	 * How full the live Concierge conversation's window is, or null when none is
+	 * open or none has reported a reading. Separate from the agent-session path
+	 * for the same reason {@link ConciergePort.describeSession} is: the Concierge
+	 * belongs to no workspace and has no row in `agentSessionService`, so a
+	 * Concierge reading its own status resolves through here or finds nothing.
+	 */
+	describeContextUsage: () => AgentControlContextUsage | null;
 }
 
 /**

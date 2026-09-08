@@ -641,6 +641,7 @@ function insertActiveSession({
 		agentResponsePendingSummary: false,
 		branch,
 		chatTabId,
+		contextUsage: null,
 		deltaCounter: 0,
 		lastBroadcastOrdinal: getMaxOrdinalForBranch({
 			branchId: branch.id,

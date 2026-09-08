@@ -6,7 +6,7 @@ import type {
 } from '../../storage/repositories';
 import { getAgentSessionById } from '../../storage/repositories/agent-session-repository.ts';
 import type { AgentSession } from '../agent-client.ts';
-import type { AgentSubscription } from '../agent-types.ts';
+import type { AgentContextUsage, AgentSubscription } from '../agent-types.ts';
 
 /** Live binding between a persisted agent session row and a runtime AgentSession. */
 export interface ActiveSession {
@@ -16,6 +16,15 @@ export interface ActiveSession {
 	chatTabId: string;
 	agentRuntimeSession: AgentSession;
 	row: AgentSessionRow;
+	/**
+	 * Newest `context-usage` reading the runtime reported, or null before it has
+	 * reported one. Held here rather than read back out of the persisted events
+	 * because the agent-control wait loop polls it per target per tick, and the
+	 * newest reading can sit hundreds of events back in a tool-heavy turn. It
+	 * dies with the entry, which is correct: usage is a property of the running
+	 * session rather than of the transcript it leaves behind.
+	 */
+	contextUsage: AgentContextUsage | null;
 	summaryQueued: boolean;
 	subscription: AgentSubscription;
 	/**

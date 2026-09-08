@@ -300,6 +300,32 @@ describe('agent-control AWARENESS parity', () => {
 		}
 	});
 
+	// A harness control identity is minted per workspace and shared by every
+	// terminal in it, so `readOwnStatus` refuses its implicit self-read with
+	// `not-found`. Advertising that read to a harness is the same class of
+	// mistake as naming a tool its list does not carry: an op that always fails.
+	it('never offers a terminal harness the implicit self-status read', () => {
+		expect(HARNESS_AWARENESS).toContain('ensemblr_get_conversation_status');
+		expect(HARNESS_AWARENESS).toContain(
+			'a status read naming no session is refused',
+		);
+		expect(HARNESS_AWARENESS).not.toContain(
+			'reports YOUR OWN when you name no session',
+		);
+	});
+
+	// The two playbooks whose callers do have a conversation behind them keep the
+	// promise, so the harness carve-out above cannot be satisfied by dropping the
+	// self-read everywhere.
+	it('keeps the implicit self-status read where a conversation backs it', () => {
+		for (const playbook of [
+			ORCHESTRATOR_AWARENESS,
+			NATIVE_ORCHESTRATOR_AWARENESS,
+		]) {
+			expect(playbook).toContain('when you name no session');
+		}
+	});
+
 	// Everything that is a property of the work rather than of the mechanism has
 	// to survive the swap, or picking the built-in tool quietly drops the rules
 	// that make a fan-out worth doing.

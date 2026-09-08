@@ -22,6 +22,7 @@ import type {
 	AgentSessionEventSink,
 	AgentSessionSnapshot,
 } from './agent-session-types.ts';
+import type { AgentContextUsage } from './agent-types.ts';
 import type { SessionNamingInput } from './naming/session-naming.ts';
 import {
 	type ActiveSessionMap,
@@ -205,6 +206,8 @@ interface AgentSessionLifecycle {
 /** Read-only view of an active session for the composition root. */
 interface ActiveSessionView {
 	branch: AgentSessionBranchRow;
+	/** Newest context-window reading the runtime reported, null before the first. */
+	contextUsage: AgentContextUsage | null;
 	row: AgentSessionRow;
 }
 
@@ -493,7 +496,11 @@ export function createAgentSessionLifecycle({
 			if (!active) {
 				return null;
 			}
-			return { branch: active.branch, row: active.row };
+			return {
+				branch: active.branch,
+				contextUsage: active.contextUsage,
+				row: active.row,
+			};
 		},
 		openSession,
 		refreshPlanUsage: async (sessionId) => {

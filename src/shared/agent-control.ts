@@ -50,6 +50,13 @@ export {
 	CONCIERGE_MESSAGE_LIMITS,
 	CONCIERGE_MESSAGE_REASONS,
 } from './agent-control/concierge-message.ts';
+export type { ContextPressureAudience } from './agent-control/context-pressure.ts';
+export {
+	CONTEXT_PRESSURE_PERCENT,
+	delegateContextPressureNote,
+	isUnderContextPressure,
+	ownContextPressureNote,
+} from './agent-control/context-pressure.ts';
 export * from './agent-control/contracts.ts';
 export { buildConversationTranscript } from './agent-control/conversation-transcript.ts';
 export { buildLanguageDirective } from './agent-control/language-directive.ts';
@@ -85,6 +92,7 @@ export {
 	CONCIERGE_ONLY_OPS,
 	CONCIERGE_WITHHELD_OPS,
 	conciergeControlOpDenial,
+	resolveContextPressureAudience,
 	retiredControlOpDenial,
 	SUBAGENT_UNUSABLE_OPS,
 	SUBAGENT_WITHHELD_OPS,

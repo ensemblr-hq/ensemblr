@@ -170,7 +170,12 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
 
 **Reads (cross-workspace):**
 - `listWorkspaces()`, `listTabs({ workspaceId? })`, `listTerminals({ workspaceId? })`
-- `getConversationStatus({ agentSessionId })`, `getLastMessage({ agentSessionId })`
+- `getConversationStatus({ agentSessionId? })`, `getLastMessage({ agentSessionId })` — the
+  status target is optional, and omitting it reports the caller's **own** conversation, which is the
+  only way an agent learns how full its own window is: it does not know its own session id. Every
+  status carries `contextUsage`, and one at or past `CONTEXT_PRESSURE_PERCENT` carries a `note`
+  saying what to do about it — cut to what the caller can actually reach, since a sub-agent and a
+  natively-delegating root both hold this op and neither holds `startConversation`
 - `readTerminalOutput({ terminalId })`
 
 **Reads (own workspace only):**

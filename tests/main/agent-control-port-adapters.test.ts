@@ -1495,6 +1495,7 @@ describe('agent-control port adapters: conversation status', () => {
 	) => {
 		const { deps } = makeDeps();
 		(deps as { agentSessionService: unknown }).agentSessionService = {
+			getContextUsage: vi.fn(() => null),
 			getSession: vi.fn(() => snapshot),
 			iterateEventPayloadsDescending: vi.fn(() => payloads),
 		};
@@ -1505,6 +1506,11 @@ describe('agent-control port adapters: conversation status', () => {
 		const { deps } = makeDeps();
 		const iterateEventPayloadsDescending = vi.fn(() => []);
 		(deps as { agentSessionService: unknown }).agentSessionService = {
+			getContextUsage: vi.fn(() => ({
+				contextWindow: 200_000,
+				percent: 31.5,
+				tokens: 63_000,
+			})),
 			getSession: vi.fn(() => ({
 				id: 'sess-1',
 				branchId: 'b1',
@@ -1517,6 +1523,7 @@ describe('agent-control port adapters: conversation status', () => {
 		const result = await ports.conversations.getStatus('sess-1');
 		expect(result).toEqual({
 			agentSessionId: 'sess-1',
+			contextUsage: { contextWindow: 200_000, percent: 31.5, tokens: 63_000 },
 			status: 'closed',
 			runtimeOpen: false,
 		});

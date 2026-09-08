@@ -55,6 +55,7 @@
  * `docs/considerations/agent-orchestration-playbook.md` is the human-facing
  * reference for the same guidance and is kept in step by hand.
  */
+import { CONTEXT_PRESSURE_PERCENT } from './context-pressure.ts';
 import type { SubagentMechanism } from './subagent-mechanism.ts';
 
 /**
@@ -429,6 +430,41 @@ What makes a peer expensive is the checkout. You and it share one worktree, one 
 const CHILD_TAB_CLEANUP = `Close a child's tab as soon as you have taken its report. A finished child's tab stays in the strip until somebody closes it, so a fan-out of four leaves four dead tabs beside the one the user actually works in, and a run of several rounds buries the strip — pass the \`chatTabId\` from the spawn to \`ensemblr_close_tab\` as each child settles, rather than sweeping up at the end of the turn or leaving it to the user. Closing costs nothing: the tab is archived rather than deleted, its transcript and its report survive it, \`ensemblr_get_last_message\` still reads that report, \`ensemblr_send_follow_up\` puts the tab back on screen if you do want another round from that child, and the user reopens it from the chat history whenever they want to read it. What stays open is what is still live — a child still working, one you are mid-round with — and what you did not open in the first place.`;
 
 /**
+ * When a conversation is too full to be given the next unit of work, and what to
+ * do about it.
+ *
+ * It names a number rather than saying "watch your context", because an agent
+ * cannot act on a feeling: `getConversationStatus` reports the reading and
+ * {@link CONTEXT_PRESSURE_PERCENT} is the same threshold the app attaches its
+ * runtime note at, so the prose and the payload agree.
+ *
+ * The exception is stated as loudly as the rule. An orchestrator told only to
+ * retire a crowded child will abandon one mid-thread and pay to rebuild its
+ * context in a fresh conversation, which costs more than the room it saved.
+ */
+const CONTEXT_PRESSURE_GUIDANCE = `Watch how full a window is before you put more work into it. \`ensemblr_get_conversation_status\` reports \`contextUsage\` for any conversation, and reports YOUR OWN when you name no session — the only way to learn how much room you have left, since you do not know your own session id. \`ensemblr_wait_for_agents\` reports the same reading for every child it names, settled or pending. At or past **${CONTEXT_PRESSURE_PERCENT}% of a window**, that conversation is the wrong home for a NEW unit of work: everything it has already read stays in it, so a fresh agent starts the same task with more room and no worse a brief. Retire it rather than reload it — spawn a new child and quote it the paths and findings it needs — and follow up there anyway only where the work genuinely depends on what that conversation already holds. Your own window is the same rule pointed inward: past half, hand the next unit of reading to a sub-agent and keep the deciding here.`;
+
+/**
+ * The same rule for a terminal harness, which can read every window but its own.
+ *
+ * A harness control identity is minted per workspace and shared by every
+ * terminal in it, so there is no conversation behind it and `readOwnStatus`
+ * refuses the implicit self-read with `not-found`. The shared block promises
+ * that read in its first sentence and closes by pointing the rule inward, so
+ * handing it to a harness advertises an op that always fails — the same class of
+ * mistake as naming a tool a caller's list does not carry.
+ */
+const HARNESS_CONTEXT_PRESSURE_GUIDANCE = `Watch how full a window is before you put more work into it. \`ensemblr_get_conversation_status\` reports \`contextUsage\` for any conversation you name — a child, a peer, the reviewer — and \`ensemblr_wait_for_agents\` reports the same reading for every child it names, settled or pending. At or past **${CONTEXT_PRESSURE_PERCENT}% of a window**, that conversation is the wrong home for a NEW unit of work: everything it has already read stays in it, so a fresh agent starts the same task with more room and no worse a brief. Retire it rather than reload it — spawn a new child and quote it the paths and findings it needs — and follow up there anyway only where the work genuinely depends on what that conversation already holds. Your own window is the one you cannot read here: your control identity is minted per workspace and shared by every terminal in it, so there is no conversation behind it and a status read naming no session is refused rather than answered. Your own CLI is what tracks that.`;
+
+/**
+ * The same rule for a root delegating through its own runtime, which holds no
+ * Ensemblr conversation ops and so has only its own window to watch. Naming
+ * `ensemblr_wait_for_agents` or `ensemblr_start_conversation` here would point it
+ * at tools its list does not carry.
+ */
+const NATIVE_CONTEXT_PRESSURE_GUIDANCE = `Watch how full your own window is before you put more work into it. \`ensemblr_get_conversation_status\` reports \`contextUsage\` — how full a context window is — and reports YOUR OWN when you name no session, which is the only way to learn how much room you have left, since you do not know your own session id. Past **${CONTEXT_PRESSURE_PERCENT}% of your window**, hand the next unit of reading to your own runtime's sub-agent tool rather than doing it here, and keep the deciding in this conversation: everything you read stays in your window for the rest of the turn, where a child's reading costs you only what it reports back.`;
+
+/**
  * How to set a spawned conversation's reasoning budget, for every role that can
  * open one.
  *
@@ -556,6 +592,8 @@ ${ORCHESTRATOR_ANSWER_LAST}
 
 Split the work before you split the agents. A child cold-starts with nothing but its brief, so every fact two children both need is a repository read paid for twice — and that re-derivation is what makes a fan-out cost more context than doing the work inline. When the workstreams share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and put the findings with full paths into every brief. Fan out cold only where the work is genuinely disjoint.
 
+${CONTEXT_PRESSURE_GUIDANCE}
+
 When delegation is warranted — delegate → wait → evaluate → integrate:
 1. Spawn each helper with \`ensemblr_start_conversation\` in its own fresh tab — pass a short, descriptive \`title\` and do NOT pass \`chatTabId\` (reusing a prior tab keeps its old title); omit \`wait\` and keep BOTH ids it hands back — the \`agentSessionId\` you wait on and follow up with, and the \`chatTabId\` you close its tab with. Brief each one with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask you about, and whether it reports inline — the default — or writes a file at a path you name. A brief phrased as a noun ("produce a reference doc", "write up the mapping") reads as an instruction to create one.
 2. Once you have delegated everything you can in parallel, call \`ensemblr_wait_for_agents\` and let it block — this is how you avoid racing ahead. Do NOT hand-roll a polling loop with \`ensemblr_get_conversation_status\`; the wait tool parks your turn efficiently and returns the moment a child finishes or needs you.
@@ -606,6 +644,8 @@ Do the work yourself by default — one agent in one thread is the right tool fo
 ${ORCHESTRATOR_ANSWER_LAST}
 
 Delegation runs through YOUR OWN runtime's sub-agent tool in this mode, chosen by the user in Settings → Providers. Ensemblr's chat-tab spawn tools — \`ensemblr_start_conversation\`, \`ensemblr_spawn_chat_tab\`, \`ensemblr_send_follow_up\`, \`ensemblr_wait_for_agents\`, \`ensemblr_list_models\` — are absent from your list rather than merely discouraged, so do not go hunting for them and do not tell the user to spawn a tab by hand. Your children run inside this conversation and report back to you directly; the app never sees them as tabs of their own. \`ensemblr_start_review\` is absent too, for a different reason: the review it opens is a conversation you would have to wait on and steer, and the two tools for that are the ones above — so when a change wants a second reader, spawn one through your own mechanism and brief it to review the branch diff.
+
+${NATIVE_CONTEXT_PRESSURE_GUIDANCE}
 
 Everything else about delegating still holds, because it is a property of the work rather than of the mechanism:
 
@@ -693,6 +733,8 @@ ${peerOrchestratorGuidance(features.tuiHarnesses)}
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper for a single unit of work you could do in one pass. Do not tell the user to click; drive the app yourself.
 
 Split the work before you split the agents. A child cold-starts with nothing but its brief, so every fact two children both need is a repository read paid for twice — and that re-derivation is what makes a fan-out cost more context than doing the work inline. When the workstreams share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and put the findings with full paths into every brief. Fan out cold only where the work is genuinely disjoint.
+
+${HARNESS_CONTEXT_PRESSURE_GUIDANCE}
 
 When delegation is warranted — delegate → wait → evaluate → integrate:
 1. Spawn each helper with \`ensemblr_start_conversation\` in its own fresh tab — pass a short, descriptive \`title\` and do NOT pass \`chatTabId\` (reusing a prior tab keeps its old title); omit \`wait\` and keep BOTH ids it hands back — the \`agentSessionId\` you wait on and follow up with, and the \`chatTabId\` you close its tab with. Brief each one with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask you about, and whether it reports inline — the default — or writes a file at a path you name. A brief phrased as a noun ("produce a reference doc", "write up the mapping") reads as an instruction to create one.

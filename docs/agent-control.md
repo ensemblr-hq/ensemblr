@@ -721,7 +721,7 @@ yields no usable words.
 
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
-| `ensemblr_get_conversation_status` | **`agentSessionId: string`** | read | — |
+| `ensemblr_get_conversation_status` | `agentSessionId?: string` | read | — |
 | `ensemblr_get_last_message` | **`agentSessionId: string`** | read | — |
 | `ensemblr_read_conversation` | **`agentSessionId: string`**, `stat?: boolean`, `fromOrdinal?: number`, `ordinal?: number` | read | — |
 
@@ -731,6 +731,59 @@ a combination. A page caps each field at 2,000 characters and the whole page at
 the page budget. This is how an orchestrator audits what a child actually ran —
 its tool calls with their arguments and results — rather than trusting the report
 `getLastMessage` hands back.
+
+#### How full a window is
+
+`getConversationStatus` is the only op whose target argument is optional, and
+that is what makes it the one way an agent learns its own context usage: it knows
+neither its own session id nor its own consumption, so a required
+`agentSessionId` would leave the question unaskable. Omitted, the op reports the
+caller's own conversation; named, it reports a child, a peer, or a reviewer.
+
+Every status carries `contextUsage` — `{ contextWindow, tokens, percent }`, with
+`percent` on a 0-100 scale because that is what both runtimes emit. `waitForAgents`
+carries the same reading on every `completed` and `pending` entry, at no extra
+cost: its poll tick already calls `getStatus`.
+
+The reading comes off the **live** session. `ConversationPort.getStatus` is
+documented as scan-free so the wait loop can call it per target per tick, so the
+newest `context-usage` event is parked on the active-session entry as it arrives
+rather than scanned back out of the transcript. A conversation with no runtime
+attached — closed, or from before a restart — therefore reports
+`contextUsage: null`, which is a fact about the reading rather than an empty
+window. That is not the gap it looks like: the decision the reading informs is
+taken about a child that has gone **idle**, and an idle child still holds its
+runtime (only `shutdown` drops the entry).
+
+The Concierge resolves through `ConciergePort.describeContextUsage` instead. It
+belongs to no workspace and has no row in the agent-session store, so the
+ordinary lookup would find nothing for the caller most likely to ask — the same
+reason `describeSession` exists beside it. A terminal harness has no conversation
+of its own at all (its control identity is minted per workspace and shared by
+every terminal in it), so omitting the argument there is refused with
+`not-found` rather than answered with a null the caller has to interpret.
+
+At or past `CONTEXT_PRESSURE_PERCENT` (50), the result carries a `note` saying so.
+Which note lands depends on two things at once. **Who is reading**: a caller
+looking at its own window is told to move the next unit of *reading* out of this
+conversation, while one looking at a conversation it steers is told to brief a
+fresh child rather than follow up — and told the exception, that a follow-up is
+still right when the work depends on what that conversation already holds. And
+**what the caller can do about it**, which is `ContextPressureAudience`:
+`getConversationStatus` is held by every role, including the two whose tool lists
+have `startConversation` withheld, so naming that op unconditionally would send a
+spawned sub-agent or a natively-delegating root after a tool it does not hold. A
+sub-agent is told to wrap up and say in its report that its window is filling; a
+native root is pointed at its own runtime's sub-agent tool. `resolveContextPressureAudience`
+sits beside `withheldControlOps` in `subagent-policy.ts` and mirrors its
+`delegatesNatively` condition deliberately — the two answer the same question and
+must move together.
+
+On `waitForAgents` the pressure note joins the resume note rather than replacing
+it, and its audience is fixed at `spawns-tabs` rather than resolved. That is sound
+only because `waitForAgents` is itself withheld from both of the other audiences
+(`SUBAGENT_UNUSABLE_OPS` and `NATIVE_DELEGATION_WITHHELD_OPS`), so everything that
+can reach the note already holds the op it names.
 
 ### Review
 

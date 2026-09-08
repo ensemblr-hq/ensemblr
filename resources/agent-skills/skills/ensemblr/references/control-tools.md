@@ -28,6 +28,18 @@ Control adds no capability of its own — it is a gate, not a feature.
 `ensemblr_get_conversation_status`, `ensemblr_get_last_message`,
 `ensemblr_read_conversation`.
 
+`ensemblr_get_conversation_status` is the only op whose target is optional, and
+that is what makes it the one way to learn your own context usage: omit
+`agentSessionId` and it reports **your own** conversation, since you do not know
+your own session id. A terminal harness is the one caller that cannot — its
+control identity is minted per workspace and shared by every terminal in it, so
+there is no conversation behind it and the implicit read is refused with
+`not-found`; its own CLI tracks that window, and it names an `agentSessionId` to
+read a child, a peer, or the reviewer. Every status carries `contextUsage`
+(`{ contextWindow, tokens, percent }`, `percent` on a 0-100 scale), and it is
+null for a conversation with no runtime attached — closed, or from before a
+restart — which is a fact about the reading rather than an empty window.
+
 **Review** — `ensemblr_get_workspace_diff`, `ensemblr_get_diff_comments`,
 `ensemblr_add_diff_comments`, `ensemblr_resolve_diff_comments`.
 
@@ -180,10 +192,15 @@ The loop is **delegate → wait → evaluate → integrate**:
 3. `timedOut: true` with children still in `pending` is a lap of the loop, not a
    fault. Wait again on the pending ids. Do not re-spawn, and do not report it
    to the user as a problem.
-4. Verify before you rely: open the path a child cited and read it yourself.
+4. Read `contextUsage` on every child the wait names, settled or pending. At or
+   past **50%** of its window, that child is the wrong home for a *new* unit of
+   work: spawn a fresh one and quote it the paths and findings it needs, rather
+   than following up there. Follow up anyway when the work genuinely depends on
+   what that child already holds.
+5. Verify before you rely: open the path a child cited and read it yourself.
    `ensemblr_read_conversation` replays a child's actual tool calls when the
    claim is about what it *did* rather than what a file says.
-5. Batch the children's open questions into one `ensemblr_ask_user_question`
+6. Batch the children's open questions into one `ensemblr_ask_user_question`
    before you answer — up to 4 questions, 2–6 options each, your recommendation
    in the option descriptions.
 

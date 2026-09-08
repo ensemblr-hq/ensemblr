@@ -588,9 +588,18 @@ export interface ListTerminalsArgs {
 	workspaceId?: string;
 }
 
-/** Args for `getConversationStatus` / `getLastMessage`: target an agent session. */
+/** Args for `getLastMessage`: target an agent session. */
 export interface ConversationRef {
 	agentSessionId: string;
+}
+
+/**
+ * Args for `getConversationStatus`: the conversation to read, defaulting to the
+ * caller's own. Optional because how full its own window is is the one thing an
+ * agent cannot learn by naming an id — it does not know which id it is.
+ */
+export interface OptionalConversationRef {
+	agentSessionId?: string;
 }
 
 /**
@@ -721,12 +730,20 @@ export interface WaitedAgent {
 	signal: OrchestratorSignal | null;
 	/** Whether `lastMessage` was shortened and the rest is still fetchable. */
 	reportTruncated: boolean;
+	/**
+	 * How full the child's window is, so the orchestrator can tell a child worth
+	 * another round from one that should hand over to a fresh conversation. Read
+	 * off the live session, so a child that has already shut down reports null.
+	 */
+	contextUsage: AgentControlContextUsage | null;
 }
 
 /** A target that had not settled when `waitForAgents` returned. */
 export interface PendingAgent {
 	agentSessionId: string;
 	status: string;
+	/** How full the child's window is, or null when nothing is attached. */
+	contextUsage: AgentControlContextUsage | null;
 }
 
 /**
@@ -1770,6 +1787,26 @@ export interface AgentControlWorkspaceInfo {
 	boardStatus: WorkspaceBoardStatusValue;
 }
 
+/**
+ * How full a conversation's context window is, as its runtime last reported it.
+ *
+ * `percent` is on a 0-100 scale, because that is what both runtimes emit —
+ * `(tokens / contextWindow) * 100` — and comparing it against a 0-1 fraction is
+ * a mistake this codebase has already made once. It is null when the runtime
+ * reported a token count before it reported a window, which is what a reader
+ * must render as "unknown" rather than as zero.
+ *
+ * The whole reading is null for a conversation with no live runtime attached:
+ * usage is tracked against the running session, so a chat closed before the app
+ * restarted has none to report. That is a fact about the reading rather than
+ * about the conversation, and a caller may not read it as "empty".
+ */
+export interface AgentControlContextUsage {
+	contextWindow: number;
+	tokens: number | null;
+	percent: number | null;
+}
+
 /** Conversation status returned by `getConversationStatus`. */
 export interface AgentControlConversationStatus {
 	agentSessionId: string;
@@ -1782,6 +1819,10 @@ export interface AgentControlConversationStatus {
 	 * re-spawning it.
 	 */
 	hasFinalMessage: boolean;
+	/** How full this conversation's window is, or null when nothing is attached. */
+	contextUsage: AgentControlContextUsage | null;
+	/** Advice attached when the reading has reached {@link CONTEXT_PRESSURE_PERCENT}. */
+	note?: string;
 }
 
 /**

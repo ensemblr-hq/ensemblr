@@ -205,6 +205,10 @@ const conversationRefSchema = z.strictObject({
 	agentSessionId: nonEmpty,
 });
 
+const optionalConversationRefSchema = z.strictObject({
+	agentSessionId: nonEmpty.optional(),
+});
+
 const readConversationSchema = z.strictObject({
 	agentSessionId: nonEmpty,
 	stat: z.boolean().optional(),
@@ -569,7 +573,7 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	listWorkspaces: emptySchema,
 	listTabs: listTabsSchema,
 	listTerminals: listTerminalsSchema,
-	getConversationStatus: conversationRefSchema,
+	getConversationStatus: optionalConversationRefSchema,
 	getLastMessage: conversationRefSchema,
 	readConversation: readConversationSchema,
 	readTerminalOutput: readTerminalOutputSchema,

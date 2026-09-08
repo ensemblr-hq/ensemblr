@@ -12,6 +12,7 @@ import {
 import {
 	conciergeAwareness,
 	PLAN_REFINEMENT_DIRECTIVE,
+	type SubagentMechanism,
 } from '../../src/shared/agent-control.ts';
 import type { AppLanguage } from '../../src/shared/i18n.ts';
 import type { PermissionMode } from '../../src/shared/permissions.ts';
@@ -209,6 +210,7 @@ const makePorts = (
 				conciergeSessionId: 'concierge-1',
 				delivered: true,
 			}),
+		describeContextUsage: () => null,
 		describeSession: () => null,
 		homePath: () => null,
 	},
@@ -255,6 +257,7 @@ const setup = (
 		ports?: AgentControlPorts;
 		guardrails?: Partial<GuardrailConfig>;
 		species?: AgentSpecies;
+		delegation?: SubagentMechanism;
 		dispatchTimeoutMs?: number;
 		architectureDiagram?: boolean;
 		tuiHarnesses?: boolean;
@@ -272,6 +275,7 @@ const setup = (
 		sessionId: 'caller',
 		workspaceId: options.concierge ? '' : 'ws',
 		concierge: options.concierge ?? false,
+		delegation: options.delegation,
 		workspaceCwd: '/ws',
 		species: options.species ?? 'pi',
 	});
@@ -3396,6 +3400,7 @@ const setupConcierge = (
 				conciergeSessionId: 'concierge-1',
 				delivered: true,
 			}),
+			describeContextUsage: () => null,
 			describeSession: () => ({
 				model: 'anthropic/sonnet',
 				thinkingLevel: null,
@@ -3862,5 +3867,215 @@ describe('agent-control service: a retired Concierge child', () => {
 		});
 
 		expect(result.ok).toBe(true);
+	});
+});
+
+// How full a window is is the one thing an agent cannot learn by naming an id:
+// it does not know which id it is. `getConversationStatus` is therefore the only
+// op whose target argument is optional, and these cover both readings.
+describe('agent-control service: reporting context usage', () => {
+	const usage = { contextWindow: 200_000, percent: 71.4, tokens: 142_800 };
+
+	it('reports the caller’s own conversation when no session is named', async () => {
+		const ports = makePorts();
+		ports.conversations.getStatus = vi.fn().mockResolvedValue({
+			agentSessionId: 'caller',
+			contextUsage: usage,
+			runtimeOpen: true,
+			status: 'streaming',
+		});
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'getConversationStatus',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(ports.conversations.getStatus).toHaveBeenCalledWith('caller');
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({
+				agentSessionId: 'caller',
+				contextUsage: usage,
+			});
+		}
+	});
+
+	// The two readings prompt different moves, so a caller must not be handed the
+	// advice meant for the other: a conversation cannot retire itself.
+	it('gives a caller reading itself the inward-facing advice', async () => {
+		const ports = makePorts();
+		ports.conversations.getStatus = vi.fn().mockResolvedValue({
+			agentSessionId: 'caller',
+			contextUsage: usage,
+			runtimeOpen: true,
+			status: 'streaming',
+		});
+		const { service } = setup({ ports });
+
+		const own = await service.invoke({
+			op: 'getConversationStatus',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+		const other = await service.invoke({
+			op: 'getConversationStatus',
+			token: 'tok-caller',
+			rawArgs: { agentSessionId: 'child-1' },
+		});
+
+		expect(own.ok && other.ok).toBe(true);
+		if (own.ok && other.ok) {
+			const ownNote = (own.data as { note?: string }).note;
+			const otherNote = (other.data as { note?: string }).note;
+			expect(ownNote).toContain('Your own context window is 71% full');
+			expect(otherNote).toContain('Context pressure');
+			expect(otherNote).not.toEqual(ownNote);
+		}
+	});
+
+	it('attaches no note while the window still has room', async () => {
+		const ports = makePorts();
+		ports.conversations.getStatus = vi.fn().mockResolvedValue({
+			agentSessionId: 'child-1',
+			contextUsage: { contextWindow: 200_000, percent: 8, tokens: 16_000 },
+			runtimeOpen: true,
+			status: 'idle',
+		});
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'getConversationStatus',
+			token: 'tok-caller',
+			rawArgs: { agentSessionId: 'child-1' },
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).not.toHaveProperty('note');
+		}
+	});
+
+	// The Concierge keeps its own session store, so the agent-session lookup holds
+	// no row for the caller most likely to ask.
+	it('resolves the Concierge’s own reading through the Concierge port', async () => {
+		const { service, ports } = setupConcierge();
+		const concierge = ports.concierge;
+		if (!concierge) {
+			throw new Error('the Concierge fixture must wire its own ports');
+		}
+		concierge.describeContextUsage = vi.fn().mockReturnValue(usage);
+
+		const result = await service.invoke({
+			op: 'getConversationStatus',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(concierge.describeContextUsage).toHaveBeenCalled();
+		expect(ports.conversations.getStatus).not.toHaveBeenCalled();
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toMatchObject({ contextUsage: usage });
+		}
+	});
+
+	// `getConversationStatus` is held by every role, including the two whose lists
+	// have `startConversation` withheld. Naming it to them sends a model after a
+	// tool it does not hold, which is the one way this op can mislead.
+	it('does not tell a spawned sub-agent to spawn its way out', async () => {
+		const ports = makePorts();
+		ports.conversations.getStatus = vi.fn().mockResolvedValue({
+			agentSessionId: 'caller',
+			contextUsage: usage,
+			runtimeOpen: true,
+			status: 'streaming',
+		});
+		vi.mocked(ports.conversations.isSpawnedSubAgent).mockResolvedValue(true);
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'getConversationStatus',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const { note } = result.data as { note?: string };
+			expect(note).toContain('71% full');
+			expect(note).toContain('cannot delegate onward');
+			expect(note).not.toContain('ensemblr_start_conversation');
+		}
+	});
+
+	// A root delegating through its own runtime has the same op withheld, and is
+	// the case NATIVE_CONTEXT_PRESSURE_GUIDANCE already covers in the playbook.
+	it('points a natively-delegating root at its own runtime', async () => {
+		const ports = makePorts();
+		ports.conversations.getStatus = vi.fn().mockResolvedValue({
+			agentSessionId: 'caller',
+			contextUsage: usage,
+			runtimeOpen: true,
+			status: 'streaming',
+		});
+		const { service } = setup({ delegation: 'native', ports });
+
+		const result = await service.invoke({
+			op: 'getConversationStatus',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const { note } = result.data as { note?: string };
+			expect(note).toContain("your own runtime's sub-agent tool");
+			expect(note).not.toContain('ensemblr_start_conversation');
+		}
+	});
+
+	// The delegate-facing note needs the same treatment: a sub-agent can name any
+	// conversation id, and cannot act on advice to spawn or to follow up.
+	it('does not tell a sub-agent to spawn when it reads another conversation', async () => {
+		const ports = makePorts();
+		ports.conversations.getStatus = vi.fn().mockResolvedValue({
+			agentSessionId: 'child-1',
+			contextUsage: usage,
+			runtimeOpen: true,
+			status: 'idle',
+		});
+		vi.mocked(ports.conversations.isSpawnedSubAgent).mockResolvedValue(true);
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'getConversationStatus',
+			token: 'tok-caller',
+			rawArgs: { agentSessionId: 'child-1' },
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const { note } = result.data as { note?: string };
+			expect(note).toContain('Context pressure');
+			expect(note).not.toContain('ensemblr_start_conversation');
+			expect(note).toContain('report');
+		}
+	});
+
+	// A harness origin is minted per workspace and shared by every terminal in it,
+	// so there is no conversation behind it — and a null there would read as "no
+	// usage" rather than "wrong question".
+	it('refuses a self-read from a terminal harness rather than answering null', async () => {
+		const { service } = setup({ species: 'harness' });
+
+		const result = await service.invoke({
+			op: 'getConversationStatus',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result).toMatchObject({ code: 'not-found', ok: false });
 	});
 });

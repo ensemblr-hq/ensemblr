@@ -1384,6 +1384,8 @@ const conciergePorts = {
 		 */
 		deliverMessage: (input: { prompt: string }) =>
 			conciergeSessionService.deliverAgentMessage(input),
+		/** How full the live Concierge conversation's own window is. */
+		describeContextUsage: () => conciergeSessionService.describeContextUsage(),
 		/** What the live Concierge conversation runs on, for a child to inherit. */
 		describeSession: () => conciergeSessionService.describeActiveSession(),
 		/** Where the Concierge may write, which is what its tool policy checks against. */
