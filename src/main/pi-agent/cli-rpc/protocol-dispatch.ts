@@ -54,7 +54,7 @@ export interface ProtocolDispatchDeps {
 
 /** One submitted prompt awaiting Pi's `message_end` echo. */
 export interface UnechoedPrompt {
-	/** Set once shutdown surfaced this prompt, so a late echo drops as a duplicate. */
+	/** True once Ensemblr has surfaced this prompt, so a late Pi echo drops as a duplicate. */
 	flushed: boolean;
 	prompt: string;
 	turnId: string;

@@ -48,6 +48,8 @@ const CLOSE_EXIT_GRACE_MS = 2000;
 // Short ceiling on a `get_state` round-trip. Title derivation polls this and must
 // never stall a tab, so a slow/unresponsive child falls back silently instead.
 const STATE_TIMEOUT_MS = 5000;
+// Keep late injection echoes deduplicated without retaining an unbounded queue.
+const MAX_INJECTED_PROMPT_DEDUPE = 32;
 
 /** Reads `sessionName` out of a raw `get_state` response payload, defensively. */
 function normalizeSessionState(data: unknown): AgentSessionState {
@@ -395,6 +397,31 @@ function createCliRpcSession({
 	const pendingStateResolvers = new Map<string, (data: unknown) => void>();
 	const unechoedPrompts: UnechoedPrompt[] = [];
 
+	/** Removes injected-prompt dedupe entries before a newer ordinary prompt. */
+	const discardInjectedPromptDedupes = (): void => {
+		for (let index = unechoedPrompts.length - 1; index >= 0; index -= 1) {
+			if (unechoedPrompts[index]?.flushed) {
+				unechoedPrompts.splice(index, 1);
+			}
+		}
+	};
+
+	/** Bounds retained injection echoes so missing Pi echoes cannot grow memory. */
+	const boundInjectedPromptDedupes = (): void => {
+		let flushedCount = unechoedPrompts.reduce(
+			(count, entry) => count + (entry.flushed ? 1 : 0),
+			0,
+		);
+		while (flushedCount > MAX_INJECTED_PROMPT_DEDUPE) {
+			const oldestIndex = unechoedPrompts.findIndex((entry) => entry.flushed);
+			if (oldestIndex < 0) {
+				return;
+			}
+			unechoedPrompts.splice(oldestIndex, 1);
+			flushedCount -= 1;
+		}
+	};
+
 	const requestContextUsage = (): void => {
 		if (closed || !child.stdin.writable) {
 			return;
@@ -446,6 +473,26 @@ function createCliRpcSession({
 	requestContextUsage();
 
 	/**
+	 * Emits one user prompt into the transcript when Pi cannot yet (or does not)
+	 * echo it itself.
+	 * @param prompt - Prompt text to show in the chat timeline.
+	 * @param turnId - Stable turn identity associated with the prompt.
+	 */
+	const emitUserPrompt = (prompt: string, turnId: string): void => {
+		emit({
+			at: now().toISOString(),
+			payload: {
+				kind: 'message',
+				parts: [{ kind: 'text', text: prompt }],
+				role: 'user',
+			},
+			role: 'user',
+			turnId,
+			type: 'message',
+		});
+	};
+
+	/**
 	 * Emits the prompts Pi never echoed back as user messages so an interrupted
 	 * turn keeps the prompt that opened it. Pi is the transcript's usual source
 	 * for user messages, and it only echoes once the turn starts producing —
@@ -468,17 +515,7 @@ function createCliRpcSession({
 		unechoedPrompts.length = 0;
 		unechoedPrompts.push(...settled);
 		for (const prompt of pending) {
-			emit({
-				at: now().toISOString(),
-				payload: {
-					kind: 'message',
-					parts: [{ kind: 'text', text: prompt.prompt }],
-					role: 'user',
-				},
-				role: 'user',
-				turnId: prompt.turnId,
-				type: 'message',
-			});
+			emitUserPrompt(prompt.prompt, prompt.turnId);
 		}
 	};
 
@@ -653,6 +690,13 @@ function createCliRpcSession({
 				message: request.prompt,
 				type: request.streamingBehavior === 'steer' ? 'steer' : 'follow_up',
 			});
+			// Pi does not reliably echo a mid-turn injection, leaving an accepted
+			// steer invisible in the native chat. Surface it now, then retain a
+			// consumed entry so a runtime version that does echo it cannot duplicate
+			// the transcript event.
+			unechoedPrompts.push({ flushed: true, prompt: request.prompt, turnId });
+			boundInjectedPromptDedupes();
+			emitUserPrompt(request.prompt, turnId);
 			return { acceptedAt, turnId };
 		}
 		// Apply per-turn model/thinking changes before the prompt. Pi processes
@@ -662,6 +706,7 @@ function createCliRpcSession({
 		// keys), so model selection must travel through these commands.
 		await applyModelChange(request.modelOverride);
 		await applyThinkingChange(request.thinkingLevel);
+		discardInjectedPromptDedupes();
 
 		// Pi RPC protocol (@earendil-works/pi-coding-agent >= 0.79):
 		//   {"type":"prompt","message":"<text>"}
