@@ -597,13 +597,14 @@ function postControl(
 }
 
 /**
- * Parses a response body, yielding undefined rather than throwing.
+ * Parses and validates a control response, yielding undefined rather than throwing.
  * @param raw - Raw response text.
- * @returns The parsed value, or undefined when it is not JSON.
+ * @returns The control result, or undefined when the body is not a valid result.
  */
-function parseJson(raw: string): unknown {
+function parseControlResult(raw: string): ControlResult | undefined {
 	try {
-		return JSON.parse(raw) as unknown;
+		const parsed = JSON.parse(raw) as unknown;
+		return isControlResult(parsed) ? parsed : undefined;
 	} catch {
 		return undefined;
 	}
@@ -666,10 +667,10 @@ async function invoke(
 			JSON.stringify({ op, args, callerModel }),
 			signal,
 		);
-		const parsed = parseJson(body);
+		const parsed = parseControlResult(body);
 		// The app answers 4xx/5xx with the same JSON envelope, so a well-formed
 		// body carries the real reason whatever the status says.
-		if (isControlResult(parsed)) {
+		if (parsed) {
 			return parsed;
 		}
 		if (status < 200 || status > 299) {
