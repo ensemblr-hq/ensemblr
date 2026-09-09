@@ -1315,12 +1315,40 @@
 		"bash": {
 			"title": "Bash"
 		},
+		"ctx-batch-execute": {
+			"commands-label": "Команды:",
+			"title": "Запуск команд"
+		},
+		"ctx-doctor": {
+			"title": "Проверка context-mode"
+		},
 		"ctx-execute": {
 			"code-label": "Код:",
 			"title": "Запуск кода"
 		},
 		"ctx-execute-file": {
 			"title": "Обработка файла"
+		},
+		"ctx-fetch-and-index": {
+			"title": "Загрузка и индексация"
+		},
+		"ctx-index": {
+			"title": "Индексация контекста"
+		},
+		"ctx-insight": {
+			"title": "Открытие Insight"
+		},
+		"ctx-purge": {
+			"title": "Удаление контекста"
+		},
+		"ctx-search": {
+			"title": "Поиск по контексту"
+		},
+		"ctx-stats": {
+			"title": "Использование контекста"
+		},
+		"ctx-upgrade": {
+			"title": "Обновление context-mode"
 		},
 		"diagnostics": {
 			"clean": "Диагностика",
