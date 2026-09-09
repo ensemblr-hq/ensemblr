@@ -17,6 +17,7 @@ import type { ChildLike } from './spawn-env.ts';
  *             cannot become an uncaught exception that crashes the main process)
  *  - process `error` → typed `spawn-error`
  *  - process `exit`  → cancel kill timer, classify shutdown reason, finalize
+ *  - process `close` without `exit` → finalize a failed spawn
  *
  * The `exit` classification:
  *  - If `pendingShutdownReason` was set by `abort`/`close`, use it verbatim.
@@ -36,6 +37,7 @@ export function bindChildStreams({
 	getPendingShutdownReason,
 	now,
 	finalizeShutdown,
+	rejectPendingCommands,
 }: {
 	child: ChildLike;
 	lineStream: JsonlLineStream;
@@ -51,7 +53,9 @@ export function bindChildStreams({
 	getPendingShutdownReason: () => AgentShutdownReason | null;
 	now: () => Date;
 	finalizeShutdown: (reason: AgentShutdownReason) => void;
+	rejectPendingCommands: (cause: Error) => void;
 }): void {
+	let exitObserved = false;
 	child.stdout.on('data', (chunk: Buffer) => {
 		lineStream.feed(chunk);
 	});
@@ -78,6 +82,7 @@ export function bindChildStreams({
 	// as a recoverable error so the renderer surfaces it and the `exit` handler
 	// classifies the real shutdown reason.
 	child.stdin.on('error', (cause: Error) => {
+		rejectPendingCommands(cause);
 		emitError(
 			'submit-failed',
 			'Pi RPC stdin write failed.',
@@ -90,7 +95,15 @@ export function bindChildStreams({
 		emitError('spawn-error', 'Pi RPC process emitted an error.', cause.message);
 	});
 
+	child.on('close', (code) => {
+		if (!exitObserved) {
+			killTimer.clear();
+			finalizeShutdown(classifyExit(code, getPendingShutdownReason()));
+		}
+	});
+
 	child.on('exit', (code, signal) => {
+		exitObserved = true;
 		killTimer.clear();
 		const reason = classifyExit(code, getPendingShutdownReason());
 		if (reason === 'crashed' && !isGracefulTermination(code, signal)) {

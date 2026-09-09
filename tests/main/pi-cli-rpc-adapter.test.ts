@@ -8,6 +8,7 @@ import type {
 	AgentSessionMetadata,
 	AgentSessionRequest,
 } from '../../src/main/agent-runtime/agent-types.ts';
+import { AgentSubmitError } from '../../src/main/agent-runtime/agent-types.ts';
 import {
 	type ChildLike,
 	createPiCliRpcAdapter,
@@ -24,6 +25,7 @@ interface FakeChildHandle extends ChildLike {
 	getStdinChunks: () => readonly string[];
 	setStdinWritable: (value: boolean) => void;
 	setPromptAutoResponse: (value: boolean) => void;
+	setReadyAutoResponse: (value: boolean) => void;
 }
 
 interface SpawnRecord {
@@ -38,6 +40,7 @@ function createFakeChild(): FakeChildHandle {
 	const stderr = new EventEmitter() as NodeJS.ReadableStream;
 	const stdinChunks: string[] = [];
 	let promptAutoResponse = true;
+	let readyAutoResponse = true;
 	const killSignals: NodeJS.Signals[] = [];
 	// Model stdin as an EventEmitter so `on('error', …)` wires up like the real
 	// pipe socket; `writable` is mutable so tests can simulate a dead pipe.
@@ -55,13 +58,16 @@ function createFakeChild(): FakeChildHandle {
 				typeof chunk === 'string' ? chunk : chunk.toString('utf8'),
 			);
 			const frame = JSON.parse(String(chunk)) as Record<string, unknown>;
-			if (promptAutoResponse && frame.type === 'prompt') {
+			if (
+				(promptAutoResponse && frame.type === 'prompt') ||
+				(readyAutoResponse && frame.type === 'get_state')
+			) {
 				queueMicrotask(() => {
 					stdout.emit(
 						'data',
 						Buffer.from(
 							`${JSON.stringify({
-								command: 'prompt',
+								command: frame.type,
 								id: frame.id,
 								success: true,
 								type: 'response',
@@ -113,6 +119,9 @@ function createFakeChild(): FakeChildHandle {
 		pid: 4242,
 		setPromptAutoResponse: (value: boolean) => {
 			promptAutoResponse = value;
+		},
+		setReadyAutoResponse: (value: boolean) => {
+			readyAutoResponse = value;
 		},
 		setStdinWritable: (value: boolean) => {
 			(stdin as unknown as { writable: boolean }).writable = value;
@@ -204,11 +213,15 @@ function firstItem<T>(items: readonly T[]): T {
 const STATS_PROBE = '"type":"get_session_stats"';
 
 /**
- * What a call under test wrote, minus the `get_session_stats` probe the adapter
- * sends at spawn so the context gauge has a window before the first turn ends.
+ * What a call under test wrote, minus the startup stats and readiness probes.
  */
 function commandChunks(child: FakeChildHandle): readonly string[] {
-	return child.getStdinChunks().filter((chunk) => !chunk.includes(STATS_PROBE));
+	return child
+		.getStdinChunks()
+		.filter(
+			(chunk) =>
+				!chunk.includes(STATS_PROBE) && !chunk.includes('"type":"get_state"'),
+		);
 }
 
 test('asks for session stats at spawn, before anything is prompted', async () => {
@@ -975,6 +988,102 @@ test('submit waits for a correlated Pi acceptance and propagates rejection', asy
 	await adapter.shutdown();
 });
 
+test('cold startup waits for correlated readiness before writing one prompt', async (t) => {
+	const recorder = createSpawnRecorder();
+	const adapter = createPiCliRpcAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession(buildInput());
+	const child = firstItem(recorder.getChildren());
+	child.setReadyAutoResponse(false);
+	t.mock.timers.enable({ apis: ['setTimeout'] });
+	const submission = session.submit({ prompt: 'cold start' });
+	await waitForMicrotasks();
+	t.mock.timers.tick(30_000);
+	await waitForMicrotasks();
+	assert.equal(commandChunks(child).length, 0);
+	const probe = child
+		.getStdinChunks()
+		.map((chunk) => JSON.parse(chunk) as Record<string, unknown>)
+		.find((frame) => frame.type === 'get_state');
+	assert.ok(probe);
+	child.emitStdout(
+		'{"type":"response","command":"get_state","id":"unrelated","success":true}\n',
+	);
+	await waitForMicrotasks();
+	assert.equal(commandChunks(child).length, 0);
+	child.emitStdout(
+		`${JSON.stringify({ type: 'response', command: 'get_state', id: probe.id, success: true })}\n`,
+	);
+	await submission;
+	assert.equal(commandChunks(child).length, 1);
+	await session.submit({ prompt: 'warm start' });
+	assert.equal(
+		child
+			.getStdinChunks()
+			.filter((chunk) => chunk.includes('"type":"get_state"')).length,
+		1,
+	);
+	t.mock.timers.reset();
+	await adapter.shutdown();
+});
+
+test('startup timeout closes the child without writing or quarantining a prompt', async (t) => {
+	const recorder = createSpawnRecorder();
+	const adapter = createPiCliRpcAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession(buildInput());
+	const child = firstItem(recorder.getChildren());
+	child.setReadyAutoResponse(false);
+	t.mock.timers.enable({ apis: ['setTimeout'] });
+	const rejection = assert.rejects(
+		session.submit({ prompt: 'never delivered' }),
+		(error: unknown) => {
+			assert.ok(error instanceof AgentSubmitError);
+			assert.equal(error.disposition, 'rejected');
+			assert.match(error.message, /startup failed before prompt delivery/);
+			return true;
+		},
+	);
+	await waitForMicrotasks();
+	t.mock.timers.tick(120_000);
+	await rejection;
+	assert.equal(commandChunks(child).length, 0);
+	assert.equal(session.getMetadata().status, 'closed');
+	t.mock.timers.reset();
+	await adapter.shutdown();
+});
+
+test('slow preflight accepts the original prompt without replay or quarantine', async (t) => {
+	const recorder = createSpawnRecorder();
+	const adapter = createPiCliRpcAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession(buildInput());
+	const child = firstItem(recorder.getChildren());
+	child.setPromptAutoResponse(false);
+	t.mock.timers.enable({ apis: ['setTimeout'] });
+	let settled = false;
+	const submission = session.submit({ prompt: 'compact before answering' });
+	void submission.then(
+		() => {
+			settled = true;
+		},
+		() => {
+			settled = true;
+		},
+	);
+	await waitForMicrotasks();
+	child.emitStdout('{"type":"compaction_start","reason":"threshold"}\n');
+	t.mock.timers.tick(125_000);
+	await waitForMicrotasks();
+	assert.equal(settled, false);
+	const frame = JSON.parse(commandChunks(child)[0] ?? '{}') as { id: string };
+	child.emitStdout(
+		`${JSON.stringify({ type: 'response', command: 'prompt', id: frame.id, success: true })}\n`,
+	);
+	await submission;
+	assert.equal(commandChunks(child).length, 1);
+	assert.deepEqual(child.getKillSignals(), []);
+	t.mock.timers.reset();
+	await adapter.shutdown();
+});
+
 test('unacknowledged prompt times out instead of reporting successful delivery', async (t) => {
 	const recorder = createSpawnRecorder();
 	const adapter = createPiCliRpcAdapter({ spawn: recorder.spawn });
@@ -988,7 +1097,7 @@ test('unacknowledged prompt times out instead of reporting successful delivery',
 		/delivery could not be confirmed/,
 	);
 	await waitForMicrotasks();
-	t.mock.timers.tick(10_000);
+	t.mock.timers.tick(180_000);
 	await rejection;
 	t.mock.timers.reset();
 	await adapter.shutdown();
@@ -1001,13 +1110,53 @@ test('runtime exit rejects an outstanding prompt acceptance', async () => {
 	const child = firstItem(recorder.getChildren());
 	child.setPromptAutoResponse(false);
 	const submission = session.submit({ prompt: 'pending delivery' });
-	const rejection = assert.rejects(
-		submission,
-		/closed before command acceptance/,
-	);
+	const rejection = assert.rejects(submission, (error: unknown) => {
+		assert.ok(error instanceof AgentSubmitError);
+		assert.equal(error.disposition, 'unconfirmed');
+		assert.match(error.message, /closed before command acceptance/);
+		return true;
+	});
 	await waitForMicrotasks();
 	child.emitExit(1);
 	await rejection;
+	await adapter.shutdown();
+});
+
+test('async pipe failure after a prompt write is unconfirmed without waiting for exit', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createPiCliRpcAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession(buildInput());
+	const child = firstItem(recorder.getChildren());
+	child.setPromptAutoResponse(false);
+	const rejection = assert.rejects(
+		session.submit({ prompt: 'possibly delivered' }),
+		(error: unknown) => {
+			assert.ok(error instanceof AgentSubmitError);
+			assert.equal(error.disposition, 'unconfirmed');
+			assert.match(error.message, /EPIPE/);
+			return true;
+		},
+	);
+	await waitForMicrotasks();
+	child.emitStdinError(new Error('write EPIPE'));
+	await rejection;
+	assert.equal(commandChunks(child).length, 1);
+	await adapter.shutdown();
+});
+
+test('asynchronous spawn failure closes the session without an exit event', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createPiCliRpcAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession(buildInput());
+	const child = firstItem(recorder.getChildren());
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	child.emit('error', new Error('spawn pi ENOENT'));
+	child.emit('close', -2, null);
+	assert.equal(session.getMetadata().status, 'closed');
+	assert.equal(events.filter((event) => event.type === 'shutdown').length, 1);
+	await assert.rejects(session.submit({ prompt: 'never written' }));
+	assert.equal(commandChunks(child).length, 0);
 	await adapter.shutdown();
 });
 
