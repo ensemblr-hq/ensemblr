@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createAfkModeRegistry } from '../../src/main/afk-mode/afk-mode-registry.ts';
 import type { AgentSessionService } from '../../src/main/agent-runtime/agent-session-service.ts';
+import type { FakeAgentAdapterController } from '../../src/main/agent-runtime/fake-agent-adapter.ts';
 import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
 import { IPC_CHANNELS } from '../../src/shared/ipc/channels.ts';
 import {
@@ -57,11 +58,11 @@ const WORKSPACE_CWD = '/tmp/ensemblr/pin/ws';
 const PI_MODEL = 'anthropic/claude-sonnet-4';
 const CLAUDE_MODEL = 'opus[1m]';
 
-const cleanups: Array<() => void> = [];
+const cleanups: Array<() => void | Promise<void>> = [];
 
-afterEach(() => {
+afterEach(async () => {
 	while (cleanups.length > 0) {
-		cleanups.pop()?.();
+		await cleanups.pop()?.();
 	}
 });
 
@@ -129,10 +130,12 @@ let recorded: RecordedService;
  * Pi executable in the given state, then returns the registered channel map.
  */
 function registerHandlers({
+	agentSessionService,
 	listClaudeModels = async () => CLAUDE_MODELS,
 	piExecutable = createReadyExecutable(),
 	setActive = () => undefined,
 }: {
+	agentSessionService?: AgentSessionService;
 	listClaudeModels?: () => Promise<readonly AgentModelOption[]>;
 	piExecutable?: PiExecutableSnapshot;
 	setActive?: (agentSessionId: string, active: boolean) => void;
@@ -170,7 +173,8 @@ function registerHandlers({
 				getSnapshot: async () => piExecutable,
 			} as never,
 		}),
-		agentSessionService: recorded as unknown as AgentSessionService,
+		agentSessionService:
+			agentSessionService ?? (recorded as unknown as AgentSessionService),
 		piExecutableService: {
 			clearOverride: () => ({ canceled: false }),
 			getSnapshot: async () => piExecutable,
@@ -482,6 +486,8 @@ describe('a spawned sub-agent starts in Plan Mode rather than joining it late', 
 
 /** A live session service over a real database and an in-memory adapter pair. */
 interface PinHarness {
+	claudeAdapter: FakeAgentAdapterController;
+	piAdapter: FakeAgentAdapterController;
 	service: AgentSessionService;
 	seedSession: (provider: 'claude' | 'pi') => string;
 }
@@ -491,7 +497,13 @@ interface PinHarness {
  * adapter registered for both runtimes so a session can be opened and submitted
  * to without any real process.
  */
-function createPinHarness(): PinHarness {
+function createPinHarness({
+	resolveProviderExecutable,
+}: {
+	resolveProviderExecutable?: (
+		provider: 'claude' | 'pi',
+	) => Promise<PiExecutableSnapshot | null>;
+} = {}): PinHarness {
 	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-pin-'));
 	const databaseService = createEnsemblrDatabaseService({
 		databasePath: path.join(directory, 'pin.db'),
@@ -508,26 +520,32 @@ function createPinHarness(): PinHarness {
 	database.exec(`
 INSERT INTO repositories (id, slug, name, path, default_branch)
 VALUES ('repo-pin', 'pin', 'Pin', '/tmp/ensemblr/pin', 'main');
-INSERT INTO workspaces (id, repository_id, slug, name, path)
-VALUES ('${WORKSPACE_ID}', 'repo-pin', 'pin', 'Pin', '${WORKSPACE_CWD}');
 `);
+	database
+		.prepare(
+			"INSERT INTO workspaces (id, repository_id, slug, name, path) VALUES (?, 'repo-pin', 'pin', 'Pin', ?)",
+		)
+		.run(WORKSPACE_ID, WORKSPACE_CWD);
 
+	const claudeAdapter = createFakeAgentAdapter();
+	const piAdapter = createFakeAgentAdapter();
 	const service = createAgentSessionService({
 		agentClient: createAgentClient({
 			adapters: {
-				claude: createFakeAgentAdapter().adapter,
-				pi: createFakeAgentAdapter().adapter,
+				claude: claudeAdapter.adapter,
+				pi: piAdapter.adapter,
 			},
 		}),
 		captureCheckpoint: async () => null,
 		databaseService,
 		queueNaming: () => undefined,
+		resolveProviderExecutable,
 	});
-	cleanups.push(() => {
-		void service.shutdown();
-	});
+	cleanups.push(() => service.shutdown());
 
 	return {
+		claudeAdapter,
+		piAdapter,
 		seedSession: (provider) =>
 			createAgentSession({
 				database,
@@ -536,6 +554,171 @@ VALUES ('${WORKSPACE_ID}', 'repo-pin', 'pin', 'Pin', '${WORKSPACE_CWD}');
 		service,
 	};
 }
+
+describe('Pi executable diagnostics during queued follow-ups', () => {
+	const brokenPi: PiExecutableSnapshot = {
+		...createReadyExecutable(),
+		command: '',
+		status: 'error',
+	};
+
+	it('keeps an attached Pi runtime when changed grants fail replacement readiness', async () => {
+		const { piAdapter, service } = createPinHarness();
+		const session = await service.openSession({
+			executable: createReadyExecutable(),
+			linkedDirectories: ['/tmp/grant-before'],
+			provider: 'pi',
+			workspaceCwd: WORKSPACE_CWD,
+			workspaceId: WORKSPACE_ID,
+		});
+		const { result } = await openThroughIpc(
+			{
+				linkedDirectories: ['/tmp/grant-after'],
+				model: PI_MODEL,
+				resumeSessionId: session.id,
+			},
+			{ agentSessionService: service, piExecutable: brokenPi },
+		);
+		expect(result.error).toBeTruthy();
+		expect(piAdapter.getOpenSessions()).toHaveLength(1);
+		await expect(
+			service.submitPrompt({
+				sessionId: session.id,
+				prompt: 'queued follow-up',
+			}),
+		).resolves.toMatchObject({ turnId: expect.any(String) });
+	});
+
+	it('reuses an attached Pi runtime when unchanged grants meet a failed probe', async () => {
+		const { piAdapter, service } = createPinHarness();
+		const linkedDirectories = ['/tmp/grant-stable'];
+		const session = await service.openSession({
+			executable: createReadyExecutable(),
+			linkedDirectories,
+			provider: 'pi',
+			workspaceCwd: WORKSPACE_CWD,
+			workspaceId: WORKSPACE_ID,
+		});
+		const { result } = await openThroughIpc(
+			{ linkedDirectories, model: PI_MODEL, resumeSessionId: session.id },
+			{ agentSessionService: service, piExecutable: brokenPi },
+		);
+		expect(result.error).toBeUndefined();
+		expect(piAdapter.getOpenSessions()).toHaveLength(1);
+		await expect(
+			service.submitPrompt({
+				sessionId: session.id,
+				prompt: 'queued follow-up',
+			}),
+		).resolves.toMatchObject({ turnId: expect.any(String) });
+	});
+
+	it('keeps an attached Claude runtime when changed grants fail replacement readiness', async () => {
+		let claudeExecutable = createReadyExecutable();
+		const { claudeAdapter, service } = createPinHarness({
+			resolveProviderExecutable: async () => claudeExecutable,
+		});
+		const session = await service.openSession({
+			executable: createReadyExecutable(),
+			linkedDirectories: ['/tmp/grant-before'],
+			provider: 'claude',
+			workspaceCwd: WORKSPACE_CWD,
+			workspaceId: WORKSPACE_ID,
+		});
+		claudeExecutable = brokenPi;
+		const { result } = await openThroughIpc(
+			{
+				linkedDirectories: ['/tmp/grant-after'],
+				model: CLAUDE_MODEL,
+				resumeSessionId: session.id,
+			},
+			{ agentSessionService: service },
+		);
+		expect(result.error).toBeTruthy();
+		expect(claudeAdapter.getOpenSessions()).toHaveLength(1);
+		await expect(
+			service.submitPrompt({
+				sessionId: session.id,
+				prompt: 'queued follow-up',
+			}),
+		).resolves.toMatchObject({ turnId: expect.any(String) });
+	});
+
+	it('serializes grant replacement and cancellation during a slow Claude resolver', async () => {
+		const executable = Promise.withResolvers<PiExecutableSnapshot>();
+		let resolverCalls = 0;
+		const { claudeAdapter, service } = createPinHarness({
+			resolveProviderExecutable: async () => {
+				resolverCalls += 1;
+				return resolverCalls === 1
+					? createReadyExecutable()
+					: executable.promise;
+			},
+		});
+		const session = await service.openSession({
+			executable: createReadyExecutable(),
+			linkedDirectories: ['/tmp/grant-before'],
+			provider: 'claude',
+			workspaceCwd: WORKSPACE_CWD,
+			workspaceId: WORKSPACE_ID,
+		});
+		const replacement = service.openSession({
+			executable: createReadyExecutable(),
+			linkedDirectories: ['/tmp/grant-after'],
+			provider: 'claude',
+			resumeSessionId: session.id,
+			workspaceCwd: WORKSPACE_CWD,
+			workspaceId: WORKSPACE_ID,
+		});
+		await vi.waitFor(() => expect(resolverCalls).toBe(2));
+
+		await expect(
+			service.openSession({
+				executable: createReadyExecutable(),
+				linkedDirectories: ['/tmp/grant-other'],
+				provider: 'claude',
+				resumeSessionId: session.id,
+				workspaceCwd: WORKSPACE_CWD,
+				workspaceId: WORKSPACE_ID,
+			}),
+		).rejects.toMatchObject({ code: 'linked-directories-busy' });
+		await expect(
+			service.submitPrompt({
+				sessionId: session.id,
+				prompt: 'during replacement',
+			}),
+		).rejects.toMatchObject({ code: 'linked-directories-busy' });
+
+		const stop = service.stopSession({
+			reason: 'user stopped replacement',
+			sessionId: session.id,
+		});
+		executable.resolve(createReadyExecutable());
+		await stop;
+		await expect(replacement).rejects.toMatchObject({
+			code: 'linked-directories-cancelled',
+		});
+		expect(claudeAdapter.getOpenSessions()).toHaveLength(0);
+	});
+
+	it('still rejects an unattached Pi session that would need to launch a broken binary', async () => {
+		const { service, seedSession } = createPinHarness();
+		const { result } = await openThroughIpc(
+			{ model: PI_MODEL, resumeSessionId: seedSession('pi') },
+			{ agentSessionService: service, piExecutable: brokenPi },
+		);
+		expect(result.error).toBeTruthy();
+	});
+
+	it('still checks the provider pin when resuming through a failed probe', async () => {
+		const { service, seedSession } = createPinHarness();
+		const { result } = await openThroughIpc(
+			{ model: PI_MODEL, resumeSessionId: seedSession('claude') },
+			{ agentSessionService: service, piExecutable: brokenPi },
+		);
+		expect(result.error).toBeTruthy();
+	});
+});
 
 describe('resuming a session across providers is rejected, not coerced', () => {
 	let harness: PinHarness;

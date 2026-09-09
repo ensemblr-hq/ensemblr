@@ -690,7 +690,14 @@ Two things stop a queue draining, and the strip says which: **stopping a turn**
 parks the messages that turn was holding, so resuming is your call rather than
 something that happens the moment the agent falls silent, and a **send that
 fails** parks the rest rather than emptying them into a session that will not
-take them. Either way the strip offers Resume. Closing a chat **discards** what
+take them. Either way the strip offers Resume. Background setup diagnostics do
+not interrupt delivery to an already-attached Pi or Claude Code runtime. If the
+composer is temporarily busy or waiting for setup before a runtime can launch,
+the queue waits and continues automatically when it becomes available; that wait
+never turns into a pause merely because it lasted longer. An empty queued
+message needs editing or removal before resuming.
+
+Closing a chat **discards** what
 it still had queued — a queued message sends only through an open composer — and
 the app says how many it dropped.
 
