@@ -3721,8 +3721,30 @@ export default interface Resources {
 			};
 		};
 		'tool-call': {
+			'ast-dump': {
+				title: 'AST dump';
+			};
+			'ast-outline': {
+				files_one: '{{count}} file';
+				files_other: '{{count}} files';
+				title: 'Syntax outline';
+			};
+			'ast-replace': {
+				applied: 'applied';
+				preview: 'preview';
+				title: 'AST replace';
+			};
+			'ast-search': {
+				title: 'AST search';
+			};
 			bash: {
 				title: 'Bash';
+			};
+			context7: {
+				'cache-hit': 'cache hit';
+				'cached-title': 'Read cached Context7 docs';
+				'fetch-title': 'Fetch Context7 docs';
+				'resolve-title': 'Resolve Context7 library';
 			};
 			'ctx-batch-execute': {
 				'commands-label': 'Commands:';
@@ -3759,6 +3781,14 @@ export default interface Resources {
 			'ctx-upgrade': {
 				title: 'Upgrade context mode';
 			};
+			'diagnostic-mark': {
+				defer: 'defer';
+				'false-positive': 'false positive';
+				flagged: 'flagged';
+				line: 'line {{line}}';
+				suppress: 'suppress';
+				title: 'Mark diagnostic';
+			};
 			diagnostics: {
 				clean: 'Diagnostics';
 				count_one: '{{count}} diagnostic';
@@ -3767,6 +3797,13 @@ export default interface Resources {
 			};
 			edit: {
 				title: 'Edit';
+			};
+			'effective-config': {
+				files_one: '{{count}} config file';
+				files_other: '{{count}} config files';
+				servers_one: '{{count}} server selected';
+				servers_other: '{{count}} servers selected';
+				title: 'Effective config';
 			};
 			failed: {
 				generic: 'Tool execution failed.';
@@ -3792,12 +3829,35 @@ export default interface Resources {
 			list: {
 				title: 'List';
 			};
+			'lsp-navigation': {
+				applied: 'applied';
+				line: 'line {{line}}';
+				preview: 'preview';
+				title: 'LSP navigation';
+			};
+			mcp: {
+				'auth-complete-title': 'Complete MCP sign-in';
+				'auth-start-title': 'Start MCP sign-in';
+				'call-title': 'Call MCP tool';
+				'connect-title': 'Connect MCP server';
+				'describe-title': 'Describe MCP tool';
+				'instructions-title': 'Read MCP instructions';
+				'list-title': 'List MCP tools';
+				'script-label': 'Script:';
+				'script-title': 'Run MCP script';
+				'search-title': 'Search MCP tools';
+				'status-title': 'MCP status';
+				'ui-messages-title': 'Read MCP UI messages';
+			};
 			'module-report': {
 				exports_one: '{{count}} export';
 				exports_other: '{{count}} exports';
 				symbols_one: '{{count}} symbol';
 				symbols_other: '{{count}} symbols';
 				title: 'Module outline';
+			};
+			'pi-lens-activate': {
+				title: 'Activate Pi Lens tools';
 			};
 			placeholder: {
 				'empty-pattern': '(empty)';
@@ -3812,6 +3872,9 @@ export default interface Resources {
 				lines_one: 'Read {{count}} line';
 				lines_other: 'Read {{count}} lines';
 				title: 'Read';
+			};
+			'read-enclosing': {
+				title: 'Read enclosing';
 			};
 			'read-symbol': {
 				title: 'Read symbol';

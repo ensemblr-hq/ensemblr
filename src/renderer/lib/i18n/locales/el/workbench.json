@@ -1284,8 +1284,30 @@
 		}
 	},
 	"tool-call": {
+		"ast-dump": {
+			"title": "Αποτύπωση AST"
+		},
+		"ast-outline": {
+			"files_one": "{{count}} αρχείο",
+			"files_other": "{{count}} αρχεία",
+			"title": "Δομή σύνταξης"
+		},
+		"ast-replace": {
+			"applied": "εφαρμόστηκε",
+			"preview": "προεπισκόπηση",
+			"title": "Αντικατάσταση AST"
+		},
+		"ast-search": {
+			"title": "Αναζήτηση AST"
+		},
 		"bash": {
 			"title": "Bash"
+		},
+		"context7": {
+			"cache-hit": "βρέθηκε στην κρυφή μνήμη",
+			"cached-title": "Τεκμηρίωση Context7 από την κρυφή μνήμη",
+			"fetch-title": "Λήψη τεκμηρίωσης Context7",
+			"resolve-title": "Επίλυση βιβλιοθήκης Context7"
 		},
 		"ctx-batch-execute": {
 			"commands-label": "Εντολές:",
@@ -1322,6 +1344,14 @@
 		"ctx-upgrade": {
 			"title": "Αναβάθμιση context-mode"
 		},
+		"diagnostic-mark": {
+			"defer": "αναβολή",
+			"false-positive": "ψευδώς θετικό",
+			"flagged": "επισημάνθηκε",
+			"line": "γραμμή {{line}}",
+			"suppress": "καταστολή",
+			"title": "Επισήμανση διαγνωστικού"
+		},
 		"diagnostics": {
 			"clean": "Διαγνωστικά",
 			"count_one": "{{count}} διαγνωστικό",
@@ -1330,6 +1360,13 @@
 		},
 		"edit": {
 			"title": "Επεξεργασία"
+		},
+		"effective-config": {
+			"files_one": "{{count}} αρχείο διαμόρφωσης",
+			"files_other": "{{count}} αρχεία διαμόρφωσης",
+			"servers_one": "{{count}} επιλεγμένος διακομιστής",
+			"servers_other": "{{count}} επιλεγμένοι διακομιστές",
+			"title": "Ενεργή διαμόρφωση"
 		},
 		"failed": {
 			"generic": "Η εκτέλεση του εργαλείου απέτυχε.",
@@ -1355,12 +1392,35 @@
 		"list": {
 			"title": "Λίστα"
 		},
+		"lsp-navigation": {
+			"applied": "εφαρμόστηκε",
+			"line": "γραμμή {{line}}",
+			"preview": "προεπισκόπηση",
+			"title": "Πλοήγηση LSP"
+		},
+		"mcp": {
+			"auth-complete-title": "Ολοκλήρωση σύνδεσης MCP",
+			"auth-start-title": "Έναρξη σύνδεσης MCP",
+			"call-title": "Κλήση εργαλείου MCP",
+			"connect-title": "Σύνδεση διακομιστή MCP",
+			"describe-title": "Περιγραφή εργαλείου MCP",
+			"instructions-title": "Οδηγίες MCP",
+			"list-title": "Λίστα εργαλείων MCP",
+			"script-label": "Σενάριο:",
+			"script-title": "Εκτέλεση σεναρίου MCP",
+			"search-title": "Αναζήτηση εργαλείων MCP",
+			"status-title": "Κατάσταση MCP",
+			"ui-messages-title": "Μηνύματα διεπαφής MCP"
+		},
 		"module-report": {
 			"exports_one": "{{count}} εξαγωγή",
 			"exports_other": "{{count}} εξαγωγές",
 			"symbols_one": "{{count}} σύμβολο",
 			"symbols_other": "{{count}} σύμβολα",
 			"title": "Δομή μονάδας"
+		},
+		"pi-lens-activate": {
+			"title": "Ενεργοποίηση εργαλείων Pi Lens"
 		},
 		"placeholder": {
 			"empty-pattern": "(κενό)",
@@ -1375,6 +1435,9 @@
 			"lines_one": "Ανάγνωση {{count}} γραμμής",
 			"lines_other": "Ανάγνωση {{count}} γραμμών",
 			"title": "Ανάγνωση"
+		},
+		"read-enclosing": {
+			"title": "Ανάγνωση περιβάλλουσας δομής"
 		},
 		"read-symbol": {
 			"title": "Ανάγνωση συμβόλου"

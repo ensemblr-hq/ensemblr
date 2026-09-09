@@ -12,12 +12,23 @@ import {
 	CONTEXT_MODE_TOOL_GLYPHS,
 	CONTEXT_MODE_TOOL_PRESENTERS,
 } from './context-mode-tool-presenters';
-import { ensemblrToolGlyph } from './ensemblr-tool-presentation';
+import {
+	CONTEXT7_TOOL_GLYPHS,
+	CONTEXT7_TOOL_PRESENTERS,
+} from './context7-tool-presenters';
+import {
+	canonicalEnsemblrToolName,
+	ensemblrToolGlyph,
+} from './ensemblr-tool-presentation';
 import { parseNumberedFileBody } from './numbered-file-body';
 import {
 	PI_LENS_TOOL_GLYPHS,
 	PI_LENS_TOOL_PRESENTERS,
 } from './pi-lens-tool-presenters';
+import {
+	resolvePiMcpAdapterTool,
+	resolvePiMcpAdapterToolPart,
+} from './pi-mcp-adapter-tool-presenters';
 import { shellCommandTitle } from './shell-command-title';
 import { TASK_TOOL_GLYPHS, TASK_TOOL_PRESENTERS } from './task-tool-presenters';
 import { parseToolDiagnostics } from './tool-diagnostics';
@@ -51,6 +62,7 @@ const IMAGE_READ_PLACEHOLDER = /^Read image file \[[^[\]]+\]$/;
 const TOOL_GLYPHS: Record<string, ToolGlyph> = {
 	...TASK_TOOL_GLYPHS,
 	...CONTEXT_MODE_TOOL_GLYPHS,
+	...CONTEXT7_TOOL_GLYPHS,
 	...PI_LENS_TOOL_GLYPHS,
 	agent: 'bot',
 	bash: 'terminal',
@@ -541,6 +553,7 @@ const PRESENTERS: Record<
 > = {
 	...TASK_TOOL_PRESENTERS,
 	...CONTEXT_MODE_TOOL_PRESENTERS,
+	...CONTEXT7_TOOL_PRESENTERS,
 	...PI_LENS_TOOL_PRESENTERS,
 	agent: presentSubagent,
 	bash: presentBash,
@@ -571,10 +584,28 @@ const PRESENTERS: Record<
  * @param toolName - The tool name as the runtime reported it
  * @returns The presenter to project the call with
  */
-export function presenterFor(
+function presenterFor(
 	toolName: string,
 ): (part: DynamicToolUIPart) => ToolPresenterResult {
-	return PRESENTERS[toolName.toLowerCase()] ?? presentGeneric;
+	const isControlTool = canonicalEnsemblrToolName(toolName) !== null;
+	return (
+		PRESENTERS[toolName.toLowerCase()] ??
+		(isControlTool ? null : resolvePiMcpAdapterTool(toolName)) ??
+		presentGeneric
+	);
+}
+
+/**
+ * Picks a presenter using both a tool's name and completed result metadata.
+ * @param part - Tool call to identify, including dynamic adapter metadata
+ * @returns The presenter that should project the call
+ */
+export function presenterForPart(
+	part: DynamicToolUIPart,
+): (part: DynamicToolUIPart) => ToolPresenterResult {
+	return canonicalEnsemblrToolName(part.toolName) === null
+		? (resolvePiMcpAdapterToolPart(part) ?? presenterFor(part.toolName))
+		: presenterFor(part.toolName);
 }
 
 /**
@@ -589,6 +620,7 @@ export function glyphForToolName(toolName: string): ToolGlyph {
 	return (
 		TOOL_GLYPHS[toolName.toLowerCase()] ??
 		ensemblrToolGlyph(toolName) ??
+		(resolvePiMcpAdapterTool(toolName) === null ? null : 'network') ??
 		'wrench'
 	);
 }
@@ -599,5 +631,9 @@ export function glyphForToolName(toolName: string): ToolGlyph {
  * @returns The glyph for the tool's name
  */
 export function restingGlyph(part: DynamicToolUIPart): ToolGlyph {
-	return glyphForToolName(part.toolName);
+	return (
+		ensemblrToolGlyph(part.toolName) ??
+		(resolvePiMcpAdapterToolPart(part) === null ? null : 'network') ??
+		glyphForToolName(part.toolName)
+	);
 }

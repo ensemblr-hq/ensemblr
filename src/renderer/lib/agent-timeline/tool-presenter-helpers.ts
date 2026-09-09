@@ -4,6 +4,7 @@ import type {
 	ToolBadgeDescriptor,
 	ToolBodyDescriptor,
 } from '@/renderer/types/tool-presentation';
+import { classifyToolOutput } from './tool-output-classifier';
 
 /** Matches an ANSI colour escape, which only the terminal body can render. */
 const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`);
@@ -58,4 +59,54 @@ export function textBody(
 		return { kind: 'terminal', text };
 	}
 	return { code: text, kind: 'code', language, startLine: null };
+}
+
+/**
+ * Projects a classifier result into the timeline's standard output bodies.
+ * @param toolName - Tool name used to infer the output format
+ * @param text - Non-empty output to classify
+ * @returns Stack-trace, terminal, or syntax-highlighted body
+ */
+export function classifiedToolOutputBody(
+	toolName: string,
+	text: string,
+): ToolBodyDescriptor {
+	const classification = classifyToolOutput(toolName, text);
+	if (classification.kind === 'stack-trace') {
+		return { kind: 'stack-trace', trace: classification.text };
+	}
+	if (classification.kind === 'terminal') {
+		return { kind: 'terminal', text: classification.text };
+	}
+	return textBody(
+		classification.text,
+		classification.kind === 'json'
+			? ('json' as BundledLanguage)
+			: (classification.language ?? ('text' as BundledLanguage)),
+	);
+}
+
+/**
+ * Projects structured tool output while validating compact JSON containers.
+ * @param toolName - Tool name used to infer non-JSON output formats
+ * @param text - Tool output to project
+ * @returns Empty, JSON, stack-trace, terminal, or syntax-highlighted body
+ */
+export function structuredToolOutputBody(
+	toolName: string,
+	text: string,
+): ToolBodyDescriptor {
+	if (text.length === 0) {
+		return { kind: 'empty' };
+	}
+	const trimmed = text.trim();
+	if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+		try {
+			JSON.parse(trimmed);
+			return textBody(text, 'json' as BundledLanguage);
+		} catch {
+			return textBody(text, 'text' as BundledLanguage);
+		}
+	}
+	return classifiedToolOutputBody(toolName, text);
 }

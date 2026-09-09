@@ -14,7 +14,7 @@ import {
 } from './ensemblr-tool-presentation';
 import { looksLikeStackTrace } from './tool-output-classifier';
 import { outputOf } from './tool-part-fields';
-import { presenterFor, restingGlyph } from './tool-presenters';
+import { presenterForPart, restingGlyph } from './tool-presenters';
 
 /**
  * Turning one recorded timeline entry into the row the conversation renders.
@@ -119,7 +119,7 @@ export function presentToolCall(
 	}
 	const glyph = restingGlyph(part);
 	const isRunning = RUNNING_STATES.has(part.state);
-	const projected = presenterFor(part.toolName)(part);
+	const projected = presenterForPart(part)(part);
 	const controlLabel = ensemblrToolLabel(part, isRunning, surface, resolveRole);
 	const presentation = {
 		...projected,
