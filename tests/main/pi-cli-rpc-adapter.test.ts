@@ -380,6 +380,14 @@ test('a recovered WebSocket error never becomes a fatal turn failure', async () 
 	child.emitStdout(
 		'{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Done."}],"stopReason":"stop"}}\n',
 	);
+	assert.ok(
+		events.some(
+			(event) =>
+				event.type === 'message' &&
+				event.payload.kind === 'message' &&
+				event.payload.endsResponse === true,
+		),
+	);
 	child.emitStdout('{"type":"auto_retry_end","success":true}\n');
 	child.emitStdout('{"type":"agent_end","willRetry":false}\n');
 	assert.equal(session.getMetadata().status, 'streaming');

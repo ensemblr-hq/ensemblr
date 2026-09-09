@@ -94,6 +94,8 @@ export type AgentWireMessagePayload =
 			toolCallId: string;
 	  }
 	| {
+			/** Completed assistant response; later continuation must not fold it into activity. Not session idle. */
+			endsResponse?: true;
 			kind: 'message';
 			parts: readonly AgentWireMessagePart[];
 			role: 'assistant' | 'user';
