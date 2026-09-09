@@ -60,7 +60,7 @@ interface UseComposerStateArgs {
 	 * The issue an issue-created workspace came from, pre-attached to the draft
 	 * once so the agent holds the whole issue rather than an editable paraphrase.
 	 */
-	seedLinkedIssue?: WorkspaceLinkedIssueSummary;
+	seedLinkedIssue: WorkspaceLinkedIssueSummary | undefined;
 }
 
 /**

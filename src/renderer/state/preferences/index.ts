@@ -82,6 +82,7 @@ export {
 	filePreviewWordWrapAtom,
 	forgetChatOverrides,
 	forgetLastRunScript,
+	hasAcknowledgedAfkModeWarningAtom,
 	lastQuickStartOwnerAtom,
 	lastRunScriptAtomFamily,
 	prDetailsDraftAtomFamily,
