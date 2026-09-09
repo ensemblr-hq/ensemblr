@@ -547,7 +547,7 @@ workspace's unmerged commit.
    immutable target:
 
 ```bash
-version=0.1.11
+version=0.1.12
 tag="v${version}"
 git fetch origin master
 target=$(git rev-parse origin/master)
@@ -610,7 +610,7 @@ returns `output.summary: null`, and the raw logs show only the unexpanded
 script. Every pinned line above derives from one fact, each asset's `name`:
 
 ```bash
-gh release view v0.1.11 --json assets -q '.assets[].name'
+gh release view v0.1.12 --json assets -q '.assets[].name'
 ```
 
 The version string is the tag with `v` stripped; each URL is
@@ -621,8 +621,13 @@ empty or partial asset list is not the signal to start editing — poll until al
 four are there. Then check the URLs actually resolve before opening the PR:
 
 ```bash
-gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.11 \
+gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.12 \
   --jq '.assets[] | "\(.name)\t\(.digest)"'
+gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.12 \
+  --jq '.assets[].browser_download_url' |
+  while IFS= read -r url; do
+    curl --fail --location --head --silent --show-error "$url" >/dev/null
+  done
 ```
 
 **The Homebrew cask bumps itself.** The same job's `Bump the Homebrew cask` step
@@ -688,10 +693,10 @@ Squirrel.Mac feed the in-app updater reads:
 
 ```json
 {
-  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.11/Ensemblr-darwin-arm64-0.1.11.zip",
-  "name": "0.1.11",
+  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.12/Ensemblr-darwin-arm64-0.1.12.zip",
+  "name": "0.1.12",
   "notes": "…the release body…",
-  "pub_date": "2026-09-09T11:41:14Z"
+  "pub_date": "2026-09-09T17:19:42Z"
 }
 ```
 
