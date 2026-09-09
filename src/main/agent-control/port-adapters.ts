@@ -863,6 +863,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 
 /**
  * Reads the spawning chat tab when it is still open in the same workspace.
+ * Best-effort so an unavailable tab store never blocks a child from starting.
  * @param deps - Adapter collaborators.
  * @param parentSessionId - Session id of the spawning agent.
  * @param workspaceId - Workspace that must own the parent tab.
@@ -877,15 +878,23 @@ function readOpenParentChatTabId(
 	if (!database) {
 		return null;
 	}
-	const parent = getChatTabByAgentSessionId({
-		agentSessionId: parentSessionId,
-		database,
-	});
-	return parent &&
-		parent.closedAt === null &&
-		parent.workspaceId === workspaceId
-		? parent.id
-		: null;
+	try {
+		const parent = getChatTabByAgentSessionId({
+			agentSessionId: parentSessionId,
+			database,
+		});
+		return parent &&
+			parent.closedAt === null &&
+			parent.workspaceId === workspaceId
+			? parent.id
+			: null;
+	} catch (cause) {
+		console.warn('[agent-control] could not read a sub-agent parent tab.', {
+			cause: cause instanceof Error ? cause.message : String(cause),
+			parentSessionId,
+		});
+		return null;
+	}
 }
 
 /**
