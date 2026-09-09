@@ -91,14 +91,26 @@ still follow.
   retain their original grouping; no prose-based final-answer guessing is used.
 - `agent_end` refreshes usage but never drains Ensemblr's Follow-Up Queue.
   `agent_settled` is the only completion signal that does.
-- Ordinary `prompt` frames carry an RPC `id`. Submission waits up to ten seconds
-  for Pi's matching acceptance response; refusal, missing acknowledgement, or
-  runtime exit rejects the send so the existing composer queue restores and
-  pauses it. A timeout means delivery is **unconfirmed**, not proof it never
-  ran; Ensemblr does not automatically resend it. The lifecycle quarantines the
-  runtime with bounded termination, marks the uncertain turn failed, and closes
-  the session so an accepted-but-unreported command cannot leave the UI running
-  forever; the user must reopen the session before trying again.
+- Before the first ordinary prompt, the adapter waits up to 120 seconds for a
+  correlated `get_state` success from that child. Extension loading and history
+  restoration therefore cannot consume the prompt's acceptance budget. Failed
+  readiness closes the attachment without writing the prompt; a later send can
+  resume the saved conversation through the existing session-open path.
+- Ordinary `prompt` frames carry an RPC `id`. Pi 0.85.1 sends its authoritative
+  acceptance **after** authentication, automatic compaction, input hooks and
+  `before_agent_start` finish (`AgentSession.prompt` and RPC `handleCommand`).
+  The adapter gives this preflight a separate 180-second deadline, including
+  slack beyond Ensemblr Control's 120-second dispatch deadline. Neither startup
+  nor preflight deadlines are renewed by unrelated events, and submission never
+  replays the prompt. These bounds tolerate slow preflight; they cannot heal an
+  indefinitely blocked extension or guarantee that every compaction finishes.
+- Only a correlated boolean acceptance/refusal settles submission. Explicit
+  refusal or an unwritable pipe before the prompt write is rejected; timeout,
+  post-write pipe failure, abort or runtime exit before acceptance means delivery
+  is **unconfirmed**, not proof it never ran. The composer restores and pauses
+  the message. The lifecycle quarantines uncertain delivery with bounded
+  termination and closes the attachment; no automatic resend is safe. A failed
+  spawn's `close` event also finalizes the attachment when no `exit` fires.
 - `steer` and `follow_up` remain mid-turn injections, not ordinary queued sends.
   They retain their existing write-based acknowledgement behavior.
 
@@ -134,7 +146,7 @@ frame (see "Aborting"). The rest of the table is Pi capability, not app usage.
 | get_session_stats | `{"type":"get_session_stats"}` | Token usage, cost, `contextUsage` — feeds the status bar. The app refreshes it on every `turn_end`/`agent_end` (`rpc.md` "get_session_stats"). |
 | set_model / set_thinking_level | `{"type":"set_model","provider","modelId"}` / `{"type":"set_thinking_level","level"}` | Written ahead of the next `prompt` only when the selection differs from what the runtime is already on. Thinking levels: `off,minimal,low,medium,high,xhigh` |
 | set_session_name | `{"type":"set_session_name","name":string}` | Renames the Pi session. Reached from `ensemblr_set_name` and from the app's own tab-naming path (`AgentClient.setSessionName`). |
-| get_state | `{"id":string,"type":"get_state"}` | Sent by `getState()`, which times out on its own (`STATE_TIMEOUT_MS`). Session *status* is derived from the `agent_start`/`turn_start`/`agent_settled` lifecycle rather than polled — the one live caller is `session-naming.ts`, reading the session's current name. |
+| get_state | `{"id":string,"type":"get_state"}` | First used as a correlated per-child readiness barrier before an ordinary prompt (`STARTUP_TIMEOUT_MS`). Separately sent by `getState()` for session naming, with its shorter `STATE_TIMEOUT_MS`. Session *status* still comes from `agent_start`/`turn_start`/`agent_settled`, not polling. |
 | abort / new_session | Pi capabilities, **not used by Ensemblr** | Abort is done by signal, not this frame. |
 
 Response frames: `{"id?":string,"type":"response","command":string,
@@ -179,7 +191,7 @@ Documented event types (`rpc.md` "Events"):
 
 Documented lifecycle for one prompt (`rpc.md` examples):
 
-```
+```text
 response(prompt) → agent_start → turn_start
   → message_start → message_update* → message_end
   → [tool_execution_start → tool_execution_update* → tool_execution_end]*

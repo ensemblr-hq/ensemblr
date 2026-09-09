@@ -1,4 +1,7 @@
-const ACCEPTANCE_TIMEOUT_MS = 10_000;
+import { AgentSubmitError } from '../../agent-runtime/agent-types.ts';
+
+/** Bounds authentication, compaction and extension preflight, not model execution. */
+const ACCEPTANCE_TIMEOUT_MS = 180_000;
 
 /** Correlates command acceptance separately from the lifetime of a model turn. */
 export function createCommandAcknowledgements() {
@@ -12,11 +15,13 @@ export function createCommandAcknowledgements() {
 		 * Writes a command and waits for its matching acceptance, not just a pipe write.
 		 * @param frame - Command carrying a unique RPC correlation id.
 		 * @param writeFrame - The session's checked JSONL writer.
+		 * @param timeoutMs - Deadline for this command's phase, never renewed by unrelated events.
 		 * @returns Completion when Pi accepts; rejection on refusal, timeout, or exit.
 		 */
 		send(
 			frame: { id: string; type: string; [key: string]: unknown },
 			writeFrame: (frame: unknown) => Promise<void>,
+			timeoutMs = ACCEPTANCE_TIMEOUT_MS,
 		): Promise<void> {
 			return new Promise<void>((resolve, reject) => {
 				/**
@@ -29,18 +34,18 @@ export function createCommandAcknowledgements() {
 					}
 					clearTimeout(timer);
 					if (error) {
-						reject(error);
+						reject(
+							error instanceof AgentSubmitError
+								? error
+								: new AgentSubmitError(error.message, 'unconfirmed'),
+						);
 					} else {
 						resolve();
 					}
 				};
 				const timer = setTimeout(() => {
-					settle(
-						new Error(
-							`Pi RPC ${frame.type} acceptance timed out; delivery is unconfirmed.`,
-						),
-					);
-				}, ACCEPTANCE_TIMEOUT_MS);
+					settle(new Error(`Pi RPC ${frame.type} acceptance timed out.`));
+				}, timeoutMs);
 				timer.unref();
 				pending.set(frame.id, { command: frame.type, settle });
 				void writeFrame(frame).catch((cause: unknown) => {
@@ -58,7 +63,11 @@ export function createCommandAcknowledgements() {
 				return false;
 			}
 			const response = frame as Record<string, unknown>;
-			if (response.type !== 'response' || typeof response.id !== 'string') {
+			if (
+				response.type !== 'response' ||
+				typeof response.id !== 'string' ||
+				typeof response.success !== 'boolean'
+			) {
 				return false;
 			}
 			const request = pending.get(response.id);
@@ -68,10 +77,11 @@ export function createCommandAcknowledgements() {
 			request.settle(
 				response.success === true
 					? undefined
-					: new Error(
+					: new AgentSubmitError(
 							typeof response.error === 'string'
 								? response.error
 								: 'Pi RPC command rejected.',
+							'rejected',
 						),
 			);
 			return true;

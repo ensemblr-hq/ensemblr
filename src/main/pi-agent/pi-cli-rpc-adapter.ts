@@ -50,6 +50,8 @@ const CLOSE_EXIT_GRACE_MS = 2000;
 // Short ceiling on a `get_state` round-trip. Title derivation polls this and must
 // never stall a tab, so a slow/unresponsive child falls back silently instead.
 const STATE_TIMEOUT_MS = 5000;
+/** Startup may load extensions and restore history before it can read RPC commands. */
+const STARTUP_TIMEOUT_MS = 120_000;
 // Keep late injection echoes deduplicated without retaining an unbounded queue.
 const MAX_INJECTED_PROMPT_DEDUPE = 32;
 
@@ -396,6 +398,7 @@ function createCliRpcSession({
 	patchMetadata({ status: 'starting' });
 
 	const acknowledgements = createCommandAcknowledgements();
+	let readiness: Promise<void> | undefined;
 	const pendingStatsIds = new Set<string>();
 	const pendingStateResolvers = new Map<string, (data: unknown) => void>();
 	const unechoedPrompts: UnechoedPrompt[] = [];
@@ -563,6 +566,7 @@ function createCliRpcSession({
 		emitError,
 		finalizeShutdown,
 		getPendingShutdownReason: () => pendingShutdownReason,
+		rejectPendingCommands: acknowledgements.rejectAll,
 		killTimer,
 		lineStream,
 		now,
@@ -582,8 +586,8 @@ function createCliRpcSession({
 		// Once the Pi child exits its stdin pipe is no longer writable and a write
 		// would throw (or asynchronously emit) EPIPE. Fail fast with a typed error
 		// the IPC layer turns into a clean `{ error }` result instead of crashing.
-		if (closed || !child.stdin.writable) {
-			throw new Error('Pi RPC session is not writable.');
+		if (closed || pendingShutdownReason !== null || !child.stdin.writable) {
+			throw new AgentSubmitError('Pi RPC session is not writable.', 'rejected');
 		}
 		let writeResult: boolean;
 		try {
@@ -681,6 +685,29 @@ function createCliRpcSession({
 		appliedThinking = next;
 	};
 
+	/** Waits once for this child's RPC loop before a prompt can become uncertain. */
+	const ensureReady = (): Promise<void> => {
+		readiness ??= acknowledgements
+			.send(
+				{ id: turnIdFactory(), type: 'get_state' },
+				writeFrame,
+				STARTUP_TIMEOUT_MS,
+			)
+			.catch(async (cause: unknown) => {
+				await close();
+				throw new AgentSubmitError(
+					`Pi RPC startup failed before prompt delivery: ${cause instanceof Error ? cause.message : String(cause)}`,
+					'rejected',
+				);
+			});
+		return readiness;
+	};
+
+	/**
+	 * Submits once after readiness and waits for authoritative preflight acceptance.
+	 * @param request - Prompt and per-turn runtime selections.
+	 * @returns The identity and timestamp of the accepted submission.
+	 */
 	const submit = async (
 		request: AgentSubmitRequest,
 	): Promise<AgentSubmitAcknowledgement> => {
@@ -712,6 +739,7 @@ function createCliRpcSession({
 		// ahead of the prompt is guaranteed to take effect for that turn. The
 		// `prompt` command itself carries no model field (Pi ignores unknown
 		// keys), so model selection must travel through these commands.
+		await ensureReady();
 		await applyModelChange(request.modelOverride);
 		await applyThinkingChange(request.thinkingLevel);
 		discardInjectedPromptDedupes();
@@ -738,11 +766,11 @@ function createCliRpcSession({
 				unechoedPrompts.splice(index, 1);
 			}
 			if (
-				cause instanceof Error &&
-				cause.message.includes('delivery is unconfirmed')
+				cause instanceof AgentSubmitError &&
+				cause.disposition === 'unconfirmed'
 			) {
 				throw new AgentSubmitError(
-					'Prompt delivery could not be confirmed; the Pi session was quarantined.',
+					`Prompt delivery could not be confirmed: ${cause.message}`,
 					'unconfirmed',
 				);
 			}
