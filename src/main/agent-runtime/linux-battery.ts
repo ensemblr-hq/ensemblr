@@ -14,11 +14,12 @@ const POWER_SUPPLY_ROOT = '/sys/class/power_supply';
 const NON_DISCHARGING_STATUSES = new Set(['charging', 'full', 'not charging']);
 
 /**
- * One power supply as sysfs describes it: the directory name, and whatever its
- * `type` attribute reports, lowercased.
+ * A sysfs supply with its lowercased type and scope; device-scoped supplies
+ * power peripherals rather than the computer.
  */
 interface PowerSupply {
 	name: string;
+	scope: string | null;
 	type: string | null;
 }
 
@@ -50,7 +51,8 @@ export async function readLinuxBattery(
 			continue;
 		}
 		return {
-			charging: reading.charging ?? (await isAnyMainsOnline(root, supplies)),
+			charging:
+				reading.charging ?? (await isExternalPowerOnline(root, supplies)),
 			percent: reading.percent,
 		};
 	}
@@ -69,6 +71,9 @@ async function readPowerSupplies(root: string): Promise<PowerSupply[]> {
 	return Promise.all(
 		names.map(async (name) => ({
 			name,
+			scope:
+				(await readSysfsValue(path.join(root, name, 'scope')))?.toLowerCase() ??
+				null,
 			type:
 				(await readSysfsValue(path.join(root, name, 'type')))?.toLowerCase() ??
 				null,
@@ -84,47 +89,55 @@ async function readPowerSupplies(root: string): Promise<PowerSupply[]> {
  * @returns True when the supply holds charge.
  */
 function isBattery(supply: PowerSupply): boolean {
+	if (supply.scope === 'device') {
+		return false;
+	}
 	return supply.type === null
 		? supply.name.startsWith('BAT')
 		: supply.type === 'battery';
 }
 
 /**
- * Reports whether a supply is a wall adapter.
+ * Reports whether a system supply can provide external power, including USB chargers.
  * @param supply - The supply to classify.
- * @returns True when the supply is mains power.
+ * @returns True when the supply is an external power source for the computer.
  */
-function isMains(supply: PowerSupply): boolean {
+function isExternalPower(supply: PowerSupply): boolean {
+	if (supply.scope === 'device') {
+		return false;
+	}
 	return supply.type === null
 		? supply.name.startsWith('AC')
-		: supply.type === 'mains';
+		: supply.type === 'mains' ||
+				supply.type === 'wireless' ||
+				/^usb(?:_|$)/.test(supply.type);
 }
 
 /**
- * Reports whether any wall adapter is plugged in, which is what settles a
+ * Reports whether any external power source is online, which settles a
  * battery whose own `status` says `Unknown` — common on a desktop and on ACPI
  * implementations that never populate it. Without it a docked machine reads as
  * draining at 100%.
  * @param root - Power-supply directory the supplies were read from.
  * @param supplies - Every supply under that root.
- * @returns True when at least one mains supply reports `online=1`.
+ * @returns True when a charger is online in fixed (1) or programmable (2) mode.
  */
-async function isAnyMainsOnline(
+async function isExternalPowerOnline(
 	root: string,
 	supplies: PowerSupply[],
 ): Promise<boolean> {
 	const states = await Promise.all(
 		supplies.flatMap((supply) =>
-			isMains(supply)
+			isExternalPower(supply)
 				? [readSysfsValue(path.join(root, supply.name, 'online'))]
 				: [],
 		),
 	);
-	return states.includes('1');
+	return states.some((state) => state === '1' || state === '2');
 }
 
 /**
- * Reads one battery directory. `charging` is `null` rather than `false` when
+ * Reads a present system battery. `charging` is `null` rather than `false` when
  * the kernel reports `Unknown` or no status at all, so the caller can fall back
  * to the mains supply instead of assuming the machine is draining.
  * @param directory - Absolute path to a battery power-supply directory.
@@ -133,6 +146,9 @@ async function isAnyMainsOnline(
 async function readBatteryReading(
 	directory: string,
 ): Promise<{ charging: boolean | null; percent: number } | null> {
+	if ((await readSysfsValue(path.join(directory, 'present'))) === '0') {
+		return null;
+	}
 	const percent = parsePercent(
 		await readSysfsValue(path.join(directory, 'capacity')),
 	);
@@ -171,7 +187,7 @@ async function readSysfsValue(filePath: string): Promise<string | null> {
  * @returns The percentage, or `null` when the value is absent or non-numeric.
  */
 function parsePercent(value: string | null): number | null {
-	if (value === null) {
+	if (value === null || value === '') {
 		return null;
 	}
 

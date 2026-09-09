@@ -153,7 +153,7 @@ interface AgentActivityMonitor {
 
 /** Below this charge (and not charging) the caffeinate blocker shuts off. */
 const BATTERY_CUTOFF_PERCENT = 10;
-/** How often to re-check the battery while the blocker is engaged. */
+/** How often to re-check the battery while active agents request inhibition. */
 const BATTERY_POLL_MS = 60_000;
 /** A cached battery reading older than this is refreshed before it's trusted. */
 const BATTERY_SAMPLE_TTL_MS = 30_000;
@@ -234,6 +234,7 @@ export function createAgentActivityMonitor(
 	const userStoppedSessions = new Set<string>();
 	let blockerId: number | null = null;
 	let cancelPoll: (() => void) | null = null;
+	let disposed = false;
 
 	// Cached battery reading. The async `readBattery` never runs on the hot path;
 	// `reconcilePower` consults this snapshot and refreshes it in the background.
@@ -241,6 +242,9 @@ export function createAgentActivityMonitor(
 	let batterySampledAt = Number.NEGATIVE_INFINITY;
 	let sampling = false;
 
+	/** Reports whether the last battery sample permits sleep inhibition.
+	 * @returns True unless a known battery is unplugged and below the cutoff.
+	 */
 	const batteryAllowsBlock = (): boolean => {
 		if (!lastBattery || lastBattery.charging) {
 			return true;
@@ -248,10 +252,9 @@ export function createAgentActivityMonitor(
 		return lastBattery.percent >= BATTERY_CUTOFF_PERCENT;
 	};
 
-	// Refresh the cached reading off the main thread, then re-reconcile so a
-	// drained laptop releases the blocker (and a freshly-plugged one re-engages).
+	/** Refreshes battery state asynchronously, then reconciles sleep inhibition. */
 	const sampleBattery = (): void => {
-		if (sampling) {
+		if (disposed || sampling) {
 			return;
 		}
 		sampling = true;
@@ -269,11 +272,21 @@ export function createAgentActivityMonitor(
 			});
 	};
 
+	/** Keeps battery monitoring alive for active work, even during a low-battery pause. */
 	const reconcilePower = (): void => {
+		if (disposed) {
+			return;
+		}
 		const settings = options.readSettings();
 		const wantBlock =
 			settings.general.caffeinateWhileRunning &&
 			(streamingSessions.size > 0 || conciergeStreamingSessionId !== null);
+		if (wantBlock && cancelPoll === null) {
+			cancelPoll = scheduleInterval(sampleBattery, BATTERY_POLL_MS);
+		} else if (!wantBlock && cancelPoll !== null) {
+			cancelPoll();
+			cancelPoll = null;
+		}
 		if (wantBlock && now() - batterySampledAt >= BATTERY_SAMPLE_TTL_MS) {
 			const firstSample = batterySampledAt === Number.NEGATIVE_INFINITY;
 			sampleBattery();
@@ -286,14 +299,9 @@ export function createAgentActivityMonitor(
 		const shouldBlock = wantBlock && batteryAllowsBlock();
 		if (shouldBlock && blockerId === null) {
 			blockerId = power.start('prevent-app-suspension');
-			// Force-refresh the battery while engaged (bypassing the TTL gate) so a
-			// draining laptop releases the blocker; `sampleBattery` re-reconciles.
-			cancelPoll = scheduleInterval(sampleBattery, BATTERY_POLL_MS);
 		} else if (!shouldBlock && blockerId !== null) {
 			power.stop(blockerId);
 			blockerId = null;
-			cancelPoll?.();
-			cancelPoll = null;
 		}
 	};
 
@@ -386,13 +394,16 @@ export function createAgentActivityMonitor(
 		emitNotification('finished', agentSessionId, target);
 	};
 
+	/** Updates workspace activity and turn notifications from a persisted event.
+	 * @param input - The event and its owning session and workspace.
+	 */
 	const handle = ({
 		event,
 		sessionId,
 		workspaceId,
 	}: AgentActivityEvent): void => {
 		const payload = event.payload;
-		if (!payload) {
+		if (disposed || !payload) {
 			return;
 		}
 		if (payload.kind === 'status') {
@@ -417,9 +428,12 @@ export function createAgentActivityMonitor(
 		}
 	};
 
+	/** Updates Concierge activity without adding it to the workspace session list.
+	 * @param input - The event and its owning Concierge session.
+	 */
 	const handleConcierge = ({ event, sessionId }: ConciergeActivityEvent) => {
 		const payload = event.payload;
-		if (!payload) {
+		if (disposed || !payload) {
 			return;
 		}
 		if (payload.kind === 'status') {
@@ -451,7 +465,9 @@ export function createAgentActivityMonitor(
 			workspaceId,
 		}));
 
+	/** Permanently stops monitoring so late events and battery reads cannot re-arm it. */
 	const dispose = (): void => {
+		disposed = true;
 		cancelPoll?.();
 		cancelPoll = null;
 		if (blockerId !== null) {
