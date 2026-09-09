@@ -80,6 +80,15 @@ still follow.
   not a fatal turn yet. Successful assistant completion or successful auto-retry
   clears it. Only `agent_settled` surfaces an unresolved failure and marks idle.
   This prevents recovered WebSocket errors from splitting a successful turn.
+- A nonempty, tool-free assistant `message_end` with `stopReason: stop` or
+  `stopReason: length` carries `endsResponse: true` in the normalized message.
+  The timeline seals that response before later tools or extension notifications
+  can bury its answer in activity. A `length` response remains truncated; the
+  marker only preserves its visible output. This is a presentation boundary, not session idle:
+  queued background notifications can trigger further responses before settlement.
+  Persisted idle status also seals a group, including older transcripts without
+  the marker. Older responses with neither marker nor intervening idle status
+  retain their original grouping; no prose-based final-answer guessing is used.
 - `agent_end` refreshes usage but never drains Ensemblr's Follow-Up Queue.
   `agent_settled` is the only completion signal that does.
 - Ordinary `prompt` frames carry an RPC `id`. Submission waits up to ten seconds

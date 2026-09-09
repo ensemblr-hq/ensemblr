@@ -47,11 +47,10 @@ import {
  * pattern-matches on `payload.kind` and projects each variant to UI parts via
  * the concern-specific sub-mappers.
  *
- * Grouping rule: consecutive renderable `message` events that share the same
- * `turnId` and the same UI role collapse into a single `UIMessage`. Lifecycle,
- * metadata, status, shutdown, unknown, stderr, and recoverable-error rows are
- * skipped so runtime bookkeeping does not appear as chat content. Only fatal
- * errors remain, as compact system messages for the timeline renderer.
+ * Consecutive same-role messages collapse until a user prompt, completed
+ * response, idle status, or fatal failure closes the group. Runtime message ids
+ * are not turn boundaries. Lifecycle bookkeeping paints no content; a completed
+ * answer stays separate even when a background notification starts more work.
  */
 export function eventsToUIMessages(
 	events: readonly AgentEventFrame[],
@@ -464,8 +463,19 @@ function handleEvent(
 	}
 
 	switch (envelope.kind) {
-		case 'message':
-			return handleMessageEnvelope(event, envelope, pending, result);
+		case 'message': {
+			const next = handleMessageEnvelope(event, envelope, pending, result);
+			if (
+				envelope.role === 'agent' &&
+				!envelope.parentToolCallId &&
+				envelope.payload.kind === 'message' &&
+				envelope.payload.endsResponse === true
+			) {
+				flush(next, result);
+				return null;
+			}
+			return next;
+		}
 		case 'error': {
 			const errorMessage = buildErrorMessage(event, envelope);
 			if (!errorMessage) {
@@ -492,8 +502,13 @@ function handleEvent(
 		case 'plan-limit':
 		case 'plan-windows':
 		case 'session-cost':
-		case 'status':
 		case 'metadata':
+			return pending;
+		case 'status':
+			if (envelope.status === 'idle') {
+				flush(pending, result);
+				return null;
+			}
 			return pending;
 		default: {
 			// Exhaustiveness guard: a future variant should be added above.
@@ -575,8 +590,8 @@ function handleMessageEnvelope(
 	// Group by role only. Pi's wire frames carry inconsistent turn ids —
 	// tool_execution_* frames fall back to toolCallId, message frames use
 	// message ids — so keying on turnId fractures one logical assistant turn
-	// into dozens of single-part messages. A run of consecutive
-	// assistant/tool events IS the turn; user messages and errors flush it.
+	// into dozens of single-part messages. Completion markers close the response
+	// independently of those ids; user messages and errors also flush it.
 	//
 	// User prompts never merge with each other: each submission is a distinct
 	// input and gets its own bubble. Keying user groups by event id keeps

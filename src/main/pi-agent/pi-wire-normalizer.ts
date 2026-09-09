@@ -34,7 +34,12 @@ export function extractMessageId(message: unknown): string | null {
  *
  * Extension-injected messages arrive under Pi's `custom` role, which
  * {@link isMessageRole} does not recognize — left to the default path they
- * would read as prose the assistant wrote, so they branch off first.
+ * would read as prose the assistant wrote, so they branch off first. Preserve
+ * successful response completion independently of session settlement: queued
+ * extension notifications may trigger more work after the answer was delivered.
+ * @param message - The completed Pi message.
+ * @param wireRole - Normalized role assigned by the dispatcher.
+ * @returns The message payload with an explicit response boundary when complete.
  */
 export function normalizeMessageEnd(
 	message: Record<string, unknown>,
@@ -45,7 +50,17 @@ export function normalizeMessageEnd(
 	}
 	const role: 'assistant' | 'user' = wireRole === 'user' ? 'user' : 'assistant';
 	const parts = normalizeContentParts(message.content);
-	return { kind: 'message', parts, role };
+	const endsResponse =
+		message.role === 'assistant' &&
+		(message.stopReason === 'stop' || message.stopReason === 'length') &&
+		parts.some((part) => part.kind === 'text' && part.text.trim().length > 0) &&
+		!parts.some((part) => part.kind === 'tool-call');
+	return {
+		...(endsResponse ? { endsResponse: true as const } : {}),
+		kind: 'message',
+		parts,
+		role,
+	};
 }
 
 /**
