@@ -3835,6 +3835,9 @@ export default interface Resources {
 				servers_other: '{{count}} servers selected';
 				title: 'Effective config';
 			};
+			extension: {
+				raw: 'Raw execution: {{tool}}';
+			};
 			failed: {
 				'exit-code-title': '{{tool}} exited with code {{code}}';
 				generic: 'Tool execution failed.';

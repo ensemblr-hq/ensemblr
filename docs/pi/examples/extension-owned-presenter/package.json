@@ -1,0 +1,10 @@
+{
+	"name": "pi-extension-owned-presenter-example",
+	"private": true,
+	"packageManager": "npm@11.17.0",
+	"pi": {
+		"extensions": [
+			"./extension.ts"
+		]
+	}
+}

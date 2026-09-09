@@ -1,3 +1,7 @@
+import {
+	parseToolPresentation,
+	type ToolPresentationV1,
+} from '../../shared/tool-presentation.ts';
 import type {
 	AgentMessagePart,
 	AgentMessagePayload,
@@ -147,10 +151,38 @@ export function contentBlockToPart(block: unknown): AgentMessagePart | null {
 }
 
 /**
+ * Reads only the extension presentation reserved inside a Pi partial result.
+ * @param partialResult - Untrusted partial tool result from Pi.
+ * @returns The validated presentation snapshot, or null when absent or invalid.
+ */
+function extractToolPresentation(
+	partialResult: unknown,
+): ToolPresentationV1 | null {
+	if (
+		!partialResult ||
+		typeof partialResult !== 'object' ||
+		Array.isArray(partialResult)
+	) {
+		return null;
+	}
+	const details = (partialResult as Record<string, unknown>).details;
+	if (!details || typeof details !== 'object' || Array.isArray(details)) {
+		return null;
+	}
+	const ensemblr = (details as Record<string, unknown>).ensemblr;
+	if (!ensemblr || typeof ensemblr !== 'object' || Array.isArray(ensemblr)) {
+		return null;
+	}
+	return parseToolPresentation(
+		(ensemblr as Record<string, unknown>).presentation,
+	);
+}
+
+/**
  * Normalizes Pi's `tool_execution_start | tool_execution_update |
- * tool_execution_end` frames. `_end` produces a `tool-result`; the in-progress
- * variants produce a `tool-call` so the renderer can show an
- * input-available/input-streaming state.
+ * tool_execution_end` frames. `_end` produces a `tool-result`; updates produce
+ * complete presentation replacements while starts produce the identity/input
+ * needed to open the running tool row.
  */
 export function normalizeToolExecutionFrame(
 	typed: Record<string, unknown>,
@@ -172,8 +204,18 @@ export function normalizeToolExecutionFrame(
 			toolCallId,
 		};
 	}
+	const input = typed.args ?? {};
+	if (typed.type === 'tool_execution_update') {
+		return {
+			input,
+			kind: 'tool-update',
+			name,
+			presentation: extractToolPresentation(typed.partialResult),
+			toolCallId,
+		};
+	}
 	return {
-		input: typed.args ?? {},
+		input,
 		kind: 'tool-call',
 		name,
 		toolCallId,

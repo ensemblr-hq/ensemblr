@@ -1,4 +1,5 @@
 import type { BundledLanguage } from 'shiki';
+import type { ToolExtensionGlyph } from '@/shared/tool-presentation';
 
 /** Whether a tool row reads as ordinary activity or as a failure. */
 export type ToolTone = 'default' | 'destructive';
@@ -209,19 +210,34 @@ export type ToolBodyDescriptor =
 	| { kind: 'stack-trace'; trace: string }
 	| { kind: 'terminal'; text: string };
 
+/** A validated host or extension Lucide glyph used by a rendered row. */
+export type ToolPresentationGlyph = ToolGlyph | ToolExtensionGlyph;
+
+/** Host-owned input and output kept visible beside extension-owned presentation. */
+export interface ToolRawIODescriptor {
+	/** Actual runtime tool name, never replaced by the extension title. */
+	toolName: string;
+	/** Deterministic serialized input sent to the tool. */
+	input: string;
+	/** Raw projected output returned by the tool. */
+	output: string;
+}
+
 /**
  * Everything a tool row needs to render one call, derived from the tool part
- * before any component runs. The four fields answer the four questions that
- * separate one tool row from another: which glyph, what it says, what stays
- * pinned, and what unfolds.
+ * before any component runs. The fields answer which glyph, what it says, what
+ * stays pinned, and what unfolds.
  */
 export interface ToolPresentation {
 	badge: ToolBadgeDescriptor | null;
 	body: ToolBodyDescriptor;
-	glyph: ToolGlyph;
+	glyph: ToolPresentationGlyph;
 	preview: ToolPreviewDescriptor | null;
+	rawIO?: ToolRawIODescriptor;
+	running?: boolean;
 	title: string;
 	tone: ToolTone;
+	extensionOwned?: boolean;
 	/**
 	 * Title to fall back to when the badge pins nothing on screen, which only a
 	 * chat or workspace badge can do — those resolve against a live catalogue and
@@ -240,5 +256,5 @@ export interface ToolPresentation {
  * default, e.g. an image `read` marking itself distinctly from a text one.
  */
 export type ToolPresenterResult = Omit<ToolPresentation, 'glyph'> & {
-	glyph?: ToolGlyph;
+	glyph?: ToolPresentationGlyph;
 };

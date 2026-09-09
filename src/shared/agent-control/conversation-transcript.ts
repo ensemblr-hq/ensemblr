@@ -218,6 +218,9 @@ function projectAgentPayload(
 	if (payload.kind === 'tool-call' || payload.kind === 'tool-result') {
 		return [toolSlot(ordinal, payload)];
 	}
+	if (payload.kind === 'tool-update') {
+		return [];
+	}
 	if (payload.kind !== 'message') {
 		return [];
 	}

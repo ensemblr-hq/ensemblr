@@ -7,8 +7,8 @@ import { useScrollAnchor } from '@/renderer/hooks/conversation/use-anchored-disc
 import { formatTurnDuration } from '@/renderer/lib/format-duration';
 import { cn } from '@/renderer/lib/utils';
 import { toolCallCollapseAtom } from '@/renderer/state/preferences';
-import type { ToolGlyph } from '@/renderer/types/tool-presentation';
-import { GLYPH_ICONS } from './tool-collapsible/glyph-icons';
+import type { ToolPresentationGlyph } from '@/renderer/types/tool-presentation';
+import { ToolGlyphIcon } from './tool-collapsible/glyph-icons';
 
 /**
  * How many tool marks the collapsed strip paints before it gives up and counts
@@ -36,7 +36,7 @@ export function ChatTurnSummary({
 	durationMs: number | null;
 	messageCount: number;
 	/** One glyph per folded tool call, in the order the turn ran them. */
-	toolGlyphs: readonly ToolGlyph[];
+	toolGlyphs: readonly ToolPresentationGlyph[];
 }) {
 	// ⌃O (and the General settings switch) flips this global mode to expand or
 	// collapse every settled turn at once. A manual click is remembered against
@@ -124,7 +124,11 @@ export function ChatTurnSummary({
  * turn still says what kind of work it did. Overflow past the cap becomes a
  * count rather than a second line.
  */
-function ToolGlyphStrip({ glyphs }: { glyphs: readonly ToolGlyph[] }) {
+function ToolGlyphStrip({
+	glyphs,
+}: {
+	glyphs: readonly ToolPresentationGlyph[];
+}) {
 	if (glyphs.length === 0) {
 		return null;
 	}
@@ -133,11 +137,11 @@ function ToolGlyphStrip({ glyphs }: { glyphs: readonly ToolGlyph[] }) {
 	return (
 		<span className='flex shrink-0 items-center gap-1.5 text-muted-foreground/60'>
 			{shown.map((glyph, index) => {
-				const GlyphIcon = GLYPH_ICONS[glyph];
 				return (
-					<GlyphIcon
+					<ToolGlyphIcon
 						aria-hidden='true'
 						className='size-3.5'
+						glyph={glyph}
 						key={`${glyph}:${index}`}
 					/>
 				);

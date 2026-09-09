@@ -33,18 +33,24 @@ export function ToolLabeledPanel({
 }: {
 	sections: readonly ToolPanelSectionDescriptor[];
 }) {
+	const keyOccurrences = new Map<string, number>();
 	return (
 		<ToolPanel>
 			<div className='space-y-3'>
-				{sections.map((section) => (
-					<ToolPanelSection
-						key={section.label}
-						label={section.label}
-						muted={section.muted}
-					>
-						{section.text}
-					</ToolPanelSection>
-				))}
+				{sections.map((section) => {
+					const keyBase = `${section.label}:${section.text}:${section.muted}`;
+					const occurrence = keyOccurrences.get(keyBase) ?? 0;
+					keyOccurrences.set(keyBase, occurrence + 1);
+					return (
+						<ToolPanelSection
+							key={`${keyBase}:${occurrence}`}
+							label={section.label}
+							muted={section.muted}
+						>
+							{section.text}
+						</ToolPanelSection>
+					);
+				})}
 			</div>
 		</ToolPanel>
 	);

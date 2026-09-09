@@ -1,4 +1,5 @@
 import type { AgentFailureClass } from '../../agent-failure.ts';
+import type { ToolPresentationV1 } from '../../tool-presentation.ts';
 
 /** Canonical session status union; the main-process repository aliases this. */
 export type AgentSessionStatusWire =
@@ -69,6 +70,9 @@ export type AgentWireMessagePart =
  * timeline; a subsequent `message` envelope for the same turn replaces them
  * with the authoritative final text.
  *
+ * `tool-update` carries a complete replacement of an extension-owned running
+ * tool presentation; it is progress data, not a completed tool result.
+ *
  * `custom` carries a message an extension injected into the conversation. It is
  * context the agent reads, not prose it wrote, so it is kept apart from `text`
  * rather than folded into it.
@@ -91,6 +95,14 @@ export type AgentWireMessagePayload =
 			isError: boolean;
 			kind: 'tool-result';
 			output: unknown;
+			toolCallId: string;
+	  }
+	| {
+			/** Complete replacement of the extension-owned running presentation. */
+			input: unknown;
+			kind: 'tool-update';
+			name: string;
+			presentation: ToolPresentationV1 | null;
 			toolCallId: string;
 	  }
 	| {

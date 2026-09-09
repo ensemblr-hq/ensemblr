@@ -524,6 +524,71 @@ test('parses JSONL frames into typed events', async () => {
 	await adapter.shutdown();
 });
 
+test('routes tool starts, presentation updates, and final results through message events', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createPiCliRpcAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession(buildInput());
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	child.emitStdout(
+		`${[
+			{
+				args: { query: 'ensemblr' },
+				toolCallId: 'call-1',
+				toolName: 'search',
+				type: 'tool_execution_start',
+			},
+			{
+				args: { query: 'ensemblr' },
+				partialResult: {
+					details: {
+						ensemblr: { presentation: { title: 'Searching', version: 1 } },
+					},
+				},
+				toolCallId: 'call-1',
+				toolName: 'search',
+				type: 'tool_execution_update',
+			},
+			{
+				isError: false,
+				result: { content: [{ text: 'done' }], details: { kept: true } },
+				toolCallId: 'call-1',
+				toolName: 'search',
+				type: 'tool_execution_end',
+			},
+		]
+			.map((frame) => JSON.stringify(frame))
+			.join('\n')}\n`,
+	);
+	await waitForMicrotasks();
+
+	const messages = events.filter(
+		(event): event is Extract<AgentEvent, { type: 'message' }> =>
+			event.type === 'message',
+	);
+	assert.deepEqual(
+		messages.map((event) => event.payload.kind),
+		['tool-call', 'tool-update', 'tool-result'],
+	);
+	assert.deepEqual(messages[1]?.payload, {
+		input: { query: 'ensemblr' },
+		kind: 'tool-update',
+		name: 'search',
+		presentation: { title: 'Searching', version: 1 },
+		toolCallId: 'call-1',
+	});
+	assert.deepEqual(messages[2]?.payload, {
+		isError: false,
+		kind: 'tool-result',
+		output: { content: [{ text: 'done' }], details: { kept: true } },
+		toolCallId: 'call-1',
+	});
+	await adapter.shutdown();
+});
+
 test('raw frames name the agent_sessions.id the debug panel scopes by', async () => {
 	const recorder = createSpawnRecorder();
 	const frames: Array<{ sessionId: string }> = [];
@@ -1615,6 +1680,215 @@ test('normalizePiPayload maps tool_execution_start to a tool-call variant', () =
 		kind: 'tool-call',
 		name: 'read',
 		toolCallId: 'call-1',
+	});
+});
+
+test('normalizes complete replacement presentation updates without persisting partial content', () => {
+	const firstPresentation = {
+		body: { kind: 'terminal', text: 'first' },
+		title: 'First',
+		version: 1,
+	};
+	const secondPresentation = {
+		body: { kind: 'terminal', text: 'second' },
+		title: 'Second',
+		version: 1,
+	};
+	const start = normalizePiPayload({
+		args: { query: 'one' },
+		toolCallId: 'call-1',
+		toolName: 'search',
+		type: 'tool_execution_start',
+	});
+	const firstUpdate = normalizePiPayload({
+		args: { query: 'one' },
+		partialResult: {
+			content: [{ text: 'do not persist', type: 'text' }],
+			details: {
+				ensemblr: { presentation: firstPresentation },
+				secret: 'drop',
+			},
+		},
+		toolCallId: 'call-1',
+		toolName: 'search',
+		type: 'tool_execution_update',
+	});
+	const secondUpdate = normalizePiPayload({
+		args: { query: 'one' },
+		partialResult: {
+			details: { ensemblr: { presentation: secondPresentation } },
+		},
+		toolCallId: 'call-1',
+		toolName: 'search',
+		type: 'tool_execution_update',
+	});
+	const invalidUpdate = normalizePiPayload({
+		args: { query: 'one' },
+		partialResult: {
+			details: { ensemblr: { presentation: { title: 'Invalid', version: 2 } } },
+		},
+		toolCallId: 'call-1',
+		toolName: 'search',
+		type: 'tool_execution_update',
+	});
+	const clearingUpdate = normalizePiPayload({
+		args: { query: 'one' },
+		partialResult: { content: [{ text: 'missing presentation' }] },
+		toolCallId: 'call-1',
+		toolName: 'search',
+		type: 'tool_execution_update',
+	});
+	const finalResult = normalizePiPayload({
+		isError: false,
+		partialResult: { content: [{ text: 'late partial' }] },
+		result: {
+			content: [{ text: 'ordinary final output' }],
+			details: { arbitrary: true },
+		},
+		toolCallId: 'call-1',
+		toolName: 'search',
+		type: 'tool_execution_end',
+	});
+
+	assert.deepEqual(start, {
+		input: { query: 'one' },
+		kind: 'tool-call',
+		name: 'search',
+		toolCallId: 'call-1',
+	});
+	assert.deepEqual(firstUpdate, {
+		input: { query: 'one' },
+		kind: 'tool-update',
+		name: 'search',
+		presentation: firstPresentation,
+		toolCallId: 'call-1',
+	});
+	assert.deepEqual(secondUpdate, {
+		input: { query: 'one' },
+		kind: 'tool-update',
+		name: 'search',
+		presentation: secondPresentation,
+		toolCallId: 'call-1',
+	});
+	assert.deepEqual(invalidUpdate, {
+		input: { query: 'one' },
+		kind: 'tool-update',
+		name: 'search',
+		presentation: null,
+		toolCallId: 'call-1',
+	});
+	assert.deepEqual(clearingUpdate, {
+		input: { query: 'one' },
+		kind: 'tool-update',
+		name: 'search',
+		presentation: null,
+		toolCallId: 'call-1',
+	});
+	assert.deepEqual(finalResult, {
+		isError: false,
+		kind: 'tool-result',
+		output: {
+			content: [{ text: 'ordinary final output' }],
+			details: { arbitrary: true },
+		},
+		toolCallId: 'call-1',
+	});
+});
+
+test('keeps update snapshots isolated across duplicate and interleaved tool identities', () => {
+	const calls = [
+		normalizePiPayload({
+			args: { path: 'a' },
+			toolCallId: 'call-a',
+			toolName: 'read',
+			type: 'tool_execution_start',
+		}),
+		normalizePiPayload({
+			args: { path: 'a' },
+			partialResult: {
+				details: { ensemblr: { presentation: { title: 'A', version: 1 } } },
+			},
+			toolCallId: 'call-a',
+			toolName: 'read',
+			type: 'tool_execution_update',
+		}),
+		normalizePiPayload({
+			args: { path: 'b' },
+			toolCallId: 'call-b',
+			toolName: 'read',
+			type: 'tool_execution_start',
+		}),
+		normalizePiPayload({
+			args: { path: 'b' },
+			partialResult: {
+				details: { ensemblr: { presentation: { title: 'B', version: 1 } } },
+			},
+			toolCallId: 'call-b',
+			toolName: 'read',
+			type: 'tool_execution_update',
+		}),
+		normalizePiPayload({
+			args: { path: 'a' },
+			toolCallId: 'call-a',
+			toolName: 'read',
+			type: 'tool_execution_start',
+		}),
+	];
+
+	assert.deepEqual(calls, [
+		{
+			input: { path: 'a' },
+			kind: 'tool-call',
+			name: 'read',
+			toolCallId: 'call-a',
+		},
+		{
+			input: { path: 'a' },
+			kind: 'tool-update',
+			name: 'read',
+			presentation: { title: 'A', version: 1 },
+			toolCallId: 'call-a',
+		},
+		{
+			input: { path: 'b' },
+			kind: 'tool-call',
+			name: 'read',
+			toolCallId: 'call-b',
+		},
+		{
+			input: { path: 'b' },
+			kind: 'tool-update',
+			name: 'read',
+			presentation: { title: 'B', version: 1 },
+			toolCallId: 'call-b',
+		},
+		{
+			input: { path: 'a' },
+			kind: 'tool-call',
+			name: 'read',
+			toolCallId: 'call-a',
+		},
+	]);
+});
+
+test('normalizes late updates after a tool error without changing completion semantics', () => {
+	const result = normalizePiPayload({
+		args: { command: 'false' },
+		partialResult: {
+			details: { ensemblr: { presentation: { title: 'Late', version: 1 } } },
+			error: 'tool failed',
+		},
+		toolCallId: 'call-error',
+		toolName: 'bash',
+		type: 'tool_execution_update',
+	});
+
+	assert.deepEqual(result, {
+		input: { command: 'false' },
+		kind: 'tool-update',
+		name: 'bash',
+		presentation: { title: 'Late', version: 1 },
+		toolCallId: 'call-error',
 	});
 });
 

@@ -3,6 +3,7 @@ import type { BundledLanguage } from 'shiki';
 import { i18n } from '@/renderer/lib/i18n';
 import type {
 	ToolGlyph,
+	ToolPresentationGlyph,
 	ToolPresenterResult,
 	ToolPreviewDescriptor,
 } from '@/renderer/types/tool-presentation';
@@ -23,6 +24,11 @@ import {
 	canonicalEnsemblrToolName,
 	ensemblrToolGlyph,
 } from './ensemblr-tool-presentation';
+import {
+	extensionPresentationOf,
+	isHostPermissionState,
+	isProtectedToolName,
+} from './extension-tool-presenter';
 import { parseNumberedFileBody } from './numbered-file-body';
 import {
 	PI_LENS_TOOL_GLYPHS,
@@ -632,7 +638,15 @@ export function glyphForToolName(toolName: string): ToolGlyph {
  * @param part - The tool part to identify
  * @returns The glyph for the tool's name
  */
-export function restingGlyph(part: DynamicToolUIPart): ToolGlyph {
+export function restingGlyph(part: DynamicToolUIPart): ToolPresentationGlyph {
+	const extension = extensionPresentationOf(part);
+	if (
+		extension?.glyph &&
+		!isProtectedToolName(part.toolName) &&
+		!isHostPermissionState(part)
+	) {
+		return extension.glyph;
+	}
 	return (
 		ensemblrToolGlyph(part.toolName) ??
 		(resolvePiMcpAdapterToolPart(part) === null ? null : 'network') ??

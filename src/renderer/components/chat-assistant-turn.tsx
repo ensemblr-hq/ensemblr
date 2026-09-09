@@ -17,7 +17,7 @@ import type {
 	TimelineActivityRow,
 } from '@/renderer/types/agent-timeline';
 import type { ChatAssistantTurnTiming } from '@/renderer/types/chat';
-import type { ToolGlyph } from '@/renderer/types/tool-presentation';
+import type { ToolPresentationGlyph } from '@/renderer/types/tool-presentation';
 
 import { ChatMessageText } from './chat-message-text';
 import { ChatSubagentCall } from './chat-subagent-call';
@@ -303,7 +303,7 @@ function splitTurnParts(
  */
 function collectActivityGlyphs(
 	parts: UIMessage['parts'],
-): readonly ToolGlyph[] {
+): readonly ToolPresentationGlyph[] {
 	return parts.flatMap((part) => {
 		if (part.type === 'dynamic-tool') {
 			return [glyphForToolCall(part as DynamicToolUIPart)];

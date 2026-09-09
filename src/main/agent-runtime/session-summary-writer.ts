@@ -256,6 +256,12 @@ function filterTranscriptEvents(
 		if (event.eventType !== 'message') {
 			return false;
 		}
+		if (
+			event.payload?.kind === 'message' &&
+			event.payload.payload.kind === 'tool-update'
+		) {
+			return false;
+		}
 		return extractRole(event) !== null;
 	});
 }
@@ -348,6 +354,8 @@ function extractText(event: AgentSessionEventWire): string {
 			return `(tool call: ${inner.name})`;
 		case 'tool-result':
 			return inner.isError ? '(tool error)' : '';
+		case 'tool-update':
+			return '';
 		// Reasoning, streaming deltas, tool calls fall through. Reasoning is
 		// excluded so chain-of-thought text doesn't bloat or distort the
 		// summary; deltas are non-canonical and `message_end` carries the

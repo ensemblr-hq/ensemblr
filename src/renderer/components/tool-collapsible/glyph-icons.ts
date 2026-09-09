@@ -40,7 +40,12 @@ import {
 	TicketPlusIcon,
 	WrenchIcon,
 } from 'lucide-react';
-import type { ToolGlyph } from '@/renderer/types/tool-presentation';
+import { DynamicIcon, type IconName, iconNames } from 'lucide-react/dynamic';
+import { type ComponentProps, createElement } from 'react';
+import type {
+	ToolGlyph,
+	ToolPresentationGlyph,
+} from '@/renderer/types/tool-presentation';
 
 /**
  * The single icon each glyph key paints, shared by the tool row and the turn
@@ -87,3 +92,28 @@ export const GLYPH_ICONS: Record<ToolGlyph, LucideIcon> = {
 	'ticket-plus': TicketPlusIcon,
 	wrench: WrenchIcon,
 };
+
+/** Props for the shared host and extension glyph renderer. */
+type ToolGlyphIconProps = Omit<
+	ComponentProps<typeof DynamicIcon>,
+	'name' | 'fallback'
+> & {
+	glyph: ToolPresentationGlyph;
+};
+
+/** Renders a host glyph statically or a validated extension glyph on demand. */
+export function ToolGlyphIcon({ glyph, ...props }: ToolGlyphIconProps) {
+	if (Object.hasOwn(GLYPH_ICONS, glyph)) {
+		const HostIcon = GLYPH_ICONS[glyph as ToolGlyph];
+		return createElement(HostIcon, props);
+	}
+	if (!iconNames.includes(glyph as IconName)) {
+		return createElement(WrenchIcon, props);
+	}
+	return createElement(DynamicIcon, {
+		...props,
+		fallback: () => createElement(WrenchIcon),
+		key: glyph,
+		name: glyph as IconName,
+	});
+}

@@ -10,6 +10,7 @@ import type {
 	AgentWireMessagePart,
 	AgentWireMessagePayload,
 } from '@/shared/ipc/contracts/agent-session';
+import { parseToolPresentation } from '@/shared/tool-presentation';
 import { parentToolCallIdOf } from './subagent-parts.ts';
 
 /**
@@ -61,11 +62,14 @@ export function buildToolResultPart(
 ): ParentedDynamicToolUIPart {
 	const normalizedOutput = normalizeToolOutput(source.output);
 	const link = parentToolCallId ? { parentToolCallId } : {};
+	const toolPresentation = presentationFromDetails(normalizedOutput.details);
+	const presentationField = toolPresentation ? { toolPresentation } : {};
 	if (source.isError) {
 		return {
 			errorText: normalizeToolError(normalizedOutput),
 			input: {},
 			...link,
+			...presentationField,
 			state: 'output-error',
 			toolCallId: source.toolCallId || event.id,
 			toolName: 'tool',
@@ -76,9 +80,33 @@ export function buildToolResultPart(
 		input: {},
 		output: normalizedOutput,
 		...link,
+		...presentationField,
 		state: 'output-available',
 		toolCallId: source.toolCallId || event.id,
 		toolName: 'tool',
+		type: 'dynamic-tool',
+	};
+}
+
+/**
+ * Builds a running part from a complete extension presentation replacement.
+ * @param source - The wire `tool-update` payload
+ * @param event - The persisted event frame carrying the update
+ * @param parentToolCallId - Tool call whose subagent produced the update
+ * @returns The running dynamic-tool part carrying the snapshot
+ */
+export function buildToolUpdatePart(
+	source: Extract<AgentWireMessagePayload, { kind: 'tool-update' }>,
+	event: AgentSessionEventWire,
+	parentToolCallId: string | null = null,
+): ParentedDynamicToolUIPart {
+	return {
+		input: isPlainObject(source.input) ? source.input : {},
+		...(parentToolCallId ? { parentToolCallId } : {}),
+		state: 'input-available',
+		toolCallId: source.toolCallId || event.id,
+		toolName: source.name || 'tool',
+		toolPresentation: source.presentation,
 		type: 'dynamic-tool',
 	};
 }
@@ -155,12 +183,28 @@ function mergeDynamicToolParts(
 	const winner = incomingRank >= previousRank ? incomingPart : previousPart;
 	const parentToolCallId =
 		parentToolCallIdOf(previousPart) ?? parentToolCallIdOf(incomingPart);
-	return {
+	const incomingWins = incomingRank >= previousRank;
+	const merged = {
 		...winner,
 		...(parentToolCallId ? { parentToolCallId } : {}),
 		input: pickRicherInput(previousPart.input, incomingPart.input),
 		toolName: pickToolName(previousPart.toolName, incomingPart.toolName),
 	} as ParentedDynamicToolUIPart;
+	if (incomingWins && incomingRank >= 2 && !hasToolPresentation(incomingPart)) {
+		const {
+			toolPresentation: ignoredPresentation,
+			...withoutToolPresentation
+		} = merged;
+		void ignoredPresentation;
+		return withoutToolPresentation as ParentedDynamicToolUIPart;
+	} else if (
+		!hasToolPresentation(incomingPart) &&
+		hasToolPresentation(previousPart) &&
+		incomingRank <= 1
+	) {
+		merged.toolPresentation = previousToolPresentationOf(previousPart);
+	}
+	return merged;
 }
 
 /**
@@ -169,15 +213,16 @@ function mergeDynamicToolParts(
  * @param b - The incoming input value
  * @returns The input that has keys, or a fallback when neither does
  */
-function pickRicherInput(a: unknown, b: unknown): unknown {
-	const aHasKeys =
-		a !== null && typeof a === 'object' && Object.keys(a).length > 0;
-	if (aHasKeys) {
-		return a;
+function pickRicherInput(a: unknown, b: unknown): Record<string, unknown> {
+	const aRecord = isPlainObject(a) ? a : null;
+	if (aRecord && Object.keys(aRecord).length > 0) {
+		return aRecord;
 	}
-	const bHasKeys =
-		b !== null && typeof b === 'object' && Object.keys(b).length > 0;
-	return bHasKeys ? b : (a ?? b);
+	const bRecord = isPlainObject(b) ? b : null;
+	if (bRecord && Object.keys(bRecord).length > 0) {
+		return bRecord;
+	}
+	return aRecord ?? bRecord ?? {};
 }
 
 /**
@@ -253,6 +298,49 @@ function normalizeToolError(output: AgentToolOutput): string {
 	return output.text.length > 0
 		? output.text
 		: i18n.t('workbench:tool-call.failed.generic', 'Tool execution failed.');
+}
+
+/**
+ * Extracts a final presentation from a normalized result details bag.
+ * @param details - Normalized tool details
+ * @returns The validated descriptor, or null when the final result has none
+ */
+function presentationFromDetails(
+	details: Readonly<Record<string, unknown>> | null,
+) {
+	if (!details) {
+		return null;
+	}
+	const ensemblr = details.ensemblr;
+	if (!isPlainObject(ensemblr)) {
+		return null;
+	}
+	return parseToolPresentation(ensemblr.presentation);
+}
+
+/**
+ * Checks whether a part carries an explicit partial/final presentation value.
+ * @param part - Tool part to inspect
+ * @returns True when the custom property is present, including null
+ */
+function hasToolPresentation(part: DynamicToolUIPart): boolean {
+	return 'toolPresentation' in part;
+}
+
+/**
+ * Reads an explicit presentation value without confusing null with absence.
+ * @param part - Tool part to inspect
+ * @returns The snapshot or null
+ */
+function previousToolPresentationOf(part: DynamicToolUIPart) {
+	const candidate = (
+		part as DynamicToolUIPart & {
+			toolPresentation?: unknown;
+		}
+	).toolPresentation;
+	return candidate === null || candidate === undefined
+		? null
+		: parseToolPresentation(candidate);
 }
 
 /**
