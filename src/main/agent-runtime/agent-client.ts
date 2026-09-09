@@ -7,6 +7,7 @@ import type { AgentAdapter, AgentAdapterSession } from './agent-adapter.ts';
 import {
 	type AgentErrorCode,
 	type AgentEventListener,
+	type AgentExecutableSnapshot,
 	type AgentModelMetadata,
 	type AgentSessionId,
 	type AgentSessionMetadata,
@@ -391,14 +392,43 @@ function wrapSession({
 }
 
 /**
- * Validates inputs before any adapter work happens. Surface errors stay typed
- * so callers can render them in the renderer without leaking adapter detail.
- *
- * An absent executable states no opinion — Pi rejects it because the IPC layer
- * already gated the session on its snapshot, while another runtime keeps
- * whatever binary its adapter would pick. An executable that is *present but
- * unready* is positive knowledge that nothing runnable was found, and is
- * rejected for every provider.
+ * Validates the executable boundary before a runtime is opened or replaced.
+ * Surface errors stay typed so callers can render them without leaking adapter
+ * detail. An absent executable states no opinion for Claude, while Pi rejects
+ * it because the IPC layer normally gates sessions on its snapshot. An
+ * executable that is present but unready is positive knowledge that nothing
+ * runnable was found and is rejected for every provider.
+ * @param executable - Provider executable snapshot, or null when the adapter resolves its own.
+ * @param provider - Runtime that will consume the executable.
+ */
+export function validateAgentExecutable(
+	executable: AgentExecutableSnapshot | null,
+	provider: AgentProviderId,
+): void {
+	if (!executable) {
+		if (provider === DEFAULT_AGENT_PROVIDER) {
+			throw new AgentClientError({
+				code: 'invalid-executable',
+				message: describeUnreadyExecutable(DEFAULT_AGENT_PROVIDER),
+				recoverable: false,
+			});
+		}
+		return;
+	}
+
+	if (!isAgentExecutableReady(executable)) {
+		throw new AgentClientError({
+			code: 'invalid-executable',
+			message: describeUnreadyExecutable(provider),
+			recoverable: false,
+		});
+	}
+}
+
+/**
+ * Validates an agent session request before adapter work begins.
+ * @param request - Session request to validate.
+ * @param provider - Runtime that will consume the request.
  */
 function validateRequest(
 	request: AgentSessionRequest,
@@ -412,24 +442,7 @@ function validateRequest(
 		});
 	}
 
-	if (!request.executable) {
-		if (provider === DEFAULT_AGENT_PROVIDER) {
-			throw new AgentClientError({
-				code: 'invalid-executable',
-				message: describeUnreadyExecutable(DEFAULT_AGENT_PROVIDER),
-				recoverable: false,
-			});
-		}
-		return;
-	}
-
-	if (!isAgentExecutableReady(request.executable)) {
-		throw new AgentClientError({
-			code: 'invalid-executable',
-			message: describeUnreadyExecutable(provider),
-			recoverable: false,
-		});
-	}
+	validateAgentExecutable(request.executable ?? null, provider);
 }
 
 /**

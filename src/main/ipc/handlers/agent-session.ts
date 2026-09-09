@@ -80,6 +80,9 @@ function applyTurnModes({
 
 /**
  * Registers IPC handlers that expose the agent session service to the renderer.
+ * Fresh opens preflight Pi's executable; resumes let the service reuse a live
+ * runtime even if a background probe fails. The client still validates the
+ * executable whenever a resume actually needs to launch a replacement runtime.
  * @param options - Required services.
  */
 export function registerAgentSessionHandlers({
@@ -144,7 +147,10 @@ export function registerAgentSessionHandlers({
 					request.model,
 				);
 				const executable = await piExecutableService.getSnapshot();
-				if (isBlockedByPiExecutable({ executable, provider })) {
+				if (
+					!request.resumeSessionId &&
+					isBlockedByPiExecutable({ executable, provider })
+				) {
 					return {
 						error: 'Pi executable is not ready. Resolve setup checks first.',
 					};

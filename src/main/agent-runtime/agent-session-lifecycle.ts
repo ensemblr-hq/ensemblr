@@ -43,6 +43,7 @@ import {
 import { assertProviderPin } from './session/provider-pin.ts';
 import {
 	createSessionOpener,
+	linkedDirectoriesBusy,
 	type ProviderExecutablePort,
 } from './session/session-open.ts';
 import {
@@ -427,6 +428,9 @@ export function createAgentSessionLifecycle({
 		request,
 	) => {
 		const database = requireDatabase();
+		if (opener.isReplacing(request.sessionId)) {
+			throw linkedDirectoriesBusy();
+		}
 		const active = activeSessions.get(request.sessionId);
 		if (quarantiningSessions.has(request.sessionId)) {
 			throw new AgentSessionServiceError({

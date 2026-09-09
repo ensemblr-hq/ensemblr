@@ -18,7 +18,11 @@ import {
 	getMainBranchForSession,
 	updateAgentSession,
 } from '../../storage/repositories/agent-session-repository.ts';
-import type { AgentClient, AgentSession } from '../agent-client.ts';
+import {
+	type AgentClient,
+	type AgentSession,
+	validateAgentExecutable,
+} from '../agent-client.ts';
 import { AgentSessionServiceError } from '../agent-session-service-error.ts';
 import type {
 	AgentSessionEventSink,
@@ -161,6 +165,8 @@ interface SessionOpener {
 		database: DatabaseSync;
 		request: OpenRequest;
 	}) => Promise<AgentSessionSnapshot>;
+	/** Whether a replacement is currently resolving or opening this session. */
+	isReplacing: (sessionId: string) => boolean;
 	/** Cancels and awaits a replacement currently opening this session. */
 	cancelReplacement: (sessionId: string) => Promise<boolean>;
 	/** Cancels and awaits every replacement currently opening a session. */
@@ -295,18 +301,22 @@ export function createSessionOpener({
 			promise: null,
 		};
 		replacingSessions.set(row.id, replacement);
+		let replacementExecutable: AgentExecutableSnapshot | null = null;
 		const replacementPromise = (async () => {
+			if (directoriesChanged) {
+				replacementExecutable = await resolveReplacementExecutable({
+					requestExecutable: request.executable,
+					replacement,
+					resolveProviderExecutable,
+					provider: row.provider,
+				});
+			}
 			if (alreadyActive) {
-				// Keep the old binding registered until teardown succeeds. A rejected
-				// close still represents a possibly-live child and must be retryable.
-				await alreadyActive.agentRuntimeSession.close();
-				if (replacement.cancelled) {
-					throw replacementCancelled();
-				}
-				if (activeSessions.get(row.id) === alreadyActive) {
-					activeSessions.delete(row.id);
-					alreadyActive.subscription.unsubscribe();
-				}
+				await closeReplacedActiveSession({
+					activeSessions,
+					alreadyActive,
+					replacement,
+				});
 			}
 			if (replacement.cancelled) {
 				throw replacementCancelled();
@@ -326,11 +336,13 @@ export function createSessionOpener({
 						thinkingLevel: request.thinkingLevel ?? row.thinkingLevel,
 					},
 				}) ?? row;
-			const executable = await resolveSessionExecutable({
-				provider: row.provider,
-				requestExecutable: request.executable,
-				resolveProviderExecutable,
-			});
+			const executable = directoriesChanged
+				? replacementExecutable
+				: await resolveSessionExecutable({
+						provider: row.provider,
+						requestExecutable: request.executable,
+						resolveProviderExecutable,
+					});
 			if (replacement.cancelled) {
 				throw replacementCancelled();
 			}
@@ -590,7 +602,13 @@ export function createSessionOpener({
 		}
 	};
 
-	return { cancelReplacement, cancelReplacements, openSession };
+	return {
+		cancelReplacement,
+		cancelReplacements,
+		/** Reports whether this session is currently being replaced. */
+		isReplacing: (sessionId) => replacingSessions.has(sessionId),
+		openSession,
+	};
 }
 
 /**
@@ -767,10 +785,63 @@ function sameDirectories(
 }
 
 /**
+ * Closes the replaced runtime only after preserving its cancellation boundary.
+ * @param input - Active runtime, replacement state, and the active-session registry.
+ */
+async function closeReplacedActiveSession({
+	activeSessions,
+	alreadyActive,
+	replacement,
+}: {
+	activeSessions: ActiveSessionMap;
+	alreadyActive: ActiveSession;
+	replacement: ReplacementOperation;
+}): Promise<void> {
+	// Keep the old binding registered until teardown succeeds. A rejected close
+	// still represents a possibly-live child and must be retryable.
+	await alreadyActive.agentRuntimeSession.close();
+	if (replacement.cancelled) {
+		throw replacementCancelled();
+	}
+	if (activeSessions.get(alreadyActive.row.id) === alreadyActive) {
+		activeSessions.delete(alreadyActive.row.id);
+		alreadyActive.subscription.unsubscribe();
+	}
+}
+
+/**
+ * Resolves and validates a replacement executable while its cancellation gate is active.
+ * @param input - Provider executable sources and the replacement cancellation state.
+ * @returns The executable snapshot to reuse when the replacement launches.
+ */
+async function resolveReplacementExecutable({
+	requestExecutable,
+	replacement,
+	resolveProviderExecutable,
+	provider,
+}: {
+	requestExecutable: PiExecutableSnapshot;
+	replacement: ReplacementOperation;
+	resolveProviderExecutable: ProviderExecutablePort | undefined;
+	provider: AgentProviderId;
+}): Promise<AgentExecutableSnapshot | null> {
+	const executable = await resolveSessionExecutable({
+		provider,
+		requestExecutable,
+		resolveProviderExecutable,
+	});
+	if (replacement.cancelled) {
+		throw replacementCancelled();
+	}
+	validateAgentExecutable(executable, provider);
+	return executable;
+}
+
+/**
  * Names a retryable grant change without interrupting a turn already in flight.
  * @returns The service error translated by the composer.
  */
-function linkedDirectoriesBusy(): AgentSessionServiceError {
+export function linkedDirectoriesBusy(): AgentSessionServiceError {
 	return new AgentSessionServiceError({
 		code: 'linked-directories-busy',
 		message: 'Linked directory changes require an idle agent session.',

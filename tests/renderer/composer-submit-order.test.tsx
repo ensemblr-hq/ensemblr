@@ -17,6 +17,10 @@ vi.mock('@/renderer/api/ensemblr-queries', () => ({
 
 import type { ComposerEditorHandle } from '../../src/renderer/components/workbench-shell/conversation-panel/composer/editor';
 import { useComposerSubmit } from '../../src/renderer/hooks/workbench-shell/composer/use-composer-submit';
+import {
+	useDropComposerSubmits,
+	useComposerSubmit as useExternalComposerSubmit,
+} from '../../src/renderer/state/composer';
 import { chatLinkedDirectoriesAtomFamily } from '../../src/renderer/state/preferences';
 import type {
 	ComposerAttachment,
@@ -99,6 +103,47 @@ beforeEach(() => {
 });
 
 describe('composer send order', () => {
+	test('external same-tick submits keep the second request queued while the first is pending', async () => {
+		const store = createStore();
+		const pending = Promise.withResolvers<{ error?: string }>();
+		const onSubmit = vi.fn(() => pending.promise);
+		const editorRef = createRef<ComposerEditorHandle>();
+		editorRef.current = { clear: vi.fn() } as unknown as ComposerEditorHandle;
+		const wrapper = ({ children }: PropsWithChildren) => (
+			<Provider store={store}>{children}</Provider>
+		);
+		const composer = renderHook(
+			() =>
+				useComposerSubmit({
+					chatTabId: CHAT_TAB_ID,
+					composer: {
+						...createComposerShellState(),
+						disabled: false,
+						onSubmit,
+						workspaceCwd: '/repo',
+					},
+					editorRef,
+					readDraft: () => ({ segments: [], text: '' }),
+					setAttachmentError: vi.fn(),
+				}),
+			{ wrapper },
+		);
+		const externalSubmit = renderHook(() => useExternalComposerSubmit(), {
+			wrapper,
+		});
+		const drop = renderHook(() => useDropComposerSubmits(), { wrapper });
+
+		act(() => {
+			externalSubmit.result.current({ chatTabId: CHAT_TAB_ID, text: 'first' });
+			externalSubmit.result.current({ chatTabId: CHAT_TAB_ID, text: 'second' });
+		});
+		await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+		expect(onSubmit).toHaveBeenCalledWith('first', expect.anything());
+		expect(drop.result.current(CHAT_TAB_ID)).toBe(1);
+		pending.resolve({});
+		composer.unmount();
+	});
+
 	test('sends each attachment where its chip sat, not bunched at one end', async () => {
 		const prompt = await submit([
 			{ kind: 'text', text: 'start from ' },

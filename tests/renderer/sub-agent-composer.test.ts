@@ -36,6 +36,7 @@ const composerStateFor = (
 	overrides: {
 		activeAgentSessionId?: string | null;
 		isStreaming?: boolean;
+		liveAgentSessionId?: string | null;
 		setupDiagnostics?: SetupDiagnosticsSnapshot | null;
 		setupError?: string | null;
 	} = {},
@@ -49,6 +50,7 @@ const composerStateFor = (
 		availableModels: [],
 		availableThinkingLevels: [],
 		isStreaming: overrides.isStreaming ?? false,
+		liveAgentSessionId: overrides.liveAgentSessionId,
 		lockedProvider: null,
 		modelId: 'gpt-5.5',
 		onModelChange: () => undefined,
@@ -105,6 +107,37 @@ describe('sub-agent composer', () => {
 			'Ask to make changes, @mention files, run /commands',
 		);
 	});
+
+	test.each([null, 'another-session'])(
+		'still gates a detached chat even with live id %s',
+		(liveAgentSessionId) => {
+			for (const setupDiagnostics of [
+				null,
+				{ ...readySetup, status: 'checking' as const },
+				{ ...readySetup, status: 'blocked' as const },
+			]) {
+				const composer = composerStateFor(chatSession(false), {
+					liveAgentSessionId,
+					setupDiagnostics,
+				});
+				expect(composer.disabled).toBe(true);
+			}
+		},
+	);
+
+	test.each([false, true])(
+		'an attached runtime stays sendable through diagnostics when streaming is %s',
+		(isStreaming) => {
+			const composer = composerStateFor(chatSession(false), {
+				liveAgentSessionId: 'agent-1',
+				isStreaming,
+				setupDiagnostics: null,
+				setupError: 'Probe failed',
+			});
+			expect(composer.disabled).toBe(false);
+			expect(composer.disabledReason).toBeNull();
+		},
+	);
 
 	test('disables an ordinary chat tab’s composer on a setup blocker', () => {
 		const composer = composerStateFor(chatSession(false), {

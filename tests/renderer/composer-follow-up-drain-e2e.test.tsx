@@ -17,6 +17,7 @@ import type {
 	ComposerShellState,
 	SessionTabModel,
 } from '../../src/renderer/types/workbench';
+import type { AgentProviderId } from '../../src/shared/agent-provider';
 import { DEFAULT_APP_SETTINGS } from '../../src/shared/config';
 import type { AgentModelCatalog } from '../../src/shared/ipc/contracts/agent-models';
 import { asModelVendorId } from '../../src/shared/ipc/contracts/agent-models';
@@ -38,6 +39,7 @@ const WORKSPACE_ID = 'workspace-drain';
 const SESSION_ID = 'session-drain';
 const BRANCH_ID = 'branch-drain';
 const MODEL_ID = 'anthropic/claude-sonnet';
+const CLAUDE_MODEL_ID = 'sonnet';
 const WORKSPACE_CWD = '/tmp/workspace-drain';
 
 const CATALOG: AgentModelCatalog = {
@@ -50,6 +52,14 @@ const CATALOG: AgentModelCatalog = {
 			displayName: 'Claude Sonnet',
 			id: MODEL_ID,
 			vendor: asModelVendorId('anthropic'),
+			thinkingLevels: ['medium'],
+		},
+		{
+			agentProvider: 'claude',
+			contextWindow: 200_000,
+			displayName: 'Claude Sonnet',
+			id: CLAUDE_MODEL_ID,
+			vendor: asModelVendorId('claude-code'),
 			thinkingLevels: ['medium'],
 		},
 	],
@@ -80,7 +90,10 @@ const SESSION_TAB: SessionTabModel = {
 };
 
 /** The session row as main would return it at a given status. */
-function sessionAt(status: AgentSessionStatusWire): AgentSessionSnapshotWire {
+function sessionAt(
+	status: AgentSessionStatusWire,
+	provider: AgentProviderId = 'pi',
+): AgentSessionSnapshotWire {
 	return {
 		branchId: BRANCH_ID,
 		closedAt: null,
@@ -88,9 +101,9 @@ function sessionAt(status: AgentSessionStatusWire): AgentSessionSnapshotWire {
 		cwd: WORKSPACE_CWD,
 		id: SESSION_ID,
 		label: null,
-		model: MODEL_ID,
+		model: provider === 'pi' ? MODEL_ID : CLAUDE_MODEL_ID,
 		openedTabs: [],
-		provider: 'pi',
+		provider,
 		runtimeOpen: true,
 		runtimeSessionId: 'runtime-drain',
 		status,
@@ -111,6 +124,7 @@ function sessionAt(status: AgentSessionStatusWire): AgentSessionSnapshotWire {
 function installTurnBridge(
 	sessionReadDelayMs = 0,
 	initialStatus: AgentSessionStatusWire = 'idle',
+	provider: AgentProviderId = 'pi',
 ) {
 	let status: AgentSessionStatusWire = initialStatus;
 	const listeners = new Set<(broadcast: unknown) => void>();
@@ -139,14 +153,16 @@ function installTurnBridge(
 			return { acceptedAt: '2026-08-14T00:00:01.000Z', turnId: 'turn-drain' };
 		},
 	);
-	const openAgentSession = vi.fn(async () => ({ session: sessionAt(status) }));
+	const openAgentSession = vi.fn(async () => ({
+		session: sessionAt(status, provider),
+	}));
 
 	installEnsemblrApi({
 		listAgentModels: vi.fn(async () => CATALOG),
 		listAgentSessionEvents: vi.fn(async () => ({ events: [] })),
 		listAgentSessions: vi.fn(async () => {
 			await new Promise((resolve) => setTimeout(resolve, sessionReadDelayMs));
-			return { sessions: [sessionAt(status)] };
+			return { sessions: [sessionAt(status, provider)] };
 		}),
 		onAgentSessionEvent: vi.fn((listener: (broadcast: unknown) => void) => {
 			listeners.add(listener);
@@ -228,8 +244,12 @@ function ChatHarness({
 	publish,
 	publishPendingStartMs,
 	publishStreaming,
+	setupDiagnostics,
+	setupError,
 }: {
 	composerMounted: boolean;
+	setupDiagnostics: SetupDiagnosticsSnapshot | null;
+	setupError: string | null;
 	publish: (api: SubmitApi) => void;
 	publishPendingStartMs: (pendingStartMs: number | null) => void;
 	publishStreaming: (isStreaming: boolean) => void;
@@ -247,6 +267,7 @@ function ChatHarness({
 		availableThinkingLevels: agentComposer.availableThinkingLevels,
 		contextUsage: agentComposer.contextUsage,
 		isStreaming: agentComposer.isStreaming,
+		liveAgentSessionId: agentComposer.liveSessionId,
 		lockedProvider: agentComposer.lockedProvider,
 		modelId: agentComposer.modelId,
 		onModelChange: agentComposer.onModelChange,
@@ -257,8 +278,8 @@ function ChatHarness({
 		onSubmit: agentComposer.onSubmit,
 		onThinkingChange: agentComposer.onThinkingChange,
 		planMode: agentComposer.planMode,
-		setupDiagnostics: READY_SETUP,
-		setupError: null,
+		setupDiagnostics,
+		setupError,
 		thinkingLevel: agentComposer.thinkingLevel,
 		workspaceCwd: WORKSPACE_CWD,
 		workspaceFiles: [],
@@ -280,12 +301,15 @@ function ChatHarness({
 }
 
 /** Mounts the controller and the composer over a fresh store and query cache. */
-function mountChat(initialStatus: AgentSessionStatusWire = 'idle') {
+function mountChat(
+	initialStatus: AgentSessionStatusWire = 'idle',
+	provider: AgentProviderId = 'pi',
+) {
 	const client = createTestQueryClient();
 	client.setQueryData(ensemblrQueryKeys.agentModels(), CATALOG);
 	client.setQueryData(
 		ensemblrQueryKeys.agentSessionsForWorkspace(WORKSPACE_ID),
-		{ sessions: [sessionAt(initialStatus)] },
+		{ sessions: [sessionAt(initialStatus, provider)] },
 	);
 
 	const store = createStore();
@@ -307,11 +331,15 @@ function mountChat(initialStatus: AgentSessionStatusWire = 'idle') {
 		streaming: false,
 		submit: null as SubmitApi | null,
 	};
+	let setupDiagnostics: SetupDiagnosticsSnapshot | null = READY_SETUP;
+	let setupError: string | null = null;
 	const tree = (composerMounted: boolean) => (
 		<Provider store={store}>
 			<QueryClientProvider client={client}>
 				<ChatHarness
 					composerMounted={composerMounted}
+					setupDiagnostics={setupDiagnostics}
+					setupError={setupError}
 					publish={(api) => {
 						latest.submit = api;
 					}}
@@ -331,6 +359,14 @@ function mountChat(initialStatus: AgentSessionStatusWire = 'idle') {
 		isStreaming: () => latest.streaming,
 		pendingStartMs: () => latest.pendingStartMs,
 		setComposerMounted: (mounted: boolean) => view.rerender(tree(mounted)),
+		setDiagnostics: (
+			snapshot: SetupDiagnosticsSnapshot | null,
+			error: string | null = null,
+		) => {
+			setupDiagnostics = snapshot;
+			setupError = error;
+			view.rerender(tree(true));
+		},
 		submit: () => {
 			if (!latest.submit) {
 				throw new Error('composer is not mounted');
@@ -354,6 +390,60 @@ afterEach(() => {
 });
 
 describe('a queue draining against the real streaming state', () => {
+	test.each([
+		['pi', 'blocked'],
+		['pi', 'checking'],
+		['pi', 'error'],
+		['claude', 'blocked'],
+		['claude', 'checking'],
+		['claude', 'error'],
+	] as const)(
+		'live %s queue drains through %s diagnostics without Resume',
+		async (provider, diagnosticsStatus) => {
+			const { endTurn, submitAgentPrompt } = installTurnBridge(
+				0,
+				'streaming',
+				provider,
+			);
+			const chat = mountChat('streaming', provider);
+			act(() => {
+				send(chat, 'first');
+				send(chat, 'second');
+			});
+			const editor = editorRef.current;
+			if (!editor) {
+				throw new Error('composer editor is not mounted');
+			}
+			const clearsAfterQueueing = vi.mocked(editor.clear).mock.calls.length;
+			act(() => {
+				chat.setDiagnostics(
+					diagnosticsStatus === 'error'
+						? null
+						: { ...READY_SETUP, status: diagnosticsStatus, blockedCount: 1 },
+					diagnosticsStatus === 'error' ? 'Pi probe timed out' : null,
+				);
+				endTurn();
+			});
+
+			await waitFor(() => expect(submitAgentPrompt).toHaveBeenCalledTimes(1));
+			expect(submitAgentPrompt.mock.calls[0]?.[0].prompt).toBe('first');
+			expect(chat.submit().queue.holdReason).toBeNull();
+			expect(chat.submit().queue.entries.map((entry) => entry.text)).toEqual([
+				'second',
+			]);
+			await act(settle);
+			expect(submitAgentPrompt).toHaveBeenCalledTimes(1);
+
+			act(() => endTurn());
+			await waitFor(() => expect(submitAgentPrompt).toHaveBeenCalledTimes(2));
+			expect(submitAgentPrompt.mock.calls[1]?.[0].prompt).toBe('second');
+			expect(chat.submit().queue.entries).toHaveLength(0);
+			expect(chat.submit().queue.holdReason).toBeNull();
+			expect(editor.clear).toHaveBeenCalledTimes(clearsAfterQueueing);
+			expect(editor.restore).not.toHaveBeenCalled();
+		},
+	);
+
 	test('a rejected session open removes its optimistic prompt, stops its timer, and keeps the queue entry', async () => {
 		const { closeSession, endTurn, openAgentSession } = installTurnBridge(
 			0,

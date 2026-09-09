@@ -235,7 +235,7 @@
 		"plan-mode": {
 			"placeholder": "Describe what you want planned"
 		},
-		"queued-send-refused": "The composer never became ready for the queued message, so the queue is paused.",
+		"queued-message-empty": "The queued message is empty. Edit or remove it before resuming the queue.",
 		"send-tooltip": "Send message",
 		"send-tooltip-hold": "Hold until you send it",
 		"send-tooltip-queue": "Queue for when the agent finishes",

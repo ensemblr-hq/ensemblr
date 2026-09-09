@@ -15,10 +15,7 @@ vi.mock('@/renderer/api/ensemblr-queries', () => ({
 }));
 
 import type { ComposerEditorHandle } from '../../src/renderer/components/workbench-shell/conversation-panel/composer/editor';
-import {
-	MAX_QUEUED_DELIVERY_ATTEMPTS,
-	useComposerSubmit,
-} from '../../src/renderer/hooks/workbench-shell/composer/use-composer-submit';
+import { useComposerSubmit } from '../../src/renderer/hooks/workbench-shell/composer/use-composer-submit';
 import {
 	followUpQueueAtomFamily,
 	followUpQueueHoldAtomFamily,
@@ -644,9 +641,7 @@ describe('a send the composer will not take right now', () => {
 		expect(pauseReason()).toBeNull();
 	});
 
-	test('pauses once the refusals run out, rather than retrying forever', async () => {
-		// A composer that never frees up is a failure in slow motion: bounded
-		// attempts are what stop the queue spinning instead of saying so.
+	test('repeated disabled attempts wait for readiness without pausing', async () => {
 		const store = createStore();
 		store.set(followUpQueueAtomFamily(CHAT_TAB_ID), [
 			queuedEntry('stuck', 'stuck'),
@@ -658,72 +653,54 @@ describe('a send the composer will not take right now', () => {
 			store,
 		});
 
-		for (
-			let attempt = 0;
-			attempt < MAX_QUEUED_DELIVERY_ATTEMPTS - 1;
-			attempt++
-		) {
+		for (let attempt = 0; attempt < 12; attempt++) {
 			await act(async () => {
 				view.result.current.flushQueueNow();
 			});
+			expect(pauseReason()).toBeNull();
 		}
+		expect(onSubmit).not.toHaveBeenCalled();
 		expect(pauseReason()).toBeNull();
 
-		await act(async () => {
-			view.result.current.flushQueueNow();
-		});
-
-		expect(onSubmit).not.toHaveBeenCalled();
-		expect(pauseReason()).toBe('send-failed');
+		act(() => view.rerender({ disabled: false, streaming: false }));
+		await waitFor(() => expect(prompts(onSubmit)).toEqual(['stuck']));
+		expect(pauseReason()).toBeNull();
 	});
 
-	test('says why it paused, since a refusal surfaces nothing on its own', async () => {
-		// The strip reads "the last message could not be sent", and only a real
-		// failure leaves an error behind it. Without one here that line is the sole
-		// account of a stopped queue for a send that was never even attempted.
+	test('an empty queued message pauses once with an actionable error instead of retrying', async () => {
 		const store = createStore();
 		store.set(followUpQueueAtomFamily(CHAT_TAB_ID), [
-			queuedEntry('stuck', 'stuck'),
+			queuedEntry('empty', '   '),
 		]);
-		const { setAttachmentError, view } = mount({
+		const { onSubmit, pauseReason, queued, setAttachmentError } = mount({
 			behavior: 'queue',
-			disabled: true,
 			isStreaming: false,
 			store,
 		});
 
-		for (let attempt = 0; attempt < MAX_QUEUED_DELIVERY_ATTEMPTS; attempt++) {
-			await act(async () => {
-				view.result.current.flushQueueNow();
-			});
-		}
-
-		expect(setAttachmentError).toHaveBeenCalledWith(
-			'The composer never became ready for the queued message, so the queue is paused.',
+		await waitFor(() => expect(pauseReason()).toBe('send-failed'));
+		expect(onSubmit).not.toHaveBeenCalled();
+		expect(queued()).toHaveLength(1);
+		expect(setAttachmentError).toHaveBeenCalledExactlyOnceWith(
+			'The queued message is empty. Edit or remove it before resuming the queue.',
 		);
 	});
 
-	test('counts refusals per entry, so steering another row does not reset the head', async () => {
-		// One shared slot would zero the head's run every time a different entry was
-		// turned away, putting the bound permanently out of reach for a queue the
-		// user keeps poking at.
+	test('disabled Resume and steer leave an intentional pause and row order intact', async () => {
 		const store = createStore();
 		store.set(followUpQueueAtomFamily(CHAT_TAB_ID), [
 			queuedEntry('head', 'head'),
 			queuedEntry('other', 'other'),
 		]);
-		const { pauseReason, view } = mount({
+		const { onSubmit, pauseReason, queued, view } = mount({
 			behavior: 'queue',
 			disabled: true,
 			isStreaming: false,
 			store,
 		});
+		act(() => view.result.current.queue.hold('turn-stopped'));
 
-		for (
-			let attempt = 0;
-			attempt < MAX_QUEUED_DELIVERY_ATTEMPTS - 1;
-			attempt++
-		) {
+		for (let attempt = 0; attempt < 12; attempt++) {
 			await act(async () => {
 				view.result.current.flushQueueNow();
 			});
@@ -731,13 +708,40 @@ describe('a send the composer will not take right now', () => {
 				view.result.current.steerQueued('other');
 			});
 		}
-		expect(pauseReason()).toBeNull();
-
+		expect(pauseReason()).toBe('turn-stopped');
+		expect(queued().map((entry) => entry.id)).toEqual(['head', 'other']);
+		act(() => view.rerender({ disabled: false, streaming: false }));
 		await act(async () => {
-			view.result.current.flushQueueNow();
+			await Promise.resolve();
 		});
+		expect(onSubmit).not.toHaveBeenCalled();
+	});
+});
 
-		expect(pauseReason()).toBe('send-failed');
+describe('same-tick queue operations', () => {
+	test('repeated Send next calls cannot take multiple entries while one send is pending', async () => {
+		const store = createStore();
+		store.set(followUpQueueAtomFamily(CHAT_TAB_ID), [
+			queuedEntry('head', 'first'),
+			queuedEntry('tail', 'second'),
+		]);
+		const { onSubmit, queued, view } = mount({
+			behavior: 'block',
+			isStreaming: false,
+			store,
+		});
+		const submitted = Promise.withResolvers<{ error?: string }>();
+		onSubmit.mockReturnValue(submitted.promise);
+
+		act(() => {
+			view.result.current.flushQueueNow();
+			view.result.current.flushQueueNow();
+			view.result.current.steerQueued('tail');
+		});
+		await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+		expect(prompts(onSubmit)).toEqual(['first']);
+		expect(queued().map((entry) => entry.text)).toEqual(['second']);
+		await act(async () => submitted.resolve({}));
 	});
 });
 

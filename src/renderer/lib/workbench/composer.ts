@@ -152,9 +152,12 @@ function getReadyPlaceholder(planMode: boolean, hasStarted: boolean): string {
 
 /**
  * Computes the composer shell state from setup readiness, the active session,
- * and an agent controller. Disables the composer while setup is not yet ready
- * and while agent runtime checks fail. Sub-agent tabs never reach here — they
+ * and an agent controller. Setup gates launching a runtime, not sending to one
+ * already attached to this chat: background probes cannot revoke that runtime's
+ * readiness. Main still validates every actual launch and send. Sub-agent tabs
  * render no composer at all; see {@link showsComposer}.
+ * @param input - Setup diagnostics and the active chat's runtime/controller state.
+ * @returns The composer's controls and delivery availability.
  */
 export function getComposerState({
 	activeSession,
@@ -244,7 +247,10 @@ export function getComposerState({
 		workspaceFiles: workspaceFiles ?? [],
 	};
 
-	if (setupError) {
+	const hasLiveRuntime =
+		Boolean(liveAgentSessionId) && liveAgentSessionId === activeAgentSessionId;
+
+	if (!hasLiveRuntime && setupError) {
 		return {
 			...base,
 			disabled: true,
@@ -256,7 +262,7 @@ export function getComposerState({
 		};
 	}
 
-	if (!setupDiagnostics) {
+	if (!hasLiveRuntime && !setupDiagnostics) {
 		return {
 			...base,
 			disabled: true,
@@ -271,7 +277,11 @@ export function getComposerState({
 		};
 	}
 
-	if (setupDiagnostics.status !== 'ready') {
+	if (
+		!hasLiveRuntime &&
+		setupDiagnostics &&
+		setupDiagnostics.status !== 'ready'
+	) {
 		return {
 			...base,
 			disabled: true,
