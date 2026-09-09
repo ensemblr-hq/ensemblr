@@ -266,6 +266,8 @@ interface SessionTabBase {
 	updatedLabel: string;
 	/** True when this tab hosts a spawned sub-agent, for distinct tinting. */
 	isSubAgent: boolean;
+	/** Persisted chat-tab id of the parent chat that spawned this sub-agent. */
+	parentChatTabId?: string;
 	/**
 	 * True while this tab holds the workspace's ephemeral preview slot: the next
 	 * preview open retargets it, and the strip renders its label in italics.

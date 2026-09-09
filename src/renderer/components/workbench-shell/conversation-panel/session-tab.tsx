@@ -80,8 +80,9 @@ export function SessionTab({
 	unreadKeys,
 }: SessionTabProps) {
 	const isChatKind = (session.kind ?? 'chat') === 'chat';
+	const isCompactSubAgent = isChatKind && session.isSubAgent && !isActive;
 	const canClose = isChatKind ? openChatTabCount > 1 : true;
-	const showCloseControls = canClose && !isDraggingTab;
+	const showCloseControls = canClose && !isDraggingTab && !isCompactSubAgent;
 	const showUnreadDot =
 		!isActive && !isDraggingTab && isSessionUnread(session, unreadKeys);
 	const clickGuard = useTabClickGuard({
@@ -91,7 +92,13 @@ export function SessionTab({
 
 	return (
 		<Reorder.Item
-			className={sessionTabVariants({ canReorder: canReorderTabs, isActive })}
+			className={cn(
+				sessionTabVariants({
+					canReorder: canReorderTabs,
+					compact: isCompactSubAgent,
+					isActive,
+				}),
+			)}
 			data-session-tab-reorderable={canReorderTabs}
 			data-tab-key={session.id}
 			dragElastic={canReorderTabs ? 0.08 : 0}
@@ -105,6 +112,7 @@ export function SessionTab({
 		>
 			<SessionTabLabel
 				isActive={isActive}
+				isCompact={isCompactSubAgent}
 				onClick={clickGuard.handleSelect}
 				onPin={() => onPin(session.id)}
 				onPointerDown={clickGuard.resetDrag}
@@ -118,17 +126,10 @@ export function SessionTab({
 					onClose={() => onClose(session.id)}
 				/>
 			) : null}
+
 			<span
 				aria-hidden='true'
 				className={sessionTabIndicatorVariants({
-					edge: 'top',
-					tone: session.isSubAgent ? 'accent' : 'none',
-				})}
-			/>
-			<span
-				aria-hidden='true'
-				className={sessionTabIndicatorVariants({
-					edge: 'bottom',
 					tone: isActive ? 'active' : 'none',
 				})}
 			/>
@@ -180,6 +181,7 @@ function useTabClickGuard({
 /** Props for the tab's selectable label region. */
 interface SessionTabLabelProps {
 	isActive: boolean;
+	isCompact: boolean;
 	onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 	onPin: () => void;
 	onPointerDown: () => void;
@@ -191,6 +193,7 @@ interface SessionTabLabelProps {
 /** The tab's icon and title, as the button that selects or pins it. */
 function SessionTabLabel({
 	isActive,
+	isCompact,
 	onClick,
 	onPin,
 	onPointerDown,
@@ -200,25 +203,40 @@ function SessionTabLabel({
 	return (
 		<button
 			aria-current={isActive ? 'page' : undefined}
-			className='flex h-full min-w-0 flex-1 cursor-inherit items-center gap-2 px-3 text-left'
+			className={cn(
+				'flex h-full min-w-0 flex-1 cursor-inherit items-center text-left',
+				isCompact ? 'justify-center px-1.5' : 'gap-2 px-3',
+			)}
 			onClick={onClick}
 			onDoubleClick={onPin}
 			onPointerDown={onPointerDown}
+			title={isCompact ? (session.fullLabel ?? session.label) : undefined}
 			type='button'
 		>
-			<span className='grid size-3.5 shrink-0 place-items-center'>
-				<SessionTabIcon session={session} />
-			</span>
 			<span
 				className={cn(
-					'truncate',
-					session.isPreview && 'italic',
-					showUnreadDot && 'pr-3 font-medium text-foreground',
+					'grid shrink-0 place-items-center',
+					session.isSubAgent
+						? 'size-5 rounded-sm bg-accent text-accent-foreground'
+						: 'size-3.5',
 				)}
-				title={session.fullLabel ?? session.label}
 			>
-				{session.label}
+				<SessionTabIcon session={session} />
 			</span>
+			{isCompact ? (
+				<span className='sr-only'>{session.fullLabel ?? session.label}</span>
+			) : (
+				<span
+					className={cn(
+						'truncate',
+						session.isPreview && 'italic',
+						showUnreadDot && 'pr-3 font-medium text-foreground',
+					)}
+					title={session.fullLabel ?? session.label}
+				>
+					{session.label}
+				</span>
+			)}
 		</button>
 	);
 }

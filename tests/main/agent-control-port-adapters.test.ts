@@ -463,7 +463,10 @@ describe('agent-control port adapters: conversation naming', () => {
 		expect(broadcastTabsChanged).not.toHaveBeenCalled();
 	});
 
-	it('startConversation stamps the tab as a sub-agent and applies the title', async () => {
+	it('startConversation persists the open parent tab on a sub-agent', async () => {
+		vi.mocked(getChatTabByAgentSessionId).mockReturnValueOnce({
+			...openChatRow({ id: 'parent-tab', workspaceId: 'ws' }),
+		} as unknown as ReturnType<typeof getChatTabByAgentSessionId>);
 		const setSessionName = vi.fn().mockResolvedValue({
 			applied: true,
 			chatTabId: 'tab-1',
@@ -503,7 +506,10 @@ describe('agent-control port adapters: conversation naming', () => {
 		expect(setChatTabMetadata).toHaveBeenCalledWith(
 			expect.objectContaining({
 				id: 'tab-1',
-				metadata: expect.objectContaining({ agentRole: 'subagent' }),
+				metadata: expect.objectContaining({
+					agentRole: 'subagent',
+					parentChatTabId: 'parent-tab',
+				}),
 			}),
 		);
 		expect(setSessionName).toHaveBeenCalledWith({

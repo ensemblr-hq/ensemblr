@@ -3595,6 +3595,8 @@ export default interface Resources {
 			'mode-afk': 'Unattended';
 			'mode-plan': 'Planning';
 			'new-tab': 'New chat tab';
+			'parent-tab': 'Parent chat · {{label}}';
+			'parent-tab-aria': 'Go to parent chat: {{label}}';
 			unread: 'Unread messages';
 			untitled: 'New chat';
 			'untitled-closed': 'Untitled chat';

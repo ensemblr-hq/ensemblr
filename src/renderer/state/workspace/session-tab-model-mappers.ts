@@ -21,6 +21,7 @@ type SessionTabBaseFields = {
 	id: string;
 	isPreview: boolean;
 	isSubAgent: boolean;
+	parentChatTabId?: string;
 	label: string;
 	status: SessionTabModel['status'];
 	summary: string;
@@ -117,6 +118,9 @@ export function toSessionTabModel(
 		id: tab.id,
 		isPreview: tab.isPreview,
 		isSubAgent: isSubAgentTab(tab),
+		...(metadataString(tab.metadata.parentChatTabId, '')
+			? { parentChatTabId: metadataString(tab.metadata.parentChatTabId, '') }
+			: {}),
 		label: tab.title || untitledOpenTabLabel(tab),
 		status: deriveTabStatus(agentSession),
 		summary: '',
@@ -177,6 +181,14 @@ export function toClosedSessionTabModel(
 		id: entry.tab.id,
 		isPreview: false,
 		isSubAgent: isSubAgentTab(entry.tab),
+		...(metadataString(entry.tab.metadata.parentChatTabId, '')
+			? {
+					parentChatTabId: metadataString(
+						entry.tab.metadata.parentChatTabId,
+						'',
+					),
+				}
+			: {}),
 		// Prefer the short chat-title that was visible on the open tab. The
 		// LLM-derived summary title is verbose and often diverges from what
 		// the user saw, so it is only used when no tab title exists.

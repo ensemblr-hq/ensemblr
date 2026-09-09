@@ -61,10 +61,12 @@ function countUserChangedFiles(
 export function WorkspaceTimeline({
 	activeSession,
 	composer,
+	hasParentButton = false,
 	workspace,
 }: {
 	activeSession: SessionTabModel;
 	composer: ComposerShellState;
+	hasParentButton?: boolean;
 	workspace: WorkspaceShellModel;
 }) {
 	const agentSessionId =
@@ -107,6 +109,7 @@ export function WorkspaceTimeline({
 				<AgentSessionTimeline
 					activeAgentSessionId={composer.activeAgentSessionId}
 					activeSession={activeSession}
+					hasParentButton={hasParentButton}
 					workspace={workspace}
 				/>
 			</div>
