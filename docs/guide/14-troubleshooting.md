@@ -65,14 +65,13 @@ npm script.
 **If `node -v` already reports v24.x, this is not your problem** — read the next
 entry, which produces the same empty `out/` for a different reason.
 
-### `make` dies fetching `SHASUMS256.txt`
+### `make` dies downloading Electron (`SHASUMS256.txt` or HTTP 5xx)
 
 **Cause.** The Electron download, not Node. Before Forge can package anything it
-downloads the Electron build for the target platform, and `@electron/get` fetches
-`SHASUMS256.txt` as its own request first, to verify the zip against. That
-request is the one that fails, and on a network that resets it the build stops
-there with nothing in `out/` — which reads exactly like the Node-major symptom
-above.
+downloads the Electron build for the target platform, and `@electron/get`
+fetches `SHASUMS256.txt` before the zip so it can verify the archive. A reset or
+server-side 5xx on either request stops the build with nothing in `out/` — which
+reads exactly like the Node-major symptom above.
 
 The reason it is specific to `make` and `package` is a version split in one
 dependency. Two copies of `@electron/get` are installed: `electron`'s own
@@ -86,6 +85,15 @@ fetching Electron does not.
 ```bash
 npm run make
 ```
+
+For a GitHub Actions release where another platform job already succeeded,
+retry only the failed job rather than rebuilding every artifact:
+
+```bash
+gh run rerun RUN_ID --failed
+```
+
+Replace `RUN_ID` with the failed run's numeric database id from `gh run list`.
 
 A successful download is cached and reused, so the second attempt usually gets
 past it — and once the artifacts are in the cache the request is skipped
@@ -102,8 +110,10 @@ else. If your network fails this consistently rather than intermittently, point
 `ELECTRON_GET_USE_PROXY` to route through the standard proxy variables.
 
 **How to tell the two apart.** The Node-major failure is silent: exit 0, no
-error, empty `out/`. This one names the artifact it could not fetch. If you see
-`SHASUMS256.txt` in the output, switching Node majors will not help.
+error, empty `out/`. The download failure carries an `@electron/get` / `got`
+stack and either names `SHASUMS256.txt` or reports an HTTP status such as
+`Response code 500`, often while Forge says `Copying files`. Switching Node
+majors will not help.
 
 ### `NODE_MODULE_VERSION` mismatch during `make`
 
@@ -270,10 +280,10 @@ directory**, or **Choose another root** on the check itself.
 **"Managed directory *x* already contains content; it may be a shared or
 previously used root"** — a warning, not an error; Ensemblr carries on. It is
 expected when you re-point at a root you used before, and worth acting on when
-two installs are quietly sharing one. **Fix:** if it is a root you used before,
-ignore it. If two builds are sharing one, give each its own — release, canary,
-and dev builds keep separate databases but will share a root if you point them
-at one.
+two independent installs are quietly sharing one. **Fix:** if it is a root you
+used before, ignore it. Packaged release, canary, and dev channels deliberately
+share their database, settings, and configured root; the unpackaged development
+build is isolated. Give genuinely separate installations their own roots.
 
 The path must be absolute or start with `~/`. A relative path is rejected.
 

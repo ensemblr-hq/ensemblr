@@ -58,7 +58,7 @@ each exposing its public surface through `index.ts`.
 | Config | `config/` | Declarative config loading, settings resolution, repository config |
 | Dictation | `dictation/` | The transcription service behind the composer's mic control, its endpoint policy, and the Keychain-held key it authenticates with |
 | Environment | `environment/` | Environment-variable catalogue and layered assembly, Infisical joining as its own layer |
-| IPC | `ipc/` | Handler registration (`handlers/`, 37 modules), request validation (`request-schemas/`, 24 modules), permission gate |
+| IPC | `ipc/` | Handler registration (`handlers/`, 38 modules), request validation (`request-schemas/`, 24 modules), permission gate |
 | Integrations | `github/`, `linear/`, `infisical/` | `gh` CLI wrapper, PR snapshots, cached issue backlog; Linear OAuth + client + per-account store; Infisical account store, REST boundary, token-caching client, per-scope cache, link store |
 | Linked directories | `linked-directories/` | Read grants for directories outside a workspace, plus the app-global recents list behind them |
 | Native menus | `menu/` | One builder per menu behind `createMenuItemFactory`, driven by the renderer's command report and the localized `menu-strings.ts` table |
@@ -71,7 +71,7 @@ each exposing its public surface through `index.ts`.
 | Setup | `setup/` | Setup diagnostics orchestration |
 | Storage | `storage/` | SQLite connection (`database.ts`), migrations, `repositories/`, `tx.ts` |
 | Terminal | `terminal/` | `node-pty` PTY sessions, plus the scrollback renderer that makes an agent's terminal read legible |
-| Updates | `updates/` | The in-app updater: GitHub release resolution per build channel (`release-feed.ts`), the can-this-build-update gate (`update-preconditions.ts`), and the Squirrel.Mac state machine (ADR&nbsp;0055). Installing is a per-platform capability — darwin installs, Linux reports and links (ADR&nbsp;0056) |
+| Updates | `updates/` | The in-app updater: GitHub release resolution per build channel (`release-feed.ts`), the can-this-build-update gate (`update-preconditions.ts`), and the Squirrel.Mac state machine (ADR&nbsp;0055). Installing is a per-platform capability — darwin replaces the app bundle; Linux checksum-verifies and atomically swaps a writable AppImage, otherwise it reports and links (ADR&nbsp;0065) |
 | Workspace files / git | `workspace-files/`, `workspace-git/` | File watching and listing, the content-addressed composer attachment store (`context-attachments.ts`), path safety (`workspace-paths.ts`) and image-signature checks (`workspace-images.ts`); git status, commits, worktrees |
 
 Do not add root-level files under `src/main/` unless Electron Forge or Vite needs
@@ -202,9 +202,9 @@ migration ids, so a new migration must be added to both.
 
 | Suite | Runner | Count |
 | --- | --- | --- |
-| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 256 files |
-| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 410 files (55 under `dom/`) |
-| `tests/shared/**` | Vitest | 48 files |
+| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 259 files |
+| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 426 files (58 under `dom/`) |
+| `tests/shared/**` | Vitest | 49 files |
 
 See [`onboarding.md`](./onboarding.md#6-running-the-tests) for which runner a new
 test should use.
