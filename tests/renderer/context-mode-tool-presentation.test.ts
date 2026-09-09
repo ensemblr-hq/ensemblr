@@ -40,6 +40,40 @@ describe('context-mode tool presentation', () => {
 		});
 	});
 
+	test.each([
+		{ path: undefined, toolName: 'ctx_execute' },
+		{ path: 'package.json', toolName: 'ctx_execute_file' },
+	] as const)(
+		'preserves embedded fences in $toolName source',
+		({ path, toolName }) => {
+			const code = [
+				'const markdown = `before',
+				'```',
+				'',
+				'after`;',
+				'console.log(markdown);',
+			].join('\n');
+			const pathPrefix = path === undefined ? '' : `path=${path}\n`;
+			const presentation = presentToolCall(
+				call(
+					toolName,
+					{
+						code,
+						language: 'javascript',
+						...(path === undefined ? {} : { path }),
+					},
+					{
+						text: `${pathPrefix}\`\`\`javascript\n${code}\n\`\`\`\n\nfinished`,
+					},
+				),
+			);
+
+			expect(presentation.body).toMatchObject({
+				sections: [{ text: code }, { label: 'Output:', text: 'finished' }],
+			});
+		},
+	);
+
 	test('presents file processing with a pinned target', () => {
 		const code = 'console.log(FILE_CONTENT.length)';
 		const presentation = presentToolCall(

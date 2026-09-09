@@ -14,22 +14,21 @@ export const CONTEXT_MODE_TOOL_GLYPHS = {
 } satisfies Record<string, ToolGlyph>;
 
 /**
- * Removes context-mode's fenced echo of the submitted program from a result.
+ * Removes context-mode's exact fenced echo of the submitted program.
  * @param text - Full execution result text
+ * @param echo - Source and protocol metadata used to build the expected echo
  * @returns The subprocess output without the duplicated program
  */
-function stripContextExecutionEcho(text: string): string {
-	const pathPrefixEnd = text.startsWith('path=') ? text.indexOf('\n') : -1;
-	const fencedStart = pathPrefixEnd < 0 ? 0 : pathPrefixEnd + 1;
-	if (!text.startsWith('```', fencedStart)) {
+function stripContextExecutionEcho(
+	text: string,
+	echo: { code: string; language: string | null; path: string | null },
+): string {
+	if (echo.language === null) {
 		return text;
 	}
-	const openingEnd = text.indexOf('\n', fencedStart);
-	const closingStart = text.indexOf('\n```\n\n', openingEnd + 1);
-	if (openingEnd < 0 || closingStart < 0) {
-		return text;
-	}
-	return text.slice(closingStart + '\n```\n\n'.length);
+	const pathPrefix = echo.path === null ? '' : `path=${echo.path}\n`;
+	const sourceEcho = `${pathPrefix}\`\`\`${echo.language}\n${echo.code}\n\`\`\`\n\n`;
+	return text.startsWith(sourceEcho) ? text.slice(sourceEcho.length) : text;
 }
 
 /**
@@ -69,7 +68,11 @@ function presentContextExecution(part: DynamicToolUIPart): ToolPresenterResult {
 				{
 					label: i18n.t('workbench:tool-call.generic.output-label', 'Output:'),
 					muted: false,
-					text: stripContextExecutionEcho(outputOf(part)?.text ?? ''),
+					text: stripContextExecutionEcho(outputOf(part)?.text ?? '', {
+						code,
+						language: stringField(input, 'language'),
+						path: isFileExecution ? pathOf(input) : null,
+					}),
 				},
 			],
 		},
