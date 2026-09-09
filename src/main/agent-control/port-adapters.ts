@@ -732,13 +732,19 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			// `submitPrompt` captures a git checkpoint first, and the renderer resolves
 			// a tab's branch id out of the session list, so a binding announced after
 			// it leaves the tab a blank rectangle for that whole window.
+			const childRole =
+				spawnedChildRole({ concierge: callerConcierge, peer: asPeer }) ===
+				'subagent'
+					? 'subagent'
+					: null;
+			const parentChatTabId = childRole
+				? readOpenParentChatTabId(deps, parentSessionId, workspaceId)
+				: null;
 			const marker = writeSubAgentMarker(
 				deps,
 				targetTabId,
-				spawnedChildRole({ concierge: callerConcierge, peer: asPeer }) ===
-					'subagent'
-					? 'subagent'
-					: null,
+				childRole,
+				parentChatTabId,
 			);
 			deps.broadcastTabsChanged({ workspaceId });
 			try {
@@ -754,7 +760,11 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 					agentSessionId: snapshot.id,
 					openedTabId,
 					markerRestore: marker
-						? { chatTabId: targetTabId, role: marker.previousRole }
+						? {
+								chatTabId: targetTabId,
+								parentChatTabId: marker.previousParentChatTabId,
+								role: marker.previousRole,
+							}
 						: null,
 					workspaceId,
 				});
@@ -852,27 +862,58 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 }
 
 /**
- * Stamps or clears the sub-agent marker on a chat tab. The renderer reads it to
- * tint the tab and to lock its composer, so it is written before the first prompt
- * is submitted and put back if that submit fails. Best-effort and idempotent:
- * a missing database or tab is ignored.
- *
- * The reported previous role is what makes the rollback safe. A spawn writes
- * either role — an orchestrator stamps the marker, the Concierge clears it,
- * because what the Concierge opens is a root — so undoing the write means
- * restoring what the tab carried rather than assuming which way it went. A
- * rollback that always cleared would strip a live sub-agent reusing the tab of
- * its role, handing it back the whole control surface.
+ * Reads the spawning chat tab when it is still open in the same workspace.
+ * Best-effort so an unavailable tab store never blocks a child from starting.
+ * @param deps - Adapter collaborators.
+ * @param parentSessionId - Session id of the spawning agent.
+ * @param workspaceId - Workspace that must own the parent tab.
+ * @returns The open parent tab id, or null when it is unavailable.
+ */
+function readOpenParentChatTabId(
+	deps: PortAdapterDeps,
+	parentSessionId: string,
+	workspaceId: string,
+): string | null {
+	const database = deps.databaseService.getConnection()?.database;
+	if (!database) {
+		return null;
+	}
+	try {
+		const parent = getChatTabByAgentSessionId({
+			agentSessionId: parentSessionId,
+			database,
+		});
+		return parent &&
+			parent.closedAt === null &&
+			parent.workspaceId === workspaceId
+			? parent.id
+			: null;
+	} catch (cause) {
+		console.warn('[agent-control] could not read a sub-agent parent tab.', {
+			cause: cause instanceof Error ? cause.message : String(cause),
+			parentSessionId,
+		});
+		return null;
+	}
+}
+
+/**
+ * Stamps or clears the sub-agent marker and its persisted parent link on a chat tab.
  * @param deps - Adapter collaborators.
  * @param chatTabId - The tab bound to the spawned conversation.
  * @param role - `'subagent'` to stamp the marker, `null` to clear it.
- * @returns The role the tab carried before this call, or null when the marker could not be touched at all.
+ * @param parentChatTabId - Open parent tab id to persist for a sub-agent, or null.
+ * @returns The previous marker values, or null when the marker could not be touched.
  */
 function writeSubAgentMarker(
 	deps: PortAdapterDeps,
 	chatTabId: string,
 	role: 'subagent' | null,
-): { previousRole: 'subagent' | null } | null {
+	parentChatTabId: string | null = null,
+): {
+	previousParentChatTabId: string | null;
+	previousRole: 'subagent' | null;
+} | null {
 	const database = deps.databaseService.getConnection()?.database;
 	if (!database) {
 		return null;
@@ -883,20 +924,38 @@ function writeSubAgentMarker(
 			return null;
 		}
 		const previousRole = isTabMarkedSubAgent(tab) ? 'subagent' : null;
-		if (previousRole === role) {
-			return { previousRole };
+		const previousParentChatTabId =
+			typeof tab.metadata.parentChatTabId === 'string'
+				? tab.metadata.parentChatTabId
+				: null;
+		const nextParentChatTabId = role ? parentChatTabId : null;
+		if (
+			previousRole === role &&
+			previousParentChatTabId === nextParentChatTabId
+		) {
+			return { previousParentChatTabId, previousRole };
 		}
-		const withoutRole = Object.fromEntries(
-			Object.entries(tab.metadata).filter(([key]) => key !== 'agentRole'),
+		const withoutMarkers = Object.fromEntries(
+			Object.entries(tab.metadata).filter(
+				([key]) => key !== 'agentRole' && key !== 'parentChatTabId',
+			),
 		);
 		setChatTabMetadata({
 			database,
 			id: chatTabId,
-			metadata: role ? { ...withoutRole, agentRole: role } : withoutRole,
+			metadata: role
+				? {
+						...withoutMarkers,
+						agentRole: role,
+						...(nextParentChatTabId
+							? { parentChatTabId: nextParentChatTabId }
+							: {}),
+					}
+				: withoutMarkers,
 		});
-		return { previousRole };
+		return { previousParentChatTabId, previousRole };
 	} catch (cause) {
-		console.warn('[agent-control] could not tint a tab as a sub-agent.', {
+		console.warn('[agent-control] could not mark a tab as a sub-agent.', {
 			cause: cause instanceof Error ? cause.message : String(cause),
 			chatTabId,
 		});
@@ -991,7 +1050,11 @@ async function rollbackConversation(
 	target: {
 		agentSessionId: string;
 		openedTabId: string | null;
-		markerRestore: { chatTabId: string; role: 'subagent' | null } | null;
+		markerRestore: {
+			chatTabId: string;
+			parentChatTabId: string | null;
+			role: 'subagent' | null;
+		} | null;
 		workspaceId: string;
 	},
 ): Promise<void> {
@@ -1002,6 +1065,7 @@ async function rollbackConversation(
 			deps,
 			target.markerRestore.chatTabId,
 			target.markerRestore.role,
+			target.markerRestore.parentChatTabId,
 		);
 	}
 	try {

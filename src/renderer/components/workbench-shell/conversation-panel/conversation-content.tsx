@@ -25,6 +25,7 @@ import {
 	WorkspacePathResolverProvider,
 } from './file-preview-context';
 import { FilePreviewPanel } from './file-preview-panel';
+import { ParentConversationButton } from './parent-conversation-button';
 import { PiRawFramePanel } from './pi-raw-frame-panel';
 import { SessionTabs } from './session-tabs';
 import { SubAgentStatusPanel } from './sub-agent-status-panel';
@@ -107,7 +108,9 @@ export function WorkspaceConversationContent({
 									activeSession={activeSession}
 									activeWorkspace={activeWorkspace}
 									composer={composer}
+									onSessionTabChange={onSessionTabChange}
 									openTurnDiff={openTurnDiff}
+									sessionTabs={sessionTabs}
 								/>
 							) : (
 								<ActiveAuxiliaryPanel
@@ -138,31 +141,52 @@ function ChatTabBody({
 	activeSession,
 	activeWorkspace,
 	composer,
+	onSessionTabChange,
 	openTurnDiff,
+	sessionTabs,
 }: {
 	activeSession: SessionTabModel;
 	activeWorkspace: WorkspaceShellModel;
 	composer: ComposerShellState;
+	onSessionTabChange: (sessionId: string) => void;
 	openTurnDiff: (input: { label: string; turnId: string }) => void;
+	sessionTabs: SessionTabModel[];
 }) {
+	const parentSession = activeSession.parentChatTabId
+		? sessionTabs.find(
+				(session) =>
+					session.id === activeSession.parentChatTabId &&
+					(session.kind ?? 'chat') === 'chat',
+			)
+		: undefined;
+
 	return (
 		<TurnDiffOpenerProvider value={openTurnDiff}>
-			<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-				<WorkspaceTimeline
-					activeSession={activeSession}
-					composer={composer}
-					workspace={activeWorkspace}
-				/>
+			<div className='relative flex min-h-0 flex-1 flex-col overflow-hidden'>
+				{parentSession ? (
+					<ParentConversationButton
+						onNavigate={() => onSessionTabChange(parentSession.id)}
+						parent={parentSession}
+					/>
+				) : null}
+				<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
+					<WorkspaceTimeline
+						activeSession={activeSession}
+						composer={composer}
+						hasParentButton={Boolean(parentSession)}
+						workspace={activeWorkspace}
+					/>
+				</div>
+				{showsComposer(activeSession) ? (
+					<LinkedIssueComposerSlot
+						activeSession={activeSession}
+						activeWorkspace={activeWorkspace}
+						composer={composer}
+					/>
+				) : (
+					<SubAgentStatusPanel composer={composer} />
+				)}
 			</div>
-			{showsComposer(activeSession) ? (
-				<LinkedIssueComposerSlot
-					activeSession={activeSession}
-					activeWorkspace={activeWorkspace}
-					composer={composer}
-				/>
-			) : (
-				<SubAgentStatusPanel composer={composer} />
-			)}
 		</TurnDiffOpenerProvider>
 	);
 }

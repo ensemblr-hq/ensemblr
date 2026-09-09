@@ -115,3 +115,16 @@ test('a titled tab keeps its own title', async () => {
 	const titled: ChatTabWire = { ...untitledTab(), title: 'Fix the parser' };
 	expect(toSessionTabModel(titled, undefined).label).toBe('Fix the parser');
 });
+
+test('a sub-agent maps its persisted parent chat tab id', () => {
+	const child: ChatTabWire = {
+		...untitledTab(),
+		agentSessionId: 'child-session',
+		metadata: { agentRole: 'subagent', parentChatTabId: 'parent-tab' },
+	};
+
+	expect(toSessionTabModel(child, undefined)).toMatchObject({
+		isSubAgent: true,
+		parentChatTabId: 'parent-tab',
+	});
+});

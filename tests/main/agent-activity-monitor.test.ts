@@ -332,6 +332,17 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 		h.monitor.dispose();
 		expect(h.stops).toBe(1);
 	});
+
+	test('ignores late activity after disposal', async () => {
+		const h = makeMonitor({
+			readSettings: () => settings({ caffeinateWhileRunning: true }),
+		});
+		h.monitor.dispose();
+		h.monitor.handle(statusFor('streaming', 's1'));
+		await flush();
+		expect(h.monitor.listRunning()).toEqual([]);
+		expect(h.starts).toBe(0);
+	});
 });
 
 describe('createAgentActivityMonitor — notifications', () => {

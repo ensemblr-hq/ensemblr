@@ -1,107 +1,162 @@
-import { MessageSquareIcon, SquareTerminalIcon, XIcon } from 'lucide-react';
+import { BotIcon, MessageSquareIcon, SquareTerminalIcon } from 'lucide-react';
 import { useState } from 'react';
 
-import { TabScroller } from '@/renderer/components/ui/tab-scroller';
-import { cn } from '@/renderer/lib/utils';
-import {
-	SESSION_TAB_CLOSE_FADE_CLASS,
-	sessionTabIndicatorVariants,
-	sessionTabVariants,
-} from '@/renderer/lib/workbench/session-tabs-variants';
+import { ParentConversationButton } from '@/renderer/components/workbench-shell/conversation-panel/parent-conversation-button';
+import { SessionTabs } from '@/renderer/components/workbench-shell/conversation-panel/session-tabs';
+import type { SessionTabModel } from '@/renderer/types/workbench';
 
-const TABS = [
-	'Refactor session tabs',
-	'Fix xterm resize',
-	'claude',
-	'Review PR 188',
-	'codex',
-	'Dock panel polish',
-	'Timeline descriptors',
-	'amp',
-	'Keymap regressions',
-	'Playground scenes',
-	'Release notes',
-	'Settings rewrite',
-].map((label, index) => ({
-	id: `tab-${index}`,
-	isTerminal: label === label.toLowerCase(),
-	label,
-}));
+const TABS: readonly SessionTabModel[] = [
+	{
+		agentSessionId: 'orchestrator-session',
+		chatTabId: 'orchestrator',
+		id: 'orchestrator',
+		isPreview: false,
+		isSubAgent: false,
+		kind: 'chat',
+		label: 'Tighten subagent tabs',
+		status: 'idle',
+		summary: '',
+		updatedLabel: '',
+	},
+	...[
+		['child-rendering', 'Inspect tab rendering'],
+		['child-lineage', 'Trace parent lineage'],
+		['child-a11y', 'Check tab accessibility'],
+		['child-tests', 'Find coverage gaps'],
+	].map(([id, label]) => ({
+		agentSessionId: `${id}-session`,
+		chatTabId: id,
+		id,
+		isPreview: false,
+		isSubAgent: true,
+		kind: 'chat' as const,
+		label,
+		parentChatTabId: 'orchestrator',
+		status: 'idle' as const,
+		summary: '',
+		updatedLabel: '',
+	})),
+	{
+		agentSessionId: 'terminal-session',
+		chatTabId: 'terminal',
+		harnessId: 'claude-code',
+		harnessLabel: 'Claude Code',
+		harnessSessionId: null,
+		id: 'terminal',
+		isPreview: false,
+		isSubAgent: false,
+		kind: 'terminal',
+		label: 'claude',
+		status: 'idle',
+		summary: '',
+		terminalId: 'terminal-session',
+		updatedLabel: '',
+	},
+	{
+		agentSessionId: 'review-session',
+		chatTabId: 'review',
+		id: 'review',
+		isPreview: false,
+		isSubAgent: false,
+		kind: 'chat',
+		label: 'Review PR 188',
+		status: 'idle',
+		summary: '',
+		updatedLabel: '',
+	},
+];
 
-/**
- * Drives {@link TabScroller} with a session-tab-shaped strip that always
- * overflows, so the auto-hiding scrollbar and the activate-scrolls-into-view
- * behaviour can be eyeballed without the Electron runtime.
- */
+/** Renders the shipped session-tab treatment against fixture conversations. */
 export function TabScrollerScene() {
-	const [activeId, setActiveId] = useState(TABS[0].id);
+	const [activeId, setActiveId] = useState('child-rendering');
+	const activeTab = TABS.find((tab) => tab.id === activeId) ?? TABS[0];
+	const parentTab = activeTab.parentChatTabId
+		? TABS.find((tab) => tab.id === activeTab.parentChatTabId)
+		: undefined;
 
 	return (
 		<div className='flex flex-col gap-6'>
-			<p className='text-muted-foreground text-xs'>
-				Activate a tab with the buttons below the strip: the strip scrolls it
-				fully into view. Hover or scroll the strip to reveal the overlay
-				scrollbar; it fades out once the pointer leaves.
+			<p className='max-w-3xl text-muted-foreground text-xs'>
+				Inactive subagent tabs collapse to their bot icon. Select one to expand
+				its title; inside its pane, use the floating parent button to jump back
+				to the orchestrator.
 			</p>
-			<div className='flex h-10 items-center gap-1.5 border-border border-b bg-background'>
-				<TabScroller activeKey={activeId} className='h-full'>
-					<div className='flex h-full w-max min-w-full'>
-						{TABS.map((tab) => (
-							<div
-								className={sessionTabVariants({
-									isActive: tab.id === activeId,
-								})}
-								data-tab-key={tab.id}
-								key={tab.id}
-							>
-								<button
-									className='flex h-full min-w-0 flex-1 items-center gap-2 px-3 text-left'
-									onClick={() => setActiveId(tab.id)}
-									type='button'
-								>
-									{tab.isTerminal ? (
-										<SquareTerminalIcon className='size-3.5 shrink-0' />
-									) : (
-										<MessageSquareIcon className='size-3.5 shrink-0' />
-									)}
-									<span className='truncate'>{tab.label}</span>
-								</button>
-								<span
-									aria-hidden='true'
-									className={SESSION_TAB_CLOSE_FADE_CLASS}
-								/>
-								<span className='absolute top-1/2 right-2 grid size-5 -translate-y-1/2 place-items-center rounded-sm opacity-0 group-hover/session-tab:opacity-100'>
-									<XIcon className='size-3' />
-								</span>
-								<span
-									aria-hidden='true'
-									className={sessionTabIndicatorVariants({
-										edge: 'bottom',
-										tone: tab.id === activeId ? 'active' : 'none',
-									})}
-								/>
-							</div>
-						))}
-					</div>
-				</TabScroller>
-			</div>
-			<div className='flex flex-wrap gap-1'>
-				{TABS.map((tab) => (
-					<button
-						className={cn(
-							'rounded-md border px-2 py-1 font-mono text-xxs transition-colors',
-							tab.id === activeId
-								? 'border-border bg-surface text-foreground'
-								: 'border-transparent text-muted-foreground hover:bg-accent/50',
-						)}
-						key={tab.id}
-						onClick={() => setActiveId(tab.id)}
-						type='button'
-					>
-						{tab.label}
-					</button>
-				))}
+			<div className='overflow-hidden rounded-lg border border-border bg-background shadow-panel'>
+				<SessionTabs
+					activeSession={activeTab}
+					closedSessions={[]}
+					onLaunchHarness={async () => null}
+					onOpenArchitectureDiagram={async () => null}
+					onSessionTabChange={setActiveId}
+					onSessionTabClose={() => undefined}
+					onSessionTabOpen={async () => null}
+					onSessionTabPin={() => undefined}
+					onSessionTabRestore={() => undefined}
+					onSessionTabsReorder={() => undefined}
+					sessions={[...TABS]}
+					unreadKeys={new Set()}
+				/>
+				<FixturePane
+					activeTab={activeTab}
+					onSelect={setActiveId}
+					parentTab={parentTab}
+				/>
 			</div>
 		</div>
 	);
+}
+
+/** Keeps the fixture pane useful without duplicating production tab chrome. */
+function FixturePane({
+	activeTab,
+	onSelect,
+	parentTab,
+}: {
+	activeTab: SessionTabModel;
+	onSelect: (id: string) => void;
+	parentTab?: SessionTabModel;
+}) {
+	return (
+		<div className='relative min-h-96 bg-canvas/40'>
+			{parentTab ? (
+				<ParentConversationButton
+					onNavigate={() => onSelect(parentTab.id)}
+					parent={parentTab}
+				/>
+			) : null}
+			<div className='mx-auto flex max-w-2xl flex-col gap-5 px-8 pt-20 pb-12'>
+				<div className='flex items-center gap-3'>
+					<span className='grid size-9 place-items-center rounded-full bg-pane-strong text-muted-foreground'>
+						<TabIcon session={activeTab} />
+					</span>
+					<div className='min-w-0'>
+						<h2 className='truncate font-medium text-sm'>{activeTab.label}</h2>
+						<p className='text-muted-foreground text-xs'>
+							{activeTab.isSubAgent
+								? 'Subagent conversation'
+								: 'Orchestrator conversation'}
+						</p>
+					</div>
+				</div>
+				<div className='rounded-xl bg-pane/80 px-4 py-3 text-sm leading-6 shadow-panel'>
+					{activeTab.isSubAgent
+						? 'I am tracing this focused task and will return a concise report to the parent orchestrator.'
+						: 'I split the investigation into focused subagents. Their compact tabs stay available without crowding this strip.'}
+				</div>
+			</div>
+		</div>
+	);
+}
+
+/** Renders the identity glyph for a fixture conversation. */
+function TabIcon({ session }: { session: SessionTabModel }) {
+	if (session.isSubAgent) {
+		return <BotIcon aria-hidden='true' className='size-3.5 shrink-0' />;
+	}
+	if (session.kind === 'terminal') {
+		return (
+			<SquareTerminalIcon aria-hidden='true' className='size-3.5 shrink-0' />
+		);
+	}
+	return <MessageSquareIcon aria-hidden='true' className='size-3.5 shrink-0' />;
 }

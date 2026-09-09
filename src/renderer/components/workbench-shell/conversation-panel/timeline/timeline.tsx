@@ -26,6 +26,7 @@ import {
 	noticeMetadataOf,
 	turnMetadataOf,
 } from '@/renderer/lib/agent-timeline';
+import { cn } from '@/renderer/lib/utils';
 import { resolveTurnTiming } from '@/renderer/lib/workbench/timeline-timing';
 import type {
 	SessionTabModel,
@@ -77,10 +78,12 @@ function resolveStartingLabel(
 export function AgentSessionTimeline({
 	activeAgentSessionId,
 	activeSession,
+	hasParentButton = false,
 	workspace,
 }: {
 	activeAgentSessionId: string | null;
 	activeSession: SessionTabModel;
+	hasParentButton?: boolean;
 	workspace: WorkspaceShellModel;
 }) {
 	const { t } = useTranslation();
@@ -147,7 +150,10 @@ export function AgentSessionTimeline({
 					'workbench:timeline.aria-label',
 					'Agent session timeline',
 				)}
-				className='flex flex-col gap-2 rounded-md border border-status-warning/30 bg-status-warning/10 p-3 text-status-warning text-xs'
+				className={cn(
+					'flex flex-col gap-2 rounded-md border border-status-warning/30 bg-status-warning/10 text-status-warning text-xs',
+					hasParentButton ? 'px-3 pt-16 pb-3' : 'p-3',
+				)}
 				data-timeline-state='errored'
 			>
 				<p>
@@ -184,7 +190,10 @@ export function AgentSessionTimeline({
 					'workbench:timeline.aria-label',
 					'Agent session timeline',
 				)}
-				className='flex min-h-0 flex-1 flex-col'
+				className={cn(
+					'flex min-h-0 flex-1 flex-col',
+					hasParentButton && 'pt-16',
+				)}
 				data-timeline-state='starting'
 			>
 				<TimelineStartingState label={startingLabel} />
@@ -204,7 +213,10 @@ export function AgentSessionTimeline({
 					key={activeSession.chatTabId}
 				>
 					<ConversationContent
-						className='mx-auto w-full max-w-3xl gap-6 px-4 pt-5 pb-5'
+						className={cn(
+							'mx-auto w-full max-w-3xl gap-6 px-4 pb-5',
+							hasParentButton ? 'pt-16' : 'pt-5',
+						)}
 						followKey={promptCount}
 						scrollKey={activeSession.chatTabId}
 					>

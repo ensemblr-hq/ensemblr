@@ -1791,7 +1791,7 @@ export default interface Resources {
 				label: 'Update Ensemblr automatically';
 			};
 			caffeinate: {
-				description: 'Prevent automatic system sleep on {{platform}} while an in-app agent works. The display may sleep. Pauses below 10% battery when unplugged.';
+				description: 'Prevent automatic system sleep while an in-app agent works. The display may sleep. Pauses below 10% battery when unplugged.';
 				label: 'Caffeinate while agents are running';
 			};
 			'context-usage': {
@@ -3595,6 +3595,8 @@ export default interface Resources {
 			'mode-afk': 'Unattended';
 			'mode-plan': 'Planning';
 			'new-tab': 'New chat tab';
+			'parent-tab': 'Parent chat · {{label}}';
+			'parent-tab-aria': 'Go to parent chat: {{label}}';
 			unread: 'Unread messages';
 			untitled: 'New chat';
 			'untitled-closed': 'Untitled chat';
