@@ -623,6 +623,11 @@ four are there. Then check the URLs actually resolve before opening the PR:
 ```bash
 gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.12 \
   --jq '.assets[] | "\(.name)\t\(.digest)"'
+gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.12 \
+  --jq '.assets[].browser_download_url' |
+  while IFS= read -r url; do
+    curl --fail --location --head --silent --show-error "$url" >/dev/null
+  done
 ```
 
 **The Homebrew cask bumps itself.** The same job's `Bump the Homebrew cask` step
