@@ -1,4 +1,8 @@
-import type { Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import type {
+	Options,
+	Query,
+	SDKMessage,
+} from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
 import type {
@@ -82,6 +86,57 @@ function promptEvents(
 }
 
 describe('claude submit', () => {
+	it('removes Git routing after merging base and session environments into query options', async () => {
+		const queryOptions: Array<Options | undefined> = [];
+		const adapter = createClaudeAgentAdapter({
+			resolveBaseEnv: () => ({
+				PATH: '/usr/bin',
+				GIT_DIR: '/sibling/.git',
+				GIT_WORK_TREE: '/sibling',
+				GIT_SSH_COMMAND: 'ssh -i /identity',
+			}),
+			queryFn: ({ options }) => {
+				queryOptions.push(options);
+				return createPendingQuery();
+			},
+		});
+		try {
+			const session = await adapter.createSession({
+				metadata: {
+					...createMetadata(),
+					env: {
+						LANG: 'en_US.UTF-8',
+						GIT_DIR: '/overlay/.git',
+						GIT_INDEX_FILE: '/sibling/.git/index',
+						GIT_CONFIG_COUNT: '1',
+						GIT_CONFIG_KEY_0: 'core.worktree',
+						GIT_CONFIG_VALUE_0: '/sibling',
+					},
+				},
+				request: { agentSessionId: SESSION_ID, workspaceCwd: WORKSPACE_CWD },
+			});
+			await session.submit({ prompt: 'work here' });
+			expect(queryOptions).toHaveLength(1);
+			const options = queryOptions[0];
+			expect(options?.cwd).toBe(WORKSPACE_CWD);
+			expect(options?.env?.PATH).toBe('/usr/bin');
+			expect(options?.env?.LANG).toBe('en_US.UTF-8');
+			expect(options?.env?.GIT_SSH_COMMAND).toBe('ssh -i /identity');
+			for (const key of [
+				'GIT_DIR',
+				'GIT_WORK_TREE',
+				'GIT_INDEX_FILE',
+				'GIT_CONFIG_COUNT',
+				'GIT_CONFIG_KEY_0',
+				'GIT_CONFIG_VALUE_0',
+			]) {
+				expect(options?.env?.[key], key).toBeUndefined();
+			}
+		} finally {
+			await adapter.shutdown();
+		}
+	});
+
 	it('renders one bubble per prompt, since the SDK echo is dropped', async () => {
 		const { events, session } = await openSession();
 

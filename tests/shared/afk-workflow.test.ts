@@ -20,6 +20,17 @@ describe('afk delivery loop', () => {
 	const nativeDirective = render({ delegation: 'native' });
 	const subagentDirective = render({ role: 'subagent' });
 
+	it('distinguishes PR merging from explicitly requested local integration', () => {
+		for (const guidance of [directive, nativeDirective]) {
+			expect(guidance).toContain('Never merge the pull request');
+			expect(guidance).toContain('AFK delivery is not base-sync consent');
+			expect(guidance).toContain(
+				'explicit human request to integrate a named base or resolve merge conflicts',
+			);
+			expect(guidance).not.toContain('Never merge,');
+		}
+	});
+
 	it('renders nothing while the user is present', () => {
 		expect(
 			buildAfkWorkflowDirective({

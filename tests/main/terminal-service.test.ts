@@ -997,10 +997,30 @@ test('script sessions merge the resolved base environment before workspace vars'
 			__CFBundleIdentifier: 'dev.ensemblr.app',
 			PATH: '/mise/shims:/opt/homebrew/bin:/usr/bin',
 			SHELL_MARKER: 'from-login-shell',
+			GIT_DIR: '/sibling/.git',
+			GIT_WORK_TREE: '/sibling',
+			GIT_SSH_COMMAND: 'ssh -i /identity',
 		}),
 		scriptShell: '/bin/zsh',
-		workspaceEnvironmentService:
-			createWorkspaceEnvironmentStub('/tmp/workspace'),
+		workspaceEnvironmentService: {
+			assemble: async (input) => {
+				const result =
+					await createWorkspaceEnvironmentStub('/tmp/workspace').assemble(
+						input,
+					);
+				return {
+					...result,
+					env: {
+						...result.env,
+						GIT_DIR: '/overlay/.git',
+						GIT_INDEX_FILE: '/sibling/.git/index',
+						GIT_CONFIG_COUNT: '1',
+						GIT_CONFIG_KEY_0: 'core.worktree',
+						GIT_CONFIG_VALUE_0: '/sibling',
+					},
+				};
+			},
+		},
 	});
 
 	await service.create({
@@ -1014,6 +1034,17 @@ test('script sessions merge the resolved base environment before workspace vars'
 	assert.equal(env.SHELL_MARKER, 'from-login-shell');
 	assert.equal(env.ENSEMBLR_WORKSPACE_PATH, '/tmp/workspace');
 	assert.equal(env.__CFBundleIdentifier, undefined);
+	assert.equal(env.GIT_SSH_COMMAND, 'ssh -i /identity');
+	for (const key of [
+		'GIT_DIR',
+		'GIT_WORK_TREE',
+		'GIT_INDEX_FILE',
+		'GIT_CONFIG_COUNT',
+		'GIT_CONFIG_KEY_0',
+		'GIT_CONFIG_VALUE_0',
+	]) {
+		assert.equal(env[key], undefined, key);
+	}
 });
 
 test('resolveUserShell returns an existing shell binary', () => {

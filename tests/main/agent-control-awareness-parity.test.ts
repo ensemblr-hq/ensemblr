@@ -66,6 +66,30 @@ const playbooksFor = (features: AwarenessFeatures) =>
 		planModeSubagentAwareness(features),
 	] as const;
 
+it('keeps Git isolation and explicit integration consent in every workspace role', () => {
+	for (const features of FEATURE_CORNERS) {
+		for (const guidance of playbooksFor(features)) {
+			for (const clause of [
+				'shared object store is not a shared checkout or index',
+				'verify cwd, Git top-level, and branch match your assigned workspace',
+				'git -C, environment overrides, or shared Git metadata',
+				'merge, pull, rebase, cherry-pick, reset, or checkout files',
+				'main/master, the base, or another workspace',
+				'catch up, fix ordinary failures, prepare/open a PR',
+				'because another workspace merged',
+				'PR presence or absence and AFK do not imply consent',
+				'explicit human request to integrate a named base or resolve merge conflicts',
+				'necessary local merge/rebase and continuation for this workspace/task only',
+				'not PR merging, arbitrary imports, sibling writes, or overriding subagent/reviewer no-HEAD rules or plan-mode read-only limits',
+				'ask when attended; when AFK leave Git unchanged and report',
+				'Unexpected history or worktree movement',
+				'never automatically reset/rebase to hide it',
+			])
+				expect(guidance).toContain(clause);
+		}
+	}
+});
+
 const ORCHESTRATOR_AWARENESS = orchestratorAwareness(ALL_ON);
 const NATIVE_ORCHESTRATOR_AWARENESS = nativeOrchestratorAwareness(ALL_ON);
 const SUBAGENT_AWARENESS = subagentAwareness(ALL_ON);
@@ -198,6 +222,9 @@ const extractEmbeddedAwareness = (
 			/\$\{features\.(\w+) \? ([A-Z_]+) : ''\}/g,
 			(_whole, flag: string, fragment: string) =>
 				flagValue(flag) ? extractEmbeddedLiteral(source, fragment) : '',
+		)
+		.replace(/\$\{GIT_WORKSPACE_CONSENT\}/g, () =>
+			extractEmbeddedLiteral(source, 'GIT_WORKSPACE_CONSENT'),
 		);
 	if (body.includes('${')) {
 		throw new Error(`Unresolved substitution left in ${name}.`);

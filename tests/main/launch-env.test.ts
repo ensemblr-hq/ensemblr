@@ -41,6 +41,47 @@ describe('stripLaunchContextEnv', () => {
 		expect(result.HOME).toBe('/Users/dev');
 	});
 
+	test('drops repository-local Git context without stripping identity or authentication', () => {
+		const preserved = {
+			PATH: '/usr/bin',
+			GIT_AUTHOR_NAME: 'Developer',
+			GIT_COMMITTER_EMAIL: 'dev@example.test',
+			GIT_EDITOR: 'vim',
+			GIT_SSH_COMMAND: 'ssh -i ~/.ssh/work',
+			GIT_ASKPASS: '/usr/bin/askpass',
+			GIT_TERMINAL_PROMPT: '0',
+			GIT_CONFIG_GLOBAL: '/home/dev/.gitconfig',
+		};
+		const source = Object.freeze({
+			...preserved,
+			GIT_DIR: '/sibling/.git',
+			GIT_COMMON_DIR: '/sibling/.git',
+			GIT_WORK_TREE: '/sibling',
+			GIT_INDEX_FILE: '/sibling/.git/index',
+			GIT_OBJECT_DIRECTORY: '/sibling/.git/objects',
+			GIT_ALTERNATE_OBJECT_DIRECTORIES: '/sibling/.git/objects',
+			GIT_CONFIG: '/sibling/.git/config',
+			GIT_CONFIG_COUNT: '1',
+			GIT_CONFIG_KEY_0: 'core.worktree',
+			GIT_CONFIG_VALUE_0: '/sibling',
+			GIT_CONFIG_KEY_99: 'stale key',
+			GIT_CONFIG_VALUE_99: 'stale value',
+			GIT_CONFIG_PARAMETERS: "'core.worktree'='/sibling'",
+			GIT_IMPLICIT_WORK_TREE: '0',
+			GIT_CEILING_DIRECTORIES: '/workspaces',
+			GIT_DISCOVERY_ACROSS_FILESYSTEM: '1',
+			GIT_GRAFT_FILE: '/sibling/.git/info/grafts',
+			GIT_PREFIX: 'sibling/',
+			GIT_SHALLOW_FILE: '/sibling/.git/shallow',
+			GIT_NAMESPACE: 'sibling',
+			GIT_REPLACE_REF_BASE: 'refs/sibling',
+			GIT_NO_REPLACE_OBJECTS: '1',
+		});
+
+		expect(stripLaunchContextEnv(source)).toEqual(preserved);
+		expect(source.GIT_INDEX_FILE).toBe('/sibling/.git/index');
+	});
+
 	test('preserves user variables and is a no-op when no markers are present', () => {
 		const source = { PATH: '/usr/bin', SHELL: '/bin/zsh', FOO: 'bar' };
 

@@ -305,11 +305,11 @@ async function resolveHeadCommit(cwd: string): Promise<string | null> {
 }
 
 /**
- * Run a git command with a launch-context-scrubbed environment, returning
- * trimmed stdout and throwing a {@link GitCheckpointError} on failure.
+ * Runs Git without inherited app/repository context, then overlays only this
+ * module's private identity/temp-index settings. Throws on command failure.
  * @param args - Git arguments to pass
  * @param cwd - Directory to run git in
- * @param env - Extra environment overlaid on the scrubbed process env
+ * @param env - Internal identity and temporary-index overrides, never caller environment
  * @param step - Label identifying this step for error reporting
  * @returns Trimmed stdout of the git command
  */
@@ -327,9 +327,7 @@ async function runGit({
 	try {
 		const { stdout } = await execFileAsync('git', [...args], {
 			cwd,
-			// Strip launch-context vars AFTER the caller overlay so a git subprocess
-			// (askpass/credential helper) can't make macOS relaunch Ensemblr.
-			env: stripLaunchContextEnv({ ...process.env, ...env }),
+			env: { ...stripLaunchContextEnv(process.env), ...env },
 			maxBuffer: 16 * 1024 * 1024,
 		});
 		return stdout.trim();

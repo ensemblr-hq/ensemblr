@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test, { type TestContext } from 'node:test';
@@ -250,6 +251,123 @@ test('passes cwd and environment overrides to commands', async (t) => {
 	assert.equal(result.status, 'success');
 	assert.equal(result.cwd, cwd);
 	assert.equal(result.stdout.endsWith('|from-override'), true);
+});
+
+for (const source of ['base', 'shell', 'overlay', 'config'] as const) {
+	test(`Git writes stay in the requested worktree despite ${source} environment routing`, async (t) => {
+		const repository = createDirectoryFixture(t);
+		const workspace = path.join(repository, 'wip');
+		const git = (cwd: string, ...args: string[]) =>
+			execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+		git(repository, 'init', '--initial-branch=main');
+		git(repository, 'config', 'user.name', 'Ensemblr Test');
+		git(repository, 'config', 'user.email', 'test@ensemblr.local');
+		writeFileSync(path.join(repository, 'tracked.txt'), 'initial\n');
+		git(repository, 'add', 'tracked.txt');
+		git(
+			repository,
+			'-c',
+			'core.hooksPath=/dev/null',
+			'commit',
+			'-m',
+			'initial',
+		);
+		git(repository, 'worktree', 'add', '-b', 'wip', workspace);
+		writeFileSync(path.join(repository, 'tracked.txt'), 'sibling staged\n');
+		git(repository, 'add', 'tracked.txt');
+		writeFileSync(path.join(repository, 'tracked.txt'), 'sibling unstaged\n');
+		writeFileSync(path.join(workspace, 'tracked.txt'), 'WIP change\n');
+		const siblingIndex = path.join(repository, '.git', 'index');
+		const indexBefore = readFileSync(siblingIndex);
+		const headBefore = git(repository, 'rev-parse', 'HEAD');
+		const routing: Record<string, string> =
+			source === 'config'
+				? {
+						GIT_CONFIG_COUNT: '1',
+						GIT_CONFIG_KEY_0: 'core.worktree',
+						GIT_CONFIG_VALUE_0: repository,
+					}
+				: {
+						GIT_DIR: path.join(repository, '.git'),
+						GIT_WORK_TREE: repository,
+						GIT_INDEX_FILE: siblingIndex,
+					};
+		const service = createLocalCommandService({
+			baseEnv: { PATH: TEST_PATH, ...(source === 'base' ? routing : {}) },
+			commonPathEntries: [],
+			shell: TEST_SHELL,
+			shellEnvironmentLoader:
+				source === 'base'
+					? async () => ({ exitCode: 1, signal: null, stdout: '', stderr: '' })
+					: createShellLoader(source === 'shell' ? routing : {}),
+		});
+
+		const result = await service.run({
+			args: ['add', 'tracked.txt'],
+			command: 'git',
+			cwd: workspace,
+			env: source === 'overlay' || source === 'config' ? routing : {},
+		});
+
+		assert.equal(result.status, 'success', result.stderr);
+		assert.equal(git(workspace, 'show', ':tracked.txt'), 'WIP change');
+		assert.deepEqual(readFileSync(siblingIndex), indexBefore);
+		assert.equal(git(repository, 'rev-parse', 'HEAD'), headBefore);
+		assert.equal(git(workspace, 'rev-parse', 'HEAD'), headBefore);
+		assert.equal(
+			readFileSync(path.join(repository, 'tracked.txt'), 'utf8'),
+			'sibling unstaged\n',
+		);
+	});
+}
+
+test('explicitly merging the base branch still updates only the requested worktree', async (t) => {
+	const repository = createDirectoryFixture(t);
+	const workspace = path.join(repository, 'wip');
+	const git = (cwd: string, ...args: string[]) =>
+		execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+	git(repository, 'init', '--initial-branch=main');
+	git(repository, 'config', 'user.name', 'Ensemblr Test');
+	git(repository, 'config', 'user.email', 'test@ensemblr.local');
+	writeFileSync(path.join(repository, 'tracked.txt'), 'initial\n');
+	git(repository, 'add', 'tracked.txt');
+	git(repository, '-c', 'core.hooksPath=/dev/null', 'commit', '-m', 'initial');
+	git(repository, 'worktree', 'add', '-b', 'wip', workspace);
+	writeFileSync(path.join(repository, 'tracked.txt'), 'base update\n');
+	git(repository, 'add', 'tracked.txt');
+	git(
+		repository,
+		'-c',
+		'core.hooksPath=/dev/null',
+		'commit',
+		'-m',
+		'base update',
+	);
+	const siblingIndex = path.join(repository, '.git', 'index');
+	const indexBefore = readFileSync(siblingIndex);
+	const baseHead = git(repository, 'rev-parse', 'HEAD');
+	const service = createTestService();
+
+	const result = await service.run({
+		command: 'git',
+		args: ['-c', 'core.hooksPath=/dev/null', 'merge', '--ff-only', 'main'],
+		cwd: workspace,
+		env: {
+			GIT_DIR: path.join(repository, '.git'),
+			GIT_WORK_TREE: repository,
+			GIT_INDEX_FILE: siblingIndex,
+		},
+	});
+
+	assert.equal(result.status, 'success', result.stderr);
+	assert.equal(git(workspace, 'rev-parse', 'HEAD'), baseHead);
+	assert.equal(git(workspace, 'branch', '--show-current'), 'wip');
+	assert.equal(
+		readFileSync(path.join(workspace, 'tracked.txt'), 'utf8'),
+		'base update\n',
+	);
+	assert.equal(git(repository, 'rev-parse', 'HEAD'), baseHead);
+	assert.deepEqual(readFileSync(siblingIndex), indexBefore);
 });
 
 test('returns typed failure for nonzero exit', async () => {

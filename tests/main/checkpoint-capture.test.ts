@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -147,6 +147,71 @@ test('capture leaves branches, HEAD, and the real index untouched', async (t) =>
 	assert.equal(
 		git(fixture.repoDirectory, 'status', '--porcelain'),
 		statusBefore,
+	);
+});
+
+test('contaminated capture snapshots its worktree without touching sibling files, index, or HEAD', async (t) => {
+	const { repoDirectory } = openFixture(t);
+	const workspace = path.join(path.dirname(repoDirectory), 'workspace');
+	git(repoDirectory, 'worktree', 'add', '-b', 'workspace', workspace);
+	writeFileSync(path.join(repoDirectory, 'tracked.txt'), 'sibling staged\n');
+	git(repoDirectory, 'add', 'tracked.txt');
+	writeFileSync(path.join(repoDirectory, 'tracked.txt'), 'sibling unstaged\n');
+	writeFileSync(path.join(workspace, 'tracked.txt'), 'workspace staged\n');
+	git(workspace, 'add', 'tracked.txt');
+	writeFileSync(path.join(workspace, 'tracked.txt'), 'workspace snapshot\n');
+	writeFileSync(path.join(workspace, 'untracked.txt'), 'workspace only\n');
+	const siblingIndex = path.join(repoDirectory, '.git', 'index');
+	const workspaceIndex = git(workspace, 'rev-parse', '--git-path', 'index');
+	const siblingIndexBefore = readFileSync(siblingIndex);
+	const workspaceIndexBefore = readFileSync(workspaceIndex);
+	const headBefore = git(workspace, 'rev-parse', 'HEAD');
+	const routing = {
+		GIT_DIR: path.join(repoDirectory, '.git'),
+		GIT_WORK_TREE: repoDirectory,
+		GIT_INDEX_FILE: siblingIndex,
+		GIT_CONFIG_COUNT: '1',
+		GIT_CONFIG_KEY_0: 'core.worktree',
+		GIT_CONFIG_VALUE_0: repoDirectory,
+	};
+	const previous = Object.keys(routing).map(
+		(key) => [key, process.env[key]] as const,
+	);
+	const ref = 'refs/ensemblr/checkpoints/isolation/capture';
+	try {
+		Object.assign(process.env, routing);
+		await captureWorkspaceCheckpoint({
+			cwd: workspace,
+			message: 'isolated capture',
+			ref,
+		});
+	} finally {
+		for (const [key, value] of previous) {
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value;
+		}
+	}
+
+	assert.equal(
+		git(workspace, 'show', `${ref}:tracked.txt`),
+		'workspace snapshot',
+	);
+	assert.equal(
+		git(workspace, 'show', `${ref}:untracked.txt`),
+		'workspace only',
+	);
+	assert.equal(git(workspace, 'rev-parse', `${ref}^`), headBefore);
+	assert.deepEqual(readFileSync(siblingIndex), siblingIndexBefore);
+	assert.deepEqual(readFileSync(workspaceIndex), workspaceIndexBefore);
+	assert.equal(git(repoDirectory, 'rev-parse', 'HEAD'), headBefore);
+	assert.equal(git(workspace, 'rev-parse', 'HEAD'), headBefore);
+	assert.equal(
+		readFileSync(path.join(repoDirectory, 'tracked.txt'), 'utf8'),
+		'sibling unstaged\n',
+	);
+	assert.equal(
+		readFileSync(path.join(workspace, 'tracked.txt'), 'utf8'),
+		'workspace snapshot\n',
 	);
 });
 
