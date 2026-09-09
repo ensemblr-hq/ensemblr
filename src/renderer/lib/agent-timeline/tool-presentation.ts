@@ -149,9 +149,17 @@ export function presentToolCall(
 	const isRunning = RUNNING_STATES.has(part.state);
 	const projected = presenterForPart(part)(part);
 	const controlLabel = ensemblrToolLabel(part, isRunning, surface, resolveRole);
+	const controlBadge = controlLabel?.badge;
 	const presentation = {
 		...projected,
-		badge: controlLabel?.badge ?? projected.badge,
+		badge:
+			controlBadge?.kind === 'file' && projected.badge?.kind === 'file'
+				? {
+						...controlBadge,
+						additions: projected.badge.additions,
+						deletions: projected.badge.deletions,
+					}
+				: (controlBadge ?? projected.badge),
 		glyph: projected.glyph ?? glyph,
 		title: controlLabel?.title ?? projected.title,
 		...(controlLabel?.unpinnedTitle

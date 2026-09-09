@@ -1338,6 +1338,38 @@
 		"ast-search": {
 			"title": "Поиск AST"
 		},
+		"background-tasks": {
+			"attested-title": "Запуск аттестованного Pi",
+			"delegate-title": "Делегирование в фоне",
+			"fusion-investigate-title": "Запуск исследования Fusion",
+			"fusion-reason-title": "Запуск рассуждения Fusion",
+			"fusion-research-title": "Запуск веб-исследования Fusion",
+			"fusion-title": "Запуск процесса Fusion",
+			"fusion-validate-title": "Запуск проверки Fusion",
+			"head": "начало",
+			"kill-title": "Остановка фоновой задачи",
+			"logs-title": "Чтение фоновых логов",
+			"result-title": "Чтение фонового результата",
+			"run-title": "Запуск фоновой задачи",
+			"state": {
+				"artifact": "артефакт",
+				"cancelled": "отменено",
+				"committed": "готово",
+				"completed": "выполнено",
+				"failed": "ошибка",
+				"inline": "встроено",
+				"killed": "остановлено",
+				"none": "не готово",
+				"running": "выполняется"
+			},
+			"status-title": "Проверка фоновых задач",
+			"tail": "конец",
+			"task-count_one": "{{count}} задача",
+			"task-count_few": "{{count}} задачи",
+			"task-count_many": "{{count}} задач",
+			"task-count_other": "{{count}} задачи",
+			"truncated": "обрезано"
+		},
 		"bash": {
 			"title": "Bash"
 		},
@@ -1538,6 +1570,36 @@
 			"transition": "Задача #{{number}} → {{status}}",
 			"transition-only": "Задача → {{status}}",
 			"untitled": "Задача без названия"
+		},
+		"web-access": {
+			"character-count_one": "{{count, number}} символ",
+			"character-count_few": "{{count, number}} символа",
+			"character-count_many": "{{count, number}} символов",
+			"character-count_other": "{{count, number}} символа",
+			"fetch-title": "Загрузка веб-контента",
+			"match-query-count_one": "{{count}} поисковый запрос",
+			"match-query-count_few": "{{count}} поисковых запроса",
+			"match-query-count_many": "{{count}} поисковых запросов",
+			"match-query-count_other": "{{count}} поискового запроса",
+			"query-count_one": "{{count}} запрос",
+			"query-count_few": "{{count}} запроса",
+			"query-count_many": "{{count}} запросов",
+			"query-count_other": "{{count}} запроса",
+			"read-title": "Чтение сохранённого веб-контента",
+			"result-count_one": "{{count}} результат",
+			"result-count_few": "{{count}} результата",
+			"result-count_many": "{{count}} результатов",
+			"result-count_other": "{{count}} результата",
+			"search-title": "Поиск в интернете",
+			"source-check-title": "Проверка веб-источников",
+			"source-count_one": "{{count}} источник",
+			"source-count_few": "{{count}} источника",
+			"source-count_many": "{{count}} источников",
+			"source-count_other": "{{count}} источника",
+			"url-count_one": "{{count}} URL",
+			"url-count_few": "{{count}} URL",
+			"url-count_many": "{{count}} URL",
+			"url-count_other": "{{count}} URL"
 		},
 		"write": {
 			"title": "Запись"

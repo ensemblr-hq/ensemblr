@@ -1300,6 +1300,36 @@
 		"ast-search": {
 			"title": "AST search"
 		},
+		"background-tasks": {
+			"attested-title": "Start attested Pi run",
+			"delegate-title": "Delegate in background",
+			"fusion-investigate-title": "Start Fusion investigation",
+			"fusion-reason-title": "Start Fusion reasoning",
+			"fusion-research-title": "Start Fusion research",
+			"fusion-title": "Start Fusion workflow",
+			"fusion-validate-title": "Start Fusion validation",
+			"head": "head",
+			"kill-title": "Stop background task",
+			"logs-title": "Read background logs",
+			"result-title": "Read background result",
+			"run-title": "Start background task",
+			"state": {
+				"artifact": "artifact",
+				"cancelled": "cancelled",
+				"committed": "ready",
+				"completed": "completed",
+				"failed": "failed",
+				"inline": "inline",
+				"killed": "stopped",
+				"none": "not ready",
+				"running": "running"
+			},
+			"status-title": "Check background tasks",
+			"tail": "tail",
+			"task-count_one": "{{count}} task",
+			"task-count_other": "{{count}} tasks",
+			"truncated": "truncated"
+		},
 		"bash": {
 			"title": "Bash"
 		},
@@ -1482,6 +1512,24 @@
 			"transition": "Task #{{number}} → {{status}}",
 			"transition-only": "Task → {{status}}",
 			"untitled": "Untitled task"
+		},
+		"web-access": {
+			"character-count_one": "{{count, number}} char",
+			"character-count_other": "{{count, number}} chars",
+			"fetch-title": "Fetch web content",
+			"match-query-count_one": "{{count}} match query",
+			"match-query-count_other": "{{count}} match queries",
+			"query-count_one": "{{count}} query",
+			"query-count_other": "{{count}} queries",
+			"read-title": "Read stored web content",
+			"result-count_one": "{{count}} result",
+			"result-count_other": "{{count}} results",
+			"search-title": "Search the web",
+			"source-check-title": "Check web sources",
+			"source-count_one": "{{count}} source",
+			"source-count_other": "{{count}} sources",
+			"url-count_one": "{{count}} URL",
+			"url-count_other": "{{count}} URLs"
 		},
 		"write": {
 			"title": "Write"

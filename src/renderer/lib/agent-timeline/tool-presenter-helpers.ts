@@ -1,4 +1,5 @@
 import type { BundledLanguage } from 'shiki';
+import { buildToolDiffRows } from '@/renderer/lib/diff/tool-rows';
 import { languageForFilePath } from '@/renderer/lib/language-from-path';
 import type {
 	ToolBadgeDescriptor,
@@ -32,6 +33,22 @@ export function fileBadge(
 		deletions: counts?.deletions ?? null,
 		kind,
 		path: named,
+	};
+}
+
+/**
+ * Counts added and deleted rows from the parsed hunks a diff body renders.
+ * @param patch - Unified diff text
+ * @returns Added and deleted line totals
+ */
+export function patchCounts(patch: string): {
+	additions: number;
+	deletions: number;
+} {
+	const { rows } = buildToolDiffRows(patch);
+	return {
+		additions: rows.filter((row) => row.kind === 'insert').length,
+		deletions: rows.filter((row) => row.kind === 'delete').length,
 	};
 }
 
