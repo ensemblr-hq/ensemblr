@@ -204,11 +204,11 @@ function useRevalidateWhenLookedAt(
  * Both runtimes answer over the same provider-parameterized channel, so a
  * Claude Code chat is never offered pi's commands and vice versa.
  *
- * Discovery is deferred until the slash menu is first opened, unless this
- * workspace already has a cached catalogue. Asking a runtime for its commands
- * starts a child process — Claude Code's SDK spawns a real `claude` — and doing
- * that on every composer mount spends a process on a menu most turns never open,
- * and races the agent session the user actually asked for.
+ * Pi discovery starts when the composer mounts so its roughly two-second runtime
+ * startup can finish before the user opens the menu. Claude Code discovery stays
+ * deferred until the menu first opens unless this workspace has a cached
+ * catalogue: its SDK spawns a real `claude`, and doing that on every composer
+ * mount spends a process on a menu most turns never open.
  *
  * A cached workspace is exempt: it has something to paint immediately, so it is
  * worth one background refresh to keep it true. That refresh is a real cost, not
@@ -250,7 +250,8 @@ export function useSlashCommands(
 	);
 	const query = agentProviderSlashCommandsQuery(provider, workspaceCwd);
 	const enabled =
-		(everOpened || warmable) && canDiscoverSlashCommands(workspaceCwd);
+		(provider === 'pi' || everOpened || warmable) &&
+		canDiscoverSlashCommands(workspaceCwd);
 	const { data, dataUpdatedAt, isFetching, refetch } = useQuery({
 		...query,
 		enabled,
