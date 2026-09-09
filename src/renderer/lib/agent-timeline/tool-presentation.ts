@@ -74,6 +74,25 @@ function failureTextOf(part: DynamicToolUIPart): string | null {
 }
 
 /**
+ * Extracts Pi's documented non-zero process status from a shell-tool result.
+ * @param part - The failed tool call.
+ * @param failureText - The normalized failure output.
+ * @returns The exit code, or null when this is not a shell exit.
+ */
+function shellExitCodeOf(
+	part: DynamicToolUIPart,
+	failureText: string,
+): string | null {
+	if (part.toolName !== 'bash' && part.toolName !== 'powershell') {
+		return null;
+	}
+	return (
+		failureText.match(/(?:^|\n)Command exited with code (-?\d+)\s*$/)?.[1] ??
+		null
+	);
+}
+
+/**
  * Projects any tool call into everything its row needs to render.
  *
  * Failures and in-flight calls short-circuit before the per-tool presenters:
@@ -102,6 +121,10 @@ export function presentToolCall(
 ): ToolPresentation {
 	const failureText = failureTextOf(part);
 	if (failureText !== null) {
+		const tool = humanizeToolName(
+			canonicalEnsemblrToolName(part.toolName) ?? part.toolName,
+		);
+		const exitCode = shellExitCodeOf(part, failureText);
 		return {
 			badge: null,
 			body: looksLikeStackTrace(failureText)
@@ -109,11 +132,16 @@ export function presentToolCall(
 				: { kind: 'error', text: failureText },
 			glyph: 'circle-x',
 			preview: { font: 'mono', text: failureText },
-			title: i18n.t('workbench:tool-call.failed.title', '{{tool}} failed', {
-				tool: humanizeToolName(
-					canonicalEnsemblrToolName(part.toolName) ?? part.toolName,
-				),
-			}),
+			title:
+				exitCode === null
+					? i18n.t('workbench:tool-call.failed.title', '{{tool}} failed', {
+							tool,
+						})
+					: i18n.t(
+							'workbench:tool-call.failed.exit-code-title',
+							'{{tool}} exited with code {{code}}',
+							{ code: exitCode, tool },
+						),
 			tone: 'destructive',
 		};
 	}

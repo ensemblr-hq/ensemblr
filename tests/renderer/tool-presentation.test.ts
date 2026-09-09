@@ -391,6 +391,27 @@ describe('presentToolCall', () => {
 		});
 	});
 
+	test('names a non-zero Bash exit without calling the command itself failed', () => {
+		const presentation = presentToolCall({
+			errorText: 'No matches found.\n\nCommand exited with code 1',
+			input: {},
+			state: 'output-error',
+			toolCallId: 'bash-nonzero',
+			toolName: 'bash',
+			type: 'dynamic-tool',
+		});
+
+		expect(presentation).toMatchObject({
+			body: {
+				kind: 'error',
+				text: 'No matches found.\n\nCommand exited with code 1',
+			},
+			glyph: 'circle-x',
+			title: 'Bash exited with code 1',
+			tone: 'destructive',
+		});
+	});
+
 	test('routes a failure carrying a traceback to the stack-trace body', () => {
 		const presentation = presentToolCall({
 			errorText: STACK_TRACE_ERROR,

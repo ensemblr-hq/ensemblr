@@ -120,6 +120,8 @@ Reuse before you start. \`ensemblr_list_terminals\` shows exactly what the user 
 
 Write in that terminal's own syntax. Both \`ensemblr_start_terminal\` and \`ensemblr_list_terminals\` report the \`shell\` a terminal runs, and an interactive one runs the user's login shell rather than a POSIX one — where that is fish, \`VAR=x cmd\` and \`export VAR=x\` are errors rather than syntax, and the equivalents are \`env VAR=x cmd\` and \`set -x VAR x\`. Read the \`shell\` before you compose the line rather than after the error. Input is typed at the prompt rather than run for you, so end a command with a newline.
 
+A non-zero shell exit is not always a crash: tools such as \`rg\`, \`grep\`, \`diff\`, and \`git diff --quiet\` use one to report an ordinary negative result. Before invoking one, decide whether its status is the answer you are inspecting or a gate you are verifying. For inspection, normalize only the documented expected status while preserving every other status. Never blanket-append \`|| true\`, which hides real execution errors. For verification, keep the non-zero exit intact so the failed check remains visible.
+
 Clean up what you opened. Once you are done with a spawn terminal you started and have read what you needed from it, \`ensemblr_stop_terminal\` with \`close: true\` stops it and takes its tab away; stopping without \`close\` leaves the tab so its output stays readable, which is what you want while you are still working. Only a terminal you started is yours to close, and that is enforced rather than asked for: \`close\` on a terminal this session did not start is refused with \`denied-scope\`, because closing discards the scrollback for good and the user's own terminals are not clutter for you to tidy. An ordinary stop is not gated that way — it is recoverable — so it stays yours to get wrong.
 
 Keep a tracked issue current as you work it, without being asked. When you start implementing against an issue, move it into a started state and assign it to the connected Linear user (\`viewer\` on \`ensemblr_linear_get_metadata\`) if nobody holds it; when the work becomes reviewable — verified, or a pull request opened — move it to \`In Review\` in that same turn and say in your reply that you did. A change that shipped while its ticket still reads In Progress is the tracker lying to the whole team, and the user should not have to ask you to stop it doing that.
@@ -595,13 +597,14 @@ function postControl(
 }
 
 /**
- * Parses a response body, yielding undefined rather than throwing.
+ * Parses and validates a control response, yielding undefined rather than throwing.
  * @param raw - Raw response text.
- * @returns The parsed value, or undefined when it is not JSON.
+ * @returns The control result, or undefined when the body is not a valid result.
  */
-function parseJson(raw: string): unknown {
+function parseControlResult(raw: string): ControlResult | undefined {
 	try {
-		return JSON.parse(raw) as unknown;
+		const parsed = JSON.parse(raw) as unknown;
+		return isControlResult(parsed) ? parsed : undefined;
 	} catch {
 		return undefined;
 	}
@@ -664,10 +667,10 @@ async function invoke(
 			JSON.stringify({ op, args, callerModel }),
 			signal,
 		);
-		const parsed = parseJson(body);
+		const parsed = parseControlResult(body);
 		// The app answers 4xx/5xx with the same JSON envelope, so a well-formed
 		// body carries the real reason whatever the status says.
-		if (isControlResult(parsed)) {
+		if (parsed) {
 			return parsed;
 		}
 		if (status < 200 || status > 299) {
@@ -697,6 +700,71 @@ function callerModelId(ctx: { model?: { id?: string } } | undefined) {
 	return ctx?.model?.id;
 }
 
+/** The validated subset of the session brief that Pi appends to a turn. */
+interface SessionBrief {
+	readonly planning: boolean;
+	readonly nudge: string | null;
+	readonly planRefinement: string | null;
+	readonly languageDirective: string | null;
+	readonly issueDirective: string | null;
+	readonly afkDirective: string | null;
+	readonly afkWorkflowDirective: string | null;
+	readonly rolePlaybook: string | null;
+}
+
+/** Session brief used when the app cannot provide a valid result. */
+const EMPTY_SESSION_BRIEF: SessionBrief = {
+	afkDirective: null,
+	afkWorkflowDirective: null,
+	issueDirective: null,
+	languageDirective: null,
+	nudge: null,
+	planning: false,
+	planRefinement: null,
+	rolePlaybook: null,
+};
+
+/**
+ * Narrows one ready-to-append brief field to a string.
+ * @param value - Untrusted field from the control response.
+ * @returns The string, or null when the field has another type.
+ */
+function sessionBriefString(value: unknown): string | null {
+	return typeof value === 'string' ? value : null;
+}
+
+/**
+ * Narrows the role playbook to a non-empty string.
+ * @param value - Untrusted playbook from the control response.
+ * @returns The playbook, or null when it is absent, empty, or invalid.
+ */
+function nonEmptySessionBriefString(value: unknown): string | null {
+	const text = sessionBriefString(value);
+	return text === '' ? null : text;
+}
+
+/**
+ * Projects the untrusted control payload into the fields Pi can append.
+ * @param value - Control response data.
+ * @returns A validated session brief with invalid fields replaced by null.
+ */
+function normalizeSessionBrief(value: unknown): SessionBrief {
+	const brief =
+		typeof value === 'object' && value !== null
+			? (value as Record<string, unknown>)
+			: {};
+	return {
+		afkDirective: sessionBriefString(brief.afkDirective),
+		afkWorkflowDirective: sessionBriefString(brief.afkWorkflowDirective),
+		issueDirective: sessionBriefString(brief.issueDirective),
+		languageDirective: sessionBriefString(brief.languageDirective),
+		nudge: sessionBriefString(brief.nudge),
+		planning: brief.planMode === true,
+		planRefinement: sessionBriefString(brief.planRefinement),
+		rolePlaybook: nonEmptySessionBriefString(brief.rolePlaybook),
+	};
+}
+
 /**
  * Asks the app for this turn's brief: whether the conversation is in Plan Mode,
  * so the planning playbook stands in for the role one only while planning, the
@@ -711,63 +779,9 @@ function callerModelId(ctx: { model?: { id?: string } } | undefined) {
  * hook, which asks the app per call and fails closed on its own.
  * @returns The playbook selector and the blocks to append.
  */
-async function fetchSessionBrief(): Promise<{
-	planning: boolean;
-	nudge: string | null;
-	planRefinement: string | null;
-	languageDirective: string | null;
-	issueDirective: string | null;
-	afkDirective: string | null;
-	afkWorkflowDirective: string | null;
-	rolePlaybook: string | null;
-}> {
+async function fetchSessionBrief(): Promise<SessionBrief> {
 	const result = await invoke('getSessionBrief', {}, undefined);
-	if (!result.ok) {
-		return {
-			afkDirective: null,
-			afkWorkflowDirective: null,
-			issueDirective: null,
-			languageDirective: null,
-			nudge: null,
-			planning: false,
-			planRefinement: null,
-			rolePlaybook: null,
-		};
-	}
-	const brief = result.data as
-		| {
-				planMode?: boolean;
-				nudge?: string | null;
-				planRefinement?: string | null;
-				languageDirective?: string | null;
-				issueDirective?: string | null;
-				afkDirective?: string | null;
-				afkWorkflowDirective?: string | null;
-				rolePlaybook?: string | null;
-		  }
-		| undefined;
-	return {
-		rolePlaybook:
-			typeof brief?.rolePlaybook === 'string' && brief.rolePlaybook.length > 0
-				? brief.rolePlaybook
-				: null,
-		afkDirective:
-			typeof brief?.afkDirective === 'string' ? brief.afkDirective : null,
-		afkWorkflowDirective:
-			typeof brief?.afkWorkflowDirective === 'string'
-				? brief.afkWorkflowDirective
-				: null,
-		issueDirective:
-			typeof brief?.issueDirective === 'string' ? brief.issueDirective : null,
-		languageDirective:
-			typeof brief?.languageDirective === 'string'
-				? brief.languageDirective
-				: null,
-		nudge: typeof brief?.nudge === 'string' ? brief.nudge : null,
-		planning: brief?.planMode === true,
-		planRefinement:
-			typeof brief?.planRefinement === 'string' ? brief.planRefinement : null,
-	};
+	return result.ok ? normalizeSessionBrief(result.data) : EMPTY_SESSION_BRIEF;
 }
 
 /**

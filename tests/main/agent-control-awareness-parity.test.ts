@@ -425,6 +425,20 @@ describe('agent-control AWARENESS parity', () => {
 		}
 	});
 
+	// A non-zero exit can be a query answer (`rg` found nothing) or a real failed
+	// gate. Root agents need to preserve that distinction without blanket masking
+	// errors, or the timeline fills with avoidable red rows and verification lies.
+	it('teaches shell-owning roles to normalize only documented expected exits', () => {
+		for (const playbook of [ORCHESTRATOR_AWARENESS, HARNESS_AWARENESS]) {
+			expect(playbook).toContain('A non-zero shell exit is not always a crash');
+			expect(playbook).toContain(
+				'normalize only the documented expected status',
+			);
+			expect(playbook).toContain('Never blanket-append `|| true`');
+			expect(playbook).toContain('keep the non-zero exit intact');
+		}
+	});
+
 	// The sub-agent report structure invites parking open questions until the end,
 	// so without a stated scope a child reads "produce a reference" as a file to
 	// write rather than a report to give.
@@ -870,14 +884,18 @@ describe('agent-control AWARENESS parity', () => {
 		expect(fields).toContain('issueDirective');
 		expect(fields.length).toBeGreaterThanOrEqual(4);
 		for (const field of fields) {
-			expect(source).toContain(`typeof brief?.${field} === 'string'`);
+			const normalizer =
+				field === 'rolePlaybook'
+					? 'nonEmptySessionBriefString'
+					: 'sessionBriefString';
+			expect(source).toContain(`${normalizer}(brief.${field})`);
 		}
 	});
 
 	it('reads the refinement block off the brief rather than authoring one', () => {
 		const source = readExtensionSource();
 		expect(source).toMatch(
-			/planRefinement:\s*\n?\s*typeof brief\?\.planRefinement === 'string'/,
+			/planRefinement:\s*\n?\s*sessionBriefString\(brief\.planRefinement\)/,
 		);
 		expect(source).not.toContain(PLAN_REFINEMENT_HEADER);
 	});
