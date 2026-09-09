@@ -37,7 +37,7 @@ in `src/shared/agent-control/subagent-policy.ts` — are absent by design, and t
 to any caller without a chat tab even if one is reached directly:
 
 | Absent | Why |
-|---|---|
+| --- | --- |
 | `ensemblr_set_name` | A harness tab is a terminal whose title is derived from the harness's own session log (`src/main/terminal/agent-conversation-title.ts`) — there is no chat tab to rename. |
 | `ensemblr_set_summary` | Session summaries hang off a chat tab's session record. |
 | `ensemblr_ask_user_question` | The question panel renders inside the chat tab bound to the asking session. |
@@ -79,6 +79,35 @@ role table refuses a marked child `denied-scope`, and the depth cap — default 
 caller at depth ≥ 1 `denied-depth`. The role check is the durable one; the cap is what stops a root
 from fork-bombing.
 
+### Pi's delegation barrier
+
+The Pi extension hardens the order; the playbook is not the only guard. A successful non-peer
+`ensemblr_start_conversation` opens a branch-local barrier in
+`resources/pi-extensions/delegation-barrier.mts`. Until `ensemblr_wait_for_agents` has returned each
+tracked child settled without an unresolved signal, the extension blocks unrelated tool calls,
+removes premature assistant prose at `message_end`, and queues a follow-up turn at `agent_settled`
+when the model stops instead of waiting. A hard wait failure stays blocked but does not auto-retry
+forever.
+
+Parallel fan-out still works: sibling start calls in one assistant tool batch may all run. A wait in
+that same batch is refused because Pi executes sibling tools concurrently and the app may not have
+registered the new child ids yet. On the next turn, the extension rewrites the wait to `mode: "all"`
+with every outstanding id. Explicit ids make the barrier survive an app restart even though the
+main process's parent→child lineage is in memory only. A reload during an in-flight spawn persists a
+recovery intent instead; the next wait uses the app's default child set without inventing an id. Any
+returned child id is adopted without a tab id so attention signals can follow the normal follow-up
+cycle; the barrier stays closed until every recovered child settles without a signal. Recovery never
+auto-retries.
+Every transition is persisted as a custom Pi session entry and reconstructed from the active branch on
+reload.
+
+The narrow escape surface while the barrier is active exists only to finish orchestration: further
+child starts, follow-ups to tracked children, tracked child-tab closure, a questionnaire prompted by
+a child's attention signal, and the all-child wait. Reads, edits, shell commands, terminal control,
+and user-facing findings wait until the barrier closes. Peers and Concierge-spawned root
+orchestrators are not children and do not open this barrier; spawned sub-agents cannot delegate in
+the first place.
+
 ### Which mechanism delegates
 
 Claude Code has a sub-agent tool of its own; Pi does not. Settings → Providers → Claude Code picks
@@ -119,7 +148,7 @@ a permission denial stays visible.
 ## Tool map
 
 | Goal | Tools |
-|---|---|
+| --- | --- |
 | Delegate a subtask to a sub-agent | `ensemblr_start_conversation` (fresh tab + `title`; keep its `agentSessionId`). The child runs the caller's own agent runtime. While planning, it inherits Plan Mode. |
 | Name your own tab | `ensemblr_set_name` (chat tabs only; the label goes in `title`, as it does everywhere) |
 | Name the workspace + git branch | `ensemblr_set_branch_name` (once per branch, while the branch still carries the name it was cut with; refuses unless the user enabled `git.renameWorkspaceOnBranch`. Pass `userRequested: true` when the user asks for a different branch name — never `git branch -m`) |
@@ -294,7 +323,7 @@ caller would have met, and it survives so the plan-mode policy stays complete on
 than depending on a second gate to cover a hole:
 
 | Denied | Why |
-|---|---|
+| --- | --- |
 | `ensemblr_start_conversation` | Nested delegation is blocked; the investigation is its own to do. |
 | `ensemblr_send_follow_up` | It has no conversations of its own to steer. |
 | `ensemblr_exit_plan_mode` | The plan belongs to the orchestrator. A plan submitted here posts into the sub-agent's own tab and renders an Approve button whose handler clears that tab's Plan Mode and submits an implementation prompt — one click would turn a read-only investigator into a writer. |

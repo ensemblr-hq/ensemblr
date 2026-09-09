@@ -15,6 +15,16 @@ import { request as httpRequest } from 'node:http';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { type Static, type TSchema, Type } from 'typebox';
 
+import {
+	afterDelegationToolResult,
+	beforeDelegationToolCall,
+	createDelegationBarrierState,
+	delegationBarrierActive,
+	restoreDelegationBarrierState,
+	sanitizeDelegationMessageContent,
+	shouldResumeDelegationWait,
+} from './delegation-barrier.mts';
+
 const CONTROL_URL = process.env.ENSEMBLR_CONTROL_URL;
 const CONTROL_TOKEN = process.env.ENSEMBLR_CONTROL_TOKEN;
 
@@ -143,6 +153,9 @@ Split the work before you split the agents. A child cold-starts with nothing but
 Watch how full a window is before you put more work into it. \`ensemblr_get_conversation_status\` reports \`contextUsage\` for any conversation, and reports YOUR OWN when you name no session — the only way to learn how much room you have left, since you do not know your own session id. \`ensemblr_wait_for_agents\` reports the same reading for every child it names, settled or pending. At or past **50% of a window**, that conversation is the wrong home for a NEW unit of work: everything it has already read stays in it, so a fresh agent starts the same task with more room and no worse a brief. Retire it rather than reload it — spawn a new child and quote it the paths and findings it needs — and follow up there anyway only where the work genuinely depends on what that conversation already holds. Your own window is the same rule pointed inward: past half, hand the next unit of reading to a sub-agent and keep the deciding here.
 
 When delegation is warranted — delegate → wait → evaluate → integrate:
+
+Pi enforces the boundary rather than trusting this sequence as prose. From the first child spawn until a report-producing wait has observed every child settled, unrelated tools are blocked and premature assistant prose is removed; the extension queues another turn when you stop instead of waiting. It also rewrites waits to \`mode: "all"\` with every outstanding child id, so a restart cannot erase the target list. If reload catches a spawn before its result is persisted, Pi keeps a recovery intent, uses the app's default child set on the next explicit wait, and stays blocked without auto-retrying until a real child settle is observed. Finish all parallel spawn calls in one tool batch, then wait in the next — a wait beside a spawn is blocked because the child id does not exist yet.
+
 1. Spawn each helper with \`ensemblr_start_conversation\` in its own fresh tab — pass a short, descriptive \`title\` and do NOT pass \`chatTabId\` (reusing a prior tab keeps its old title); omit \`wait\` and keep BOTH ids it hands back — the \`agentSessionId\` you wait on and follow up with, and the \`chatTabId\` you close its tab with. Brief each one with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask you about, and whether it reports inline — the default — or writes a file at a path you name. A brief phrased as a noun ("produce a reference doc", "write up the mapping") reads as an instruction to create one.
 2. Once you have delegated everything you can in parallel, call \`ensemblr_wait_for_agents\` and let it block — this is how you avoid racing ahead. Do NOT hand-roll a polling loop with \`ensemblr_get_conversation_status\`; the wait tool parks your turn efficiently and returns the moment a child finishes or needs you.
    - \`mode: "all"\` (default target: every child you spawned) blocks until they have all finished. Pass it explicitly whenever that is what you want — the mode defaults to \`first\`.
@@ -255,6 +268,8 @@ Your job this turn is to reach a shared understanding with the user before any c
 - Challenge fuzzy or overloaded terms and propose a precise one. Stress-test the design with concrete scenarios — a real input, a real failure, a real edge case. When what the user says contradicts what the code does, say so plainly and show them the code.
 
 Finding those facts does not have to be serial. When the plan hinges on facts spread across two or more independent areas of the codebase — areas you would otherwise read one after another — fan out read-only investigators and read them at once. Never fan out for one file, one question, or anything you could answer in a single pass; a fan-out you did not need costs the user a tab and costs you a wait. Split the work before you split the investigators: a child cold-starts with nothing but its brief, so a fact two of them both need is a repository read paid for twice. When the areas share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and hand the findings with full paths to each investigator; fan out cold only where the questions are genuinely disjoint. When it is warranted, the loop is delegate → wait → evaluate → integrate:
+
+Pi enforces the boundary rather than trusting this sequence as prose. From the first child spawn until a report-producing wait has observed every child settled, unrelated tools are blocked and premature assistant prose is removed; the extension queues another turn when you stop instead of waiting. It also rewrites waits to \`mode: "all"\` with every outstanding child id, so a restart cannot erase the target list. If reload catches a spawn before its result is persisted, Pi keeps a recovery intent, uses the app's default child set on the next explicit wait, and stays blocked without auto-retrying until a real child settle is observed. Finish all parallel spawn calls in one tool batch, then wait in the next — a wait beside a spawn is blocked because the child id does not exist yet.
 
 1. Spawn each investigator with \`ensemblr_start_conversation\` in its own fresh tab — pass a short \`title\` naming the QUESTION it is answering and do NOT pass \`chatTabId\`; omit \`wait\` and keep BOTH ids it hands back — the \`agentSessionId\` you wait on, and the \`chatTabId\` you close its tab with. To run one on a specific model, call \`ensemblr_list_models\` first and pass an id from that list; never invent one. Each row also carries a \`tier\`: naming a \`frontier\` one is put to the user for confirmation whatever the permission mode, because it costs several times what the rest do and inheriting yours does not. Reach for it only when the question genuinely needs it, and expect to be refused while the user is away. Codex Spark has a separate, limited usage allowance: when selecting an OpenAI Codex model for a child, prefer Luna or Terra over Spark; if you are currently on Spark, name a returned Luna or Terra id rather than inheriting Spark. Use Spark only when the user explicitly asks for it. Depth, per-session spawn count, and spawn rate are capped, and a child cannot spawn further — never fork-bomb.
 2. A child you spawn inherits Plan Mode: it reads the repository and runs read-only commands, and it cannot write, edit, spawn anything of its own, or talk to the user. So brief it as a question to answer — "find and report how X works, with full paths" — never as work to do. A child briefed to implement will come back saying it could not. Name the defaults it should assume rather than come back and ask you about, so it spends its turn reading instead of waiting on you.
@@ -796,6 +811,54 @@ function toToolResult(result: ControlResult) {
 	return { content: [{ type: 'text' as const, text }], details: result };
 }
 
+const DELEGATION_BARRIER_ENTRY = 'ensemblr-delegation-barrier';
+
+/** Reads a record-shaped extension value without trusting its fields. */
+function recordOf(value: unknown): Record<string, unknown> {
+	return typeof value === 'object' && value !== null
+		? (value as Record<string, unknown>)
+		: {};
+}
+
+/** Whether the current assistant batch contains a real child spawn. */
+function assistantBatchStartsChild(ctx: {
+	sessionManager: { getBranch(): readonly unknown[] };
+}): boolean {
+	const branch = ctx.sessionManager.getBranch();
+	const entry = recordOf(branch.at(-1));
+	const message = recordOf(entry.message);
+	if (message.role !== 'assistant' || !Array.isArray(message.content)) {
+		return false;
+	}
+	return message.content.some((candidate) => {
+		const block = recordOf(candidate);
+		if (
+			block.type !== 'toolCall' ||
+			block.name !== 'ensemblr_start_conversation'
+		) {
+			return false;
+		}
+		return recordOf(block.arguments).peer !== true;
+	});
+}
+
+/** Restores the latest branch-local delegation snapshot after a Pi reload. */
+function restoreDelegationBarrier(ctx: {
+	sessionManager: { getBranch(): readonly unknown[] };
+}) {
+	const branch = ctx.sessionManager.getBranch();
+	for (let index = branch.length - 1; index >= 0; index -= 1) {
+		const entry = recordOf(branch[index]);
+		if (
+			entry.type === 'custom' &&
+			entry.customType === DELEGATION_BARRIER_ENTRY
+		) {
+			return restoreDelegationBarrierState(entry.data);
+		}
+	}
+	return createDelegationBarrierState();
+}
+
 /**
  * Ensemblr Control extension entry point. Registers one tool per control op.
  * @param pi - The Pi extension API.
@@ -803,6 +866,90 @@ function toToolResult(result: ControlResult) {
 export default function ensemblrControl(pi: ExtensionAPI): void {
 	if (!CONTROL_URL || !CONTROL_TOKEN) {
 		return;
+	}
+
+	let delegationBarrier = createDelegationBarrierState();
+	let delegationResumeQueued = false;
+	const delegationBarrierEnabled = !IS_SUBAGENT && !IS_CONCIERGE;
+
+	if (delegationBarrierEnabled) {
+		pi.on('session_start', (_event, ctx) => {
+			delegationBarrier = restoreDelegationBarrier(ctx);
+			delegationResumeQueued = false;
+		});
+
+		pi.on('agent_start', () => {
+			delegationResumeQueued = false;
+		});
+
+		pi.on('tool_call', (event, ctx) => {
+			const decision = beforeDelegationToolCall(delegationBarrier, {
+				batchStartsChild: assistantBatchStartsChild(ctx),
+				input: event.input,
+				toolCallId: event.toolCallId,
+				toolName: event.toolName,
+			});
+			if (decision.state !== delegationBarrier) {
+				delegationBarrier = decision.state;
+				pi.appendEntry(DELEGATION_BARRIER_ENTRY, delegationBarrier);
+			}
+			if (decision.input && typeof event.input === 'object' && event.input) {
+				if (decision.clearWaitTargets) {
+					Object.assign(event.input, { targets: undefined });
+				}
+				Object.assign(event.input, decision.input);
+			}
+			return decision.blockReason
+				? { block: true, reason: decision.blockReason }
+				: undefined;
+		});
+
+		pi.on('tool_result', (event) => {
+			const next = afterDelegationToolResult(delegationBarrier, {
+				details: event.details,
+				input: event.input,
+				toolCallId: event.toolCallId,
+				toolName: event.toolName,
+			});
+			if (next !== delegationBarrier) {
+				delegationBarrier = next;
+				pi.appendEntry(DELEGATION_BARRIER_ENTRY, delegationBarrier);
+			}
+		});
+
+		pi.on('message_end', (event) => {
+			if (
+				event.message.role !== 'assistant' ||
+				!delegationBarrierActive(delegationBarrier)
+			) {
+				return;
+			}
+			return {
+				message: {
+					...event.message,
+					content: sanitizeDelegationMessageContent(event.message.content),
+				},
+			};
+		});
+
+		pi.on('agent_settled', () => {
+			if (
+				delegationResumeQueued ||
+				!shouldResumeDelegationWait(delegationBarrier)
+			) {
+				return;
+			}
+			delegationResumeQueued = true;
+			pi.sendMessage(
+				{
+					content:
+						'Delegated children remain outstanding. Call ensemblr_wait_for_agents now; do not use other tools or present findings until every child settles.',
+					customType: DELEGATION_BARRIER_ENTRY,
+					display: false,
+				},
+				{ deliverAs: 'followUp', triggerTurn: true },
+			);
+		});
 	}
 
 	pi.on('before_agent_start', async (event) => {

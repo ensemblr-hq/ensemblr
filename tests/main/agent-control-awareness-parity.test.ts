@@ -384,6 +384,18 @@ describe('agent-control AWARENESS parity', () => {
 		expect(SUBAGENT_AWARENESS).toContain('Produce nothing after it');
 	});
 
+	it('tells Pi orchestrators that delegation order is enforced', () => {
+		for (const playbook of [
+			ORCHESTRATOR_AWARENESS,
+			PLAN_MODE_ORCHESTRATOR_AWARENESS,
+		]) {
+			expect(playbook).toContain('Pi enforces the boundary');
+			expect(playbook).toContain('premature assistant prose is removed');
+			expect(playbook).toContain('rewrites waits to `mode: "all"`');
+			expect(playbook).toContain('a wait beside a spawn is blocked');
+		}
+	});
+
 	it('tells the orchestrator a wait hands back the child’s whole final turn', () => {
 		expect(ORCHESTRATOR_AWARENESS).toContain('whole final turn');
 	});
