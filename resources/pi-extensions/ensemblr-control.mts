@@ -700,6 +700,71 @@ function callerModelId(ctx: { model?: { id?: string } } | undefined) {
 	return ctx?.model?.id;
 }
 
+/** The validated subset of the session brief that Pi appends to a turn. */
+interface SessionBrief {
+	readonly planning: boolean;
+	readonly nudge: string | null;
+	readonly planRefinement: string | null;
+	readonly languageDirective: string | null;
+	readonly issueDirective: string | null;
+	readonly afkDirective: string | null;
+	readonly afkWorkflowDirective: string | null;
+	readonly rolePlaybook: string | null;
+}
+
+/** Session brief used when the app cannot provide a valid result. */
+const EMPTY_SESSION_BRIEF: SessionBrief = {
+	afkDirective: null,
+	afkWorkflowDirective: null,
+	issueDirective: null,
+	languageDirective: null,
+	nudge: null,
+	planning: false,
+	planRefinement: null,
+	rolePlaybook: null,
+};
+
+/**
+ * Narrows one ready-to-append brief field to a string.
+ * @param value - Untrusted field from the control response.
+ * @returns The string, or null when the field has another type.
+ */
+function sessionBriefString(value: unknown): string | null {
+	return typeof value === 'string' ? value : null;
+}
+
+/**
+ * Narrows the role playbook to a non-empty string.
+ * @param value - Untrusted playbook from the control response.
+ * @returns The playbook, or null when it is absent, empty, or invalid.
+ */
+function nonEmptySessionBriefString(value: unknown): string | null {
+	const text = sessionBriefString(value);
+	return text === '' ? null : text;
+}
+
+/**
+ * Projects the untrusted control payload into the fields Pi can append.
+ * @param value - Control response data.
+ * @returns A validated session brief with invalid fields replaced by null.
+ */
+function normalizeSessionBrief(value: unknown): SessionBrief {
+	const brief =
+		typeof value === 'object' && value !== null
+			? (value as Record<string, unknown>)
+			: {};
+	return {
+		afkDirective: sessionBriefString(brief.afkDirective),
+		afkWorkflowDirective: sessionBriefString(brief.afkWorkflowDirective),
+		issueDirective: sessionBriefString(brief.issueDirective),
+		languageDirective: sessionBriefString(brief.languageDirective),
+		nudge: sessionBriefString(brief.nudge),
+		planning: brief.planMode === true,
+		planRefinement: sessionBriefString(brief.planRefinement),
+		rolePlaybook: nonEmptySessionBriefString(brief.rolePlaybook),
+	};
+}
+
 /**
  * Asks the app for this turn's brief: whether the conversation is in Plan Mode,
  * so the planning playbook stands in for the role one only while planning, the
@@ -714,63 +779,9 @@ function callerModelId(ctx: { model?: { id?: string } } | undefined) {
  * hook, which asks the app per call and fails closed on its own.
  * @returns The playbook selector and the blocks to append.
  */
-async function fetchSessionBrief(): Promise<{
-	planning: boolean;
-	nudge: string | null;
-	planRefinement: string | null;
-	languageDirective: string | null;
-	issueDirective: string | null;
-	afkDirective: string | null;
-	afkWorkflowDirective: string | null;
-	rolePlaybook: string | null;
-}> {
+async function fetchSessionBrief(): Promise<SessionBrief> {
 	const result = await invoke('getSessionBrief', {}, undefined);
-	if (!result.ok) {
-		return {
-			afkDirective: null,
-			afkWorkflowDirective: null,
-			issueDirective: null,
-			languageDirective: null,
-			nudge: null,
-			planning: false,
-			planRefinement: null,
-			rolePlaybook: null,
-		};
-	}
-	const brief = result.data as
-		| {
-				planMode?: boolean;
-				nudge?: string | null;
-				planRefinement?: string | null;
-				languageDirective?: string | null;
-				issueDirective?: string | null;
-				afkDirective?: string | null;
-				afkWorkflowDirective?: string | null;
-				rolePlaybook?: string | null;
-		  }
-		| undefined;
-	return {
-		rolePlaybook:
-			typeof brief?.rolePlaybook === 'string' && brief.rolePlaybook.length > 0
-				? brief.rolePlaybook
-				: null,
-		afkDirective:
-			typeof brief?.afkDirective === 'string' ? brief.afkDirective : null,
-		afkWorkflowDirective:
-			typeof brief?.afkWorkflowDirective === 'string'
-				? brief.afkWorkflowDirective
-				: null,
-		issueDirective:
-			typeof brief?.issueDirective === 'string' ? brief.issueDirective : null,
-		languageDirective:
-			typeof brief?.languageDirective === 'string'
-				? brief.languageDirective
-				: null,
-		nudge: typeof brief?.nudge === 'string' ? brief.nudge : null,
-		planning: brief?.planMode === true,
-		planRefinement:
-			typeof brief?.planRefinement === 'string' ? brief.planRefinement : null,
-	};
+	return result.ok ? normalizeSessionBrief(result.data) : EMPTY_SESSION_BRIEF;
 }
 
 /**

@@ -884,14 +884,18 @@ describe('agent-control AWARENESS parity', () => {
 		expect(fields).toContain('issueDirective');
 		expect(fields.length).toBeGreaterThanOrEqual(4);
 		for (const field of fields) {
-			expect(source).toContain(`typeof brief?.${field} === 'string'`);
+			const normalizer =
+				field === 'rolePlaybook'
+					? 'nonEmptySessionBriefString'
+					: 'sessionBriefString';
+			expect(source).toContain(`${normalizer}(brief.${field})`);
 		}
 	});
 
 	it('reads the refinement block off the brief rather than authoring one', () => {
 		const source = readExtensionSource();
 		expect(source).toMatch(
-			/planRefinement:\s*\n?\s*typeof brief\?\.planRefinement === 'string'/,
+			/planRefinement:\s*\n?\s*sessionBriefString\(brief\.planRefinement\)/,
 		);
 		expect(source).not.toContain(PLAN_REFINEMENT_HEADER);
 	});
