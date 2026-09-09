@@ -2,17 +2,22 @@ import type { DynamicToolUIPart } from 'ai';
 import type { BundledLanguage } from 'shiki';
 import { buildToolDiffRows } from '@/renderer/lib/diff/tool-rows';
 import { i18n } from '@/renderer/lib/i18n';
-import { languageForFilePath } from '@/renderer/lib/language-from-path';
 import type {
-	ToolBadgeDescriptor,
-	ToolBodyDescriptor,
 	ToolGlyph,
 	ToolPresenterResult,
 	ToolPreviewDescriptor,
 } from '@/renderer/types/tool-presentation';
 import { isPreviewableImagePath } from '@/shared/preview-media';
+import {
+	CONTEXT_MODE_TOOL_GLYPHS,
+	CONTEXT_MODE_TOOL_PRESENTERS,
+} from './context-mode-tool-presenters';
 import { ensemblrToolGlyph } from './ensemblr-tool-presentation';
 import { parseNumberedFileBody } from './numbered-file-body';
+import {
+	PI_LENS_TOOL_GLYPHS,
+	PI_LENS_TOOL_PRESENTERS,
+} from './pi-lens-tool-presenters';
 import { shellCommandTitle } from './shell-command-title';
 import { TASK_TOOL_GLYPHS, TASK_TOOL_PRESENTERS } from './task-tool-presenters';
 import { parseToolDiagnostics } from './tool-diagnostics';
@@ -24,15 +29,13 @@ import {
 	pathOf,
 	stringField,
 } from './tool-part-fields';
+import { fileBadge, languageFor, textBody } from './tool-presenter-helpers';
 
 /**
  * One presenter per tool the app knows by name, and the mark each of them
  * answers to. `tool-presentation.ts` dispatches into this table once a call has
  * been shown to be neither a failure nor still in flight.
  */
-
-/** Matches an ANSI colour escape, which only the terminal body can render. */
-const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`);
 
 /**
  * Matches the `read` tool's placeholder text for an image target ("Read image
@@ -47,6 +50,8 @@ const IMAGE_READ_PLACEHOLDER = /^Read image file \[[^[\]]+\]$/;
  */
 const TOOL_GLYPHS: Record<string, ToolGlyph> = {
 	...TASK_TOOL_GLYPHS,
+	...CONTEXT_MODE_TOOL_GLYPHS,
+	...PI_LENS_TOOL_GLYPHS,
 	agent: 'bot',
 	bash: 'terminal',
 	cli: 'terminal',
@@ -69,41 +74,6 @@ const TOOL_GLYPHS: Record<string, ToolGlyph> = {
 	write: 'file-plus',
 	write_file: 'file-plus',
 };
-
-/**
- * Builds the chip that pins a tool's target path to its row, trimmed so the same
- * file resolves against the workspace tree whichever tool named it.
- * @param path - Path the tool operated on, or null when it named none
- * @param kind - Whether the path is a file or a directory
- * @param counts - Added and removed line counts; either side may be null when
- * the tool reports only one, as a fresh write does
- * @returns The badge, or null when there is no path to pin
- */
-function fileBadge(
-	path: string | null,
-	kind: 'file' | 'folder' = 'file',
-	counts: { additions: number | null; deletions: number | null } | null = null,
-): ToolBadgeDescriptor | null {
-	const named = path?.trim() ?? '';
-	if (named.length === 0) {
-		return null;
-	}
-	return {
-		additions: counts?.additions ?? null,
-		deletions: counts?.deletions ?? null,
-		kind,
-		path: named,
-	};
-}
-
-/**
- * Resolves the Shiki grammar for a path, falling back to plain text.
- * @param path - Path whose extension picks the grammar, or null when unknown
- * @returns The Shiki language to highlight with
- */
-function languageFor(path: string | null): BundledLanguage {
-	return path ? languageForFilePath(path) : ('text' as BundledLanguage);
-}
 
 /**
  * Preview standing in for a missing file chip, so a path-shaped row still says
@@ -151,21 +121,6 @@ function lineCount(text: string): number {
 	}
 	const lines = text.split('\n');
 	return lines.at(-1) === '' ? lines.length - 1 : lines.length;
-}
-
-/**
- * Picks the body for free-form command or search output: the terminal only when
- * the payload actually carries ANSI colour, otherwise the shared code surface
- * so most rows keep the same chrome.
- * @param text - The tool's output text
- * @param language - Shiki grammar for the non-ANSI case
- * @returns The matching body descriptor
- */
-function textBody(text: string, language: BundledLanguage): ToolBodyDescriptor {
-	if (ANSI_ESCAPE.test(text)) {
-		return { kind: 'terminal', text };
-	}
-	return { code: text, kind: 'code', language, startLine: null };
 }
 
 /**
@@ -585,6 +540,8 @@ const PRESENTERS: Record<
 	(part: DynamicToolUIPart) => ToolPresenterResult
 > = {
 	...TASK_TOOL_PRESENTERS,
+	...CONTEXT_MODE_TOOL_PRESENTERS,
+	...PI_LENS_TOOL_PRESENTERS,
 	agent: presentSubagent,
 	bash: presentBash,
 	cli: presentBash,

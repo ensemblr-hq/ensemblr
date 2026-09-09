@@ -1279,6 +1279,13 @@
 		"bash": {
 			"title": "Bash"
 		},
+		"ctx-execute": {
+			"code-label": "Κώδικας:",
+			"title": "Εκτέλεση κώδικα"
+		},
+		"ctx-execute-file": {
+			"title": "Επεξεργασία αρχείου"
+		},
 		"diagnostics": {
 			"clean": "Διαγνωστικά",
 			"count_one": "{{count}} διαγνωστικό",
@@ -1304,19 +1311,37 @@
 		"grep": {
 			"title": "Αναζήτηση"
 		},
+		"lens-diagnostics": {
+			"mode": "mode={{mode}}",
+			"scope_one": "mode={{mode}} · {{count}} διαδρομή",
+			"scope_other": "mode={{mode}} · {{count}} διαδρομές"
+		},
 		"list": {
 			"title": "Λίστα"
+		},
+		"module-report": {
+			"exports_one": "{{count}} εξαγωγή",
+			"exports_other": "{{count}} εξαγωγές",
+			"symbols_one": "{{count}} σύμβολο",
+			"symbols_other": "{{count}} σύμβολα",
+			"title": "Δομή μονάδας"
 		},
 		"placeholder": {
 			"empty-pattern": "(κενό)",
 			"no-command": "(καμία εντολή)",
 			"no-path": "(καμία διαδρομή)"
 		},
+		"project-report": {
+			"title": "Επισκόπηση έργου"
+		},
 		"read": {
 			"image": "Ανάγνωση εικόνας",
 			"lines_one": "Ανάγνωση {{count}} γραμμής",
 			"lines_other": "Ανάγνωση {{count}} γραμμών",
 			"title": "Ανάγνωση"
+		},
+		"read-symbol": {
+			"title": "Ανάγνωση συμβόλου"
 		},
 		"reasoning": {
 			"title": "Σκέψη"
@@ -1328,6 +1353,9 @@
 		"subagent": {
 			"named": "Υποπράκτορας: {{type}}",
 			"title": "Υποπράκτορας"
+		},
+		"symbol-search": {
+			"title": "Αναζήτηση συμβόλων"
 		},
 		"task": {
 			"list_one": "{{count}} εργασία",

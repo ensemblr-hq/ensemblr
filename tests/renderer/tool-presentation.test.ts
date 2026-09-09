@@ -1,4 +1,3 @@
-import type { DynamicToolUIPart } from 'ai';
 import { describe, expect, test } from 'vitest';
 
 import {
@@ -7,30 +6,7 @@ import {
 	presentSkillInvocation,
 	presentToolCall,
 } from '../../src/renderer/lib/agent-timeline/tool-presentation';
-
-function call(
-	toolName: string,
-	input: Record<string, unknown>,
-	output?: { details?: Record<string, unknown>; text: string },
-): DynamicToolUIPart {
-	if (output === undefined) {
-		return {
-			input,
-			state: 'input-available',
-			toolCallId: `${toolName}-1`,
-			toolName,
-			type: 'dynamic-tool',
-		};
-	}
-	return {
-		input,
-		output: { details: output.details ?? null, text: output.text },
-		state: 'output-available',
-		toolCallId: `${toolName}-1`,
-		toolName,
-		type: 'dynamic-tool',
-	};
-}
+import { dynamicToolCall as call } from './support/tool-presentation';
 
 const EDIT_PATCH =
 	'--- src/broken.ts\n+++ src/broken.ts\n@@ -1,3 +1,3 @@\n import { a } from "./a";\n-const x = "1";\n+const x = 1;\n';

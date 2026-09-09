@@ -15,6 +15,7 @@ import {
 	FilePreviewOpenerProvider,
 	WorkspacePathResolverProvider,
 } from '../../src/renderer/components/workbench-shell/conversation-panel/file-preview-context';
+import { createWorkspacePathResolver } from '../../src/renderer/lib/agent-timeline';
 import { renderWithProviders } from './support/dom';
 
 function readDirectoryPart(path: string): DynamicToolUIPart {
@@ -33,6 +34,26 @@ function editFilePart(path: string): DynamicToolUIPart {
 		state: 'input-available',
 		toolCallId: `edit-${path}`,
 		toolName: 'edit',
+		type: 'dynamic-tool',
+	};
+}
+
+function symbolSearchPart(path: string): DynamicToolUIPart {
+	return {
+		input: { paths: [path], query: 'presenter' },
+		state: 'input-available',
+		toolCallId: `symbol-search-${path}`,
+		toolName: 'symbol_search',
+		type: 'dynamic-tool',
+	};
+}
+
+function listDirectoryPart(path: string): DynamicToolUIPart {
+	return {
+		input: { path },
+		state: 'input-available',
+		toolCallId: `list-directory-${path}`,
+		toolName: 'list_directory',
 		type: 'dynamic-tool',
 	};
 }
@@ -57,6 +78,37 @@ describe('directory attachment chips', () => {
 		expect(container.innerHTML).toContain('default-folder');
 		fireEvent.click(screen.getByRole('button', { name: 'renderer' }));
 		expect(openPreview).toHaveBeenCalledWith('src/renderer');
+	});
+
+	test('uses the resolved folder kind for a directory-scoped symbol search', () => {
+		const { container } = renderWithProviders(
+			<WorkspacePathResolverProvider
+				value={(path) => ({
+					kind: path === 'src/renderer' ? 'directory' : 'file',
+					path,
+					scope: 'workspace',
+				})}
+			>
+				<ChatToolCall part={symbolSearchPart('src/renderer')} />
+			</WorkspacePathResolverProvider>,
+		);
+
+		expect(container.innerHTML).toContain('default-folder');
+	});
+
+	test.each([
+		{ condition: 'startup before the file tree loads', workspaceCwd: '/repo' },
+		{ condition: 'a non-git workspace', workspaceCwd: null },
+	])('preserves a known folder during $condition', ({ workspaceCwd }) => {
+		const resolver = createWorkspacePathResolver([], workspaceCwd);
+		const { container } = renderWithProviders(
+			<WorkspacePathResolverProvider value={resolver}>
+				<ChatToolCall part={listDirectoryPart('src/renderer')} />
+			</WorkspacePathResolverProvider>,
+		);
+
+		expect(resolver('src/renderer')).toMatchObject({ kind: 'file' });
+		expect(container.innerHTML).toContain('default-folder');
 	});
 
 	test('omits redundant edit path when a file chip is present', () => {
