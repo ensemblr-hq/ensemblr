@@ -26,7 +26,7 @@ The current build is [`0.1.10`](https://github.com/ensemblr-hq/ensemblr/releases
 
 ## Reference
 
-- [`pi/`](./pi) — Pi integration internals: the [RPC protocol](./pi/rpc-protocol.md) and [event taxonomy](./pi/event-taxonomy.md).
+- [`pi/`](./pi) — Pi integration internals: the [RPC protocol](./pi/rpc-protocol.md), [event taxonomy](./pi/event-taxonomy.md), and [custom timeline tool presenters](./pi/custom-tool-presenters.md).
 - [`claude/`](./claude) — Claude Code runtime internals: the [runtime guide](./claude/README.md) (adapter wiring, discovery, live-discovered slash commands / MCP roster / model catalogue, effort, context measurement) and the [SDK surface reference](./claude/sdk-surface.md). [ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) is the decision record.
 - [`adr/`](./adr) — **66** Architecture Decision Records, numbered `0001`–`0067` (`0007` was withdrawn before acceptance), covering the accepted decisions and their supersessions. ADRs are historical records: some cite planning documents that were removed before the public release, and those references are left as written rather than rewritten after the fact.
 - [`ux-conventions.md`](./ux-conventions.md) — the settled workflows, information architecture, visual design, copy, and icon conventions the shell is built to.

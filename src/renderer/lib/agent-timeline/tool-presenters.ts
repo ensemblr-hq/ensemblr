@@ -1,6 +1,5 @@
 import type { DynamicToolUIPart } from 'ai';
 import type { BundledLanguage } from 'shiki';
-import { buildToolDiffRows } from '@/renderer/lib/diff/tool-rows';
 import { i18n } from '@/renderer/lib/i18n';
 import type {
 	ToolGlyph,
@@ -8,6 +7,10 @@ import type {
 	ToolPreviewDescriptor,
 } from '@/renderer/types/tool-presentation';
 import { isPreviewableImagePath } from '@/shared/preview-media';
+import {
+	BACKGROUND_TASK_TOOL_GLYPHS,
+	BACKGROUND_TASK_TOOL_PRESENTERS,
+} from './background-task-tool-presenters';
 import {
 	CONTEXT_MODE_TOOL_GLYPHS,
 	CONTEXT_MODE_TOOL_PRESENTERS,
@@ -40,7 +43,17 @@ import {
 	pathOf,
 	stringField,
 } from './tool-part-fields';
-import { fileBadge, languageFor, textBody } from './tool-presenter-helpers';
+import {
+	fileBadge,
+	languageFor,
+	patchCounts,
+	textBody,
+} from './tool-presenter-helpers';
+import {
+	WEB_ACCESS_TOOL_GLYPHS,
+	WEB_ACCESS_TOOL_PRESENTERS,
+} from './web-access-tool-presenters';
+import { presentWorkspaceDiff } from './workspace-diff-tool-presenter';
 
 /**
  * One presenter per tool the app knows by name, and the mark each of them
@@ -61,9 +74,11 @@ const IMAGE_READ_PLACEHOLDER = /^Read image file \[[^[\]]+\]$/;
  */
 const TOOL_GLYPHS: Record<string, ToolGlyph> = {
 	...TASK_TOOL_GLYPHS,
+	...BACKGROUND_TASK_TOOL_GLYPHS,
 	...CONTEXT_MODE_TOOL_GLYPHS,
 	...CONTEXT7_TOOL_GLYPHS,
 	...PI_LENS_TOOL_GLYPHS,
+	...WEB_ACCESS_TOOL_GLYPHS,
 	agent: 'bot',
 	bash: 'terminal',
 	cli: 'terminal',
@@ -100,25 +115,6 @@ function missingPathPreview(path: string | null): ToolPreviewDescriptor | null {
 				text: i18n.t('workbench:tool-call.placeholder.no-path', '(no path)'),
 			}
 		: null;
-}
-
-/**
- * Counts a unified patch's added and removed lines from its parsed hunks, which
- * is the same projection the diff body renders — so the badge can never disagree
- * with the rows below it, and content lines opening with `--`, `++`, or a `---`
- * frontmatter fence are never mistaken for file headers.
- * @param patch - Unified diff for a single file
- * @returns The added and removed line counts
- */
-function countPatchLines(patch: string): {
-	additions: number;
-	deletions: number;
-} {
-	const { rows } = buildToolDiffRows(patch);
-	return {
-		additions: rows.filter((row) => row.kind === 'insert').length,
-		deletions: rows.filter((row) => row.kind === 'delete').length,
-	};
 }
 
 /**
@@ -242,7 +238,7 @@ function patchPresentation(
 		return null;
 	}
 	return {
-		badge: fileBadge(path, 'file', countPatchLines(patch)),
+		badge: fileBadge(path, 'file', patchCounts(patch)),
 		body: { kind: 'diff', language: languageFor(path), patch },
 	};
 }
@@ -552,9 +548,11 @@ const PRESENTERS: Record<
 	(part: DynamicToolUIPart) => ToolPresenterResult
 > = {
 	...TASK_TOOL_PRESENTERS,
+	...BACKGROUND_TASK_TOOL_PRESENTERS,
 	...CONTEXT_MODE_TOOL_PRESENTERS,
 	...CONTEXT7_TOOL_PRESENTERS,
 	...PI_LENS_TOOL_PRESENTERS,
+	...WEB_ACCESS_TOOL_PRESENTERS,
 	agent: presentSubagent,
 	bash: presentBash,
 	cli: presentBash,
@@ -603,7 +601,11 @@ function presenterFor(
 export function presenterForPart(
 	part: DynamicToolUIPart,
 ): (part: DynamicToolUIPart) => ToolPresenterResult {
-	return canonicalEnsemblrToolName(part.toolName) === null
+	const controlTool = canonicalEnsemblrToolName(part.toolName);
+	if (controlTool === 'ensemblr_get_workspace_diff') {
+		return presentWorkspaceDiff;
+	}
+	return controlTool === null
 		? (resolvePiMcpAdapterToolPart(part) ?? presenterFor(part.toolName))
 		: presenterFor(part.toolName);
 }

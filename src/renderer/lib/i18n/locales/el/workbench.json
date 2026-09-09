@@ -1300,6 +1300,36 @@
 		"ast-search": {
 			"title": "Αναζήτηση AST"
 		},
+		"background-tasks": {
+			"attested-title": "Εκκίνηση πιστοποιημένης εκτέλεσης Pi",
+			"delegate-title": "Ανάθεση στο παρασκήνιο",
+			"fusion-investigate-title": "Εκκίνηση διερεύνησης Fusion",
+			"fusion-reason-title": "Εκκίνηση συλλογισμού Fusion",
+			"fusion-research-title": "Εκκίνηση έρευνας Fusion",
+			"fusion-title": "Εκκίνηση ροής Fusion",
+			"fusion-validate-title": "Εκκίνηση επικύρωσης Fusion",
+			"head": "αρχή",
+			"kill-title": "Διακοπή εργασίας παρασκηνίου",
+			"logs-title": "Ανάγνωση αρχείων καταγραφής παρασκηνίου",
+			"result-title": "Ανάγνωση αποτελέσματος παρασκηνίου",
+			"run-title": "Εκκίνηση εργασίας παρασκηνίου",
+			"state": {
+				"artifact": "τεχνούργημα",
+				"cancelled": "ακυρώθηκε",
+				"committed": "έτοιμο",
+				"completed": "ολοκληρώθηκε",
+				"failed": "απέτυχε",
+				"inline": "ενσωματωμένο",
+				"killed": "σταμάτησε",
+				"none": "μη έτοιμο",
+				"running": "εκτελείται"
+			},
+			"status-title": "Έλεγχος εργασιών παρασκηνίου",
+			"tail": "τέλος",
+			"task-count_one": "{{count}} εργασία",
+			"task-count_other": "{{count}} εργασίες",
+			"truncated": "περικομμένο"
+		},
 		"bash": {
 			"title": "Bash"
 		},
@@ -1482,6 +1512,24 @@
 			"transition": "Εργασία #{{number}} → {{status}}",
 			"transition-only": "Εργασία → {{status}}",
 			"untitled": "Εργασία χωρίς τίτλο"
+		},
+		"web-access": {
+			"character-count_one": "{{count, number}} χαρακτήρας",
+			"character-count_other": "{{count, number}} χαρακτήρες",
+			"fetch-title": "Λήψη περιεχομένου ιστού",
+			"match-query-count_one": "{{count}} ερώτημα αντιστοίχισης",
+			"match-query-count_other": "{{count}} ερωτήματα αντιστοίχισης",
+			"query-count_one": "{{count}} ερώτημα",
+			"query-count_other": "{{count}} ερωτήματα",
+			"read-title": "Ανάγνωση αποθηκευμένου περιεχομένου ιστού",
+			"result-count_one": "{{count}} αποτέλεσμα",
+			"result-count_other": "{{count}} αποτελέσματα",
+			"search-title": "Αναζήτηση στον ιστό",
+			"source-check-title": "Έλεγχος πηγών ιστού",
+			"source-count_one": "{{count}} πηγή",
+			"source-count_other": "{{count}} πηγές",
+			"url-count_one": "{{count}} URL",
+			"url-count_other": "{{count}} URL"
 		},
 		"write": {
 			"title": "Εγγραφή"

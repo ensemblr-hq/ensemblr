@@ -194,7 +194,13 @@ export type ToolBodyDescriptor =
 			startLine: number | null;
 	  }
 	| { entries: readonly ToolDiagnosticEntry[]; kind: 'diagnostics' }
-	| { kind: 'diff'; language: BundledLanguage; patch: string }
+	| {
+			kind: 'diff';
+			language: BundledLanguage;
+			patch: string;
+			/** Shows parsed paths when no file badge identifies a workspace-wide diff. */
+			showFileNames?: boolean;
+	  }
 	| { kind: 'empty' }
 	| { kind: 'error'; text: string }
 	| { kind: 'labeled'; sections: readonly ToolPanelSectionDescriptor[] }

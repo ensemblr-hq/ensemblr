@@ -63,7 +63,13 @@ export function ToolBody({ body }: { body: ToolBodyDescriptor }) {
 		case 'diagnostics':
 			return <ToolDiagnosticsList entries={body.entries} />;
 		case 'diff':
-			return <ToolDiffPreview language={body.language} patch={body.patch} />;
+			return (
+				<ToolDiffPreview
+					language={body.language}
+					patch={body.patch}
+					showFileNames={body.showFileNames}
+				/>
+			);
 		case 'empty':
 			return null;
 		case 'error':
