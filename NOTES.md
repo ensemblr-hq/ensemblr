@@ -1,21 +1,19 @@
-## Ensemblr v0.1.10
+## Ensemblr v0.1.11
 
-Ensemblr 0.1.10 makes local projects and linked directories more dependable, restores Pi command discovery across installations, and improves agent-session recovery.
+Ensemblr 0.1.11 makes agent work easier to follow and harder to lose: tool activity now reads as purpose-built timeline entries, Pi delivery and queued follow-ups recover more reliably, and delegated work is held behind an enforced wait barrier until every child reports.
 
 ### Highlights
 
-* **Open local projects in place.** “Open Local Project” now uses the selected checkout as its project root instead of cloning it under Ensemblr; its Git state and settings stay intact. Removing it from Ensemblr no longer deletes the original folder, branches, or refs. (#507)
-* **Linked directories now reliably reach agents.** Directory links persist per chat, appear in sent-message history, and are applied on the next send after an active turn finishes. (#506)
-* **Restore Pi skills, prompt templates, and extension slash commands.** Ensemblr now discovers commands through the configured Pi executable's RPC interface, rather than depending on a particular SDK installation layout. (#504)
-
-### Fixed
-
-* Hidden models are excluded from delegated-agent choices and fallback selection, while sessions recover to idle if a large completion frame is dropped. (#503)
-* Repository settings now show the actual managed workspace location for imported local checkouts. (#509)
+* **Purpose-built tool activity.** Pi Lens, context-mode, Context7, MCP adapter, background-task, web-access, and workspace-diff calls now have focused timeline presenters with compact previews, readable results, and localized English, Russian, and Greek labels. Workspace diffs retain per-file identity and truncation notices, URL previews redact credentials and signed parameters, and `.mts` files receive TypeScript highlighting. (#516, #517, #520, #522, #526)
+* **More dependable Pi turns and queues.** Ensemblr now waits for Pi's definitive settlement event before surfacing terminal failures or draining follow-ups, confirms prompt acceptance, shows injected steering prompts, and preserves final or truncated responses before later activity can fold them away. Pi 0.80.4 or newer is now required. (#513, #515, #525)
+* **Queued follow-ups survive transient diagnostics.** Existing Pi and Claude Code runtimes remain usable when a background readiness probe fails; same-tick queue operations are serialized, temporary refusals defer cleanly, and runtime replacement validates the new executable before closing a healthy session. (#521)
+* **Delegation now enforces its own lifecycle.** Root Pi orchestrators must collect every spawned child's report before unrelated tools or premature prose can continue. The barrier survives reloads, recovers interrupted spawns fail-closed, and distinguishes informational `done`/`progress` signals from blockers and decisions. (#523, #524)
 
 ### Changed
 
-* Simplified the linked-directory composer area with a clearer label-and-chip layout and less redundant copy. (#508)
+* AFK mode shows a one-time, persistent warning about its additional token cost before activation. Composer, shortcut, and native-menu activation all use the same guard. (#518)
+* Live model catalog reductions are confirmed before replacing cached data, allowing removed providers and models to retire without letting a transient partial listing erase valid choices. (#514)
+* Shell tool rows distinguish a process's non-zero exit code from a tool invocation failure while preserving the command output. (#519)
 
 ### Install
 
@@ -35,4 +33,4 @@ The `.dmg` is signed with a Developer ID certificate, hardened-runtime, notarize
 
 ---
 
-*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.1.9...v0.1.10>
+*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.1.10...v0.1.11>

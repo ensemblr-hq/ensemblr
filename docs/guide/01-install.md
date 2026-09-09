@@ -5,7 +5,7 @@ Ensemblr runs on **macOS with Apple silicon** and on **Linux with x86-64**.
 | Platform | Artifact | Signed | Updates itself |
 | --- | --- | --- | --- |
 | macOS, Apple silicon | `.dmg` and `.zip` | Developer ID, notarized, stapled | Yes |
-| Linux, x86-64 | `.AppImage` | No — there is no equivalent | No; it tells you and links |
+| Linux, x86-64 | `.AppImage` | No — there is no equivalent | Yes when the AppImage directory is writable; otherwise it links |
 
 Neither host cross-builds the other's artifact, so they are built by two separate
 CI jobs and attached to the same release. There is no Intel Mac build, no arm64
@@ -17,8 +17,9 @@ Linux build, and no Windows build.
 brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
-The [tap](https://github.com/ensemblr-hq/homebrew-tap) carries the stable
-channel only. It declares Apple silicon and macOS Ventura as requirements, so
+The [tap](https://github.com/ensemblr-hq/homebrew-tap) tracks the highest
+semantic-versioned release, including tagged prereleases, and never the rolling
+`nightly` build. It declares Apple silicon and macOS Ventura as requirements, so
 `brew` refuses on a machine that cannot run the app rather than installing
 something that will not open.
 
@@ -38,8 +39,8 @@ brew upgrade --cask --greedy ensemblr
 curl -fsSL https://www.ensemblr.dev/install.sh | sh
 ```
 
-The AppImage on its own is one file and nothing else — no launcher entry, no
-icon, and no update path. The script is the missing half. It resolves the newest
+The AppImage on its own is one file and nothing else — no launcher entry or
+icon. The script supplies that desktop integration. It resolves the newest
 release, **verifies the download against the digest GitHub publishes for it**
 before writing anything, extracts the `.desktop` entry and the icon ladder the
 AppImage already carries, and records a manifest so `--uninstall` removes exactly
@@ -59,7 +60,7 @@ Nothing needs root and nothing is written outside `$HOME`:
 
 | Option | Does |
 | --- | --- |
-| `--version <tag>` | install a specific release, e.g. `--version v0.1.10` |
+| `--version <tag>` | install a specific release, e.g. `--version v0.1.11` |
 | `--nightly` | install the rolling canary build, **alongside** a release |
 | `--dir <path>` | where the AppImage goes |
 | `--no-desktop` | skip the launcher entry and the icons |
@@ -85,13 +86,13 @@ same file. `--check` exits `10` when there is something to install, distinct fro
 
 ## Download
 
-The current build is **`0.1.10`**:
+The current build is **`0.1.11`**:
 
-- [**`Ensemblr-0.1.10-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.10/Ensemblr-0.1.10-arm64.dmg)
+- [**`Ensemblr-0.1.11-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.11/Ensemblr-0.1.11-arm64.dmg)
   — the macOS disk image. Open it and drag Ensemblr to `/Applications`.
-- [`Ensemblr-darwin-arm64-0.1.10.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.10/Ensemblr-darwin-arm64-0.1.10.zip)
+- [`Ensemblr-darwin-arm64-0.1.11.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.11/Ensemblr-darwin-arm64-0.1.11.zip)
   — the same `.app`, zipped, if you would rather not mount an image.
-- [**`Ensemblr-0.1.10-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.10/Ensemblr-0.1.10-x64.AppImage)
+- [**`Ensemblr-0.1.11-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.11/Ensemblr-0.1.11-x64.AppImage)
   — the Linux build, if you would rather place it yourself than run the
   [install script](#install-script-linux). One file, no installer:
 
@@ -100,8 +101,9 @@ The current build is **`0.1.10`**:
   ./Ensemblr-*.AppImage
   ```
 
-  You get no launcher entry, no icon, and no update path this way — that is what
-  the script adds. Its runtime is statically linked, so no libfuse2 is needed on the host. If it
+  You get no launcher entry or icon this way — that is what the script adds. The
+  app still updates itself when this file's directory is writable. Its runtime is
+  statically linked, so no libfuse2 is needed on the host. If it
   refuses to mount anyway — a container, or a kernel with no FUSE at all — run it
   with `--appimage-extract-and-run`. If it starts and dies immediately with a
   sandbox error, the kernel is refusing unprivileged user namespaces; an AppImage
@@ -129,7 +131,7 @@ it against the checksum on the release page if you want a check, or let the
 [install script](#install-script-linux) do it for you. Either way this is
 **pre-1.0** software, with breaking changes expected before 1.0.
 
-The app reports the full version, any prerelease suffix included — `0.1.10` in
+The app reports the full version, any prerelease suffix included — `0.1.11` in
 **Settings → General**, and on macOS in the bundle's
 `CFBundleShortVersionString`. It matches the release tag, so a bug report only
 has to quote one string.
@@ -169,12 +171,11 @@ Two things it deliberately will not do:
 - **Cross channels.** A release build only ever updates to another `v<semver>`
   release, and Ensemblr Canary only ever to a newer nightly. They are separate
   apps with separate bundle ids, so neither can replace the other.
-- **Update from anywhere but `/Applications`.** Replacing the bundle in place
-  needs a writable location, so a copy run straight from the mounted `.dmg`
-  reports that rather than failing quietly. Drag it to `/Applications` first.
-  This one is macOS-specific: on Linux nothing is replaced in place at all.
-
-A build you compiled yourself does not update — rebuild it instead.
+- **Update a macOS bundle from anywhere but `/Applications`.** Replacing the
+  bundle in place needs a writable location, so a copy run straight from the
+  mounted `.dmg` reports that rather than failing quietly. Drag it to
+  `/Applications` first. Linux instead downloads beside a writable AppImage and
+  atomically renames the new file over its path on restart.
 
 If a package manager owns your copy, turn **Settings → General → Update Ensemblr
 automatically** off. Ensemblr then never checks, downloads, or installs, and
@@ -318,12 +319,12 @@ right-click path is the one that works.
 | `dev` | `npm run make:dev` | `dev.ensemblr.app.dev` | Ensemblr Dev |
 
 This matters to you, not just to the packager. A bundle id is what macOS Launch
-Services uses to tell one installed app from another, and what Electron uses to
-pick the userData directory. Because the channels do not share an id, you can
-keep a canary build beside a release build without the two fighting over which
-one macOS opens, and each keeps its own database, settings, and secrets. Two
-builds sharing one id is what previously made a stray Dock tile flash during
-workspace creation.
+Services uses to tell one installed app from another. Because the channels do
+not share an id, you can keep a canary build beside a release build without the
+two fighting over which one macOS opens. Packaged channels deliberately share
+one database, settings, secrets, Electron state directory, and single-instance
+lock; their identities are separate, their state is not. Two builds sharing one
+id is what previously made a stray Dock tile flash during workspace creation.
 
 On Linux the same separation runs through the **launcher id** instead — the
 basename of the generated `.desktop` entry, which Electron turns into the XDG

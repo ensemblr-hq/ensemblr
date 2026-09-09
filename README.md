@@ -23,16 +23,16 @@ the workspace that needs it.
 **macOS on Apple silicon, or Linux on x86-64. Bring your own agent CLI — Pi or Claude Code, one is enough.
 `git` and an authenticated `gh` are required.**
 
-No Ensemblr account, no sign-in, no cloud sync, no telemetry. State is a local SQLite database, secrets go
-to the OS keyring — the macOS Keychain, or gnome-keyring / KWallet on Linux — GitHub tokens stay with `gh`
-and are never copied anywhere, and the app ships no agent binary of its own — it drives the one you
-installed.
+No Ensemblr account, no sign-in, no cloud sync, no telemetry. State is a local SQLite database. Secrets
+use the macOS Keychain or Electron `safeStorage` backed by gnome-keyring / KWallet on Linux, where only
+encrypted ciphertext is stored in SQLite. GitHub tokens stay with `gh` and are never copied anywhere, and
+the app ships no agent binary of its own — it drives the one you installed.
 
 ![The Ensemblr workbench: an orchestrator's timeline in the middle with two delegates beside it in the tab strip, the five-file diff the turn produced in the Changes panel, and the dev server it started still streaming in the dock.](./docs/guide/images/00-hero-orchestrator.png)
 
 *Ensemblr Control driving the app from inside a workspace: the agent moved the workspace to In progress, started a run script, delegated to two sub-agents in their own chat tabs, and launched a Claude Code harness in a terminal — all of it visible on one screen.*
 
-- **Version:** [`0.1.10`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.10) (stable)
+- **Version:** [`0.1.11`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.11) (stable)
 - **License:** Apache-2.0
 
 | Platform | Artifact | Install |
@@ -46,7 +46,7 @@ Intel Macs and arm64 Linux are not built. Windows is not supported.
 
 ## Status
 
-Ensemblr is **stable at 0.1.10**, released 2026-09-08. The core workflows —
+Ensemblr is **stable at 0.1.11**, released 2026-09-09. The core workflows —
 isolated workspaces, Pi and Claude Code agent sessions, the review and PR flow, and the GitHub / Linear /
 git integrations — are implemented and wired to real services, on both macOS and Linux. Stable means
 ordinary semver rather than a frozen surface: breaking changes remain possible before 1.0 and are recorded
@@ -58,7 +58,7 @@ in [`CHANGELOG.md`](./CHANGELOG.md) when they land.
 brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
-Or **[Download Ensemblr 0.1.10 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.10/Ensemblr-0.1.10-arm64.dmg)** — open it and drag Ensemblr to Applications.
+Or **[Download Ensemblr 0.1.11 (.dmg, Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.11/Ensemblr-0.1.11-arm64.dmg)** — open it and drag Ensemblr to Applications.
 
 The macOS build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
 stapled, so it opens without a Gatekeeper prompt and validates offline. Every build is on the
@@ -335,10 +335,11 @@ There is no Ensemblr account to create, nothing to sign in to, and nothing synce
   Ensemblr backend in the path and no telemetry.
 - **GitHub tokens stay with `gh`.** Ensemblr stores none — no token field in settings, no OAuth screen, no
   second place one can leak from. It shells out to the CLI you already authenticated.
-- **Secrets live in the OS keyring**, never a file and never an environment variable: the macOS Keychain,
-  or gnome-keyring / KWallet through Electron's `safeStorage` on Linux. Linear's OAuth tokens go straight
-  there; the app can list what it holds without reading it back. On a Linux session with no keyring daemon
-  running, a setup check warns that values are only obfuscated rather than encrypted.
+- **Secrets use OS-backed encryption**, never plaintext files or environment variables: the macOS
+  Keychain stores values directly; on Linux, Electron's `safeStorage` encrypts them through gnome-keyring
+  or KWallet and Ensemblr stores only the ciphertext in SQLite. The app can list metadata without reading
+  values back. On a Linux session with no keyring daemon running, a setup check warns that values are only
+  obfuscated rather than encrypted.
 - **State is a local SQLite database** (Node 24's built-in `node:sqlite`), alongside worktrees under a root
   directory you choose.
 - **No agent binary ships in the app.** Your `pi` and `claude` installs, your credentials, your models,

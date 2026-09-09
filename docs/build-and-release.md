@@ -515,62 +515,88 @@ A third artifact exists only on the release, not in `out/`: both workflows write
 **An empty `out/` has two unrelated causes and they look alike.** The Node-major
 one is silent — exit 0, no error. The other is the Electron download: Forge
 reaches `@electron/get` **v3** through `@electron/packager`, which fetches
-`SHASUMS256.txt` over `got@11` before the zip, and a network that resets that
-request stops the build there. `electron`'s own postinstall is not affected — it
-uses `@electron/get` **v5**, which downloads over native `fetch` — so `npm
-install` can succeed on a network where `npm run make` does not. It is transient
-and the download is cached, so retrying usually clears it. See
-[Troubleshooting](./guide/14-troubleshooting.md#make-dies-fetching-shasums256txt).
+`SHASUMS256.txt` over `got@11` before the zip, and a reset or server-side 5xx on
+either request stops the build there. `electron`'s own postinstall is not
+affected — it uses `@electron/get` **v5**, which downloads over native `fetch` —
+so `npm install` can succeed on a network where `npm run make` does not. It is
+transient and the download is cached, so retrying usually clears it. See
+[Troubleshooting](./guide/14-troubleshooting.md#make-dies-downloading-electron-shasums256txt-or-http-5xx).
 
 ## Releasing
 
-Releases are built by GitHub Actions on a `macos-15` runner, not on a laptop.
-The local `npm run make` route above stays the escape hatch when CI is down or
-you need to bisect a packaging break.
+Releases are built by GitHub Actions, not on a laptop: macOS artifacts on the
+pinned `macos-15` runner and the Linux AppImage on `ubuntu-latest`. The local
+`npm run make` route above stays the escape hatch when CI is down or you need to
+bisect a packaging break.
 
 ### Cutting a release
 
-**Write the notes and create the release. That is the whole ritual.**
+**Merge the version bump, write the notes, then create the release.** The order
+is load-bearing: the workflow refuses a tag whose version does not match
+`package.json`, and the tag must point at reviewed `master`, not at the release
+workspace's unmerged commit.
+
+1. On a branch cut from current `origin/master`, run
+   `npm version <version> --no-git-tag-version`, replacing `<version>` with the
+   exact version being cut. Commit only `package.json` and `package-lock.json`,
+   open the version-bump PR, and merge it when the required **Checks** workflow
+   is green. Advisory review services are not a release gate.
+2. Write the final release body in `NOTES.md`.
+3. Fetch the merged `master`, resolve it to a commit SHA, confirm that tree
+   carries the intended package version, and publish the release against that
+   immutable target:
 
 ```bash
-gh release create v0.1.10 --notes-file NOTES.md
+version=0.1.11
+tag="v${version}"
+git fetch origin master
+target=$(git rev-parse origin/master)
+git show "${target}:package.json" | grep -F "\"version\": \"${version}\""
+gh release create "$tag" --target "$target" --notes-file NOTES.md
 ```
 
-**Pass `--target master`, not `--target origin/master`, when the local checkout
-is on a different branch** — an Ensemblr workspace always is, since it checks
-out its own branch in its own worktree rather than `master` directly. The
-remote-tracking form is rejected outright (`HTTP 422: Release.target_commitish
-is invalid`); the GitHub API wants a bare branch name or a commit SHA.
+Do not pass the literal `origin/master` as `--target`: GitHub rejects a
+remote-tracking ref (`HTTP 422: Release.target_commitish is invalid`). A bare
+branch name or full commit SHA is accepted; the SHA above also prevents a later
+push to `master` from changing what this release tags.
 
 Add `--prerelease` for an `-alpha` / `-beta` / `-rc` tag; the workflow corrects
 the flag from the tag either way.
 
 That creates the tag and fires `release: published`, which triggers
-[`.github/workflows/release.yml`](../.github/workflows/release.yml): it runs the
-full `checks.yml` suite, builds, signs, notarizes, verifies, then attaches the
-`.dmg` and `.zip` to the release you just made and corrects the prerelease flag
-from the tag (`-alpha` / `-beta` / `-rc` → prerelease, anything else → latest).
+[`.github/workflows/release.yml`](../.github/workflows/release.yml): it reuses a
+green **Checks** run for that exact `master` commit or runs the suite itself,
+builds, signs, notarizes, verifies, then attaches the `.dmg` and `.zip` to the
+release you just made and corrects the prerelease flag from the tag (`-alpha` /
+`-beta` / `-rc` → prerelease, anything else → latest). The Linux job starts only
+after the macOS artifacts pass verification.
 
 **Pushing a bare `vX.Y.Z` tag does nothing on purpose** — there would be no notes
 to attach to, and every release so far is hand-written prose that
-`--generate-notes` would only degrade. If a tag exists but the build needs
-re-running, dispatch the workflow manually with that tag as its input.
+`--generate-notes` would only degrade. If a release run fails, retry its failed
+jobs first with `gh run rerun RUN_ID --failed` (using the numeric id from
+`gh run list`); this preserves the original
+release event and avoids rebuilding artifacts that already passed. If the tag
+exists but there is no failed run to retry, or a clean rebuild is required,
+dispatch the workflow manually with that tag as its input. A manual dispatch
+does not bump Homebrew because that side effect belongs to the original
+`release: published` event.
 
 The workflow refuses to build when `package.json`'s `version` does not match the
 tag with `v` stripped, or when the release is still a draft.
 
-**Five version-pinned lines stay hand-edited, and the release commit touches
-none of them.** The README's version line and `.dmg` download URL are the two
-that get remembered; the other four live under `docs/` and quietly point at the
-previous release until someone edits them:
+**Five version-pinned files stay hand-edited, and the version-bump commit
+touches none of them.** The root README carries three current-release mentions;
+the other four files live under `docs/` and quietly point at the previous
+release until someone edits them:
 
 | File | What is pinned |
 | --- | --- |
-| `README.md` | version line, `.dmg` URL |
+| `README.md` | version line, status sentence, `.dmg` URL |
 | `docs/README.md` | version link, `.dmg` and `.AppImage` URLs |
 | `docs/guide/README.md` | the version this guide describes |
-| `docs/guide/01-install.md` | version string ×2, all three asset URLs |
-| `docs/build-and-release.md` | the `update-darwin-arm64.json` example |
+| `docs/guide/01-install.md` | current-version examples and all three asset URLs |
+| `docs/build-and-release.md` | the command and `update-darwin-arm64.json` examples |
 
 **Never string-replace the old version into the new one.** Asset filenames
 change shape between releases — `0.1.0` dropped the `-beta.N` segment, so
@@ -584,7 +610,7 @@ returns `output.summary: null`, and the raw logs show only the unexpanded
 script. Every pinned line above derives from one fact, each asset's `name`:
 
 ```bash
-gh release view v0.1.10 --json assets -q '.assets[].name'
+gh release view v0.1.11 --json assets -q '.assets[].name'
 ```
 
 The version string is the tag with `v` stripped; each URL is
@@ -595,7 +621,7 @@ empty or partial asset list is not the signal to start editing — poll until al
 four are there. Then check the URLs actually resolve before opening the PR:
 
 ```bash
-gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.10 \
+gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.11 \
   --jq '.assets[] | "\(.name)\t\(.digest)"'
 ```
 
@@ -662,10 +688,10 @@ Squirrel.Mac feed the in-app updater reads:
 
 ```json
 {
-  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.10/Ensemblr-darwin-arm64-0.1.10.zip",
-  "name": "0.1.10",
+  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.11/Ensemblr-darwin-arm64-0.1.11.zip",
+  "name": "0.1.11",
   "notes": "…the release body…",
-  "pub_date": "2026-09-08T18:20:34Z"
+  "pub_date": "2026-09-09T11:41:14Z"
 }
 ```
 

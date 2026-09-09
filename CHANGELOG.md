@@ -9,6 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-09-09
+
+Ensemblr 0.1.11 makes agent work easier to follow and harder to lose: tool activity now reads as
+purpose-built timeline entries, Pi delivery and queued follow-ups recover more reliably, and
+delegated work is held behind an enforced wait barrier until every child reports.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.11) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.11/Ensemblr-0.1.11-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.11/Ensemblr-0.1.11-x64.AppImage)
+
+### Added
+
+- **Purpose-built timeline presenters for developer tools.** Pi Lens, context-mode, Context7, MCP
+  adapter, background-task, web-access, and workspace-diff calls now have focused previews and
+  readable results in English, Russian, and Greek. Workspace diffs retain per-file identity and
+  truncation notices, URL previews redact credentials and signed parameters, and `.mts` files use
+  TypeScript highlighting. (#516, #517, #520, #522, #526)
+- **Delegation enforces its own lifecycle.** Root Pi orchestrators must collect every spawned child's
+  report before unrelated tools or premature prose can continue. The barrier survives reloads,
+  recovers interrupted spawns fail-closed, and distinguishes informational `done`/`progress` signals
+  from blockers and decisions. (#523, #524)
+- **AFK mode warns once about its additional token cost.** Composer, shortcut, and native-menu
+  activation use one persistent acknowledgement guard. (#518)
+
+### Fixed
+
+- **Pi turns settle and preserve every visible response.** Ensemblr waits for Pi's definitive
+  settlement event before surfacing terminal failures or draining follow-ups, confirms prompt
+  acceptance, shows injected steering prompts, and seals final or truncated responses before later
+  activity can fold them away. Pi 0.80.4 or newer is now required. (#513, #515, #525)
+- **Queued follow-ups survive transient diagnostics.** Existing Pi and Claude Code runtimes remain
+  usable when a background readiness probe fails; same-tick queue operations are serialized,
+  temporary refusals defer cleanly, and runtime replacement validates the new executable before
+  closing a healthy session. (#521)
+- **Removed providers and models retire from the cached catalogue** after a confirmed live reduction,
+  without letting a transient partial listing erase valid choices or stale hidden IDs disable the
+  final visible model. (#514)
+- **Shell activity distinguishes process exit codes from tool failures** while preserving the command
+  output. (#519)
+
+### Changed
+
+- **Release and repository documentation were re-audited against the shipped code and v0.1.11
+  assets.** Linux self-update behavior, packaged-channel state sharing, Linux secret storage,
+  architecture and test counts, Homebrew semantics, and the end-to-end release/retry procedure now
+  match the implementation.
+
 ## [0.1.10] - 2026-09-08
 
 Ensemblr 0.1.10 makes local projects and linked directories more dependable, restores Pi command
