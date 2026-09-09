@@ -1,3 +1,4 @@
+import { AfkModeWarningScene } from './afk-mode-warning-preview.tsx';
 import { AgentErrorScene } from './agent-error-preview.tsx';
 import { AnswerPreview } from './answer-preview.tsx';
 import { ArchiveToastScene } from './archive-toast-preview.tsx';
@@ -67,6 +68,12 @@ export const SCENE_GROUPS = [
 				label: 'composer',
 				render: () => <ComposerScene />,
 				source: 'playground/composer-preview.tsx',
+			},
+			{
+				id: 'afk-warning',
+				label: 'AFK warning',
+				render: () => <AfkModeWarningScene />,
+				source: 'playground/afk-mode-warning-preview.tsx',
 			},
 			{
 				id: 'composer-queue',

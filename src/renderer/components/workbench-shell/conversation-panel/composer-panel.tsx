@@ -1,6 +1,7 @@
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextContextMenu } from '@/renderer/components/text-context-menu';
+import { useAfkModeWarning } from '@/renderer/hooks/workbench-shell/composer/use-afk-mode-warning';
 import { useComposerDictation } from '@/renderer/hooks/workbench-shell/composer/use-composer-dictation';
 import { useComposerShortcuts } from '@/renderer/hooks/workbench-shell/composer/use-composer-shortcuts';
 import { useComposerState } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
@@ -10,6 +11,7 @@ import type {
 	ComposerShellState,
 	WorkspaceLinkedIssueSummary,
 } from '@/renderer/types/workbench';
+import { AfkModeWarningDialog } from './composer/afk-mode-warning-dialog';
 import { ComposerControls } from './composer/composer-controls';
 import { ComposerNotices } from './composer/composer-notices';
 import { ComposerEditor } from './composer/editor';
@@ -32,6 +34,43 @@ interface ComposerPanelProps {
 	seedLinkedIssue?: WorkspaceLinkedIssueSummary;
 	/** Workspace whose dock hosts terminals the control row hands work off to. */
 	workspaceId: string;
+}
+
+/**
+ * Resolves the composer frame treatment with mode states taking focus precedence.
+ * @param planMode - Whether Plan Mode currently owns the frame.
+ * @param afkMode - Whether AFK mode currently owns the frame.
+ * @param focused - Whether the editor currently owns keyboard focus.
+ * @returns The class for the highest-priority active frame state.
+ */
+function composerFrameStateClass(
+	planMode: boolean,
+	afkMode: boolean,
+	focused: boolean,
+): string | undefined {
+	if (planMode) {
+		return 'border-accent-strong/50 border-dashed';
+	}
+	if (afkMode) {
+		return 'border-status-away/50 border-dashed';
+	}
+	if (focused) {
+		return 'ring-1 ring-ring/40';
+	}
+	return undefined;
+}
+
+/**
+ * Determines whether a queued turn can enter the send pipeline.
+ * @param composerDisabled - Whether the composer refuses all sends.
+ * @param pending - Whether another send is awaiting acceptance.
+ * @returns Whether queue delivery is currently safe.
+ */
+function canDeliverQueuedMessage(
+	composerDisabled: boolean,
+	pending: boolean,
+): boolean {
+	return !(composerDisabled || pending);
 }
 
 /**
@@ -67,8 +106,17 @@ function ComposerPanelBody({
 	const state = useComposerState({
 		chatTabId,
 		composer,
-		...(seedLinkedIssue ? { seedLinkedIssue } : {}),
+		seedLinkedIssue,
 	});
+	const pickersDisabled = composer.disabled || state.isStreaming;
+	const afkModeWarning = useAfkModeWarning(
+		composer.onAfkModeChange,
+		!pickersDisabled,
+	);
+	const composerWithAfkWarning = {
+		...composer,
+		onAfkModeChange: afkModeWarning.requestChange,
+	};
 	const [focused, setFocused] = useState(false);
 	const [modelPickerOpen, setModelPickerOpen] = useState(false);
 	const [issuePickerOpen, setIssuePickerOpen] = useState(false);
@@ -79,12 +127,11 @@ function ComposerPanelBody({
 	}, [state.editorRef]);
 	useConsumeComposerFocusRequest(chatTabId, focusEditor);
 
-	const pickersDisabled = composer.disabled || state.isStreaming;
 	const toggleModelPicker = useCallback(() => {
 		setModelPickerOpen((current) => !current);
 	}, []);
 	useComposerShortcuts({
-		composer,
+		composer: composerWithAfkWarning,
 		focusEditor,
 		isStreaming: state.isStreaming,
 		pickersDisabled,
@@ -100,7 +147,10 @@ function ComposerPanelBody({
 	// refuses one outright while the composer cannot take a send. Offering them
 	// then would burn the queue's delivery attempts on a refusal the user can
 	// neither see nor act on.
-	const canDeliverQueued = !composer.disabled && !state.pending;
+	const canDeliverQueued = canDeliverQueuedMessage(
+		composer.disabled,
+		state.pending,
+	);
 
 	const placeholder =
 		composer.placeholder.length > 0
@@ -162,11 +212,11 @@ function ComposerPanelBody({
 				<div
 					className={cn(
 						'relative flex w-full flex-col overflow-hidden rounded-xl border border-border bg-pane/80 shadow-panel transition-shadow',
-						composer.planMode
-							? 'border-accent-strong/50 border-dashed'
-							: composer.afkMode
-								? 'border-status-away/50 border-dashed'
-								: focused && 'ring-1 ring-ring/40',
+						composerFrameStateClass(
+							composer.planMode,
+							composer.afkMode,
+							focused,
+						),
 					)}
 					onDragOver={state.handleDragOver}
 					onDrop={state.handleDrop}
@@ -213,7 +263,7 @@ function ComposerPanelBody({
 						</ComposerAutocompletePopover>
 
 						<ComposerControls
-							composer={composer}
+							composer={composerWithAfkWarning}
 							dictation={dictation}
 							modelPickerOpen={modelPickerOpen}
 							onLinkDirectory={() => setDirectoryPickerOpen(true)}
@@ -232,6 +282,12 @@ function ComposerPanelBody({
 				onOpenChange={setDirectoryPickerOpen}
 				onUnlink={state.unlinkDirectory}
 				open={directoryPickerOpen}
+			/>
+			<AfkModeWarningDialog
+				disabled={pickersDisabled}
+				onAcknowledge={afkModeWarning.acknowledge}
+				onGoBack={afkModeWarning.goBack}
+				open={afkModeWarning.open}
 			/>
 			<IssuePickerDialog
 				onOpenChange={setIssuePickerOpen}

@@ -80,6 +80,18 @@ export const chatAfkModeAtomFamily = atomFamily((chatTabId: string) =>
 );
 
 /**
+ * Whether this installation has acknowledged AFK mode's high token use. Read
+ * from storage on the first render so returning users never see the warning
+ * flash before their persisted choice loads.
+ */
+export const hasAcknowledgedAfkModeWarningAtom = atomWithStorage<boolean>(
+	KEY('afk_mode_warning_acknowledged'),
+	false,
+	undefined,
+	{ getOnInit: true },
+);
+
+/**
  * Directories outside the workspace this chat has been given access to, keyed by
  * chat-tab id. Like {@link chatPlanModeAtomFamily} this is the durable record of
  * the user's choice and rides every `openAgentSession` call; the main process

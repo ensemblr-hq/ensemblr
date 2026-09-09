@@ -20,7 +20,15 @@
 		"aria-label-off": "AFK mode: off. Click to toggle.",
 		"aria-label-on": "AFK mode: on. Click to toggle.",
 		"tooltip-off": "Work without asking me",
-		"tooltip-on": "Stop working unattended"
+		"tooltip-on": "Stop working unattended",
+		"warning": {
+			"acknowledge": "Turn on AFK",
+			"acknowledgment": "Use it cautiously and sparingly. Turning it on acknowledges this warning, so you will not see it again.",
+			"best-work": "While you are away, AFK mode gives agents room to plan, build, review, and refine—pushing for their absolute best work without waiting for you.",
+			"go-back": "Not now",
+			"title": "Before you turn on AFK",
+			"token-cost": "AFK mode is token-intensive and can use substantially more tokens than attended work."
+		}
 	},
 	"all-files": {
 		"empty": {
