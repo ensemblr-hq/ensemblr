@@ -22,6 +22,7 @@ const EXTENSION_LANGUAGE: Record<string, string> = {
 	md: 'markdown',
 	mdx: 'mdx',
 	mjs: 'javascript',
+	mts: 'typescript',
 	php: 'php',
 	prisma: 'prisma',
 	py: 'python',
