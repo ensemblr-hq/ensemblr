@@ -3716,12 +3716,40 @@ export default interface Resources {
 			bash: {
 				title: 'Bash';
 			};
+			'ctx-batch-execute': {
+				'commands-label': 'Commands:';
+				title: 'Run commands';
+			};
+			'ctx-doctor': {
+				title: 'Check context mode';
+			};
 			'ctx-execute': {
 				'code-label': 'Code:';
 				title: 'Run code';
 			};
 			'ctx-execute-file': {
 				title: 'Process file';
+			};
+			'ctx-fetch-and-index': {
+				title: 'Fetch and index';
+			};
+			'ctx-index': {
+				title: 'Index context';
+			};
+			'ctx-insight': {
+				title: 'Open Insight';
+			};
+			'ctx-purge': {
+				title: 'Purge context';
+			};
+			'ctx-search': {
+				title: 'Search context';
+			};
+			'ctx-stats': {
+				title: 'Context usage';
+			};
+			'ctx-upgrade': {
+				title: 'Upgrade context mode';
 			};
 			diagnostics: {
 				clean: 'Diagnostics';

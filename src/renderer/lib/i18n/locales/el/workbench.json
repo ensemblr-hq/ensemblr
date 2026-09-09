@@ -1279,12 +1279,40 @@
 		"bash": {
 			"title": "Bash"
 		},
+		"ctx-batch-execute": {
+			"commands-label": "Εντολές:",
+			"title": "Εκτέλεση εντολών"
+		},
+		"ctx-doctor": {
+			"title": "Έλεγχος context-mode"
+		},
 		"ctx-execute": {
 			"code-label": "Κώδικας:",
 			"title": "Εκτέλεση κώδικα"
 		},
 		"ctx-execute-file": {
 			"title": "Επεξεργασία αρχείου"
+		},
+		"ctx-fetch-and-index": {
+			"title": "Λήψη και ευρετηρίαση"
+		},
+		"ctx-index": {
+			"title": "Ευρετηρίαση περιβάλλοντος"
+		},
+		"ctx-insight": {
+			"title": "Άνοιγμα Insight"
+		},
+		"ctx-purge": {
+			"title": "Εκκαθάριση περιβάλλοντος"
+		},
+		"ctx-search": {
+			"title": "Αναζήτηση στο περιβάλλον"
+		},
+		"ctx-stats": {
+			"title": "Χρήση περιβάλλοντος"
+		},
+		"ctx-upgrade": {
+			"title": "Αναβάθμιση context-mode"
 		},
 		"diagnostics": {
 			"clean": "Διαγνωστικά",
