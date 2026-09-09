@@ -103,13 +103,27 @@ How chats behave day to day, plus where Ensemblr keeps its repositories.
 | Follow-up behavior | What happens to a message you send while the agent is still working. `Steer` interrupts mid-turn, `Queue` holds it until the turn ends, `Block` holds it until you send it yourself. A queued message stays editable. `⌘J` queues in any mode. | Steer, Queue, Block | Steer |
 | Desktop notifications | Notify you when a chat finishes a turn or stops to ask you something. One notification per chat, titled with the chat's own name; clicking it focuses that chat. | On / off | On |
 | Notification sound | Play a chime alongside the notification when a chat needs your attention. | On / off | On |
-| Caffeinate while agents are running | Keep the machine awake while an agent is working. Shuts off below 10% battery — read from macOS power APIs, or from sysfs on Linux. | On / off | Off |
+| Caffeinate while agents are running | Prevent automatic system sleep on macOS and Linux while an in-app agent or the Concierge is working. The display may sleep. Pauses below 10% battery when unplugged. | On / off | Off |
 | Always show context usage | Show the context meter at all times instead of only past 70% used. | On / off | On |
 | Auto-convert long text | Turn pasted text over 5,000 characters into a text attachment instead of inlining it. | On / off | On |
 | Don't collapse tool calls | Show tool calls expanded by default. Toggle per session with `⌃O`. | On / off | Off (collapsed) |
 | Ensemblr root directory | Where Ensemblr stores repositories, workspaces, and archived workspace context. | Any directory | `~/Ensemblr` |
 | Update Ensemblr automatically | Check for a newer build, download it, and offer to restart into it. Off is a hard off — no check, no download, no install. | On / off | On |
 | Ensemblr version | The running build, its channel, and what the updater is doing. `Check for updates` runs a check now; once a build is downloaded the button becomes `Restart to update`. | — | — |
+
+**Caffeinate prevents idle sleep, not every kind of sleep.** It does not override
+closing a laptop lid, explicitly choosing Sleep, or critical-battery shutdown.
+Terminal commands and third-party CLI harnesses are not monitored. On Linux,
+the desktop session's power-management service must honor Electron's sleep
+inhibitor; headless sessions and desktop policies may not. No macOS-only
+`caffeinate` executable or extra Linux utility is required.
+
+Battery state is checked every minute while the setting is enabled and an
+agent is starting or working, including while low battery pauses inhibition.
+Plugging in or recovering to at least 10% restores inhibition at the next
+check. Battery readings come from `pmset` on macOS and sysfs on Linux; an
+unavailable reading does not impose a battery cutoff. Finishing the last turn,
+switching the setting off, or quitting releases the inhibitor and stops polling.
 
 **Updating is automatic, restarting is not.** Ensemblr checks GitHub a couple of
 minutes after launch and every four hours after, downloads a newer build in the

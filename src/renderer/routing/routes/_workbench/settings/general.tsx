@@ -14,6 +14,7 @@ import {
 	SelectValue,
 } from '@/renderer/components/ui/select';
 import { Switch } from '@/renderer/components/ui/switch';
+import { detectPlatform } from '@/renderer/lib/window-chrome';
 import {
 	alwaysShowContextUsageAtom,
 	autoConvertLongTextAtom,
@@ -234,7 +235,8 @@ function GeneralSettings() {
 				}
 				description={t(
 					'settings:general.caffeinate.description',
-					'Prevent your Mac from sleeping while an agent is actively working. Shuts off below 10% battery.',
+					'Prevent automatic system sleep on {{platform}} while an in-app agent works. The display may sleep. Pauses below 10% battery when unplugged.',
+					{ platform: detectPlatform() === 'darwin' ? 'macOS' : 'Linux' },
 				)}
 				label={t(
 					'settings:general.caffeinate.label',

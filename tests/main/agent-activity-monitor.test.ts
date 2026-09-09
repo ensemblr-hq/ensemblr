@@ -208,6 +208,121 @@ describe('createAgentActivityMonitor — caffeinate', () => {
 		expect(h.stops).toBe(1);
 	});
 
+	test.each([5, 80])(
+		're-arms after low battery without another status event (initial charge %i)',
+		async (percent) => {
+			let battery: BatterySnapshot = { charging: false, percent };
+			const pollRef: { fn: (() => void) | null } = { fn: null };
+			const h = makeMonitor({
+				readBattery: () => Promise.resolve(battery),
+				readSettings: () => settings({ caffeinateWhileRunning: true }),
+				scheduleInterval: (callback, ms) => {
+					expect(ms).toBe(60_000);
+					expect(pollRef.fn).toBeNull();
+					pollRef.fn = callback;
+					return () => {
+						pollRef.fn = null;
+					};
+				},
+			});
+			h.monitor.handle(statusFor('streaming', 's1'));
+			await flush();
+			const initialStarts = percent >= 10 ? 1 : 0;
+			expect(h.starts).toBe(initialStarts);
+			battery = { charging: false, percent: 5 };
+			pollRef.fn?.();
+			await flush();
+			expect(h.stops).toBe(initialStarts);
+			expect(pollRef.fn).not.toBeNull();
+			battery = { charging: true, percent: 5 };
+			pollRef.fn?.();
+			await flush();
+			expect(h.starts).toBe(initialStarts + 1);
+			h.monitor.handle(statusFor('idle', 's1'));
+			expect(h.stops).toBe(initialStarts + 1);
+			expect(pollRef.fn).toBeNull();
+		},
+	);
+
+	test('stops polling when disabled and restarts when enabled mid-turn', async () => {
+		let enabled = true;
+		let polls = 0;
+		let cancellations = 0;
+		const h = makeMonitor({
+			readBattery: () => Promise.resolve({ charging: false, percent: 5 }),
+			readSettings: () => settings({ caffeinateWhileRunning: enabled }),
+			scheduleInterval: () => {
+				polls += 1;
+				return () => {
+					cancellations += 1;
+				};
+			},
+		});
+		h.monitor.handle(statusFor('starting', 's1'));
+		await flush();
+		expect(polls).toBe(1);
+		enabled = false;
+		h.monitor.refresh();
+		expect(cancellations).toBe(1);
+		enabled = true;
+		h.monitor.refresh();
+		expect(polls).toBe(2);
+		h.monitor.dispose();
+		expect(cancellations).toBe(2);
+		expect(h.starts).toBe(0);
+	});
+
+	test.each(['idle', 'disabled', 'disposed'])(
+		'does not acquire a blocker from a pending sample after %s',
+		async (action) => {
+			let enabled = true;
+			const battery = Promise.withResolvers<BatterySnapshot | null>();
+			let activePolls = 0;
+			const h = makeMonitor({
+				readBattery: () => battery.promise,
+				readSettings: () => settings({ caffeinateWhileRunning: enabled }),
+				scheduleInterval: () => {
+					activePolls += 1;
+					return () => {
+						activePolls -= 1;
+					};
+				},
+			});
+			h.monitor.handle(statusFor('starting', 's1'));
+			if (action === 'idle') {
+				h.monitor.handle(statusFor('idle', 's1'));
+			} else if (action === 'disabled') {
+				enabled = false;
+				h.monitor.refresh();
+			} else {
+				h.monitor.dispose();
+				h.monitor.handle(statusFor('streaming', 's1'));
+			}
+			battery.resolve(null);
+			await flush();
+			expect(h.starts).toBe(0);
+			expect(activePolls).toBe(0);
+		},
+	);
+
+	test('uses system-sleep inhibition, allowing the display to sleep', async () => {
+		const calls: string[] = [];
+		const h = makeMonitor({
+			readSettings: () => settings({ caffeinateWhileRunning: true }),
+			powerControls: {
+				start: (type) => {
+					calls.push(type);
+					return 0;
+				},
+				stop: (id) => calls.push(`stop:${id}`),
+			},
+		});
+		h.monitor.handle(statusFor('starting', 's1'));
+		await flush();
+		h.monitor.dispose();
+		expect(calls).toEqual(['prevent-app-suspension', 'stop:0']);
+	});
+
 	test('dispose releases an engaged blocker', async () => {
 		const h = makeMonitor({
 			readSettings: () => settings({ caffeinateWhileRunning: true }),

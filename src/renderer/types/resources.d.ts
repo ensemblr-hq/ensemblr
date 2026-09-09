@@ -1791,7 +1791,7 @@ export default interface Resources {
 				label: 'Update Ensemblr automatically';
 			};
 			caffeinate: {
-				description: 'Prevent your Mac from sleeping while an agent is actively working. Shuts off below 10% battery.';
+				description: 'Prevent automatic system sleep on {{platform}} while an in-app agent works. The display may sleep. Pauses below 10% battery when unplugged.';
 				label: 'Caffeinate while agents are running';
 			};
 			'context-usage': {

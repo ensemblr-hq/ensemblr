@@ -202,6 +202,69 @@ describe('readLinuxBattery', () => {
 		});
 	});
 
+	test.each<Record<string, string>>([
+		{ capacity: '2', scope: 'Device' },
+		{ capacity: '0', present: '0' },
+		{ capacity: '' },
+	])('ignores a non-system or unreadable battery: %j', async (attributes) => {
+		pretendPlatform('linux');
+		const root = await withRoot({
+			BAT0: { status: 'Discharging', type: 'Battery', ...attributes },
+			BAT1: { capacity: '80', status: 'Discharging', type: 'Battery' },
+		});
+		await expect(readLinuxBattery(root)).resolves.toEqual({
+			charging: false,
+			percent: 80,
+		});
+	});
+
+	test.each(['USB', 'USB_C', 'USB_PD', 'Wireless'])(
+		'recognizes an online %s charger',
+		async (type) => {
+			pretendPlatform('linux');
+			const root = await withRoot({
+				charger: { online: '1', type },
+				BAT0: { capacity: '5', status: 'Unknown', type: 'Battery' },
+			});
+			await expect(readLinuxBattery(root)).resolves.toEqual({
+				charging: true,
+				percent: 5,
+			});
+		},
+	);
+
+	test('recognizes a programmable USB charger', async () => {
+		pretendPlatform('linux');
+		const root = await withRoot({
+			charger: { online: '2', type: 'USB_PD' },
+			BAT0: { capacity: '5', status: 'Unknown', type: 'Battery' },
+		});
+		await expect(readLinuxBattery(root)).resolves.toEqual({
+			charging: true,
+			percent: 5,
+		});
+	});
+
+	test('ignores a device-scoped charger', async () => {
+		pretendPlatform('linux');
+		const root = await withRoot({
+			charger: { online: '1', scope: 'Device', type: 'USB' },
+			BAT0: { capacity: '5', status: 'Unknown', type: 'Battery' },
+		});
+		await expect(readLinuxBattery(root)).resolves.toEqual({
+			charging: false,
+			percent: 5,
+		});
+	});
+
+	test('returns null when only a peripheral battery exists', async () => {
+		pretendPlatform('linux');
+		const root = await withRoot({
+			mouse: { capacity: '2', scope: 'Device', type: 'Battery' },
+		});
+		await expect(readLinuxBattery(root)).resolves.toBeNull();
+	});
+
 	test('returns null for a desktop with no battery', async () => {
 		pretendPlatform('linux');
 		const root = await withRoot({ AC: { online: '1' } });
