@@ -98,6 +98,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	vi.useRealTimers();
 	vi.restoreAllMocks();
 	clearEnsemblrApi();
 	// The slash cache reads ambient storage, and its module mirror outlives a
@@ -143,9 +144,9 @@ function seedAgedCache(commands = CLAUDE_COMMANDS.commands) {
 	);
 }
 
-// Asking a runtime for its commands starts a child process, so a composer that
-// never opens the slash menu must never pay for one.
-test('asks nothing until the slash menu is first opened', async () => {
+// Claude discovery starts a child process for a menu most composers never use,
+// so it stays lazy even though Pi now warms its slower catalogue on mount.
+test('defers Claude discovery until the slash menu is first opened', async () => {
 	const { listAgentProviderSlashCommands, rerender } =
 		renderSlashCommandsClosed();
 
@@ -158,6 +159,25 @@ test('asks nothing until the slash menu is first opened', async () => {
 	await waitFor(() =>
 		expect(listAgentProviderSlashCommands).toHaveBeenCalledTimes(1),
 	);
+});
+
+test('warms Pi commands before the slash menu is first opened', async () => {
+	const { listAgentProviderSlashCommands } = renderSlashCommandsClosed('pi');
+
+	await waitFor(() =>
+		expect(listAgentProviderSlashCommands).toHaveBeenCalledTimes(1),
+	);
+});
+
+test('refreshes a mounted catalogue every five minutes', async () => {
+	vi.useFakeTimers();
+	const { listAgentProviderSlashCommands } = renderSlashCommandsClosed('pi');
+
+	await act(() => vi.advanceTimersByTimeAsync(0));
+	expect(listAgentProviderSlashCommands).toHaveBeenCalledTimes(1);
+
+	await act(() => vi.advanceTimersByTimeAsync(5 * 60_000));
+	expect(listAgentProviderSlashCommands).toHaveBeenCalledTimes(2);
 });
 
 test('keeps the catalogue after the menu closes again', async () => {

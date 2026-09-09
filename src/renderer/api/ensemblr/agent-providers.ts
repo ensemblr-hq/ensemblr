@@ -17,6 +17,8 @@ import {
 	writeCachedSlashCommands,
 } from './slash-commands-cache';
 
+const SLASH_COMMANDS_REFRESH_INTERVAL_MS = 5 * 60_000;
+
 /**
  * Shapes a cached catalogue as a live runtime result, so a seeded menu is
  * indistinguishable from a freshly discovered one downstream.
@@ -112,10 +114,9 @@ export function canDiscoverSlashCommands(cwd: string): boolean {
  * picked up without a relaunch.
  *
  * Seeds from the localStorage cache so a workspace opened before paints its menu
- * instantly on launch, then revalidates only once the seed is genuinely older
- * than `staleTime`: reporting the cache's real fetch time through
- * `initialDataUpdatedAt` is what stops every launch from spawning a `claude`
- * child immediately.
+ * instantly on launch, then refreshes the mounted catalogue every five minutes.
+ * Reporting the cache's real fetch time through `initialDataUpdatedAt` keeps the
+ * first refresh honest without spawning a child on every composer mount.
  * @param provider - Agent runtime whose commands the composer offers.
  * @param cwd - Workspace directory the commands resolve against.
  * @returns Query options for the slash command catalogue.
@@ -164,7 +165,8 @@ export function agentProviderSlashCommandsQuery(
 			return result;
 		},
 		queryKey: ensemblrQueryKeys.agentProviderSlashCommands(provider, cwd),
-		staleTime: 5 * 60_000,
+		refetchInterval: SLASH_COMMANDS_REFRESH_INTERVAL_MS,
+		staleTime: SLASH_COMMANDS_REFRESH_INTERVAL_MS,
 	});
 }
 
