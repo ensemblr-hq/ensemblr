@@ -3769,6 +3769,7 @@ export default interface Resources {
 				title: 'Edit';
 			};
 			failed: {
+				'exit-code-title': '{{tool}} exited with code {{code}}';
 				generic: 'Tool execution failed.';
 				title: '{{tool}} failed';
 				unspecified: 'The call failed without a reported reason.';
