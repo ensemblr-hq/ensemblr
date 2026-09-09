@@ -173,6 +173,44 @@ describe('Pi delegation barrier', () => {
 		expect(delegationBarrierActive(state)).toBe(false);
 	});
 
+	it.each(['done', 'progress'])(
+		'unblocks work after a settled child reports an informational %s signal',
+		(reason) => {
+			const state = waitFor(startChild(), {
+				completed: [
+					{
+						agentSessionId: 'child-1',
+						lastMessage: 'Work complete. Checks passed.',
+						signal: { message: 'Checks passed.', reason },
+						status: 'idle',
+					},
+				],
+				pending: [],
+				timedOut: false,
+			});
+			const closed = afterDelegationToolResult(state, {
+				details: successful({ ok: true }),
+				input: { chatTabId: 'tab-1' },
+				toolCallId: 'close-1',
+				toolName: 'ensemblr_close_tab',
+			});
+			for (const toolName of ['read', 'bash']) {
+				expect(
+					beforeDelegationToolCall(closed, {
+						batchStartsChild: false,
+						input: {},
+						toolCallId: `${toolName}-1`,
+						toolName,
+					}).blockReason,
+				).toBeUndefined();
+			}
+			expect(shouldResumeDelegationWait(closed)).toBe(false);
+			expect(
+				delegationBarrierActive(restoreDelegationBarrierState(closed)),
+			).toBe(false);
+		},
+	);
+
 	it('keeps signaled children outstanding until a follow-up settles', () => {
 		const signaled = waitFor(startChild(), {
 			completed: [
@@ -213,6 +251,22 @@ describe('Pi delegation barrier', () => {
 			timedOut: false,
 		});
 		expect(delegationBarrierActive(settled)).toBe(false);
+	});
+
+	it('fails closed for an unrecognized child signal', () => {
+		const signaled = waitFor(startChild(), {
+			completed: [
+				{
+					agentSessionId: 'child-1',
+					signal: { message: 'New signal', reason: 'future_reason' },
+					status: 'streaming',
+				},
+			],
+			pending: [],
+			timedOut: false,
+		});
+
+		expect(delegationBarrierActive(signaled)).toBe(true);
 	});
 
 	it('allows only barrier-resolution tools while a child is outstanding', () => {
@@ -423,24 +477,34 @@ describe('Pi delegation barrier', () => {
 		expect(delegationBarrierActive(knownChildSettled)).toBe(true);
 	});
 
-	it('clears recovery after the default wait observes the child settle', () => {
-		const started = beforeDelegationToolCall(createDelegationBarrierState(), {
-			batchStartsChild: true,
-			input: {},
-			toolCallId: 'start-1',
-			toolName: 'ensemblr_start_conversation',
-		});
-		const restored = restoreDelegationBarrierState(started.state);
-		const settled = afterDelegationToolResult(restored, {
-			details: successful({
-				completed: [{ agentSessionId: 'child-1', signal: null }],
+	it.each([
+		[null, false],
+		['done', false],
+		['progress', false],
+		['future_reason', true],
+	] as const)(
+		'sets recovery after signal %s to active=%s',
+		(reason, active) => {
+			const started = beforeDelegationToolCall(createDelegationBarrierState(), {
+				batchStartsChild: true,
+				input: {},
+				toolCallId: 'start-1',
+				toolName: 'ensemblr_start_conversation',
+			});
+			const restored = restoreDelegationBarrierState(started.state);
+			const settled = waitFor(restored, {
+				completed: [
+					{
+						agentSessionId: 'child-1',
+						signal:
+							reason === null ? null : { message: 'Checks passed.', reason },
+						status: 'idle',
+					},
+				],
 				pending: [],
-			}),
-			input: { mode: 'all' },
-			toolCallId: 'wait-1',
-			toolName: 'ensemblr_wait_for_agents',
-		});
+			});
 
-		expect(delegationBarrierActive(settled)).toBe(false);
-	});
+			expect(delegationBarrierActive(settled)).toBe(active);
+		},
+	);
 });
