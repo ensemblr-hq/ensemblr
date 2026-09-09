@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-09-09
+
+Ensemblr 0.1.12 gives Pi extensions a safe, structured way to present tool activity, while making Pi startup and command discovery more dependable.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.12) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.12/Ensemblr-0.1.12-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.12/Ensemblr-0.1.12-x64.AppImage)
+
+### Added
+
+- **Pi extensions can now present their own tool activity.** A versioned, schema-validated contract supports extension-owned titles, Lucide glyphs, previews, and structured bodies; snapshots persist through streaming and transcript restoration while host-owned presenters keep precedence and raw execution has a localized fallback. (#531)
+- **Pi slash commands warm when the composer opens and refresh every five minutes.** Claude Code discovery remains lazy. (#529)
+
+### Fixed
+
+- **Pi startup readiness and prompt acceptance now wait independently.** A correlated child readiness event precedes the first prompt, prompt preflight receives its own bounded window, and uncertain post-write delivery is never replayed automatically. Failed child spawns also settle cleanly so saved conversations can resume. (#530)
+
 ## [0.1.11] - 2026-09-09
 
 Ensemblr 0.1.11 makes agent work easier to follow and harder to lose: tool activity now reads as
@@ -3115,4 +3131,5 @@ Two gaps were filled with new ADRs:
 
 `docs/agent-control.md` needed no correction: `tests/main/agent-control-doc-parity.test.ts` holds its tables
 against `TOOL_DEFS`, so #244's five Linear ops could not land without the doc being updated with them.
+
 - `tests/main/agent-control-doc-parity.test.ts`, `tests/main/support/agent-control-doc.ts` - New. Parses the tool tables out of `docs/agent-control.md` and asserts them against `TOOL_DEFS`, the Zod schemas, and the withholding policy, so the reference cannot drift silently a fourth time.
