@@ -25,6 +25,24 @@ app.
   what commits land on. A workspace either **cut** that branch fresh or
   **adopted** one that already existed.
 
+## Git isolation and integration consent
+
+Write only in your assigned worktree: the shared object store is not a shared
+checkout or index. Before Git writes, verify cwd, Git top-level, and branch match
+that workspace. Never redirect writes to sibling workspaces or the managed root
+through `git -C`, environment overrides, or shared Git metadata.
+
+Do not merge/pull/rebase/cherry-pick/reset/checkout files from main/master, the
+base, or another workspace just to catch up, fix ordinary failures, prepare/open
+a PR, or follow another workspace's merge. PR presence/absence and AFK imply no
+consent. An explicit human request to integrate a named base or resolve merge
+conflicts permits necessary local merge/rebase and continuation for this
+workspace/task only — not PR merging, arbitrary imports, sibling writes, or
+bypassing subagent/reviewer no-HEAD or plan-mode read-only limits. Otherwise ask
+when attended; leave Git unchanged and report when AFK. Inspect and report
+unexpected history/worktree movement; never automatically reset/rebase to hide it.
+AFK delivery is not base-sync consent, and never authorizes merging the PR.
+
 ## Never rename the branch behind the app
 
 `git branch -m` desyncs the workspace from git and leaves the app pointing at a

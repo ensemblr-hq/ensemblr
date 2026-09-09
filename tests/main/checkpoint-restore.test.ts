@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -12,6 +18,10 @@ import {
 	readHiddenEventRanges,
 	restoreTurnCheckpoint,
 } from '../../src/main/checkpoints/checkpoint-service.ts';
+import {
+	captureWorkspaceCheckpoint,
+	restoreWorkspaceTo,
+} from '../../src/main/checkpoints/git-checkpoint.ts';
 import {
 	type EnsemblrDatabaseConnection,
 	openEnsemblrDatabase,
@@ -242,6 +252,75 @@ test('restore leaves never-tracked post-checkpoint files in place', async (t) =>
 	});
 
 	assert.equal(existsSync(strayPath), true);
+});
+
+test('contaminated restore updates only its worktree, leaving sibling files, index, and HEAD intact', async (t) => {
+	const { repoDirectory } = openFixture(t);
+	const workspace = path.join(path.dirname(repoDirectory), 'workspace');
+	git(repoDirectory, 'worktree', 'add', '-b', 'workspace', workspace);
+	writeFileSync(path.join(workspace, 'app.txt'), 'workspace snapshot\n');
+	writeFileSync(path.join(workspace, 'note.txt'), 'captured note\n');
+	const { commitHash } = await captureWorkspaceCheckpoint({
+		cwd: workspace,
+		message: 'restore target',
+		ref: 'refs/ensemblr/checkpoints/isolation/restore',
+	});
+	writeFileSync(path.join(workspace, 'app.txt'), 'wrecked\n');
+	writeFileSync(path.join(workspace, 'note.txt'), 'wrecked\n');
+	writeFileSync(path.join(workspace, 'keep.txt'), 'untracked user work\n');
+	writeFileSync(path.join(repoDirectory, 'app.txt'), 'sibling staged\n');
+	git(repoDirectory, 'add', 'app.txt');
+	writeFileSync(path.join(repoDirectory, 'app.txt'), 'sibling unstaged\n');
+	writeFileSync(path.join(repoDirectory, 'note.txt'), 'sibling note\n');
+	const siblingIndex = path.join(repoDirectory, '.git', 'index');
+	const indexBefore = readFileSync(siblingIndex);
+	const headBefore = git(workspace, 'rev-parse', 'HEAD');
+	const routing = {
+		GIT_DIR: path.join(repoDirectory, '.git'),
+		GIT_WORK_TREE: repoDirectory,
+		GIT_INDEX_FILE: siblingIndex,
+		GIT_CONFIG_COUNT: '1',
+		GIT_CONFIG_KEY_0: 'core.worktree',
+		GIT_CONFIG_VALUE_0: repoDirectory,
+	};
+	const previous = Object.keys(routing).map(
+		(key) => [key, process.env[key]] as const,
+	);
+	try {
+		Object.assign(process.env, routing);
+		await restoreWorkspaceTo({ cwd: workspace, commitHash });
+	} finally {
+		for (const [key, value] of previous) {
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value;
+		}
+	}
+
+	assert.equal(
+		readFileSync(path.join(workspace, 'app.txt'), 'utf8'),
+		'workspace snapshot\n',
+	);
+	assert.equal(
+		readFileSync(path.join(workspace, 'note.txt'), 'utf8'),
+		'captured note\n',
+	);
+	assert.equal(
+		readFileSync(path.join(workspace, 'keep.txt'), 'utf8'),
+		'untracked user work\n',
+	);
+	assert.equal(git(workspace, 'show', ':app.txt'), 'workspace snapshot');
+	assert.equal(git(workspace, 'show', ':note.txt'), 'captured note');
+	assert.deepEqual(readFileSync(siblingIndex), indexBefore);
+	assert.equal(git(repoDirectory, 'rev-parse', 'HEAD'), headBefore);
+	assert.equal(git(workspace, 'rev-parse', 'HEAD'), headBefore);
+	assert.equal(
+		readFileSync(path.join(repoDirectory, 'app.txt'), 'utf8'),
+		'sibling unstaged\n',
+	);
+	assert.equal(
+		readFileSync(path.join(repoDirectory, 'note.txt'), 'utf8'),
+		'sibling note\n',
+	);
 });
 
 test('restoreTurnCheckpoint fails cleanly when no checkpoint exists', async (t) => {

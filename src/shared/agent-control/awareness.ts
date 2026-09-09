@@ -534,6 +534,9 @@ ${SKILL_POINTER}
 ${terminalDiscipline ? `\n${terminalDiscipline}\n` : ''}${trackerObligation ? `\n${trackerObligation}\n` : ''}
 ${REVIEW_FOLLOW_THROUGH}`;
 
+/** Git write scope and human consent apply across every workspace role and mode. */
+const GIT_WORKSPACE_CONSENT = `Git isolation and consent: write only in your own worktree; a shared object store is not a shared checkout or index. Before Git writes, verify cwd, Git top-level, and branch match your assigned workspace. Never route writes to a sibling workspace or managed root checkout through git -C, environment overrides, or shared Git metadata. Do not merge, pull, rebase, cherry-pick, reset, or checkout files from main/master, the base, or another workspace merely to catch up, fix ordinary failures, prepare/open a PR, or because another workspace merged. PR presence or absence and AFK do not imply consent. An explicit human request to integrate a named base or resolve merge conflicts authorizes necessary local merge/rebase and continuation for this workspace/task only — not PR merging, arbitrary imports, sibling writes, or overriding subagent/reviewer no-HEAD rules or plan-mode read-only limits. Without that permission, ask when attended; when AFK leave Git unchanged and report. Unexpected history or worktree movement: inspect and report; never automatically reset/rebase to hide it.`;
+
 /**
  * The closing etiquette bullets, held in one place so a change to scope, cleanup,
  * or approval wording cannot land in one playbook and drift out of the others.
@@ -541,7 +544,9 @@ ${REVIEW_FOLLOW_THROUGH}`;
  * call site; the cleanup bullet is composed in below, because only a role that can
  * open a tab has one to clean up.
  */
-const SCOPE_ETIQUETTE = `- Writes act only on your own workspace; reads may span all open workspaces — inspect before acting.`;
+const SCOPE_ETIQUETTE = `- Writes act only on your own workspace; reads may span all open workspaces — inspect before acting.
+
+${GIT_WORKSPACE_CONSENT}`;
 
 /** The cleanup bullet, for the roles that can open a tab in the first place. */
 const CLEANUP_ETIQUETTE = `- Close the tabs you opened once they have served their purpose (\`ensemblr_close_tab\`); a conversation that outlives your turn stays open, and so does any tab you did not open.`;
@@ -911,6 +916,8 @@ export const planModeOrchestratorAwareness = (
 ): string =>
 	`${PLAN_MODE_HEADLINE}
 
+${GIT_WORKSPACE_CONSENT}
+
 You are running inside Ensemblr, a desktop coding-workspace app, and you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`). Planning leaves you the half of that surface that reads, asks, and delegates reading:
 
 ${PLAN_MODE_READ_BULLET}
@@ -973,6 +980,8 @@ export const planModeSubagentAwareness = (
 	features: AwarenessFeatures,
 ): string =>
 	`${PLAN_MODE_HEADLINE}
+
+${GIT_WORKSPACE_CONSENT}
 
 You are running inside Ensemblr, a desktop coding-workspace app, and you were spawned as a sub-agent by an orchestrator that is planning. Your job is to answer the question it gave you, from the code, and hand the answer back. Planning leaves you the half of the Ensemblr control surface (prefixed \`ensemblr_\`) that reads:
 

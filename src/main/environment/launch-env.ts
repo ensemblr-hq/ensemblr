@@ -24,20 +24,51 @@ const LAUNCH_CONTEXT_ENV_KEYS = [
 ] as const;
 
 /**
- * Returns a copy of `env` with the macOS/Electron launch-context variables
- * removed, so spawning a child can never make macOS relaunch this app. Pure:
- * the input object is not mutated. Generic in the env shape so callers keep
- * their exact type (`Record<string, string>` in, `Record<string, string>` out)
- * without an assertion at the boundary.
- * @param env - Source environment, typically `process.env` or a base env.
- * @returns A new environment object without the launch-context keys.
+ * Repository-local context reported by `git rev-parse --local-env-vars`, plus
+ * namespace and discovery overrides documented by git(1). These override cwd
+ * or change which index, objects, refs, or configuration a child operates on.
+ */
+const GIT_CONTEXT_ENV_KEYS: ReadonlySet<string> = new Set([
+	'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+	'GIT_CEILING_DIRECTORIES',
+	'GIT_COMMON_DIR',
+	'GIT_CONFIG',
+	'GIT_CONFIG_COUNT',
+	'GIT_CONFIG_PARAMETERS',
+	'GIT_DIR',
+	'GIT_DISCOVERY_ACROSS_FILESYSTEM',
+	'GIT_GRAFT_FILE',
+	'GIT_IMPLICIT_WORK_TREE',
+	'GIT_INDEX_FILE',
+	'GIT_NAMESPACE',
+	'GIT_NO_REPLACE_OBJECTS',
+	'GIT_OBJECT_DIRECTORY',
+	'GIT_PREFIX',
+	'GIT_REPLACE_REF_BASE',
+	'GIT_SHALLOW_FILE',
+	'GIT_WORK_TREE',
+]);
+
+/**
+ * Removes inherited app identity and Git repository context so children use
+ * their assigned cwd rather than a parent's checkout, index, or ref namespace.
+ * Git identity, editor, and authentication settings remain intact. Apply after
+ * merging overlays; private Git operations may then supply their own temp index.
+ * @param env - Assembled environment to sanitize without mutating it.
+ * @returns A copy without launch identity or repository-local Git overrides.
  */
 export function stripLaunchContextEnv<T extends NodeJS.ProcessEnv>(env: T): T {
-	// Spread preserves every own key of `env`, so the result is still a `T`; TS
-	// can't infer that through the delete loop, hence the single localized cast.
-	const sanitized = { ...env } as T;
+	const sanitized = { ...env };
 	for (const key of LAUNCH_CONTEXT_ENV_KEYS) {
 		delete sanitized[key];
+	}
+	for (const key of Object.keys(sanitized)) {
+		if (
+			GIT_CONTEXT_ENV_KEYS.has(key) ||
+			/^GIT_CONFIG_(?:KEY|VALUE)_\d+$/.test(key)
+		) {
+			delete sanitized[key];
+		}
 	}
 	return sanitized;
 }

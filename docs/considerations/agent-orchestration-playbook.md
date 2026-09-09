@@ -1,5 +1,36 @@
 # Agent Orchestration Playbook
 
+## Git isolation and consent
+
+`GIT_WORKSPACE_CONSENT` in `src/shared/agent-control/awareness.ts` supplies the
+same instruction-level boundary to roots, native roots, subagents, terminal
+harnesses, and both plan-mode roles; the Pi extension mirrors it with parity tests.
+This changes guidance, not OS execution policy. Git writes require verifying the
+assigned cwd/top-level/branch; the shared object store never grants writes to
+sibling worktrees or the managed root, including through Git overrides.
+
+Base integration is not routine catch-up, failure repair, or PR preparation.
+Only an explicit human request to integrate a named base or resolve merge
+conflicts permits necessary local merge/rebase and continuation for that
+workspace/task; role no-HEAD and plan-mode read-only limits still apply. PR
+presence/absence and AFK delivery grant no base-sync consent, and local integration
+permission never grants PR merging or arbitrary imports. Without permission,
+ask when attended; leave Git unchanged and report when AFK. Unexpected history
+or worktree movement calls for inspection/reporting, not an automatic reset/rebase.
+
+The launch environment also drops inherited Git repository-routing variables
+(`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, object/common-directory and ref
+namespace overrides, and repository-local config injection). Git otherwise uses
+these instead of the assigned cwd. The shared sanitizer applies after overlays
+for command, Pi, Claude, and terminal launches; checkpoint Git calls sanitize
+ambient context before supplying their own private temporary index. Identity,
+editor, and authentication variables remain available. This does not prevent a
+running shell, agent, extension, hook, or user startup script from explicitly
+setting those variables again. It is inherited-environment isolation, not an OS
+sandbox or a mechanically enforced local-merge approval gate. The variable list
+follows `git rev-parse --local-env-vars` and the
+[official Git environment documentation](https://git-scm.com/docs/git#_environment_variables).
+
 > The canonical guidance that teaches an agent to use the `ensemblr_*` control tools. The
 > authoritative text lives in `src/shared/agent-control/awareness.ts` as a **2×2 of role by Plan
 > Mode**: `orchestratorAwareness` / `subagentAwareness` for working agents, and

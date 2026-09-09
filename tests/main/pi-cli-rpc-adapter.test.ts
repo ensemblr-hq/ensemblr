@@ -359,10 +359,26 @@ test('spawns the Pi child under the resolved base environment', async () => {
 		resolveBaseEnv: () => ({
 			HOME: '/Users/dev',
 			PATH: '/opt/homebrew/bin:/usr/bin:/bin',
+			GIT_DIR: '/sibling/.git',
+			GIT_WORK_TREE: '/sibling',
+			GIT_SSH_COMMAND: 'ssh -i /identity',
 		}),
 		spawn: recorder.spawn,
 	});
-	await adapter.createSession(buildInput());
+	await adapter.createSession(
+		buildInput({
+			metadata: {
+				env: {
+					LANG: 'en_US.UTF-8',
+					GIT_DIR: '/overlay/.git',
+					GIT_INDEX_FILE: '/sibling/.git/index',
+					GIT_CONFIG_COUNT: '1',
+					GIT_CONFIG_KEY_0: 'core.worktree',
+					GIT_CONFIG_VALUE_0: '/sibling',
+				},
+			},
+		}),
+	);
 
 	const record = firstItem(recorder.getRecords());
 	// Base env (shell PATH + HOME) is present, and the per-session overlay layers
@@ -370,6 +386,17 @@ test('spawns the Pi child under the resolved base environment', async () => {
 	assert.equal(record.env.PATH, '/opt/homebrew/bin:/usr/bin:/bin');
 	assert.equal(record.env.HOME, '/Users/dev');
 	assert.equal(record.env.LANG, 'en_US.UTF-8');
+	assert.equal(record.env.GIT_SSH_COMMAND, 'ssh -i /identity');
+	for (const key of [
+		'GIT_DIR',
+		'GIT_WORK_TREE',
+		'GIT_INDEX_FILE',
+		'GIT_CONFIG_COUNT',
+		'GIT_CONFIG_KEY_0',
+		'GIT_CONFIG_VALUE_0',
+	]) {
+		assert.equal(record.env[key], undefined, key);
+	}
 	await adapter.shutdown();
 });
 
