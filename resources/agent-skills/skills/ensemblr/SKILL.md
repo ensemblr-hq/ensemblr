@@ -5,7 +5,7 @@ description: How Ensemblr works from inside it — the workspace/git-worktree mo
 
 # Working inside Ensemblr
 
-You are running inside **Ensemblr**, a macOS desktop coding-workspace app. It
+You are running inside **Ensemblr**, a desktop coding-workspace app for macOS and Linux. It
 opens git repositories, cuts an isolated workspace per stream of work, runs
 coding agents against them, and reviews what they changed. You are one of those
 agents.
