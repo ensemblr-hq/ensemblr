@@ -286,7 +286,7 @@ export function afterDelegationToolResult(
 			next = adoptRecoveryChild(
 				next,
 				completed,
-				completed.signal == null ? 'settled' : 'attention',
+				completedChildPhase(completed),
 			);
 		}
 		for (const pending of recordsOf(data.pending)) {
@@ -301,7 +301,7 @@ export function afterDelegationToolResult(
 		next = updateChildPhase(
 			next,
 			agentSessionId,
-			completed.signal == null ? 'settled' : 'attention',
+			completedChildPhase(completed),
 		);
 	}
 	for (const pending of recordsOf(data.pending)) {
@@ -320,6 +320,21 @@ export function afterDelegationToolResult(
 		next = { ...next, recoveryRequired: false };
 	}
 	return next;
+}
+
+/**
+ * Distinguishes informational signals from any signal that may need attention.
+ * @param completed - A child included in a successful wait's completed reports.
+ * @returns Settled only without a signal or for a known informational signal.
+ */
+function completedChildPhase(
+	completed: Record<string, unknown>,
+): DelegatedChild['phase'] {
+	if (completed.signal == null) {
+		return 'settled';
+	}
+	const reason = recordOf(completed.signal).reason;
+	return reason === 'done' || reason === 'progress' ? 'settled' : 'attention';
 }
 
 /** Adopts a child returned by a recovery wait without inventing a tab id. */
