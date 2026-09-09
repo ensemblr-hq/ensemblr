@@ -5,7 +5,7 @@ cites the source it was read from. Facts marked `OBSERVED` were not stated in
 docs and must be confirmed against the Phase 1 captures in
 `tests/fixtures/pi-captures/`.
 
-Sources inspected (pi `0.79.1`, `@earendil-works/pi-coding-agent`). At runtime
+Sources inspected (Pi `0.85.1`, `@earendil-works/pi-coding-agent`). This documents the tested Pi version; it does not change Ensemblr's configured minimum. At runtime
 Ensemblr resolves the Pi executable through the Pi executable service
 (`resolvePiExecutable` in `src/main/pi-runtime/pi-executable.ts`) — an npm-global
 install, Homebrew, or an explicitly configured path — never a hardcoded
@@ -157,8 +157,8 @@ Documented event types (`rpc.md` "Events"):
 | `message_start` / `message_end` | `message: AgentMessage` |
 | `message_update` | `message` (partial) + `assistantMessageEvent` delta |
 | `tool_execution_start` | `toolCallId`, `toolName`, `args` |
-| `tool_execution_update` | + `partialResult` — **accumulated** output so far, not a delta (`rpc.md` "tool_execution_*") |
-| `tool_execution_end` | + `result`, `isError` |
+| `tool_execution_update` | + `partialResult` — **accumulated** output so far, not a delta (`rpc.md` "tool_execution_*"). Ensemblr extracts only `partialResult.details.ensemblr.presentation` for a normalized running snapshot. |
+| `tool_execution_end` | + `result`, `isError`; the final `result.details.ensemblr.presentation` is authoritative when valid. |
 | `queue_update` | `steering: string[]`, `followUp: string[]` |
 | `compaction_start` / `compaction_end` | `reason: "manual"\|"threshold"\|"overflow"`, result/abort/error fields |
 | `auto_retry_start` / `auto_retry_end` | attempt counters, delay, error text |
@@ -193,6 +193,29 @@ response(prompt) → agent_start → turn_start
 `OBSERVED`: exact interleaving of `message_end` vs `tool_execution_start`,
 and whether `turn_end` fires per LLM call or per tool-loop iteration — verify
 in `multi-tool-chain` capture.
+
+## Extension-owned presentation snapshots
+
+Pi extensions may put a complete, data-only Ensemblr descriptor at
+`details.ensemblr.presentation` in ordinary tool results and partial results.
+The [v1 specification](./tool-presentation-spec.md) defines the exact
+vocabulary, validation limits, locale fallback, and safe fallback behavior.
+The descriptor is advisory: it cannot set completion or error state, bypass
+permissions, grant capabilities, or identify its sender. Host failure and
+permission handling, protected core tools, and Ensemblr Control remain first in
+the presentation precedence order.
+
+Each `tool_execution_update.partialResult` is a complete replacement snapshot,
+not a patch. A missing or invalid descriptor clears the custom snapshot. Final
+results are authoritative and must repeat the descriptor if it should remain;
+a final result without one selects the existing presenter. Keep the normal
+`content` and other `details` fields. For a presentation-only update, use
+`content: []` to avoid duplicating accumulated output.
+
+The descriptor limits do not remove Pi's 1 MiB RPC JSONL frame limit. A frame
+that is too large can be discarded before Ensemblr sees the descriptor; keep
+snapshots small and throttle updates. Pi's `tool_execution_update` payload is
+accumulated output, so do not copy that output into every presentation snapshot.
 
 ## Message/event payload types
 

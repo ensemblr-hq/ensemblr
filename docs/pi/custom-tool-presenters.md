@@ -1,5 +1,19 @@
 # Pi custom tool presenters
 
+This is the developer entry point for Pi extension-owned native presentation. Start with the [v1 contract](./tool-presentation-spec.md) and the [working example](./examples/extension-owned-presenter/). An extension returns data in `details.ensemblr.presentation`; it does not load Ensemblr UI code, register a presenter, or add a tool-name mapping. The contract is tested against Pi `0.85.1`; Ensemblr's existing Pi minimum is unchanged.
+
+Use Pi's ordinary development command:
+
+```bash
+pi -e ./path/to/extension.ts
+```
+
+During execution, emit complete replacement snapshots from `onUpdate`; repeat the desired snapshot in the final result. Keep ordinary `content` and other `details` intact, and use `content: []` for presentation-only updates. Host failures, permissions, protected core tools, and Ensemblr Control remain authoritative. Invalid or unsupported descriptors safely fall back to the normal result or the legacy presenter. The [RPC notes](./rpc-protocol.md#extension-owned-presentation-snapshots) cover event transport and the 1 MiB frame caveat.
+
+## Legacy built-in inventory
+
+The table below is retained as the fallback reference for hardcoded third-party presenters. New extensions should use the v1 contract instead of adding a name-based mapping.
+
 Ensemblr renders the following Pi extension tool calls with dedicated timeline titles, previews, bodies, and glyphs. Dispatch is centralized in [`src/renderer/lib/agent-timeline/tool-presenters.ts`](../../src/renderer/lib/agent-timeline/tool-presenters.ts); each extension owns its mapping below.
 
 | Extension | Tools | Presenter source | Tests |

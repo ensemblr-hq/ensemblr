@@ -1,35 +1,40 @@
 # Schemas
 
-Public JSON Schemas for the two configuration files Ensemblr reads. They are
-published so an editor can complete, validate, and document a config file
-without Ensemblr running.
+Public JSON Schemas for Ensemblr configuration and Pi extension presentation.
+They are published so an editor can complete, validate, and document these data
+shapes without Ensemblr running.
 
 | File | Schema | Describes |
 | --- | --- | --- |
 | `~/.config/ensemblr/config.json` | [`config.schema.json`](./config.schema.json) | User-scope App settings and declarative configuration. See [11. App settings](../docs/guide/11-app-settings.md). |
 | `.ensemblr/settings.toml` | [`settings.schema.json`](./settings.schema.json) | A repository's committed per-repository settings. See [12. Repository settings](../docs/guide/12-repository-settings.md). |
+| Pi `details.ensemblr.presentation` | [`tool-presentation.v1.schema.json`](./tool-presentation.v1.schema.json) | The v1 data-only contract for extension-owned native tool presentation. See [the Pi presentation spec](../docs/pi/tool-presentation-spec.md). |
 
-Both are JSON Schema draft 2020-12. TOML has no schema language of its own;
+All are JSON Schema draft 2020-12. TOML has no schema language of its own;
 [Taplo](https://taplo.tamasfe.dev/) — the engine behind the Even Better TOML
 extension — validates TOML against JSON Schema, which is why `settings.toml`
 gets one too.
 
 ## URLs
 
-Each schema's canonical `$id` is under the product domain, and the site serves
-it. Reference these:
+Each schema's canonical `$id` is under the product domain. The two
+configuration schemas are served there; reference these URLs:
 
-```
+```text
 https://www.ensemblr.dev/schemas/config.schema.json
 https://www.ensemblr.dev/schemas/settings.schema.json
 ```
+
+The presentation schema keeps a product-domain `$id` for stable references, but
+its published artifact currently lives in this repository; do not assume a
+separate website endpoint for it.
 
 The committed copies also resolve over raw.githubusercontent.com, which is what
 the canonical URLs are cut from. Prefer the product domain — it is the `$id`
 each schema declares, so an editor that follows a `$ref` or caches by `$id`
 agrees with the pointer it was given:
 
-```
+```text
 https://raw.githubusercontent.com/ensemblr-hq/ensemblr/master/schemas/config.schema.json
 https://raw.githubusercontent.com/ensemblr-hq/ensemblr/master/schemas/settings.schema.json
 ```
@@ -42,9 +47,9 @@ by hand to a config that predates it:
 
 ```json
 {
-	"$schema": "https://www.ensemblr.dev/schemas/config.schema.json",
-	"schemaVersion": 1,
-	"app": {}
+ "$schema": "https://www.ensemblr.dev/schemas/config.schema.json",
+ "schemaVersion": 1,
+ "app": {}
 }
 ```
 
@@ -63,6 +68,10 @@ repository up once survives.
 This repository points its own `.ensemblr/settings.toml` at the checked-in file
 with a relative path (`#:schema ../schemas/settings.schema.json`) so it
 validates offline and always against the tree it ships with.
+
+The presentation schema leaves `glyph` as a string because its runtime validator
+checks the value against the installed `lucide-react` icon set; this keeps the
+published schema usable when the icon catalogue changes.
 
 An editor can also be told directly, without a pointer in the file at all —
 `.vscode/settings.json` in this repository maps `.ensemblr/settings.toml` that

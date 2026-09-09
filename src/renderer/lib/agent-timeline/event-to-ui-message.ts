@@ -35,6 +35,7 @@ import {
 import {
 	buildToolCallPart,
 	buildToolResultPart,
+	buildToolUpdatePart,
 	mergeToolPart,
 } from './tool-event-mapper';
 
@@ -699,6 +700,8 @@ function projectMessagePayload(
 			return [buildToolCallPart(payload, event, parentToolCallId)];
 		case 'tool-result':
 			return [buildToolResultPart(payload, event, parentToolCallId)];
+		case 'tool-update':
+			return [buildToolUpdatePart(payload, event, parentToolCallId)];
 		case 'message':
 			return payload.parts.flatMap((part) =>
 				projectMessagePart(part, event, parentToolCallId),

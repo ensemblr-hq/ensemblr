@@ -4,14 +4,20 @@ import type { PiCustomMessageData } from '@/renderer/types/agent-timeline';
 import type {
 	AgentRoleResolver,
 	TimelineSurface,
-	ToolGlyph,
 	ToolPresentation,
+	ToolPresentationGlyph,
 } from '@/renderer/types/tool-presentation';
 import {
 	canonicalEnsemblrToolName,
 	ensemblrControlFailure,
 	ensemblrToolLabel,
 } from './ensemblr-tool-presentation';
+import {
+	extensionPresentationOf,
+	isHostPermissionState,
+	isProtectedToolName,
+	presentExtensionToolCall,
+} from './extension-tool-presenter';
 import { looksLikeStackTrace } from './tool-output-classifier';
 import { outputOf } from './tool-part-fields';
 import { presenterForPart, restingGlyph } from './tool-presenters';
@@ -26,7 +32,12 @@ import { presenterForPart, restingGlyph } from './tool-presenters';
  */
 
 /** Tool states that still represent work in flight rather than a result. */
-const RUNNING_STATES = new Set(['input-streaming', 'input-available']);
+const RUNNING_STATES = new Set([
+	'approval-requested',
+	'approval-responded',
+	'input-streaming',
+	'input-available',
+]);
 
 /**
  * Turns a raw tool name into a title-cased, space-separated label.
@@ -65,12 +76,38 @@ function failureTextOf(part: DynamicToolUIPart): string | null {
 	if ('errorText' in part && part.errorText) {
 		return part.errorText;
 	}
+	if (
+		part.state === 'output-denied' ||
+		(part.state === 'approval-responded' &&
+			'approval' in part &&
+			part.approval.approved === false)
+	) {
+		return (
+			approvalReasonOf(part) ??
+			i18n.t('common:tool-approval.status', 'Approval required for {{tool}}.', {
+				tool: humanizeToolName(part.toolName),
+			})
+		);
+	}
 	const controlFailure = ensemblrControlFailure(part);
 	if (controlFailure === null) {
 		return null;
 	}
 	const reported = controlFailure.error ?? outputOf(part)?.text ?? '';
 	return reported.length > 0 ? reported : unspecifiedFailure();
+}
+
+/**
+ * Reads the user's denial reason from a tool approval payload.
+ * @param part - The tool call carrying the approval decision.
+ * @returns The denial reason, or null when none was supplied.
+ */
+function approvalReasonOf(part: DynamicToolUIPart): string | null {
+	if (!('approval' in part)) {
+		return null;
+	}
+	const reason = part.approval?.reason;
+	return typeof reason === 'string' && reason.length > 0 ? reason : null;
 }
 
 /**
@@ -95,10 +132,10 @@ function shellExitCodeOf(
 /**
  * Projects any tool call into everything its row needs to render.
  *
- * Failures and in-flight calls short-circuit before the per-tool presenters:
- * a failed call reads the same whichever tool produced it, and a running one
- * has no result to shape yet. Otherwise a tool-specific presenter runs, falling
- * back to the generic extension shape for names the app does not know.
+ * Failures short-circuit before the per-tool presenters so a failed call reads
+ * the same whichever tool produced it. Running calls may render a validated
+ * extension snapshot; otherwise a tool-specific presenter runs, falling back to
+ * the generic extension shape for names the app does not know.
  *
  * A failure carrying a stack trace gets the frame-parsing viewer rather than a
  * flat block, so a several-hundred-line traceback collapses to its error line.
@@ -147,7 +184,20 @@ export function presentToolCall(
 	}
 	const glyph = restingGlyph(part);
 	const isRunning = RUNNING_STATES.has(part.state);
-	const projected = presenterForPart(part)(part);
+	const hostProjected = presenterForPart(part)(part);
+	const extension =
+		isProtectedToolName(part.toolName) || isHostPermissionState(part)
+			? null
+			: extensionPresentationOf(part);
+	const projected =
+		extension === null
+			? hostProjected
+			: (presentExtensionToolCall(
+					part,
+					extension,
+					hostProjected,
+					i18n.language,
+				) ?? hostProjected);
 	const controlLabel = ensemblrToolLabel(part, isRunning, surface, resolveRole);
 	const controlBadge = controlLabel?.badge;
 	const presentation = {
@@ -165,8 +215,9 @@ export function presentToolCall(
 		...(controlLabel?.unpinnedTitle
 			? { unpinnedTitle: controlLabel.unpinnedTitle }
 			: {}),
+		...(isRunning ? { running: true } : {}),
 	};
-	if (isRunning) {
+	if (isRunning && (extension === null || extension.body === undefined)) {
 		return { ...presentation, body: { kind: 'pending' } };
 	}
 	return presentation;
@@ -179,7 +230,9 @@ export function presentToolCall(
  * @param part - The tool part to identify
  * @returns The glyph for the tool, or the failure mark when the call failed
  */
-export function glyphForToolCall(part: DynamicToolUIPart): ToolGlyph {
+export function glyphForToolCall(
+	part: DynamicToolUIPart,
+): ToolPresentationGlyph {
 	return failureTextOf(part) === null ? restingGlyph(part) : 'circle-x';
 }
 

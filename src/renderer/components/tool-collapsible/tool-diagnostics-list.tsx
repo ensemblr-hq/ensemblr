@@ -24,21 +24,25 @@ export function ToolDiagnosticsList({
 }: {
 	entries: readonly ToolDiagnosticEntry[];
 }) {
+	const keyOccurrences = new Map<string, number>();
 	return (
 		<ToolPanel>
 			<div className='flex flex-col gap-2'>
-				{entries.map((entry) => (
-					<ToolDiagnosticRow entry={entry} key={diagnosticKey(entry)} />
-				))}
+				{entries.map((entry) => {
+					const keyBase = diagnosticKey(entry);
+					const occurrence = keyOccurrences.get(keyBase) ?? 0;
+					keyOccurrences.set(keyBase, occurrence + 1);
+					return (
+						<ToolDiagnosticRow entry={entry} key={`${keyBase}:${occurrence}`} />
+					);
+				})}
 			</div>
 		</ToolPanel>
 	);
 }
 
 /**
- * Builds a diagnostic's list key from its own content, so the key survives
- * reordering. Two diagnostics matching on every field are indistinguishable to
- * the reader, so collapsing them onto one key costs nothing.
+ * Builds the content-derived portion of a diagnostic's collision-safe list key.
  * @param entry - The diagnostic to identify
  * @returns A key derived from severity, position, source, and message
  */

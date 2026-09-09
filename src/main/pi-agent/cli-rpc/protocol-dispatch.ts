@@ -292,6 +292,8 @@ function handleMessageEnd(
 
 /**
  * Normalizes a tool-execution lifecycle frame into a tool-role message event.
+ * Updates carry a complete extension presentation replacement; starts and ends
+ * retain their ordinary identity and result semantics.
  * @param typed - A `tool_execution_start`/`_update`/`_end` frame.
  * @param deps - Session callbacks.
  */

@@ -1,5 +1,5 @@
 import type { DynamicToolUIPart } from 'ai';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChatAttachmentChip } from '@/renderer/components/chat-attachment-chip';
 import {
@@ -19,6 +19,7 @@ import type {
 	ToolChatBadgeDescriptor,
 	ToolFileBadgeDescriptor,
 	ToolPresentation,
+	ToolRawIODescriptor,
 	ToolWorkspaceBadgeDescriptor,
 } from '@/renderer/types/tool-presentation';
 import type { ConciergeReference } from '@/shared/concierge-references';
@@ -30,6 +31,7 @@ import {
 import { ToolCollapsible } from './tool-collapsible';
 import { ToolBody } from './tool-collapsible/tool-body';
 import { ToolCommandChip, ToolFileBadge } from './tool-collapsible/tool-chips';
+import { ToolLabeledPanel } from './tool-collapsible/tool-panel';
 import { useAgentRoleResolver } from './workbench-shell/conversation-panel/agent-role-context';
 import {
 	useFilePreviewOpener,
@@ -136,15 +138,25 @@ export function ChatSkillInvocation({ name }: { name: string }) {
  * what the row's own pulse already says.
  */
 function ToolRow({ presentation }: { presentation: ToolPresentation }) {
-	const { badge, body, glyph, preview, title, tone, unpinnedTitle } =
-		presentation;
+	const {
+		badge,
+		body,
+		extensionOwned,
+		glyph,
+		preview,
+		rawIO,
+		running,
+		title,
+		tone,
+		unpinnedTitle,
+	} = presentation;
 	const subject = useToolRowSubject(badge);
 
 	return (
 		<ToolCollapsible
 			disabled={body.kind === 'empty' || body.kind === 'pending'}
 			glyph={glyph}
-			pending={body.kind === 'pending'}
+			pending={running ?? body.kind === 'pending'}
 			title={subject ? title : (unpinnedTitle ?? title)}
 			tone={tone}
 			toolBadge={subject ? <ToolRowBadge subject={subject} /> : null}
@@ -157,7 +169,45 @@ function ToolRow({ presentation }: { presentation: ToolPresentation }) {
 			}
 		>
 			<ToolBody body={body} />
+			{extensionOwned && rawIO ? <ToolRawIODisclosure rawIO={rawIO} /> : null}
 		</ToolCollapsible>
+	);
+}
+
+/** Host-owned disclosure that keeps the actual execution visible beside custom UI. */
+function ToolRawIODisclosure({ rawIO }: { rawIO: ToolRawIODescriptor }) {
+	const { t } = useTranslation();
+	const [open, setOpen] = useState(false);
+	return (
+		<details
+			className='mt-3 rounded-md border border-border/60'
+			data-role='tool-raw-io'
+			data-tool-name={rawIO.toolName}
+			onToggle={(event) => setOpen(event.currentTarget.open)}
+			open={open}
+		>
+			<summary className='cursor-pointer px-3 py-2 text-muted-foreground text-xs'>
+				{t('workbench:tool-call.extension.raw', 'Raw execution: {{tool}}', {
+					tool: rawIO.toolName,
+				})}
+			</summary>
+			<div className='border-border/60 border-t p-3'>
+				<ToolLabeledPanel
+					sections={[
+						{
+							label: t('workbench:tool-call.generic.input-label', 'Input:'),
+							muted: true,
+							text: rawIO.input,
+						},
+						{
+							label: t('workbench:tool-call.generic.output-label', 'Output:'),
+							muted: false,
+							text: rawIO.output,
+						},
+					]}
+				/>
+			</div>
+		</details>
 	);
 }
 

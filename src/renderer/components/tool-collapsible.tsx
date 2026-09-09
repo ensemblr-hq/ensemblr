@@ -3,15 +3,18 @@ import type { ReactNode } from 'react';
 import { useId } from 'react';
 import { useAnchoredDisclosure } from '@/renderer/hooks/conversation/use-anchored-disclosure';
 import { cn } from '@/renderer/lib/utils';
-import type { ToolGlyph, ToolTone } from '@/renderer/types/tool-presentation';
-import { GLYPH_ICONS } from './tool-collapsible/glyph-icons';
+import type {
+	ToolPresentationGlyph,
+	ToolTone,
+} from '@/renderer/types/tool-presentation';
+import { ToolGlyphIcon } from './tool-collapsible/glyph-icons';
 
 /** Shape of a {@link ToolCollapsible} row. */
 interface ToolCollapsibleProps {
 	children: ReactNode;
 	/** Suppresses the disclosure control for a row with nothing to disclose. */
 	disabled?: boolean;
-	glyph: ToolGlyph;
+	glyph: ToolPresentationGlyph;
 	/** Pulses the row while the call is still in flight. */
 	pending?: boolean;
 	title: string;
@@ -52,7 +55,6 @@ export function ToolCollapsible({
 }: ToolCollapsibleProps) {
 	const { isOpen: open, rowRef, toggle } = useAnchoredDisclosure();
 	const bodyId = useId();
-	const ToolIcon = GLYPH_ICONS[glyph];
 	const DisclosureIcon = open ? MinusIcon : PlusIcon;
 	const isOpen = open && !disabled;
 
@@ -83,7 +85,8 @@ export function ToolCollapsible({
 										'group-hover/disclosure:opacity-0 group-has-[.filebadge:hover]/collapsible:opacity-100',
 								)}
 							>
-								<ToolIcon
+								<ToolGlyphIcon
+									glyph={glyph}
 									aria-hidden='true'
 									className={cn(
 										'size-3',

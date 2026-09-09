@@ -167,6 +167,34 @@ describe('eventPayload', () => {
 		});
 	});
 
+	it('persists a tool presentation update as a message payload', () => {
+		const event: AgentEvent = {
+			at: AT,
+			payload: {
+				input: { query: 'ensemblr' },
+				kind: 'tool-update',
+				name: 'search',
+				presentation: { title: 'Search', version: 1 },
+				toolCallId: 'call-1',
+			},
+			role: 'tool',
+			turnId: 'turn-1',
+			type: 'message',
+		};
+
+		expect(eventPayload(event)).toEqual({
+			kind: 'message',
+			payload: {
+				input: { query: 'ensemblr' },
+				kind: 'tool-update',
+				name: 'search',
+				presentation: { title: 'Search', version: 1 },
+				toolCallId: 'call-1',
+			},
+			role: 'tool',
+		});
+	});
+
 	it('still maps the variants that existed before usage did', () => {
 		expect(
 			eventPayload({

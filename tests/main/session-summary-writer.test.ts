@@ -58,6 +58,29 @@ function makeAgentEvent(text: string, turnId = 't-1'): AgentSessionEventWire {
 	};
 }
 
+function makeToolUpdateEvent(turnId = 't-1'): AgentSessionEventWire {
+	return {
+		branchId: 'b-1',
+		createdAt: '2026-01-01T00:00:00.500Z',
+		eventType: 'message',
+		id: `evt-tool-update-${turnId}`,
+		ordinal: 0.5,
+		payload: {
+			kind: 'message',
+			payload: {
+				input: { query: 'status' },
+				kind: 'tool-update',
+				name: 'search',
+				presentation: null,
+				toolCallId: 'call-1',
+			},
+			role: 'tool',
+		},
+		stream: 'protocol',
+		turnId,
+	};
+}
+
 const CONVERSATION = [
 	makeUserEvent('Fix the login redirect bug'),
 	makeAgentEvent('Patched the guard in auth.ts.'),
@@ -105,6 +128,25 @@ describe('writeSessionSummary', () => {
 		expect(contents).toContain('[user]: Fix the login redirect bug');
 		expect(contents).toContain('[agent]: Patched the guard in auth.ts.');
 		expect(contents).toContain('source: "transcript"');
+	});
+
+	test('ignores tool presentation updates in transcript summaries', async () => {
+		const workspaceCwd = makeWorkspaceDir();
+
+		const result = await createSessionSummaryWriter().writeSessionSummary({
+			...baseInput(workspaceCwd),
+			events: [
+				makeUserEvent('Check the search'),
+				makeToolUpdateEvent(),
+				makeAgentEvent('Search complete'),
+			],
+		});
+
+		const contents = readFileSync(result.path, 'utf8');
+		expect(contents).toContain('[user]: Check the search');
+		expect(contents).toContain('[agent]: Search complete');
+		expect(contents).not.toContain('[tool]:');
+		expect(contents).toContain('messageCount: 2');
 	});
 
 	test("renders the agent's own summary when it recorded one", async () => {

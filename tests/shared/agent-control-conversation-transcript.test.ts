@@ -130,6 +130,17 @@ describe('buildConversationTranscript', () => {
 					payload: { kind: 'text-delta', text: 'par' },
 					role: 'agent',
 				},
+				{
+					kind: 'message',
+					payload: {
+						input: { query: 'par' },
+						kind: 'tool-update',
+						name: 'search',
+						presentation: null,
+						toolCallId: 'call-1',
+					},
+					role: 'tool',
+				},
 				{ kind: 'status', previous: 'idle', status: 'streaming' },
 				{
 					kind: 'context-usage',

@@ -9,8 +9,8 @@
 import type { DynamicToolUIPart, UIMessage } from 'ai';
 import type { AttachmentMark } from '@/renderer/types/components';
 import type { ConciergeReference } from '@/shared/concierge-references';
-
 import type { AgentWireError } from '@/shared/ipc/contracts/agent-session';
+import type { ToolPresentationV1 } from '@/shared/tool-presentation';
 
 /** UI-message role of a mapped agent turn: user, assistant, or system. */
 export type UIRole = UIMessage['role'];
@@ -34,6 +34,7 @@ export type ParentedUIMessagePart = UIMessagePart & {
 /** A tool part carrying the subagent link, as {@link ParentedUIMessagePart}. */
 export type ParentedDynamicToolUIPart = DynamicToolUIPart & {
 	parentToolCallId?: string | null;
+	toolPresentation?: ToolPresentationV1 | null;
 };
 
 /** One activity row and, for a subagent call, the rows that ran inside it. */
