@@ -7,7 +7,7 @@ import type {
 	ToolPresenterResult,
 	ToolPreviewDescriptor,
 } from '@/renderer/types/tool-presentation';
-import { classifyToolOutput } from './tool-output-classifier';
+import { presentLspNavigation } from './pi-lens-lsp-navigation-presenter';
 import {
 	inputOf,
 	numberField,
@@ -15,13 +15,29 @@ import {
 	pathOf,
 	stringField,
 } from './tool-part-fields';
-import { fileBadge, languageFor, textBody } from './tool-presenter-helpers';
+import {
+	classifiedToolOutputBody,
+	fileBadge,
+	languageFor,
+	structuredToolOutputBody,
+	textBody,
+} from './tool-presenter-helpers';
 
-/** Icon assignments for the Pi Lens tools with dedicated presentation. */
+/** Icon assignments for every tool shipped by Pi Lens. */
 export const PI_LENS_TOOL_GLYPHS = {
+	ast_grep_dump: 'network',
+	ast_grep_outline: 'network',
+	ast_grep_replace: 'file-pen',
+	ast_grep_search: 'search',
+	effective_config: 'scroll-text',
+	lens_diagnostic_mark: 'stethoscope',
 	lens_diagnostics: 'stethoscope',
+	lsp_diagnostics: 'stethoscope',
+	lsp_navigation: 'crosshair',
 	module_report: 'network',
+	pi_lens_activate_tools: 'puzzle',
 	project_report: 'network',
+	read_enclosing: 'file-text',
 	read_symbol: 'file-text',
 	symbol_search: 'search',
 } satisfies Record<string, ToolGlyph>;
@@ -53,6 +69,335 @@ function firstOutputLine(text: string): string | null {
 			.map((line) => line.trim())
 			.find((line) => line.length > 0) ?? null
 	);
+}
+
+/**
+ * Reads an array of non-empty strings from an untrusted field bag.
+ * @param input - Tool arguments or details to inspect
+ * @param key - Field expected to contain strings
+ * @returns Valid strings in their original order
+ */
+function stringArrayField(
+	input: Readonly<Record<string, unknown>>,
+	key: string,
+): string[] {
+	const value = input[key];
+	return Array.isArray(value)
+		? value.filter(
+				(item): item is string =>
+					typeof item === 'string' && item.trim().length > 0,
+			)
+		: [];
+}
+
+/**
+ * Builds a badge when a path-aware tool was scoped to exactly one target.
+ * @param input - Tool arguments carrying `path`, `file`, or `paths`
+ * @returns A file or folder badge, or null for broader scopes
+ */
+function singleScopeBadge(
+	input: Readonly<Record<string, unknown>>,
+): ToolPresenterResult['badge'] {
+	const directPath = pathOf(input as Record<string, unknown>);
+	const paths = stringArrayField(input, 'paths');
+	const scope = directPath ?? (paths.length === 1 ? paths[0] : null);
+	return fileBadge(
+		scope,
+		scope?.trim().endsWith('/') === true ? 'folder' : 'file',
+	);
+}
+
+/**
+ * Projects free-form Pi Lens output without repeating the input argument bag.
+ * @param part - Tool call whose result should become the expandable body
+ * @returns Empty, terminal, or syntax-classified body
+ */
+function piLensOutputBody(part: DynamicToolUIPart): ToolBodyDescriptor {
+	return structuredToolOutputBody(part.toolName, outputOf(part)?.text ?? '');
+}
+
+/**
+ * Joins available preview fragments with the timeline's compact separator.
+ * @param parts - Optional fragments in display order
+ * @returns Monospaced preview, or null when every fragment is absent
+ */
+function monoPreview(
+	parts: readonly (string | null)[],
+): ToolPreviewDescriptor | null {
+	const visible = parts.filter((part): part is string => part !== null);
+	return visible.length === 0
+		? null
+		: { font: 'mono', text: visible.join(' · ') };
+}
+
+/**
+ * Presents activation of Pi Lens's lazily registered tools.
+ * @param part - The `pi_lens_activate_tools` call to project
+ * @returns A compact capability list with no redundant result body
+ */
+function presentActivateTools(part: DynamicToolUIPart): ToolPresenterResult {
+	const tools = stringArrayField(inputOf(part), 'tools');
+	return {
+		badge: null,
+		body: { kind: 'empty' },
+		preview: monoPreview(tools),
+		title: i18n.t(
+			'workbench:tool-call.pi-lens-activate.title',
+			'Activate Pi Lens tools',
+		),
+		tone: 'default',
+	};
+}
+
+/**
+ * Localizes Pi Lens diagnostic disposition codes for the collapsed row.
+ * @param disposition - Runtime disposition code
+ * @returns Localized label, or the unknown code unchanged
+ */
+function diagnosticDisposition(disposition: string | null): string | null {
+	switch (disposition) {
+		case 'false-positive':
+			return i18n.t(
+				'workbench:tool-call.diagnostic-mark.false-positive',
+				'false positive',
+			);
+		case 'suppress':
+			return i18n.t('workbench:tool-call.diagnostic-mark.suppress', 'suppress');
+		case 'defer':
+			return i18n.t('workbench:tool-call.diagnostic-mark.defer', 'defer');
+		case 'flagged':
+			return i18n.t('workbench:tool-call.diagnostic-mark.flagged', 'flagged');
+		default:
+			return disposition;
+	}
+}
+
+/**
+ * Presents the disposition recorded for one Pi Lens finding.
+ * @param part - The `lens_diagnostic_mark` call to project
+ * @returns File-scoped disposition, line, and confirmation body
+ */
+function presentDiagnosticMark(part: DynamicToolUIPart): ToolPresenterResult {
+	const input = inputOf(part);
+	const disposition = diagnosticDisposition(stringField(input, 'disposition'));
+	const line = numberField(input, 'line');
+	const lineLabel =
+		line === null
+			? null
+			: i18n.t('workbench:tool-call.diagnostic-mark.line', 'line {{line}}', {
+					line,
+				});
+	const previewParts = [disposition, lineLabel].filter(
+		(value): value is string => value !== null,
+	);
+	return {
+		badge: fileBadge(pathOf(input)),
+		body: piLensOutputBody(part),
+		preview:
+			previewParts.length === 0
+				? null
+				: { font: 'sans', text: previewParts.join(' · ') },
+		title: i18n.t(
+			'workbench:tool-call.diagnostic-mark.title',
+			'Mark diagnostic',
+		),
+		tone: 'default',
+	};
+}
+
+/**
+ * Reads the most identifying structural query from an AST search call.
+ * @param input - AST search arguments
+ * @returns Pattern, node kind, or first rule line
+ */
+function astSearchQuery(input: Record<string, unknown>): string | null {
+	const query = stringField(input, 'pattern', 'nodeKind', 'rule');
+	return query === null ? null : firstOutputLine(query);
+}
+
+/**
+ * Presents structural AST matches without serializing the large input bag.
+ * @param part - The `ast_grep_search` call to project
+ * @returns Search query, optional scope, and match output
+ */
+function presentAstSearch(part: DynamicToolUIPart): ToolPresenterResult {
+	const input = inputOf(part);
+	return {
+		badge: singleScopeBadge(input),
+		body: piLensOutputBody(part),
+		preview: monoPreview([astSearchQuery(input)]),
+		title: i18n.t('workbench:tool-call.ast-search.title', 'AST search'),
+		tone: 'default',
+	};
+}
+
+/**
+ * Presents an AST rewrite as the pattern-to-replacement transformation.
+ * @param part - The `ast_grep_replace` call to project
+ * @returns Rewrite preview, optional scope, and match output
+ */
+function presentAstReplace(part: DynamicToolUIPart): ToolPresenterResult {
+	const input = inputOf(part);
+	const pattern = stringField(input, 'pattern');
+	const rewrite = stringField(input, 'rewrite');
+	let transform = pattern;
+	if (pattern !== null && rewrite !== null) {
+		transform = `${pattern} → ${rewrite}`;
+	}
+	const details = outputOf(part)?.details;
+	const applied =
+		typeof details?.applied === 'boolean'
+			? details.applied
+			: input.apply === true;
+	const state = applied
+		? i18n.t('workbench:tool-call.ast-replace.applied', 'applied')
+		: i18n.t('workbench:tool-call.ast-replace.preview', 'preview');
+	return {
+		badge: singleScopeBadge(input),
+		body: piLensOutputBody(part),
+		preview: monoPreview([transform, state]),
+		title: i18n.t('workbench:tool-call.ast-replace.title', 'AST replace'),
+		tone: 'default',
+	};
+}
+
+/**
+ * Summarizes the number of symbols and files returned by an AST outline.
+ * @param details - Structured outline counts
+ * @returns Localized compact count summary
+ */
+function astOutlineSummary(
+	details: Readonly<Record<string, unknown>> | null,
+): string | null {
+	if (details === null) {
+		return null;
+	}
+	const symbols = numberField(details, 'items');
+	const files = numberField(details, 'files');
+	if (symbols === null || files === null) {
+		return null;
+	}
+	return [
+		i18n.t('workbench:tool-call.module-report.symbols', {
+			count: symbols,
+			defaultValue_one: '{{count}} symbol',
+			defaultValue_other: '{{count}} symbols',
+		}),
+		i18n.t('workbench:tool-call.ast-outline.files', {
+			count: files,
+			defaultValue_one: '{{count}} file',
+			defaultValue_other: '{{count}} files',
+		}),
+	].join(' · ');
+}
+
+/**
+ * Presents a syntax-only AST outline with its returned inventory.
+ * @param part - The `ast_grep_outline` call to project
+ * @returns Scope, count preview, and JSON outline body
+ */
+function presentAstOutline(part: DynamicToolUIPart): ToolPresenterResult {
+	const input = inputOf(part);
+	const output = outputOf(part);
+	return {
+		badge: singleScopeBadge(input),
+		body: piLensOutputBody(part),
+		preview: monoPreview([
+			astOutlineSummary(output?.details ?? null) ?? stringField(input, 'view'),
+		]),
+		title: i18n.t('workbench:tool-call.ast-outline.title', 'Syntax outline'),
+		tone: 'default',
+	};
+}
+
+/**
+ * Presents a tree-sitter AST dump by language and source snippet.
+ * @param part - The `ast_grep_dump` call to project
+ * @returns Language/source preview and textual AST body
+ */
+function presentAstDump(part: DynamicToolUIPart): ToolPresenterResult {
+	const input = inputOf(part);
+	const language =
+		stringField(outputOf(part)?.details ?? {}, 'lang') ??
+		stringField(input, 'lang');
+	const source = stringField(input, 'source');
+	return {
+		badge: null,
+		body: piLensOutputBody(part),
+		preview: monoPreview([
+			language,
+			source === null ? null : firstOutputLine(source),
+		]),
+		title: i18n.t('workbench:tool-call.ast-dump.title', 'AST dump'),
+		tone: 'default',
+	};
+}
+
+/**
+ * Builds the compact file-specific summary for effective configuration.
+ * @param details - Effective-config result metadata
+ * @returns Localized document/server counts, or null before completion
+ */
+function effectiveConfigSummary(
+	details: Readonly<Record<string, unknown>> | null,
+): string | null {
+	if (details === null) {
+		return null;
+	}
+	const documents = numberField(details, 'documents');
+	const servers = numberField(details, 'selectedServers');
+	if (documents === null) {
+		return null;
+	}
+	const parts: string[] = [
+		i18n.t('workbench:tool-call.effective-config.files', {
+			count: documents,
+			defaultValue_one: '{{count}} config file',
+			defaultValue_other: '{{count}} config files',
+		}),
+	];
+	if (servers !== null) {
+		parts.push(
+			i18n.t('workbench:tool-call.effective-config.servers', {
+				count: servers,
+				defaultValue_one: '{{count}} server selected',
+				defaultValue_other: '{{count}} servers selected',
+			}),
+		);
+	}
+	return parts.join(' · ');
+}
+
+/**
+ * Removes the effective-config summary line before rendering its JSON body.
+ * @param text - Summary followed by the serialized resolved configuration
+ * @returns The serialized body, or the original output when not sectioned
+ */
+function effectiveConfigBody(text: string): string {
+	const separator = text.indexOf('\n\n');
+	return separator < 0 ? text : text.slice(separator + 2);
+}
+
+/**
+ * Presents Pi Lens configuration provenance for the optional target file.
+ * @param part - The `effective_config` call to project
+ * @returns File scope, selected counts, and serialized provenance body
+ */
+function presentEffectiveConfig(part: DynamicToolUIPart): ToolPresenterResult {
+	const input = inputOf(part);
+	const output = outputOf(part);
+	const text = effectiveConfigBody(output?.text ?? '');
+	const summary = effectiveConfigSummary(output?.details ?? null);
+	return {
+		badge: fileBadge(stringField(input, 'file')),
+		body: structuredToolOutputBody(part.toolName, text),
+		preview: summary === null ? null : { font: 'sans', text: summary },
+		title: i18n.t(
+			'workbench:tool-call.effective-config.title',
+			'Effective config',
+		),
+		tone: 'default',
+	};
 }
 
 /**
@@ -168,7 +513,6 @@ function presentModuleReport(part: DynamicToolUIPart): ToolPresenterResult {
 	const input = inputOf(part);
 	const output = outputOf(part);
 	const text = output?.text ?? '';
-	const classification = classifyToolOutput(part.toolName, text);
 	const summary = moduleReportSummary(output?.details ?? null);
 	const focus = stringField(input, 'focus');
 	const previewText = summary ?? focus;
@@ -177,10 +521,7 @@ function presentModuleReport(part: DynamicToolUIPart): ToolPresenterResult {
 		body:
 			text.length === 0
 				? { kind: 'empty' }
-				: textBody(
-						classification.text,
-						classification.language ?? ('text' as BundledLanguage),
-					),
+				: classifiedToolOutputBody(part.toolName, text),
 		preview: previewText === null ? null : { font: 'sans', text: previewText },
 		title: i18n.t('workbench:tool-call.module-report.title', 'Module outline'),
 		tone: 'default',
@@ -287,16 +628,17 @@ function readSymbolBody(
 }
 
 /**
- * Presents a Pi Lens symbol read as numbered source pinned to its file.
- * @param part - The `read_symbol` tool part to project
+ * Presents a Pi Lens symbol or enclosing-source read pinned to its file.
+ * @param part - The `read_symbol` or `read_enclosing` tool part to project
  * @returns The row's title, file badge, symbol preview, and source body
  */
-function presentReadSymbol(part: DynamicToolUIPart): ToolPresenterResult {
+function presentSourceRead(part: DynamicToolUIPart): ToolPresenterResult {
 	const input = inputOf(part);
 	const output = outputOf(part);
 	const details = output?.details ?? null;
 	const path = pathOf(input);
 	const source = readSymbolSource(output?.text ?? '', details);
+	const readsEnclosing = part.toolName.toLowerCase() === 'read_enclosing';
 	return {
 		badge: fileBadge(path),
 		body: readSymbolBody(source, path),
@@ -304,7 +646,9 @@ function presentReadSymbol(part: DynamicToolUIPart): ToolPresenterResult {
 			readSymbolName(input, details),
 			readSymbolRange(details),
 		),
-		title: i18n.t('workbench:tool-call.read-symbol.title', 'Read symbol'),
+		title: readsEnclosing
+			? i18n.t('workbench:tool-call.read-enclosing.title', 'Read enclosing')
+			: i18n.t('workbench:tool-call.read-symbol.title', 'Read symbol'),
 		tone: 'default',
 	};
 }
@@ -355,11 +699,20 @@ function presentSymbolSearch(part: DynamicToolUIPart): ToolPresenterResult {
 	};
 }
 
-/** Dedicated presenters for Pi Lens tools. */
+/** Dedicated presenters for every Pi Lens tool except shared LSP diagnostics. */
 export const PI_LENS_TOOL_PRESENTERS = {
+	ast_grep_dump: presentAstDump,
+	ast_grep_outline: presentAstOutline,
+	ast_grep_replace: presentAstReplace,
+	ast_grep_search: presentAstSearch,
+	effective_config: presentEffectiveConfig,
+	lens_diagnostic_mark: presentDiagnosticMark,
 	lens_diagnostics: presentLensDiagnostics,
+	lsp_navigation: presentLspNavigation,
 	module_report: presentModuleReport,
+	pi_lens_activate_tools: presentActivateTools,
 	project_report: presentProjectReport,
-	read_symbol: presentReadSymbol,
+	read_enclosing: presentSourceRead,
+	read_symbol: presentSourceRead,
 	symbol_search: presentSymbolSearch,
 } satisfies Record<string, (part: DynamicToolUIPart) => ToolPresenterResult>;

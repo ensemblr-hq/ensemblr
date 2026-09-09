@@ -1320,8 +1320,32 @@
 		}
 	},
 	"tool-call": {
+		"ast-dump": {
+			"title": "Дамп AST"
+		},
+		"ast-outline": {
+			"files_one": "{{count}} файл",
+			"files_few": "{{count}} файла",
+			"files_many": "{{count}} файлов",
+			"files_other": "{{count}} файла",
+			"title": "Структура синтаксиса"
+		},
+		"ast-replace": {
+			"applied": "применено",
+			"preview": "предпросмотр",
+			"title": "Замена AST"
+		},
+		"ast-search": {
+			"title": "Поиск AST"
+		},
 		"bash": {
 			"title": "Bash"
+		},
+		"context7": {
+			"cache-hit": "найдено в кэше",
+			"cached-title": "Документация Context7 из кэша",
+			"fetch-title": "Загрузка документации Context7",
+			"resolve-title": "Поиск библиотеки Context7"
 		},
 		"ctx-batch-execute": {
 			"commands-label": "Команды:",
@@ -1358,6 +1382,14 @@
 		"ctx-upgrade": {
 			"title": "Обновление context-mode"
 		},
+		"diagnostic-mark": {
+			"defer": "отложить",
+			"false-positive": "ложное срабатывание",
+			"flagged": "отмечено",
+			"line": "строка {{line}}",
+			"suppress": "подавить",
+			"title": "Отметить диагностику"
+		},
 		"diagnostics": {
 			"clean": "Диагностика",
 			"count_one": "{{count}} диагностика",
@@ -1368,6 +1400,17 @@
 		},
 		"edit": {
 			"title": "Правка"
+		},
+		"effective-config": {
+			"files_one": "{{count}} файл конфигурации",
+			"files_few": "{{count}} файла конфигурации",
+			"files_many": "{{count}} файлов конфигурации",
+			"files_other": "{{count}} файла конфигурации",
+			"servers_one": "{{count}} сервер выбран",
+			"servers_few": "{{count}} сервера выбрано",
+			"servers_many": "{{count}} серверов выбрано",
+			"servers_other": "{{count}} сервера выбрано",
+			"title": "Действующая конфигурация"
 		},
 		"failed": {
 			"exit-code-title": "{{tool}} завершился с кодом {{code}}",
@@ -1396,6 +1439,26 @@
 		"list": {
 			"title": "Список"
 		},
+		"lsp-navigation": {
+			"applied": "применено",
+			"line": "строка {{line}}",
+			"preview": "предпросмотр",
+			"title": "Навигация LSP"
+		},
+		"mcp": {
+			"auth-complete-title": "Завершение входа MCP",
+			"auth-start-title": "Начало входа MCP",
+			"call-title": "Вызов MCP-инструмента",
+			"connect-title": "Подключение MCP-сервера",
+			"describe-title": "Описание MCP-инструмента",
+			"instructions-title": "Инструкции MCP",
+			"list-title": "Список MCP-инструментов",
+			"script-label": "Скрипт:",
+			"script-title": "Запуск MCP-скрипта",
+			"search-title": "Поиск MCP-инструментов",
+			"status-title": "Статус MCP",
+			"ui-messages-title": "Сообщения интерфейса MCP"
+		},
 		"module-report": {
 			"exports_one": "{{count}} экспорт",
 			"exports_few": "{{count}} экспорта",
@@ -1406,6 +1469,9 @@
 			"symbols_many": "{{count}} символов",
 			"symbols_other": "{{count}} символа",
 			"title": "Структура модуля"
+		},
+		"pi-lens-activate": {
+			"title": "Активация инструментов Pi Lens"
 		},
 		"placeholder": {
 			"empty-pattern": "(пусто)",
@@ -1422,6 +1488,9 @@
 			"lines_many": "Прочитано {{count}} строк",
 			"lines_other": "Прочитано {{count}} строки",
 			"title": "Чтение"
+		},
+		"read-enclosing": {
+			"title": "Чтение по строке"
 		},
 		"read-symbol": {
 			"title": "Чтение символа"
