@@ -39,6 +39,7 @@ import type {
 	AgentWireMessagePayload,
 } from '../../shared/ipc/contracts/agent-session.ts';
 import type { CreateTerminalSessionResult } from '../../shared/ipc/contracts/terminal.ts';
+import { assignedRolesFor } from '../../shared/model-role.ts';
 import type { PermissionMode } from '../../shared/permissions.ts';
 import { selectDefaultRunScript } from '../../shared/scripts.ts';
 import type {
@@ -611,17 +612,24 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 		listModels: async ({ runtime }): Promise<AgentControlModelList> => {
 			const listing = await deps.spawnModelResolver.listModelsFor(runtime);
 			return {
+				allowedRuntimes: listing.allowedRuntimes,
+				callerRuntime: listing.callerRuntime,
+				crossRuntimeDelegationEnabled: listing.crossRuntimeDelegationEnabled,
 				defaultModelId: listing.defaultModelId,
 				models: listing.models.map((model) => ({
 					displayName: model.displayName,
 					id: model.id,
+					roles: assignedRolesFor(
+						listing.roleAssignments,
+						model.agentProvider,
+						model.id,
+					),
 					runtime: model.agentProvider,
 					thinkingAxis: getThinkingAxis(model.agentProvider),
 					thinkingLevels: acceptableThinkingLevels(model),
 					tier: classifyAgentModelTier(model),
 					vendor: model.vendor,
 				})),
-				runtime: listing.runtime,
 			};
 		},
 		startConversation: async ({

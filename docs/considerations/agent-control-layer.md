@@ -109,15 +109,15 @@ keeps per-session support for a later upgrade.
 ## Locked decisions
 
 | Branch | Decision |
-|---|---|
+| --- | --- |
 | Controllers | **Pi + third-party harnesses** |
-| Transport | **One loopback HTTP control server.** Pi reaches it via a shipped extension (`POST /invoke`); harnesses via an MCP endpoint (`POST /mcp`). One shared App-Control Service. _(Superseded the original `extension_ui_request/response` plan — see the pivot note at the top.)_ |
+| Transport | **One loopback HTTP control server.** Pi reaches it via a shipped extension (`POST /invoke`); harnesses via an MCP endpoint (`POST /mcp`). One shared App-Control Service. *(Superseded the original `extension_ui_request/response` plan — see the pivot note at the top.)* |
 | Scope | **Writes: own workspace only. Reads: cross-workspace.** Identity injected at spawn; agent-supplied ids never trusted. |
 | Orchestration | **`wait` flag** — fire-and-forget default; `wait:true` blocks until child conversation completes. |
 | Guardrails | **All four:** max nesting depth, per-session spawn quota + rate limit, wait-mode timeout, lineage deadlock check. |
 | Permissions | **Uniform, follows mode.** Reads always allowed; all writes auto in `workspace-trusted`, confirm in `approval-required`, blocked in `read-only`. No per-op special-casing. |
 | Capabilities | Core + all extras (follow-up, drive terminal stdin, read output, open non-chat tabs). |
-| Lifecycle | **Persist — no cascade.** Spawned resources are first-class; parent ending does not tear them down. Lineage tracked for guardrails only. _(Partly superseded by #194 — see below.)_ |
+| Lifecycle | **Persist — no cascade.** Spawned resources are first-class; parent ending does not tear them down. Lineage tracked for guardrails only. *(Partly superseded by #194 — see below.)* |
 
 > **Lifecycle, superseded in part by #194.** Tabs and terminals still persist, and lineage is still
 > never used for cleanup. But *stopping a conversation now cascades*: `stopSession` walks the origin
@@ -133,8 +133,9 @@ keeps per-session support for a later upgrade.
 Defined once in a shared contract (`src/shared/agent-control/`), consumed by both bridges.
 
 **Writes (own workspace):**
+
 - `spawnChatTab()` → `{ chatTabId }`
-- `startConversation({ chatTabId?, prompt, model?, thinkingLevel?, title?, wait? })` → `{ chatTabId, agentSessionId, result? }` (a spawned tab is marked a sub-agent and tinted; `title` names it via Pi `/name`). Since #236 the child is **pinned to the caller's agent runtime**: the service passes `callerRuntime` to the port, and a `model` belonging to the other runtime comes back `invalid-args` naming both rather than being substituted. Omitting `model` inherits the caller's; a terminal harness, whose runtime the app cannot name, must pass one
+- `startConversation({ chatTabId?, prompt, model?, thinkingLevel?, title?, wait? })` → `{ chatTabId, agentSessionId, result? }` (a spawned tab is marked a sub-agent and tinted; `title` names it via Pi `/name`). The service passes `callerRuntime` to the port: an explicit model stays inside it by default and may cross only when the live user opt-in permits the discovered, non-hidden destination. Omitting `model` always inherits inside the caller's runtime; a terminal harness, whose runtime the app cannot name, must pass one
 - `sendFollowUp({ agentSessionId, prompt, wait? })` → `{ result? }` (Pi steer/follow_up + submitPrompt)
 - `setName({ title })` → `{ applied, title, message }` — set the **caller's own** tab name via Pi `set_session_name`. Stamps `titleProvenance: 'agent'`; a title the user chose outranks it and the call reports `applied: false` rather than failing. **Chat-tab callers only** (a terminal harness owns no chat tab)
 - `setBranchName({ name, userRequested? })` → `{ applied, name, branchName, message }` — name the caller's **workspace and its git branch** together from one slug. Gated on the branch, not the display name: it applies while the git branch still carries the name it was cut with, and a workspace the user has already titled keeps that title while only its branch moves. Reports `applied: false` rather than failing once the branch is named, unless `userRequested` says the user asked for a different one by name. An adopted branch never moves, and `git.renameWorkspaceOnBranch` overrides everything, `userRequested` included
@@ -169,6 +170,7 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
   nothing pulls no focus at all — the same condition the cache-invalidation broadcast is gated on.
 
 **Reads (cross-workspace):**
+
 - `listWorkspaces()`, `listTabs({ workspaceId? })`, `listTerminals({ workspaceId? })`
 - `getConversationStatus({ agentSessionId? })`, `getLastMessage({ agentSessionId })` — the
   status target is optional, and omitting it reports the caller's **own** conversation, which is the
@@ -179,6 +181,7 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
 - `readTerminalOutput({ terminalId })`
 
 **Reads (own workspace only):**
+
 - `getWorkspaceDiff({ filePath?, stat? })` → `{ baseRef, files?, summary?, diff?, truncated, omittedFiles }` — the workspace's branch diff, scoped like the Changes panel (`merge-base(base_branch, HEAD)` → working tree, untracked files included). `stat: true` returns rows and totals with **no** per-file git call; `filePath` returns one patch whole. The full read is capped at `MAX_AGENT_PAYLOAD_CHARS` (32,000), cut on whole-file boundaries, with the dropped paths in `omittedFiles`
 - `getDiffComments({ filePath? })` → `{ comments }` — the workspace's Ensemblr-local review comments, each carrying `origin`. GitHub-synced PR threads are excluded: they are a live `gh` snapshot rather than local rows, and no op here could reply to or resolve one
 
@@ -202,8 +205,7 @@ as the whole set. Their argument shapes live in
 - `readConversation({ agentSessionId, stat?, fromOrdinal?, ordinal? })` (#194) — page a conversation's
   persisted transcript, tool calls included, so an orchestrator can audit what a child actually ran
   rather than trusting its report
-- `listModels()` → `{ defaultModelId, models, runtime }` — cut to the caller's own agent runtime for
-  a chat caller, unfiltered for a terminal harness whose runtime the app cannot name
+- `listModels()` → `{ allowedRuntimes, callerRuntime, crossRuntimeDelegationEnabled, defaultModelId, models }` — cut to a chat caller's runtime while the opt-in is off, expanded to all permitted runtimes while it is on, and unfiltered for a terminal harness whose runtime the app cannot name. Each model includes its advisory `roles`
 - `listRunScripts()` → `{ scripts }` (#223) — the repository's named run scripts and which is default
 - `getSessionBrief()` and `checkPlanModeTool({ tool, command? })` — control ops with **no** MCP tool.
   They are the Pi extension's own per-turn hooks; nothing reaches them over `POST /mcp`
@@ -224,11 +226,13 @@ as the whole set. Their argument shapes live in
 > `src/main/agent-control/harness-launch-config.ts` rather than `buildCommand`).
 
 ### 1. Shared contract — `src/shared/agent-control/`
+
 - `contracts.ts` — request/response types for every op above (mirrors `src/shared/ipc/contracts/` style).
 - `schemas.ts` — Zod validators for each op's args (validate at the service boundary; agents are untrusted input).
 - Op names namespaced `ensemblr.<op>` to match the pi `extension_ui_request` method convention.
 
 ### 2. App-Control Service — `src/main/agent-control/`
+
 - `agent-control-service.ts` — `createAgentControlService(deps)`. Public method `invoke({ op, args, origin })`.
   `origin` is the **resolved** identity (see §5), never agent-supplied. Steps per call:
   1. Validate args with the Zod schema (reject malformed).
@@ -249,6 +253,7 @@ as the whole set. Their argument shapes live in
 - Composed in `src/main/main.ts` (~285–484) alongside the other services; receives their handles.
 
 ### 3. Identity / session registry — `src/main/agent-control/origin-registry.ts`
+
 - At agent spawn, mint a per-session record: `{ token, agentSessionId|harnessSessionId, workspaceId,
   parentSessionId, depth }`. Store in an in-memory registry keyed by token.
 - **Pi:** inject `token` + endpoint into the pi extension via spawn env (extend
@@ -260,6 +265,7 @@ as the whole set. Their argument shapes live in
   `origin` from the caller. Used only for guardrails, never for cleanup.
 
 ### 4. Recursion guardrails — `src/main/agent-control/guardrails.ts`
+
 - **Max depth:** deny spawn ops when `origin.depth >= maxSpawnDepth` (config, default **1**; see `DEFAULT_GUARDRAIL_CONFIG` in `src/main/agent-control/guardrails.ts`).
 - **Quota + rate:** per-session counters — max N total spawns, M per minute.
 - **Wait timeout:** any `wait:true` op resolves with a `timeout` result after `waitTimeoutMs`
@@ -268,6 +274,7 @@ as the whole set. Their argument shapes live in
   lineage (cheap cycle walk over `parentSessionId`).
 
 ### 5. Pi bridge
+
 - **New:** an Ensemblr pi extension package that registers the control tools and calls
   `ctx.ui.request('ensemblr.<op>', args)`. *(Requires reading the pi extension SDK / `ctx.ui`
   API from the vendored global `@earendil-works/pi-coding-agent` and `docs/pi/rpc-protocol.md`
@@ -283,6 +290,7 @@ as the whole set. Their argument shapes live in
   the blocking request with the op result. This writer does not exist today.
 
 ### 6. Harness bridge — `src/main/agent-control/mcp-server.ts`
+
 - Localhost HTTP MCP server hosted by main, exposing the capability set as MCP tools that call
   `agentControlService.invoke`. Token from the request authenticates → resolves `origin`.
 - **Config injection:** write a per-launch MCP config referencing the server + token when a
@@ -291,6 +299,7 @@ as the whole set. Their argument shapes live in
   `buildCommand` in `src/shared/agents/harness-registry.ts` is the injection seam.)*
 
 ### 7. Permissions & confirm UX
+
 - Add `PermissionActionKind` values in `src/shared/permissions.ts`: `'app-control-read'`
   (classify like `workspace-read` → always allowed) and `'app-control-write'` (classify like
   `workspace-write` → mode-driven). No sensitive-action special-casing.

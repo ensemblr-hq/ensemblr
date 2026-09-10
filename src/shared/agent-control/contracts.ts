@@ -18,6 +18,7 @@ import type {
 	WorkspaceGitChangeSummaryWire,
 	WorkspaceGitFileWire,
 } from '../ipc/contracts/workspace-git.ts';
+import type { ModelRole } from '../model-role.ts';
 import type { ConciergeMessageReason } from './concierge-message.ts';
 import { MAX_AGENT_PAYLOAD_CHARS } from './workspace-diff.ts';
 
@@ -1840,10 +1841,9 @@ export interface GetLastMessageResult {
 
 /**
  * One available agent model, as returned by `listModels`. `runtime` is the agent
- * runtime that would drive the chat and is the axis a spawn may not cross;
- * `vendor` is the inference vendor (`anthropic`, `openai`, `claude-code`) and is
- * descriptive only. They were both called "provider" once, which is how a spawn
- * check meant to keep a child inside its runtime ended up comparing vendors.
+ * runtime that would drive the child; `vendor` is the inference vendor
+ * (`anthropic`, `openai`, `claude-code`) and is descriptive only. They were both
+ * called "provider" once, which let a runtime policy accidentally compare vendors.
  *
  * `thinkingLevels` and `thinkingAxis` are here so a caller can *choose* a level
  * rather than inherit its own: the two runtimes publish different ladders (pi
@@ -1855,6 +1855,8 @@ export interface GetLastMessageResult {
 export interface AgentControlModelInfo {
 	displayName: string;
 	id: string;
+	/** Advisory strengths the user assigned to this runtime-and-model pair. */
+	roles: readonly ModelRole[];
 	runtime: AgentProviderId;
 	/** The dial this model's runtime steers: `effort` on Claude, `thinking` on pi. */
 	thinkingAxis: ThinkingAxis;
@@ -1866,15 +1868,17 @@ export interface AgentControlModelInfo {
 }
 
 /**
- * Available agent models plus the default, returned by `listModels`. The list is
- * already cut to the calling orchestrator's own runtime, so every id in it is
- * one the caller may spawn a child on; `runtime` names which one, or is null for
- * a caller (a terminal harness) whose runtime the app cannot determine.
+ * Available agent models plus the live runtime policy returned by `listModels`.
+ * `callerRuntime` identifies the origin independently from `allowedRuntimes`,
+ * which names explicit destinations. A terminal harness has no identifiable
+ * caller runtime and must still choose a model explicitly.
  */
 export interface AgentControlModelList {
+	allowedRuntimes: readonly AgentProviderId[];
+	callerRuntime: AgentProviderId | null;
+	crossRuntimeDelegationEnabled: boolean;
 	defaultModelId: string | null;
 	models: readonly AgentControlModelInfo[];
-	runtime: AgentProviderId | null;
 }
 
 /** One run script the workspace's repository configures, as returned by `listRunScripts`. */

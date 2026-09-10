@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { agentModelsQuery } from '@/renderer/api/ensemblr';
 import { ModelVisibilityList } from '@/renderer/components/settings/model-visibility-list';
+import { ModelOrchestrationSettings } from '@/renderer/components/settings/models/model-orchestration-settings';
 import { ModelSelect } from '@/renderer/components/settings/models/model-select';
 import { NoModelsNotice } from '@/renderer/components/settings/models/no-models-notice';
 import { ThinkingLevelSelect } from '@/renderer/components/settings/models/thinking-level-select';
@@ -153,7 +154,7 @@ function ModelsSettings() {
 		<SettingsSection
 			description={t(
 				'settings:models.description',
-				"Agent models and thinking-level defaults for new chats, reviews, and the Concierge. Sourced from each configured runtime's capability discovery.",
+				"Agent models, thinking-level defaults, delegation roles, and runtime policy for new chats, reviews, and the Concierge. Sourced from each configured runtime's capability discovery.",
 			)}
 			title={t('settings:models.title', 'Models')}
 		>
@@ -241,6 +242,12 @@ function ModelsSettings() {
 				models={list}
 				placeholder={placeholder}
 				slot={conciergeSlot}
+			/>
+
+			<ModelOrchestrationSettings
+				error={modelsError}
+				isLoading={modelsLoading}
+				models={allModels}
 			/>
 
 			<SettingRow

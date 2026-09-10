@@ -413,6 +413,16 @@ passed, because the Concierge acts on other workspaces on the strength of it.
 Guardrails cap it at **10 per session** and **3/min**: the loop
 Concierge → orchestrator → Concierge has no natural end.
 
+### Advisory task roles
+
+Use the live `ensemblr_list_models` result as the source of permitted destinations and role preferences. Every delegation brief names its chosen task role and any meaningful deviation from the configured role tags:
+
+- **Sage** frames the decision and surfaces uncertainty.
+- **Coder** handles an uncertain implementation path and proposes the smallest safe change.
+- **Builder** carries a settled implementation through to working code. Coder versus Builder is about uncertainty, not task size.
+- **Grunt** receives a fully determined, zero-judgment brief and reports failed preconditions instead of improvising.
+- **Explorer** returns a read-only actionable implementation plan containing evidence, files, sequence, dependencies, verification, and open questions. Explorer makes no edits and does not submit a plan to the user.
+
 ### Harnesses, terminals, and run scripts
 
 | Tool | Arguments | Gate | Withheld from |
@@ -827,7 +837,7 @@ the context that found it.
 **The user's review model is honoured across runtimes.** The pin is looked up in
 every runtime's catalogue rather than only the caller's, and the spawn withholds
 the caller's runtime so the review opens on the model's own — `resolveRequested`
-refuses a cross-runtime model only against a caller runtime it can see, and here
+applies the caller's allowed-runtime policy only where it can see that runtime, and here
 nobody asked for the model: it came from settings, and honouring it is the value
 of the op. So a Pi orchestrator whose user reviews on Claude Code gets that. The
 configured thinking level rides along, except where the resolved model's ladder
@@ -1027,6 +1037,15 @@ unattended one. `afkMode` also refuses `wait`, for the reason `peer` does: the
 unattended loop runs for hours and `waitTimeoutMs` is five minutes, so every such
 wait would return `timeout` having said nothing.
 
+AFK does not create a second role system. Its delivery directive keeps the same
+Sage/Coder/Builder/Grunt/Explorer boundaries and requires a role in every child
+brief. Ensemblr chat-tab delegation reads the live `listModels` role preferences
+and runtime policy before each spawn; Claude's built-in mechanism cannot read
+those tags or cross runtimes, so it uses the vocabulary from the work itself.
+The AFK fallback to a defensible assumption does not override the role boundary:
+a Grunt reports ambiguity instead of filling it, and an Explorer remains
+read-only and returns an actionable plan.
+
 ### Not served over MCP
 
 `getSessionBrief` and `checkPlanModeTool` are control ops with no entry in
@@ -1059,20 +1078,22 @@ itself in a workspace it has none of, and to name a chat tab it does not own.
 
 ### Choosing a model for a child
 
-A spawn never crosses the **agent runtime** axis (`pi` | `claude`), which is
+A spawn uses only an agent runtime permitted by the live `ensemblr_list_models` policy (`pi` | `claude`), which is
 distinct from a model's inference **vendor** (`anthropic`, `openai`,
 `claude-code`) — `listModels` returns both on every entry precisely because the
-two were once called "provider" and got compared by accident. A child is pinned
-to its caller's runtime: `startConversation` passes the caller's own
-`callerRuntime` to the port, and a `model` belonging to the other runtime comes
-back as `invalid-args` naming both runtimes rather than being substituted. No
-tab, session, or spawn budget is consumed by that refusal.
+two were once called "provider" and got compared by accident. With cross-runtime
+delegation off, an explicit `model` belonging to another runtime comes back as
+`invalid-args` naming both runtimes rather than being substituted. When the user
+opts in, that same explicit request may cross to a discovered, non-hidden model.
+No tab, session, or spawn budget is consumed by a refusal.
 
-Called from a chat tab, `listModels` is already cut to the caller's runtime and
-`model` may be omitted to inherit the caller's own. Called from a terminal
-harness it carries every runtime — the app cannot tell which one the caller is,
-because a harness origin is minted per workspace — which is also why `model` is
-**mandatory** there and omitting it is refused rather than defaulted.
+Called from a chat tab, `listModels` is cut to the caller's runtime by default
+and expands to all configured runtimes only while the live opt-in is enabled.
+Omitting `model` always inherits on the caller's own runtime and never crosses.
+Called from a terminal harness the list carries every runtime — the app cannot
+tell which one the caller is, because a harness origin is minted per workspace —
+which is also why `model` is **mandatory** there and omitting it is refused rather
+than defaulted.
 
 Inheritance reads two signals: the live model the caller's runtime reports, which
 only the Pi extension forwards, and the model the app has on record for the

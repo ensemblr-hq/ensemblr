@@ -7,6 +7,7 @@ import {
 	type AgentModelOption,
 	asModelVendorId,
 } from '../../../src/shared/ipc/contracts/agent-models';
+import type { ModelRoleAssignment } from '../../../src/shared/model-role';
 
 /** Builds one catalog row without repeating the fields no assertion reads. */
 export const modelOption = (input: {
@@ -29,12 +30,16 @@ export const modelOption = (input: {
  * @param models - The catalog rows both runtimes' models are drawn from.
  * @param defaultModelId - What the catalog itself calls default; the first row when omitted.
  * @param readHiddenModelIds - Reads the model ids hidden from delegated spawns.
+ * @param readCrossRuntimeDelegationEnabled - Reads whether native runtimes may cross.
+ * @param readModelRoleAssignments - Reads saved advisory role preferences.
  * @returns The resolver, wired to a catalog that never shells out.
  */
 export function fakeSpawnModelResolver(
 	models: readonly AgentModelOption[],
 	defaultModelId?: string,
 	readHiddenModelIds: () => readonly string[] = () => [],
+	readCrossRuntimeDelegationEnabled: () => boolean = () => false,
+	readModelRoleAssignments: () => readonly ModelRoleAssignment[] = () => [],
 ): SpawnModelResolver {
 	return createSpawnModelResolver({
 		catalog: {
@@ -46,6 +51,8 @@ export function fakeSpawnModelResolver(
 			resolveAgentProvider: async (modelId: string | null | undefined) =>
 				models.find((model) => model.id === modelId)?.agentProvider ?? null,
 		},
+		readCrossRuntimeDelegationEnabled,
 		readHiddenModelIds,
+		readModelRoleAssignments,
 	});
 }

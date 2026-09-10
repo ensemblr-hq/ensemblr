@@ -166,6 +166,26 @@ describe('afk delivery loop', () => {
 		);
 	});
 
+	it('keeps model-role selection live for unattended Ensemblr hand-offs', () => {
+		expect(directive).toContain('same five advisory task roles');
+		expect(directive).toContain('ensemblr_list_models');
+		expect(directive).toContain("user's role preferences");
+		expect(directive).toContain('prefer a model tagged for it');
+		expect(directive).toContain('name the role in the brief');
+		expect(directive).toContain('allowedRuntimes');
+		expect(directive).toContain('meaningful departure');
+	});
+
+	it('preserves every role boundary without widening authority', () => {
+		for (const role of ['Sage', 'Coder', 'Builder', 'Grunt', 'Explorer']) {
+			expect(directive).toContain(role);
+		}
+		expect(directive).toContain('zero-judgment');
+		expect(directive).toContain('Explorer stays read-only');
+		expect(directive).toContain('A role never grants tools');
+		expect(directive).toContain('send an Explorer child');
+	});
+
 	// Delegating the change itself is the failure mode the encouragement invites,
 	// so the block names the half that stays.
 	it('keeps the plan and the load-bearing edits out of the fan-out', () => {
@@ -316,6 +336,14 @@ describe('afk delivery loop', () => {
 			expect(nativeDirective).toContain('Steps 1 to 4 are a loop');
 		});
 
+		it('uses the role vocabulary without claiming access to configured tags', () => {
+			expect(nativeDirective).toContain('same five advisory task roles');
+			expect(nativeDirective).toContain(
+				"cannot read the user's configured model-role tags or cross runtimes",
+			);
+			expect(nativeDirective).toContain('name it in every brief');
+		});
+
 		// Which steps a change earns is a question about the change, not about how
 		// this session spawns, so the sizing gate is the same on both mechanisms.
 		it('sizes the loop the same way', () => {
@@ -373,6 +401,16 @@ describe('afk delivery loop', () => {
 				'Decide the approach before the first edit',
 			);
 			expect(subagentDirective).toContain('name the assumption');
+		});
+
+		it('obeys the named role before AFK ambiguity defaults', () => {
+			expect(subagentDirective).toContain(
+				'Follow the advisory task role named in the brief',
+			);
+			expect(subagentDirective).toContain(
+				'Grunt encounters ambiguity or a failed precondition',
+			);
+			expect(subagentDirective).toContain('Explorer makes no edits');
 		});
 
 		// The block above it recruits read-only children by name — the survey

@@ -402,6 +402,18 @@ const readTuiHarnessesEnabled = (): boolean =>
 const readHiddenModelIds = (): readonly string[] =>
 	appSettingsService.read().models.hiddenModels;
 /**
+ * Reads whether delegated chats may explicitly cross native runtimes.
+ * @returns The latest global opt-in from model settings.
+ */
+const readCrossRuntimeDelegationEnabled = (): boolean =>
+	appSettingsService.read().models.allowCrossRuntimeDelegation;
+/**
+ * Reads advisory roles for every saved runtime-and-model pair.
+ * @returns The latest assignments, including unavailable models.
+ */
+const readModelRoleAssignments = () =>
+	appSettingsService.read().models.roleAssignments;
+/**
  * Reads the user's "Credit Ensemblr as a commit co-author" setting, which puts
  * the trailer block into the playbooks an agent receives. Read per call rather
  * than captured, and for the same reason the diagram flag is: the settings file
@@ -753,7 +765,9 @@ const agentModelCatalog = createAgentModelCatalog({
 });
 const spawnModelResolver = createSpawnModelResolver({
 	catalog: agentModelCatalog,
+	readCrossRuntimeDelegationEnabled,
 	readHiddenModelIds,
+	readModelRoleAssignments,
 });
 /**
  * Resolves the binary a non-Pi agent runtime launches, so the executable the

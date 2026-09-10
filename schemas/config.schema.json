@@ -160,6 +160,38 @@
 							"items": {
 								"type": "string"
 							}
+						},
+						"allowCrossRuntimeDelegation": {
+							"type": "boolean",
+							"default": false,
+							"description": "Allow an orchestrator using Ensemblr chat-tab delegation to explicitly spawn a child on another configured native runtime. Omitted-model inheritance stays on the caller's runtime."
+						},
+						"roleAssignments": {
+							"type": "array",
+							"default": [],
+							"description": "Advisory task-role preferences assigned independently to runtime-and-model pairs. Saved assignments remain when a model is hidden or temporarily unavailable.",
+							"items": {
+								"type": "object",
+								"additionalProperties": false,
+								"required": ["modelId", "roles", "runtime"],
+								"properties": {
+									"modelId": {
+										"type": "string",
+										"minLength": 1
+									},
+									"roles": {
+										"type": "array",
+										"items": {
+											"type": "string",
+											"enum": ["sage", "coder", "builder", "grunt", "explorer"]
+										}
+									},
+									"runtime": {
+										"type": "string",
+										"enum": ["pi", "claude"]
+									}
+								}
+							}
 						}
 					}
 				},
