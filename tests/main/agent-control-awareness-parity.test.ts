@@ -354,11 +354,20 @@ describe('agent-control AWARENESS parity', () => {
 		}
 	});
 
-	// Observed: a normal Pi chat interpreted the standing "prefer" language as a
-	// reason to open a reviewer while packaging a one-file deletion. The review
-	// op belongs to an explicit user request or to the AFK workflow that introduced
-	// it, not to routine verification in every attended turn.
-	it('reserves agent-opened reviews for explicit requests and the AFK workflow', () => {
+	it('tells the Concierge AFK review delegation is optional and unpinned', () => {
+		expect(CONCIERGE_AWARENESS).toContain(
+			'whether and whom to delegate review',
+		);
+		expect(CONCIERGE_AWARENESS).toContain('self-review is allowed');
+		expect(CONCIERGE_AWARENESS).toContain(
+			'manual Review model does not pin its delegates',
+		);
+		expect(CONCIERGE_AWARENESS).not.toContain(
+			'has it reviewed by the workspace',
+		);
+	});
+
+	it('reserves the configured Review action for explicit requests, not AFK', () => {
 		const reviewTool = TOOL_DEFS.find(
 			(def) => def.name === 'ensemblr_start_review',
 		)?.description;
@@ -367,7 +376,7 @@ describe('agent-control AWARENESS parity', () => {
 		).get('ensemblr_start_review');
 
 		expect(ORCHESTRATOR_AWARENESS).toContain(
-			'- Agent review (explicit request or AFK only):',
+			'- Agent review (explicit request only):',
 		);
 		expect(ORCHESTRATOR_AWARENESS).not.toContain('- Get the change reviewed:');
 		for (const guidance of [
@@ -376,7 +385,8 @@ describe('agent-control AWARENESS parity', () => {
 			embeddedReviewTool,
 		]) {
 			expect(guidance).toContain('only when the user explicitly asks');
-			expect(guidance).toContain('AFK workflow');
+			expect(guidance).toContain('AFK alone is not a request');
+			expect(guidance).not.toContain('or when the AFK workflow directs you to');
 			expect(guidance).toContain('Do not start it as routine');
 			expect(guidance?.toLowerCase()).not.toContain(
 				'prefer it to reviewing your own work',

@@ -447,20 +447,21 @@ or to read the diff before it lands:
    unattended run is the one place where doing it properly costs only time.
 2. **Build the plan**, saying so in the conversation when something it finds
    makes the plan wrong.
-3. **Open the Review chat.** The same review your Review button runs — your
-   review skill, your review model — over its own change, opened by the agent
-   rather than by you. It is a full chat with its own delegation budget, so it
-   can spread a wide diff over several readers.
-4. **Send the findings back to that same chat** and have it fix them there, then
-   re-review — judging each finding rather than accepting the list.
+3. **Review the change.** The agent decides whether to read the diff itself or
+   delegate bounded review work under the normal delegation rules. Self-review
+   is allowed on the full loop too. Delegated reviewers use ordinary model-role,
+   runtime, thinking-level, and cost rules, not your configured Review model.
+4. **Judge the findings, fix them, and check again.** It makes repairs itself or
+   delegates a bounded repair, runs the relevant checks, and re-reads the diff.
+   Another agent is not required for re-review either.
 5. **Open the pull request.** Turning AFK on for a change is the request for one.
    It never merges, never force-pushes over other work, and updates an existing
    pull request rather than opening a second.
 
 **Not every change earns all five.** A documentation edit, a version bump, a
 translation of copy that already exists, or a rename the compiler follows end to
-end is a change the agent can settle by reading its own diff, so running a plan,
-a second orchestrator, and a round of fixes over it buys nothing you would not
+end is a change the agent can settle by reading its own diff, so running a plan
+and separate review and fix rounds over it buys nothing you would not
 have had anyway. The agent sizes the loop first: where the whole diff fits in one
 reading, where that reading plus your repository's checks establish it is right,
 and where the shape was decided before it started, it takes a **short path** —
@@ -476,11 +477,13 @@ call — goes back to step 1 rather than carrying on short. It never moves the
 other way: a run already inside the full loop does not drop out of it to save
 time.
 
-A Claude chat set to **Claude Code built-in** sub-agents
-([11. App settings](./11-app-settings.md#providers)) reads a step 3 and 4 of its
-own. It cannot open the Review chat — driving one needs the spawn tools that
-setting withholds — so it briefs one of its own sub-agents over the branch diff
-instead, and fixes what comes back itself. The rest of the loop is the same.
+The manual **Review** button keeps your configured review model and thinking
+level. An explicit request for that Review action still uses them; AFK alone is
+not such a request. If the agent chooses to delegate, Ensemblr chats use ordinary
+child conversations and Claude chats set to **Claude Code built-in** sub-agents
+([11. App settings](./11-app-settings.md#providers)) use their runtime's own tool.
+Neither mechanism requires delegation. A refused hand-off falls back to an
+honest self-review, not a retry loop or a bypass of the limit.
 
 **Steps 1 to 4 are a loop, and the agent decides how many times it runs.** There
 is no round cap: it keeps reviewing, judging, repairing, and re-reading for as
@@ -492,14 +495,13 @@ re-planning does not break the circle either, it stops and reports rather than
 spending the night on one finding, and the pull request is not opened while real
 problems stand.
 
-**It works through sub-agents where that keeps the run alive.** An unattended run
-ends when the agent's context window fills, not when the work does, and nobody is
-there to restart it — so it is told to spend a child's context rather than its
-own on wide reading: surveying a subsystem before it plans, triaging a failing
-suite, sweeping files a review round touched. The plan, the design calls, and the
-load-bearing edits stay with the one agent, so the change keeps a single author.
-This matters most on a model with a smaller context window, which is exactly
-where an overnight run would otherwise run out part-way.
+**Delegation follows the ordinary rules.** AFK does not force a child, reviewer,
+or second orchestrator. The agent splits substantial independent work before
+spawning and accounts for context pressure before starting another unit of
+reading. It keeps the plan, design calls, and reconciliation, and gives delegates
+the facts and paths it already established rather than paying for the same survey
+twice. Review delegates are read-only; the agent waits before changing the files
+they are reading and closes their ordinary child tabs when finished.
 
 A **hard block** — a credential it does not have, a service refusing it, a step
 that needs your authority — stops the run there and produces the report rather
@@ -511,8 +513,9 @@ does gets an answer, not a pull request.
 
 Read the session summary first when you come back: it is written for exactly this
 case, and it carries what the agent did, what it assumed, and what it left. The
-report names every decision it took on your behalf, every review finding it
-disagreed with, and anything it could not finish.
+report names whether it self-reviewed or delegated review and why, every decision
+it took on your behalf, every review finding it disagreed with, and anything it
+could not finish.
 
 ![A finished unattended run: the report naming the path it took, the calls it made on the user's behalf, the review finding it argued with, and what it is least sure of — with the Review chat beside it in the tab strip and the pull request it opened in the header.](./images/06-afk-report.png)
 
@@ -521,7 +524,8 @@ rather than of the turn — so a strip you come back to still says which chats r
 while you were gone. See
 [ADR 0060](../adr/0060-let-a-chat-run-unattended.md),
 [ADR 0061](../adr/0061-run-an-unattended-change-through-plan-review-and-a-pull-request.md),
-and [ADR 0064](../adr/0064-size-the-unattended-delivery-loop-to-the-change.md).
+[ADR 0064](../adr/0064-size-the-unattended-delivery-loop-to-the-change.md),
+and [ADR 0068](../adr/0068-let-afk-agents-choose-review-delegation.md).
 
 ## Checkpoints and session branching
 

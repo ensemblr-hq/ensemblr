@@ -11,7 +11,6 @@ describe('afk delivery loop', () => {
 		buildAfkWorkflowDirective({
 			delegation: 'ensemblr',
 			role: 'orchestrator',
-			tuiHarnesses: true,
 			unattended: true,
 			...overrides,
 		}) ?? '';
@@ -20,87 +19,128 @@ describe('afk delivery loop', () => {
 	const nativeDirective = render({ delegation: 'native' });
 	const subagentDirective = render({ role: 'subagent' });
 
-	it('distinguishes PR merging from explicitly requested local integration', () => {
-		for (const guidance of [directive, nativeDirective]) {
-			expect(guidance).toContain('Never merge the pull request');
-			expect(guidance).toContain('AFK delivery is not base-sync consent');
-			expect(guidance).toContain(
-				'explicit human request to integrate a named base or resolve merge conflicts',
-			);
-			expect(guidance).not.toContain('Never merge,');
-		}
-	});
-
 	it('renders nothing while the user is present', () => {
 		expect(
 			buildAfkWorkflowDirective({
 				delegation: 'ensemblr',
 				role: 'orchestrator',
-				tuiHarnesses: true,
 				unattended: false,
 			}),
 		).toBeNull();
 	});
 
 	it('opens with the header a test can locate it by', () => {
-		expect(directive).toContain(AFK_WORKFLOW_HEADER);
-		expect(nativeDirective).toContain(AFK_WORKFLOW_HEADER);
-		expect(subagentDirective).toContain(AFK_WORKFLOW_HEADER);
+		for (const guidance of [directive, nativeDirective, subagentDirective]) {
+			expect(guidance).toContain(AFK_WORKFLOW_HEADER);
+		}
 	});
 
-	// The block is appended to every AFK turn, so an agent asked to explain a
-	// function reads it too. Without the gate it would open a pull request for
-	// work nobody asked to have shipped.
+	for (const delegation of ['ensemblr', 'native'] as const) {
+		describe(delegation, () => {
+			const guidance = render({ delegation });
+
+			it('lets either mechanism self-review or delegate without the Review model pin', () => {
+				expect(guidance).toContain(
+					'Self-review is allowed, including on the full loop',
+				);
+				expect(guidance).toContain('normal delegation rules');
+				expect(guidance).toContain(
+					'manual Review button, not to AFK delegation',
+				);
+				expect(guidance).not.toContain('ensemblr_start_review');
+				expect(guidance).not.toContain('Do not review your own work instead');
+				expect(guidance).toContain('AFK does not require spawning');
+				expect(guidance).toContain('do the work yourself by default');
+			});
+
+			it('keeps review, repairs, and checks mandatory without a delegate', () => {
+				expect(guidance).toContain(
+					'Read the whole branch diff against its base',
+				);
+				expect(guidance).toContain('make the repair here');
+				expect(guidance).toContain(
+					'Run the relevant checks and re-read the changed diff',
+				);
+				expect(guidance).toContain('Re-review does not require another agent');
+				expect(guidance).toContain('Review the whole rebuilt change');
+				expect(guidance).not.toContain(
+					'by then the second reader is already reading',
+				);
+			});
+
+			it('briefs optional reviewers as ordinary bounded read-only delegates', () => {
+				expect(guidance).toContain('If you delegate review');
+				expect(guidance).toContain('bounded, read-only review');
+				expect(guidance).toContain('git diff');
+				expect(guidance).toContain('full paths and line numbers');
+				expect(guidance).toContain('A reviewer child has no delegation budget');
+				expect(guidance).toContain('Leave the reviewed files alone');
+			});
+
+			it('falls back to self-review without bypassing a refused delegation', () => {
+				expect(guidance).toContain('If delegation is unavailable or refused');
+				expect(guidance).toContain(
+					'do not retry in a loop or bypass the limit',
+				);
+				expect(guidance).toContain(
+					'review the diff yourself and record the limitation',
+				);
+				expect(guidance).not.toContain('co-tenancy slot');
+			});
+
+			it('reports the review choice and its reason', () => {
+				expect(guidance).toContain(
+					'whether you self-reviewed or delegated review and why',
+				);
+				expect(guidance).toContain(
+					'which path you sized the change onto and why',
+				);
+				expect(guidance).toContain(
+					'every review finding you disagreed with and why',
+				);
+				expect(guidance).toContain('ensemblr_set_summary');
+			});
+
+			it('distinguishes PR merging from explicitly requested local integration', () => {
+				expect(guidance).toContain('Never merge the pull request');
+				expect(guidance).toContain('AFK delivery is not base-sync consent');
+				expect(guidance).toContain(
+					'explicit human request to integrate a named base or resolve merge conflicts',
+				);
+				expect(guidance).not.toContain('Never merge,');
+			});
+		});
+	}
+
 	it('gates itself on the turn being a change to the codebase', () => {
 		expect(directive).toContain('change to this codebase');
 		expect(directive).toContain('skip the rest of this block');
 	});
 
-	// A review and a peer both inherit the opener's AFK mode, so both read this
-	// block — and the turn where one is asked to fix what it found is a change to
-	// the codebase by the first gate's own definition. Without this second gate
-	// that turn ends in a commit and a pull request the agent's opening brief
-	// forbids, racing the orchestrator that owns them.
 	it('excludes an agent whose brief named somebody else as the committer', () => {
 		expect(directive).toContain('as the committer');
 		expect(directive).toContain('leave it in the working tree');
 		expect(directive).toContain('follow-up asking you to fix what you found');
-	});
-
-	// The gate is self-checking — it asks what this conversation's own brief said —
-	// so an example only works if the reader can match it. A harness brief names no
-	// committer above the harness, so naming one here offers a test it cannot run.
-	it('offers the reviewer and the peer as examples a reader can check', () => {
 		expect(directive).toContain('as it does for a reviewer');
 		expect(directive).toContain('a peer opened to take half the work');
 		expect(directive).not.toContain('harness launched into this checkout');
 	});
 
-	// The scope gate is binary — change or not — and a documentation edit clears
-	// it, then takes a plan, a second orchestrator, and however many fix rounds it
-	// earns to be told what one reading of the diff already said.
-	it('sizes the loop to the change before the steps run', () => {
-		const sizing = directive.indexOf('Size the loop to the change');
-		expect(sizing).toBeGreaterThan(-1);
-		expect(sizing).toBeLessThan(directive.indexOf('**1.'));
-		expect(directive).toContain('short path');
-		expect(directive).toContain('steps 1, 3, and 4 do not run');
+	it('sizes the loop before the steps, by evidence rather than diff size', () => {
+		for (const guidance of [directive, nativeDirective]) {
+			const sizing = guidance.indexOf('Size the loop to the change');
+			expect(sizing).toBeGreaterThan(-1);
+			expect(sizing).toBeLessThan(guidance.indexOf('**1.'));
+			expect(guidance).toContain('steps 1, 3, and 4 do not run');
+			expect(guidance).toContain(
+				'the whole diff fits in one reading of your own',
+			);
+			expect(guidance).toContain('the shape was decided before you started');
+			expect(guidance).toContain('however few lines they end up being');
+		}
 	});
 
-	// Stated as evidence rather than as a list of small-looking task types: a
-	// one-word label change is short and a fifty-line feature in one file is not,
-	// so a size heuristic would sort both the wrong way.
-	it('defines the short path by what settles the change rather than by its size', () => {
-		expect(directive).toContain(
-			'the whole diff fits in one reading of your own',
-		);
-		expect(directive).toContain('the shape was decided before you started');
-		expect(directive).toContain('however few lines they end up being');
-	});
-
-	// The short path trades the second reader for the agent's own reading, not for
-	// shipping something nobody read.
-	it('replaces the second reader with a reading rather than with nothing', () => {
+	it('requires an adversarial reading and delivery on the short path', () => {
 		expect(directive).toContain('read the diff you produced from the top');
 		expect(directive).toContain('That reading is not a formality');
 		expect(directive).toContain(
@@ -108,24 +148,17 @@ describe('afk delivery loop', () => {
 		);
 	});
 
-	// A model that cannot decide must not decide in favour of the cheaper path,
-	// and one that finds mid-build that it guessed wrong has to be able to
-	// escalate — while one already in the full loop must not shed it for speed.
-	it('breaks the tie towards the full loop and only escalates from there', () => {
+	it('breaks the tie towards the full loop without forcing another agent', () => {
 		expect(directive).toContain('it is on the full loop');
 		expect(directive).toContain('pick the loop up at step 1');
 		expect(directive).toContain('does not drop out of it to save time');
+		expect(directive).toContain('it does not require another agent');
 	});
 
-	// The scope gate answers this one first and answers it "open nothing", so a
-	// short-path example naming it too would have the two gates order opposite
-	// things — and neither the tie-break nor the escalation clause arbitrates
-	// whether the loop applies at all, only which path applies inside it.
 	it('leaves the user-named correction to the scope gate alone', () => {
-		const claims = directive.split(
-			'correction the user asked for by name',
-		).length;
-		expect(claims).toBe(2);
+		expect(
+			directive.split('correction the user asked for by name'),
+		).toHaveLength(2);
 		expect(directive).toContain(
 			'a one-line correction the user asked for by name',
 		);
@@ -134,262 +167,103 @@ describe('afk delivery loop', () => {
 		);
 	});
 
-	// The five steps in order. Asserted by their leading numbers rather than by
-	// prose so a rewording does not silently drop one.
 	it('runs plan, build, review, fix, and ship in that order', () => {
 		const positions = ['**1.', '**2.', '**3.', '**4.', '**5.'].map((step) =>
 			directive.indexOf(step),
 		);
-
 		expect(positions.every((position) => position > -1)).toBe(true);
 		expect(positions).toEqual([...positions].sort((a, b) => a - b));
 	});
 
-	// The run ends when the orchestrator's context does, so the block has to say
-	// that reading belongs in a child's window — and has to say it before step 1,
-	// which is where the widest read of the run happens.
-	it('asks for the reading to be spent out of a sub-agent context', () => {
-		const delegation = directive.indexOf("Spend a sub-agent's context");
-		expect(delegation).toBeGreaterThan(-1);
-		expect(delegation).toBeLessThan(directive.indexOf('**1.'));
-		expect(directive).toContain('context window runs out');
-		expect(directive).toContain('Hand over the reading, keep the deciding');
-	});
-
-	// The role playbook says to delegate only for two or more parallel
-	// workstreams. An agent holding that and "delegate more" with nothing saying
-	// which governs picks one by guess, so the override has to be explicit.
-	it('overrides the playbook default rather than contradicting it silently', () => {
-		expect(directive).toContain('role playbook');
-		expect(directive).toContain(
-			'material you will not need again, whether or not anything else runs beside it',
-		);
-	});
-
 	it('keeps model-role selection live for unattended Ensemblr hand-offs', () => {
-		expect(directive).toContain('same five advisory task roles');
-		expect(directive).toContain('ensemblr_list_models');
-		expect(directive).toContain("user's role preferences");
-		expect(directive).toContain('prefer a model tagged for it');
-		expect(directive).toContain('name the role in the brief');
-		expect(directive).toContain('allowedRuntimes');
-		expect(directive).toContain('meaningful departure');
-		expect(directive).toContain('once before each fan-out batch');
-		expect(directive).toContain(
+		for (const clause of [
+			'ensemblr_list_models',
+			"user's role preferences",
+			'prefer a model tagged for it',
+			'name the role in the brief',
+			'allowedRuntimes',
+			'meaningful departure',
+			'once before each fan-out batch',
 			'Reuse that result for every child in the batch',
-		);
-		expect(directive).toContain('refresh it before a later batch');
+			'refresh it before a later batch',
+			'thinking level deliberately',
+			'normal cost-approval rules',
+		])
+			expect(directive).toContain(clause);
 	});
 
-	it('preserves every role boundary without widening authority', () => {
-		for (const role of ['Sage', 'Coder', 'Builder', 'Grunt', 'Explorer']) {
-			expect(directive).toContain(role);
+	it('preserves role boundaries and keeps the decisions with the orchestrator', () => {
+		for (const guidance of [directive, nativeDirective]) {
+			for (const role of ['Sage', 'Coder', 'Builder', 'Grunt', 'Explorer']) {
+				expect(guidance).toContain(role);
+			}
+			expect(guidance).toContain('zero-judgment');
+			expect(guidance).toContain('Explorer stays read-only');
+			expect(guidance).toContain('A role never grants tools');
+			expect(guidance).toContain('If that survey earns delegation');
+			expect(guidance).toContain(
+				'Keep the plan, the design calls, and reconciliation here',
+			);
 		}
-		expect(directive).toContain('zero-judgment');
-		expect(directive).toContain('Explorer stays read-only');
-		expect(directive).toContain('A role never grants tools');
-		expect(directive).toContain('send an Explorer child');
 	});
 
-	// Delegating the change itself is the failure mode the encouragement invites,
-	// so the block names the half that stays.
-	it('keeps the plan and the load-bearing edits out of the fan-out', () => {
-		expect(directive).toContain('Not worth handing over: the plan');
-		expect(directive).toContain('cannot delegate');
-	});
-
-	// The whole point of the review step is that somebody other than the author
-	// reads the change, and the two mechanics below are the ones an agent cannot
-	// work out for itself.
-	it('names the review tool and how to wait on what it opens', () => {
-		expect(directive).toContain('ensemblr_start_review');
-		expect(directive).toContain('root orchestrator rather than your child');
-		expect(directive).toContain('targets');
-		expect(directive).not.toContain('one of your own sub-agents');
-	});
-
-	// The review takes a co-tenancy slot again, so a full workspace refuses a step
-	// the loop treats as mandatory — and nothing the agent can do frees one, since
-	// a running harness is the user's to close.
-	it('says what to do when the review is refused for quota', () => {
-		expect(directive).toContain('denied-quota');
-		expect(directive).toContain('Do not retry it in a loop');
-		expect(directive).toContain('the second reading was refused');
-	});
-
-	// Fixes belong in the conversation that found the problem, not back here.
-	it('sends findings back to the review conversation rather than fixing them here', () => {
+	it('follows up only when a review was delegated and cleans up its child tabs', () => {
+		expect(directive).toContain("If a delegated reader's report needs");
 		expect(directive).toContain('ensemblr_send_follow_up');
-		expect(directive).toContain('same');
+		expect(directive).toContain('while its context remains suitable');
+		expect(directive).toContain('Close each delegate tab');
+		expect(directive).not.toContain(
+			'hands you back the reviewer you already have',
+		);
 	});
 
-	// The op hands the open reviewer back rather than seating a second one, so the
-	// block states that outcome instead of arguing against a call the app allows.
-	// The reason is still carried, because it is what makes the outcome the right
-	// one rather than a limitation to work around.
-	it('re-reviews in the same conversation rather than opening a second', () => {
-		expect(directive).toContain('ask that same conversation to re-review');
-		expect(directive).toContain('hands you back the reviewer you already have');
-		expect(directive).toContain('re-read the whole diff from cold');
-		expect(directive).not.toContain('repeat step 3');
-	});
-
-	// A count either cuts off a run that was still converging or licenses rounds
-	// that stopped paying for themselves. The agent inside the loop is the only
-	// party that can tell those apart, so the bound is progress rather than a
-	// number.
-	it('lets the pre-pull-request core run as many rounds as it earns', () => {
+	it('bounds review rounds by progress and stops when replanning cannot fix the approach', () => {
 		expect(directive).toContain('Steps 1 to 4 are a loop');
 		expect(directive).toContain('Nothing caps the rounds');
 		expect(directive).toContain('paid for by something actually changing');
-		expect(directive).not.toContain('three** rounds');
-	});
-
-	// Without a stop condition the loop is how an unattended run spends a night
-	// on the same three findings, and re-planning is the answer to a circle that
-	// grinding step 4 cannot break.
-	it('names what ends the loop, including a wrong approach', () => {
 		expect(directive).toContain('nothing you agree needs fixing');
 		expect(directive).toContain('circling the same class of problem');
 		expect(directive).toContain('go back to step 1');
 		expect(directive).toContain('re-planning does not break the circle');
 	});
 
-	// Re-entering at step 1 walks back through step 3, and step 3 says to call
-	// `ensemblr_start_review` — which answers with the reviewer already open. Step
-	// 4 says the same for an ordinary round, but the re-entry bypasses step 4, so
-	// the fact has to be here too.
-	it('re-reads a rebuilt change without opening a second review', () => {
-		const reEntry = directive.indexOf('rebuild from there');
-		expect(reEntry).toBeGreaterThan(-1);
+	it('permits delivery from either path but withholds the PR while real problems stand', () => {
 		expect(directive).toContain(
-			'Send the rebuilt change back to the reviewer you already have',
+			"the loop ended clean, or the short path's own reading came back clean",
 		);
-		expect(directive.indexOf('hands that same reviewer back')).toBeGreaterThan(
-			reEntry,
-		);
-	});
-
-	it('opens a pull request and forbids merging it', () => {
-		expect(directive).toContain('pull request');
-		expect(directive).toContain('Never merge');
-	});
-
-	// Stated for both entries rather than for the loop alone. It is the only
-	// clause that stops a broken change being pushed, and a short-path run whose
-	// own reading turned up something it could not settle never entered a loop
-	// for a loop-shaped condition to be about.
-	it('withholds the pull request while real problems stand, on either path', () => {
 		expect(directive).toContain(
 			'If real problems are still standing — the loop ended with them, or your own reading found one you could not settle — do not open the pull request',
 		);
 	});
 
-	// "Blocked" is the word a model reaches for when a task is merely hard, so
-	// the block has to separate the two or the run stops at the first difficulty.
 	it('separates a hard block from an ordinary uncertainty', () => {
 		expect(directive).toContain('hard block');
 		expect(directive).toContain('Being unsure is not a hard block');
 	});
 
-	it('asks for the honest report the user comes back to', () => {
-		expect(directive).toContain('final message');
-		expect(directive).toContain('ensemblr_set_summary');
-	});
-
-	// A short-path run reports one build and no rounds, which is what a full-loop
-	// run that converged immediately also reports. Naming the path is the only
-	// thing that tells the user which of the two they are reading.
-	it('has the report name the path the change was sized onto', () => {
-		expect(directive).toContain('which path you sized the change onto and why');
-	});
-
-	// Step 5 used to open on the loop having ended clean, which a short-path change
-	// never entered.
-	it('lets step 5 be reached from either path', () => {
-		expect(directive).toContain(
-			"the loop ended clean, or the short path's own reading came back clean",
+	it('gives native delegation only the mechanism and model information it can use', () => {
+		expect(nativeDirective).toContain("your own runtime's sub-agent tool");
+		expect(nativeDirective).toContain(
+			"cannot read the user's configured model-role tags or cross runtimes",
 		);
-	});
-
-	describe('a root delegating through its own runtime', () => {
-		// `startReview` and `sendFollowUp` are both in
-		// `NATIVE_DELEGATION_WITHHELD_OPS`, so the default wording orders two tools
-		// this caller does not hold — and it reads the block on every turn while
-		// the playbook that says so was read once at session open.
-		it('is told the review op is absent and to spawn its own reader', () => {
-			expect(nativeDirective).toContain(
-				'`ensemblr_start_review` is absent from your tool list',
-			);
-			expect(nativeDirective).not.toContain('ensemblr_send_follow_up');
-			expect(nativeDirective).not.toContain('ensemblr_start_conversation');
-		});
-
-		it('briefs that reader with what a review needs to be actionable', () => {
-			expect(nativeDirective).toContain('git diff');
-			expect(nativeDirective).toContain('full paths and line numbers');
-		});
-
-		// A sub-agent ends with its report, so the re-read of a fix round is a
-		// second child rather than a follow-up into the first.
-		it('re-reviews with a fresh child rather than a follow-up', () => {
-			expect(nativeDirective).toContain('a second reading is a second child');
-		});
-
-		it('carries the same delegation posture and the same loop', () => {
-			expect(nativeDirective).toContain("Spend a sub-agent's context");
-			expect(nativeDirective).toContain('Steps 1 to 4 are a loop');
-		});
-
-		it('uses the role vocabulary without claiming access to configured tags', () => {
-			expect(nativeDirective).toContain('same five advisory task roles');
-			expect(nativeDirective).toContain(
-				"cannot read the user's configured model-role tags or cross runtimes",
-			);
-			expect(nativeDirective).toContain('name it in every brief');
-		});
-
-		// Which steps a change earns is a question about the change, not about how
-		// this session spawns, so the sizing gate is the same on both mechanisms.
-		it('sizes the loop the same way', () => {
-			expect(nativeDirective).toContain('Size the loop to the change');
-			expect(nativeDirective).toContain('steps 1, 3, and 4 do not run');
-		});
-
-		// Nothing is still open here to follow up, so the co-tenancy sentence the
-		// other mechanism needs would be an instruction against a conversation this
-		// caller never opened.
-		it('re-reads a rebuilt change with a fresh child rather than a follow-up', () => {
-			expect(nativeDirective).toContain(
-				'Brief a fresh reviewer child over the rebuilt change',
-			);
-			expect(nativeDirective).toContain('give it the whole of that change');
-			expect(nativeDirective).not.toContain('co-tenancy slot');
-		});
+		expect(nativeDirective).toContain('name it in every brief');
+		expect(nativeDirective).toContain(
+			'If another delegated reading is warranted',
+		);
+		expect(nativeDirective).not.toContain('ensemblr_send_follow_up');
+		expect(nativeDirective).not.toContain('ensemblr_start_conversation');
 	});
 
 	describe('a spawned sub-agent', () => {
-		// Nested delegation is blocked on every axis, so the delegation block would
-		// be an instruction it cannot follow, and the numbered steps name ops it
-		// does not hold.
-		it('reads neither the steps nor the fan-out', () => {
+		it('reads neither the steps, the sizing gate, nor the fan-out', () => {
 			expect(subagentDirective).not.toContain('**1.');
 			expect(subagentDirective).not.toContain('**5.');
+			expect(subagentDirective).not.toContain('short path');
+			expect(subagentDirective).not.toContain('Size the loop');
 			expect(subagentDirective).not.toContain('ensemblr_start_conversation');
 			expect(subagentDirective).toContain('Nested delegation is blocked');
 		});
 
-		// It never runs the loop, so there is nothing for it to size, and a short
-		// path that ended in a pull request is exactly what its own body forbids.
-		it('reads no sizing gate either', () => {
-			expect(subagentDirective).not.toContain('short path');
-			expect(subagentDirective).not.toContain('Size the loop');
-		});
-
-		// Named as what the child does not do rather than as what its parent does:
-		// a reviewer and a peer are roots that read this file too, so a child of one
-		// has its commit two levels up and "your orchestrator commits" would be
-		// false for it.
 		it('is told the change is not its to commit, at any depth', () => {
 			expect(subagentDirective).toContain('is not yours');
 			expect(subagentDirective).toContain(
@@ -399,16 +273,11 @@ describe('afk delivery loop', () => {
 			expect(subagentDirective).toContain('leave it in the working tree');
 		});
 
-		// The discipline the loop exists for applies to a child's unwatched turn
-		// exactly as it does to its orchestrator's.
-		it('keeps the discipline the loop exists for', () => {
+		it('keeps verification discipline and obeys the named role before AFK ambiguity defaults', () => {
 			expect(subagentDirective).toContain(
 				'Decide the approach before the first edit',
 			);
 			expect(subagentDirective).toContain('name the assumption');
-		});
-
-		it('obeys the named role before AFK ambiguity defaults', () => {
 			expect(subagentDirective).toContain(
 				'Follow the advisory task role named in the brief',
 			);
@@ -416,47 +285,10 @@ describe('afk delivery loop', () => {
 				'Grunt encounters ambiguity or a failed precondition',
 			);
 			expect(subagentDirective).toContain('Explorer makes no edits');
-		});
-
-		// The block above it recruits read-only children by name — the survey
-		// before a plan, the triage of a failing suite — so an ungated "run the
-		// checks" spends a minute of an unattended run per scout on a tree the
-		// child never wrote to.
-		it('asks for the repository checks only where the work changed files', () => {
 			expect(subagentDirective).toContain(
 				'Where your unit of work changed files',
 			);
 			expect(subagentDirective).toContain('has nothing to check');
-		});
-	});
-
-	// Same axis as the peer block's harness clause: off, nothing can launch one,
-	// so naming a running harness as what holds the slot describes a cause that
-	// cannot occur. The quota sentence itself has to survive either way — it is
-	// the only thing standing between a refused mandatory step and a retry loop.
-	describe('with third-party CLI harnesses switched off', () => {
-		const off = render({ tuiHarnesses: false });
-
-		it('drops the harness from the quota refusal', () => {
-			expect(directive).toContain("a running harness is the user's to close");
-			expect(off).not.toContain('harness');
-		});
-
-		it('still tells the agent what denied-quota means and not to retry', () => {
-			expect(off).toContain('A `denied-quota` here means');
-			expect(off).toContain('nothing you can do frees a slot.');
-			expect(off).toContain('Do not retry it in a loop');
-		});
-
-		it('leaves the rest of the loop intact', () => {
-			expect(off.length).toBeGreaterThan(directive.length * 0.95);
-			expect(off).not.toBe(directive);
-		});
-
-		it('changes nothing for a root that delegates natively', () => {
-			expect(render({ delegation: 'native', tuiHarnesses: false })).toBe(
-				nativeDirective,
-			);
 		});
 	});
 });

@@ -1936,8 +1936,8 @@ export function createAgentControlService({
 	 * cannot spawn readers of its own reads a fifty-file diff in one window or not
 	 * at all. It costs a slot in the workspace's co-tenancy allowance for exactly
 	 * the reason a peer does — it is a second writer on one checkout — and what
-	 * keeps that affordable for the unattended loop, which holds a reviewer open
-	 * across every round it runs, is {@link coTenantLimit} widening the allowance
+	 * keeps that affordable for an explicitly requested unattended review is
+	 * {@link coTenantLimit} widening the allowance
 	 * for an unattended caller rather than this op stepping outside the count.
 	 *
 	 * A reviewer may not open a review, and {@link openedReviewSessions} is what
@@ -1971,9 +1971,9 @@ export function createAgentControlService({
 	 * "the user asked for this" has to be established by a dialog; this is the
 	 * Review action the user already has a button for, composed from their own
 	 * settings and running on the model they picked for reviews. Asking them to
-	 * confirm their own review — and refusing it overnight, when the unattended
-	 * loop is the one that most needs a second reader — would be gating the wrong
-	 * thing.
+	 * confirm their explicitly requested review would be gating the wrong thing.
+	 * AFK alone no longer requests this action; its loop chooses whether to
+	 * delegate review through the ordinary spawn path.
 	 * @param origin - Resolved caller identity.
 	 * @param args - The optional tab title.
 	 * @param callerModel - The Pi extension's live-model hint, absent for MCP callers.
@@ -2233,7 +2233,6 @@ export function createAgentControlService({
 			afkWorkflowDirective: buildAfkWorkflowDirective({
 				delegation: origin.delegation,
 				role,
-				tuiHarnesses: readTuiHarnessesEnabled(),
 				unattended: afkMode,
 			}),
 			issueDirective: issueDirectiveFor(origin, role),
@@ -3650,7 +3649,6 @@ export function createAgentControlService({
 			buildAfkWorkflowDirective({
 				delegation: origin.delegation,
 				role,
-				tuiHarnesses: readTuiHarnessesEnabled(),
 				unattended: isUnattended(origin),
 			}),
 			readLanguageDirective(),
