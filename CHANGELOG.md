@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-09-10
+
+Ensemblr 0.1.14 makes multi-agent work easier to direct and follow, with a bounded two-level delegation hierarchy, a live Agents panel, and safer unattended workflows.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.14) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.14/Ensemblr-0.1.14-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.14/Ensemblr-0.1.14-x64.AppImage)
+
+### Added
+
+- **Delegation now supports a bounded root → manager → leaf hierarchy with a live Agents panel.** Ensemblr preserves lineage and spawn budgets across restarts, shows activity and context usage, links children back to their parent, and keeps completed history compact. (#535, #544, #547)
+- **Models can be assigned Sage, Coder, Builder, Grunt, and Explorer roles for delegation.** Opt-in cross-runtime delegation can route work between Pi and Claude Code. (#537)
+- **The Concierge can read and update app settings** through the same validated control layer used by first-party settings surfaces. (#539)
+- **Workspace file lists distinguish symlinks and dotenv files,** including broken, cyclic, external, and lazily loaded links without letting slow targets hold up the listing. (#545)
+
+### Changed
+
+- **AFK agents choose review delegation for the work at hand** instead of being pinned to the manually configured Review model. (#541)
+- **Delegation guidance preserves the parent orchestrator's context** by splitting shared foundations before fan-out and retiring contexts that cross the pressure threshold. (#542)
+- **Documentation now matches shipped behavior** for repository locations, Linux AppImage updates, secret storage, workspace environment scope, setup timing, and control-tool availability. (#540)
+- **The demo catalogue and delegation screenshots cover the current Agents workflow.** (#548, #549)
+
+### Fixed
+
+- **Caffeinate handling recovers across battery and charger changes on macOS and Linux** without leaving stale inhibitors behind. (#534)
+- **Linux sidebar sheets clear the native title bar** while retaining the macOS layout. (#538)
+- **Plan Mode preserves refinements across filesystem races and locks the composer while review is pending.** (#543)
+- **Internal delegation wait-barrier refusals stay out of the user-facing timeline** without hiding real tool errors. (#546)
+
+### Security
+
+- **Workspace Git operations scrub inherited Git environment state** before applying their own private checkpoint context, preventing one workspace's process environment from redirecting another workspace's repository operations. (#536)
+
 ## [0.1.12] - 2026-09-09
 
 Ensemblr 0.1.12 gives Pi extensions a safe, structured way to present tool activity, while making Pi startup and command discovery more dependable.
