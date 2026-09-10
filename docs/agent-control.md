@@ -813,6 +813,11 @@ git.
 
 #### Opening the app's own review
 
+Use this action only for an explicit user request. AFK alone is not a request:
+the unattended loop lets the agent self-review or choose ordinary review
+delegates under the normal delegation rules. Those delegates are not pinned to
+the manual Review model or thinking level.
+
 `startReview` opens the workspace's **Review conversation** over the caller's
 change: the same review the user's Review button runs, deferring to whatever
 review skill the repository ships, carrying the user's own review instructions,
@@ -877,12 +882,11 @@ caller in that set is refused `denied-scope` ahead of every other check.
 It costs one of the workspace's co-tenancy slots and refuses with the same
 message a peer spawn does when the checkout is full. The allowance is
 `maxPerWorkspace` (two) for an attended caller and `maxPerUnattendedWorkspace`
-(four) for an unattended one, chosen off the caller rather than the workspace:
-the unattended delivery loop holds a reviewer open across every round it runs, so
-its own floor is two, and the extra pair absorbs the still-running harness
-terminal and the earlier peer a user routinely leaves behind when they step away.
-A run script is not one of them — the count reads terminals of kind `agent`, so a
-dev server has never taken a slot. The refusal names whichever limit was applied.
+(four) for an unattended one, chosen off the caller rather than the workspace.
+That allowance still applies to an explicitly requested Review action while the
+user is away; the AFK loop no longer opens one automatically. The count includes
+harness terminals of kind `agent`, not run scripts or dev servers. The refusal
+names whichever limit was applied.
 
 Unlike a peer it raises no confirmation and is not refused while the user is
 away: a peer is a second writer the agent chose, whereas this is the Review

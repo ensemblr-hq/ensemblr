@@ -388,9 +388,6 @@ describe('getSessionBrief', () => {
 				afkWorkflowDirective: buildAfkWorkflowDirective({
 					delegation: 'ensemblr',
 					role: 'orchestrator',
-					// This service is built without `readTuiHarnessesEnabled`, so it
-					// takes the off default and the quota step drops its harness clause.
-					tuiHarnesses: false,
 					unattended: true,
 				}),
 			});
@@ -427,7 +424,7 @@ describe('getSessionBrief', () => {
 		if (result.ok) {
 			expect(result.data).toMatchObject({
 				afkWorkflowDirective: expect.stringContaining(
-					'`ensemblr_start_review` is absent from your tool list',
+					'Self-review is allowed, including on the full loop',
 				),
 			});
 		}
@@ -507,9 +504,10 @@ describe('readTurnPreamble', () => {
 		const preamble = await service.readTurnPreamble(CALLER);
 
 		expect(preamble).toContain(
-			'`ensemblr_start_review` is absent from your tool list',
+			'Self-review is allowed, including on the full loop',
 		);
-		expect(preamble).toContain('Brief a fresh reviewer child');
+		expect(preamble).toContain('If another delegated reading is warranted');
+		expect(preamble).not.toContain('ensemblr_start_review');
 	});
 
 	it('tells a refinement turn to close on another plan submission', async () => {

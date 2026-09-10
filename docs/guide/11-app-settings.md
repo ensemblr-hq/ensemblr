@@ -185,8 +185,8 @@ actually offer.
 | --- | --- | --- |
 | Default model | Model a new chat starts on. Falls back to the runtime-reported default when unset. | Unset |
 | Default thinking level | Reasoning level paired with the default model. | Unset |
-| Review model | Model used by the Review action on a workspace. | Unset |
-| Review thinking level | Reasoning level paired with the review model. | Unset |
+| Review model | Model used by the manual Review action on a workspace, not by ordinary AFK delegates. | Unset |
+| Review thinking level | Reasoning level paired with the manual Review model; does not pin AFK delegates. | Unset |
 | Concierge model | Model the Concierge runs on. Stored under `app.concierge`, not `app.models`. | Unset |
 | Concierge thinking level | Reasoning level paired with the Concierge model. | Unset |
 | Model visibility | Hide models you don't use from the model picker and from the selects above. | Nothing hidden |

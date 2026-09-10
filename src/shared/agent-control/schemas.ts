@@ -96,7 +96,7 @@ const startConversationSchema = z
 	// caller's turn to hold open.
 	.refine((args) => !args.afkMode || !args.wait, {
 		message:
-			'An unattended conversation runs for hours — it plans the work, builds it, has it reviewed, fixes what came back, and opens a pull request — so no wait window covers it and `wait` would only time out. Brief it fully, drop `wait`, and read its tab or its last message when it has something to say.',
+			'An unattended conversation runs for hours — it plans the work, builds it, reviews the change, fixes what it finds, and opens a pull request — so no wait window covers it and `wait` would only time out. Brief it fully, drop `wait`, and read its tab or its last message when it has something to say.',
 	});
 
 const startReviewSchema = z.strictObject({

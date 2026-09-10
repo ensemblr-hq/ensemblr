@@ -302,15 +302,16 @@ run when you are not; instead the agent takes the most defensible reading and re
 **Approval prompts are answered for you**, without widening the workspace's permission mode: a `read-only`
 workspace still blocks every write, because AFK answers a question the mode already permits rather than
 granting a new one. **A second orchestrator is refused rather than approved**, since a peer writer on the
-worktree only ever happens because you asked for one (the Review chat below is the deliberate exception —
-an unattended run is the one that most needs a second reader).
+worktree only ever happens because you asked for one. The explicitly requested Review action remains
+available, but AFK alone does not request it.
 
 **A change gets a delivery loop, not just a longer leash.** Nobody is there to correct the approach at
 message three or read the diff before it lands, so the agent plans in writing before its first edit, builds
-it, opens the **Review chat** — your review skill, your review model, over its own change — sends the
-findings back and has them fixed there, then opens a pull request. It never merges, never force-pushes over
-work that is not its own, and updates an existing PR rather than opening a second. It judges each finding
-rather than accepting the list, and it decides how many rounds the loop runs.
+it, reviews the diff, fixes what it finds, then opens a pull request. **The agent decides whether and whom
+to delegate review to**, using the normal delegation rules; self-review is allowed. The manual **Review**
+button keeps your configured review model and thinking level, which do not pin AFK delegates. It never
+merges, never force-pushes over work that is not its own, and updates an existing PR rather than opening a
+second. It judges each finding rather than accepting the list, and decides how many rounds the loop runs.
 
 Not every change earns all five steps. A documentation edit, a version bump, or a rename the compiler
 follows end to end takes a **short path** — make it, run your checks, read the diff back adversarially, open
@@ -319,9 +320,9 @@ out of the full loop to save time.
 
 ![A finished unattended run: the report naming the path it took, the calls it made on the user's behalf, the review finding it argued with, and what it is least sure of — with the Review chat beside it in the tab strip and the pull request it opened in the header.](./docs/guide/images/06-afk-report.png)
 
-**The report is the point.** You come back to one account of the run: which path it took, what each review
-round moved, every decision it made on your behalf, every finding it disagreed with and why, what it could
-not finish, and the pull request. The same account lands in the session summary, so the tab still tells you
+**The report is the point.** You come back to one account of the run: which path it took, whether it
+self-reviewed or delegated review and why, what each review round moved, every decision it made on your
+behalf, every finding it disagreed with and why, what it could not finish, and the pull request. The same account lands in the session summary, so the tab still tells you
 months later. Full detail in [`docs/guide/06-agents.md`](./docs/guide/06-agents.md#afk-mode) and
 [ADR 0060](./docs/adr/0060-let-a-chat-run-unattended.md).
 

@@ -1,56 +1,7 @@
 /**
- * The loop an unattended agent runs a change through: plan, build, get it
- * reviewed, fix what came back, open the pull request.
- *
- * Split out of `afk-directive.ts` because the two answer different questions.
- * That file says what being unattended *takes away* — the ask tool, the
- * confirmations a human would have answered — and it applies to every AFK turn,
- * a question about the codebase included. This one says what an unattended turn
- * that changes code should *do* with the hours nobody is watching, and it is
- * gated on the turn being that kind of turn.
- *
- * The gate is the load-bearing part. A user who turns AFK on to ask "what does
- * this module do" and comes back to a pull request has been badly served, so the
- * loop opens by naming the two things that put a turn inside it — the task asks
- * for a change, and the change is one this workspace's branch would carry — and
- * says plainly what to do when neither holds.
- *
- * A sizing gate follows it, on a different axis. The scope gate asks whether the
- * turn is a change at all; {@link RIGHT_SIZE} asks how much of the loop that
- * change has earned, and lets one whose correctness the agent can settle by
- * reading its own diff skip the plan, the second reader, and the fix rounds.
- * Both are gates against the same failure — apparatus spent on work that did not
- * ask for it — and both run before the steps, because a model that has read five
- * numbered steps has already started step one.
- *
- * Every step in it exists because of what an unattended run loses. Planning
- * first, because nobody will catch the wrong approach at message three and the
- * cost of finding out at hour two is the whole run. A review by an agent that
- * did not write the code, because self-review is the weakest reading of a change
- * there is and the one thing an overnight run has plenty of is time for a second
- * one. Fixes in the reviewer's own conversation, because it holds the finding
- * and the file in one context. A report, because the final message is the entire
- * account of what happened.
- *
- * Two things the block is shaped by that the steps do not say on their own.
- *
- * The first is context. An unattended run ends when the orchestrator's context
- * window runs out, not when the work does, and nobody is there to start it
- * again — so the block asks for the reading to be spent out of a sub-agent's
- * window rather than the orchestrator's, and says so *before* step 1, because
- * planning is where the first wide reads happen. It has to override the role
- * playbook's "delegate only for two or more substantial parallel workstreams"
- * in as many words: that default is written for a chat somebody is watching,
- * and an agent holding both instructions with nothing saying which governs picks
- * one by guess.
- *
- * The second is that the core is a cycle rather than a line. Steps 1 to 4 run as
- * many times as the agent judges they earn, bounded by whether a round changed
- * anything rather than by a count — a fixed cap either cuts off a run that was
- * still converging or licenses rounds that were not paying for themselves, and
- * the agent is the only party in the loop that can tell those apart. Re-entering
- * at step 1 walks back through step 3, so the cycle carries the same mechanism
- * split step 3 does: one of the two mechanisms already has a reviewer open.
+ * The unattended delivery loop: scope and size the change, plan, build, review,
+ * repair, and ship. Review is required; delegating it is the agent's choice under
+ * the normal delegation rules.
  */
 
 import type { AgentControlRole } from './awareness.ts';
@@ -59,298 +10,80 @@ import type { SubagentMechanism } from './subagent-mechanism.ts';
 /** Opening line of the block, and the marker tests locate it by. */
 export const AFK_WORKFLOW_HEADER = 'UNATTENDED DELIVERY LOOP';
 
-/**
- * What puts a turn inside the loop, and what to do when it is outside it.
- *
- * Stated before the steps rather than after them because a model that has read
- * five numbered steps has already started step one.
- *
- * Its second paragraph covers the agents this block reaches by inheritance
- * rather than by being asked for. A review opened by `startReview` and a peer
- * opened by `startConversation` both inherit the caller's AFK mode, so both read
- * this block on every turn — and the turn where one is asked to fix what it
- * found is a change to the codebase by the first paragraph's own definition.
- * Without the second that turn ends in a commit and a pull request from an agent
- * whose opening brief forbids both, racing the orchestrator that owns them.
- * Written as scope prose rather than enforced by role because both are spawned
- * as roots and hold no role the app can read.
- *
- * Those two are that paragraph's only examples, and that is a completeness claim
- * rather than an omission. It is self-checking — it asks what this
- * conversation's own brief said — so an example only works for a reader who can
- * match it. A harness is a root in the same position on the role axis, but
- * nothing above it names a committer: `harnessAwareness` makes it the committer
- * for the peers it opens. Naming it here would offer a test it cannot run.
- */
+/** Limits delivery to requested code changes whose commit belongs to this conversation. */
 const SCOPE = `This applies when the task in front of you is a **change to this codebase** that this workspace's branch would carry — a feature, a fix, a refactor, a migration. It does not apply to a question, an investigation, a review of somebody else's work, or a one-line correction the user asked for by name. Answer those directly, and skip the rest of this block; opening a pull request for work nobody asked to have shipped is worse than not doing it.
 
 It also does not apply when this conversation's own opening brief named another orchestrator in this workspace as the committer — as it does for a reviewer, and for a peer opened to take half the work. That brief wins outright over every step below, including on a follow-up asking you to fix what you found: make the change, leave it in the working tree, and say what you touched. Committing, pushing, or opening a pull request from there would move HEAD underneath the agent already doing those things for both of you.`;
 
-/**
- * How much of the loop a change earns, and what replaces the parts it does not.
- *
- * The scope gate above is binary — inside the loop or outside it — and that is
- * one axis short. A documentation edit, a version bump, and a rename are all
- * changes this workspace's branch would carry, so they clear that gate and then
- * take the whole apparatus: a written plan, a second orchestrator opened over
- * the diff, and however many fix rounds it earns. Nothing in that is wrong, and
- * all of it is spent to be told what one reading of the diff already said.
- *
- * The criterion is whether the agent can settle the change's correctness on its
- * own. That is what the second reader exists to supply and what a plan exists to
- * protect, so where reading the diff and running the repository's checks
- * genuinely establish it, both are ceremony. Stated as three conditions rather
- * than as a list of small-looking task types, because "small" is a judgement
- * about the diff and the conditions are about the evidence — a one-word label
- * change is short, and a fifty-line feature that happens to be one file is not.
- *
- * The examples deliberately omit the correction the user asked for by name,
- * which {@link SCOPE} already routes out of the loop entirely. Listing it here
- * would have the two gates answer one task with "open nothing" and "commit,
- * push, and open a pull request" — and neither the tie-break below nor the
- * escalation clause resolves a disagreement about whether the loop applies at
- * all, because both are about which path a change inside it takes.
- *
- * Two asymmetries hold it in place. The tie goes to the full loop, so a model
- * that cannot decide does not decide in favour of the cheaper path. And the
- * judgement only moves upward: a run that discovers mid-build that it was on the
- * wrong path escalates, while one already inside the full loop never drops out
- * of it, because by then a reviewer is already reading.
- *
- * What does not become optional is the delivery: step 5 and the report run on
- * both paths. The short path trades the second reader for the agent's own
- * reading of the diff, not for shipping something nobody read.
- */
-const RIGHT_SIZE = `**Size the loop to the change before you start it.** Everything below is written for a change whose correctness you cannot settle on your own — a feature, a refactor, a migration, anything whose effect you have to reason about rather than read. Not every task AFK is turned on for is one of those, and running five steps and a second reader over a documentation edit spends an hour of the run to be told what your own reading of the diff already told you.
+/** Sizes planning and fix rounds without making review or verification optional. */
+const RIGHT_SIZE = `**Size the loop to the change before you start it.** Everything below is written for a change that benefits from explicit planning and iterative verification — a feature, a refactor, a migration, anything whose effect you have to reason about rather than read. Not every task AFK is turned on for is one of those, and running five steps over a documentation edit buys nothing your own reading of the diff and the repository's checks cannot establish.
 
 A change takes the **short path** when all three of these hold: the whole diff fits in one reading of your own; its correctness is settled by that reading plus whatever this repository uses to check a change, rather than by behaviour you would have to reason about to see; and the shape was decided before you started, because the user named it or because the repository leaves one way to do it. Documentation, comments, a translation of copy that already exists, a version or dependency bump, formatting, a rename the compiler follows end to end — those are the short path. A feature, a refactor, a migration, a bug whose cause you still have to find, and anything handed to you in one sentence that you had to design yourself are not, however few lines they end up being.
 
-**On the short path, steps 1, 3, and 4 do not run** — no written plan, no second reader, no fix rounds. Make the change; run whatever this repository uses to check it; then read the diff you produced from the top, as though somebody else had written it and you were looking for what they got wrong. That reading is not a formality: it is the whole of what you traded the second reader for, and it is what has to catch a claim the code no longer supports, a path that does not exist, a value left unfilled. Then go to step 5. The change is still committed, pushed, and opened as a pull request, and the report still carries everything asked for below.
+**On the short path, steps 1, 3, and 4 do not run** — no written plan, no separate review and fix rounds. Make the change; run whatever this repository uses to check it; then read the diff you produced from the top, as though somebody else had written it and you were looking for what they got wrong. That reading is not a formality: it has to catch a claim the code no longer supports, a path that does not exist, a value left unfilled. Then go to step 5. The change is still committed, pushed, and opened as a pull request, and the report still carries everything asked for below.
 
-**When you cannot tell which path a change is on, it is on the full loop**, and that judgement only ever moves the same way. Take it again while you build: a diff that outgrows one reading, a check that fails for a reason you did not predict, or a repair that turns out to need a design call all mean the short path was the wrong call — say so in the conversation and pick the loop up at step 1. A run already inside the full loop does not drop out of it to save time, because by then the second reader is already reading.`;
+**When you cannot tell which path a change is on, it is on the full loop**, and that judgement only ever moves the same way. Take it again while you build: a diff that outgrows one reading, a check that fails for a reason you did not predict, or a repair that turns out to need a design call all mean the short path was the wrong call — say so in the conversation and pick the loop up at step 1. A run already inside the full loop does not drop out of it to save time. The full loop requires planning, review, and repairs; it does not require another agent.`;
 
-/**
- * Why an unattended run delegates more than an attended one, and what it must
- * not delegate.
- *
- * Placed ahead of step 1 because the survey a plan needs is the single largest
- * read of the run, and an orchestrator that has already done it here cannot
- * un-spend the window. The last paragraph names the two halves — reading out,
- * decisions in — because a model told only "delegate more" fans the *writing*
- * out too, and a change authored by four agents at once is one nobody can hold.
- */
-const DELEGATE_PREMISE = `**Spend a sub-agent's context before you spend your own.** An unattended run ends when your context window runs out, not when the work does, and nobody is here to restart you — so what you have left is the real budget for every step below. A child's window is a separate one and costs you only what it reports back: a sub-agent that opens twenty files and answers in six lines with paths costs you six lines, where the same reading done here costs you those twenty files for the rest of the run.
+/** Keeps AFK delegation subject to the ordinary work-splitting and context rules. */
+const DELEGATE_PREMISE = `**Delegate deliberately, not because you are unattended.** Follow the normal delegation rules in your role playbook: do the work yourself by default, split substantial independent work before spawning, and account for context pressure before taking on a new unit of reading. AFK does not require spawning a child, a reviewer, or a second orchestrator.
 
-Your role playbook says to do the work yourself and delegate only when the task splits into two or more substantial workstreams that can run in parallel. That default is written for a chat somebody is watching, and here it is narrower than it should be. Read it as: delegate whenever a unit of work would fill your context with material you will not need again, whether or not anything else runs beside it. One child, spawned for that reason alone, is a correct use of the mechanism — and the smaller your context window, the earlier that stops being optional.
+Your context window is still a budget. Where delegation earns its cost, quote the paths and facts you already established so a child does not buy the same reading twice. Keep the plan, the design calls, and reconciliation here; hand off a bounded unit with an actionable deliverable rather than the responsibility for the whole change.`;
 
-Hand over the reading, keep the deciding. Worth handing over: the survey of a subsystem you do not know yet, before you plan; the triage of a failing suite or a long build log; a sweep confirming a fix landed everywhere it had to; an edit that is the same mechanical change in many files. Not worth handing over: the plan, the design calls, the load-bearing edits, and the reconciliation of what comes back. The shape of the change is the part you cannot delegate, and a diff written by four agents at once is one nobody can hold.`;
-
-/**
- * The Ensemblr-mechanism half of the delegation block: the ops, and the two
- * habits that stop a fan-out costing more context than it saves — briefing with
- * what you already hold, and not reading a whole report to use one line of it.
- */
-const DELEGATE_MECHANICS_ENSEMBLR = `Pay for a hand-off once. Call \`ensemblr_list_models\` once before each fan-out batch: its live result is the source of permitted runtime destinations and the user's role preferences. Reuse that result for every child in the batch, and refresh it before a later batch. Choose the task role first, prefer a model tagged for it, and name the role in the brief; untagged setups keep working as before, and a meaningful departure from configured tags is allowed when the brief says why. An explicit model may use only a runtime in \`allowedRuntimes\`; omitting it still inherits on your runtime.
+/** Model-role selection and hand-off mechanics for Ensemblr delegates. */
+const DELEGATE_MECHANICS_ENSEMBLR = `Pay for a hand-off once. Call \`ensemblr_list_models\` once before each fan-out batch: its live result is the source of permitted runtime destinations and the user's role preferences. Reuse that result for every child in the batch, and refresh it before a later batch. Choose the task role first, prefer a model tagged for it, and name the role in the brief; untagged setups keep working as before, and a meaningful departure from configured tags is allowed when the brief says why. An explicit model may use only a runtime in \`allowedRuntimes\`; omitting it still inherits on your runtime. Choose a thinking level deliberately from that model's ladder, and follow the normal cost-approval rules.
 
 Quote into each brief the paths and facts you already have, or the child re-derives them and you have bought the same read twice; say what to deliver rather than what to look at; ask for findings with full paths rather than a narrative. Spawn with \`ensemblr_start_conversation\`, one child per unit of work, then block on \`ensemblr_wait_for_agents\` — and pass \`reports: "brief"\` when several land at once, so four full reports do not arrive to be mined for one line each. Verify a load-bearing claim against the file yourself before you build on it.`;
 
-/**
- * The same half for a root delegating through its own runtime. It states the
- * absence of the chat-tab ops rather than leaving it to be discovered, because
- * this block is read on every turn while the playbook that says so was read once
- * at session open.
- */
+/** Hand-off mechanics for roots using their runtime's own delegation tools. */
 const DELEGATE_MECHANICS_NATIVE = `Pay for a hand-off once. Delegation here runs through your own runtime's sub-agent tool — Ensemblr's chat-tab spawn ops and \`ensemblr_list_models\` are absent from your list rather than discouraged, so do not go hunting for them. This built-in mechanism cannot read the user's configured model-role tags or cross runtimes; choose the task role from the work itself and name it in every brief.
 
 Quote into each brief the paths and facts you already have, or the child re-derives them and you have bought the same read twice; say what to deliver rather than what to look at; ask for findings with full paths rather than a narrative. Verify a load-bearing claim against the file yourself before you build on it.`;
 
-/** Advisory work boundaries that AFK hand-offs keep despite their wider delegation posture. */
+/** Advisory work boundaries that AFK hand-offs keep without widening authority. */
 const AFK_ROLE_GUIDANCE = `Use the same five advisory task roles for every hand-off in this unattended loop. Sage frames reasoning, architecture, and difficult tradeoffs. Coder resolves a novel implementation path; Builder follows a settled pattern or specification — uncertainty, not size, separates them. Grunt receives only fully determined, zero-judgment work and reports a failed precondition instead of improvising. Explorer stays read-only and returns an actionable implementation plan with evidence, affected files, sequence, dependencies, verification, and open questions. A role never grants tools, permissions, cost approval, or deeper delegation.`;
 
-/** Step one, and the one the length of the run is decided by. */
-const PLAN = `**1. Plan before you write anything.** Read the code the change touches, the tests around it, and whatever the repository says about how it wants to be worked on — its agent instructions, its architecture notes, its decision records. Where that reading is wide, send an Explorer child to investigate it and plan from the actionable report it returns. Then decide the approach and write it down, in this conversation, before the first edit. Weigh at least one alternative and say why you rejected it. Nobody is going to stop you at message three, so the plan is the only place a wrong approach gets caught.
+/** Requires a written approach before the full loop's first edit. */
+const PLAN = `**1. Plan before you write anything.** Read the code the change touches, the tests around it, and whatever the repository says about how it wants to be worked on — its agent instructions, its architecture notes, its decision records. If that survey earns delegation under the rules above, send an Explorer child to investigate it and plan from the actionable report it returns. Then decide the approach and write it down, in this conversation, before the first edit. Weigh at least one alternative and say why you rejected it. Nobody is going to stop you at message three, so the plan is the only place a wrong approach gets caught.
 
 Choose the design that is genuinely best for the architecture and for the person using the app — not the fastest to type, not the one that touches fewest files. An unattended run is the one place where "do it properly" costs nothing but time, and time is what you have. Where the repository already has a way of doing this thing, follow it rather than inventing a second one.`;
 
-/** Step two. */
+/** Requires implementation and repository checks before review. */
 const BUILD = `**2. Build the plan.** Follow it. When something you find while building invalidates it, say so in the conversation, revise it, and carry on from the revision rather than quietly drifting. Keep the change to what the task asked for. Leave the tree in a state that builds and whose tests pass, and run whatever this repository uses to check that — a change you have not run the checks on is not finished.`;
 
-/**
- * Step three for the Ensemblr mechanism. Names the tool and its two non-obvious
- * mechanics — the review is not a child, and it shares the checkout — because
- * both cost a wasted turn when discovered by trial.
- *
- * It also names the one refusal, which the reviewer's shape made reachable
- * again: a review takes a co-tenancy slot, so a workspace already full of
- * writers answers `denied-quota`. Nothing the agent can do frees one — a running
- * harness is the user's to close — so the step states the fallback rather than
- * leaving a mandatory step with no way past it.
- *
- * The harness half of that sentence is cut with the feature, the same way
- * `PEER_ORCHESTRATOR_HARNESS_CLAUSE` is: off, it names a cause that cannot
- * occur. The refusal itself still names whatever holds the checkout when it
- * fires, so what goes is the warning rather than the explanation.
- */
-const REVIEW_QUOTA_HARNESS_CLAUSE = ` — a running harness is the user's to close`;
+/** Requires review while leaving delegation and model selection to the agent. */
+const REVIEW = `**3. Review the change.** Read the whole branch diff against its base using the repository's own review skill or review instructions where it ships them. Self-review is allowed, including on the full loop. Decide whether a separate reader adds enough value to justify a hand-off under the normal delegation rules; AFK is not itself a reason to spawn one. The configured review model and thinking level belong to the manual Review button, not to AFK delegation.
 
-/**
- * Step three for the Ensemblr mechanism, with the quota sentence closing on the
- * harness clause only while harnesses exist.
- * @param harnesses - Whether third-party CLI harnesses are switched on.
- * @returns The review step for that feature state.
- */
-const reviewEnsemblr = (
-	harnesses: boolean,
-): string => `**3. Have it reviewed by an agent that did not write it.** Call \`ensemblr_start_review\`. That opens this workspace's Review conversation over your change: the same review the user's Review button runs, on the model they configured for it, deferring to whatever review skill this repository ships. Do not review your own work instead — a reader who already believes the code is right is the weakest reviewer available, and the whole point of the hours nobody is watching is that a second reading is free. It reads the diff so you do not have to, which is the largest single saving of context in the loop.
+If you delegate review, use the ordinary delegation mechanism and model-selection rules above, not the configured Review action or a peer orchestrator. Brief a bounded, read-only review with the diff to read (\`git diff\` against this branch's base), relevant paths and facts, the repository's review instructions, and ranked findings with full paths and line numbers; mark uncertainty explicitly. A reviewer child has no delegation budget of its own, so split substantial independent slices yourself when the diff earns that. Leave the reviewed files alone until the reader reports. If delegation is unavailable or refused, do not retry in a loop or bypass the limit: review the diff yourself and record the limitation.`;
 
-Two things about what it opens. It is a root orchestrator rather than your child — it has a delegation budget of its own and fans readers out over a wide diff — so \`ensemblr_wait_for_agents\` will not find it unless you name its \`agentSessionId\` in \`targets\`; wait on it that way. And it shares this worktree with you, so leave the files alone while it works.
+/** Keeps repairs and verification with the orchestrator rather than forcing a reviewer follow-up. */
+const FIX = `**4. Judge the findings, fix them, and check again.** Judge each finding rather than accepting the whole list, whether it came from your own reading or a delegate. A finding you disagree with is one you explain in the final report. Where it is right, make the repair here, or delegate a bounded repair under the same rules above. Run the relevant checks and re-read the changed diff. Re-review does not require another agent either.`;
 
-A \`denied-quota\` here means this workspace already holds as many agents writing the checkout as your allowance covers, and nothing you can do frees a slot${harnesses ? REVIEW_QUOTA_HARNESS_CLAUSE : ''}. Do not retry it in a loop: read your own diff as adversarially as you can manage, carry on to step 5, and say in both your report and the pull request that the second reading was refused and why.`;
+/** Follow-up and cleanup instructions apply only when Ensemblr review delegates were actually opened. */
+const REVIEW_FOLLOW_UP_ENSEMBLR = `If a delegated reader's report needs clarification or another reading, use \`ensemblr_send_follow_up\` against that same \`agentSessionId\` while its context remains suitable, then wait on it again. When its context is full, brief a fresh child with the findings and paths instead. Close each delegate tab once you have taken its final report; these are ordinary child tabs, not the manual Review conversation.`;
 
-/**
- * Step three for a root delegating through its own runtime, which does not hold
- * `startReview` — driving the conversation it opens needs the spawn ops that
- * role is withheld. Without this variant the block orders a tool that is absent
- * from the list, and the agent spends a turn of an unattended run finding out.
- */
-const REVIEW_NATIVE = `**3. Have it reviewed by an agent that did not write it.** \`ensemblr_start_review\` is absent from your tool list, because driving the conversation it opens would take the spawn ops this session withholds — so your second reader is a sub-agent of your own. Do not review your own work instead: a reader who already believes the code is right is the weakest reviewer available, and the whole point of the hours nobody is watching is that a second reading is free. It also reads the diff so you do not have to, which is the largest single saving of context in the loop.
+/** Native delegates return a report rather than a persistent conversation to steer. */
+const REVIEW_FOLLOW_UP_NATIVE = `If another delegated reading is warranted, brief a fresh child through your runtime's own mechanism with the findings and paths it needs. Do not assume a finished native sub-agent is a conversation you can follow up into.`;
 
-Brief it as a reviewer rather than as a helper, or it comes back with prose you cannot act on: the diff to read (\`git diff\` against this branch's base), the repository's own review skill or review instructions where it ships them, and a report of ranked findings carrying full paths and line numbers, with anything it is unsure of marked as such. Where the diff is wide, brief one reader per slice of it rather than one over all of it.`;
+/** Bounds iteration by useful progress, without requiring a reviewer to exist. */
+const ITERATE = `**Steps 1 to 4 are a loop, and you decide how many times it runs.** Nothing caps the rounds. Run the cycle as many times as it earns — reviewing, judging, repairing, re-reading — and let each pass be paid for by something actually changing. Say in the conversation when a round finishes and what it moved, so the record shows how the change converged rather than only where it landed.
 
-/**
- * Step four for the Ensemblr mechanism, and where the user's "fixes go back to
- * the same chat" rule lives. The continuity sentence is here rather than in the
- * iteration block because it is what makes re-review a follow-up rather than a
- * second `startReview` — which the op answers by handing back the reviewer the
- * caller already has, so the sentence describes what happens rather than warning
- * against what would.
- */
-const FIX_ENSEMBLR = `**4. Send the findings back to the same conversation.** When the review reports, use \`ensemblr_send_follow_up\` against that same \`agentSessionId\` and ask it to fix what it found. The fixes belong there, not here: it holds the finding and the file in one context, it can spawn its own sub-agents when the list is long, and every repair made there is one that never enters your window. Then wait on it again.
-
-Judge each finding rather than accepting the whole list. A finding you disagree with is one you say you disagree with — in the follow-up, so the reviewer can answer, and in your final report, so the user can. Where it is right, the fix is the fix, not a comment explaining the problem.
-
-Then ask that same conversation to re-review what it changed. Keep every round in the one conversation: a second \`ensemblr_start_review\` hands you back the reviewer you already have rather than opening a fresh one, because a new reader has seen neither the findings nor your answers to them and would re-read the whole diff from cold to arrive where this one is already standing.`;
-
-/**
- * Step four for a root delegating through its own runtime. A child ends with its
- * report and cannot be followed up, so the re-read is a fresh child rather than
- * a second message — the one mechanic that genuinely differs between the two.
- */
-const FIX_NATIVE = `**4. Fix what the review found, and have it read again.** Judge each finding rather than accepting the whole list. A finding you disagree with is one you say you disagree with — in your final report, so the user can answer it. Where it is right, the fix is the fix, not a comment explaining the problem.
-
-Make the repairs here, or hand a mechanical one to a child of its own. Then spawn a fresh reviewer over what changed: a sub-agent ends with its report and cannot be followed up, so a second reading is a second child, briefed with the findings it is checking and the files they moved.`;
-
-/**
- * How the Ensemblr mechanism gets the *rebuilt* change read again.
- *
- * The re-plan re-entry walks back through step 3, which on this mechanism says
- * to call `startReview` — and the op answers that call with the reviewer already
- * open rather than a second one. Step 4 says the same for an ordinary round, but
- * the re-entry bypasses step 4 entirely, which is why it is stated twice rather
- * than once.
- *
- * Both statements describe the op rather than restraining the agent. They used to
- * lean on a `denied-quota` refusal from the co-tenancy cap, which stopped being
- * load-bearing once
- * [ADR 0063](../../../docs/adr/0063-open-an-agent-requested-review-as-a-peer-again.md)
- * widened that cap for an unattended caller: the reviewer is a peer again, but
- * the workspace now has room for a second one. What holds the rule is
- * `reviewsByCaller`, which hands the open reviewer back.
- */
-const REBUILT_REVIEW_ENSEMBLR = `Send the rebuilt change back to the reviewer you already have, the way you sent the first round. Calling \`ensemblr_start_review\` again on the way past step 3 hands that same reviewer back rather than opening a fresh one: it has read every round that led here, where a new reader would start from the diff alone.`;
-
-/**
- * The same, for a root delegating through its own runtime. Here there is nothing
- * still open to follow up — the reviewer was a sub-agent that ended with its
- * report — so the re-entry genuinely does spawn a new one, and the only thing
- * worth saying is that it reads the rebuilt change whole.
- *
- * Worded so it does not echo step 4's own "the files they moved". That step
- * briefs a per-round reader on the delta, which is right for a round; negating
- * its phrasing here would read as overriding it rather than as naming the one
- * case it does not cover.
- */
-const REBUILT_REVIEW_NATIVE = `Brief a fresh reviewer child over the rebuilt change, and give it the whole of that change: it came out of a plan the earlier readers never saw, so a brief scoped to one round's findings would point it at the wrong thing.`;
-
-/**
- * The cycle, and what ends it.
- *
- * There is no round count. A cap either cuts off a run that was still
- * converging or licenses rounds that stopped paying for themselves, and the
- * agent inside the loop is the only party that can tell those apart — so the
- * stop conditions are about whether the last round changed anything, and the
- * one failure they exist to name is a run of rounds circling the same problem,
- * which is a fact about the approach rather than about the code.
- *
- * Mechanism-dependent for one sentence only: the re-entry passes through step 3,
- * and step 3 is where the two mechanisms differ.
- * @param delegation - The mechanism this session was pinned to at open.
- * @returns The cycle, carrying the re-entry sentence its mechanism needs.
- */
-function iterateFor(delegation: SubagentMechanism): string {
-	const rebuiltReview =
-		delegation === 'native' ? REBUILT_REVIEW_NATIVE : REBUILT_REVIEW_ENSEMBLR;
-	return `**Steps 1 to 4 are a loop, and you decide how many times it runs.** Nothing caps the rounds. Run the cycle as many times as it earns — reviewing, judging, repairing, re-reading — and let each pass be paid for by something actually changing. Say in the conversation when a round finishes and what it moved, so the record shows how the change converged rather than only where it landed.
-
-Three things end it. A round that comes back with nothing you agree needs fixing: the change is done. A round that repeats the list you already judged and answered: a second copy of an answered finding is not new information. And a run of rounds circling the same class of problem: that says the approach is wrong rather than the code, and grinding step 4 will not fix an approach — go back to step 1 with what the reviews taught you, re-plan, and rebuild from there. ${rebuiltReview}
+Three things end it. A round that comes back with nothing you agree needs fixing: the change is done. A round that repeats the list you already judged and answered: a second copy of an answered finding is not new information. And a run of rounds circling the same class of problem: that says the approach is wrong rather than the code, and grinding step 4 will not fix an approach — go back to step 1 with what the reviews taught you, re-plan, and rebuild from there. Review the whole rebuilt change, not just the earlier findings; decide again whether to delegate that reading under the same rules.
 
 When re-planning does not break the circle either, stop. An honest report of a change that did not converge is worth more than another six rounds against the same wall, and spending the night on one finding is the outcome this loop exists to prevent.`;
-}
 
-/**
- * Step five, and the two hard limits on it.
- *
- * Both of its conditions name both ways a change arrives here, because
- * {@link RIGHT_SIZE} routes a short-path change straight into a step whose
- * original wording waited on a loop it never entered. The withholding clause
- * needs that as much as the opening one does: it is the only thing that stops a
- * change with real problems in it being pushed, and a short-path run whose own
- * reading turned one up has no loop for a loop-shaped condition to be about.
- * `RIGHT_SIZE`'s escalation clause does not cover it either — that fires on a
- * diff outgrowing one reading, an *unpredicted* check failure, or a repair
- * needing a design call, none of which a foreseen but unresolvable problem is.
- */
+/** Delivers either path without permitting PR merging or implicit base integration. */
 const SHIP = `**5. Open the pull request — and never merge it.** Once the change is done — the loop ended clean, or the short path's own reading came back clean — commit the work following this repository's commit conventions, push the branch, and open the pull request. Turning AFK on for a change *is* the request for one, so this is the one outward-facing step the block above has already asked for and it needs no further permission — but it is the end of your authority. Never merge the pull request, never force-push over somebody else's work, never close or reopen anything. AFK delivery is not base-sync consent: only an explicit human request to integrate a named base or resolve merge conflicts permits necessary local merge/rebase and continuation for this workspace/task, subject to the Git isolation and role limits in your playbook. A branch that already has an open pull request gets that one updated rather than a second one opened.
 
 If real problems are still standing — the loop ended with them, or your own reading found one you could not settle — do not open the pull request. Leave the work committed on the branch, and report what is unresolved.`;
 
-/**
- * The report, and the two things that end a run early.
- *
- * A hard block is defined by example rather than by adjective, because "blocked"
- * is exactly the word a model reaches for when a task is merely hard — and an
- * unattended run that gives up at the first difficulty is the failure mode this
- * whole block exists to prevent.
- */
+/** Requires an honest delivery account, including the review choice and unresolved blockers. */
 const REPORT = `**Stop on a hard block, and say so.** A hard block is something no amount of your own effort resolves: a credential or account you do not have, a service that is refusing you, a dependency that cannot be installed here, a step that would need the user's authority — publishing, deleting, paying, touching something outside this workspace. Stop at that point. Do not route around it, do not fake it, do not carry on with the parts that depend on it. Write the report and end the turn.
 
 Being unsure is not a hard block. An ambiguous requirement, a missing convention, a choice between two reasonable designs: decide it yourself, on the most defensible reading, and record it. That is what the rest of this mode is for.
 
-**Your final message is the whole account of the run.** It carries what you built, which path you sized the change onto and why, the approach you chose and what you rejected, how many rounds the loop ran and what each one moved, every decision you made on the user's behalf, every review finding you disagreed with and why, what you could not finish and what stopped you, and the pull request if you opened one. Be honest about the parts you are least sure of — a run reported as clean that was not is worse than one that names its own weak spots. Put the same thing in \`ensemblr_set_summary\`, which is what the user reads first.`;
+**Your final message is the whole account of the run.** It carries what you built, which path you sized the change onto and why, whether you self-reviewed or delegated review and why, the approach you chose and what you rejected, how many rounds the loop ran and what each one moved, every decision you made on the user's behalf, every review finding you disagreed with and why, what you could not finish and what stopped you, and the pull request if you opened one. Be honest about the parts you are least sure of — a run reported as clean that was not is worse than one that names its own weak spots. Put the same thing in \`ensemblr_set_summary\`, which is what the user reads first.`;
 
-/**
- * What a spawned sub-agent reads instead of the loop.
- *
- * It gets a body of its own rather than the scope gate alone for two reasons.
- * Nested delegation is blocked on every axis, so the delegation block above
- * would be an instruction it cannot follow — and the steps that follow name ops
- * it does not hold. What survives is the discipline the loop exists for, which
- * applies to a child's unwatched turn exactly as it does to its orchestrator's.
- *
- * The opening names what the child does not do rather than what its parent does,
- * because the parent is not always the committer: a peer is spawned as a root,
- * reads this file, and may spawn children of its own — whose commit belongs two
- * levels up. Naming the parent's role would be a false claim for a whole class
- * of children, and every other claim in the block is worth following only
- * because they can all be checked.
- *
- * The agent-opened review is not one of the children reading this:
- * [ADR 0063](../../../docs/adr/0063-open-an-agent-requested-review-as-a-peer-again.md)
- * spawns it as a root, so it reads the full loop and is held off the commit by
- * {@link SCOPE}'s second gate, exactly as a peer is. What it needs beyond that —
- * that fixing its own findings on a follow-up is in scope — is in its own
- * opening brief, because nothing else opened this way is asked for a second turn.
- */
+/** Gives children the verification discipline without delivery or nested-delegation authority. */
 const SUBAGENT_BODY = `The delivery loop Ensemblr runs an unattended change through is not yours. You were spawned to carry out one unit of work, and nothing that happens to the change afterwards is yours: the commit, the review, and the pull request all sit above you, however many levels up that is. Do not commit, push, rebase, or open one from here — make the change, leave it in the working tree, and say in your report exactly what you touched.
 
 What does carry over is the discipline the loop exists for, because nobody is watching your turn either. Decide the approach before the first edit rather than discovering it during one. Where your unit of work changed files, run whatever this repository uses to check a change and say in your report what it said — a survey, a triage, or any other unit that changed none has nothing to check. Follow the advisory task role named in the brief without treating it as extra authority. If Grunt encounters ambiguity or a failed precondition, report it instead of filling the gap; Explorer makes no edits and returns the requested actionable plan. For every other role, take the most defensible reading of an ambiguity, act on it, and name the assumption rather than deciding it silently.
@@ -358,54 +91,17 @@ What does carry over is the discipline the loop exists for, because nobody is wa
 Nested delegation is blocked on every axis, so the reading is yours to do — and do only what your unit of work needs. Your brief already holds paths and facts your orchestrator paid to establish; re-deriving them spends the saving the hand-off was for. Read what the brief did not give you, and leave your findings as your last message.`;
 
 /**
- * The delegation block for one caller: why it delegates, then how.
- * @param delegation - The mechanism this session was pinned to at open.
- * @returns The premise and the mechanism-specific mechanics, joined.
- */
-function delegateFor(delegation: SubagentMechanism): string {
-	const mechanics =
-		delegation === 'native'
-			? DELEGATE_MECHANICS_NATIVE
-			: DELEGATE_MECHANICS_ENSEMBLR;
-	return `${DELEGATE_PREMISE}\n\n${AFK_ROLE_GUIDANCE}\n\n${mechanics}`;
-}
-
-/**
- * Steps 3 and 4 for one caller. They move together: the mechanism that opens the
- * review is the one that drives the fix round, and a caller handed one half of
- * each pair would be told to follow up into something it never opened.
- * @param delegation - The mechanism this session was pinned to at open.
- * @param harnesses - Whether third-party CLI harnesses are switched on.
- * @returns The review and fix steps, joined.
- */
-function reviewAndFixFor(
-	delegation: SubagentMechanism,
-	harnesses: boolean,
-): string {
-	return delegation === 'native'
-		? `${REVIEW_NATIVE}\n\n${FIX_NATIVE}`
-		: `${reviewEnsemblr(harnesses)}\n\n${FIX_ENSEMBLR}`;
-}
-
-/**
  * Renders the delivery loop, or null when the conversation is not unattended.
- *
- * There is no Concierge branch, and it is not an omission: AFK is a per-chat-tab
- * toggle and the Concierge is a panel, so no Concierge session is ever in the
- * registry `isUnattended` reads. A branch for it would be an unreachable answer
- * to a question the caller cannot ask.
- * @param options - Whether the session is unattended, the delegation mechanism it was pinned to at open, the caller's control-layer role, and whether third-party CLI harnesses are switched on.
- * @returns The block to append to this turn's prompt, or null when AFK is off.
+ * @param options - AFK state, the pinned delegation mechanism, and the caller's role.
+ * @returns The per-turn delivery directive, or null when AFK is off.
  */
 export function buildAfkWorkflowDirective({
 	delegation,
 	role,
-	tuiHarnesses,
 	unattended,
 }: {
 	delegation: SubagentMechanism;
 	role: AgentControlRole;
-	tuiHarnesses: boolean;
 	unattended: boolean;
 }): string | null {
 	if (!unattended) {
@@ -414,19 +110,28 @@ export function buildAfkWorkflowDirective({
 	if (role === 'subagent') {
 		return `${AFK_WORKFLOW_HEADER} — ${SUBAGENT_BODY}`;
 	}
+	const native = delegation === 'native';
 	return `${AFK_WORKFLOW_HEADER} — ${SCOPE}
 
 ${RIGHT_SIZE}
 
-${delegateFor(delegation)}
+${DELEGATE_PREMISE}
+
+${AFK_ROLE_GUIDANCE}
+
+${native ? DELEGATE_MECHANICS_NATIVE : DELEGATE_MECHANICS_ENSEMBLR}
 
 ${PLAN}
 
 ${BUILD}
 
-${reviewAndFixFor(delegation, tuiHarnesses)}
+${REVIEW}
 
-${iterateFor(delegation)}
+${FIX}
+
+${native ? REVIEW_FOLLOW_UP_NATIVE : REVIEW_FOLLOW_UP_ENSEMBLR}
+
+${ITERATE}
 
 ${SHIP}
 
