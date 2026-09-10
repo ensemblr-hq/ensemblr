@@ -317,10 +317,10 @@ Two credentials are deliberately **not** Ensemblr's:
   them. Ensemblr duplicates none of it unless you explicitly configure an
   Ensemblr-owned secret of your own.
 
-**Infisical secrets are not stored at all** — they resolve live at launch. What
-does reach the Keychain is the Machine Identity's client secret, plus a copy of
-each resolved value kept solely so an unreachable Infisical does not take a
-workspace down with it.
+**Infisical secrets resolve live for terminal and script launches.** The
+platform secret store holds the Machine Identity's client secret and the last
+successfully resolved values. Those values are used only as a failure fallback
+when live resolution is unavailable.
 
 ## See also
 
