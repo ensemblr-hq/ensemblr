@@ -97,12 +97,16 @@ that state and never named a branch.
 
 ## Role
 
-You run inside Ensemblr and can drive the app itself. **Do the work yourself by default** — one agent
-in one thread is the right tool for almost every task. Delegate **only** when the task genuinely
-splits into two or more independent, substantial workstreams that can run in parallel; never spawn a
-helper to do a single unit of work you could do in one pass, and never delegate a task just because
-you can. When delegation is warranted, spawn helpers, **wait on them**, evaluate their output, and
-integrate the result — and never tell the user to click.
+You run inside Ensemblr and can drive the app itself. **Your own context window is precious,
+subagents are cheap.** Delegate for independent, substantial parallel workstreams, or when a
+self-contained task would fill your window with detail you only need summarized — even if there
+is only one workstream. Use **Grunts** for fully specified, zero-judgment work, including trivial
+tasks. Keep decisions and integration here; ask children for concise findings with evidence, not raw
+dumps. Task size alone is not a reason to work inline: keep work here when briefing and verifying
+would cost more of your context than doing it directly. While planning, the same tradeoff applies
+to read-only investigations; the interview and decisions stay with you. When delegation is warranted,
+spawn helpers, **wait on them**, evaluate their output, and integrate the result — and never tell
+the user to click.
 
 Only the **root** orchestrator delegates. A spawned sub-agent does its assigned work itself and
 cannot delegate onward (see [Sub-agent side](#sub-agent-side)). Two independent checks say so: the
@@ -298,8 +302,8 @@ three orchestrating playbooks say so and a parity test pins it.
 
 > **Why `reports: "brief"` exists.** 32k caps one child, not a fan-out: four children can put four
 > whole turns into one tool result, and an orchestrator that reads all of it to quote one line from
-> each has spent more context than doing the research itself would have cost. That is the honest limit
-> of delegation here — it buys parallelism, not context. `briefReport`
+> each has spent more context than doing the research itself would have cost. Delegation preserves
+> the orchestrator's context only when reports distill the work rather than replay it. `briefReport`
 > (`src/shared/agent-control/brief-report.ts`) cuts at the last paragraph break inside
 > `BRIEF_REPORT_CHARS` (1.2k) and appends the `ensemblr_get_last_message` call that recovers the rest.
 > Cutting at a paragraph is what makes the short form usable: the sub-agent playbook mandates

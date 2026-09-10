@@ -177,8 +177,14 @@ a terminal somebody else is using.
 
 ## Delegation
 
-Do the work yourself by default. Delegate only when the task genuinely splits
-into two or more independent, substantial workstreams.
+**Your own context window is precious, subagents are cheap.** Delegate for
+independent, substantial parallel workstreams, or to keep a self-contained task's
+detail out of your window when you only need its findings — even with one
+workstream. Use **Grunts** for fully specified, zero-judgment work, including
+trivial tasks. Keep decisions and integration here; ask children for concise
+findings with evidence, not raw dumps. Task size alone is not a reason to work
+inline: keep work here when briefing and verifying would cost more of your context
+than doing it directly.
 
 The guardrails, so you know what a denial means:
 

@@ -569,6 +569,47 @@ describe('agent-control AWARENESS parity', () => {
 		}
 	});
 
+	it('permits delegation to preserve context without requiring parallel workstreams', () => {
+		for (const features of FEATURE_CORNERS) {
+			for (const playbook of [
+				orchestratorAwareness(features),
+				nativeOrchestratorAwareness(features),
+				harnessAwareness(features),
+				planModeOrchestratorAwareness(features),
+			]) {
+				expect(playbook).toContain(
+					'Your own context window is precious, subagents are cheap',
+				);
+				expect(playbook).toContain('even if there is only one workstream');
+				expect(playbook).not.toContain('Keep trivial work inline');
+				expect(playbook).not.toContain('Do the work yourself by default');
+				expect(playbook).toContain(
+					'Task size alone is not a reason to work inline',
+				);
+				expect(playbook).toContain('briefing and verifying');
+				expect(playbook).toContain(
+					'concise findings with evidence, not raw dumps',
+				);
+				expect(playbook).not.toContain('Delegate ONLY when');
+				expect(playbook).not.toContain(
+					'Never fan out for one file, one question',
+				);
+			}
+		}
+	});
+
+	it('routes fully specified trivial work to Grunts in working roles', () => {
+		for (const playbook of [
+			ORCHESTRATOR_AWARENESS,
+			NATIVE_ORCHESTRATOR_AWARENESS,
+			HARNESS_AWARENESS,
+		]) {
+			expect(playbook).toContain(
+				'Use Grunts for fully specified, zero-judgment work, including trivial tasks',
+			);
+		}
+	});
+
 	it('offers the orchestrator the brief report mode a wide fan-out needs', () => {
 		expect(ORCHESTRATOR_AWARENESS).toContain('reports: "brief"');
 		expect(ORCHESTRATOR_AWARENESS).toContain('ensemblr_get_last_message');
@@ -1385,7 +1426,9 @@ describe('harness playbook', () => {
 	it('teaches the same wait-based delegation loop as the orchestrator variant', () => {
 		expect(HARNESS_AWARENESS).toContain('ensemblr_start_conversation');
 		expect(HARNESS_AWARENESS).toContain('ensemblr_wait_for_agents');
-		expect(HARNESS_AWARENESS).toContain('Do the work yourself by default');
+		expect(HARNESS_AWARENESS).toContain(
+			'Your own context window is precious, subagents are cheap',
+		);
 	});
 
 	// A harness receives no per-turn upkeep block — the app renders that into a Pi
