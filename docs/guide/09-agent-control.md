@@ -10,7 +10,7 @@ An agent with Control can:
 - launch a harness — Claude Code, Codex, Vibe — in a terminal
 - start and stop the setup script, a run script, or a scratch terminal, type into
   one, and read its output
-- bring a tab, terminal, or the Files / Changes / Checks panel forward
+- bring a tab, terminal, or the Agents / Files / Changes / Checks panel forward
 - read the workspace diff, leave review comments on specific lines, and resolve
   ones it has addressed
 - read Linear issues, comment on one, and move it along
@@ -45,7 +45,9 @@ Because both funnel into one service, the two surfaces cannot drift apart. See
 [ADR 0040](../adr/0040-use-loopback-control-server-for-agent-app-control.md).
 
 Control follows the workspace permission mode, so it is already governed by the
-setting you chose in [`06-agents.md`](./06-agents.md):
+setting you chose in [`06-agents.md`](./06-agents.md). Claude Code also applies
+that mode to its own file and shell tools; Pi's own tools remain unrestricted,
+while Ensemblr Control is still gated:
 
 | Mode | Reads | Writes |
 | --- | --- | --- |
@@ -93,38 +95,50 @@ Delegation is bounded so a runaway agent cannot fill your machine with children:
 
 | Guardrail | Limit |
 | --- | --- |
-| Spawn depth | **1** — only a root orchestrator may spawn; a sub-agent cannot delegate onward |
-| Spawns per session | 20 |
+| Spawn depth | **2** — a root may open a depth-1 manager, which may open depth-2 leaves |
+| Spawns per root tree | 20 |
 | Spawns per minute | 10 |
 | Blocking wait | times out after 5 minutes; the child keeps running |
 | Waiting on an ancestor | refused — it would deadlock |
 
-Plan mode is inherited by a spawned child, and the depth cap still applies, so
-inheritance never recurses.
+A depth-2 leaf cannot delegate. Plan mode and AFK mode are inherited by spawned
+children; a planning manager can therefore open read-only leaves, but the depth
+cap still prevents further recursion. Closing or stopping a child does not restore
+the spawn budget.
 
 ## Orchestrator and sub-agents
 
 When you ask an agent for something big enough to split up, it becomes an
 **orchestrator** and works in a loop:
 
-1. **Delegate** — spawn a sub-agent per unit of work, each in its own chat tab
-   with its own brief.
+1. **Delegate** — open a manager per substantial workstream, each in its own chat
+   tab with its own brief.
 2. **Wait** — block until they report, or until the wait times out.
-3. **Evaluate** — read each result; send a follow-up to any child that came back
+3. **Evaluate** — read each result; send a follow-up to a manager that came back
    wrong or incomplete, and wait again.
 4. **Integrate** — fold the reports into one answer for you.
 
-Each sub-agent gets a real chat tab you can open and read, so a delegated run is
-never a black box. That tab has no composer — the orchestrator owns the child,
-not you — but in its place is a read-only readout of the model, reasoning level,
-and context the child is running with.
+A depth-1 manager owns its workstream and may open fresh depth-2 leaves. Managers
+run the same delegate → wait → evaluate → integrate loop for those leaves, then
+report upward; leaves cannot delegate. Every brief names the task role it needs:
+Sage frames uncertainty, Coder handles an unsettled implementation, Builder
+carries a settled implementation through, Grunt performs fully specified work,
+and Explorer investigates read-only and returns an actionable plan. These are
+advisory roles, not permission levels.
+
+Each child gets a real chat tab you can open and read, so a delegated run is never
+a black box. The Agents panel lists open and closed conversations in their
+lineage, including a last recorded context reading for closed chats. A child tab
+has no composer — its parent owns it — but shows the model, reasoning level, and
+context it is running with.
 
 ![An orchestrator's timeline listing four delegated reviews, with each sub-agent open as its own tab in the strip above and two of the four already reported back.](./images/09-subagents.png)
+![The Agents panel listing delegated conversations and their parent-child history.](./images/09-agents-panel.png)
 
-A sub-agent that hits a genuine blocker escalates to its orchestrator rather than
-stopping silently. Decisions that are yours to make are collected by the
-orchestrator and put to you in one questionnaire, instead of four children
-interrupting you separately.
+A child that hits a genuine blocker reports to its parent rather than stopping
+silently. Decisions that are yours to make are collected by the root orchestrator
+and put to you in one questionnaire, instead of several children interrupting
+you separately.
 
 **Claude Code can delegate its own way instead.** Settings → Providers → Claude
 Code → **Sub-agents** switches a first-class Claude chat between Ensemblr's chat
@@ -149,7 +163,7 @@ not in a workspace, so the rules land differently:
   its own by default; the Concierge has none, so an op that names no workspace is
   refused rather than guessed at.
 - **What it spawns is a root orchestrator, not a sub-agent.** The child owns the
-  task and fans out its own children under its own depth cap.
+  task and fans out its own managers and leaves under its own depth cap.
 - **It holds four ops nothing else does.** Listing every project, navigating the
   app to a workspace, cutting a new workspace off a project, and searching its own
   memory. A workspace agent is withheld all four: it belongs to one project and
