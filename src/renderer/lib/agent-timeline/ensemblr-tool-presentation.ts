@@ -24,12 +24,11 @@ import { inputOf, outputOf } from './tool-part-fields';
  * the one argument that says what the call acted on, and deciding which rows the
  * timeline omits entirely.
  *
- * A failed call is never hidden. The denial codes these tools return —
- * `denied-permission`, `denied-scope`, `invalid-args` — are exactly what a user
- * needs to see, so only a call that succeeded disappears. A refusal reaches the
- * timeline as an ordinary result rather than as a transport error, so it is the
- * `{ ok: false }` envelope on the result's `details`, not the error text, that
- * separates the two.
+ * Real failures stay visible, including `denied-permission`, `denied-scope`,
+ * and `invalid-args`. Only the delegation barrier's internal sequencing refusals
+ * disappear: the model still receives them and the transcript keeps them.
+ * Control refusals otherwise reach the timeline as ordinary results, so their
+ * `{ ok: false }` envelope on `details` distinguishes them from success.
  *
  * Every lookup here goes through {@link canonicalEnsemblrToolName} rather than
  * the reported name, because only one of the two runtimes reports the name the
@@ -133,16 +132,31 @@ function nonEmptyString(value: unknown): string | null {
 }
 
 /**
- * Whether a tool call is the app's own bookkeeping and should not be rendered.
- * A failed call always renders, so a denial or a malformed argument stays
- * visible — including the denials the control channel reports as a normal
- * result carrying `ok: false`.
+ * Exact refusals emitted by `resources/pi-extensions/delegation-barrier.mts`.
+ * Pi supplies only error text for blocked calls; exact matching also handles
+ * saved transcripts without hiding other errors that mention delegation.
+ */
+// i18next-instrument-ignore -- exact agent-facing protocol text, matched only to omit rows
+const DELEGATION_GUARD_ERRORS = new Set([
+	'Delegated children are still working. Call ensemblr_wait_for_agents and observe every child settled before doing more work or presenting findings.',
+	'A child is being spawned in this same tool batch. Finish the parallel spawn calls first; unrelated work must wait for the children.',
+	'Child spawn calls in this tool batch have not returned their session ids yet. Call ensemblr_wait_for_agents in the next turn so it can wait on every child.',
+	'Only a tracked child can receive a follow-up while delegated work is outstanding.',
+	'Only a tracked child tab can be closed while delegated work is outstanding.',
+]);
+
+/**
+ * Omits bookkeeping and internal delegation refusals, even on non-control tools.
+ * Real failures stay visible, including control denials carrying `ok: false`.
  * @param part - The tool part to classify
  * @returns True when the row should be omitted from the timeline
  */
 export function isHiddenEnsemblrToolCall(part: DynamicToolUIPart): boolean {
 	if ('errorText' in part && part.errorText) {
-		return false;
+		return (
+			part.state === 'output-error' &&
+			DELEGATION_GUARD_ERRORS.has(part.errorText)
+		);
 	}
 	if (ensemblrControlFailure(part) !== null) {
 		return false;
