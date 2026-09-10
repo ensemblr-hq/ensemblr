@@ -249,7 +249,7 @@ Use the live `ensemblr_list_models` result as the source of permitted destinatio
 - **Grunt** receives a fully determined, zero-judgment brief and reports failed preconditions instead of improvising.
 - **Explorer** returns a read-only actionable implementation plan containing evidence, files, sequence, dependencies, verification, and open questions. Explorer makes no edits and does not submit a plan to the user.
 
-AFK Mode keeps these same boundaries and names the chosen role in every child brief. Ensemblr chat-tab delegation re-reads the live role preferences and allowed runtimes before each spawn. A native Claude sub-agent cannot read those saved tags or cross runtimes, so it applies the vocabulary to the work itself. AFK never lets a Grunt fill a gap or an Explorer edit.
+AFK Mode keeps these same boundaries and names the chosen role in every child brief. Ensemblr chat-tab delegation reads the live role preferences and allowed runtimes once before each fan-out batch, reuses that result for every child in the batch, and refreshes it before a later batch. A native Claude sub-agent cannot read those saved tags or cross runtimes, so it applies the vocabulary to the work itself. AFK never lets a Grunt fill a gap or an Explorer edit.
 
 ## Asking the user
 

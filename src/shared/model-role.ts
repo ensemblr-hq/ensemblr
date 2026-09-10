@@ -40,13 +40,11 @@ export function assignedRolesFor(
 	runtime: AgentProviderId,
 	modelId: string,
 ): readonly ModelRole[] {
-	const assigned = new Set(
-		assignments
-			.filter(
-				(assignment) =>
-					assignment.runtime === runtime && assignment.modelId === modelId,
-			)
-			.flatMap((assignment) => assignment.roles),
-	);
+	const assigned = new Set<ModelRole>();
+	for (const assignment of assignments) {
+		if (assignment.runtime !== runtime || assignment.modelId !== modelId)
+			continue;
+		for (const role of assignment.roles) assigned.add(role);
+	}
 	return MODEL_ROLES.filter((role) => assigned.has(role));
 }

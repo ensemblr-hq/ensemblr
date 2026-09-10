@@ -174,6 +174,11 @@ describe('afk delivery loop', () => {
 		expect(directive).toContain('name the role in the brief');
 		expect(directive).toContain('allowedRuntimes');
 		expect(directive).toContain('meaningful departure');
+		expect(directive).toContain('once before each fan-out batch');
+		expect(directive).toContain(
+			'Reuse that result for every child in the batch',
+		);
+		expect(directive).toContain('refresh it before a later batch');
 	});
 
 	it('preserves every role boundary without widening authority', () => {

@@ -161,28 +161,26 @@ export function ModelRoleAssignmentsSetting({
 		const hidden = new Set(hiddenModels);
 		return models.filter((model) => !hidden.has(model.id));
 	}, [hiddenModels, models]);
-	const unavailableAssignments = useMemo(
-		() =>
-			assignments
-				.filter(
-					(assignment) =>
-						assignment.roles.length > 0 &&
-						!activeModels.some(
-							(model) =>
-								model.agentProvider === assignment.runtime &&
-								model.id === assignment.modelId,
-						),
-				)
-				.filter(
-					(assignment, index, unavailable) =>
-						unavailable.findIndex(
-							(candidate) =>
-								candidate.runtime === assignment.runtime &&
-								candidate.modelId === assignment.modelId,
-						) === index,
-				),
-		[activeModels, assignments],
-	);
+	const unavailableAssignments = useMemo(() => {
+		const activePairs = new Set(
+			activeModels.map((model) => `${model.agentProvider}:${model.id}`),
+		);
+		const seenPairs = new Set<string>();
+		const unavailable: ModelRoleAssignment[] = [];
+		for (const assignment of assignments) {
+			const pair = `${assignment.runtime}:${assignment.modelId}`;
+			if (
+				assignment.roles.length === 0 ||
+				activePairs.has(pair) ||
+				seenPairs.has(pair)
+			) {
+				continue;
+			}
+			seenPairs.add(pair);
+			unavailable.push(assignment);
+		}
+		return unavailable;
+	}, [activeModels, assignments]);
 
 	return (
 		<SettingRow
@@ -206,13 +204,20 @@ export function ModelRoleAssignmentsSetting({
 						label={t('settings:models.loading', 'Loading models…')}
 					/>
 				) : error ? (
-					<SettingsErrorState
-						message={t(
-							'settings:models.discovery-failed',
-							'Model discovery failed: {{error}}.',
-							{ error: String(error) },
-						)}
-					/>
+					<>
+						<SettingsErrorState
+							message={t(
+								'settings:models.discovery-failed',
+								'Model discovery failed: {{error}}.',
+								{ error: String(error) },
+							)}
+						/>
+						<UnavailableRoleAssignments
+							assignments={unavailableAssignments}
+							copy={copy}
+							setAssignments={setAssignments}
+						/>
+					</>
 				) : (
 					<>
 						{activeModels.length === 0 ? (

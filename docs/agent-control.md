@@ -1040,8 +1040,10 @@ wait would return `timeout` having said nothing.
 AFK does not create a second role system. Its delivery directive keeps the same
 Sage/Coder/Builder/Grunt/Explorer boundaries and requires a role in every child
 brief. Ensemblr chat-tab delegation reads the live `listModels` role preferences
-and runtime policy before each spawn; Claude's built-in mechanism cannot read
-those tags or cross runtimes, so it uses the vocabulary from the work itself.
+and runtime policy once before each fan-out batch, reuses that result for every
+child in the batch, and refreshes it before a later batch; Claude's built-in
+mechanism cannot read those tags or cross runtimes, so it uses the vocabulary
+from the work itself.
 The AFK fallback to a defensible assumption does not override the role boundary:
 a Grunt reports ambiguity instead of filling it, and an Explorer remains
 read-only and returns an actionable plan.

@@ -23,6 +23,9 @@ export const appSettingsAtom = atom<AppSettings>(DEFAULT_APP_SETTINGS);
 /** Latest model-orchestration persistence failure, cleared by its next write. */
 export const modelOrchestrationWriteErrorAtom = atom<string | null>(null);
 
+/** Monotonic renderer write generation used to reject stale failure refreshes. */
+const appSettingsWriteGenerationAtom = atom(0);
+
 /**
  * Builds a writable atom over one `config.json` setting. Reads project the
  * mirror; writes optimistically update the mirror and persist the patch via IPC,
@@ -41,6 +44,8 @@ function settingAtom<
 	return atom(
 		(get) => get(appSettingsAtom)[section][key],
 		(get, set, update: Update) => {
+			const writeGeneration = get(appSettingsWriteGenerationAtom) + 1;
+			set(appSettingsWriteGenerationAtom, writeGeneration);
 			const current = get(appSettingsAtom);
 			const value =
 				typeof update === 'function'
@@ -53,6 +58,9 @@ function settingAtom<
 			if (writeErrorAtom) set(writeErrorAtom, null);
 			const patch = { [section]: { [key]: value } } as AppSettingsPatch;
 			void updateAppSettings(patch).catch((error: unknown) => {
+				const failedWriteGeneration = writeGeneration;
+				if (get(appSettingsWriteGenerationAtom) !== failedWriteGeneration)
+					return;
 				if (writeErrorAtom) {
 					set(
 						writeErrorAtom,
@@ -60,7 +68,11 @@ function settingAtom<
 					);
 				}
 				void getAppSettings()
-					.then((settings) => set(appSettingsAtom, settings))
+					.then((settings) => {
+						if (get(appSettingsWriteGenerationAtom) === failedWriteGeneration) {
+							set(appSettingsAtom, settings);
+						}
+					})
 					.catch(() => undefined);
 			});
 		},

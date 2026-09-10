@@ -36,8 +36,14 @@ export function ModelRolePicker({
 	const id = useId();
 	const anchor = useComboboxAnchor();
 	const [assignments, setAssignments] = useAtom(modelRoleAssignmentsAtom);
+	const selectedPairs = new Set<string>();
+	for (const assignment of assignments) {
+		if (assignment.roles.some((assignedRole) => assignedRole === role)) {
+			selectedPairs.add(`${assignment.runtime}:${assignment.modelId}`);
+		}
+	}
 	const selected = models.filter((model) =>
-		assignedRolesFor(assignments, model.agentProvider, model.id).includes(role),
+		selectedPairs.has(`${model.agentProvider}:${model.id}`),
 	);
 
 	/**

@@ -10,8 +10,9 @@ import { ModelOrchestrationSettings } from '@/renderer/components/settings/model
 import {
 	appSettingsAtom,
 	modelOrchestrationWriteErrorAtom,
+	modelRoleAssignmentsAtom,
 } from '@/renderer/state/preferences';
-import { DEFAULT_APP_SETTINGS } from '@/shared/config';
+import { type AppSettings, DEFAULT_APP_SETTINGS } from '@/shared/config';
 import {
 	type AgentModelOption,
 	asModelVendorId,
@@ -267,6 +268,27 @@ describe('model orchestration settings', () => {
 		);
 	});
 
+	test('keeps unavailable assignments recoverable when discovery fails', async () => {
+		getDefaultStore().set(appSettingsAtom, {
+			...DEFAULT_APP_SETTINGS,
+			models: {
+				...DEFAULT_APP_SETTINGS.models,
+				roleAssignments: [
+					{ modelId: 'missing', roles: ['sage'], runtime: 'claude' },
+				],
+			},
+		});
+		renderSettings({ error: new Error('offline'), models: [] });
+
+		expect(
+			screen.getByText('Model discovery failed: Error: offline.'),
+		).toBeVisible();
+		expect(screen.getByText('Unavailable saved assignments')).toBeVisible();
+		expect(
+			screen.getByRole('button', { name: 'Clear roles for missing' }),
+		).toBeVisible();
+	});
+
 	test('reports a model-orchestration persistence failure visibly', async () => {
 		settingsApi.updateAppSettings.mockRejectedValueOnce(new Error('disk full'));
 		renderSettings();
@@ -285,6 +307,38 @@ describe('model orchestration settings', () => {
 			).toBeVisible(),
 		);
 		expect(settingsApi.getAppSettings).toHaveBeenCalledOnce();
+	});
+
+	test('does not let a failed-write refresh overwrite a newer optimistic write', async () => {
+		let rejectFirstWrite: (reason?: unknown) => void = () => undefined;
+		let resolveRefresh: (settings: AppSettings) => void = () => undefined;
+		const firstWrite = new Promise<AppSettings>((_resolve, reject) => {
+			rejectFirstWrite = reject;
+		});
+		const refresh = new Promise<AppSettings>((resolve) => {
+			resolveRefresh = resolve;
+		});
+		settingsApi.updateAppSettings.mockReturnValueOnce(firstWrite);
+		settingsApi.getAppSettings.mockReturnValueOnce(refresh);
+		const store = getDefaultStore();
+		const firstAssignments: AppSettings['models']['roleAssignments'] = [
+			{ modelId: 'first', roles: ['sage'], runtime: 'pi' },
+		];
+		const latestAssignments: AppSettings['models']['roleAssignments'] = [
+			{ modelId: 'latest', roles: ['coder'], runtime: 'pi' },
+		];
+
+		store.set(modelRoleAssignmentsAtom, firstAssignments);
+		rejectFirstWrite(new Error('disk full'));
+		await waitFor(() =>
+			expect(settingsApi.getAppSettings).toHaveBeenCalledOnce(),
+		);
+		store.set(modelRoleAssignmentsAtom, latestAssignments);
+		resolveRefresh(DEFAULT_APP_SETTINGS);
+		await refresh;
+		await Promise.resolve();
+
+		expect(store.get(modelRoleAssignmentsAtom)).toEqual(latestAssignments);
 	});
 
 	test('renders loading, discovery failure, empty, and no-match states', async () => {

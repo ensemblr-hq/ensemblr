@@ -1000,13 +1000,17 @@ describe('agent-control AWARENESS parity', () => {
 	});
 
 	it('prefers Luna or Terra over the separately limited Codex Spark allowance', () => {
-		for (const playbook of [
-			ORCHESTRATOR_AWARENESS,
-			PLAN_MODE_ORCHESTRATOR_AWARENESS,
-		]) {
-			expect(playbook).toContain('prefer Luna or Terra');
-			expect(playbook).toContain('Codex Spark');
-			expect(playbook).toContain('separate, limited usage allowance');
+		for (const features of [ALL_ON, { ...ALL_ON, tuiHarnesses: false }]) {
+			for (const playbook of [
+				orchestratorAwareness(features),
+				planModeOrchestratorAwareness(features),
+			]) {
+				expect(playbook).toContain('prefer Luna or Terra');
+				expect(playbook).toContain('Codex Spark');
+				expect(playbook).toContain('separate, limited usage allowance');
+				expect(playbook).toContain('rather than inheriting Spark');
+				expect(playbook).toContain('only when the user explicitly asks');
+			}
 		}
 	});
 
@@ -1019,6 +1023,7 @@ describe('agent-control AWARENESS parity', () => {
 	it('preserves the advisory role boundaries in every Ensemblr delegation playbook', () => {
 		for (const playbook of [
 			ORCHESTRATOR_AWARENESS,
+			NATIVE_ORCHESTRATOR_AWARENESS,
 			SUBAGENT_AWARENESS,
 			HARNESS_AWARENESS,
 			PLAN_MODE_ORCHESTRATOR_AWARENESS,
