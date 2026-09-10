@@ -60,7 +60,7 @@ const agentClient = createAgentClient({
   process hardcodes them in a `switch`. Claude's:
 
   | Field | Value |
-  |---|---|
+  | --- | --- |
   | `executableCommand` | `claude` |
   | `executableSettingKey` | `claude.executablePath` |
   | `label` | `Claude Code` |
@@ -95,7 +95,7 @@ SDK option name:**
 name:**
 
 | File | Owns |
-|---|---|
+| --- | --- |
 | `src/main/claude-agent/claude-agent-adapter.ts` | the session, the `query()` options, turn submission |
 | `src/main/claude-agent/sdk-message-normalizer.ts` | `SDKMessage` → `AgentEvent` |
 | `src/main/claude-agent/streamed-reasoning.ts` | the `thinking_delta` buffer |
@@ -258,7 +258,7 @@ runs.
 four checks:
 
 | Check id | How |
-|---|---|
+| --- | --- |
 | `executable` | the resolution above; offers a `select-claude-executable` remediation |
 | `version` | `<claude> --version` through `LocalCommandService`, 5 s timeout, 4 KiB output cap |
 | `auth` | `session.accountInfo()` on a throwaway `query()` |
@@ -404,7 +404,7 @@ Pi steers *thinking*; Claude steers *effort*. `src/shared/agent-thinking.ts`
 holds both vocabularies and refuses to collapse them into one enum:
 
 | Runtime | Levels, ascending | Axis label |
-|---|---|---|
+| --- | --- | --- |
 | Pi | `off`, `minimal`, `low`, `medium`, `high`, `xhigh` | Thinking |
 | Claude | `off`, `low`, `medium`, `high`, `xhigh`, `max` | Effort |
 
@@ -592,7 +592,7 @@ at `off` could never turn reasoning on again. Measured against the bundled CLI,
 `claude-code` 2.1.220, one reasoning prompt per row:
 
 | Session opened | Steer applied | `thinking_delta` frames / chars |
-|---|---|---|
+| --- | --- | --- |
 | `adaptive` + `summarized` | none | 6 / 372 |
 | `adaptive` + `summarized` | `applyFlagSettings({ alwaysThinkingEnabled: false, effortLevel: null })` | 4 / 298 |
 | `adaptive` + `summarized` | `setMaxThinkingTokens(0)` | **0 / 0** |
@@ -699,21 +699,20 @@ For the tool inventory, the permission model, the guardrails, and the
 questionnaire, read [`../agent-control.md`](../agent-control.md) — none of it is
 restated here.
 
-### A spawned child is pinned to its caller's runtime (#236)
+### A spawned child follows the configured runtime policy
 
-`src/main/agent-providers/spawn-model-resolver.ts` holds the invariant: **a spawn
-never crosses the agent runtime axis.** It lives beside the model catalog rather
-than in the control layer, because "which runtime owns this model id" is the same
-question the renderer's own open request asks, and one answer is what stops the
-two spawn routes from disagreeing.
+`src/main/agent-providers/spawn-model-resolver.ts` holds the runtime-destination
+invariant: a spawn uses only a runtime permitted by the live model policy. The
+model catalogue and `ensemblr_list_models` are the source of truth for permitted
+destinations, rather than an unconditional same-runtime rule.
 
 Resolution order for a delegated child:
 
-1. An explicit `model`, honoured **only** when it belongs to the caller's
-   runtime — refused by name otherwise, never silently substituted.
+1. An explicit `model`, honoured **only** when its runtime appears in the caller's
+   allowed destinations — refused by name otherwise, never silently substituted.
 2. The caller's own model: its live value first, its persisted session row
    second.
-3. The catalog's default for that runtime.
+3. The catalog's default for the caller's runtime.
 
 Thinking level follows the same shape — requested, else the caller's, else
 `medium` (the one rung both ladders publish) — each accepted only if the child's
@@ -724,13 +723,25 @@ it consumes no tab, session, or spawn-guardrail slot.
 A **terminal harness has no runtime the app can name**: `originRuntime` returns
 `null` for it, because its control origin is minted per workspace and shared by
 every terminal in it. It therefore gets the unfiltered model list and must pass
-`model` outright. `ensemblr_list_models` is cut to the caller's runtime for
-everyone else.
+`model` outright. `ensemblr_list_models` returns the caller runtime and allowed runtime policy for
+everyone else, and its rows are the only permitted destinations.
 
-Once opened, a chat is pinned for life: `assertProviderPin`
-(`src/main/agent-runtime/session/provider-pin.ts`) rejects a model from the other
-runtime main-side, because the two speak different native session formats and
-crossing mid-chat would hand the new runtime a history it cannot resume.
+Once opened, a chat remains pinned to its selected runtime: `assertProviderPin`
+(`src/main/agent-runtime/session/provider-pin.ts`) rejects a mid-chat runtime
+switch, because the two speak different native session formats and crossing mid-chat
+would hand the new runtime a history it cannot resume.
+
+### Advisory task roles
+
+Use the live `ensemblr_list_models` result as the source of permitted destinations and role preferences. Every delegation brief names its chosen task role and any meaningful deviation from the configured role tags:
+
+- **Sage** frames the decision and surfaces uncertainty.
+- **Coder** handles an uncertain implementation path and proposes the smallest safe change.
+- **Builder** carries a settled implementation through to working code. Coder versus Builder is about uncertainty, not task size.
+- **Grunt** receives a fully determined, zero-judgment brief and reports failed preconditions instead of improvising.
+- **Explorer** returns a read-only actionable implementation plan containing evidence, files, sequence, dependencies, verification, and open questions. Explorer makes no edits and does not submit a plan to the user.
+
+AFK Mode keeps the same role boundary in every child brief. With Ensemblr chat-tab delegation it reads the live saved tags and runtime policy once before each fan-out batch, reuses that result for every child in the batch, and refreshes it before a later batch. Claude's built-in sub-agent mechanism cannot read those preferences or cross runtimes, so it selects a role from the work itself; Grunt still cannot improvise and Explorer still cannot edit.
 
 ### Permission modes and plan mode are Claude-specific below the line
 
@@ -738,7 +749,7 @@ crossing mid-chat would hand the new runtime a history it cannot resume.
 mode onto SDK gates:
 
 | Ensemblr mode | SDK settings |
-|---|---|
+| --- | --- |
 | `workspace-trusted` (default) | `permissionMode: 'bypassPermissions'` + `allowDangerouslySkipPermissions` |
 | `approval-required` | `permissionMode: 'default'` + a `canUseTool` gate |
 | `read-only` | `permissionMode: 'plan'` **plus** `disallowedTools` for `Bash`, `BashOutput`, `Edit`, `KillShell`, `NotebookEdit`, `Write` |

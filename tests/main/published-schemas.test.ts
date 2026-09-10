@@ -23,7 +23,9 @@ import {
 	REPOSITORY_CONFIG_KEYS,
 } from '../../src/main/config/repository-config';
 import { SUBAGENT_MECHANISMS } from '../../src/shared/agent-control/subagent-mechanism';
+import { listAgentProviderIds } from '../../src/shared/agent-provider';
 import { appSettingsPatchSchema } from '../../src/shared/config';
+import { MODEL_ROLES } from '../../src/shared/model-role';
 import {
 	parseWorkspaceScriptSettings,
 	RUN_SCRIPT_ICON_NAMES,
@@ -208,6 +210,15 @@ describe('config.schema.json', () => {
 		expect(
 			appSchema.properties.providers.properties.claudeSubagentMode.enum,
 		).toEqual([...SUBAGENT_MECHANISMS]);
+	});
+
+	test('model role assignments list every role and runtime', () => {
+		const assignment =
+			appSchema.properties.models.properties.roleAssignments.items;
+		expect(assignment.properties.roles.items.enum).toEqual([...MODEL_ROLES]);
+		expect(assignment.properties.runtime.enum).toEqual([
+			...listAgentProviderIds(),
+		]);
 	});
 
 	test('repository settings cover every repository-scope built-in default', () => {

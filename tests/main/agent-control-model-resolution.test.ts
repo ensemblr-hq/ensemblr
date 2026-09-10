@@ -1,18 +1,14 @@
 /**
- * What a delegated child is opened with. The rule the whole suite defends: a
- * spawn never crosses the agent runtime axis. A Claude Code orchestrator's
- * children run on Claude, a Pi orchestrator's on Pi, and a caller the app cannot
- * place on either is told to name a model rather than quietly handed Pi's
- * default — which is exactly what used to happen, because the spawn path read a
- * Pi-only catalog and compared *inference vendors* (`anthropic`) while calling
- * them providers.
+ * What a delegated child is opened with. Omitted models stay on the caller's
+ * runtime; explicit models may cross only under the user's live opt-in. A caller
+ * the app cannot place still names a model rather than receiving Pi's default.
  */
 import { describe, expect, it, vi } from 'vitest';
-
 import {
 	createAgentControlPorts,
 	type PortAdapterDeps,
 } from '../../src/main/agent-control/index.ts';
+import type { ModelRoleAssignment } from '../../src/shared/model-role.ts';
 import {
 	fakeSpawnModelResolver,
 	modelOption,
@@ -65,7 +61,9 @@ const makeDeps = (input: {
 	conciergeSession?: CallerSession | null;
 	models?: typeof CATALOG;
 	openSession?: ReturnType<typeof vi.fn>;
+	readCrossRuntimeDelegationEnabled?: () => boolean;
 	readHiddenModelIds?: () => readonly string[];
+	readModelRoleAssignments?: () => readonly ModelRoleAssignment[];
 	piReady?: boolean;
 }): PortAdapterDeps =>
 	({
@@ -124,6 +122,8 @@ const makeDeps = (input: {
 			input.models ?? CATALOG,
 			input.catalogDefaultModelId,
 			input.readHiddenModelIds,
+			input.readCrossRuntimeDelegationEnabled,
+			input.readModelRoleAssignments,
 		),
 		terminalService: {},
 	}) as unknown as PortAdapterDeps;
@@ -136,10 +136,14 @@ const spawn = async (input: {
 	callerRuntime: 'pi' | 'claude' | null;
 	conciergeSession?: CallerSession | null;
 	catalogDefaultModelId?: string;
+	afkMode?: boolean;
 	model?: string;
 	models?: typeof CATALOG;
 	piReady?: boolean;
+	planMode?: boolean;
+	readCrossRuntimeDelegationEnabled?: () => boolean;
 	readHiddenModelIds?: () => readonly string[];
+	readModelRoleAssignments?: () => readonly ModelRoleAssignment[];
 	thinkingLevel?: string;
 }): Promise<Record<string, unknown>> => {
 	const openSession: ReturnType<typeof vi.fn> = vi.fn(async () => ({
@@ -154,8 +158,8 @@ const spawn = async (input: {
 		callerRuntime: input.callerRuntime,
 		model: input.model,
 		parentSessionId: 'parent',
-		planMode: false,
-		afkMode: false,
+		planMode: input.planMode ?? false,
+		afkMode: input.afkMode ?? false,
 		prompt: 'go',
 		thinkingLevel: input.thinkingLevel,
 		workspaceCwd: '/ws',
@@ -198,7 +202,7 @@ const refusal = async (input: Parameters<typeof spawn>[0]): Promise<string> => {
 	return outcome.reason;
 };
 
-describe('a Claude orchestrator never spawns a Pi child', () => {
+describe('a Claude orchestrator defaults to its own runtime', () => {
 	it('opens the child on the caller’s own Claude model when none is requested', async () => {
 		const request = await spawn({
 			caller: { model: CLAUDE_MODEL, thinkingLevel: 'max' },
@@ -219,7 +223,22 @@ describe('a Claude orchestrator never spawns a Pi child', () => {
 		expect(message).toContain(PI_MODEL);
 		expect(message).toContain('Pi');
 		expect(message).toContain('Claude Code');
-		expect(message).toContain('cannot cross runtimes');
+		expect(message).toContain('Cross-runtime delegation is off');
+	});
+
+	it('spawns an explicitly selected Pi child when the user opts in', async () => {
+		const request = await spawn({
+			caller: { model: CLAUDE_MODEL, thinkingLevel: 'max' },
+			callerRuntime: 'claude',
+			model: PI_MODEL,
+			planMode: true,
+			readCrossRuntimeDelegationEnabled: () => true,
+		});
+
+		expect(request.model).toBe(PI_MODEL);
+		expect(request.provider).toBe('pi');
+		expect(request.thinkingLevel).toBe('medium');
+		expect(request.planMode).toBe(true);
 	});
 
 	it('does not require a working Pi executable to spawn on Claude', async () => {
@@ -240,7 +259,7 @@ describe('a Claude orchestrator never spawns a Pi child', () => {
 	});
 });
 
-describe('a Pi orchestrator never spawns a Claude child', () => {
+describe('a Pi orchestrator defaults to its own runtime', () => {
 	it('inherits the caller’s Pi model when none is requested', async () => {
 		const request = await spawn({
 			caller: { model: PI_MODEL, thinkingLevel: 'high' },
@@ -285,7 +304,7 @@ describe('a Pi orchestrator never spawns a Claude child', () => {
 		expect(request.provider).toBe('pi');
 	});
 
-	it('refuses a requested Claude model', async () => {
+	it('refuses a requested Claude model while cross-runtime delegation is off', async () => {
 		const message = await refusal({
 			caller: { model: PI_MODEL, thinkingLevel: 'high' },
 			callerRuntime: 'pi',
@@ -293,7 +312,73 @@ describe('a Pi orchestrator never spawns a Claude child', () => {
 		});
 
 		expect(message).toContain(CLAUDE_MODEL);
-		expect(message).toContain('cannot cross runtimes');
+		expect(message).toContain('Cross-runtime delegation is off');
+	});
+
+	it('spawns an explicitly selected Claude child when the user opts in', async () => {
+		const request = await spawn({
+			caller: { model: PI_MODEL, thinkingLevel: 'high' },
+			callerRuntime: 'pi',
+			afkMode: true,
+			model: CLAUDE_MODEL,
+			readCrossRuntimeDelegationEnabled: () => true,
+		});
+
+		expect(request.model).toBe(CLAUDE_MODEL);
+		expect(request.provider).toBe('claude');
+		expect(request.thinkingLevel).toBe('high');
+		expect(request.afkMode).toBe(true);
+	});
+
+	it('keeps omitted-model inheritance on Pi when cross-runtime delegation is enabled', async () => {
+		const request = await spawn({
+			caller: { model: PI_MODEL, thinkingLevel: 'high' },
+			callerRuntime: 'pi',
+			readCrossRuntimeDelegationEnabled: () => true,
+		});
+
+		expect(request.model).toBe(PI_MODEL);
+		expect(request.provider).toBe('pi');
+	});
+
+	it('enforces a setting change between spawn calls on the same resolver', async () => {
+		let enabled = false;
+		const openSession = vi.fn(async (_input: unknown) => ({
+			id: 'child-1',
+			status: 'starting',
+		}));
+		const ports = createAgentControlPorts(
+			makeDeps({
+				caller: { model: PI_MODEL, thinkingLevel: 'high' },
+				openSession,
+				readCrossRuntimeDelegationEnabled: () => enabled,
+			}),
+		);
+		const input = {
+			afkMode: false,
+			asPeer: false,
+			callerConcierge: false,
+			callerModel: PI_MODEL,
+			callerRuntime: 'pi' as const,
+			model: CLAUDE_MODEL,
+			parentSessionId: 'parent',
+			planMode: false,
+			prompt: 'go',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		};
+
+		const refused = await ports.conversations.startConversation(input);
+		enabled = true;
+		const accepted = await ports.conversations.startConversation(input);
+
+		expect(refused.ok).toBe(false);
+		expect(accepted.ok).toBe(true);
+		expect(openSession).toHaveBeenCalledTimes(1);
+		expect(openSession.mock.calls[0]?.[0]).toMatchObject({
+			model: CLAUDE_MODEL,
+			provider: 'claude',
+		});
 	});
 
 	// With nothing to inherit the child takes the model the app itself would open,
@@ -330,7 +415,7 @@ describe('a Pi orchestrator never spawns a Claude child', () => {
 		});
 
 		expect(message).toContain(CLAUDE_ANTHROPIC_MODEL);
-		expect(message).toContain('cannot cross runtimes');
+		expect(message).toContain('Cross-runtime delegation is off');
 	});
 
 	// A session row the catalog places on the other runtime is a data fault, not a
@@ -628,7 +713,9 @@ describe('the model list a caller is served', () => {
 			CLAUDE_MODEL,
 			CLAUDE_ANTHROPIC_MODEL,
 		]);
-		expect(listing.runtime).toBe('claude');
+		expect(listing.callerRuntime).toBe('claude');
+		expect(listing.allowedRuntimes).toEqual(['claude']);
+		expect(listing.crossRuntimeDelegationEnabled).toBe(false);
 	});
 
 	// "Default" means the model the app itself would open, not whichever row the
@@ -659,7 +746,56 @@ describe('the model list a caller is served', () => {
 		const listing = await listFor(null);
 
 		expect(listing.models).toHaveLength(CATALOG.length);
-		expect(listing.runtime).toBeNull();
+		expect(listing.callerRuntime).toBeNull();
+		expect(listing.allowedRuntimes).toEqual(['pi', 'claude']);
+	});
+
+	it('reads the cross-runtime policy live for every listing', async () => {
+		let enabled = false;
+		const ports = createAgentControlPorts(
+			makeDeps({ readCrossRuntimeDelegationEnabled: () => enabled }),
+		);
+
+		const sameRuntime = await ports.conversations.listModels({ runtime: 'pi' });
+		enabled = true;
+		const crossRuntime = await ports.conversations.listModels({
+			runtime: 'pi',
+		});
+
+		expect(sameRuntime.models.map((model) => model.runtime)).toEqual([
+			'pi',
+			'pi',
+		]);
+		expect(sameRuntime.allowedRuntimes).toEqual(['pi']);
+		expect(crossRuntime.models).toHaveLength(CATALOG.length);
+		expect(crossRuntime.allowedRuntimes).toEqual(['pi', 'claude']);
+		expect(crossRuntime.defaultModelId).toBe(PI_MODEL);
+	});
+
+	it('publishes independent advisory roles for each runtime-and-model pair', async () => {
+		const ports = createAgentControlPorts(
+			makeDeps({
+				readCrossRuntimeDelegationEnabled: () => true,
+				readModelRoleAssignments: () => [
+					{ modelId: PI_MODEL, roles: ['coder', 'sage'], runtime: 'pi' },
+					{
+						modelId: CLAUDE_ANTHROPIC_MODEL,
+						roles: ['builder'],
+						runtime: 'claude',
+					},
+				],
+			}),
+		);
+
+		const listing = await ports.conversations.listModels({ runtime: 'pi' });
+
+		expect(
+			listing.models.find((model) => model.id === PI_MODEL)?.roles,
+		).toEqual(['sage', 'coder']);
+		expect(
+			listing.models.find((model) => model.id === CLAUDE_ANTHROPIC_MODEL)
+				?.roles,
+		).toEqual(['builder']);
 	});
 });
 

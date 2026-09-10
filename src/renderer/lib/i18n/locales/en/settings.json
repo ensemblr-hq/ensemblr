@@ -339,7 +339,7 @@
 			"label": "Default model",
 			"thinking-aria-label": "Default thinking level"
 		},
-		"description": "Agent models and thinking-level defaults for new chats, reviews, and the Concierge. Sourced from each configured runtime's capability discovery.",
+		"description": "Agent models, thinking-level defaults, delegation roles, and runtime policy for new chats, reviews, and the Concierge. Sourced from each configured runtime's capability discovery.",
 		"discovery-failed": "Model discovery failed: {{error}}.",
 		"loading": "Loading models…",
 		"no-models": "No models",
@@ -347,6 +347,56 @@
 			"action": "Open Providers",
 			"description": "No agent runtime reported a model. Pi lists none until at least one provider is configured, and Claude Code has to be installed separately. Set one up, then reopen this page.",
 			"title": "No models available"
+		},
+		"orchestration": {
+			"claude-native": {
+				"action": "Open Providers",
+				"description": "Claude Code’s built-in sub-agents bypass Ensemblr delegation and cannot use these role preferences or cross-runtime routing. Choose Ensemblr chat tabs for new Claude chats to use this feature.",
+				"label": "Claude Code delegation"
+			},
+			"cross-runtime": {
+				"aria-label": "Allow cross-runtime delegation",
+				"description": "Lets Ensemblr-managed children explicitly run on another configured runtime and model provider. Omitted models still inherit the caller’s runtime. Filesystem permissions and cost approvals do not change.",
+				"label": "Allow cross-runtime delegation"
+			},
+			"empty": {
+				"description": "Configure a runtime or show a hidden model before assigning roles.",
+				"title": "No active delegation models"
+			},
+			"no-matches": "No matching models.",
+			"remove-model": "Remove {{model}} ({{runtime}}) from {{role}}",
+			"role-models-aria-label": "Models for {{role}}",
+			"roles": {
+				"builder": {
+					"description": "Routine implementation from an established pattern",
+					"name": "Builder"
+				},
+				"coder": {
+					"description": "Novel code with unresolved design choices",
+					"name": "Coder"
+				},
+				"explorer": {
+					"description": "Read-only investigation and planning",
+					"name": "Explorer"
+				},
+				"grunt": {
+					"description": "Mechanical work; no judgment required",
+					"name": "Grunt"
+				},
+				"label": "Delegation roles",
+				"sage": {
+					"description": "Reasoning, architecture, and difficult tradeoffs",
+					"name": "Sage"
+				}
+			},
+			"save-failed": "Could not save model orchestration settings. Your latest change may not be saved.",
+			"search-placeholder": "Search models, runtimes, providers…",
+			"unavailable": {
+				"clear": "Clear",
+				"clear-aria-label": "Clear roles for {{model}}",
+				"description": "These models are hidden or were not reported by discovery. Their roles remain saved until you clear them.",
+				"title": "Unavailable saved assignments"
+			}
 		},
 		"review-model": {
 			"aria-label": "Review model",

@@ -7,6 +7,7 @@ import {
 	parseAppSettings,
 } from '../../src/shared/config';
 import { LANGUAGE_PREFERENCES } from '../../src/shared/i18n';
+import { MODEL_ROLES } from '../../src/shared/model-role';
 
 describe('parseAppSettings', () => {
 	test('fills all defaults from empty / nullish input', () => {
@@ -26,6 +27,49 @@ describe('parseAppSettings', () => {
 		expect(parsed.general.followUpBehavior).toBe('steer'); // default
 		expect(parsed.models.defaultModel).toBe('anthropic/claude-opus-4-8');
 		expect(parsed.models.hiddenModels).toEqual([]); // default
+		expect(parsed.models.allowCrossRuntimeDelegation).toBe(false);
+		expect(parsed.models.roleAssignments).toEqual([]);
+	});
+
+	test('keeps independent runtime-and-model role assignments', () => {
+		const parsed = parseAppSettings({
+			models: {
+				allowCrossRuntimeDelegation: true,
+				roleAssignments: [
+					{ modelId: 'shared-model', roles: ['sage', 'coder'], runtime: 'pi' },
+					{ modelId: 'shared-model', roles: ['builder'], runtime: 'claude' },
+				],
+			},
+		});
+
+		expect(parsed.models.allowCrossRuntimeDelegation).toBe(true);
+		expect(parsed.models.roleAssignments).toEqual([
+			{ modelId: 'shared-model', roles: ['sage', 'coder'], runtime: 'pi' },
+			{ modelId: 'shared-model', roles: ['builder'], runtime: 'claude' },
+		]);
+	});
+
+	test('rejects unknown role identifiers and malformed cross-runtime values', () => {
+		expect(
+			parseAppSettings({
+				models: {
+					allowCrossRuntimeDelegation: 'yes',
+					roleAssignments: [
+						{ modelId: 'model', roles: ['wizard'], runtime: 'pi' },
+					],
+				},
+			}).models,
+		).toMatchObject({
+			allowCrossRuntimeDelegation: false,
+			roleAssignments: [],
+		});
+		expect(MODEL_ROLES).toEqual([
+			'sage',
+			'coder',
+			'builder',
+			'grunt',
+			'explorer',
+		]);
 	});
 
 	test('applies appearance defaults', () => {
@@ -202,15 +246,25 @@ describe('parseAppSettings', () => {
 
 describe('mergeAppSettings', () => {
 	test('applies a section-scoped patch immutably', () => {
+		const roleAssignments = [
+			{ modelId: 'x/y', roles: ['builder' as const], runtime: 'pi' as const },
+		];
 		const next = mergeAppSettings(DEFAULT_APP_SETTINGS, {
 			general: { caffeinateWhileRunning: true },
-			models: { hiddenModels: ['x/y'] },
+			models: {
+				allowCrossRuntimeDelegation: true,
+				hiddenModels: ['x/y'],
+				roleAssignments,
+			},
 		});
 		expect(next.general.caffeinateWhileRunning).toBe(true);
 		expect(next.general.sendShortcut).toBe('enter'); // untouched
 		expect(next.models.hiddenModels).toEqual(['x/y']);
+		expect(next.models.allowCrossRuntimeDelegation).toBe(true);
+		expect(next.models.roleAssignments).toEqual(roleAssignments);
 		// original is not mutated
 		expect(DEFAULT_APP_SETTINGS.general.caffeinateWhileRunning).toBe(false);
+		expect(DEFAULT_APP_SETTINGS.models.roleAssignments).toEqual([]);
 	});
 
 	test('merges the git section immutably', () => {

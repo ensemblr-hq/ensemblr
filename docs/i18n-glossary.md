@@ -95,6 +95,12 @@ Rules of thumb:
 | Board | Доска | Πίνακας εργασιών | The kanban dashboard. |
 | Setting | Настройка | Ρύθμιση | |
 | Model | Модель | Μοντέλο | |
+| Cross-runtime delegation | Делегирование между средами выполнения | Ανάθεση μεταξύ περιβαλλόντων εκτέλεσης | Explicitly opening a delegated Ensemblr chat on another native runtime. Keep the full `Среда выполнения`/`Περιβάλλον εκτέλεσης` term rather than borrowing `runtime`; the switch is about where instructions and context go, not about a model vendor. |
+| Sage *(model role)* | Советник | Σύμβουλος | Advisory role for reasoning, architecture, and difficult tradeoffs. Not an authority role and never a permission label. |
+| Coder *(model role)* | Инженер | Μηχανικός | Advisory role for novel or design-adjacent code where the implementation path is unresolved. Distinct from **Builder** by uncertainty, never by task size. |
+| Builder *(model role)* | Разработчик | Υλοποιητής | Advisory role for routine implementation from an established pattern or settled specification. Never use it as a synonym for **Coder** merely because the task is large. |
+| Grunt *(model role)* | Исполнитель | Διεκπεραιωτής | Advisory role for fully specified mechanical work requiring zero judgment. The localized labels avoid the English military slang, but the no-interpretation boundary remains explicit in the description. |
+| Explorer *(model role)* | Исследователь | Ερευνητής | Advisory role for read-only codebase investigation that returns an actionable implementation plan; it neither edits nor submits the user-facing approval plan. |
 | Thinking level | Уровень размышления | Επίπεδο σκέψης | |
 | Context usage | Использование контекста | Χρήση περιβάλλοντος | |
 | Plan (subscription) | Тариф | Συνδρομή | The claude.ai subscription tier the account bills against. Deliberately **not** `план`/`σχέδιο`, which `Plan mode` already owns — the two are unrelated concepts and sharing a word makes "plan limits" read as a limit on planning. |

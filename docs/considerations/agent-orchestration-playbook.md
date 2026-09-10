@@ -180,7 +180,7 @@ a permission denial stays visible.
 
 | Goal | Tools |
 | --- | --- |
-| Delegate a subtask to a sub-agent | `ensemblr_start_conversation` (fresh tab + `title`; keep its `agentSessionId`). The child runs the caller's own agent runtime. While planning, it inherits Plan Mode. |
+| Delegate a subtask to a sub-agent | `ensemblr_start_conversation` (fresh tab + `title`; keep its `agentSessionId`). Omitted `model` stays on the caller's runtime; an explicit model follows the live policy. While planning, the child inherits Plan Mode. |
 | Name your own tab | `ensemblr_set_name` (chat tabs only; the label goes in `title`, as it does everywhere) |
 | Name the workspace + git branch | `ensemblr_set_branch_name` (once per branch, while the branch still carries the name it was cut with; refuses unless the user enabled `git.renameWorkspaceOnBranch`. Pass `userRequested: true` when the user asks for a different branch name — never `git branch -m`) |
 | Record what the session covered | `ensemblr_set_summary` (every turn; chat tabs only) |
@@ -339,7 +339,9 @@ load-bearing: the child is a separate process and can ask the app for its playbo
 the edits it was just told to make. After the spawn the child owns the flag, and the user can turn it
 off in the child's tab. Nothing propagates the other way — approving the orchestrator's plan does not
 un-plan a child that is still running, which is why the playbook tells the orchestrator to close its
-investigation tabs once it holds their reports.
+investigation tabs once it holds their reports. Every planning brief names **Explorer** as its
+advisory role because the child is read-only; choosing a model without that saved tag is allowed,
+but the brief records the deviation and why.
 
 `src/main/agent-control/port-adapters.ts` also broadcasts `agentControlPlanModeChanged` from the same
 site, and `usePlanModeSync` mirrors it into the child tab's toggle. That mirror is for honesty only:
@@ -528,16 +530,16 @@ owns the conversation is the one blocked waiting on the report. The question rid
 
 ## Model selection
 
-A spawn never crosses the **agent runtime** axis (`pi` | `claude`). Do not confuse it with a
-model's **inference vendor** (`anthropic`, `openai`, `claude-code`): both were once called
-"provider", and comparing one against the other is what let a Claude Code orchestrator spawn
-children on Pi. `AgentModelOption.vendor` is a branded `ModelVendorId` so the two can no longer be
+A spawn follows the **live runtime policy** returned by `ensemblr_list_models`. Do not confuse the
+agent runtime axis (`pi` | `claude`) with a model's **inference vendor** (`anthropic`, `openai`,
+`claude-code`): both were once called "provider". The listing is the source of permitted
+destinations and reports the caller runtime, allowed runtimes, and role preferences; a caller may
+cross runtimes only when its current policy allows that destination. `AgentModelOption.vendor` is a branded `ModelVendorId` so the two can no longer be
 compared by accident.
 
 Resolution order, in `src/main/agent-providers/spawn-model-resolver.ts`:
 
-1. An explicit `model` — honoured only when it belongs to the caller's own runtime. A cross-runtime
-   id is **refused** with an `invalid-args` envelope naming both runtimes, never substituted.
+1. An explicit `model` — honoured only when `ensemblr_list_models` reports its runtime in the caller's allowed destinations. A disallowed destination is **refused** with an `invalid-args` envelope, never substituted.
 2. Otherwise the caller's own model — the live one its runtime forwarded (`callerModel`, Pi only)
    when the catalog places it on the caller's runtime, else the persisted session row. The row only
    learns a new model when a prompt goes through Ensemblr, so an agent that switched model inside
@@ -545,13 +547,14 @@ Resolution order, in `src/main/agent-providers/spawn-model-resolver.ts`:
 3. Otherwise the catalog's own default for the caller's runtime, falling back to that runtime's
    first entry when the default belongs to the other one.
 
-`ensemblr_list_models` (`id`, `runtime`, `vendor`, `displayName`, plus the default) is already cut to
-the caller's runtime, so every id it returns is spawnable. The caller's runtime comes from its
-control origin — `pi` and `claude` chats name theirs; a **terminal harness cannot**, because its
-origin is minted per workspace (`ws:<id>`) and shared by every terminal in it. Such a caller gets the
-unfiltered list and must pass `model` explicitly; omitting it is refused rather than defaulted onto
-Pi, and `harnessAwareness` plus both tool descriptions say so up front so no harness has to learn
-it from a failed call.
+`ensemblr_list_models` returns `callerRuntime`, `allowedRuntimes`, the live opt-in, and every permitted
+model with `id`, `runtime`, `vendor`, `displayName`, and advisory `roles`. With the opt-in off, a chat
+caller's list is cut to its own runtime; with it on, the list expands to discovered, non-hidden models
+on every allowed runtime. The caller runtime comes from its control origin — `pi` and `claude` chats
+name theirs; a **terminal harness cannot**, because its origin is minted per workspace (`ws:<id>`)
+and shared by every terminal in it. Such a caller gets the unfiltered list and must pass `model`
+explicitly; omitting it is refused rather than defaulted onto Pi, and `harnessAwareness` plus both
+tool descriptions say so up front so no harness has to learn it from a failed call.
 
 A refusal is a modelled outcome, not a thrown error: the port returns
 `{ ok: false, reason }` (`StartConversationOutcome`), the service turns it into an `invalid-args`
@@ -561,6 +564,18 @@ back.
 
 The child's thinking level follows the same rule: requested → caller's → `medium`, each accepted only
 if the child's model publishes that rung, so `max` never lands on a Pi chat.
+
+### Advisory task roles
+
+Use the live `ensemblr_list_models` result as the source of permitted destinations and role preferences. Every delegation brief names its chosen task role and any meaningful deviation from the configured role tags:
+
+- **Sage** frames the decision and surfaces uncertainty.
+- **Coder** handles an uncertain implementation path and proposes the smallest safe change.
+- **Builder** carries a settled implementation through to working code. Coder versus Builder is about uncertainty, not task size.
+- **Grunt** receives a fully determined, zero-judgment brief and reports failed preconditions instead of improvising.
+- **Explorer** returns a read-only actionable implementation plan containing evidence, files, sequence, dependencies, verification, and open questions. Explorer makes no edits and does not submit a plan to the user.
+
+AFK Mode keeps these same boundaries and names the chosen role in every child brief. Under Ensemblr chat-tab delegation it reads the live model roles and allowed runtimes once before each fan-out batch, reuses that result for every child in the batch, and refreshes it before a later batch. Claude's built-in mechanism cannot read those saved tags or cross runtimes, so it applies the vocabulary to the work without claiming the configured preference. AFK's ordinary assumption-taking rule never permits a Grunt to fill a gap or an Explorer to edit.
 
 ## Run scripts
 

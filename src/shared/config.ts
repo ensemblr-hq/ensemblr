@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { SUBAGENT_MECHANISMS } from './agent-control/subagent-mechanism.ts';
+import { MODEL_ROLES } from './model-role.ts';
 
 /**
  * Schema + defaults for the user-facing **App settings** persisted in
@@ -44,6 +45,16 @@ const modelSettingsSchema = z.object({
 	reviewModel: z.string().nullable().catch(null),
 	reviewThinkingLevel: z.string().nullable().catch(null),
 	hiddenModels: z.array(z.string()).catch([]),
+	allowCrossRuntimeDelegation: z.boolean().catch(false),
+	roleAssignments: z
+		.array(
+			z.object({
+				modelId: z.string().min(1),
+				roles: z.array(z.enum(MODEL_ROLES)),
+				runtime: z.enum(['pi', 'claude']),
+			}),
+		)
+		.catch([]),
 });
 
 // Per-runtime preferences, keyed by the runtime they bite for. `claudeSubagentMode`
@@ -179,7 +190,7 @@ export type AppSettings = z.infer<typeof appSettingsSchema>;
 /** The `general` section of App settings. */
 export type GeneralSettings = AppSettings['general'];
 /** The `models` section of App settings. */
-type ModelSettings = AppSettings['models'];
+export type ModelSettings = AppSettings['models'];
 /** The `providers` per-runtime preferences section of App settings. */
 export type ProviderSettings = AppSettings['providers'];
 /** The `git` user-scope defaults section of App settings. */

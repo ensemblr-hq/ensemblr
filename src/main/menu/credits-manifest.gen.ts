@@ -24,6 +24,12 @@ export const CREDITS_PACKAGES = [
 		kind: 'runtime',
 	},
 	{
+		name: '@base-ui/react',
+		license: 'MIT',
+		url: 'https://base-ui.com',
+		kind: 'runtime',
+	},
+	{
 		name: '@iconify-json/logos',
 		license: 'CC0-1.0',
 		url: 'https://icon-sets.iconify.design/logos/',

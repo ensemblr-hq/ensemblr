@@ -223,8 +223,8 @@ const extractEmbeddedAwareness = (
 			(_whole, flag: string, fragment: string) =>
 				flagValue(flag) ? extractEmbeddedLiteral(source, fragment) : '',
 		)
-		.replace(/\$\{GIT_WORKSPACE_CONSENT\}/g, () =>
-			extractEmbeddedLiteral(source, 'GIT_WORKSPACE_CONSENT'),
+		.replace(/\$\{([A-Z_]+)\}/g, (_whole, fragment: string) =>
+			extractEmbeddedLiteral(source, fragment),
 		);
 	if (body.includes('${')) {
 		throw new Error(`Unresolved substitution left in ${name}.`);
@@ -709,11 +709,16 @@ describe('agent-control AWARENESS parity', () => {
 		expect(handOff).toBeGreaterThan(fanOut);
 	});
 
-	it('tells a planning sub-agent to investigate and report, not plan or ask', () => {
+	it('tells a planning sub-agent to return an actionable plan without submitting or asking', () => {
 		expect(PLAN_MODE_SUBAGENT_AWARENESS).toContain(
 			'Your last message is your report',
 		);
-		expect(PLAN_MODE_SUBAGENT_AWARENESS).toContain('Do not write the plan');
+		expect(PLAN_MODE_SUBAGENT_AWARENESS).toContain(
+			'Do not write the plan the user approves',
+		);
+		expect(PLAN_MODE_SUBAGENT_AWARENESS).toContain(
+			'Return an actionable implementation plan',
+		);
 		expect(PLAN_MODE_SUBAGENT_AWARENESS).toContain(
 			'You do not talk to the user',
 		);
@@ -995,13 +1000,17 @@ describe('agent-control AWARENESS parity', () => {
 	});
 
 	it('prefers Luna or Terra over the separately limited Codex Spark allowance', () => {
-		for (const playbook of [
-			ORCHESTRATOR_AWARENESS,
-			PLAN_MODE_ORCHESTRATOR_AWARENESS,
-		]) {
-			expect(playbook).toContain('prefer Luna or Terra');
-			expect(playbook).toContain('Codex Spark');
-			expect(playbook).toContain('separate, limited usage allowance');
+		for (const features of [ALL_ON, { ...ALL_ON, tuiHarnesses: false }]) {
+			for (const playbook of [
+				orchestratorAwareness(features),
+				planModeOrchestratorAwareness(features),
+			]) {
+				expect(playbook).toContain('prefer Luna or Terra');
+				expect(playbook).toContain('Codex Spark');
+				expect(playbook).toContain('separate, limited usage allowance');
+				expect(playbook).toContain('rather than inheriting Spark');
+				expect(playbook).toContain('only when the user explicitly asks');
+			}
 		}
 	});
 
@@ -1009,6 +1018,38 @@ describe('agent-control AWARENESS parity', () => {
 		expect(SUBAGENT_AWARENESS).toContain('Do NOT spawn further sub-agents');
 		expect(SUBAGENT_AWARENESS).toContain('ensemblr_notify_orchestrator');
 		expect(SUBAGENT_AWARENESS).not.toContain('ensemblr_wait_for_agents');
+	});
+
+	it('preserves the advisory role boundaries in every Ensemblr delegation playbook', () => {
+		for (const playbook of [
+			ORCHESTRATOR_AWARENESS,
+			NATIVE_ORCHESTRATOR_AWARENESS,
+			SUBAGENT_AWARENESS,
+			HARNESS_AWARENESS,
+			PLAN_MODE_ORCHESTRATOR_AWARENESS,
+			PLAN_MODE_SUBAGENT_AWARENESS,
+		]) {
+			expect(playbook).toContain('zero-judgment');
+			expect(playbook).toContain('Coder versus Builder is about uncertainty');
+			expect(playbook).toContain('actionable implementation plan');
+		}
+		expect(ORCHESTRATOR_AWARENESS).toContain(
+			'an untagged setup keeps the existing model-selection behavior',
+		);
+		expect(PLAN_MODE_ORCHESTRATOR_AWARENESS).toContain(
+			'Name Explorer as the chosen advisory role in every brief',
+		);
+		expect(PLAN_MODE_SUBAGENT_AWARENESS).toContain(
+			'not the user-facing approval plan',
+		);
+	});
+
+	it('states that role preferences never widen enforced policy', () => {
+		for (const playbook of [SUBAGENT_AWARENESS, PLAN_MODE_SUBAGENT_AWARENESS]) {
+			expect(playbook).toContain(
+				'No role changes your tools, permission mode, or delegation depth',
+			);
+		}
 	});
 
 	// The `git.renameWorkspaceOnBranch` setting gates `ensemblr_set_branch_name`,

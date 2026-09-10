@@ -108,10 +108,28 @@ describe('createAppSettingsService', () => {
 		const next = service.update({
 			experimental: { autoRunAfterSetup: true },
 			general: { sendShortcut: 'mod+enter' },
-			models: { hiddenModels: ['lmstudio/x'] },
+			models: {
+				allowCrossRuntimeDelegation: true,
+				hiddenModels: ['lmstudio/x'],
+				roleAssignments: [
+					{
+						modelId: 'shared',
+						roles: ['sage', 'coder'],
+						runtime: 'claude',
+					},
+				],
+			},
 		});
 		expect(next.general.sendShortcut).toBe('mod+enter');
 		expect(next.models.hiddenModels).toEqual(['lmstudio/x']);
+		expect(next.models.allowCrossRuntimeDelegation).toBe(true);
+		expect(next.models.roleAssignments).toEqual([
+			{
+				modelId: 'shared',
+				roles: ['sage', 'coder'],
+				runtime: 'claude',
+			},
+		]);
 		expect(next.experimental.autoRunAfterSetup).toBe(true);
 		// other fields keep defaults
 		expect(next.general.followUpBehavior).toBe('steer');
@@ -119,6 +137,13 @@ describe('createAppSettingsService', () => {
 		// persisted + reflected on re-read
 		expect(service.read().general.sendShortcut).toBe('mod+enter');
 		expect(readJson(configPath).app.general.sendShortcut).toBe('mod+enter');
+		expect(readJson(configPath).app.models.roleAssignments).toEqual([
+			{
+				modelId: 'shared',
+				roles: ['sage', 'coder'],
+				runtime: 'claude',
+			},
+		]);
 		expect(readJson(configPath).app.experimental.autoRunAfterSetup).toBe(true);
 	});
 

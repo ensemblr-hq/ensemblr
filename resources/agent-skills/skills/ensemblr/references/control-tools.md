@@ -239,6 +239,18 @@ A child that cannot produce its deliverable until someone answers calls
 pending wait whatever its mode. Ordinary open decisions do not arrive that way —
 children park those in their reports.
 
+### Advisory task roles
+
+Use the live `ensemblr_list_models` result as the source of permitted destinations and role preferences. Every delegation brief names its chosen task role and any meaningful deviation from the configured role tags:
+
+- **Sage** frames the decision and surfaces uncertainty.
+- **Coder** handles an uncertain implementation path and proposes the smallest safe change.
+- **Builder** carries a settled implementation through to working code. Coder versus Builder is about uncertainty, not task size.
+- **Grunt** receives a fully determined, zero-judgment brief and reports failed preconditions instead of improvising.
+- **Explorer** returns a read-only actionable implementation plan containing evidence, files, sequence, dependencies, verification, and open questions. Explorer makes no edits and does not submit a plan to the user.
+
+AFK Mode keeps these same boundaries and names the chosen role in every child brief. Ensemblr chat-tab delegation reads the live role preferences and allowed runtimes once before each fan-out batch, reuses that result for every child in the batch, and refreshes it before a later batch. A native Claude sub-agent cannot read those saved tags or cross runtimes, so it applies the vocabulary to the work itself. AFK never lets a Grunt fill a gap or an Explorer edit.
+
 ## Asking the user
 
 `ensemblr_ask_user_question` blocks with **no time limit**: it stays open until

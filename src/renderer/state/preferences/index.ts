@@ -11,6 +11,7 @@
 // The source of truth is `~/.config/ensemblr/config.json`; see ./app-settings.
 export {
 	accessibleColorsAtom,
+	allowCrossRuntimeDelegationAtom,
 	alwaysShowContextUsageAtom,
 	appSettingsAtom,
 	architectureDiagramAtom,
@@ -41,6 +42,8 @@ export {
 	hiddenModelsAtom,
 	languageAtom,
 	markdownStyleAtom,
+	modelOrchestrationWriteErrorAtom,
+	modelRoleAssignmentsAtom,
 	monoFontAtom,
 	notificationSoundAtom,
 	renameWorkspaceOnBranchAtom,

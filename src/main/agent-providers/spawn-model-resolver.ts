@@ -10,21 +10,23 @@
  * opening a chat, an orchestrator delegating one — from disagreeing about which
  * runtime a model belongs to.
  *
- * The invariant the whole module exists to hold: a spawn never crosses the agent
- * runtime axis. A Claude orchestrator's child runs on Claude, a Pi
- * orchestrator's on Pi, and a caller whose runtime cannot be determined is told
- * to name a model rather than quietly handed Pi's default.
+ * Explicit spawns may cross the runtime axis only when the user opts in. An
+ * omitted model still inherits on the caller's runtime, and a caller whose
+ * runtime cannot be determined must name a model rather than receiving a default
+ * nobody chose.
  */
 import { classifyAgentModelTier } from '../../shared/agent-model-tier.ts';
 import {
 	type AgentProviderId,
 	getAgentProviderLabel,
+	listAgentProviderIds,
 } from '../../shared/agent-provider.ts';
 import {
 	getThinkingAxisLabel,
 	listThinkingLevels,
 } from '../../shared/agent-thinking.ts';
 import type { AgentModelOption } from '../../shared/ipc/contracts/agent-models.ts';
+import type { ModelRoleAssignment } from '../../shared/model-role.ts';
 import type { AgentModelCatalogService } from './agent-model-catalog.ts';
 
 /**
@@ -38,7 +40,7 @@ const FALLBACK_THINKING_LEVEL = 'medium';
 /** What a spawned conversation should be opened with. */
 export interface SpawnModelSelection {
 	modelId: string;
-	/** Agent runtime the child is pinned to; never the caller's opposite. */
+	/** Agent runtime the child is pinned to after policy validation. */
 	runtime: AgentProviderId;
 	thinkingLevel: string | null;
 }
@@ -71,18 +73,21 @@ export interface SpawnCallerIdentity {
 	thinkingLevel: string | null;
 }
 
-/** The models one caller may spawn a child on, plus which of them is default. */
+/** The models one caller may spawn a child on, plus its current runtime policy. */
 export interface SpawnModelListing {
+	allowedRuntimes: readonly AgentProviderId[];
+	callerRuntime: AgentProviderId | null;
+	crossRuntimeDelegationEnabled: boolean;
 	defaultModelId: string | null;
 	models: readonly AgentModelOption[];
-	runtime: AgentProviderId | null;
+	roleAssignments: readonly ModelRoleAssignment[];
 }
 
 /** Resolves and lists the models a delegated conversation may be opened with. */
 export interface SpawnModelResolver {
 	/**
-	 * The models a caller on `runtime` may spawn a child on. A null runtime cannot
-	 * be narrowed, so it gets every runtime's models and has to pick explicitly.
+	 * The models a caller may spawn on under the user's current runtime policy. A
+	 * null runtime cannot be narrowed, so it gets every runtime and must pick.
 	 */
 	listModelsFor: (
 		runtime: AgentProviderId | null,
@@ -97,8 +102,12 @@ export interface SpawnModelResolver {
 /** Collaborators for {@link createSpawnModelResolver}. */
 export interface CreateSpawnModelResolverOptions {
 	catalog: AgentModelCatalogService;
+	/** Whether native orchestrators may explicitly target another runtime. */
+	readCrossRuntimeDelegationEnabled: () => boolean;
 	/** Reads model ids the user currently excludes from delegated spawns. */
 	readHiddenModelIds: () => readonly string[];
+	/** Reads advisory role assignments, including temporarily unavailable models. */
+	readModelRoleAssignments: () => readonly ModelRoleAssignment[];
 }
 
 /** Every known model plus the id the catalog itself calls default. */
@@ -160,6 +169,38 @@ function modelsOn(
 	return runtime === null
 		? snapshot.models
 		: snapshot.models.filter((option) => option.agentProvider === runtime);
+}
+
+/**
+ * Lists the catalog rows the caller may explicitly target under current policy.
+ * @param snapshot - Available, non-hidden catalog rows.
+ * @param callerRuntime - The caller's native runtime, when known.
+ * @param allowCrossRuntime - Whether a native caller may target the other runtime.
+ * @returns Every permitted explicit destination model.
+ */
+function availableModelsFor(
+	snapshot: CatalogSnapshot,
+	callerRuntime: AgentProviderId | null,
+	allowCrossRuntime: boolean,
+): readonly AgentModelOption[] {
+	return callerRuntime === null || allowCrossRuntime
+		? snapshot.models
+		: modelsOn(snapshot, callerRuntime);
+}
+
+/**
+ * Names destination runtimes the current policy permits, independently of model availability.
+ * @param callerRuntime - The caller's native runtime, when known.
+ * @param allowCrossRuntime - Whether a native caller may target the other runtime.
+ * @returns Allowed native runtime identifiers.
+ */
+function allowedRuntimesFor(
+	callerRuntime: AgentProviderId | null,
+	allowCrossRuntime: boolean,
+): readonly AgentProviderId[] {
+	return callerRuntime === null || allowCrossRuntime
+		? listAgentProviderIds()
+		: [callerRuntime];
 }
 
 /**
@@ -249,7 +290,9 @@ function pickThinkingLevel(input: {
  */
 export function createSpawnModelResolver({
 	catalog,
+	readCrossRuntimeDelegationEnabled,
 	readHiddenModelIds,
+	readModelRoleAssignments,
 }: CreateSpawnModelResolverOptions): SpawnModelResolver {
 	const selectionFor = (input: {
 		model: AgentModelOption | undefined;
@@ -284,16 +327,15 @@ export function createSpawnModelResolver({
 	};
 
 	/**
-	 * Honours an explicitly requested model, but only when it belongs to the
-	 * caller's own runtime. A cross-runtime request is refused by name rather than
-	 * coerced, because silently substituting another model is how an orchestrator
-	 * ends up believing its children run something they do not.
+	 * Honours an explicitly requested model when the current runtime policy allows
+	 * its destination. A refused request is never coerced to another model.
 	 */
 	const resolveRequested = (input: {
 		caller: SpawnCallerIdentity;
 		models: readonly AgentModelOption[];
 		requestedModelId: string;
 		requestedThinkingLevel: string | null;
+		allowCrossRuntime: boolean;
 	}): SpawnModelResolution => {
 		const model = input.models.find(
 			(option) => option.id === input.requestedModelId,
@@ -305,10 +347,14 @@ export function createSpawnModelResolver({
 			};
 		}
 		const callerRuntime = input.caller.runtime;
-		if (callerRuntime !== null && model.agentProvider !== callerRuntime) {
+		if (
+			callerRuntime !== null &&
+			model.agentProvider !== callerRuntime &&
+			!input.allowCrossRuntime
+		) {
 			return {
 				ok: false,
-				reason: `Model "${input.requestedModelId}" runs on the ${getAgentProviderLabel(model.agentProvider)} runtime, and this conversation runs on ${getAgentProviderLabel(callerRuntime)}. A spawned child cannot cross runtimes: call ensemblr_list_models, which lists only the ${getAgentProviderLabel(callerRuntime)} models you may spawn on, and pass one of those — or omit "model" to inherit yours.`,
+				reason: `Model "${input.requestedModelId}" runs on the ${getAgentProviderLabel(model.agentProvider)} runtime, and this conversation runs on ${getAgentProviderLabel(callerRuntime)}. Cross-runtime delegation is off. Enable “Allow cross-runtime delegation” in Settings → Models, or call ensemblr_list_models and choose one of its currently allowed models. Omitting "model" still inherits yours.`,
 			};
 		}
 		return selectionFor({
@@ -387,15 +433,26 @@ export function createSpawnModelResolver({
 	};
 
 	return {
-		listModelsFor: async (runtime) => {
+		listModelsFor: async (callerRuntime) => {
 			const snapshot = withoutHiddenModels(
 				await readCatalog(catalog),
 				readHiddenModelIds(),
 			);
+			const crossRuntimeDelegationEnabled = readCrossRuntimeDelegationEnabled();
 			return {
-				defaultModelId: defaultModelFor(snapshot, runtime)?.id ?? null,
-				models: modelsOn(snapshot, runtime),
-				runtime,
+				allowedRuntimes: allowedRuntimesFor(
+					callerRuntime,
+					crossRuntimeDelegationEnabled,
+				),
+				callerRuntime,
+				crossRuntimeDelegationEnabled,
+				defaultModelId: defaultModelFor(snapshot, callerRuntime)?.id ?? null,
+				models: availableModelsFor(
+					snapshot,
+					callerRuntime,
+					crossRuntimeDelegationEnabled,
+				),
+				roleAssignments: readModelRoleAssignments(),
 			};
 		},
 		resolveForSpawn: async ({
@@ -410,6 +467,7 @@ export function createSpawnModelResolver({
 			);
 			if (requestedModelId) {
 				return resolveRequested({
+					allowCrossRuntime: readCrossRuntimeDelegationEnabled(),
 					caller,
 					models: availableSnapshot.models,
 					requestedModelId,

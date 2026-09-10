@@ -1,4 +1,4 @@
-import { atom, useSetAtom } from 'jotai';
+import { atom, type PrimitiveAtom, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
 
 import {
@@ -20,6 +20,12 @@ import {
  */
 export const appSettingsAtom = atom<AppSettings>(DEFAULT_APP_SETTINGS);
 
+/** Latest model-orchestration persistence failure, cleared by its next write. */
+export const modelOrchestrationWriteErrorAtom = atom<string | null>(null);
+
+/** Monotonic renderer write generation used to reject stale failure refreshes. */
+const appSettingsWriteGenerationAtom = atom(0);
+
 /**
  * Builds a writable atom over one `config.json` setting. Reads project the
  * mirror; writes optimistically update the mirror and persist the patch via IPC,
@@ -28,7 +34,7 @@ export const appSettingsAtom = atom<AppSettings>(DEFAULT_APP_SETTINGS);
 function settingAtom<
 	Section extends keyof AppSettings,
 	Key extends keyof AppSettings[Section],
->(section: Section, key: Key) {
+>(section: Section, key: Key, writeErrorAtom?: PrimitiveAtom<string | null>) {
 	/** Value type of the targeted `config.json` setting. */
 	type Value = AppSettings[Section][Key];
 	// Accept a direct value or an updater fn, matching the `atomWithStorage`
@@ -38,6 +44,8 @@ function settingAtom<
 	return atom(
 		(get) => get(appSettingsAtom)[section][key],
 		(get, set, update: Update) => {
+			const writeGeneration = get(appSettingsWriteGenerationAtom) + 1;
+			set(appSettingsWriteGenerationAtom, writeGeneration);
 			const current = get(appSettingsAtom);
 			const value =
 				typeof update === 'function'
@@ -47,10 +55,24 @@ function settingAtom<
 				...current,
 				[section]: { ...current[section], [key]: value },
 			});
+			if (writeErrorAtom) set(writeErrorAtom, null);
 			const patch = { [section]: { [key]: value } } as AppSettingsPatch;
-			void updateAppSettings(patch).catch(() => {
+			void updateAppSettings(patch).catch((error: unknown) => {
+				const failedWriteGeneration = writeGeneration;
+				if (get(appSettingsWriteGenerationAtom) !== failedWriteGeneration)
+					return;
+				if (writeErrorAtom) {
+					set(
+						writeErrorAtom,
+						error instanceof Error ? error.message : String(error),
+					);
+				}
 				void getAppSettings()
-					.then((settings) => set(appSettingsAtom, settings))
+					.then((settings) => {
+						if (get(appSettingsWriteGenerationAtom) === failedWriteGeneration) {
+							set(appSettingsAtom, settings);
+						}
+					})
 					.catch(() => undefined);
 			});
 		},
@@ -124,6 +146,18 @@ export const reviewThinkingLevelAtom = settingAtom(
 	'reviewThinkingLevel',
 );
 export const hiddenModelsAtom = settingAtom('models', 'hiddenModels');
+/** Whether explicit delegated children may target another native runtime. */
+export const allowCrossRuntimeDelegationAtom = settingAtom(
+	'models',
+	'allowCrossRuntimeDelegation',
+	modelOrchestrationWriteErrorAtom,
+);
+/** Advisory strengths saved for runtime-and-model pairs, including unavailable models. */
+export const modelRoleAssignmentsAtom = settingAtom(
+	'models',
+	'roleAssignments',
+	modelOrchestrationWriteErrorAtom,
+);
 
 // ─── Providers ──────────────────────────────────────────────────────────────────
 /**
