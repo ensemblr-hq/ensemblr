@@ -1,12 +1,13 @@
-# Ensemblr v0.1.12
+# Ensemblr v0.1.14
 
-Ensemblr 0.1.12 lets Pi extensions present their own tool activity while making Pi startup and slash-command discovery more dependable.
+Ensemblr 0.1.14 makes multi-agent work easier to direct and follow, with a bounded two-level delegation hierarchy, a live Agents panel, and safer unattended workflows.
 
 ### Highlights
 
-* **Extension-owned tool presentations.** Pi extensions can now provide a versioned, schema-validated presentation for tool calls: titles, Lucide glyphs, previews, and structured bodies. Ensemblr safely persists and restores complete presentation snapshots while retaining host-owned presenters and a localized raw-execution fallback. (#531)
-* **More reliable Pi startup and prompt delivery.** Startup readiness and prompt acknowledgement now have separate bounded waits, reducing premature delivery failures without replaying any prompt whose execution may be uncertain. Failed child spawns also settle cleanly so saved conversations can resume. (#530)
-* **Fresh Pi slash commands.** Pi command discovery now warms when the composer opens and refreshes mounted command catalogues every five minutes; Claude Code discovery remains lazy. (#529)
+* **Two-level delegation with a live Agents panel.** An orchestrator can delegate a workstream to a manager, which can split it across leaf agents. Ensemblr preserves lineage and spawn budgets across restarts, shows live activity and context usage, links child conversations back to their parent, and keeps completed history compact. (#535, #544, #547)
+* **Models can be assigned orchestration roles.** Settings now support Sage, Coder, Builder, Grunt, and Explorer preferences, plus opt-in delegation between Pi and Claude Code. AFK agents choose review delegation for the work at hand, and delegation guidance preserves the parent orchestrator's context. (#537, #541, #542)
+* **Safer plans, workspaces, and guardrails.** Workspace Git operations scrub inherited Git environment state, Plan Mode preserves refinements and locks the composer while review is pending, and internal wait-barrier refusals stay out of the user-facing timeline without hiding real errors. (#536, #543, #546)
+* **Desktop workflow polish on macOS and Linux.** Caffeinate handling recovers cleanly across battery changes, Linux sidebar sheets clear the native title bar, the Concierge can manage app settings, and workspace files now distinguish symlinks and dotenv files. (#534, #538, #539, #545)
 
 ### Install
 
@@ -26,4 +27,4 @@ The `.dmg` is signed with a Developer ID certificate, hardened-runtime, notarize
 
 ---
 
-*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.1.11...v0.1.12>
+*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.1.12...v0.1.14>
