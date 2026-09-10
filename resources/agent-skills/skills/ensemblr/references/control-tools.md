@@ -28,8 +28,8 @@ Control adds no capability of its own — it is a gate, not a feature.
 `ensemblr_get_conversation_status`, `ensemblr_get_last_message`,
 `ensemblr_read_conversation`.
 
-`ensemblr_get_conversation_status` is the only op whose target is optional, and
-that is what makes it the one way to learn your own context usage: omit
+Among the conversation readers, `ensemblr_get_conversation_status` lets you
+omit its target to learn your own context usage: omit
 `agentSessionId` and it reports **your own** conversation, since you do not know
 your own session id. A terminal harness is the one caller that cannot — its
 control identity is minted per workspace and shared by every terminal in it, so
@@ -40,8 +40,22 @@ read a child, a peer, or the reviewer. Every status carries `contextUsage`
 null for a conversation with no runtime attached — closed, or from before a
 restart — which is a fact about the reading rather than an empty window.
 
-**Review** — `ensemblr_get_workspace_diff`, `ensemblr_get_diff_comments`,
-`ensemblr_add_diff_comments`, `ensemblr_resolve_diff_comments`.
+**Review** — `ensemblr_start_review`, `ensemblr_get_workspace_diff`,
+`ensemblr_get_diff_comments`, `ensemblr_add_diff_comments`,
+`ensemblr_resolve_diff_comments`. Start an agent review only on an explicit user
+request or when the AFK delivery workflow calls for it; the Review conversation
+is a root orchestrator, so name its `agentSessionId` in the wait's `targets`.
+
+**Optional features** — `ensemblr_launch_harness` (terminal harnesses),
+`ensemblr_get_architecture_diagram`, `ensemblr_update_architecture_diagram`
+(architecture diagram). Each is withheld when its Experimental feature is off.
+Read the stored diagram before updating it; the architecture skill carries the
+full contract.
+
+**Concierge only** — `ensemblr_focus_workspace`, `ensemblr_create_workspace`,
+`ensemblr_list_projects`, `ensemblr_recall_memory`, `ensemblr_get_app_settings`,
+`ensemblr_update_app_settings`. These address the app above a workspace and are
+withheld from workspace agents. Read app settings before updating them.
 
 **Linear** — `ensemblr_linear_list_issues`, `ensemblr_linear_get_issue`,
 `ensemblr_linear_get_metadata`, `ensemblr_linear_create_comment`,

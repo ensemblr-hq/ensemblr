@@ -22,7 +22,7 @@ credentials and Ensemblr never copies them.
 
 Setup is one command:
 
-```
+```bash
 gh auth login --hostname github.com
 ```
 
@@ -153,17 +153,20 @@ hides it locally; the issue's own status stays yours to change
 
 ## Infisical
 
-Link a repository to an **Infisical** project and its secrets resolve into every
-workspace, terminal, run script, and agent that repository launches
+Link a repository to an **Infisical** project and its secrets resolve into the
+workspace environment used by terminals, run scripts, and terminal harnesses
 ([ADR 0051](../adr/0051-resolve-infisical-secrets-as-a-live-environment-layer.md)).
-Nothing is written into the repository, and nothing is copied into Ensemblr's
-own secret store.
+Native Pi and Claude Code chat sessions do not inherit that environment; an
+agent needing a linked secret must run the command through an Ensemblr terminal.
+Secret values are never written into the repository. Ensemblr keeps the last
+successful values in its platform secret store only as a failure fallback,
+not as a freshness cache.
 
 Setup is two halves, split by sensitivity:
 
 | Half | Where it goes | What it holds |
 | --- | --- | --- |
-| The **account** | SQLite, with its client secret in the Keychain | a Machine Identity — instance URL, client id, client secret |
+| The **account** | SQLite, with its client secret in the platform secret store | a Machine Identity — instance URL, client id, client secret |
 | The **project** | the committed `.ensemblr/settings.toml` | instance URL, project id, environment, path |
 
 Because the project half is committed, a teammate who clones the repository is
@@ -217,14 +220,15 @@ the file is read.
 Three properties worth knowing:
 
 - **Pull only.** Ensemblr never writes a secret back to Infisical.
-- **Every launch resolves live.** There is no freshness window — a rotated
-  secret takes effect on the next terminal, script, or agent you start. The
-  Keychain-held copy is a *failure* fallback, read only when the fetch fails,
-  never as a cache.
+- **Every terminal or script launch resolves live.** There is no freshness
+  window — a rotated secret takes effect on the next terminal, script, or
+  terminal harness you start. The platform secret store (macOS Keychain or
+  Linux `safeStorage`) holds a *failure* fallback, used only when live
+  resolution is unavailable, never instead of a successful fetch.
 - **Local values still win.** The layer sits between env files and the values
   you set by hand:
 
-  ```
+  ```text
   env files  <  infisical  <  plain (local)  <  Ensemblr secrets
   ```
 

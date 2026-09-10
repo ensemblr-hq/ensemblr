@@ -91,7 +91,7 @@ Ensemblr equivalent:
 
 Ensemblr equivalent:
 
-- A first launch opens the setup wizard at `/onboarding` rather than the workbench: a welcome moment, then one screen per gate — agent CLI, GitHub CLI, Linear — and a terminal screen that names whatever is still unresolved.
+- A first launch opens the setup wizard at `/onboarding` rather than the workbench: a welcome moment, then one screen per gate — agent CLI, GitHub CLI, Linear — and a Ready screen that names whatever is still unresolved.
 - The wizard is the first-run surface only. Settings → Diagnostics owns the recurring case and remains the full gate; the wizard shows the five checks a first run can act on and reads them from the same `setupDiagnostics` probe.
 - The agent-CLI gate is either-or: a working Pi *or* a working Claude Code satisfies it, so a machine carrying one runtime reads as ready and the runtime the user skipped dims instead of turning red. Linear is a soft gate that always leaves a way forward.
 - The same either-or rule governs the diagnostics rollup, not just the wizard, but the two resolve it from different lists. The rollup reads the `AGENT_RUNTIME_CHECK_GROUPS` table in `src/shared/setup-checks.ts` — Pi's four checks, Claude's one — and `setupDiagnostics` resolves it onto each check's `blocking` flag before computing `blocked`: with one runtime working the others demote to optional, and with none working every runtime check is promoted to required, because either would fix it. The wizard's `agent-cli` step carries its own narrower list in `src/renderer/lib/onboarding/gates.ts` — `['pi-executable', 'claude-executable']` under an `any` gate — so it clears on either executable while diagnostics still holds Pi to its RPC and provider checks. Diagnostics is the stricter authority; the wizard is deliberately the cheaper one. Ensemblr needs *an* agent runtime, never a particular one and never both.
@@ -188,9 +188,10 @@ Ensemblr equivalent:
   `~/.pi/agent`, project `.pi`, skills, prompts, themes, and context files; Claude Code uses the
   user's own `claude` configuration, slash commands, and MCP roster (#228). Ensemblr duplicates
   neither.
-- **Tool approvals.** Workspace permission modes, enforced in-app for Claude (ADR 0042, decision 7)
-  and mapped to Pi tool restrictions where available. Plan mode (#184) is a separate per-chat hold:
-  Claude uses its native plan mode, Pi is gated through the shipped extension's `tool_call` hook.
+- **Tool approvals.** Workspace permission modes are enforced in-app for Claude
+  (ADR 0042, decision 7). For Pi they gate Ensemblr Control, not Pi's own file and
+  shell tools. Plan mode (#184) is a separate per-chat hold: Claude uses its native
+  plan mode, Pi is gated through the shipped extension's `tool_call` hook.
 - **Retry and checkpoints.** Agent session tree fork/continuation behavior plus file checkpoint
   policy. Ensemblr does not enable the Claude SDK's own file checkpointing (ADR 0042, decision 6).
 - **Prompt templates.** Repository action templates for review, create-PR, and fix, stored per

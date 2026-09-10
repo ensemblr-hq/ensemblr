@@ -191,7 +191,7 @@ submits) carries no menu accelerator at all. See ADR&nbsp;0046.
 | Composer attachments | Content-addressed under the workspace's `.context/attachments/<digest>/` |
 | Secrets | macOS Keychain (ADR&nbsp;0018); on Linux, `safeStorage` ciphertext in the `secret_metadata` row (ADR&nbsp;0056) |
 | Per-turn checkpoints | Git refs in the workspace (ADR&nbsp;0012) |
-| Managed repos, workspaces, archived context | The Ensemblr Root Directory (ADR&nbsp;0010) |
+| Managed repos, workspaces, archived context, Concierge memory and artifacts | The Ensemblr Root Directory (ADR&nbsp;0010) |
 | Unread chat marks, slash-command catalogue cache | Renderer `localStorage`, via persisted Jotai atoms |
 
 Schema changes go through the numbered migration list in
@@ -200,11 +200,11 @@ migration ids, so a new migration must be added to both.
 
 ## Tests
 
-| Suite | Runner | Count |
-| --- | --- | --- |
-| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites | 259 files |
-| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) | 426 files (58 under `dom/`) |
-| `tests/shared/**` | Vitest | 49 files |
+| Suite | Runner |
+| --- | --- |
+| `tests/main/**` | `electron --test` (`ELECTRON_RUN_AS_NODE=1`), plus the pure-logic files listed one-by-one in `vitest.config.mts` — an explicit list, not a glob, so it never drags in the Electron-only suites |
+| `tests/renderer/**` | Vitest (`node` env; DOM files opt in per file) |
+| `tests/shared/**` | Vitest |
 
 See [`onboarding.md`](./onboarding.md#6-running-the-tests) for which runner a new
 test should use.

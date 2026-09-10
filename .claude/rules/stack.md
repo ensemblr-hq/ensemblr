@@ -4,8 +4,8 @@ The versions this repo is pinned to, and the constraints that are not obvious
 from `package.json`. Policies for *how* to use the stack (npm, Biome, Jotai,
 Tailwind scale, JSDoc) live in `AGENTS.md` — this file is the stack itself.
 
-Verified against `package.json` at `0.1.0-beta.22` on 2026-09-01. Re-check before
-asserting a version.
+`package.json` declares the supported ranges; `package-lock.json` records the
+resolved versions. Re-check both before asserting an exact version.
 
 ## Platform
 
@@ -25,8 +25,9 @@ declared per platform rather than branched inline: the secret store
 "Open in…" registry (`src/main/open-target/open-target-registry.ts` carries a
 `platforms` map), the battery reader (`linux-battery.ts` reads sysfs), the
 workspace file watcher (`linux-recursive-watch.ts`), the window chrome
-(`src/shared/window-chrome.ts`), and updates (Linux checks and links, never
-installs).
+(`src/shared/window-chrome.ts`), and updates (Linux swaps the running AppImage
+when its containing directory is writable; other Linux builds check and link
+instead — ADR 0065).
 
 **`node-pty` is the only thing that compiles, and the Linux preflight builds it
 rather than complaining about it.** It publishes prebuilds for darwin and win32
@@ -108,8 +109,9 @@ stable.
 
 - **TypeScript 7**, `strict: true`, `noImplicitAny: true`, `moduleResolution: "bundler"`,
   `target`/`lib` ES2022, `allowImportingTsExtensions: true`. Path alias `@/*` → `./src/*`.
-- **Vite 8** — four configs: `vite.main.config.mts`, `vite.preload.config.mts`,
-  `vite.renderer.config.mts`, `vite.playground.config.mts`.
+- **Vite 8** — app configs: `vite.main.config.mts`, `vite.preload.config.mts`,
+  `vite.renderer.config.mts`; playground: `vite.playground.config.mts`; demo:
+  `vite.demo-main.config.mts`, `vite.demo.config.mts`.
 - Four tsconfig projects, all checked by `npm run typecheck`: app
   (`tsconfig.json`), scripts (`tsconfig.scripts.json`), tests
   (`tsconfig.tests.json`), demo (`tsconfig.demo.json`). They each `include`
@@ -244,14 +246,20 @@ a primitive gets reformatted to house style.
 - **TOML** — `js-toml`, read and written through `src/main/config/`, which owns
   the atomic writer both the scripts and the Infisical link writers share for the
   committed `.ensemblr/settings.toml`.
-- **Secrets** — macOS Keychain, never a file or env var.
+- **Secrets** — macOS Keychain; Linux uses Electron `safeStorage` ciphertext in
+  SQLite. Never plain config values; workspace secrets enter terminal and script
+  environments at launch.
 - **GitHub** — shells out to the `gh` CLI. Ensemblr stores no GitHub token.
 - **Linear** — OAuth, with a loopback callback server. Many accounts at once
-  (ADR 0052): identity in SQLite, tokens in the Keychain keyed per account.
+  (ADR 0052): identity in SQLite, tokens in the platform secret store keyed per
+  account.
 - **Infisical** — a hand-written REST client against four endpoints, authenticated
   with a Machine Identity (Universal Auth), no `@infisical/sdk` (ADR 0051). It is
-  an environment *layer*, resolved live per launch, never materialized to disk.
-- **Agent control** — `@modelcontextprotocol/sdk` over a loopback HTTP server.
+  an environment *layer*, resolved live for terminal and script launches, with
+  the last successful values in the platform secret store as a failure fallback.
+  Native chat agents do not inherit this layer.
+- **Agent control** — a loopback HTTP server: Claude and harnesses use
+  `@modelcontextprotocol/sdk` at `/mcp`; Pi's bundled extension calls `/invoke`.
 - **Agent runtimes** — Pi via CLI RPC; Claude Code via `@anthropic-ai/claude-agent-sdk`
   against the user's own `claude` binary (the SDK's ~260 MB per-platform binary is
   deliberately not packaged).

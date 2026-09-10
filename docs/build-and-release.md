@@ -133,7 +133,7 @@ one, during `npm ci`. Forge then rebuilds it again against Electron's ABI inside
 `start` and `package`, which is failure two, and it surfaces as nothing more
 useful than:
 
-```
+```text
 Error: node-gyp failed to rebuild '.../node_modules/node-pty'
 ```
 
@@ -183,7 +183,7 @@ assumes **Desktop Mode**.
 place. `npm run diagnose:linux` reports all of them, plus whether `pty.node` is
 built and what it links against:
 
-```
+```text
 node         24.20.0 (electron rebuild target)
 compiler     MISSING
 make         MISSING
@@ -324,7 +324,7 @@ cause. If the runtime refuses to mount at all, `--appimage-extract-and-run`.
 | 12 | Open a terminal tab; run a workspace script | node-pty actually loaded |
 | 13 | The "Open in…" menu | Lists only what is installed — Konsole, Dolphin, any editor — and launches it |
 | 14 | The menu bar | Carries Settings and Check for Updates, reachable from a frameless window; hints read `Ctrl+…`, never `⌘…` |
-| 15 | Settings → General → Check for updates | Reports a version with a link; never tries to install |
+| 15 | Settings → General → Check for updates | A packaged stable/canary AppImage in a writable directory offers download and restart; an unpacked build or AppImage in a non-writable directory links to the release instead |
 | 16 | Unplug it, run a long agent turn | The power-save blocker releases at the low-battery threshold |
 | 17 | `--ozone-platform=x11` | Still starts (the documented XWayland escape hatch) |
 | 18 | Let a background chat finish a turn | A desktop notification appears, and the in-app chime plays |

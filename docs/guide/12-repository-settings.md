@@ -272,7 +272,7 @@ There are **57** curated icon names. The list is closed so that a committed
 config can never reference an icon that fails to render. Anything outside it
 falls back to the default, **`play`**.
 
-```
+```text
 activity          badge-check       blocks            book-open
 box               bug               calculator        cloud
 code              cog               component         container
@@ -349,9 +349,13 @@ The action buttons themselves: [8. Reviewing changes](./08-reviewing-changes.md)
 
 ## A worked example
 
-This is Ensemblr's own committed `.ensemblr/settings.toml`, verbatim:
+This shortened example is drawn from Ensemblr's committed
+[`.ensemblr/settings.toml`](../../.ensemblr/settings.toml). See that file for the
+full run-script list, including the demo host and Linux build/diagnostic scripts.
 
 ```toml
+#:schema ../schemas/settings.schema.json
+
 # Node 24 is pinned by scripts/require-node-version.mjs, so every command goes
 # through the wrapper — non-interactive shells never activate mise on their own.
 [scripts]
@@ -387,15 +391,14 @@ available_in = ["local"]
 
 Reading it line by line:
 
-- **`[scripts] setup = "npm ci"`** — every new workspace runs `npm ci` on
-  creation. No `archive` script, so nothing runs on the way out.
+- **`[scripts] setup`** — every new workspace runs `npm ci` through the pinned
+  Node wrapper on creation. No `archive` script, so nothing runs on the way out.
 - **No `run_mode`**, so it falls back to `concurrent`: several workspaces can run
   their dev server at the same time, each on its own `ENSEMBLR_PORT`.
 - **No `auto_run_after_setup`**, so it falls back to `false`: after `npm ci`
   finishes, nothing starts on its own.
-- **Five named run scripts**, so the Run menu offers five entries rather than
-  one. They appear in declaration order: Dev, Checks, Test, Playground,
-  Unsigned.
+- **The named run scripts shown here** appear in declaration order in the Run
+  menu: Dev, Checks, Test, Playground, Unsigned. The full file adds more entries.
 - **`[scripts.run.dev]` carries `default = true`** — it is what `⌘R` and the
   Run button start. No other table sets `default`, so there is no conflict to
   resolve.
@@ -405,9 +408,9 @@ Reading it line by line:
 - **Every script declares `available_in = ["local"]`** — explicit rather than
   omitted. Same effect here, since `local` is the only environment Ensemblr
   launches, but it documents intent.
-- **The comment above `[scripts.run.dev]`** explains why every command is
-  wrapped rather than calling `npm` directly. Note that this comment does not
-  survive a save from the Scripts pane.
+- **The comment above `[scripts]`** explains why every command is wrapped
+  rather than calling `npm` directly. It does not survive a save from the
+  Scripts pane; the leading `#:schema` directive does.
 - **No `[git]`, `[prompts]`, `environment_variables`, or
   `file_include_globs`** — those all fall through to personal settings, then to
   user defaults. `file_include_globs` therefore resolves to its built-in
