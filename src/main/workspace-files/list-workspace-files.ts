@@ -29,6 +29,7 @@ import {
 	writeContextFileAttachment,
 	writeContextImageAttachment,
 } from './context-attachments.ts';
+import { annotateSymlinkTargets } from './symlink-metadata.ts';
 import { resolveWorkspaceCwd } from './workspace-cwd.ts';
 import {
 	imageSignatureMatches,
@@ -191,7 +192,12 @@ export function createListWorkspaceFilesService({
 							workspaceCwd: cwdResult.cwd,
 						})
 					: [];
-			return { files: [...trackedEntries, ...ignoredEntries] };
+			return {
+				files: await annotateSymlinkTargets(cwdResult.cwd, [
+					...trackedEntries,
+					...ignoredEntries,
+				]),
+			};
 		},
 		async read(request) {
 			const cwdResult = resolveWorkspaceCwd(request.workspaceCwd);
@@ -316,7 +322,10 @@ export function createListWorkspaceFilesService({
 						break;
 					}
 				}
-				return { entries, path: target.relativePath };
+				return {
+					entries: await annotateSymlinkTargets(cwdResult.cwd, entries),
+					path: target.relativePath,
+				};
 			} catch (cause) {
 				return {
 					entries: [],

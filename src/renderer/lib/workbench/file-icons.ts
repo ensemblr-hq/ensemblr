@@ -109,12 +109,15 @@ const fileIconByExtension: Record<string, string> = {
 	zsh: 'file-type-shell',
 };
 
-/** Minimal file or folder shape needed to choose an icon: its name and kind. */
-type WorkspaceFileIconTarget = Pick<WorkspaceFileSummary, 'kind' | 'name'>;
+/** File identity and optional symlink target needed to choose an icon. */
+type WorkspaceFileIconTarget = Pick<
+	WorkspaceFileSummary,
+	'kind' | 'name' | 'symlinkTargetKind'
+>;
 
 /**
- * Picks the appropriate VSCode icon name for a workspace file or folder.
- * @param file - File/folder name and kind.
+ * Picks a shortcut icon for symlinks, otherwise a VSCode file or folder icon.
+ * @param file - File/folder identity and optional symlink target kind.
  * @param options - When `isExpanded` is set, directories resolve to their
  *   open-folder glyph (falling back to the closed one if no `-opened` variant
  *   exists in the icon set).
@@ -124,6 +127,12 @@ export function getWorkspaceFileIconName(
 	file: WorkspaceFileIconTarget,
 	options?: { isExpanded?: boolean },
 ): string {
+	if (file.symlinkTargetKind) {
+		return file.symlinkTargetKind === 'directory'
+			? 'ensemblr:folder-symlink'
+			: 'ensemblr:file-symlink';
+	}
+
 	if (file.kind === 'directory') {
 		const baseIcon = folderIconByName[file.name] ?? 'default-folder';
 		const openIcon = `${baseIcon}-opened`;

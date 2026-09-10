@@ -87,6 +87,7 @@ export interface ReviewFileSummary {
 		| 'untracked';
 }
 
+/** Workspace file-list row, including optional icon-only symlink metadata. */
 export interface WorkspaceFileSummary {
 	id: string;
 	/** True when git ignores this entry; the all-files tree dims it. */
@@ -94,6 +95,8 @@ export interface WorkspaceFileSummary {
 	kind: 'directory' | 'file';
 	name: string;
 	path: string;
+	/** Present only for symlinks; unresolved targets use the file-link icon. */
+	symlinkTargetKind?: 'directory' | 'file' | 'unknown';
 }
 
 /** A workspace file-tree entry that a path written by an agent was matched to. */

@@ -8,6 +8,8 @@ export interface WorkspaceFileEntryWire {
 	kind: 'directory' | 'file';
 	name: string;
 	path: string;
+	/** Present only for symlinks; unresolved targets are unknown. Links stay leaf entries, never traversed. */
+	symlinkTargetKind?: 'directory' | 'file' | 'unknown';
 }
 
 /** Request to list files under a workspace working directory. */

@@ -24,6 +24,7 @@ function combineDirectoryEntries(
 			kind: entry.kind,
 			name: entry.name,
 			path: entry.path,
+			symlinkTargetKind: entry.symlinkTargetKind,
 		})),
 	);
 }

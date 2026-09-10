@@ -110,6 +110,33 @@ function readWorkspaceFile(cwd: string, filePath: string) {
 }
 
 describe('createListWorkspaceFilesService.list', () => {
+	test('identifies file, directory, broken and cyclic symlinks without traversing them', async () => {
+		const cwd = seedRepo();
+		symlinkSync('README.md', path.join(cwd, 'linked-readme'));
+		symlinkSync('src', path.join(cwd, 'linked-src'));
+		symlinkSync('missing', path.join(cwd, 'broken-link'));
+		symlinkSync('cyclic-link', path.join(cwd, 'cyclic-link'));
+		git(cwd, ['add', 'linked-readme']);
+
+		const result = await listFiles(cwd);
+		const byPath = new Map(result.files.map((entry) => [entry.path, entry]));
+
+		expect(result.error).toBeUndefined();
+		expect(byPath.get('linked-readme')).toMatchObject({
+			kind: 'file',
+			symlinkTargetKind: 'file',
+		});
+		expect(byPath.get('linked-src')).toMatchObject({
+			kind: 'file',
+			symlinkTargetKind: 'directory',
+		});
+		for (const name of ['broken-link', 'cyclic-link']) {
+			expect(byPath.get(name)).toMatchObject({ symlinkTargetKind: 'unknown' });
+		}
+		expect(byPath.has('linked-src/app.ts')).toBe(false);
+		expect(byPath.get('README.md')).not.toHaveProperty('symlinkTargetKind');
+	});
+
 	test('enumerates ignored directory contents so they are browsable', async () => {
 		const result = await listFiles(seedRepo());
 
@@ -142,6 +169,51 @@ describe('createListWorkspaceFilesService.list', () => {
 			isIgnored: true,
 			kind: 'file',
 		});
+	});
+
+	test('keeps symlink icons in ignored listings and lazy directory reads, including external targets', async () => {
+		const cwd = seedRepo();
+		const external = mkdtempSync(path.join(tmpdir(), 'ensemblr-link-target-'));
+		tempDirs.push(external);
+		writeFileSync(path.join(external, 'private.txt'), 'outside workspace');
+		symlinkSync('README.md', path.join(cwd, 'linked.log'));
+		symlinkSync('../README.md', path.join(cwd, '.context', 'linked-file'));
+		symlinkSync(external, path.join(cwd, '.context', 'linked-folder'));
+
+		const listed = await listFiles(cwd);
+		const lazy = await readDir(cwd, '.context');
+
+		expect(listed.files).toContainEqual(
+			expect.objectContaining({
+				isIgnored: true,
+				path: 'linked.log',
+				symlinkTargetKind: 'file',
+			}),
+		);
+		for (const entries of [listed.files, lazy.entries]) {
+			expect(entries).toContainEqual(
+				expect.objectContaining({
+					isIgnored: true,
+					kind: 'file',
+					path: '.context/linked-file',
+					symlinkTargetKind: 'file',
+				}),
+			);
+			expect(entries).toContainEqual(
+				expect.objectContaining({
+					isIgnored: true,
+					kind: 'file',
+					path: '.context/linked-folder',
+					symlinkTargetKind: 'directory',
+				}),
+			);
+			expect(entries.some((entry) => entry.path.includes('private.txt'))).toBe(
+				false,
+			);
+		}
+		expect((await readDir(cwd, '.context/linked-folder')).error?.code).toBe(
+			'invalid-path',
+		);
 	});
 
 	test('collapses ignored directories larger than the cap', async () => {

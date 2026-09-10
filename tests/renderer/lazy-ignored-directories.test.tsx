@@ -75,6 +75,29 @@ function renderLazyDirectories(
 }
 
 describe('useLazyIgnoredDirectories', () => {
+	test('preserves symlink target metadata in lazily loaded children', async () => {
+		const entriesByCall = {
+			current: [
+				{
+					...entry('.context/linked-folder'),
+					symlinkTargetKind: 'directory' as const,
+				},
+			],
+		};
+		const { result } = renderLazyDirectories([IGNORED_ROOT], entriesByCall);
+
+		act(() => result.current.loadIgnoredDirectory('.context'));
+
+		await waitFor(() => {
+			expect(result.current.allFiles).toContainEqual(
+				expect.objectContaining({
+					path: '.context/linked-folder',
+					symlinkTargetKind: 'directory',
+				}),
+			);
+		});
+	});
+
 	test('drops a child that disappeared from an opened directory on refetch', async () => {
 		const entriesByCall = {
 			current: [entry('.context/a.md'), entry('.context/b.md')],
