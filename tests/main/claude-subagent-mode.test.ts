@@ -141,14 +141,16 @@ describe('withheldControlOps: the other half of the same choice', () => {
 		});
 
 		// Not a denial the agent could recover from by phrasing the call
-		// differently: it has a workspace, so navigating to another one, cutting a
-		// new one, listing the projects it could be cut from, and searching a memory
-		// index it does not have are all meaningless rather than merely forbidden.
+		// differently: it has a workspace, so app-wide settings, navigating to
+		// another workspace, cutting a new one, listing projects, and searching a
+		// memory index it does not have are meaningless rather than merely forbidden.
 		expect([...withheld].toSorted()).toEqual([
 			'createWorkspace',
 			'focusWorkspace',
+			'getAppSettings',
 			'listProjects',
 			'recallMemory',
+			'updateAppSettings',
 		]);
 	});
 });

@@ -2842,6 +2842,10 @@ export default interface Resources {
 				done: 'Opened a workspace';
 				running: 'Opening a workspace';
 			};
+			'get-app-settings': {
+				done: 'Read app settings';
+				running: 'Reading app settings';
+			};
 			'get-architecture-diagram': {
 				done: 'Read the architecture diagram';
 				running: 'Reading the architecture diagram';
@@ -3013,6 +3017,10 @@ export default interface Resources {
 			'stop-terminal': {
 				done: 'Stopped a terminal';
 				running: 'Stopping a terminal';
+			};
+			'update-app-settings': {
+				done: 'Updated app settings';
+				running: 'Updating app settings';
 			};
 			'update-architecture-diagram': {
 				done: 'Redrew the architecture diagram';
