@@ -250,7 +250,7 @@ Give one agent the task. It can investigate the shared ground once, split indepe
 briefs, and keep the decisions and final integration in the parent conversation. You can open each
 child's tab to see its work, rather than trusting a progress message from the parent.
 
-![An orchestrator reviewing the updates surface through four delegates, with their tabs above the conversation and the shared diff and running dev server beside it.](./docs/guide/images/09-subagents.png)
+![An orchestrator waiting for a manager and its two leaf agents, with their hierarchy, status, and context usage visible in the Agents panel.](./docs/guide/images/09-agents-panel.png)
 
 ### A manager can split its work too
 
