@@ -1,62 +1,112 @@
+import {
+	mkdir,
+	mkdtemp,
+	readdir,
+	readFile,
+	rm,
+	symlink,
+	writeFile,
+} from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
-import { createPlanFileWriter } from '../../src/main/plan-mode/plan-file-writer.ts';
+import {
+	createPlanFileWriter,
+	type WritePlanFileInput,
+} from '../../src/main/plan-mode/plan-file-writer.ts';
 
-const WORKSPACE_CWD = '/tmp/workspace';
 const CREATED_AT = new Date('2026-07-28T14:32:07.000Z');
 
 const INPUT = {
 	agentSessionId: 'sess-1',
 	plan: '# Steps\n\n1. Do the thing',
 	title: 'Add Plan Mode',
-	workspaceCwd: WORKSPACE_CWD,
 	workspaceId: 'ws-1',
 };
 
-const setup = (existingPaths: readonly string[] = []) => {
-	const written: { path: string; contents: string }[] = [];
-	const created: string[] = [];
-	const writer = createPlanFileWriter({
-		exists: (filePath) => Promise.resolve(existingPaths.includes(filePath)),
-		mkdir: (dirPath) => {
-			created.push(dirPath);
-			return Promise.resolve();
-		},
-		now: () => CREATED_AT,
-		writeFile: (filePath, contents) => {
-			written.push({ contents, path: filePath });
-			return Promise.resolve();
-		},
-	});
-	return { created, writer, written };
+const temporaryDirectories: string[] = [];
+
+const makeTemporaryDirectory = async (label: string) => {
+	const directory = await mkdtemp(path.join(tmpdir(), `ensemblr-${label}-`));
+	temporaryDirectories.push(directory);
+	return directory;
 };
 
+const makeInput = (
+	workspaceCwd: string,
+	overrides: Partial<WritePlanFileInput> = {},
+): WritePlanFileInput => ({ ...INPUT, workspaceCwd, ...overrides });
+
+const plansDirectory = (workspaceCwd: string) =>
+	path.join(workspaceCwd, '.context', 'plans');
+
+const createWriter = (now = CREATED_AT) =>
+	createPlanFileWriter({ now: () => now });
+
 /** Local-time stem the injected clock produces, so the test is timezone-proof. */
-const stem = () => {
+const stem = (date = CREATED_AT) => {
 	const pad = (value: number) => String(value).padStart(2, '0');
-	return `${CREATED_AT.getFullYear()}${pad(CREATED_AT.getMonth() + 1)}${pad(
-		CREATED_AT.getDate(),
-	)}-${pad(CREATED_AT.getHours())}${pad(CREATED_AT.getMinutes())}`;
+	return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(
+		date.getDate(),
+	)}-${pad(date.getHours())}${pad(date.getMinutes())}`;
 };
+
+const legacyPlan = ({
+	agentSessionId = INPUT.agentSessionId,
+	createdAt,
+	title,
+	workspaceId = INPUT.workspaceId,
+}: {
+	agentSessionId?: string;
+	createdAt: string;
+	title: string;
+	workspaceId?: string;
+}) => `---
+title: ${JSON.stringify(title)}
+agentSessionId: ${JSON.stringify(agentSessionId)}
+workspaceId: ${JSON.stringify(workspaceId)}
+createdAt: ${JSON.stringify(createdAt)}
+---
+
+# ${title}
+
+Old body
+`;
+
+afterEach(async () => {
+	await Promise.all(
+		temporaryDirectories
+			.splice(0)
+			.map((directory) => rm(directory, { force: true, recursive: true })),
+	);
+});
 
 describe('createPlanFileWriter', () => {
 	it('writes into .context/plans and returns a workspace-relative path', async () => {
-		const { created, writer, written } = setup();
-		const relativePath = await writer.writePlanFile(INPUT);
+		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+		const relativePath = await createWriter().writePlanFile(
+			makeInput(workspaceCwd),
+		);
 
-		expect(created).toEqual([path.join(WORKSPACE_CWD, '.context', 'plans')]);
 		expect(relativePath).toBe(
 			path.join('.context', 'plans', `${stem()}-add-plan-mode.md`),
 		);
-		expect(written).toHaveLength(1);
+		expect(await readdir(plansDirectory(workspaceCwd))).toEqual([
+			`${stem()}-add-plan-mode.md`,
+		]);
 	});
 
 	it('records identity in frontmatter and keeps the plan body', async () => {
-		const { writer, written } = setup();
-		await writer.writePlanFile(INPUT);
+		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+		const relativePath = await createWriter().writePlanFile(
+			makeInput(workspaceCwd),
+		);
+		const contents = await readFile(
+			path.join(workspaceCwd, relativePath),
+			'utf8',
+		);
 
-		const contents = written[0]?.contents ?? '';
 		expect(contents).toContain('title: "Add Plan Mode"');
 		expect(contents).toContain('agentSessionId: "sess-1"');
 		expect(contents).toContain('workspaceId: "ws-1"');
@@ -65,43 +115,303 @@ describe('createPlanFileWriter', () => {
 		expect(contents).toContain('1. Do the thing');
 	});
 
-	it('suffixes the filename rather than overwriting a colliding plan', async () => {
-		const directory = path.join(WORKSPACE_CWD, '.context', 'plans');
-		const { writer } = setup([
-			path.join(directory, `${stem()}-add-plan-mode.md`),
-			path.join(directory, `${stem()}-add-plan-mode-2.md`),
-		]);
-
-		expect(await writer.writePlanFile(INPUT)).toBe(
-			path.join('.context', 'plans', `${stem()}-add-plan-mode-3.md`),
+	it('reuses the original plan file after a restart and preserves its creation time', async () => {
+		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+		const originalPath = await createWriter().writePlanFile(
+			makeInput(workspaceCwd),
 		);
+		const refinedPath = await createWriter(
+			new Date('2026-07-29T09:15:00.000Z'),
+		).writePlanFile(
+			makeInput(workspaceCwd, {
+				plan: 'Refined steps',
+				title: 'A Better Title',
+			}),
+		);
+		const contents = await readFile(
+			path.join(workspaceCwd, originalPath),
+			'utf8',
+		);
+
+		expect(refinedPath).toBe(originalPath);
+		expect(await readdir(plansDirectory(workspaceCwd))).toEqual([
+			path.basename(originalPath),
+		]);
+		expect(contents).toContain(`createdAt: "${CREATED_AT.toISOString()}"`);
+		expect(contents).toContain('title: "A Better Title"');
+		expect(contents).toContain('Refined steps');
+		expect(contents).not.toContain('1. Do the thing');
+	});
+
+	it('serializes overlapping writes for the same plan identity', async () => {
+		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+		let releaseFirstWrite = () => {};
+		let markFirstWriteStarted = () => {};
+		const firstWriteBlocked = new Promise<void>((resolve) => {
+			releaseFirstWrite = resolve;
+		});
+		const firstWriteStarted = new Promise<void>((resolve) => {
+			markFirstWriteStarted = resolve;
+		});
+		let writeCount = 0;
+		const writer = createPlanFileWriter({
+			now: () => CREATED_AT,
+			writeFile: async (filePath, contents) => {
+				writeCount += 1;
+				if (writeCount === 1) {
+					markFirstWriteStarted();
+					await firstWriteBlocked;
+				}
+				await writeFile(filePath, contents, { encoding: 'utf8', flag: 'wx' });
+			},
+		});
+		const firstWrite = writer.writePlanFile(
+			makeInput(workspaceCwd, { plan: 'First plan' }),
+		);
+		await firstWriteStarted;
+		const secondWrite = writer.writePlanFile(
+			makeInput(workspaceCwd, { plan: 'Second plan' }),
+		);
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		releaseFirstWrite();
+
+		const [firstPath, secondPath] = await Promise.all([
+			firstWrite,
+			secondWrite,
+		]);
+		const entries = await readdir(plansDirectory(workspaceCwd));
+
+		expect(secondPath).toBe(firstPath);
+		expect(entries).toEqual([path.basename(firstPath)]);
+		expect(
+			await readFile(path.join(workspaceCwd, firstPath), 'utf8'),
+		).toContain('Second plan');
+	});
+
+	it('does not block writes for different plan identities', async () => {
+		const blockedWorkspace = await makeTemporaryDirectory(
+			'plan-writer-blocked',
+		);
+		const otherWorkspace = await makeTemporaryDirectory('plan-writer-other');
+		let releaseBlockedWrite = () => {};
+		let markBlockedWriteStarted = () => {};
+		const blockedWriteGate = new Promise<void>((resolve) => {
+			releaseBlockedWrite = resolve;
+		});
+		const blockedWriteStarted = new Promise<void>((resolve) => {
+			markBlockedWriteStarted = resolve;
+		});
+		const writer = createPlanFileWriter({
+			now: () => CREATED_AT,
+			writeFile: async (filePath, contents) => {
+				if (filePath.startsWith(plansDirectory(blockedWorkspace))) {
+					markBlockedWriteStarted();
+					await blockedWriteGate;
+				}
+				await writeFile(filePath, contents, { encoding: 'utf8', flag: 'wx' });
+			},
+		});
+		const blockedWrite = writer.writePlanFile(makeInput(blockedWorkspace));
+		await blockedWriteStarted;
+
+		const otherPath = await writer.writePlanFile(
+			makeInput(otherWorkspace, {
+				agentSessionId: 'sess-2',
+				workspaceId: 'ws-2',
+			}),
+		);
+		releaseBlockedWrite();
+		await blockedWrite;
+
+		expect(await readdir(plansDirectory(otherWorkspace))).toEqual([
+			path.basename(otherPath),
+		]);
+	});
+
+	it('continues a queued write after the preceding write fails', async () => {
+		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+		let releaseFailedWrite = () => {};
+		let markFailedWriteStarted = () => {};
+		const failedWriteGate = new Promise<void>((resolve) => {
+			releaseFailedWrite = resolve;
+		});
+		const failedWriteStarted = new Promise<void>((resolve) => {
+			markFailedWriteStarted = resolve;
+		});
+		let writeCount = 0;
+		const writer = createPlanFileWriter({
+			now: () => CREATED_AT,
+			writeFile: async (filePath, contents) => {
+				writeCount += 1;
+				if (writeCount === 1) {
+					markFailedWriteStarted();
+					await failedWriteGate;
+					throw new Error('disk full');
+				}
+				await writeFile(filePath, contents, { encoding: 'utf8', flag: 'wx' });
+			},
+		});
+		const failedWrite = writer.writePlanFile(makeInput(workspaceCwd));
+		await failedWriteStarted;
+		const queuedWrite = writer.writePlanFile(
+			makeInput(workspaceCwd, { plan: 'Recovered plan' }),
+		);
+		releaseFailedWrite();
+
+		await expect(failedWrite).rejects.toThrow('disk full');
+		const recoveredPath = await queuedWrite;
+
+		expect(
+			await readFile(path.join(workspaceCwd, recoveredPath), 'utf8'),
+		).toContain('Recovered plan');
+	});
+
+	it('suffixes the filename for a different conversation in the same minute', async () => {
+		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+		const writer = createWriter();
+		await writer.writePlanFile(makeInput(workspaceCwd));
+
+		expect(
+			await writer.writePlanFile(
+				makeInput(workspaceCwd, { agentSessionId: 'sess-2' }),
+			),
+		).toBe(path.join('.context', 'plans', `${stem()}-add-plan-mode-2.md`));
+	});
+
+	it('updates the earliest legacy duplicate and leaves later duplicates untouched', async () => {
+		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+		const directory = plansDirectory(workspaceCwd);
+		await mkdir(directory, { recursive: true });
+		const originalPath = path.join(directory, '20260728-1000-original.md');
+		const duplicatePath = path.join(directory, '20260728-1100-duplicate.md');
+		const duplicateContents = legacyPlan({
+			createdAt: '2026-07-28T11:00:00.000Z',
+			title: 'Duplicate',
+		});
+		await writeFile(
+			originalPath,
+			legacyPlan({
+				createdAt: '2026-07-28T10:00:00.000Z',
+				title: 'Original',
+			}),
+			'utf8',
+		);
+		await writeFile(duplicatePath, duplicateContents, 'utf8');
+
+		const relativePath = await createWriter().writePlanFile(
+			makeInput(workspaceCwd, { plan: 'Refined', title: 'Current title' }),
+		);
+
+		expect(relativePath).toBe(path.relative(workspaceCwd, originalPath));
+		expect(await readFile(originalPath, 'utf8')).toContain('Refined');
+		expect(await readFile(originalPath, 'utf8')).toContain(
+			'createdAt: "2026-07-28T10:00:00.000Z"',
+		);
+		expect(await readFile(duplicatePath, 'utf8')).toBe(duplicateContents);
+	});
+
+	it('selects the earliest plan across multiple read batches', async () => {
+		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+		const directory = plansDirectory(workspaceCwd);
+		await mkdir(directory, { recursive: true });
+		await Promise.all(
+			Array.from({ length: 17 }, (_, index) =>
+				writeFile(
+					path.join(directory, `plan-${String(index).padStart(2, '0')}.md`),
+					legacyPlan({
+						createdAt: new Date(
+							CREATED_AT.getTime() - index * 60_000,
+						).toISOString(),
+						title: `Plan ${index}`,
+					}),
+					'utf8',
+				),
+			),
+		);
+
+		const relativePath = await createWriter().writePlanFile(
+			makeInput(workspaceCwd, { plan: 'Refined across batches' }),
+		);
+
+		expect(relativePath).toBe(path.join('.context', 'plans', 'plan-16.md'));
+		expect(await readdir(directory)).toHaveLength(17);
+		expect(
+			await readFile(path.join(workspaceCwd, relativePath), 'utf8'),
+		).toContain('Refined across batches');
+	});
+
+	it('keeps the previous plan intact when a refinement write fails', async () => {
+		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+		const relativePath = await createWriter().writePlanFile(
+			makeInput(workspaceCwd),
+		);
+		const absolutePath = path.join(workspaceCwd, relativePath);
+		const originalContents = await readFile(absolutePath, 'utf8');
+		const failingWriter = createPlanFileWriter({
+			writeFile: () => Promise.reject(new Error('disk full')),
+		});
+
+		await expect(
+			failingWriter.writePlanFile(
+				makeInput(workspaceCwd, { plan: 'Unsaved refinement' }),
+			),
+		).rejects.toThrow('disk full');
+		expect(await readFile(absolutePath, 'utf8')).toBe(originalContents);
+	});
+
+	it('does not follow a colliding plan-file symlink', async () => {
+		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+		const victimDirectory = await makeTemporaryDirectory('plan-victim');
+		const victimPath = path.join(victimDirectory, 'victim.md');
+		await writeFile(victimPath, 'do not replace', 'utf8');
+		await mkdir(plansDirectory(workspaceCwd), { recursive: true });
+		await symlink(
+			victimPath,
+			path.join(plansDirectory(workspaceCwd), `${stem()}-add-plan-mode.md`),
+		);
+
+		expect(await createWriter().writePlanFile(makeInput(workspaceCwd))).toBe(
+			path.join('.context', 'plans', `${stem()}-add-plan-mode-2.md`),
+		);
+		expect(await readFile(victimPath, 'utf8')).toBe('do not replace');
+	});
+
+	it('rejects a plan directory redirected outside the workspace', async () => {
+		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+		const externalDirectory = await makeTemporaryDirectory('plan-external');
+		await symlink(externalDirectory, path.join(workspaceCwd, '.context'));
+
+		await expect(
+			createWriter().writePlanFile(makeInput(workspaceCwd)),
+		).rejects.toThrow('Plan directory must stay inside the workspace');
+		expect(await readdir(externalDirectory)).toEqual([]);
 	});
 
 	it('strips path separators out of a traversing title', async () => {
-		const { writer } = setup();
-		const relativePath = await writer.writePlanFile({
-			...INPUT,
-			title: '../../etc/passwd',
-		});
+		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+		const relativePath = await createWriter().writePlanFile(
+			makeInput(workspaceCwd, { title: '../../etc/passwd' }),
+		);
 
 		expect(relativePath.startsWith(path.join('.context', 'plans'))).toBe(true);
 		expect(relativePath).not.toContain('..');
 	});
 
 	it('falls back to a generic slug when the title has no usable characters', async () => {
-		const { writer } = setup();
+		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
 
-		expect(await writer.writePlanFile({ ...INPUT, title: '!!!' })).toBe(
-			path.join('.context', 'plans', `${stem()}-plan.md`),
-		);
+		expect(
+			await createWriter().writePlanFile(
+				makeInput(workspaceCwd, { title: '!!!' }),
+			),
+		).toBe(path.join('.context', 'plans', `${stem()}-plan.md`));
 	});
 
 	it('caps a very long title so the filename stays usable', async () => {
-		const { writer } = setup();
-		const relativePath = await writer.writePlanFile({
-			...INPUT,
-			title: 'a'.repeat(80),
-		});
+		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+		const relativePath = await createWriter().writePlanFile(
+			makeInput(workspaceCwd, { title: 'a'.repeat(80) }),
+		);
 
 		expect(path.basename(relativePath)).toBe(`${stem()}-${'a'.repeat(60)}.md`);
 	});

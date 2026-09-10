@@ -5,8 +5,9 @@
  * user answers where the agent asked rather than hunting for a dialog.
  *
  * A finished plan rides as the composer's own header instead of replacing it:
- * the agent has already stopped, the plan is the message right above, and
- * refining it means typing into that same composer.
+ * the agent has already stopped and the plan is the message right above. The
+ * composer stays disabled until a review action is chosen; Refine unlocks the
+ * same draft for the user's next planning prompt.
  */
 import { useCallback } from 'react';
 
@@ -89,7 +90,10 @@ export function ComposerSlot({
 	return (
 		<ComposerPanel
 			chatTabId={chatTabId}
-			composer={composer}
+			composer={{
+				...composer,
+				disabled: composer.disabled || plan.review !== null,
+			}}
 			repositoryId={workspace.projectId}
 			planReview={
 				plan.review ? (

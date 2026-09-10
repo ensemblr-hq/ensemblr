@@ -39,6 +39,7 @@ export const PASTE_ATTACHMENT_THRESHOLD = 5_000;
  * content-addressed store the moment it is attached, so every chip carries a
  * real path and re-attaching the same bytes costs nothing.
  * @param chatTabId - Chat tab the attachment list is scoped to
+ * @param disabled - Whether user attachment ingestion is locked
  * @param editorRef - Handle onto the draft the chips are inserted into
  * @param insertPlainText - Fallback for a long paste whose write failed
  * @param workspaceCwd - Absolute workspace path pasted files are saved under
@@ -46,16 +47,19 @@ export const PASTE_ATTACHMENT_THRESHOLD = 5_000;
  */
 export function useComposerAttachments({
 	chatTabId,
+	disabled,
 	editorRef,
 	insertPlainText,
 	workspaceCwd,
 }: {
 	chatTabId: string;
+	disabled: boolean;
 	editorRef: RefObject<ComposerEditorHandle | null>;
 	insertPlainText: (text: string) => void;
 	workspaceCwd: string;
 }) {
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
+	const filePickerAllowedRef = useRef(false);
 	const attachments = useAtomValue(composerAttachmentsAtomFamily(chatTabId));
 	const [attachmentError, setAttachmentError] = useState<string | null>(null);
 	const autoConvertLong = useAtomValue(autoConvertLongTextAtom);
@@ -116,10 +120,13 @@ export function useComposerAttachments({
 	 * Claims a pasted payload the editor should not inline: any file, and a
 	 * paste long enough to bury the draft.
 	 * @param data - The clipboard payload
-	 * @returns True when the paste was taken over as an attachment
+	 * @returns True when the paste was consumed or refused while locked.
 	 */
 	const consumePastedTransfer = useCallback(
 		(data: DataTransfer): boolean => {
+			if (disabled) {
+				return true;
+			}
 			const files = getTransferFiles(data);
 			if (files.length > 0) {
 				void handlePastedFiles(files);
@@ -135,16 +142,19 @@ export function useComposerAttachments({
 			void handlePastedText(text);
 			return true;
 		},
-		[autoConvertLong, handlePastedFiles, handlePastedText],
+		[autoConvertLong, disabled, handlePastedFiles, handlePastedText],
 	);
 
 	/**
 	 * Claims files dropped onto the composer, saving them like a paste.
 	 * @param data - The drag payload
-	 * @returns True when the drop carried files and was taken over
+	 * @returns True when the drop was consumed or refused while locked.
 	 */
 	const consumeDroppedTransfer = useCallback(
 		(data: DataTransfer): boolean => {
+			if (disabled) {
+				return true;
+			}
 			const files = getTransferFiles(data);
 			if (files.length === 0) {
 				return false;
@@ -152,7 +162,7 @@ export function useComposerAttachments({
 			void handlePastedFiles(files);
 			return true;
 		},
-		[handlePastedFiles],
+		[disabled, handlePastedFiles],
 	);
 
 	const handleDrop = useCallback(
@@ -164,22 +174,35 @@ export function useComposerAttachments({
 		[consumeDroppedTransfer],
 	);
 
-	/** Signals the composer as a valid drop target so `handleDrop` can fire. */
-	const handleDragOver = useCallback((event: ReactDragEvent<HTMLElement>) => {
-		if (Array.from(event.dataTransfer.types).includes('Files')) {
-			event.preventDefault();
-		}
-	}, []);
+	/**
+	 * Captures file drops, including locked drops that must not navigate the app.
+	 * @param event - Drag event over the composer card.
+	 */
+	const handleDragOver = useCallback(
+		(event: ReactDragEvent<HTMLElement>) => {
+			if (disabled || Array.from(event.dataTransfer.types).includes('Files')) {
+				event.preventDefault();
+			}
+		},
+		[disabled],
+	);
 
+	/**
+	 * Accepts a picker selection only when enabled or opened before the lock.
+	 * @param event - Completed file-picker selection.
+	 */
 	const handleFileChange = useCallback(
 		(event: ChangeEvent<HTMLInputElement>) => {
-			const files = event.target.files ? [...event.target.files] : [];
+			const canIngestSelection = !disabled || filePickerAllowedRef.current;
+			filePickerAllowedRef.current = false;
+			const files =
+				canIngestSelection && event.target.files ? [...event.target.files] : [];
 			if (files.length > 0) {
 				void handlePastedFiles(files);
 			}
 			event.target.value = '';
 		},
-		[handlePastedFiles],
+		[disabled, handlePastedFiles],
 	);
 
 	const removeAttachment = useCallback(
@@ -197,9 +220,16 @@ export function useComposerAttachments({
 		consumeDroppedTransfer,
 		consumePastedTransfer,
 		fileInputRef,
+		/** Opens the picker only while enabled, preserving that pending selection. */
 		handleAddAttachment: useCallback(() => {
-			fileInputRef.current?.click();
-		}, []),
+			const input = fileInputRef.current;
+			filePickerAllowedRef.current = false;
+			if (disabled || !input) {
+				return;
+			}
+			filePickerAllowedRef.current = true;
+			input.click();
+		}, [disabled]),
 		handleDragOver,
 		handleDrop,
 		handleFileChange,
