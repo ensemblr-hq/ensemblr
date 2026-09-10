@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+	appSettingsControlPatchSchema,
 	appSettingsPatchSchema,
 	DEFAULT_APP_SETTINGS,
 	mergeAppSettings,
@@ -302,6 +303,55 @@ describe('mergeAppSettings', () => {
 		});
 		expect(next.onboarding.completedAt).toBe('2026-08-09T10:00:00.000Z');
 		expect(DEFAULT_APP_SETTINGS.onboarding.completedAt).toBeNull();
+	});
+});
+
+describe('appSettingsControlPatchSchema', () => {
+	test('accepts and preserves every allowed preference field', () => {
+		const { onboarding: _onboarding, ...projection } = DEFAULT_APP_SETTINGS;
+		const parsed = appSettingsControlPatchSchema.safeParse(projection);
+
+		expect(parsed.success).toBe(true);
+		if (parsed.success) {
+			expect(parsed.data).toEqual(projection);
+		}
+	});
+
+	test('accepts only editable sections and rejects unknown or invalid values', () => {
+		expect(
+			appSettingsControlPatchSchema.safeParse({
+				general: { sendShortcut: 'mod+enter' },
+				appearance: { terminalFontSize: 18 },
+			}).success,
+		).toBe(true);
+		expect(
+			appSettingsControlPatchSchema.safeParse({
+				onboarding: { completedAt: null },
+			}).success,
+		).toBe(false);
+		expect(
+			appSettingsControlPatchSchema.safeParse({ general: { unknown: true } })
+				.success,
+		).toBe(false);
+		expect(
+			appSettingsControlPatchSchema.safeParse({
+				general: { sendShortcut: 'invalid' },
+			}).success,
+		).toBe(false);
+		expect(
+			appSettingsControlPatchSchema.safeParse({
+				appearance: { terminalFontSize: 99 },
+			}).success,
+		).toBe(false);
+		expect(
+			appSettingsControlPatchSchema.safeParse({
+				models: {
+					roleAssignments: [
+						{ modelId: 'm', roles: ['coder'], runtime: 'pi', secret: true },
+					],
+				},
+			}).success,
+		).toBe(false);
 	});
 });
 

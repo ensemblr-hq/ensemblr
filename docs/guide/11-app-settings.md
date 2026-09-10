@@ -12,6 +12,28 @@ Switch between them with the scope toggle at the top of the settings window.
 
 ---
 
+## Ask the Concierge
+
+The Concierge can read and change app preferences directly: General, Models,
+Providers' delegation preference, app-wide Git defaults, Appearance, non-secret
+Dictation configuration, its own model and context-clear preferences, and
+Experimental switches. For example: “Use the dark theme” or “What is my default
+review model?” It reads the current preferences before answering or changing
+anything, and follows the app's existing permission policy for writes.
+
+It also knows what the settings it **cannot access** do and where to find them:
+Environment, all Repo panes, root-directory changes in General, executable paths
+in Providers, credentials and account connections in Integrations, and diagnostics
+or onboarding actions in Diagnostics. For these, it explains the purpose and
+location—not their current values—and does not make the change. Shortcuts is a
+read-only reference, not a rebinding interface.
+
+A successful preference change updates the settings UI and live consumers. Some
+preferences apply to new sessions or later turns; Linux title-bar changes require
+a relaunch. Changing an app default does not remove a repository override. The
+Concierge's instructions explain these distinctions without keeping stale
+snapshots of your settings in its memory.
+
 ## Where app settings live
 
 App settings are stored in `~/.config/ensemblr/config.json`. That file is the
@@ -204,8 +226,8 @@ it may do. Everything about the runtime it opens on is stored under
 
 The first three are what the two Concierge controls in the Models pane above
 write; `provider` follows from the model you pick rather than being chosen
-separately. **`autoClearAtPercent` has no control at all** — it is edited in
-`config.json` and picked up without a restart, like every other key in the file.
+separately. **`autoClearAtPercent` has no settings-pane control** — ask the Concierge to
+change it, or edit it in `config.json`; it is picked up without a restart.
 
 It is a **fraction between 0 and 1**, not a percentage, despite the name: `0.8`
 means 80% of the window. Anything outside that range is rejected and the default

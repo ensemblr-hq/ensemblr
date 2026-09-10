@@ -8,6 +8,7 @@
 import { afkModeControlOpDenial } from '../../shared/afk-mode.ts';
 import type {
 	AddDiffCommentsArgs,
+	AgentControlAppSettings,
 	AgentControlConversationStatus,
 	AgentControlErrorCode,
 	AgentControlModelInfo,
@@ -69,6 +70,7 @@ import type {
 	StartReviewResult,
 	StartTerminalArgs,
 	StopTerminalArgs,
+	UpdateAppSettingsArgs,
 	UpdateArchitectureDiagramArgs,
 	WaitedAgent,
 	WaitForAgentsArgs,
@@ -89,6 +91,7 @@ import {
 	buildPlanModeDelegationDirective,
 	buildReviewPeerDirective,
 	buildSessionBriefNudge,
+	CONCIERGE_ONLY_OPS,
 	conciergeAwareness,
 	conciergeControlOpDenial,
 	delegateContextPressureNote,
@@ -108,7 +111,10 @@ import {
 	type AgentProviderId,
 	getAgentProviderLabel,
 } from '../../shared/agent-provider.ts';
-import { classifyPermissionAction } from '../../shared/permissions.ts';
+import {
+	classifyPermissionAction,
+	type PermissionActionKind,
+} from '../../shared/permissions.ts';
 import {
 	evaluateConciergeTool,
 	evaluatePlanModeTool,
@@ -1033,6 +1039,12 @@ export function createAgentControlService({
 		op: AgentControlOp,
 		origin: AgentControlOrigin,
 	): Promise<AgentControlResult<never> | null> => {
+		if (CONCIERGE_ONLY_OPS.has(op) && !origin.concierge) {
+			return fail(
+				'denied-scope',
+				'This app-control operation is available only to the active Concierge.',
+			);
+		}
 		if (origin.concierge) {
 			// Ahead of the Concierge list rather than folded into it: retirement is
 			// a state the same origin passes through, and it withdraws ops the
@@ -1097,7 +1109,12 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 		signal: AbortSignal | undefined,
 	): Promise<AgentControlResult<never> | null> => {
-		const action = isWriteOp(op) ? 'app-control-write' : 'app-control-read';
+		let action: PermissionActionKind = 'app-control-read';
+		if (op === 'updateAppSettings') {
+			action = 'app-settings-change';
+		} else if (isWriteOp(op)) {
+			action = 'app-control-write';
+		}
 		const mode = ports.permissions.getMode();
 		const boundary = classifyPermissionAction({ action, mode }).boundary;
 		if (boundary === 'blocked') {
@@ -1998,6 +2015,33 @@ export function createAgentControlService({
 		} finally {
 			reserved();
 		}
+	};
+
+	/**
+	 * Reads the editable app-preference projection for the active Concierge.
+	 * @returns The settings projection.
+	 */
+	const handleGetAppSettings = (): AgentControlResult<unknown> =>
+		ok(ports.appSettings.get() satisfies AgentControlAppSettings);
+
+	/**
+	 * Applies a validated partial app-preference patch after rechecking Concierge liveness.
+	 * @param origin - Resolved caller identity.
+	 * @param args - Validated preference patch.
+	 * @returns The updated settings projection, or a scope failure when the caller retired.
+	 */
+	const handleUpdateAppSettings = (
+		origin: AgentControlOrigin,
+		args: UpdateAppSettingsArgs,
+	): AgentControlResult<unknown> => {
+		const liveOrigin = originRegistry.resolveByToken(origin.token);
+		if (!liveOrigin || liveOrigin.retired) {
+			return fail(
+				'denied-scope',
+				'This Concierge session is no longer active and may not update app settings.',
+			);
+		}
+		return ok(ports.appSettings.update(args) satisfies AgentControlAppSettings);
 	};
 
 	/**
@@ -3348,6 +3392,9 @@ export function createAgentControlService({
 	const opHandlers: Record<AgentControlOp, OpHandler> = {
 		addDiffComments: ({ args, origin }) =>
 			handleAddDiffComments(origin, args as AddDiffCommentsArgs),
+		getAppSettings: () => handleGetAppSettings(),
+		updateAppSettings: ({ args, origin }) =>
+			handleUpdateAppSettings(origin, args as UpdateAppSettingsArgs),
 		askUserQuestion: ({ args, origin, signal }) =>
 			handleAskUserQuestion(origin, args as AskUserQuestionArgs, signal),
 		checkPlanModeTool: ({ args, origin }) =>
@@ -3578,6 +3625,7 @@ export function createAgentControlService({
 			architectureDiagram,
 			delegation: origin.delegation,
 			hasChatTab: originHasChatTab(origin),
+			retired: origin.retired,
 			role: await resolveRole(origin),
 			tuiHarnesses,
 		};

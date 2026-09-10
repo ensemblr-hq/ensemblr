@@ -175,10 +175,18 @@ const topLevelKeys = (body: string): readonly string[] => {
  * @param rest - Extension source starting at the comma before the schema argument.
  * @returns The schema's top-level keys.
  */
-const parseParamKeys = (rest: string): readonly string[] => {
+const parseParamKeys = (rest: string, source: string): readonly string[] => {
 	const head = rest.replace(/^\s*,\s*/, '');
 	if (head.startsWith('empty')) {
 		return [];
+	}
+	if (head.startsWith('appSettingsPatch')) {
+		const declaration = 'const appSettingsPatch = Type.Object({';
+		const start = source.indexOf(declaration);
+		if (start < 0) {
+			throw new Error('Missing appSettingsPatch declaration');
+		}
+		return topLevelKeys(source.slice(start + declaration.length));
 	}
 	if (!head.startsWith(TYPEBOX_OBJECT_OPEN)) {
 		throw new Error(`Unrecognized parameter schema: ${head.slice(0, 40)}`);
@@ -197,7 +205,7 @@ export const extractEmbeddedToolParamKeys = (
 	const byName = new Map<string, readonly string[]>();
 	for (const match of source.matchAll(EXTENSION_TOOL_PATTERN)) {
 		const rest = source.slice((match.index ?? 0) + match[0].length);
-		byName.set(match[2], parseParamKeys(rest));
+		byName.set(match[2], parseParamKeys(rest, source));
 	}
 	for (const match of source.matchAll(
 		/name: '(ensemblr_[a-z_0-9]+)',[\s\S]*?parameters: Type\.Object\(\{/g,

@@ -32,6 +32,7 @@ import {
 	withheldControlOps,
 } from '../../src/shared/agent-control.ts';
 import { formatConciergeReferenceHref } from '../../src/shared/concierge-references.ts';
+import { DEFAULT_APP_SETTINGS } from '../../src/shared/config.ts';
 import {
 	CONCIERGE_GUARDED_TOOLS,
 	PLAN_MODE_GUARDED_TOOLS,
@@ -1223,6 +1224,44 @@ describe('sub-agent role policy', () => {
 });
 
 describe('Concierge role policy', () => {
+	it('teaches live preference access and awareness-only settings without delegating', () => {
+		for (const clause of [
+			'App-preference requests are yours to handle directly',
+			'ensemblr_get_app_settings',
+			'ensemblr_update_app_settings',
+			'before answering a current-settings question or applying a change',
+			'Do not read their current values',
+			'Settings > General',
+			'Settings > Providers',
+			'Settings > Environment',
+			'Settings > Integrations',
+			'Settings > Diagnostics',
+			'Settings > Shortcuts',
+			'Settings > Repo',
+		]) {
+			expect(CONCIERGE_AWARENESS).toContain(clause);
+		}
+	});
+
+	it('describes every editable preference even when features are disabled', () => {
+		const { onboarding: _onboarding, ...preferences } = DEFAULT_APP_SETTINGS;
+		for (const features of FEATURE_CORNERS) {
+			const guidance = conciergeAwareness(features);
+			for (const [section, settings] of Object.entries(preferences)) {
+				expect(guidance).toContain(`\`${section}\``);
+				for (const field of Object.keys(settings)) {
+					expect(guidance).toContain(`\`${field}\``);
+				}
+			}
+		}
+	});
+
+	it('mirrors the Concierge-only op set in Pi discovery', () => {
+		expect(
+			extractEmbeddedStringSet(readExtensionSource(), 'CONCIERGE_ONLY_OPS'),
+		).toEqual([...CONCIERGE_ONLY_OPS].sort());
+	});
+
 	it('embeds the same withheld-op set the app enforces', () => {
 		expect(
 			extractEmbeddedStringSet(readExtensionSource(), 'CONCIERGE_WITHHELD_OPS'),
@@ -1566,8 +1605,9 @@ describe('the third-party CLI harness feature switch', () => {
 	// The harness variant is exempt and stays in the op assertion above: it is
 	// served only to a caller that is itself a harness, so telling one what it is
 	// describes something that demonstrably exists. Everything an agent with a
-	// chat tab reads must be silent on the subject.
-	it('mentions a harness nowhere a non-harness would read it while off', () => {
+	// workspace chat tab reads must be silent on the subject. The Concierge's
+	// settings guide must still explain the disabled switch without offering tools.
+	it('omits harness prose from workspace playbooks while off', () => {
 		const [orchestrator, native, subagent, , planOrchestrator, planSubagent] =
 			AWARENESS_WITHOUT_HARNESSES;
 		const playbooks = [
@@ -1576,7 +1616,6 @@ describe('the third-party CLI harness feature switch', () => {
 			subagent,
 			planOrchestrator,
 			planSubagent,
-			conciergeAwareness({ ...ALL_ON, tuiHarnesses: false }),
 		];
 		const sparkModelGuidance =
 			'Codex Spark has a separate, limited usage allowance: when selecting an OpenAI Codex model for a child, prefer Luna or Terra over Spark; if you are currently on Spark, name a returned Luna or Terra id rather than inheriting Spark. Use Spark only when the user explicitly asks for it.';

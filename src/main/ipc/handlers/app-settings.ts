@@ -12,8 +12,8 @@ import { openInEditor } from '../../config/open-in-editor.ts';
 /** Service dependencies for the app-settings IPC handlers. */
 interface AppSettingsHandlersOptions {
 	appSettingsService: AppSettingsService;
-	/** Invoked after a successful write so main-process side-effects re-read. */
-	onAppSettingsUpdated?: () => void;
+	/** Invoked after a successful write so renderer and main-process consumers refresh. */
+	onAppSettingsUpdated?: (settings: AppSettings) => void;
 }
 
 /**
@@ -36,7 +36,7 @@ export function registerAppSettingsHandlers({
 			const settings = appSettingsService.update(
 				appSettingsPatchSchema.parse(raw),
 			);
-			onAppSettingsUpdated?.();
+			onAppSettingsUpdated?.(settings);
 			return settings;
 		},
 	);

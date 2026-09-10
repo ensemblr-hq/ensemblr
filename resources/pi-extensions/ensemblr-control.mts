@@ -522,10 +522,21 @@ const CONCIERGE_WITHHELD_OPS = new Set([
 ]);
 
 /**
+ * Ops withheld from every workspace caller because they belong only to the
+ * active Concierge. Mirrors `CONCIERGE_ONLY_OPS` in the shared policy.
+ */
+const CONCIERGE_ONLY_OPS = new Set([
+	'focusWorkspace',
+	'createWorkspace',
+	'listProjects',
+	'recallMemory',
+	'getAppSettings',
+	'updateAppSettings',
+]);
+
+/**
  * The two ops the architecture diagram feature owns. Registered only when the
- * feature is on, whatever the role. MUST hold the same members as
- * `ARCHITECTURE_DIAGRAM_OPS` in `src/shared/agent-control/subagent-policy.ts`
- * (this file cannot import from `src/` at runtime); a parity test enforces it.
+ * feature is on, whatever the role. Mirrors the shared policy.
  */
 const ARCHITECTURE_DIAGRAM_OPS = new Set([
 	'getArchitectureDiagram',
@@ -555,6 +566,9 @@ const registersOp = (op: string): boolean => {
 		return false;
 	}
 	if (!TUI_HARNESSES_ON && TUI_HARNESS_OPS.has(op)) {
+		return false;
+	}
+	if (!IS_CONCIERGE && CONCIERGE_ONLY_OPS.has(op)) {
 		return false;
 	}
 	return IS_CONCIERGE
@@ -1067,6 +1081,186 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	};
 
 	const empty = Type.Object({});
+	const appSettingsPatch = Type.Object({
+		general: Type.Optional(
+			Type.Object({
+				sendShortcut: Type.Optional(
+					Type.Union([Type.Literal('enter'), Type.Literal('mod+enter')]),
+				),
+				followUpBehavior: Type.Optional(
+					Type.Union([
+						Type.Literal('steer'),
+						Type.Literal('queue'),
+						Type.Literal('block'),
+					]),
+				),
+				language: Type.Optional(
+					Type.Union([
+						Type.Literal('system'),
+						Type.Literal('en'),
+						Type.Literal('ru'),
+						Type.Literal('el'),
+					]),
+				),
+				desktopNotifications: Type.Optional(Type.Boolean()),
+				notificationSound: Type.Optional(Type.Boolean()),
+				autoConvertLongText: Type.Optional(Type.Boolean()),
+				alwaysShowContextUsage: Type.Optional(Type.Boolean()),
+				caffeinateWhileRunning: Type.Optional(Type.Boolean()),
+				automaticUpdates: Type.Optional(Type.Boolean()),
+				toolCallCollapse: Type.Optional(
+					Type.Union([Type.Literal('collapsed'), Type.Literal('expanded')]),
+				),
+			}),
+		),
+		models: Type.Optional(
+			Type.Object({
+				defaultModel: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+				defaultThinkingLevel: Type.Optional(
+					Type.Union([Type.String(), Type.Null()]),
+				),
+				reviewModel: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+				reviewThinkingLevel: Type.Optional(
+					Type.Union([Type.String(), Type.Null()]),
+				),
+				hiddenModels: Type.Optional(Type.Array(Type.String())),
+				allowCrossRuntimeDelegation: Type.Optional(Type.Boolean()),
+				roleAssignments: Type.Optional(
+					Type.Array(
+						Type.Object({
+							modelId: Type.String({
+								description: 'Non-empty model id.',
+								minLength: 1,
+							}),
+							roles: Type.Array(
+								Type.Union([
+									Type.Literal('sage'),
+									Type.Literal('coder'),
+									Type.Literal('builder'),
+									Type.Literal('grunt'),
+									Type.Literal('explorer'),
+								]),
+							),
+							runtime: Type.Union([Type.Literal('pi'), Type.Literal('claude')]),
+						}),
+					),
+				),
+			}),
+		),
+		providers: Type.Optional(
+			Type.Object({
+				claudeSubagentMode: Type.Optional(
+					Type.Union([Type.Literal('ensemblr'), Type.Literal('native')]),
+				),
+			}),
+		),
+		git: Type.Optional(
+			Type.Object({
+				branchPrefixSource: Type.Optional(
+					Type.Union([
+						Type.Literal('github-username'),
+						Type.Literal('custom'),
+						Type.Literal('none'),
+					]),
+				),
+				branchPrefixCustom: Type.Optional(Type.String()),
+				renameWorkspaceOnBranch: Type.Optional(Type.Boolean()),
+				deleteLocalBranchOnArchive: Type.Optional(Type.Boolean()),
+				archiveAfterMerge: Type.Optional(Type.Boolean()),
+				setUpstreamOnPush: Type.Optional(Type.Boolean()),
+				coAuthorEnsemblr: Type.Optional(Type.Boolean()),
+			}),
+		),
+		appearance: Type.Optional(
+			Type.Object({
+				theme: Type.Optional(
+					Type.Union([
+						Type.Literal('system'),
+						Type.Literal('light'),
+						Type.Literal('dark'),
+					]),
+				),
+				accessibleColors: Type.Optional(
+					Type.Union([
+						Type.Literal('default'),
+						Type.Literal('protanopia'),
+						Type.Literal('deuteranopia'),
+						Type.Literal('tritanopia'),
+					]),
+				),
+				codeTheme: Type.Optional(
+					Type.Union([
+						Type.Literal('catppuccin-mocha'),
+						Type.Literal('catppuccin-latte'),
+						Type.Literal('github-dark'),
+						Type.Literal('github-light'),
+						Type.Literal('one-dark-pro'),
+						Type.Literal('solarized-dark'),
+					]),
+				),
+				monoFont: Type.Optional(Type.String()),
+				codeLigatures: Type.Optional(Type.Boolean()),
+				markdownStyle: Type.Optional(
+					Type.Union([
+						Type.Literal('default'),
+						Type.Literal('compact'),
+						Type.Literal('prose'),
+					]),
+				),
+				titleBar: Type.Optional(
+					Type.Union([Type.Literal('custom'), Type.Literal('system')]),
+				),
+				terminalFont: Type.Optional(Type.String()),
+				terminalFontSize: Type.Optional(
+					Type.Number({ minimum: 8, maximum: 24, multipleOf: 1 }),
+				),
+				terminalScrollbackMb: Type.Optional(
+					Type.Number({ minimum: 1, maximum: 200, multipleOf: 1 }),
+				),
+			}),
+		),
+		dictation: Type.Optional(
+			Type.Object({
+				enabled: Type.Optional(Type.Boolean()),
+				baseUrl: Type.Optional(Type.String()),
+				model: Type.Optional(Type.String()),
+				language: Type.Optional(Type.Literal('en')),
+			}),
+		),
+		concierge: Type.Optional(
+			Type.Object({
+				provider: Type.Optional(
+					Type.Union([Type.Literal('pi'), Type.Literal('claude')]),
+				),
+				model: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+				thinkingLevel: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+				autoClearAtPercent: Type.Optional(
+					Type.Number({ minimum: 0, maximum: 1 }),
+				),
+			}),
+		),
+		experimental: Type.Optional(
+			Type.Object({
+				architectureDiagram: Type.Optional(Type.Boolean()),
+				autoRunAfterSetup: Type.Optional(Type.Boolean()),
+				developerMode: Type.Optional(Type.Boolean()),
+				tuiHarnesses: Type.Optional(Type.Boolean()),
+			}),
+		),
+	});
+
+	tool(
+		'ensemblr_get_app_settings',
+		'getAppSettings',
+		'Concierge-only. Read current saved app preferences before answering a current-settings question or making a change: general, models, providers, git, appearance, dictation, concierge, experimental. These are app defaults, not resolved repository settings. Excludes onboarding, environment, repository settings, credentials, executable overrides, root paths and account/system actions; explain their purpose and Settings location without retrieving their values.',
+		empty,
+	);
+	tool(
+		'ensemblr_update_app_settings',
+		'updateAppSettings',
+		'Concierge-only. Apply a partial app-preference patch directly as section objects (no app or patch wrapper) and return saved preferences. Call ensemblr_get_app_settings first. Unknown/excluded keys and invalid values reject the whole patch; omitted fields stay unchanged, arrays are replaced. Uses existing write permissions. Environment, repository settings, onboarding and account/system actions are excluded. Dictation preferences exclude its API key. Runtime/delegation changes may require a new session; Linux title-bar changes need relaunch.',
+		appSettingsPatch,
+	);
 
 	tool(
 		'ensemblr_spawn_chat_tab',

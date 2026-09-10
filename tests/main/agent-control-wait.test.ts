@@ -12,6 +12,7 @@ import type {
 	AgentControlConversationStatus,
 	WaitForAgentsResult,
 } from '../../src/shared/agent-control.ts';
+import { DEFAULT_APP_SETTINGS } from '../../src/shared/config.ts';
 
 /**
  * A deterministic scheduler: `sleep` advances a virtual clock so the wait loop's
@@ -37,6 +38,10 @@ const makePorts = (
 	lastMessage: (agentSessionId: string) => string = (id) => `msg:${id}`,
 	contextUsage: Map<string, AgentControlContextUsage> = new Map(),
 ): AgentControlPorts => ({
+	appSettings: {
+		get: () => DEFAULT_APP_SETTINGS,
+		update: () => DEFAULT_APP_SETTINGS,
+	},
 	workspaces: {
 		listProjects: vi.fn().mockResolvedValue([]),
 		listWorkspaces: vi.fn().mockResolvedValue([]),

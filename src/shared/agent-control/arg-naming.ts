@@ -22,6 +22,15 @@ import type { AgentControlOp } from './contracts.ts';
 export const CANONICAL_ARG_KEYS = {
 	accountId:
 		'Identifier of one connected tracker account. Several can be connected at once, and an id from one is never valid in another.',
+	appearance: 'Appearance preference section.',
+	accessibleColors: 'Color-vision palette preference.',
+	architectureDiagram: 'Whether architecture-diagram operations are enabled.',
+	autoClearAtPercent: 'Concierge context-clear threshold from 0 to 1.',
+	autoConvertLongText: 'Whether long composer text is converted automatically.',
+	autoRunAfterSetup:
+		'Whether setup completion starts the configured run script.',
+	automaticUpdates: 'Whether Ensemblr checks, downloads, and installs updates.',
+	allowCrossRuntimeDelegation: 'Whether delegation across runtimes is allowed.',
 	afkMode:
 		'Open a conversation unattended, because the user has said they are away.',
 	agentSessionId: 'Identifier of an agent conversation.',
@@ -40,6 +49,8 @@ export const CANONICAL_ARG_KEYS = {
 	filePath:
 		'Workspace-relative path of a file, e.g. src/main/main.ts. Never `file` or `path`.',
 	fromOrdinal: 'Inclusive lower bound when paging a transcript.',
+	general: 'General app-preference section.',
+	git: 'Git preference section.',
 	harnessId: 'Identifier of a third-party agent harness.',
 	input: 'Raw text written into a terminal, keystrokes included.',
 	issueId: 'Identifier of a tracker issue, or its human key such as ENG-106.',
@@ -47,9 +58,31 @@ export const CANONICAL_ARG_KEYS = {
 	labelIds: 'Identifiers of the labels a tracker issue carries.',
 	limit: 'Upper bound on how many results a listing returns.',
 	message: 'Prose addressed to a human or to the orchestrator.',
+	followUpBehavior: 'Whether follow-up prompts steer, queue, or block.',
+	hiddenModels: 'Model ids hidden from spawn choices.',
+	alwaysShowContextUsage: 'Whether context usage stays visible in the UI.',
+	archiveAfterMerge: 'Whether merged workspaces are archived automatically.',
+	language: 'App or dictation language preference.',
+	markdownStyle: 'Markdown rendering style.',
+	models: 'Model preference section.',
+	monoFont: 'Code and markdown monospace font family.',
 	mode: 'How an op behaves across several targets.',
 	model: 'Identifier of the agent model a conversation runs on.',
 	baseBranch: 'Branch a new workspace measures its diff against.',
+	baseUrl: 'Non-secret OpenAI-compatible dictation API root.',
+	branchPrefixCustom: 'Custom app-level git branch prefix.',
+	branchPrefixSource: 'Source for the app-level git branch prefix.',
+	caffeinateWhileRunning: 'Whether Ensemblr prevents sleep while agents run.',
+	codeLigatures: 'Whether code font ligatures are enabled.',
+	codeTheme: 'Code-block theme family.',
+	concierge: 'Concierge runtime preference section.',
+	defaultModel: 'Default model id for new conversations.',
+	defaultThinkingLevel: 'Default thinking level for new conversations.',
+	desktopNotifications: 'Whether desktop notifications are enabled.',
+	deleteLocalBranchOnArchive: 'Whether archiving deletes the local branch.',
+	developerMode: 'Whether experimental developer features are enabled.',
+	dictation: 'Non-secret dictation preference section.',
+	experimental: 'Experimental preference section.',
 	name: 'Identity of a durable, addressable thing — the workspace and its git branch, a run script. Never the label of a tab or an artifact; that is `title`.',
 	ordinal: 'Position of a single transcript entry.',
 	panel: 'Which review panel to bring forward.',
@@ -61,6 +94,11 @@ export const CANONICAL_ARG_KEYS = {
 	prNumber: 'Number of the pull request a tab is opened on.',
 	priority: "Urgency rank of a tracker issue, on the tracker's own scale.",
 	projectId: 'Identifier of a tracked git repository.',
+	provider: 'Runtime provider selected for the Concierge.',
+	providers: 'Per-runtime provider preference section.',
+	claudeSubagentMode: 'Delegation mechanism used by Claude Code.',
+	roleAssignments: 'Model assignments for named agent roles.',
+	roles: 'Agent roles served by a model assignment.',
 	prompt: 'Text submitted to a conversation as a turn.',
 	query: 'Free-text search narrowing a listing.',
 	questions: 'Batch of multiple-choice questions put to the user.',
@@ -71,11 +109,26 @@ export const CANONICAL_ARG_KEYS = {
 	scriptName: 'Name of a run script the repository configures.',
 	stat: 'Return counts and totals only, with no body text.',
 	stateId: 'Identifier of the workflow state a tracker issue sits in.',
+	terminalFont: 'Terminal font family.',
+	terminalFontSize: 'Terminal font size, from 8 to 24.',
+	terminalScrollbackMb: 'Terminal scrollback size in megabytes, from 1 to 200.',
+	titleBar: 'Linux title-bar style.',
+	toolCallCollapse: 'Whether tool-call rows start collapsed or expanded.',
+	tuiHarnesses: 'Whether third-party CLI harnesses are enabled.',
+	coAuthorEnsemblr: 'Whether commits include Ensemblr as co-author.',
 	status: 'Kanban board status of a workspace.',
 	summary: 'Markdown record of what a session covered.',
 	targets: 'Conversations an op acts on.',
+	theme: 'App theme: system, light, or dark.',
 	teamId: 'Identifier of a tracker team.',
 	terminalId: 'Identifier of a terminal.',
+	notificationSound: 'Whether desktop notification sounds are enabled.',
+	renameWorkspaceOnBranch: 'Whether a workspace follows branch renames.',
+	reviewModel: 'Default model id for code review conversations.',
+	reviewThinkingLevel: 'Default thinking level for code review conversations.',
+	runtime: 'Runtime assigned to a model role entry.',
+	sendShortcut: 'Keyboard shortcut for sending composer text.',
+	setUpstreamOnPush: 'Whether pushes set the remote upstream automatically.',
 	thinkingLevel:
 		'Reasoning budget a conversation runs at, from the ladder its own model publishes. Chosen per child rather than inherited.',
 	timeoutMs: 'Upper bound on a blocking call, in milliseconds.',
@@ -141,10 +194,10 @@ const isArgObject = (value: unknown): value is Record<string, unknown> =>
  * @param rawArgs - Untrusted argument object from the agent.
  * @returns A new argument object with aliases resolved, or the input unchanged when there is nothing to rewrite.
  */
-export function canonicalizeArgs(
+export function canonicalizeArgs<T>(
 	op: AgentControlOp,
-	rawArgs: unknown,
-): unknown {
+	rawArgs: T,
+): T | Record<string, unknown> {
 	const aliases: Readonly<Record<string, string>> | undefined =
 		AGENT_CONTROL_ARG_ALIASES[op as keyof typeof AGENT_CONTROL_ARG_ALIASES];
 	if (!aliases || !isArgObject(rawArgs)) {

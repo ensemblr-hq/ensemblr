@@ -14,8 +14,17 @@ import {
 	PLAN_REFINEMENT_DIRECTIVE,
 	type SubagentMechanism,
 } from '../../src/shared/agent-control.ts';
+import {
+	type AppSettings,
+	DEFAULT_APP_SETTINGS,
+} from '../../src/shared/config.ts';
 import type { AppLanguage } from '../../src/shared/i18n.ts';
 import type { PermissionMode } from '../../src/shared/permissions.ts';
+
+const controlProjection = (settings: AppSettings) => {
+	const { onboarding: _onboarding, ...projection } = settings;
+	return projection;
+};
 
 /**
  * Builds a fully-stubbed port surface with sensible in-workspace defaults;
@@ -33,6 +42,7 @@ const makePorts = (
 		spawnedSubAgent: boolean;
 		language: AppLanguage;
 		deliverMessage: ConciergePort['deliverMessage'];
+		appSettings: AppSettings;
 	}> = {},
 ): AgentControlPorts => ({
 	workspaces: {
@@ -203,6 +213,18 @@ const makePorts = (
 	// Present on the default ports, not only on the Concierge variant below: a
 	// workspace agent messaging upward reaches this port, and a build without one
 	// is a different answer ("no Concierge in this build") from an empty panel.
+	appSettings: {
+		get: vi
+			.fn()
+			.mockReturnValue(
+				controlProjection(overrides.appSettings ?? DEFAULT_APP_SETTINGS),
+			),
+		update: vi
+			.fn()
+			.mockImplementation((patch) =>
+				controlProjection({ ...DEFAULT_APP_SETTINGS, ...patch }),
+			),
+	},
 	concierge: {
 		deliverMessage:
 			overrides.deliverMessage ??
@@ -300,6 +322,178 @@ const startTerminalAs = (
 	service: ReturnType<typeof setup>['service'],
 	token: string,
 ) => service.invoke({ op: 'startTerminal', token, rawArgs: { kind: 'spawn' } });
+
+describe('agent-control service: app settings', () => {
+	it.each([
+		{ mode: 'workspace-trusted', updateAllowed: true, confirm: true },
+		{ mode: 'approval-required', updateAllowed: true, confirm: true },
+		{ mode: 'read-only', updateAllowed: false, confirm: false },
+	] as const)(
+		'requires confirmation for app settings writes in $mode mode',
+		async ({ mode, updateAllowed, confirm }) => {
+			const ports = makePorts({ mode, confirm });
+			const { service } = setup({ concierge: true, ports });
+
+			const read = await service.invoke({
+				op: 'getAppSettings',
+				token: 'tok-caller',
+				rawArgs: {},
+			});
+			const update = await service.invoke({
+				op: 'updateAppSettings',
+				token: 'tok-caller',
+				rawArgs: { general: { automaticUpdates: false } },
+			});
+
+			expect(read.ok).toBe(true);
+			expect(update.ok).toBe(updateAllowed);
+			expect(ports.confirm.confirm).toHaveBeenCalledOnce();
+			expect(ports.appSettings.update).toHaveBeenCalledTimes(
+				updateAllowed ? 1 : 0,
+			);
+		},
+	);
+
+	it('lets the active Concierge read and update editable app settings', async () => {
+		const { service, ports } = setup({ concierge: true });
+		const result = await service.invoke({
+			op: 'getAppSettings',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+		expect(result).toMatchObject({ ok: true });
+		if (result.ok) {
+			expect(result.data).not.toHaveProperty('onboarding');
+		}
+
+		const updated = await service.invoke({
+			op: 'updateAppSettings',
+			token: 'tok-caller',
+			rawArgs: { general: { automaticUpdates: false } },
+		});
+		expect(updated.ok).toBe(true);
+		expect(ports.appSettings.update).toHaveBeenCalledWith({
+			general: { automaticUpdates: false },
+		});
+	});
+
+	it.each([
+		{ label: 'workspace agent', options: {} },
+		{
+			label: 'sub-agent',
+			options: { ports: makePorts({ spawnedSubAgent: true }) },
+		},
+		{ label: 'harness', options: { species: 'harness' as const } },
+	] as const)(
+		'rejects app settings access for a $label',
+		async ({ options }) => {
+			const { service, ports } = setup(options);
+			const read = await service.invoke({
+				op: 'getAppSettings',
+				token: 'tok-caller',
+				rawArgs: {},
+			});
+			const update = await service.invoke({
+				op: 'updateAppSettings',
+				token: 'tok-caller',
+				rawArgs: { general: { automaticUpdates: false } },
+			});
+
+			expect(read).toMatchObject({ ok: false, code: 'denied-scope' });
+			expect(update).toMatchObject({ ok: false, code: 'denied-scope' });
+			expect(ports.appSettings.get).not.toHaveBeenCalled();
+			expect(ports.appSettings.update).not.toHaveBeenCalled();
+		},
+	);
+
+	it('rejects app settings access for a retired Concierge', async () => {
+		const retired = setup({ concierge: true });
+		retired.registry.retire('caller');
+		const read = await retired.service.invoke({
+			op: 'getAppSettings',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+		const update = await retired.service.invoke({
+			op: 'updateAppSettings',
+			token: 'tok-caller',
+			rawArgs: { general: { automaticUpdates: false } },
+		});
+		expect(read).toMatchObject({ ok: false, code: 'denied-scope' });
+		expect(update).toMatchObject({ ok: false, code: 'denied-scope' });
+		expect(retired.ports.appSettings.get).not.toHaveBeenCalled();
+		expect(retired.ports.appSettings.update).not.toHaveBeenCalled();
+	});
+
+	it('does not mutate settings when approval is declined', async () => {
+		const ports = makePorts({ mode: 'approval-required', confirm: false });
+		const { service } = setup({ concierge: true, ports });
+		const result = await service.invoke({
+			op: 'updateAppSettings',
+			token: 'tok-caller',
+			rawArgs: { general: { automaticUpdates: false } },
+		});
+
+		expect(result).toMatchObject({ ok: false, code: 'denied-permission' });
+		expect(ports.appSettings.update).not.toHaveBeenCalled();
+	});
+
+	it('rejects a mixed allowed and excluded patch before mutation', async () => {
+		const { service, ports } = setup({ concierge: true });
+		const result = await service.invoke({
+			op: 'updateAppSettings',
+			token: 'tok-caller',
+			rawArgs: {
+				general: { automaticUpdates: false },
+				onboarding: { completedAt: null },
+			},
+		});
+
+		expect(result).toMatchObject({ ok: false, code: 'invalid-args' });
+		expect(ports.appSettings.update).not.toHaveBeenCalled();
+	});
+
+	it('rejects a Concierge retirement that happens during approval', async () => {
+		const ports = makePorts({ mode: 'approval-required' });
+		let approve!: (value: boolean) => void;
+		ports.confirm.confirm = vi.fn(
+			() =>
+				new Promise<boolean>((resolve) => {
+					approve = resolve;
+				}),
+		);
+		const {
+			service,
+			ports: servicePorts,
+			registry,
+		} = setup({ concierge: true, ports });
+		const pending = service.invoke({
+			op: 'updateAppSettings',
+			token: 'tok-caller',
+			rawArgs: { general: { automaticUpdates: false } },
+		});
+		await vi.waitFor(() =>
+			expect(ports.confirm.confirm).toHaveBeenCalledOnce(),
+		);
+		registry.retire('caller');
+		approve(true);
+
+		const result = await pending;
+		expect(result).toMatchObject({ ok: false, code: 'denied-scope' });
+		expect(servicePorts.appSettings.update).not.toHaveBeenCalled();
+	});
+
+	it('rejects invalid app settings before the update port is called', async () => {
+		const { service, ports } = setup({ concierge: true });
+		const result = await service.invoke({
+			op: 'updateAppSettings',
+			token: 'tok-caller',
+			rawArgs: { onboarding: { completedAt: null } },
+		});
+		expect(result).toMatchObject({ ok: false, code: 'invalid-args' });
+		expect(ports.appSettings.update).not.toHaveBeenCalled();
+	});
+});
 
 describe('agent-control service: gating', () => {
 	it('rejects an unknown token', async () => {
@@ -3315,6 +3509,7 @@ describe('agent-control service: audience resolution', () => {
 			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
+			retired: false,
 			role: 'orchestrator',
 		});
 	});
@@ -3327,6 +3522,7 @@ describe('agent-control service: audience resolution', () => {
 			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
+			retired: false,
 			role: 'orchestrator',
 		});
 	});
@@ -3339,6 +3535,7 @@ describe('agent-control service: audience resolution', () => {
 			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: false,
+			retired: false,
 			role: 'orchestrator',
 		});
 	});
@@ -3354,7 +3551,22 @@ describe('agent-control service: audience resolution', () => {
 			tuiHarnesses: true,
 			delegation: 'ensemblr',
 			hasChatTab: true,
+			retired: false,
 			role: 'subagent',
+		});
+	});
+
+	it('reports a retired Concierge audience', async () => {
+		const { service, registry } = setup({ concierge: true });
+		registry.retire('caller');
+
+		expect(await service.describeAudience('tok-caller')).toEqual({
+			architectureDiagram: true,
+			tuiHarnesses: true,
+			delegation: 'ensemblr',
+			hasChatTab: true,
+			retired: true,
+			role: 'concierge',
 		});
 	});
 

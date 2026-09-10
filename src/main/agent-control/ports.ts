@@ -6,6 +6,8 @@
  */
 import type {
 	AddDiffCommentsResult,
+	AgentControlAppSettings,
+	AgentControlAppSettingsPatch,
 	AgentControlContextUsage,
 	AgentControlConversationStatus,
 	AgentControlModelList,
@@ -164,6 +166,12 @@ export function originRuntime(
 	origin: AgentControlOrigin,
 ): AgentProviderId | null {
 	return origin.species === 'harness' ? null : origin.species;
+}
+
+/** Reads and writes the allowed app preferences for the active Concierge. */
+export interface AppSettingsPort {
+	get: () => AgentControlAppSettings;
+	update: (patch: AgentControlAppSettingsPatch) => AgentControlAppSettings;
 }
 
 /** Lists the app's projects and workspaces for the cross-workspace read ops. */
@@ -871,6 +879,7 @@ export interface ArchitecturePort {
 
 /** All collaborators the agent-control service composes. */
 export interface AgentControlPorts {
+	appSettings: AppSettingsPort;
 	ask: AskPort;
 	planMode: PlanModePort;
 	afkMode: AfkModePort;

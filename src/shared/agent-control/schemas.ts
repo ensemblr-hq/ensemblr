@@ -4,6 +4,7 @@
  * runs. Each schema is keyed by its {@link AgentControlOp} in {@link AGENT_CONTROL_ARG_SCHEMAS}.
  */
 import { z } from 'zod';
+import { appSettingsControlPatchSchema } from '../config.ts';
 import type { ReviewBriefReply } from '../ipc/contracts/review-launch.ts';
 import { toSlug } from '../slug.ts';
 import { canonicalizeArgs } from './arg-naming.ts';
@@ -569,6 +570,8 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	linearCreateComment: linearCreateCommentSchema,
 	linearCreateIssue: linearCreateIssueSchema,
 	linearUpdateIssue: linearUpdateIssueSchema,
+	getAppSettings: emptySchema,
+	updateAppSettings: appSettingsControlPatchSchema,
 	listProjects: emptySchema,
 	listWorkspaces: emptySchema,
 	listTabs: listTabsSchema,
@@ -597,9 +600,7 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
  * @returns Its argument keys, sorted.
  */
 export const argKeysForOp = (op: AgentControlOp): readonly string[] =>
-	Object.keys(
-		(AGENT_CONTROL_ARG_SCHEMAS[op] as unknown as { shape: object }).shape,
-	).sort();
+	Object.keys(AGENT_CONTROL_ARG_SCHEMAS[op].shape).sort();
 
 const askUserQuestionAnswerSchema = z.strictObject({
 	questionIndex: z.number().int().min(0),

@@ -1,3 +1,4 @@
+import type { AppSettings } from '../../shared/config.ts';
 import type { AppLanguage } from '../../shared/i18n';
 import type { WindowChromeSnapshot } from '../../shared/window-chrome';
 import type { AfkModeRegistry } from '../afk-mode';
@@ -155,8 +156,8 @@ interface RegisterIpcHandlersOptions {
 	menuBarStore: MenuBarStore;
 	/** Reinstalls the native application menu from the current settings and menu context. */
 	rebuildMenu: () => void;
-	/** Fired after an in-app App-settings write so side-effects can re-read. */
-	onAppSettingsUpdated?: () => void;
+	/** Fired after an in-app App-settings write so renderer and side-effects refresh. */
+	onAppSettingsUpdated?: (settings: AppSettings) => void;
 	openTargetService: OpenTargetService;
 	piExecutableService: PiExecutableService;
 	/** Merged per-runtime model catalog, shared with the agent-control spawn path. */

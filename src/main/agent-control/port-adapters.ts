@@ -33,6 +33,10 @@ import { classifyAgentModelTier } from '../../shared/agent-model-tier.ts';
 import type { AgentProviderId } from '../../shared/agent-provider.ts';
 import { getThinkingAxis } from '../../shared/agent-thinking.ts';
 import { findHarnessDefinition } from '../../shared/agents.ts';
+import type {
+	AppSettings,
+	AppSettingsControlPatch,
+} from '../../shared/config.ts';
 import type { AppLanguage } from '../../shared/i18n.ts';
 import type {
 	AgentPersistedEnvelope,
@@ -146,6 +150,8 @@ export interface PortAdapterDeps {
 	/** Decides a delegated child's model, runtime, and thinking level. */
 	spawnModelResolver: SpawnModelResolver;
 	appSettingsService: AppSettingsService;
+	/** Notifies renderer and main-process consumers after a control write. */
+	onAppSettingsUpdated?: (settings: AppSettings) => void;
 	workspaceGitService: WorkspaceGitService;
 	reviewService: ReviewService;
 	/**
@@ -1591,7 +1597,23 @@ export function createAgentControlPorts(
 	deps: PortAdapterDeps,
 ): AgentControlPorts {
 	const architecture = makeArchitecturePort(deps);
+	const appSettings = {
+		/** Reads the app-preference projection without first-run state. */
+		get: () => {
+			const { onboarding: _onboarding, ...settings } =
+				deps.appSettingsService.read();
+			return settings;
+		},
+		/** Persists an app-preference patch and broadcasts the full settings snapshot. */
+		update: (patch: AppSettingsControlPatch) => {
+			const settings = deps.appSettingsService.update(patch);
+			deps.onAppSettingsUpdated?.(settings);
+			const { onboarding: _onboarding, ...projection } = settings;
+			return projection;
+		},
+	};
 	return {
+		appSettings,
 		...(architecture ? { architecture } : {}),
 		workspaces: makeWorkspacePort(deps),
 		tabs: makeTabPort(deps),

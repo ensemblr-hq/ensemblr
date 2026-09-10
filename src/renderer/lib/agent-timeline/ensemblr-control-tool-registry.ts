@@ -194,6 +194,36 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 				),
 		],
 	},
+	ensemblr_get_app_settings: {
+		glyph: 'eye',
+		title: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.get-app-settings.done',
+					'Read app settings',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.get-app-settings.running',
+					'Reading app settings',
+				),
+		],
+	},
+	ensemblr_update_app_settings: {
+		glyph: 'wrench',
+		title: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.update-app-settings.done',
+					'Updated app settings',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.update-app-settings.running',
+					'Updating app settings',
+				),
+		],
+	},
 	ensemblr_get_architecture_diagram: {
 		glyph: 'network',
 		title: [

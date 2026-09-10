@@ -25,6 +25,7 @@
 import type { AgentControlRole, ControlAudience } from './awareness.ts';
 import type { ContextPressureAudience } from './context-pressure.ts';
 import type { AgentControlOp } from './contracts.ts';
+import { AGENT_CONTROL_OPS } from './contracts.ts';
 import type { SubagentMechanism } from './subagent-mechanism.ts';
 
 /**
@@ -304,13 +305,16 @@ export const TUI_HARNESS_OPS: readonly AgentControlOp[] = ['launchHarness'];
  * cutting a new one, listing the projects any of them could be cut from, and
  * searching a memory index nothing else has. A workspace agent belongs to
  * exactly one project and cannot act on another, so the roster of the rest is
- * noise in its tool list.
+ * noise in its tool list. App settings are also above every workspace, and are
+ * therefore held only by the active Concierge.
  */
 export const CONCIERGE_ONLY_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'focusWorkspace',
 	'createWorkspace',
 	'listProjects',
 	'recallMemory',
+	'getAppSettings',
+	'updateAppSettings',
 ]);
 
 /**
@@ -378,7 +382,14 @@ export function withheldControlOps(
 		...(audience.tuiHarnesses ? [] : TUI_HARNESS_OPS),
 	];
 	if (audience.role === 'concierge') {
-		return new Set([...CONCIERGE_WITHHELD_OPS, ...featureWithheld]);
+		const retiredWithheld = audience.retired
+			? AGENT_CONTROL_OPS.filter((op) => retiredControlOpDenial(op) !== null)
+			: [];
+		return new Set([
+			...CONCIERGE_WITHHELD_OPS,
+			...retiredWithheld,
+			...featureWithheld,
+		]);
 	}
 	const delegatesNatively =
 		audience.role === 'orchestrator' && audience.delegation === 'native';
