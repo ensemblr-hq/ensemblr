@@ -354,6 +354,7 @@ export function useComposerState({
 		setAttachmentError,
 	} = useComposerAttachments({
 		chatTabId,
+		disabled: composer.disabled,
 		editorRef,
 		insertPlainText: insertText,
 		workspaceCwd: composer.workspaceCwd,

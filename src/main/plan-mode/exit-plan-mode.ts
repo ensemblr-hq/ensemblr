@@ -12,9 +12,9 @@
  *
  * It deliberately does NOT block on the user's decision. A blocking call would
  * park the turn with the agent still "working", pushing the plan out of the
- * last-message slot and freezing the composer while the user reads. Ending the
- * turn instead leaves the plan as the last thing said; the decision reaches the
- * agent as its next prompt.
+ * last-message slot. Ending the turn leaves the plan as the last thing said;
+ * the review state, not a running turn, locks the composer until the user picks
+ * an action. The decision reaches the agent as its next prompt.
  */
 import { randomUUID } from 'node:crypto';
 

@@ -74,10 +74,10 @@ An unanswered control channel blocks the call:
 
 ```ts
 if (!result.ok) {
-	return {
-		block: true,
-		reason: `Ensemblr could not confirm whether Plan Mode is on (…), so this tool call was blocked. Retry, or tell the user the app is unreachable.`,
-	};
+ return {
+  block: true,
+  reason: `Ensemblr could not confirm whether Plan Mode is on (…), so this tool call was blocked. Retry, or tell the user the app is unreachable.`,
+ };
 }
 ```
 
@@ -208,7 +208,7 @@ agent is *told* are blocked and the ops actually refused cannot disagree.
 
 The original decision (#184) blocked `startConversation` outright, because a
 spawned conversation was never registered as planning and would run unrestricted.
-#191 made inheritance real — `startConversation` passes
+# 191 made inheritance real — `startConversation` passes
 `planMode: isPlanning(origin)` to the child — which is what moved the op into the
 conditional set for an orchestrator while leaving it denied for a sub-agent. A
 planning orchestrator can now fan out read-only investigators.
@@ -226,7 +226,14 @@ the ops it may reach come from one source.
 
 `ensemblr_exit_plan_mode` takes the plan as a tool argument, and
 `src/main/plan-mode/plan-file-writer.ts` writes
-`<workspaceCwd>/.context/plans/<YYYYMMDD-HHmm>-<slug>.md`.
+`<workspaceCwd>/.context/plans/<YYYYMMDD-HHmm>-<slug>.md` on the first submission.
+Refinements update that original file, even if the title changes or the app
+restarts. The generated frontmatter's `agentSessionId` and `workspaceId` identify
+the conversation's document; its filename and `createdAt` stay fixed. Existing
+legacy duplicates are left alone except for the earliest matching document,
+which receives subsequent refinements. New conversations get distinct files.
+Refinements replace the file only after the new contents have been written to a
+temporary file, preserving the previous plan when writing fails.
 
 The alternative — let the agent write its own plan out — requires an exception in
 the `write` block, and an exception in a deny-by-default gate is the thing most
@@ -240,9 +247,12 @@ posts it, broadcasts the review panel, and returns immediately — which aborts 
 turn.
 
 **Not blocking is deliberate.** A blocking call would park the turn with the
-agent still "working", pushing the plan out of the last-message slot and freezing
-the composer while the user reads the thing they are being asked to approve. The
-decision reaches the agent as its next prompt, not as the tool result.
+agent still "working", pushing the plan out of the last-message slot. Instead,
+the pending review disables the composer and its send pipeline until the user
+chooses Approve, Refine, or Hand off. The decision bar remains active; Refine
+unlocks the existing draft, and Hand off keeps the lock until a new chat is
+successfully created. The decision reaches the agent as its next prompt, not as
+the tool result.
 
 **The app posts the plan from `args.plan`** rather than relying on the agent to
 print it first. The turn ends the moment the tool returns, so an agent that
