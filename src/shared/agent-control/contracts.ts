@@ -13,6 +13,7 @@ import type { AgentModelTier } from '../agent-model-tier.ts';
 import type { AgentProviderId } from '../agent-provider.ts';
 import type { ThinkingAxis } from '../agent-thinking.ts';
 import { ARCHITECTURE_DIAGRAM_LIMITS } from '../architecture-diagram/schema.ts';
+import type { AppSettingsControl, AppSettingsControlPatch } from '../config.ts';
 import type { ReviewCommentWire } from '../ipc/contracts/review-comments.ts';
 import type {
 	WorkspaceGitChangeSummaryWire,
@@ -57,6 +58,8 @@ export const AGENT_CONTROL_OPS = [
 	'linearCreateComment',
 	'linearCreateIssue',
 	'linearUpdateIssue',
+	'getAppSettings',
+	'updateAppSettings',
 	'listProjects',
 	'listWorkspaces',
 	'listTabs',
@@ -142,7 +145,8 @@ export type AgentControlOp = (typeof AGENT_CONTROL_OPS)[number];
 
 /**
  * Operations that mutate app state. Everything else is a read. Writes are scoped
- * to the caller's own workspace and follow the permission mode; reads are always
+ * to the caller's own workspace and follow the permission mode; the app-settings
+ * write is Concierge-only but uses the same permission gate. Reads are always
  * allowed and may span workspaces.
  *
  * `exitPlanMode` writes a plan file yet is deliberately absent: it is the only
@@ -175,6 +179,7 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'linearCreateComment',
 	'linearCreateIssue',
 	'linearUpdateIssue',
+	'updateAppSettings',
 	'messageConcierge',
 ]);
 
@@ -210,6 +215,15 @@ export function isWriteOp(op: AgentControlOp): boolean {
 export function isSpawnOp(op: AgentControlOp): boolean {
 	return SPAWN_OPS.has(op);
 }
+
+/** The app preferences an active Concierge may inspect or change. */
+export type AgentControlAppSettings = AppSettingsControl;
+
+/** The section-scoped preference patch an active Concierge may submit. */
+export type AgentControlAppSettingsPatch = AppSettingsControlPatch;
+
+/** Args for `updateAppSettings`: a strict partial patch of editable app sections. */
+export type UpdateAppSettingsArgs = AgentControlAppSettingsPatch;
 
 /** Thinking-level tokens an agent runtime accepts, kept loose as a string on the wire. */
 export type AgentControlThinkingLevel = string;

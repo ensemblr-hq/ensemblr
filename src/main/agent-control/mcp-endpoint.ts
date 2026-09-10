@@ -28,7 +28,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { type ZodRawShape, z } from 'zod';
-
 import {
 	type AgentControlOp,
 	type AgentControlResult,
@@ -49,6 +48,7 @@ import {
 	ARCHITECTURE_LAYOUT_MAX_COLS,
 	MAX_COMPONENT_SOURCES,
 } from '../../shared/architecture-diagram.ts';
+import { appSettingsControlPatchSchema } from '../../shared/config.ts';
 import type { AgentControlService } from './agent-control-service.ts';
 import { withProgressHeartbeat } from './mcp-progress.ts';
 
@@ -524,6 +524,20 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 				.max(LINEAR_AGENT_LIMITS.maxDescriptionLength)
 				.optional(),
 		},
+	},
+	{
+		name: 'ensemblr_get_app_settings',
+		op: 'getAppSettings',
+		description:
+			'Concierge-only. Read current saved app preferences before answering a current-settings question or making a change: general, models, providers, git, appearance, dictation, concierge, experimental. These are app defaults, not resolved repository settings. Excludes onboarding, environment, repository settings, credentials, executable overrides, root paths and account/system actions; explain their purpose and Settings location without retrieving their values.',
+		shape: {},
+	},
+	{
+		name: 'ensemblr_update_app_settings',
+		op: 'updateAppSettings',
+		description:
+			'Concierge-only. Apply a partial app-preference patch directly as section objects (no app or patch wrapper) and return saved preferences. Call ensemblr_get_app_settings first. Unknown/excluded keys and invalid values reject the whole patch; omitted fields stay unchanged, arrays are replaced. Uses existing write permissions. Environment, repository settings, onboarding and account/system actions are excluded. Dictation preferences exclude its API key. Runtime/delegation changes may require a new session; Linux title-bar changes need relaunch.',
+		shape: appSettingsControlPatchSchema.shape,
 	},
 	{
 		name: 'ensemblr_list_models',

@@ -225,4 +225,17 @@ describe('createAppSettingsService', () => {
 		expect(settings.general.sendShortcut).toBe('mod+enter');
 		expect(settings.general.toolCallCollapse).toBe('collapsed');
 	});
+
+	test('fails closed when an existing config is malformed on update', () => {
+		const configPath = tmpConfigPath();
+		const malformed = '{"app":';
+		writeFileSync(configPath, malformed);
+		const service = createAppSettingsService({ configPath });
+
+		expect(service.read().general.sendShortcut).toBe('enter');
+		expect(() =>
+			service.update({ general: { automaticUpdates: false } }),
+		).toThrow();
+		expect(readFileSync(configPath, 'utf8')).toBe(malformed);
+	});
 });

@@ -206,6 +206,9 @@ export type ExperimentalSettings = AppSettings['experimental'];
 /** The `onboarding` first-run state section of App settings. */
 export type OnboardingSettings = AppSettings['onboarding'];
 
+/** The preference projection exposed to agent-control callers. */
+export type AppSettingsControl = Omit<AppSettings, 'onboarding'>;
+
 /** Section-scoped partial patch applied by `updateAppSettings`. */
 export interface AppSettingsPatch {
 	general?: Partial<GeneralSettings>;
@@ -230,6 +233,128 @@ export const appSettingsPatchSchema = z.object({
 	concierge: conciergeSettingsSchema.partial().optional(),
 	experimental: experimentalSettingsSchema.partial().optional(),
 	onboarding: onboardingSettingsSchema.partial().optional(),
+});
+
+/** Section-scoped patch accepted by the agent-control settings operations. */
+export type AppSettingsControlPatch = Omit<AppSettingsPatch, 'onboarding'>;
+
+/** Strict agent-control validator; unlike the IPC parser it rejects unknown keys and invalid values. */
+export const appSettingsControlPatchSchema = z.strictObject({
+	general: z
+		.strictObject({
+			sendShortcut: generalSettingsSchema.shape.sendShortcut.removeCatch(),
+			followUpBehavior:
+				generalSettingsSchema.shape.followUpBehavior.removeCatch(),
+			language: generalSettingsSchema.shape.language.removeCatch(),
+			desktopNotifications:
+				generalSettingsSchema.shape.desktopNotifications.removeCatch(),
+			notificationSound:
+				generalSettingsSchema.shape.notificationSound.removeCatch(),
+			autoConvertLongText:
+				generalSettingsSchema.shape.autoConvertLongText.removeCatch(),
+			alwaysShowContextUsage:
+				generalSettingsSchema.shape.alwaysShowContextUsage.removeCatch(),
+			caffeinateWhileRunning:
+				generalSettingsSchema.shape.caffeinateWhileRunning.removeCatch(),
+			automaticUpdates:
+				generalSettingsSchema.shape.automaticUpdates.removeCatch(),
+			toolCallCollapse:
+				generalSettingsSchema.shape.toolCallCollapse.removeCatch(),
+		})
+		.partial()
+		.optional(),
+	models: z
+		.strictObject({
+			defaultModel: modelSettingsSchema.shape.defaultModel.removeCatch(),
+			defaultThinkingLevel:
+				modelSettingsSchema.shape.defaultThinkingLevel.removeCatch(),
+			reviewModel: modelSettingsSchema.shape.reviewModel.removeCatch(),
+			reviewThinkingLevel:
+				modelSettingsSchema.shape.reviewThinkingLevel.removeCatch(),
+			hiddenModels: modelSettingsSchema.shape.hiddenModels.removeCatch(),
+			allowCrossRuntimeDelegation:
+				modelSettingsSchema.shape.allowCrossRuntimeDelegation.removeCatch(),
+			roleAssignments: modelSettingsSchema.shape.roleAssignments
+				.removeCatch()
+				.element.strict()
+				.array(),
+		})
+		.partial()
+		.optional(),
+	providers: z
+		.strictObject({
+			claudeSubagentMode:
+				providerSettingsSchema.shape.claudeSubagentMode.removeCatch(),
+		})
+		.partial()
+		.optional(),
+	git: z
+		.strictObject({
+			branchPrefixSource:
+				gitSettingsSchema.shape.branchPrefixSource.removeCatch(),
+			branchPrefixCustom:
+				gitSettingsSchema.shape.branchPrefixCustom.removeCatch(),
+			renameWorkspaceOnBranch:
+				gitSettingsSchema.shape.renameWorkspaceOnBranch.removeCatch(),
+			deleteLocalBranchOnArchive:
+				gitSettingsSchema.shape.deleteLocalBranchOnArchive.removeCatch(),
+			archiveAfterMerge:
+				gitSettingsSchema.shape.archiveAfterMerge.removeCatch(),
+			setUpstreamOnPush:
+				gitSettingsSchema.shape.setUpstreamOnPush.removeCatch(),
+			coAuthorEnsemblr: gitSettingsSchema.shape.coAuthorEnsemblr.removeCatch(),
+		})
+		.partial()
+		.optional(),
+	appearance: z
+		.strictObject({
+			theme: appearanceSettingsSchema.shape.theme.removeCatch(),
+			accessibleColors:
+				appearanceSettingsSchema.shape.accessibleColors.removeCatch(),
+			codeTheme: appearanceSettingsSchema.shape.codeTheme.removeCatch(),
+			monoFont: appearanceSettingsSchema.shape.monoFont.removeCatch(),
+			codeLigatures: appearanceSettingsSchema.shape.codeLigatures.removeCatch(),
+			markdownStyle: appearanceSettingsSchema.shape.markdownStyle.removeCatch(),
+			titleBar: appearanceSettingsSchema.shape.titleBar.removeCatch(),
+			terminalFont: appearanceSettingsSchema.shape.terminalFont.removeCatch(),
+			terminalFontSize:
+				appearanceSettingsSchema.shape.terminalFontSize.removeCatch(),
+			terminalScrollbackMb:
+				appearanceSettingsSchema.shape.terminalScrollbackMb.removeCatch(),
+		})
+		.partial()
+		.optional(),
+	dictation: z
+		.strictObject({
+			enabled: dictationSettingsSchema.shape.enabled.removeCatch(),
+			baseUrl: dictationSettingsSchema.shape.baseUrl.removeCatch(),
+			model: dictationSettingsSchema.shape.model.removeCatch(),
+			language: dictationSettingsSchema.shape.language.removeCatch(),
+		})
+		.partial()
+		.optional(),
+	concierge: z
+		.strictObject({
+			provider: conciergeSettingsSchema.shape.provider.removeCatch(),
+			model: conciergeSettingsSchema.shape.model.removeCatch(),
+			thinkingLevel: conciergeSettingsSchema.shape.thinkingLevel.removeCatch(),
+			autoClearAtPercent:
+				conciergeSettingsSchema.shape.autoClearAtPercent.removeCatch(),
+		})
+		.partial()
+		.optional(),
+	experimental: z
+		.strictObject({
+			architectureDiagram:
+				experimentalSettingsSchema.shape.architectureDiagram.removeCatch(),
+			autoRunAfterSetup:
+				experimentalSettingsSchema.shape.autoRunAfterSetup.removeCatch(),
+			developerMode:
+				experimentalSettingsSchema.shape.developerMode.removeCatch(),
+			tuiHarnesses: experimentalSettingsSchema.shape.tuiHarnesses.removeCatch(),
+		})
+		.partial()
+		.optional(),
 });
 
 /** Fully-defaulted settings — the baseline before any config file is read. */

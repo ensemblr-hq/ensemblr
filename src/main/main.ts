@@ -20,7 +20,7 @@ import {
 	resolveAgentRole,
 } from '../shared/agent-control.ts';
 import type { AgentProviderId } from '../shared/agent-provider.ts';
-import { DEFAULT_APP_SETTINGS } from '../shared/config.ts';
+import { type AppSettings, DEFAULT_APP_SETTINGS } from '../shared/config.ts';
 import {
 	type AppLanguage,
 	FALLBACK_LANGUAGE,
@@ -371,6 +371,7 @@ const configService = createEnsemblrConfigService(
 const appSettingsService = createAppSettingsService(
 	isDev ? { configPath: devConfigPath } : {},
 );
+let onAppSettingsUpdated: ((settings: AppSettings) => void) | undefined;
 const databaseService = createEnsemblrDatabaseService(
 	isDev ? { databasePath: devDatabasePath } : {},
 );
@@ -1490,6 +1491,7 @@ agentControlService = createAgentControlService({
 		broadcastAfkMode: (payload) =>
 			broadcastToAllWindows(IPC_CHANNELS.agentControlAfkModeChanged, payload),
 		appSettingsService,
+		onAppSettingsUpdated: (settings) => onAppSettingsUpdated?.(settings),
 		ask: askUserQuestionCoordinator.port,
 		chatTabService: agentControlChatTabService,
 		confirm: { confirm: confirmAgentControlAction },
@@ -1780,9 +1782,8 @@ app.whenReady().then(() => {
 		);
 	};
 	rebuildMenu();
-	// config.json is the source of truth; live-reload the renderer when it's
-	// edited outside the app (the service suppresses echoes of its own writes).
-	appSettingsService.startWatching((settings) => {
+	/** Broadcasts one settings snapshot to renderer and main-process consumers. */
+	const notifyAppSettingsUpdated = (settings: AppSettings): void => {
 		broadcastToAllWindows(IPC_CHANNELS.appSettingsChanged, {
 			settings,
 		} satisfies AppSettingsChangedBroadcast);
@@ -1790,7 +1791,11 @@ app.whenReady().then(() => {
 		updateService.settingsChanged();
 		refreshWindowBackgrounds();
 		rebuildMenu();
-	});
+	};
+	onAppSettingsUpdated = notifyAppSettingsUpdated;
+	// config.json is the source of truth; live-reload the renderer when it's
+	// edited outside the app (the service suppresses echoes of its own writes).
+	appSettingsService.startWatching(notifyAppSettingsUpdated);
 	// A `system` theme follows the OS, and the backing colour has to follow it
 	// too — otherwise the window keeps flashing the polarity the user left.
 	nativeTheme.on('updated', refreshWindowBackgrounds);
@@ -1866,12 +1871,7 @@ app.whenReady().then(() => {
 		// The in-app write is echo-suppressed and so never reaches the watcher
 		// above; without this rebuild the menu keeps the previous language until
 		// the next restart.
-		onAppSettingsUpdated: () => {
-			agentActivityMonitor.refresh();
-			updateService.settingsChanged();
-			refreshWindowBackgrounds();
-			rebuildMenu();
-		},
+		onAppSettingsUpdated: notifyAppSettingsUpdated,
 		menuBarStore,
 		menuContextStore,
 		rebuildMenu,

@@ -109,6 +109,21 @@ export function createAppSettingsService(
 		}
 	};
 
+	/** Reads a valid object config for mutation without replacing malformed bytes. */
+	const readRawForUpdate = (): Record<string, unknown> => {
+		try {
+			const parsed: unknown = JSON.parse(readFileSync(configPath, 'utf8'));
+			if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+				throw new Error('Config root is not an object.');
+			}
+			return parsed as Record<string, unknown>;
+		} catch (error) {
+			throw new Error('Cannot update malformed app settings config.', {
+				cause: error,
+			});
+		}
+	};
+
 	const writeRaw = (config: Record<string, unknown>): void => {
 		const serialized = `${JSON.stringify(config, null, 2)}\n`;
 		mkdirSync(path.dirname(configPath), { recursive: true });
@@ -139,7 +154,7 @@ export function createAppSettingsService(
 
 	const update = (patch: AppSettingsPatch): AppSettings => {
 		ensureExists();
-		const config = readRaw();
+		const config = readRawForUpdate();
 		const app = asRecord(config.app);
 		const next = mergeAppSettings(settingsFrom(config), patch);
 		writeRaw({
@@ -197,9 +212,9 @@ export function createAppSettingsService(
  * @param text - JSON text to parse
  * @returns The parsed value, or an empty object when parsing fails
  */
-function safeParse(text: string): unknown {
+function safeParse(text: string): Record<string, unknown> {
 	try {
-		return JSON.parse(text);
+		return asRecord(JSON.parse(text));
 	} catch {
 		return {};
 	}

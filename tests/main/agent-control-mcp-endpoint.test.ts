@@ -116,6 +116,18 @@ afterEach(async () => {
 });
 
 describe('agent-control MCP endpoint', () => {
+	it('withholds preference tools from a retired Concierge during discovery', async () => {
+		const retired = {
+			...HARNESS_ROOT,
+			role: 'concierge' as const,
+			retired: true,
+		};
+		const names = await toolNamesFor(retired);
+		expect(names).not.toContain('ensemblr_get_app_settings');
+		expect(names).not.toContain('ensemblr_update_app_settings');
+		expect(names).toContain('ensemblr_recall_memory');
+	});
+
 	it('lists the control tools to an MCP client', async () => {
 		server = await startControlServer(stubService);
 		const client = await connect('good');
@@ -488,6 +500,28 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 		expect(client.getInstructions()).toBe(ORCHESTRATOR_AWARENESS);
 
 		await client.close();
+	});
+
+	it('serves app settings only to the active Concierge', async () => {
+		const concierge = await toolNamesFor({
+			architectureDiagram: true,
+			tuiHarnesses: true,
+			delegation: 'ensemblr',
+			hasChatTab: false,
+			role: 'concierge',
+		});
+		const workspaceAgent = await toolNamesFor({
+			architectureDiagram: true,
+			tuiHarnesses: true,
+			delegation: 'ensemblr',
+			hasChatTab: true,
+			role: 'orchestrator',
+		});
+
+		expect(concierge).toContain('ensemblr_get_app_settings');
+		expect(concierge).toContain('ensemblr_update_app_settings');
+		expect(workspaceAgent).not.toContain('ensemblr_get_app_settings');
+		expect(workspaceAgent).not.toContain('ensemblr_update_app_settings');
 	});
 
 	it('names only tools a first-class root is actually served', async () => {

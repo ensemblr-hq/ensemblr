@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -9,6 +9,7 @@ import {
 	createBoardStatusStore,
 	type PortAdapterDeps,
 } from '../../src/main/agent-control/index.ts';
+import { createAppSettingsService } from '../../src/main/config/app-settings-service.ts';
 import {
 	getChatTabByAgentSessionId,
 	getChatTabById,
@@ -20,6 +21,7 @@ import {
 	selectWorkspaceWithRepositoryById,
 } from '../../src/main/storage/repositories/workspace-repository.ts';
 import { TerminalServiceError } from '../../src/main/terminal/terminal-service.ts';
+import { DEFAULT_APP_SETTINGS } from '../../src/shared/config.ts';
 import type { AgentPersistedEnvelope } from '../../src/shared/ipc/contracts/agent-session';
 import type {
 	CreateTerminalSessionResult,
@@ -974,6 +976,91 @@ describe('agent-control port adapters: reopening a closed chat tab', () => {
 
 		expect(restoreTab).toHaveBeenCalledWith({ chatTabId: 'tab-1' });
 		expect(broadcastTabsChanged).toHaveBeenCalledWith({ workspaceId: 'ws' });
+	});
+});
+
+describe('agent-control port adapters: app settings', () => {
+	it('persists allowed fields while preserving excluded raw config', async () => {
+		const configDir = await mkdtemp(path.join(tmpdir(), 'settings-port-'));
+		const configPath = path.join(configDir, 'config.json');
+		try {
+			await writeFile(
+				configPath,
+				JSON.stringify({
+					app: {
+						onboarding: { completedAt: '2026-01-01T00:00:00.000Z' },
+					},
+					environment: { secret: 'preserve' },
+					repositoryDefaults: { branchPrefix: 'preserve' },
+					repositoryRules: [{ match: 'preserve' }],
+				}),
+			);
+			const settings = createAppSettingsService({ configPath });
+			const onAppSettingsUpdated = vi.fn();
+			const { deps } = makeDeps();
+			deps.appSettingsService = settings;
+			deps.onAppSettingsUpdated = onAppSettingsUpdated;
+
+			const result = createAgentControlPorts(deps).appSettings.update({
+				general: { automaticUpdates: false },
+				appearance: { theme: 'dark' },
+			});
+			const persisted = JSON.parse(await readFile(configPath, 'utf8')) as {
+				app: Record<string, unknown>;
+				environment: Record<string, unknown>;
+				repositoryDefaults: Record<string, unknown>;
+				repositoryRules: readonly Record<string, unknown>[];
+			};
+
+			expect(result.general.automaticUpdates).toBe(false);
+			expect(result.appearance.theme).toBe('dark');
+			expect(result).not.toHaveProperty('onboarding');
+			expect(persisted.app.onboarding).toEqual({
+				completedAt: '2026-01-01T00:00:00.000Z',
+			});
+			expect(persisted.environment).toEqual({ secret: 'preserve' });
+			expect(persisted.repositoryDefaults).toEqual({
+				branchPrefix: 'preserve',
+			});
+			expect(persisted.repositoryRules).toEqual([{ match: 'preserve' }]);
+			expect(onAppSettingsUpdated).toHaveBeenCalledWith(
+				expect.objectContaining({
+					general: expect.objectContaining({ automaticUpdates: false }),
+				}),
+			);
+		} finally {
+			await rm(configDir, { force: true, recursive: true });
+		}
+	});
+
+	it('returns the safe projection and notifies consumers after a control write', () => {
+		const settings = {
+			...DEFAULT_APP_SETTINGS,
+			general: { ...DEFAULT_APP_SETTINGS.general, automaticUpdates: false },
+		};
+		const update = vi.fn(() => settings);
+		const onAppSettingsUpdated = vi.fn();
+		const { deps } = makeDeps();
+		deps.appSettingsService = {
+			ensureExists: vi.fn(),
+			getPath: () => '',
+			read: () => settings,
+			startWatching: vi.fn(),
+			stop: vi.fn(),
+			update,
+		};
+		deps.onAppSettingsUpdated = onAppSettingsUpdated;
+
+		const result = createAgentControlPorts(deps).appSettings.update({
+			general: { automaticUpdates: false },
+		});
+
+		expect(result).not.toHaveProperty('onboarding');
+		expect(result.general.automaticUpdates).toBe(false);
+		expect(update).toHaveBeenCalledWith({
+			general: { automaticUpdates: false },
+		});
+		expect(onAppSettingsUpdated).toHaveBeenCalledWith(settings);
 	});
 });
 

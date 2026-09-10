@@ -41,6 +41,7 @@ const EXPECTED_DENIALS: Record<
 	focusPanel: [],
 	focusTab: [],
 	focusWorkspace: [],
+	getAppSettings: [],
 	getArchitectureDiagram: [],
 	getConversationStatus: [],
 	getLastMessage: [],
@@ -83,6 +84,7 @@ const EXPECTED_DENIALS: Record<
 	// planning agent redrawing it dirties the user's `git status` and the Changes
 	// panel — the invariant planning sells. `linearCreateComment` is not the
 	// precedent, because that writes to a remote tracker; `resolveDiffComments` is.
+	updateAppSettings: [],
 	updateArchitectureDiagram: ['orchestrator', 'subagent'],
 	waitForAgents: [],
 	writeTerminal: ['orchestrator', 'subagent'],

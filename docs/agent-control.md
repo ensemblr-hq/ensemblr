@@ -266,7 +266,7 @@ harness.
 
 ## Tool reference
 
-Forty-eight tools, enumerated from `TOOL_DEFS` in
+Fifty tools, enumerated from `TOOL_DEFS` in
 `src/main/agent-control/mcp-endpoint.ts`. The argument names and types below are
 the authoritative Zod schemas in `src/shared/agent-control/schemas.ts` — every
 schema is a `strictObject`, so an argument not listed here is rejected as
@@ -929,6 +929,38 @@ route to an `assigneeId` is matching a display name against the users table.
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
 | `ensemblr_recall_memory` | **`query: string`**, `limit?: number` | read | workspace agent |
+| `ensemblr_get_app_settings` | *(none)* | read | workspace agent |
+| `ensemblr_update_app_settings` | `general?: object`, `models?: object`, `providers?: object`, `git?: object`, `appearance?: object`, `dictation?: object`, `concierge?: object`, `experimental?: object` | write | workspace agent |
+
+App-preference requests are handled directly by the Concierge, not delegated to a
+workspace. `ensemblr_get_app_settings` reads the eight editable sections of
+`AppSettings`; `ensemblr_update_app_settings` accepts partial sections directly
+(for example, `{ "appearance": { "theme": "dark" } }`) and returns their saved
+values. Both operations are Concierge-only at discovery and dispatch. Writes use
+the normal app-control permission gate; read-only mode refuses them.
+
+The control patch schema derives field constraints from `src/shared/config.ts`,
+but removes fallback defaults and rejects unknown keys, including nested keys.
+Invalid values or excluded sections reject the whole patch before persistence.
+The file reader remains tolerant of hand-edited values. Writes reuse the existing
+atomic settings service, preserve unrelated configuration, and broadcast to the
+renderer and main-process consumers rather than relying on the echo-suppressed
+file watcher.
+
+The Concierge's built-in guide explains allowed preferences and every excluded
+settings area's purpose and UI location. It looks up current editable preferences
+before answering current-settings questions or writing a patch; snapshots are not
+injected every turn or saved as memories. Environment, repository settings,
+onboarding, credentials/account actions, root-directory changes, provider
+executable overrides, and diagnostics actions are awareness-only: the settings
+tools neither retrieve their values nor change them. Existing Linear issue tools
+remain separate from account management.
+
+These are saved app preferences, not resolved repository settings. Overrides still
+win where applicable. Model/runtime preferences affect subsequent turns or
+sessions; existing sessions may retain feature/delegation surfaces, and Linux
+title-bar changes need a relaunch. A settings write does not itself restart,
+launch, archive, or authenticate anything.
 
 `ensemblr_list_projects` is documented with the other listings above, and is the
 Concierge's too: a workspace agent belongs to one project and cannot act on
@@ -963,7 +995,9 @@ anywhere. `retiredControlOpDenial` narrows it to the three ops that turn actuall
 needs — `checkPlanModeTool`, which is what clears each write against the home and
 which the Pi extension blocks every guarded call on when it does not answer;
 `getSessionBrief`; and `ensemblr_recall_memory` — and answers `denied-scope` to
-everything else. The axis is the origin's `retired` flag, set by
+everything else. Fresh MCP discovery also withholds these denied operations;
+already-registered runtime tools still meet the dispatch refusal. The axis is
+the origin's `retired` flag, set by
 `OriginRegistry.retire` when the clear detaches the child and cleared only when
 the pass ends and the origin is released outright. Without it the child keeps the
 whole Concierge surface: `ensemblr_ask_user_question` would broadcast under a
