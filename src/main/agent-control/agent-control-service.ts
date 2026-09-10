@@ -226,9 +226,9 @@ export interface AgentControlService {
 	 */
 	readIssueDirective: (token: string) => Promise<string | null>;
 	/**
-	 * Releases all per-session state (pending orchestrator signal, spawn
-	 * counters, origin token) when an agent session ends, keeping the in-memory
-	 * maps bounded. Idempotent; safe to call for unknown sessions.
+	 * Releases ephemeral per-session state and the origin token when a session
+	 * ends. The root-tree spawn budget deliberately survives until process reset.
+	 * Idempotent; safe to call for unknown sessions.
 	 */
 	releaseSession: (sessionId: string) => void;
 	/**
@@ -811,8 +811,11 @@ export function createAgentControlService({
 	scheduler = REAL_SCHEDULER,
 	dispatchTimeoutMs = DISPATCH_TIMEOUT_MS,
 }: AgentControlServiceOptions): AgentControlService {
-	/** Latest pending signal per child session id, set by `notifyOrchestrator`. */
-	const signalsByChild = new Map<string, OrchestratorSignal>();
+	/** Latest pending signal per child session id, scoped to its immediate parent. */
+	const signalsByChild = new Map<
+		string,
+		{ parentSessionId: string; signal: OrchestratorSignal }
+	>();
 
 	/**
 	 * Sessions that have searched Linear at least once, which is the precondition
@@ -940,6 +943,7 @@ export function createAgentControlService({
 		isPlanning(origin)
 			? buildPlanModeDelegationDirective({
 					delegation: origin.delegation,
+					depth: origin.depth,
 					role,
 				})
 			: null;
@@ -961,13 +965,9 @@ export function createAgentControlService({
 		buildCoAuthorDirective(ports.commitCredit.isCoAuthorEnabled());
 
 	/**
-	 * The caller's control-layer role. Prefers the sub-agent marker its spawn
-	 * persisted on its chat tab over live lineage, because lineage does not
-	 * survive a restart: `parentSessionId` is not stored, so a resumed session
-	 * re-registers at depth 0, while Plan Mode is restored from the renderer's
-	 * per-tab store. Without the durable marker a restored investigator would come
-	 * back holding the orchestrator policy and could submit a plan, question the
-	 * user, or delegate onward — the three ops that policy exists to deny it.
+	 * The caller's control-layer role. Validated durable depth is authoritative;
+	 * the legacy tab marker remains a fail-closed fallback for sessions created
+	 * before versioned lineage was persisted.
 	 * @param origin - Resolved caller identity.
 	 * @returns The role that selects which half of the plan-mode policy applies.
 	 */
@@ -1023,10 +1023,8 @@ export function createAgentControlService({
 	 * property of the turn, so a sub-agent should hear why it is a sub-agent rather
 	 * than why it is planning.
 	 *
-	 * This is what a sub-agent used to be denied only by accident: the spawn
-	 * guardrail refusing `origin.depth >= 1`. That counter lives in an in-memory
-	 * registry, so a session resumed after a restart came back at depth 0 holding
-	 * the whole surface again.
+	 * Level-1 managers retain only the five child-management operations the shared
+	 * policy admits; level-2 leaves and unverified legacy descendants fail closed.
 	 *
 	 * The op is checked before the role because resolving the role reads the tab
 	 * marker out of the database, and this runs on every dispatch: an op no role is
@@ -1058,7 +1056,10 @@ export function createAgentControlService({
 				? null
 				: fail('denied-scope', conciergeDenial);
 		}
-		const denial = subAgentControlOpDenial(op);
+		const denial = subAgentControlOpDenial(
+			op,
+			origin.depth === 0 ? 2 : origin.depth,
+		);
 		if (denial === null) {
 			return null;
 		}
@@ -1089,7 +1090,11 @@ export function createAgentControlService({
 		if (!isPlanning(origin)) {
 			return null;
 		}
-		const denial = planModeControlOpDenial(op, await resolveRole(origin));
+		const denial = planModeControlOpDenial(
+			op,
+			await resolveRole(origin),
+			origin.depth === 0 ? 2 : origin.depth,
+		);
 		return denial === null ? null : fail('denied-scope', denial);
 	};
 
@@ -1145,15 +1150,17 @@ export function createAgentControlService({
 	};
 
 	/**
-	 * Checks a spawn op against depth/quota/rate without consuming quota.
+	 * Atomically reserves root-tree spawn capacity before asynchronous creation.
 	 * @param origin - Resolved caller identity.
-	 * @returns A denial envelope, or null when the spawn may proceed.
+	 * @returns An idempotent failure refund, or a denial envelope.
 	 */
-	const evaluateSpawnGuard = (
+	const reserveSpawnGuard = (
 		origin: AgentControlOrigin,
-	): AgentControlResult<never> | null => {
-		const verdict = guardrails.evaluateSpawn(origin);
-		return verdict.ok ? null : fail(verdict.code, verdict.reason);
+	): AgentControlResult<never> | (() => void) => {
+		const reservation = guardrails.reserveSpawn(origin);
+		return reservation.ok
+			? reservation.refund
+			: fail(reservation.code, reservation.reason);
 	};
 
 	const waitIfRequested = async (
@@ -1243,16 +1250,21 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 		args: SpawnChatTabArgs,
 	): Promise<AgentControlResult<unknown>> => {
-		const spawnDenied = evaluateSpawnGuard(origin);
-		if (spawnDenied) {
-			return spawnDenied;
+		const reserved = reserveSpawnGuard(origin);
+		if (typeof reserved !== 'function') {
+			return reserved;
 		}
-		const created = await ports.tabs.spawnChatTab({
-			workspaceId: origin.workspaceId,
-			title: args.title,
-		});
-		guardrails.recordSpawn(origin.sessionId);
-		return ok(created);
+		try {
+			return ok(
+				await ports.tabs.spawnChatTab({
+					workspaceId: origin.workspaceId,
+					title: args.title,
+				}),
+			);
+		} catch (error) {
+			reserved();
+			throw error;
+		}
 	};
 
 	/**
@@ -1681,9 +1693,17 @@ export function createAgentControlService({
 		if ('failure' in target) {
 			return target.failure;
 		}
-		const spawnDenied = evaluateSpawnGuard(origin);
-		if (spawnDenied) {
-			return spawnDenied;
+		if (origin.depth > 0 && args.chatTabId) {
+			return fail(
+				'denied-scope',
+				'A delegated agent must open a fresh child conversation and may not reuse an existing tab.',
+			);
+		}
+		if (origin.depth > 0 && args.peer) {
+			return fail(
+				'denied-scope',
+				'A delegated agent may open only its own child, not a peer root.',
+			);
 		}
 		const modeDenied = spawnModeDenial(origin, args);
 		if (modeDenied) {
@@ -1710,49 +1730,55 @@ export function createAgentControlService({
 			}
 			releasePeerSlot = gated;
 		}
-		// Held until the child is open, because that is when it registers an origin
-		// of its own and starts being counted by the gate above.
-		const started = await ports.conversations
-			.startConversation({
-				workspaceId: target.workspaceId,
-				workspaceCwd: target.cwd,
-				asPeer,
-				chatTabId: args.chatTabId,
-				prompt: asPeer
-					? `${buildPeerBriefDirective(origin.sessionId)}\n\n---\n\n${args.prompt}`
-					: args.prompt,
-				model: args.model,
-				thinkingLevel: args.thinkingLevel,
-				title: args.title,
-				callerConcierge: origin.concierge,
-				callerModel,
-				callerRuntime: originRuntime(origin),
-				parentSessionId: origin.sessionId,
-				// Unreachable defence today, and deliberately so: `spawnModeDenial`
-				// refuses both flags from every caller that inherits a mode, and the
-				// Concierge, which is the only one that may pass them, has no composer
-				// chip to inherit from — so the two operands are never both live. It is
-				// an OR rather than a coalesce so that a Concierge which later gains a
-				// mode of its own cannot open a child *less* restricted than itself; a
-				// coalesce would invert that the day such a chip lands.
-				planMode: isPlanning(origin) || args.planMode === true,
-				afkMode: isUnattended(origin) || args.afkMode === true,
-			})
-			.finally(() => releasePeerSlot?.());
-		if (!started.ok) {
-			return fail('invalid-args', started.reason);
+		try {
+			const reserved = reserveSpawnGuard(origin);
+			if (typeof reserved !== 'function') {
+				return reserved;
+			}
+			let started: Awaited<
+				ReturnType<AgentControlPorts['conversations']['startConversation']>
+			>;
+			try {
+				started = await ports.conversations.startConversation({
+					workspaceId: target.workspaceId,
+					workspaceCwd: target.cwd,
+					asPeer,
+					chatTabId: args.chatTabId,
+					prompt: asPeer
+						? `${buildPeerBriefDirective(origin.sessionId)}\n\n---\n\n${args.prompt}`
+						: args.prompt,
+					model: args.model,
+					thinkingLevel: args.thinkingLevel,
+					title: args.title,
+					callerConcierge: origin.concierge,
+					callerModel,
+					callerRuntime: originRuntime(origin),
+					callerSpecies: origin.species,
+					parentSessionId: origin.sessionId,
+					planMode: isPlanning(origin) || args.planMode === true,
+					afkMode: isUnattended(origin) || args.afkMode === true,
+				});
+			} catch (error) {
+				reserved();
+				throw error;
+			}
+			if (!started.ok) {
+				reserved();
+				return fail('invalid-args', started.reason);
+			}
+			const result = await waitIfRequested(
+				started.agentSessionId,
+				args.wait,
+				signal,
+			);
+			return ok({
+				agentSessionId: started.agentSessionId,
+				chatTabId: started.chatTabId,
+				result,
+			});
+		} finally {
+			releasePeerSlot?.();
 		}
-		guardrails.recordSpawn(origin.sessionId);
-		const result = await waitIfRequested(
-			started.agentSessionId,
-			args.wait,
-			signal,
-		);
-		return ok({
-			agentSessionId: started.agentSessionId,
-			chatTabId: started.chatTabId,
-			result,
-		});
 	};
 
 	/**
@@ -1878,29 +1904,42 @@ export function createAgentControlService({
 		});
 		const pinned = await reviewModelRow(brief.model);
 		const thinkingLevel = reviewThinkingLevel(brief, pinned);
-		const started = await ports.conversations.startConversation({
-			afkMode: isUnattended(origin),
-			asPeer: true,
-			callerConcierge: false,
-			callerModel,
-			// Withheld when the user pinned a review model, which is what lets the
-			// spawn open on that model's own runtime: `resolveRequested` refuses a
-			// cross-runtime model only against a caller runtime it can see, and here
-			// the model is the user's rather than the caller's to have chosen.
-			callerRuntime: pinned ? null : originRuntime(origin),
-			model: pinned?.id,
-			parentSessionId: origin.sessionId,
-			planMode: false,
-			prompt: `${buildReviewPeerDirective(origin.sessionId)}\n\n---\n\n${brief.prompt}`,
-			thinkingLevel: thinkingLevel ?? undefined,
-			title: args.title ?? DEFAULT_REVIEW_TAB_TITLE,
-			workspaceCwd: origin.workspaceCwd,
-			workspaceId: origin.workspaceId,
-		});
+		const reserved = reserveSpawnGuard(origin);
+		if (typeof reserved !== 'function') {
+			return reserved;
+		}
+		let started: Awaited<
+			ReturnType<AgentControlPorts['conversations']['startConversation']>
+		>;
+		try {
+			started = await ports.conversations.startConversation({
+				afkMode: isUnattended(origin),
+				asPeer: true,
+				callerConcierge: false,
+				callerModel,
+				// Withheld when the user pinned a review model, which is what lets the
+				// spawn open on that model's own runtime: `resolveRequested` refuses a
+				// cross-runtime model only against a caller runtime it can see, and here
+				// the model is the user's rather than the caller's to have chosen.
+				callerRuntime: pinned ? null : originRuntime(origin),
+				callerSpecies: origin.species,
+				model: pinned?.id,
+				parentSessionId: origin.sessionId,
+				planMode: false,
+				prompt: `${buildReviewPeerDirective(origin.sessionId)}\n\n---\n\n${brief.prompt}`,
+				thinkingLevel: thinkingLevel ?? undefined,
+				title: args.title ?? DEFAULT_REVIEW_TAB_TITLE,
+				workspaceCwd: origin.workspaceCwd,
+				workspaceId: origin.workspaceId,
+			});
+		} catch (error) {
+			reserved();
+			throw error;
+		}
 		if (!started.ok) {
+			reserved();
 			return fail('invalid-args', started.reason);
 		}
-		guardrails.recordSpawn(origin.sessionId);
 		reviewsByCaller.set(origin.sessionId, {
 			agentSessionId: started.agentSessionId,
 			chatTabId: started.chatTabId,
@@ -1996,10 +2035,6 @@ export function createAgentControlService({
 				...open,
 				message: reusedReviewMessage(open.agentSessionId),
 			} satisfies StartReviewResult);
-		}
-		const spawnDenied = evaluateSpawnGuard(origin);
-		if (spawnDenied) {
-			return spawnDenied;
 		}
 		const reserved = await reserveCoTenantSlot(origin);
 		if (typeof reserved !== 'function') {
@@ -2251,6 +2286,30 @@ export function createAgentControlService({
 	};
 
 	/**
+	 * Restricts a level-1 caller to a validated durable immediate child.
+	 * @param origin - Caller whose depth determines whether child scope applies.
+	 * @param targetSessionId - Conversation the caller wants to control.
+	 * @returns A denial envelope, or null for roots and owned children.
+	 */
+	const immediateChildDenial = (
+		origin: AgentControlOrigin,
+		targetSessionId: string | null,
+	): AgentControlResult<never> | null => {
+		if (origin.depth !== 1) {
+			return null;
+		}
+		return targetSessionId !== null &&
+			ports.conversations
+				.listImmediateChildren(origin.sessionId)
+				.includes(targetSessionId)
+			? null
+			: fail(
+					'denied-scope',
+					'A delegated agent may control only its own validated immediate children.',
+				);
+	};
+
+	/**
 	 * Steers another conversation. A planning caller may only reach a target that
 	 * is itself planning, so delegation cannot be laundered into an edit through a
 	 * conversation that is not restricted. The plan-mode check runs after the scope
@@ -2274,14 +2333,6 @@ export function createAgentControlService({
 		if (scoped) {
 			return scoped;
 		}
-		if (isPlanning(origin)) {
-			const denial = planModeFollowUpDenial(
-				ports.planMode.isActive(args.agentSessionId),
-			);
-			if (denial) {
-				return fail('denied-scope', denial);
-			}
-		}
 		if (args.wait) {
 			const deadlock = guardrails.evaluateWaitTarget(
 				args.agentSessionId,
@@ -2289,6 +2340,18 @@ export function createAgentControlService({
 			);
 			if (!deadlock.ok) {
 				return fail(deadlock.code, deadlock.reason);
+			}
+		}
+		const childDenied = immediateChildDenial(origin, args.agentSessionId);
+		if (childDenied) {
+			return childDenied;
+		}
+		if (isPlanning(origin)) {
+			const denial = planModeFollowUpDenial(
+				ports.planMode.isActive(args.agentSessionId),
+			);
+			if (denial) {
+				return fail('denied-scope', denial);
 			}
 		}
 		await ports.conversations.sendFollowUp({
@@ -2312,6 +2375,13 @@ export function createAgentControlService({
 		if (scoped) {
 			return scoped;
 		}
+		const childDenied = immediateChildDenial(
+			origin,
+			await ports.tabs.resolveTabAgentSession(args.chatTabId),
+		);
+		if (childDenied) {
+			return childDenied;
+		}
 		await ports.tabs.closeTab({ chatTabId: args.chatTabId });
 		return ok({ ok: true });
 	};
@@ -2326,41 +2396,54 @@ export function createAgentControlService({
 				'This build launches no third-party CLI harnesses, so there is none to launch.',
 			);
 		}
-		const spawnDenied = evaluateSpawnGuard(origin);
-		if (spawnDenied) {
-			return spawnDenied;
+		const reserved = reserveSpawnGuard(origin);
+		if (typeof reserved !== 'function') {
+			return reserved;
 		}
-		const launched = await ports.harnesses.launchHarness({
-			workspaceId: origin.workspaceId,
-			harnessId: args.harnessId,
-			parentSessionId: origin.sessionId,
-		});
-		guardrails.recordSpawn(origin.sessionId);
-		return ok(launched);
+		try {
+			return ok(
+				await ports.harnesses.launchHarness({
+					workspaceId: origin.workspaceId,
+					harnessId: args.harnessId,
+					parentSessionId: origin.sessionId,
+				}),
+			);
+		} catch (error) {
+			reserved();
+			throw error;
+		}
 	};
 
 	const handleStartTerminal = async (
 		origin: AgentControlOrigin,
 		args: StartTerminalArgs,
 	): Promise<AgentControlResult<unknown>> => {
-		const spawnDenied = evaluateSpawnGuard(origin);
-		if (spawnDenied) {
-			return spawnDenied;
+		const reserved = reserveSpawnGuard(origin);
+		if (typeof reserved !== 'function') {
+			return reserved;
 		}
-		const started = await ports.terminals.startTerminal({
-			workspaceId: origin.workspaceId,
-			workspaceCwd: origin.workspaceCwd,
-			kind: args.kind,
-			...(args.scriptName ? { scriptName: args.scriptName } : {}),
-			...(args.restart ? { restart: true } : {}),
-		});
+		let started: Awaited<
+			ReturnType<AgentControlPorts['terminals']['startTerminal']>
+		>;
+		try {
+			started = await ports.terminals.startTerminal({
+				workspaceId: origin.workspaceId,
+				workspaceCwd: origin.workspaceCwd,
+				kind: args.kind,
+				...(args.scriptName ? { scriptName: args.scriptName } : {}),
+				...(args.restart ? { restart: true } : {}),
+			});
+		} catch (error) {
+			reserved();
+			throw error;
+		}
 		if (!started.ok) {
+			reserved();
 			return fail(
 				startTerminalErrorCode(started.code),
 				describeStartTerminalRefusal(started.message, started.terminalId),
 			);
 		}
-		guardrails.recordSpawn(origin.sessionId);
 		startedTerminals.record(origin.sessionId, started.terminalId);
 		// A terminal an agent started is one the user is meant to watch, so bring it
 		// forward rather than leaving it behind whichever dock tab was already open.
@@ -2500,20 +2583,25 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 		args: OpenTabArgs,
 	): Promise<AgentControlResult<unknown>> => {
-		const spawnDenied = evaluateSpawnGuard(origin);
-		if (spawnDenied) {
-			return spawnDenied;
+		const reserved = reserveSpawnGuard(origin);
+		if (typeof reserved !== 'function') {
+			return reserved;
 		}
-		const created = await ports.tabs.openNonChatTab({
-			workspaceId: origin.workspaceId,
-			variant: args.variant,
-			filePath: args.filePath,
-			turnId: args.turnId,
-			commentBody: args.commentBody,
-			prNumber: args.prNumber,
-		});
-		guardrails.recordSpawn(origin.sessionId);
-		return ok(created);
+		try {
+			return ok(
+				await ports.tabs.openNonChatTab({
+					workspaceId: origin.workspaceId,
+					variant: args.variant,
+					filePath: args.filePath,
+					turnId: args.turnId,
+					commentBody: args.commentBody,
+					prNumber: args.prNumber,
+				}),
+			);
+		} catch (error) {
+			reserved();
+			throw error;
+		}
 	};
 
 	/**
@@ -2904,17 +2992,9 @@ export function createAgentControlService({
 	};
 
 	/**
-	 * Parks a child's signal for the orchestrator's next wait tick. Gated on the
-	 * durable role rather than on live lineage: `origin.parentSessionId` lives in
-	 * the in-memory registry, so a session resumed after a restart would lose its
-	 * one sanctioned escape hatch at exactly the moment the depth counter stopped
-	 * denying it everything else. The signal is keyed by child, and a wait reads it
-	 * by child id, so recovering the parent's id is not needed to deliver it.
-	 *
-	 * Delivery still needs the orchestrator to name the child. A default wait
-	 * resolves its targets from the same in-memory lineage, so after a restart it
-	 * finds none — {@link emptyWait} is what tells the orchestrator to pass the ids
-	 * explicitly rather than read the empty result as "nothing needs me".
+	 * Parks a descendant's signal for its validated immediate parent's next wait
+	 * tick. The parent id is stored beside the signal so another root that names the
+	 * child cannot consume an escalation intended for somebody else.
 	 * @param origin - Resolved caller identity.
 	 * @param args - The signal reason and its message.
 	 * @returns An acknowledgement, or a `not-found` failure for a root caller.
@@ -2923,15 +3003,19 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 		args: NotifyOrchestratorArgs,
 	): Promise<AgentControlResult<unknown>> => {
-		if ((await resolveRole(origin)) !== 'subagent') {
+		if (
+			(await resolveRole(origin)) !== 'subagent' ||
+			origin.depth === 0 ||
+			origin.parentSessionId === null
+		) {
 			return fail(
 				'not-found',
-				'No orchestrator to notify: this session was not spawned by another agent.',
+				'No verified immediate parent to notify for this session.',
 			);
 		}
 		signalsByChild.set(origin.sessionId, {
-			reason: args.reason,
-			message: args.message,
+			parentSessionId: origin.parentSessionId,
+			signal: { reason: args.reason, message: args.message },
 		});
 		return ok({ ok: true });
 	};
@@ -2943,14 +3027,20 @@ export function createAgentControlService({
 	 * descending scan of its whole final turn on the main thread. The report is
 	 * fetched once, by {@link reportOn}, on the tick that returns.
 	 * @param agentSessionId - The child to inspect.
+	 * @param parentSessionId - Caller eligible to receive this child's signal.
 	 * @returns The child's current state and whether it counts as settled.
 	 */
 	const settleTarget = async (
 		agentSessionId: string,
+		parentSessionId: string,
 	): Promise<{ agent: WaitedAgent; settled: boolean }> => {
 		const live = await ports.conversations.getStatus(agentSessionId);
 		const status = live?.status;
-		const signal = signalsByChild.get(agentSessionId) ?? null;
+		const pendingSignal = signalsByChild.get(agentSessionId);
+		const signal =
+			pendingSignal?.parentSessionId === parentSessionId
+				? pendingSignal.signal
+				: null;
 		const terminal = status === undefined || TERMINAL_STATUSES.has(status);
 		return {
 			agent: {
@@ -2996,17 +3086,24 @@ export function createAgentControlService({
 	 * carried, because handing a signal to a caller is what spends it.
 	 * @param done - The settled targets from the tick that returned.
 	 * @param detail - The report detail the caller asked for.
+	 * @param parentSessionId - Caller allowed to consume child signals.
 	 * @returns Each finished child with its report attached.
 	 */
 	const collectReports = async (
 		done: readonly { agent: WaitedAgent }[],
 		detail: WaitReportDetail,
+		parentSessionId: string,
 	): Promise<WaitedAgent[]> => {
 		const completed = await Promise.all(
 			done.map((entry) => reportOn(entry.agent, detail)),
 		);
 		for (const entry of completed) {
-			signalsByChild.delete(entry.agentSessionId);
+			if (
+				signalsByChild.get(entry.agentSessionId)?.parentSessionId ===
+				parentSessionId
+			) {
+				signalsByChild.delete(entry.agentSessionId);
+			}
 		}
 		return completed;
 	};
@@ -3016,20 +3113,23 @@ export function createAgentControlService({
 	 * waiting turn ends. An abandoned wait returns before it reports: the report
 	 * is expensive and it spends the children's escalations, so a turn that is
 	 * already gone must not be the one to take them.
-	 * @param input - The targets to poll, the caller's mode and report detail, the
-	 *   deadline, and the signal that ends the wait early.
+	 * @param input - The targets, caller id, mode, report detail, deadline, and the
+	 *   signal that ends the wait early.
 	 * @returns What settled, what is still running, and whether time ran out.
 	 */
 	const pollUntilSettled = async (input: {
+		parentSessionId: string;
 		targets: readonly string[];
 		mode: WaitMode;
 		detail: WaitReportDetail;
 		deadline: number;
 		signal: AbortSignal | undefined;
 	}): Promise<WaitForAgentsResult> => {
-		const { deadline, detail, mode, signal, targets } = input;
+		const { deadline, detail, mode, parentSessionId, signal, targets } = input;
 		for (;;) {
-			const settled = await Promise.all(targets.map(settleTarget));
+			const settled = await Promise.all(
+				targets.map((target) => settleTarget(target, parentSessionId)),
+			);
 			const pending = stillRunning(settled);
 			if (signal?.aborted) {
 				return waitOutcome({ completed: [], mode, pending, timedOut: false });
@@ -3040,7 +3140,7 @@ export function createAgentControlService({
 			const expired = scheduler.now() >= deadline;
 			if (satisfied || expired) {
 				return waitOutcome({
-					completed: await collectReports(done, detail),
+					completed: await collectReports(done, detail, parentSessionId),
 					mode,
 					pending,
 					timedOut: !satisfied && expired,
@@ -3066,9 +3166,13 @@ export function createAgentControlService({
 		args: WaitForAgentsArgs,
 		signal: AbortSignal | undefined,
 	): Promise<AgentControlResult<unknown>> => {
-		const targets = args.targets ?? [
-			...originRegistry.childrenOf(origin.sessionId),
+		const immediateChildren = [
+			...new Set([
+				...ports.conversations.listImmediateChildren(origin.sessionId),
+				...originRegistry.childrenOf(origin.sessionId),
+			]),
 		];
+		const targets = args.targets ?? immediateChildren;
 		if (targets.length === 0) {
 			return ok(emptyWait(args.targets === undefined));
 		}
@@ -3078,6 +3182,10 @@ export function createAgentControlService({
 			if (!deadlock.ok) {
 				return fail(deadlock.code, deadlock.reason);
 			}
+			const childDenied = immediateChildDenial(origin, target);
+			if (childDenied) {
+				return childDenied;
+			}
 		}
 		const timeoutMs = Math.min(
 			args.timeoutMs ?? guardrails.waitTimeoutMs,
@@ -3086,6 +3194,7 @@ export function createAgentControlService({
 		return ok(
 			await pollUntilSettled({
 				deadline: scheduler.now() + timeoutMs,
+				parentSessionId: origin.sessionId,
 				detail: args.reports ?? 'full',
 				mode: args.mode ?? 'first',
 				signal,
@@ -3194,6 +3303,7 @@ export function createAgentControlService({
 	): Promise<ContextPressureAudience> =>
 		resolveContextPressureAudience({
 			delegation: origin.delegation,
+			depth: origin.depth,
 			role: await resolveRole(origin),
 		});
 
@@ -3623,6 +3733,7 @@ export function createAgentControlService({
 		return {
 			architectureDiagram,
 			delegation: origin.delegation,
+			depth: origin.depth,
 			hasChatTab: originHasChatTab(origin),
 			retired: origin.retired,
 			role: await resolveRole(origin),
@@ -3667,7 +3778,11 @@ export function createAgentControlService({
 		ports.ask.releaseSession(sessionId);
 		ports.planMode.releaseSession(sessionId);
 		ports.afkMode.releaseSession(sessionId);
-		signalsByChild.delete(sessionId);
+		for (const [childSessionId, pending] of signalsByChild) {
+			if (pending.parentSessionId === sessionId) {
+				signalsByChild.delete(childSessionId);
+			}
+		}
 		linearSearchesBySession.delete(sessionId);
 		reviewsByCaller.delete(sessionId);
 		openedReviewSessions.delete(sessionId);

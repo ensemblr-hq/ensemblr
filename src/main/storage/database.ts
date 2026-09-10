@@ -1195,6 +1195,23 @@ CREATE INDEX idx_chat_tabs_session_id ON chat_tabs(agent_session_id);
 CREATE INDEX idx_chat_tabs_open ON chat_tabs(workspace_id, closed_at);
 `,
 	},
+	{
+		id: '028_agent_control_spawn_reservations',
+		version: 28,
+		// One row is one charged root-tree spawn. Successful reservations remain for
+		// the tree lifetime, including across app restarts; only a creation failure
+		// deletes its exact row. Integer timestamps support the rolling rate query.
+		sql: `
+CREATE TABLE agent_control_spawn_reservations (
+	id TEXT PRIMARY KEY,
+	root_session_id TEXT NOT NULL,
+	reserved_at INTEGER NOT NULL
+) STRICT;
+
+CREATE INDEX idx_agent_control_spawn_root_time
+ON agent_control_spawn_reservations(root_session_id, reserved_at);
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

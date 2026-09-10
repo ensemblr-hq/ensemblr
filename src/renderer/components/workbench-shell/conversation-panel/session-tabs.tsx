@@ -4,6 +4,7 @@ import {
 	BotIcon,
 	BugIcon,
 	HistoryIcon,
+	LeafIcon,
 	MessageSquareIcon,
 	PlusIcon,
 	RotateCcwIcon,
@@ -288,12 +289,19 @@ function ClosedSessionIcon({ session }: { session: SessionTabModel }) {
 			/>
 		);
 	}
-	if (session.isSubAgent) {
+	if (session.isSubAgent || session.delegationDepth === 2) {
+		const AgentIcon = session.delegationDepth === 2 ? LeafIcon : BotIcon;
 		return (
-			<BotIcon
-				aria-hidden='true'
-				className='size-4 shrink-0 text-muted-foreground'
-			/>
+			<span
+				className={cn(
+					'grid size-5 shrink-0 place-items-center rounded-sm',
+					session.delegationDepth === 2
+						? 'bg-status-ok/15 text-status-ok'
+						: 'bg-accent text-accent-foreground',
+				)}
+			>
+				<AgentIcon aria-hidden='true' className='size-3.5' />
+			</span>
 		);
 	}
 	return (

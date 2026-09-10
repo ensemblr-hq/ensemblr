@@ -52,6 +52,7 @@ const makePorts = (
 		openNonChatTab: vi.fn().mockResolvedValue({ chatTabId: 't' }),
 		listTabs: vi.fn().mockResolvedValue([]),
 		resolveTabWorkspace: vi.fn().mockResolvedValue('ws'),
+		resolveTabAgentSession: vi.fn().mockResolvedValue(null),
 	},
 	conversations: {
 		startConversation: vi
@@ -94,6 +95,7 @@ const makePorts = (
 		isSpawnedSubAgent: vi.fn().mockResolvedValue(false),
 		listModels: vi.fn().mockResolvedValue({ defaultModelId: null, models: [] }),
 		resolveConversationWorkspace: vi.fn().mockResolvedValue('ws'),
+		listImmediateChildren: vi.fn().mockReturnValue([]),
 	},
 	terminals: {
 		startTerminal: vi.fn().mockResolvedValue({ ok: true, terminalId: 't' }),

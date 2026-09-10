@@ -15,11 +15,14 @@ import {
 	CONCIERGE_WITHHELD_OPS,
 	conciergeAwareness,
 	conciergeControlOpDenial,
+	FOCUS_PANEL_NAMES,
 	harnessAwareness,
+	managerSubagentAwareness,
 	nativeOrchestratorAwareness,
 	orchestratorAwareness,
 	PLAN_MODE_DELEGATION_HEADER,
 	PLAN_REFINEMENT_HEADER,
+	planModeManagerSubagentAwareness,
 	planModeOrchestratorAwareness,
 	planModeSubagentAwareness,
 	roleForDepth,
@@ -61,9 +64,11 @@ const playbooksFor = (features: AwarenessFeatures) =>
 	[
 		orchestratorAwareness(features),
 		nativeOrchestratorAwareness(features),
+		managerSubagentAwareness(features),
 		subagentAwareness(features),
 		harnessAwareness(features),
 		planModeOrchestratorAwareness(features),
+		planModeManagerSubagentAwareness(features),
 		planModeSubagentAwareness(features),
 	] as const;
 
@@ -93,9 +98,12 @@ it('keeps Git isolation and explicit integration consent in every workspace role
 
 const ORCHESTRATOR_AWARENESS = orchestratorAwareness(ALL_ON);
 const NATIVE_ORCHESTRATOR_AWARENESS = nativeOrchestratorAwareness(ALL_ON);
+const MANAGER_SUBAGENT_AWARENESS = managerSubagentAwareness(ALL_ON);
 const SUBAGENT_AWARENESS = subagentAwareness(ALL_ON);
 const HARNESS_AWARENESS = harnessAwareness(ALL_ON);
 const PLAN_MODE_ORCHESTRATOR_AWARENESS = planModeOrchestratorAwareness(ALL_ON);
+const PLAN_MODE_MANAGER_SUBAGENT_AWARENESS =
+	planModeManagerSubagentAwareness(ALL_ON);
 const PLAN_MODE_SUBAGENT_AWARENESS = planModeSubagentAwareness(ALL_ON);
 const CONCIERGE_AWARENESS = conciergeAwareness(ALL_ON);
 
@@ -126,6 +134,7 @@ const FEATURE_CORNERS: readonly AwarenessFeatures[] = [
 /** Both plan-mode playbooks, for the assertions that hold whatever the role. */
 const PLAN_MODE_PLAYBOOKS = [
 	PLAN_MODE_ORCHESTRATOR_AWARENESS,
+	PLAN_MODE_MANAGER_SUBAGENT_AWARENESS,
 	PLAN_MODE_SUBAGENT_AWARENESS,
 ] as const;
 
@@ -1025,7 +1034,17 @@ describe('agent-control AWARENESS parity', () => {
 		}
 	});
 
-	it('tells sub-agents to do the work themselves and escalate, not fan out', () => {
+	it('teaches managers one visible edge and leaves leaves unable to fan out', () => {
+		for (const playbook of [
+			MANAGER_SUBAGENT_AWARENESS,
+			PLAN_MODE_MANAGER_SUBAGENT_AWARENESS,
+		]) {
+			expect(playbook).toContain('depth-1');
+			expect(playbook).toContain('depth-2');
+			expect(playbook).toContain('ensemblr_start_conversation');
+			expect(playbook).toContain('ensemblr_wait_for_agents');
+			expect(playbook).toContain('immediate parent');
+		}
 		expect(SUBAGENT_AWARENESS).toContain('Do NOT spawn further sub-agents');
 		expect(SUBAGENT_AWARENESS).toContain('ensemblr_notify_orchestrator');
 		expect(SUBAGENT_AWARENESS).not.toContain('ensemblr_wait_for_agents');
@@ -1035,9 +1054,11 @@ describe('agent-control AWARENESS parity', () => {
 		for (const playbook of [
 			ORCHESTRATOR_AWARENESS,
 			NATIVE_ORCHESTRATOR_AWARENESS,
+			MANAGER_SUBAGENT_AWARENESS,
 			SUBAGENT_AWARENESS,
 			HARNESS_AWARENESS,
 			PLAN_MODE_ORCHESTRATOR_AWARENESS,
+			PLAN_MODE_MANAGER_SUBAGENT_AWARENESS,
 			PLAN_MODE_SUBAGENT_AWARENESS,
 		]) {
 			expect(playbook).toContain('zero-judgment');
@@ -1056,7 +1077,12 @@ describe('agent-control AWARENESS parity', () => {
 	});
 
 	it('states that role preferences never widen enforced policy', () => {
-		for (const playbook of [SUBAGENT_AWARENESS, PLAN_MODE_SUBAGENT_AWARENESS]) {
+		for (const playbook of [
+			MANAGER_SUBAGENT_AWARENESS,
+			SUBAGENT_AWARENESS,
+			PLAN_MODE_MANAGER_SUBAGENT_AWARENESS,
+			PLAN_MODE_SUBAGENT_AWARENESS,
+		]) {
 			expect(playbook).toContain(
 				'No role changes your tools, permission mode, or delegation depth',
 			);
@@ -1122,6 +1148,20 @@ describe('agent-control AWARENESS parity', () => {
 	});
 });
 
+describe('Pi tool schema parity', () => {
+	it('serves every focus panel accepted by the shared control schema', () => {
+		const source = readExtensionSource();
+		const focusPanelBlock = source.slice(
+			source.indexOf("'ensemblr_focus_panel'"),
+			source.indexOf("'ensemblr_focus_workspace'"),
+		);
+
+		for (const panel of FOCUS_PANEL_NAMES) {
+			expect(focusPanelBlock).toContain(`Type.Literal('${panel}')`);
+		}
+	});
+});
+
 describe('sub-agent role policy', () => {
 	it('embeds the same withheld-op set the app enforces', () => {
 		expect(
@@ -1134,11 +1174,11 @@ describe('sub-agent role policy', () => {
 	// playbook never offered it. Both registration paths have to consult it: the
 	// shared `tool()` helper, and `ensemblr_exit_plan_mode`, which registers on its
 	// own because it aborts the turn after a successful call.
-	it('gates both registration paths on that set', () => {
+	it('gates both registration paths on the depth-specific set', () => {
 		const source = readExtensionSource();
-		expect(source).toMatch(
-			/return IS_CONCIERGE\s*\? !CONCIERGE_WITHHELD_OPS\.has\(op\)\s*: !IS_SUBAGENT \|\| !SUBAGENT_WITHHELD_OPS\.has\(op\);/,
-		);
+		expect(source).toContain('IS_MANAGER_SUBAGENT');
+		expect(source).toContain('MANAGER_SUBAGENT_WITHHELD_OPS.has(op)');
+		expect(source).toContain('SUBAGENT_WITHHELD_OPS.has(op)');
 		expect(source).toMatch(/if \(!registersOp\(op\)\) \{\s*return;/);
 		expect(source).toMatch(/if \(registersOp\('exitPlanMode'\)\) \{/);
 	});
@@ -1197,11 +1237,10 @@ describe('sub-agent role policy', () => {
 		}
 	});
 
-	// The role gate is what makes the promise true. Before it, the playbook said
-	// nested delegation was blocked while only the in-memory depth counter blocked
-	// it, so a child resumed after a restart could delegate onward.
+	// The role and depth gates make the leaf promise survive a restart rather
+	// than relying on the current process's in-memory ancestry.
 	it('backs the sub-agent playbook’s promises with a real denial', () => {
-		expect(SUBAGENT_AWARENESS).toContain('nested delegation is blocked');
+		expect(SUBAGENT_AWARENESS).toContain('delegation is blocked at leaf depth');
 		expect(SUBAGENT_AWARENESS).toContain('refused here');
 		for (const op of [
 			'startConversation',
@@ -1618,13 +1657,23 @@ describe('the third-party CLI harness feature switch', () => {
 	// workspace chat tab reads must be silent on the subject. The Concierge's
 	// settings guide must still explain the disabled switch without offering tools.
 	it('omits harness prose from workspace playbooks while off', () => {
-		const [orchestrator, native, subagent, , planOrchestrator, planSubagent] =
-			AWARENESS_WITHOUT_HARNESSES;
+		const [
+			orchestrator,
+			native,
+			manager,
+			subagent,
+			,
+			planOrchestrator,
+			planManager,
+			planSubagent,
+		] = AWARENESS_WITHOUT_HARNESSES;
 		const playbooks = [
 			orchestrator,
 			native,
+			manager,
 			subagent,
 			planOrchestrator,
+			planManager,
 			planSubagent,
 		];
 		const sparkModelGuidance =

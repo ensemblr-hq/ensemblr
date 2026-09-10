@@ -365,6 +365,12 @@ describe('buildPlanModeDelegationDirective', () => {
 			delegation: 'native',
 			role: 'orchestrator',
 		}) ?? '';
+	const manager =
+		buildPlanModeDelegationDirective({
+			delegation: 'ensemblr',
+			depth: 1,
+			role: 'subagent',
+		}) ?? '';
 	const child =
 		buildPlanModeDelegationDirective({
 			delegation: 'ensemblr',
@@ -372,7 +378,7 @@ describe('buildPlanModeDelegationDirective', () => {
 		}) ?? '';
 
 	test('opens every variant with the header a preamble can be searched for', () => {
-		for (const directive of [root, native, child]) {
+		for (const directive of [root, native, manager, child]) {
 			expect(directive.startsWith(PLAN_MODE_DELEGATION_HEADER)).toBe(true);
 		}
 	});
@@ -389,7 +395,7 @@ describe('buildPlanModeDelegationDirective', () => {
 	});
 
 	test('names both pieces of harness text it is answering', () => {
-		for (const directive of [root, native, child]) {
+		for (const directive of [root, native, manager, child]) {
 			expect(directive).toContain('Explore');
 			expect(directive).toContain('AgentTool');
 		}
@@ -422,19 +428,26 @@ describe('buildPlanModeDelegationDirective', () => {
 		expect(native).not.toContain('is denied in this session');
 	});
 
-	test('blocks an investigator from fanning out at all', () => {
-		expect(child).toContain('nested delegation is blocked on every axis');
+	test('lets a verified manager fan out only through Ensemblr', () => {
+		expect(manager).toContain('verified depth-1 sub-agent');
+		expect(manager).toContain('ensemblr_start_conversation');
+		expect(manager).toContain('fresh depth-2 leaves');
+		expect(manager).toContain('native `Agent`/`Task` tool is denied');
+	});
+
+	test('blocks a leaf investigator from fanning out at all', () => {
+		expect(child).toContain('depth-2 leaf');
 		expect(child).not.toContain('ensemblr_start_conversation');
 	});
 
 	test('blocks an investigator from submitting a plan', () => {
 		expect(child).toContain('ExitPlanMode');
 		expect(child).toContain('ensemblr_exit_plan_mode');
-		expect(child).toContain('belong to the orchestrator that spawned you');
+		expect(child).toContain('belong to the root orchestrator');
 	});
 
 	test('closes every variant on the plan file the harness names', () => {
-		for (const directive of [root, native, child]) {
+		for (const directive of [root, native, manager, child]) {
 			expect(directive).toContain('~/.claude/plans/');
 			expect(directive).toContain(
 				'Do not write the plan file your workflow names',

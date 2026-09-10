@@ -6,6 +6,7 @@ import {
 	FileIcon,
 	FileTextIcon,
 	KeyboardOffIcon,
+	LeafIcon,
 	LoaderCircleIcon,
 	MapIcon,
 	MessageSquareIcon,
@@ -83,7 +84,7 @@ export function SessionTab({
 	const isCompactSubAgent = isChatKind && session.isSubAgent && !isActive;
 	const canClose = isChatKind ? openChatTabCount > 1 : true;
 	const showCloseControls = canClose && !isDraggingTab && !isCompactSubAgent;
-	const showUnreadDot =
+	const isUnread =
 		!isActive && !isDraggingTab && isSessionUnread(session, unreadKeys);
 	const clickGuard = useTabClickGuard({
 		onDragStart,
@@ -117,9 +118,8 @@ export function SessionTab({
 				onPin={() => onPin(session.id)}
 				onPointerDown={clickGuard.resetDrag}
 				session={session}
-				showUnreadDot={showUnreadDot}
+				isUnread={isUnread}
 			/>
-			{showUnreadDot ? <SessionTabUnreadDot /> : null}
 			{showCloseControls ? (
 				<SessionTabCloseControls
 					label={session.label}
@@ -186,8 +186,30 @@ interface SessionTabLabelProps {
 	onPin: () => void;
 	onPointerDown: () => void;
 	session: SessionTabModel;
-	/** Reserves trailing room for the dot the tab draws over this region. */
-	showUnreadDot: boolean;
+	/** Emphasizes unread labels; only root chat icons receive a dot. */
+	isUnread: boolean;
+}
+
+/**
+ * Classifies one tab for label emphasis and hierarchy icon treatment.
+ * @param session - Tab model whose kind, depth, and preview state drive presentation.
+ * @returns Stable presentation fields consumed by the selectable label.
+ */
+function sessionTabLabelPresentation(session: SessionTabModel) {
+	const kind = session.kind ?? 'chat';
+	return {
+		fullLabel: session.fullLabel ?? session.label,
+		iconClassName:
+			session.delegationDepth === 2
+				? 'size-5 rounded-sm bg-status-ok/15 text-status-ok'
+				: session.isSubAgent
+					? 'size-5 rounded-sm bg-accent text-accent-foreground'
+					: 'size-3.5',
+		isContentPreview:
+			session.isPreview && kind !== 'chat' && kind !== 'terminal',
+		isRootChat:
+			kind === 'chat' && !session.isSubAgent && !session.delegationDepth,
+	};
 }
 
 /** The tab's icon and title, as the button that selects or pins it. */
@@ -198,8 +220,10 @@ function SessionTabLabel({
 	onPin,
 	onPointerDown,
 	session,
-	showUnreadDot,
+	isUnread,
 }: SessionTabLabelProps) {
+	const { fullLabel, iconClassName, isContentPreview, isRootChat } =
+		sessionTabLabelPresentation(session);
 	return (
 		<button
 			aria-current={isActive ? 'page' : undefined}
@@ -210,29 +234,28 @@ function SessionTabLabel({
 			onClick={onClick}
 			onDoubleClick={onPin}
 			onPointerDown={onPointerDown}
-			title={isCompact ? (session.fullLabel ?? session.label) : undefined}
+			title={isCompact ? fullLabel : undefined}
 			type='button'
 		>
 			<span
 				className={cn(
-					'grid shrink-0 place-items-center',
-					session.isSubAgent
-						? 'size-5 rounded-sm bg-accent text-accent-foreground'
-						: 'size-3.5',
+					'relative grid shrink-0 place-items-center',
+					iconClassName,
 				)}
 			>
 				<SessionTabIcon session={session} />
+				{isUnread ? <SessionTabUnreadMarker showDot={isRootChat} /> : null}
 			</span>
 			{isCompact ? (
-				<span className='sr-only'>{session.fullLabel ?? session.label}</span>
+				<span className='sr-only'>{fullLabel}</span>
 			) : (
 				<span
 					className={cn(
 						'truncate',
-						session.isPreview && 'italic',
-						showUnreadDot && 'pr-3 font-medium text-foreground',
+						isContentPreview && 'italic',
+						isUnread && 'font-medium text-foreground',
 					)}
-					title={session.fullLabel ?? session.label}
+					title={fullLabel}
 				>
 					{session.label}
 				</span>
@@ -241,13 +264,17 @@ function SessionTabLabel({
 	);
 }
 
-/** The dot marking a tab whose conversation has gone unread. */
-function SessionTabUnreadDot() {
+/** Announces unread conversations, adding an icon-corner dot only for root chats. */
+function SessionTabUnreadMarker({ showDot }: { showDot: boolean }) {
 	const { t } = useTranslation();
 
 	return (
 		<span
-			className='pointer-events-none absolute top-1/2 right-2 size-1.5 -translate-y-1/2 rounded-full bg-primary transition-opacity group-hover/session-tab:opacity-0'
+			className={
+				showDot
+					? 'pointer-events-none absolute -top-0.5 -right-0.5 size-1 rounded-full bg-primary'
+					: 'sr-only'
+			}
 			data-session-tab-unread='true'
 		>
 			<span className='sr-only'>
@@ -410,7 +437,12 @@ function ChatSessionTabIcon({ session }: { session: SessionTabModel }) {
 	}
 
 	const { className, glyph } = SESSION_TAB_MODE_ICONS[mode];
-	const ModeIcon = session.isSubAgent ? BotIcon : glyph;
+	const ModeIcon =
+		session.delegationDepth === 2
+			? LeafIcon
+			: session.isSubAgent
+				? BotIcon
+				: glyph;
 	return (
 		<ModeIcon
 			aria-label={modeLabel}
@@ -445,6 +477,10 @@ function KindSessionTabIcon({ session }: { session: SessionTabModel }) {
 				/>
 			);
 		}
+	}
+
+	if (session.delegationDepth === 2) {
+		return <LeafIcon aria-hidden='true' className='size-3.5' />;
 	}
 
 	if (session.isSubAgent) {

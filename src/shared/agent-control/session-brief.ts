@@ -295,7 +295,10 @@ const NATIVE_DELEGATION_BODY = `The user chose your runtime's own sub-agent tool
  * A change that lets a marked session open under `native` makes this sentence a
  * lie and hands a child a live fan-out around the depth cap.
  */
-const SUBAGENT_DELEGATION_BODY = `You were spawned to answer one question, and nested delegation is blocked on every axis: your runtime's sub-agent tool is denied and Ensemblr's spawn ops are withheld. The fan-out step in your plan workflow is not yours to run — do the reading yourself and leave your findings as your last message, which is what the orchestrator waiting on you reads. Submitting a plan is not yours either: \`ExitPlanMode\` and \`ensemblr_exit_plan_mode\` both belong to the orchestrator that spawned you, and a plan posted from here would raise a review panel in a tab nobody is watching.`;
+const MANAGER_SUBAGENT_DELEGATION_BODY = `You are a verified depth-1 sub-agent. Your runtime's native \`Agent\`/\`Task\` tool is denied, but Ensemblr's delegation tools remain available for one more edge: you may start fresh depth-2 leaves with \`ensemblr_start_conversation\`, wait on and follow up with only those children, and close only their tabs after collecting their reports. Do not pass \`chatTabId\`, \`peer\`, \`planMode\`, or \`afkMode\`; Plan Mode is inherited automatically. A leaf cannot delegate. You still report to your immediate parent and do not submit the user-facing plan.`;
+
+/** The plan-workflow resolution for a depth-2 leaf, which cannot delegate. */
+const SUBAGENT_DELEGATION_BODY = `You are a depth-2 leaf spawned to answer one question, and delegation is blocked on every axis: your runtime's sub-agent tool is denied and Ensemblr's spawn ops are withheld. The fan-out step in your plan workflow is not yours to run — do the reading yourself and leave your findings as your last message, which is what your immediate parent reads. Submitting a plan is not yours either: \`ExitPlanMode\` and \`ensemblr_exit_plan_mode\` both belong to the root orchestrator, and a plan posted from here would raise a review panel in a tab nobody is watching.`;
 
 /**
  * Closes the block for a root. The workflow names a plan file under the user's
@@ -342,15 +345,19 @@ const SUBAGENT_PLAN_FILE_CLAUSE = `Do not write the plan file your workflow name
 export function buildPlanModeDelegationDirective({
 	delegation,
 	role,
+	depth,
 }: {
 	delegation: SubagentMechanism;
 	role: AgentControlRole;
+	depth?: 0 | 1 | 2;
 }): string | null {
 	if (role === 'concierge') {
 		return null;
 	}
 	if (role === 'subagent') {
-		return `${PLAN_MODE_DELEGATION_PREAMBLE}\n\n${SUBAGENT_DELEGATION_BODY}\n\n${SUBAGENT_PLAN_FILE_CLAUSE}`;
+		const body =
+			depth === 1 ? MANAGER_SUBAGENT_DELEGATION_BODY : SUBAGENT_DELEGATION_BODY;
+		return `${PLAN_MODE_DELEGATION_PREAMBLE}\n\n${body}\n\n${SUBAGENT_PLAN_FILE_CLAUSE}`;
 	}
 	const body =
 		delegation === 'native' ? NATIVE_DELEGATION_BODY : ENSEMBLR_DELEGATION_BODY;

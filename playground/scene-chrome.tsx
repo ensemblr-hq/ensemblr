@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { createContext, use } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/renderer/lib/utils';
 
@@ -77,6 +78,24 @@ export function ControlGroup({
 			</span>
 			<div className='flex flex-wrap items-center gap-1'>{children}</div>
 		</div>
+	);
+}
+
+/** Shared locale toggles for scenes that exercise translated product UI. */
+export function SceneLanguageControl() {
+	const { i18n } = useTranslation();
+
+	return (
+		<ControlGroup label='language'>
+			{(['en', 'ru', 'el'] as const).map((language) => (
+				<SceneToggle
+					isActive={i18n.language === language}
+					key={language}
+					label={language}
+					onClick={() => void i18n.changeLanguage(language)}
+				/>
+			))}
+		</ControlGroup>
 	);
 }
 

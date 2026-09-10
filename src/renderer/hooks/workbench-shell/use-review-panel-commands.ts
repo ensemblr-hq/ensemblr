@@ -10,7 +10,7 @@ import type { ReviewPanelTab } from '@/renderer/types/workbench';
 
 /**
  * Registers every command that reaches the review panel from outside it: the
- * View menu's Files / Changes / Checks picks, ⌥⌘U's jump to the uncommitted
+ * View menu's Agents / Files / Changes / Checks picks, ⌥⌘U's jump to the uncommitted
  * change set, and ⌘P's file palette.
  *
  * They live in the workspace shell rather than in the panel they act on, because
@@ -39,6 +39,10 @@ export function useReviewPanelCommands({
 	workspaceId: string;
 }): void {
 	const setChangesSource = useSetChangesSource(workspaceId);
+	const showAgentsTab = useCallback(() => {
+		onTabChange('agents');
+		revealRail();
+	}, [onTabChange, revealRail]);
 	const showFilesTab = useCallback(() => {
 		onTabChange('files');
 		revealRail();
@@ -56,9 +60,11 @@ export function useReviewPanelCommands({
 		showChangesTab();
 	}, [setChangesSource, showChangesTab]);
 
+	useMenuCommand('panel.agents', showAgentsTab);
 	useMenuCommand('panel.files', showFilesTab);
 	useMenuCommand('panel.changes', showChangesTab);
 	useMenuCommand('panel.checks', showChecksTab);
+	useMenuCommandChecked('panel.agents', activeTab === 'agents');
 	useMenuCommandChecked('panel.files', activeTab === 'files');
 	useMenuCommandChecked('panel.changes', activeTab === 'changes');
 	useMenuCommandChecked('panel.checks', activeTab === 'checks');

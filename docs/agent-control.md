@@ -123,35 +123,24 @@ is gated on active Plan Mode instead.
 Delegation is bounded so a runaway agent cannot fork-bomb the app
 (`src/main/agent-control/guardrails.ts`):
 
-- **Shallow by design** — only a root orchestrator may spawn; a spawned
-  sub-agent cannot delegate onward (spawn depth capped at **1**).
-- **20 spawns per session** (lifetime) and **10 per minute** (rolling).
-- **Plan Mode is inherited** — a spawn from a planning parent produces a planning
-  child, so a planning orchestrator can fan out read-only investigators without
-  handing any of them a way to edit the repository. The depth cap still applies,
-  so inheritance never recurses.
+- **Two edges at most** — a root may open a depth-1 manager, and that manager may
+  open fresh depth-2 leaves. Leaves cannot delegate (spawn depth capped at **2**).
+- **20 spawns per root tree** (lifetime) and **10 per minute** (rolling). Closing
+  or stopping a child does not restore either budget.
+- **Plan Mode and AFK Mode are inherited** — a descendant receives the caller's
+  mode snapshot. A depth-1 planning manager may fan out read-only leaves; the
+  inherited depth-2 policy prevents further recursion.
 - A blocking wait times out after **5 minutes**; the child keeps running.
 - Waiting on an ancestor session is refused (it would deadlock).
 
 ## The sub-agent role policy
 
-Guardrails count spawns; they do not decide who may do what. That is the role
-policy in `src/shared/agent-control/subagent-policy.ts`, which refuses a spawned
-sub-agent eighteen ops with `denied-scope` **whatever mode it is in**:
-
-`spawnChatTab`, `startConversation`, `startReview`, `sendFollowUp`,
-`launchHarness`, `startTerminal`, `stopTerminal`, `writeTerminal`, `openTab`,
-`closeTab`, `setBranchName`, `setWorkspaceStatus`, `askUserQuestion`,
-`exitPlanMode`, `linearCreateComment`, `linearCreateIssue`,
-`linearUpdateIssue`, `messageConcierge`.
-
-Two things run together and are easy to confuse. The spawn guardrail reads
-`origin.depth`, which lives in the in-memory origin registry; the role policy
-reads the **durable sub-agent marker** on the chat tab. Only the second survives
-a restart. Before it existed, a resumed child re-registered at depth 0, read as a
-root, and got the whole surface back — while `notifyOrchestrator`, its one
-sanctioned escape hatch, broke on the same missing lineage. `notifyOrchestrator`
-now keys off the marker too, so the two move together.
+Guardrails count spawns; they do not decide who may do what. The role policy in
+`src/shared/agent-control/subagent-policy.ts` combines the durable descendant
+role with validated persisted lineage depth. Both survive restart. A legacy
+marker without provable depth is useful only to establish that the caller is a
+descendant, so it fails closed at depth 2 rather than manufacturing manager or
+root authority.
 
 **A conversation the Concierge opens is a root orchestrator, not a sub-agent of
 it.** The Concierge is on no lineage axis, so what it opens is a peer with its own
@@ -164,14 +153,34 @@ from. A tab the Concierge reuses has any marker its last tenant left cleared,
 because the tab now hosts a root; a spawn that fails to submit puts back whatever
 the tab carried before rather than assuming which way the write went.
 
-`waitForAgents`, `listModels`, and `listRunScripts` are not denied — a sub-agent
-simply has no children to wait on, no spawn to pick a model for, and no
-`startTerminal` to pick a run script for. Those three (`SUBAGENT_UNUSABLE_OPS`)
-are withheld from its tool list along with the eighteen above, because listing a
-tool the service would only refuse teaches the model to keep reaching for it. The
-Pi extension registers the complement of `SUBAGENT_WITHHELD_OPS` — twenty-one ops
-in all — for a child, and a parity test compares its copy of that set against the
-shared one.
+The policy refuses a leaf twenty ops with `denied-scope`:
+
+`spawnChatTab`, `startConversation`, `startReview`, `sendFollowUp`,
+`launchHarness`, `listModels`, `startTerminal`, `stopTerminal`, `waitForAgents`,
+`writeTerminal`, `openTab`, `closeTab`, `setBranchName`, `setWorkspaceStatus`,
+`askUserQuestion`, `exitPlanMode`, `linearCreateComment`, `linearCreateIssue`,
+`linearUpdateIssue`, `messageConcierge`.
+
+The policy refuses a manager fifteen ops with `denied-scope`:
+
+`spawnChatTab`, `startReview`, `launchHarness`, `startTerminal`, `stopTerminal`,
+`writeTerminal`, `openTab`, `setBranchName`, `setWorkspaceStatus`,
+`askUserQuestion`, `exitPlanMode`, `linearCreateComment`, `linearCreateIssue`,
+`linearUpdateIssue`, `messageConcierge`.
+
+The five differences are one visible Ensemblr edge: a verified depth-1 manager
+keeps `startConversation`, `listModels`, `waitForAgents`, `sendFollowUp`, and
+`closeTab`, scoped to fresh immediate leaves it owns. It cannot reuse a tab, open
+a peer or Review, override inherited Plan/AFK mode, steer sideways or upward, or
+use a runtime's native sub-agent tool. Missing or malformed descendant depth is
+always treated as a depth-2 leaf.
+
+`listRunScripts` is not denied — no descendant can start a workspace-owned run
+script, so the listing is merely unusable. It is the sole member of
+`SUBAGENT_UNUSABLE_OPS` and is withheld from every descendant.
+`SUBAGENT_WITHHELD_OPS` — twenty-one ops in all — is the leaf-safe default. The
+Pi extension uses `ENSEMBLR_CONTROL_DEPTH` to select the manager or leaf set and
+defaults an unrecognized descendant value to leaf.
 
 What a sub-agent keeps: every read, `focusTab`/`focusDockTab`/`focusPanel`,
 `setName`, `setSummary`, and `notifyOrchestrator` — which is also why
@@ -200,8 +209,9 @@ service refuses to any caller that drives no native chat tab. That is a property
 of the **caller**, not of a runtime: a terminal harness owns a tab that titles
 itself from its own session log, so all four would have nothing to act on, while
 every first-class runtime on the chat surface (Pi and Claude Code alike) holds
-them. `ControlAudience` carries exactly three facts — `hasChatTab`, `role`, and
-`delegation` — so a runtime added later selects its surface by declaring them
+them. `ControlAudience` carries `hasChatTab`, `role`, `delegation`, and validated
+`depth` — missing descendant depth fails closed as a leaf — so a runtime added
+later selects its surface by declaring them
 rather than by being named.
 
 ## The delegation-mechanism axis
@@ -246,21 +256,13 @@ The SDK fixes `disallowedTools` when `query()` opens, so a live-read tool list
 would let the user flip the setting mid-session and leave that session holding
 neither mechanism. A change therefore reaches the next chat, not the open one.
 
-Pi is unaffected: it has no sub-agent tool of its own, so
-`resolveAgentControlWiring` pins every non-Claude runtime to `ensemblr`
-regardless of the setting. So is every spawned child, whatever its runtime — the
-setting picks how a *root* delegates. Nested delegation is blocked on the other
-axes already, so a child opened under `native` would keep its own sub-agent tool
-live and fan out around the depth cap.
-
-**A child is recognised by its marker, not only by its lineage.**
-`parentSessionId` rides the open request and a *resume* carries none, so a child
-reopened after a restart reads as a root — and would take the user's `native`
-setting, which is exactly the escape above. `resolveDelegation` therefore reads
-the durable sub-agent marker off the chat tab as well, the same column the
-control layer's role resolution prefers over lineage for the same reason. The
-sub-agent variant of the plan-mode delegation directive states outright that the
-runtime's tool is denied; this pin is what makes that true.
+Pi has no native sub-agent tool, so every Pi session delegates through Ensemblr.
+Every spawned Claude descendant is pinned to `ensemblr` too: the setting picks
+how a root delegates, while a depth-1 manager's remaining edge must stay on the
+visible lineage the app can enforce. `resolveDelegation` reads validated persisted
+lineage first and the durable tab marker only as a compatibility fallback. A
+Claude descendant is denied `Agent` and `Task` regardless of the saved root mode,
+so native delegation cannot route around the depth cap.
 
 Terminal harnesses are unaffected too — their control
 token is minted per workspace and shared by every terminal in it, so the app
@@ -287,24 +289,22 @@ them; a row the parser cannot read fails the test rather than going unchecked.
 the caller's own workspace; `read` is allowed in every mode and may span
 workspaces; `spawn` additionally spends depth, quota, and rate budget.
 **Withheld from** names the callers whose tool list omits it — `sub-agent`
-(denied by role, `denied-scope`), `sub-agent*` (withheld as unusable, still
-dispatchable), `no chat tab` (a terminal harness), `workspace agent` (a
-Concierge-only op, meaningless to an agent that already has a workspace), and
-`Concierge` (denied to the Concierge, which has neither a workspace to act in
-nor a chat tab of its own).
+(denied to every descendant), `leaf` (denied only at depth 2), `sub-agent*`
+(withheld as unusable from every descendant, still dispatchable), `no chat tab`
+(a terminal harness), `workspace agent` (a Concierge-only op), and `Concierge`.
 
 ### Conversations and delegation
 
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
 | `ensemblr_spawn_chat_tab` | `title?: string` | write, spawn | sub-agent, Concierge |
-| `ensemblr_start_conversation` | **`prompt: string`**, `afkMode?: boolean`, `chatTabId?: string`, `model?: string`, `peer?: boolean`, `planMode?: boolean`, `thinkingLevel?: string`, `title?: string`, `wait?: boolean`, `workspaceId?: string` | write, spawn | sub-agent |
-| `ensemblr_send_follow_up` | **`agentSessionId: string`**, **`prompt: string`**, `wait?: boolean` | write | sub-agent |
-| `ensemblr_wait_for_agents` | `targets?: string[]`, `mode?: 'first' \| 'all'`, `reports?: 'full' \| 'brief'`, `timeoutMs?: number` | read | sub-agent\* |
+| `ensemblr_start_conversation` | **`prompt: string`**, `afkMode?: boolean`, `chatTabId?: string`, `model?: string`, `peer?: boolean`, `planMode?: boolean`, `thinkingLevel?: string`, `title?: string`, `wait?: boolean`, `workspaceId?: string` | write, spawn | leaf |
+| `ensemblr_send_follow_up` | **`agentSessionId: string`**, **`prompt: string`**, `wait?: boolean` | write | leaf |
+| `ensemblr_wait_for_agents` | `targets?: string[]`, `mode?: 'first' \| 'all'`, `reports?: 'full' \| 'brief'`, `timeoutMs?: number` | read | leaf |
 | `ensemblr_notify_orchestrator` | **`reason: 'need_decision' \| 'blocked' \| 'progress' \| 'done'`**, **`message: string`** | read | Concierge |
 | `ensemblr_message_concierge` | **`reason: 'need_decision' \| 'blocked' \| 'brief_wrong' \| 'progress' \| 'done'`**, **`message: string`** (≤ 4,000) | write | sub-agent, Concierge |
-| `ensemblr_list_models` | *(none)* | read | sub-agent\* |
-| `ensemblr_close_tab` | **`chatTabId: string`** | write | sub-agent |
+| `ensemblr_list_models` | *(none)* | read | leaf |
+| `ensemblr_close_tab` | **`chatTabId: string`** | write | leaf |
 
 `waitForAgents` and `notifyOrchestrator` are reads, so they survive `read-only`
 mode — a blocked child can still reach its orchestrator when every write is
@@ -479,7 +479,7 @@ fragment and a colour code cut before its `ESC` reads as ordinary text.
 | `ensemblr_open_tab` | **`variant: 'file' \| 'diff' \| 'comment'`**, `filePath?: string`, `turnId?: string`, `commentBody?: string`, `prNumber?: number` | write, spawn | Concierge, sub-agent |
 | `ensemblr_focus_tab` | **`chatTabId: string`** | write | — |
 | `ensemblr_focus_dock_tab` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one — `workspaceId?: string` | write | — |
-| `ensemblr_focus_panel` | **`panel: 'files' \| 'changes' \| 'checks'`**, `workspaceId?: string` | write | — |
+| `ensemblr_focus_panel` | **`panel: 'agents' \| 'files' \| 'changes' \| 'checks'`**, `workspaceId?: string` | write | — |
 | `ensemblr_focus_workspace` | **`workspaceId: string`** | write | workspace agent |
 | `ensemblr_create_workspace` | **`projectId: string`**, **`name: string`**, `baseBranch?: string` | write, spawn | workspace agent |
 | `ensemblr_set_workspace_status` | **`status: 'backlog' \| 'in-progress' \| 'in-review' \| 'done' \| 'canceled'`**, `workspaceId?: string` | write | sub-agent |
@@ -783,20 +783,20 @@ conversation, while one looking at a conversation it steers is told to brief a
 fresh child rather than follow up — and told the exception, that a follow-up is
 still right when the work depends on what that conversation already holds. And
 **what the caller can do about it**, which is `ContextPressureAudience`:
-`getConversationStatus` is held by every role, including the two whose tool lists
-have `startConversation` withheld, so naming that op unconditionally would send a
-spawned sub-agent or a natively-delegating root after a tool it does not hold. A
-sub-agent is told to wrap up and say in its report that its window is filling; a
-native root is pointed at its own runtime's sub-agent tool. `resolveContextPressureAudience`
+`getConversationStatus` is held by every role, including callers whose tool lists
+have `startConversation` withheld. Naming that op unconditionally would send a
+leaf or a natively-delegating root after a tool it does not hold. A depth-1
+manager receives the same fresh-child advice as a root; a leaf is told to wrap up
+and say in its report that its window is filling; a native root is pointed at its
+own runtime's sub-agent tool. `resolveContextPressureAudience`
 sits beside `withheldControlOps` in `subagent-policy.ts` and mirrors its
 `delegatesNatively` condition deliberately — the two answer the same question and
 must move together.
 
 On `waitForAgents` the pressure note joins the resume note rather than replacing
 it, and its audience is fixed at `spawns-tabs` rather than resolved. That is sound
-only because `waitForAgents` is itself withheld from both of the other audiences
-(`SUBAGENT_UNUSABLE_OPS` and `NATIVE_DELEGATION_WITHHELD_OPS`), so everything that
-can reach the note already holds the op it names.
+only because `waitForAgents` is itself withheld from leaves and native-delegating
+roots, so everything that can reach the note already holds the op it names.
 
 ### Review
 
@@ -1628,10 +1628,11 @@ could discharge it.
 
 ## Orchestration in practice
 
-An agent starts as an **orchestrator** (the root, lineage depth 0) and may
-delegate; anything it spawns is a **sub-agent** that does its one unit of work
-itself and never fans out. The intended loop is **delegate → wait → evaluate →
-integrate**:
+An agent starts as an **orchestrator** (depth 0). It may open depth-1 manager
+sub-agents; each manager owns its delegated workstream and may open fresh depth-2
+leaves for genuinely independent units. Leaves do their work themselves. The
+same **delegate → wait → evaluate → integrate** loop applies at both permitted
+edges:
 
 1. **Delegate** each independent, substantial workstream to its own fresh tab
    with `ensemblr_start_conversation` (give it a short `title`), briefing each
@@ -1655,8 +1656,9 @@ integrate**:
    follow along.
 
 Delegation is the exception, not the default — one agent in one thread is the
-right tool for almost every task. A sub-agent's report is its only deliverable —
-it writes no files unless its brief names a path.
+right tool for almost every task. Every descendant reports to its immediate
+parent; a manager integrates its leaves before reporting upward. A leaf's report
+is its only deliverable unless its brief names an output path.
 
 Decisions the user owns end a child's report under an `Open questions` heading:
 each one a question, 2-6 options, and the option the child took. The orchestrator
@@ -1687,12 +1689,11 @@ orchestrator that owns the conversation is blocked waiting on its report.
 Two things a wait returns as prose rather than as a flag. `timedOut: true` with
 children still `pending` carries a `note` naming the exact resume call, in the
 caller's own mode, because an orchestrator reads a bare timeout as a fault to
-report. And a *default* wait that finds no registered children carries a `note`
-too: lineage lives in the in-memory origin registry, so after a restart the
-default target resolves empty even though `notifyOrchestrator` — keyed off the
-durable marker — still works. Without the note, a resumed child's signal parks
-in a wait that reads back "nothing needs me". The recovery is to wait again with
-explicit `targets`, which the orchestrator still holds in its own transcript.
+report. A *default* wait also resolves children from validated lineage in SQLite, so it
+continues to find owned descendants after an app restart even when the live
+origin registry starts empty. `notifyOrchestrator` and the wait target therefore
+agree on the same durable immediate parent rather than relying on transcript-held
+explicit ids as a recovery path.
 
 The same loop runs while planning, with read-only children: each one answers a
 question about the codebase and reports back, and the orchestrator folds those

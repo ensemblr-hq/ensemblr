@@ -31,7 +31,12 @@ export function normalizeWorkbenchSearch(
 
 /** Type guard for the review-panel tab enum. */
 function isReviewTab(value: unknown): value is ReviewPanelTab {
-	return value === 'files' || value === 'changes' || value === 'checks';
+	return (
+		value === 'agents' ||
+		value === 'files' ||
+		value === 'changes' ||
+		value === 'checks'
+	);
 }
 
 /** Coerces a raw `dock` search param to a valid {@link DockTabId}. */

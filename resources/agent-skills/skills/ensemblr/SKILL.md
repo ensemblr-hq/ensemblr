@@ -78,6 +78,10 @@ workspace. Treat that shape as managed — never rearrange it by hand.
   when you begin; move it to In Review the same turn the work becomes reviewable.
 - **Close the loop on review.** Resolve a diff comment only in the turn you
   actually fixed what it asked. Leave the rest open and say which, and why.
+- **Delegate by depth.** A root may open depth-1 managers; a manager may open
+  fresh depth-2 leaves and must integrate them before reporting upward. Leaves
+  cannot delegate. Every descendant signals and reports only to its immediate
+  parent, and missing depth is treated as leaf authority.
 - **Record the summary** (`ensemblr_set_summary`) before your closing message.
 
 ## Reference

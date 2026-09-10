@@ -49,9 +49,13 @@ import { selectDefaultRunScript } from '../../shared/scripts.ts';
 import type {
 	SpawnCallerIdentity,
 	SpawnModelResolver,
+	SpawnModelSelection,
 } from '../agent-providers';
 import { acceptableThinkingLevels } from '../agent-providers';
-import type { AgentSessionService } from '../agent-runtime/agent-session-service.ts';
+import type {
+	AgentSessionOpenRequest,
+	AgentSessionService,
+} from '../agent-runtime/agent-session-service.ts';
 import {
 	applyBranchSlug,
 	BranchSlugRejected,
@@ -114,6 +118,7 @@ import {
 	type WorkspacePort,
 } from './ports.ts';
 import { makeDiffPort, makeReviewPort } from './review-ports.ts';
+import { listImmediateAgentSessionChildren } from './session-lineage.ts';
 import {
 	isSessionTabMarkedSubAgent,
 	isTabMarkedSubAgent,
@@ -537,7 +542,173 @@ function makeTabPort(deps: PortAdapterDeps): TabPort {
 			}));
 		},
 		resolveTabWorkspace: async (chatTabId) => workspaceOfTab(chatTabId),
+		resolveTabAgentSession: async (chatTabId) =>
+			readTab(chatTabId)?.agentSessionId ?? null,
 	};
+}
+
+type StartConversationInput = Parameters<
+	ConversationPort['startConversation']
+>[0];
+
+/** Allocated chat tab for a conversation start transaction. */
+interface ConversationTabAllocation {
+	openedTabId: string | null;
+	targetTabId: string;
+}
+
+/**
+ * Claims the workspace placeholder or opens the one chat tab this transaction owns.
+ * @param deps - Adapter collaborators.
+ * @param request - Conversation request naming an optional existing tab.
+ * @returns The target tab and the id cleanup may close.
+ */
+function allocateConversationTab(
+	deps: PortAdapterDeps,
+	request: Pick<StartConversationInput, 'chatTabId' | 'workspaceId'>,
+): ConversationTabAllocation {
+	const claimedTab = request.chatTabId
+		? null
+		: deps.chatTabService.claimPlaceholderChatTab({
+				workspaceId: request.workspaceId,
+			});
+	const openedTabId =
+		request.chatTabId || claimedTab
+			? null
+			: deps.chatTabService.openTab({
+					kind: 'chat',
+					workspaceId: request.workspaceId,
+				}).id;
+	if (openedTabId) {
+		deps.broadcastTabsChanged({ workspaceId: request.workspaceId });
+	}
+	const targetTabId = request.chatTabId ?? claimedTab?.id ?? openedTabId;
+	if (!targetTabId) {
+		throw new Error('Failed to resolve a chat tab for the conversation.');
+	}
+	return { openedTabId, targetTabId };
+}
+
+/**
+ * Opens a persisted runtime session and rolls back a tab allocated by this call when opening fails.
+ * @param input - Transaction collaborators, resolved model, request, and tab allocation.
+ * @returns The opened session snapshot.
+ */
+async function openSpawnedSession(input: {
+	deps: PortAdapterDeps;
+	executable: AgentSessionOpenRequest['executable'];
+	request: StartConversationInput;
+	selection: SpawnModelSelection;
+	tab: ConversationTabAllocation;
+}): Promise<Awaited<ReturnType<AgentSessionService['openSession']>>> {
+	const { deps, executable, request, selection, tab } = input;
+	try {
+		return await deps.agentSessionService.openSession({
+			afkMode: request.afkMode,
+			chatTabId: tab.targetTabId,
+			executable,
+			initialPrompt: request.prompt,
+			model: selection.modelId,
+			...(request.asPeer || request.callerConcierge
+				? {}
+				: {
+						parentSessionId: request.parentSessionId,
+						...(request.callerSpecies === 'harness'
+							? { parentSpecies: 'harness' as const }
+							: {}),
+					}),
+			planMode: request.planMode,
+			provider: selection.runtime,
+			thinkingLevel: selection.thinkingLevel,
+			workspaceCwd: request.workspaceCwd,
+			workspaceId: request.workspaceId,
+		});
+	} catch (error) {
+		await rollbackConversation(deps, {
+			agentSessionId: null,
+			markerRestore: null,
+			openedTabId: tab.openedTabId,
+			workspaceId: request.workspaceId,
+		});
+		throw error;
+	}
+}
+
+/**
+ * Activates inherited turn modes and submits the first prompt as one rollback boundary.
+ * @param input - Open session, resolved model, request, and owned tab allocation.
+ */
+async function submitSpawnedConversation(input: {
+	deps: PortAdapterDeps;
+	request: StartConversationInput;
+	selection: SpawnModelSelection;
+	sessionId: string;
+	tab: ConversationTabAllocation;
+}): Promise<void> {
+	const { deps, request, selection, sessionId, tab } = input;
+	let marker: ReturnType<typeof writeSubAgentMarker> = null;
+	try {
+		if (request.planMode) {
+			deps.planMode.activateForSpawn(sessionId);
+			deps.broadcastPlanMode({
+				agentSessionId: sessionId,
+				chatTabId: tab.targetTabId,
+				planMode: true,
+				workspaceId: request.workspaceId,
+			});
+		}
+		if (request.afkMode) {
+			deps.afkMode.activateForSpawn(sessionId);
+			deps.broadcastAfkMode({
+				afkMode: true,
+				agentSessionId: sessionId,
+				chatTabId: tab.targetTabId,
+				workspaceId: request.workspaceId,
+			});
+		}
+		const childRole =
+			spawnedChildRole({
+				concierge: request.callerConcierge,
+				peer: request.asPeer,
+			}) === 'subagent'
+				? 'subagent'
+				: null;
+		const parentChatTabId = childRole
+			? readOpenParentChatTabId(
+					deps,
+					request.parentSessionId,
+					request.workspaceId,
+				)
+			: null;
+		marker = writeSubAgentMarker(
+			deps,
+			tab.targetTabId,
+			childRole,
+			parentChatTabId,
+		);
+		deps.broadcastTabsChanged({ workspaceId: request.workspaceId });
+		await deps.agentSessionService.submitPrompt({
+			model: selection.modelId,
+			prompt: request.prompt,
+			provider: selection.runtime,
+			sessionId,
+			thinkingLevel: selection.thinkingLevel,
+		});
+	} catch (error) {
+		await rollbackConversation(deps, {
+			agentSessionId: sessionId,
+			markerRestore: marker
+				? {
+						chatTabId: tab.targetTabId,
+						parentChatTabId: marker.previousParentChatTabId,
+						role: marker.previousRole,
+					}
+				: null,
+			openedTabId: tab.openedTabId,
+			workspaceId: request.workspaceId,
+		});
+		throw error;
+	}
 }
 
 /**
@@ -638,22 +809,17 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				})),
 			};
 		},
-		startConversation: async ({
-			workspaceId,
-			workspaceCwd,
-			asPeer,
-			chatTabId,
-			prompt,
-			model,
-			thinkingLevel,
-			title,
-			callerConcierge,
-			callerModel,
-			callerRuntime,
-			parentSessionId,
-			planMode,
-			afkMode,
-		}) => {
+		startConversation: async (request) => {
+			const {
+				callerConcierge,
+				callerModel,
+				callerRuntime,
+				model,
+				parentSessionId,
+				thinkingLevel,
+				title,
+				workspaceId,
+			} = request;
 			const caller = describeCaller({
 				callerConcierge,
 				callerModel,
@@ -678,112 +844,21 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			}
 			const selection = resolution.selection;
 			const executable = await requireExecutableFor(selection.runtime);
-			// A workspace the user has looked at already has an empty chat tab: the
-			// renderer opens one for every workspace with none, so a spawn that
-			// always opened its own left the freshly created workspace showing two,
-			// one of them permanently blank. Only that placeholder is claimable — a
-			// blank tab the user opened looks identical on the row, because an unsent
-			// draft never leaves the renderer. Claimed rather than opened, the tab
-			// stays out of `openedTabId` — rollback closes what this spawn created,
-			// and a tab that was already there is not that.
-			const claimedTab = chatTabId
-				? null
-				: deps.chatTabService.claimPlaceholderChatTab({ workspaceId });
-			const openedTabId =
-				chatTabId || claimedTab
-					? null
-					: deps.chatTabService.openTab({ kind: 'chat', workspaceId }).id;
-			if (openedTabId) {
-				deps.broadcastTabsChanged({ workspaceId });
-			}
-			const targetTabId = chatTabId ?? claimedTab?.id ?? openedTabId;
-			if (!targetTabId) {
-				throw new Error('Failed to resolve a chat tab for the conversation.');
-			}
-			const snapshot = await deps.agentSessionService.openSession({
-				chatTabId: targetTabId,
-				workspaceId,
-				workspaceCwd,
-				model: selection.modelId,
-				// Without this the open falls through to the default runtime, which is
-				// how a Claude orchestrator's children were created as Pi sessions
-				// however the model resolved.
-				provider: selection.runtime,
-				thinkingLevel: selection.thinkingLevel,
-				initialPrompt: prompt,
-				executable,
-				// A peer records no parent, and that is what makes it a root on every
-				// axis rather than only in this module: the control registry reads
-				// lineage to resolve depth, and `resolveDelegation` treats any parent
-				// at all as proof of a spawned child and pins it to `ensemblr`.
-				...(asPeer ? {} : { parentSessionId }),
-				// The registry below cannot be seeded until the session has an id, so
-				// a runtime that gates on its starting permission mode would miss the
-				// spawn entirely without the flag riding the open itself.
-				planMode,
-				afkMode,
-			});
-			// Registered before `submitPrompt` because the child can reach
-			// `before_agent_start` first.
-			if (planMode) {
-				deps.planMode.activateForSpawn(snapshot.id);
-				deps.broadcastPlanMode({
-					chatTabId: targetTabId,
-					agentSessionId: snapshot.id,
-					planMode: true,
-					workspaceId,
-				});
-			}
-			if (afkMode) {
-				deps.afkMode.activateForSpawn(snapshot.id);
-				deps.broadcastAfkMode({
-					chatTabId: targetTabId,
-					afkMode: true,
-					agentSessionId: snapshot.id,
-					workspaceId,
-				});
-			}
-			// `submitPrompt` captures a git checkpoint first, and the renderer resolves
-			// a tab's branch id out of the session list, so a binding announced after
-			// it leaves the tab a blank rectangle for that whole window.
-			const childRole =
-				spawnedChildRole({ concierge: callerConcierge, peer: asPeer }) ===
-				'subagent'
-					? 'subagent'
-					: null;
-			const parentChatTabId = childRole
-				? readOpenParentChatTabId(deps, parentSessionId, workspaceId)
-				: null;
-			const marker = writeSubAgentMarker(
+			const tab = allocateConversationTab(deps, request);
+			const snapshot = await openSpawnedSession({
 				deps,
-				targetTabId,
-				childRole,
-				parentChatTabId,
-			);
-			deps.broadcastTabsChanged({ workspaceId });
-			try {
-				await deps.agentSessionService.submitPrompt({
-					sessionId: snapshot.id,
-					prompt,
-					model: selection.modelId,
-					provider: selection.runtime,
-					thinkingLevel: selection.thinkingLevel,
-				});
-			} catch (error) {
-				await rollbackConversation(deps, {
-					agentSessionId: snapshot.id,
-					openedTabId,
-					markerRestore: marker
-						? {
-								chatTabId: targetTabId,
-								parentChatTabId: marker.previousParentChatTabId,
-								role: marker.previousRole,
-							}
-						: null,
-					workspaceId,
-				});
-				throw error;
-			}
+				executable,
+				request,
+				selection,
+				tab,
+			});
+			await submitSpawnedConversation({
+				deps,
+				request,
+				selection,
+				sessionId: snapshot.id,
+				tab,
+			});
 			if (title) {
 				await applyConversationName(deps, {
 					name: title,
@@ -791,7 +866,11 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				});
 			}
 			deps.broadcastTabsChanged({ workspaceId });
-			return { ok: true, chatTabId: targetTabId, agentSessionId: snapshot.id };
+			return {
+				agentSessionId: snapshot.id,
+				chatTabId: tab.targetTabId,
+				ok: true,
+			};
 		},
 		sendFollowUp: async ({ agentSessionId, prompt }) => {
 			// Ahead of the submit, so the tab is back on screen before the turn it
@@ -872,6 +951,12 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			readSubAgentMarker(deps, agentSessionId),
 		resolveConversationWorkspace: async (agentSessionId) =>
 			deps.agentSessionService.getSession(agentSessionId)?.workspaceId ?? null,
+		listImmediateChildren: (parentSessionId) => {
+			const database = deps.databaseService.getConnection()?.database;
+			return database
+				? listImmediateAgentSessionChildren({ database, parentSessionId })
+				: [];
+		},
 	};
 }
 
@@ -1062,7 +1147,7 @@ async function applyConversationName(
 async function rollbackConversation(
 	deps: PortAdapterDeps,
 	target: {
-		agentSessionId: string;
+		agentSessionId: string | null;
 		openedTabId: string | null;
 		markerRestore: {
 			chatTabId: string;
@@ -1072,8 +1157,10 @@ async function rollbackConversation(
 		workspaceId: string;
 	},
 ): Promise<void> {
-	deps.planMode.releaseSession(target.agentSessionId);
-	deps.afkMode.releaseSession(target.agentSessionId);
+	if (target.agentSessionId) {
+		deps.planMode.releaseSession(target.agentSessionId);
+		deps.afkMode.releaseSession(target.agentSessionId);
+	}
 	if (target.markerRestore) {
 		writeSubAgentMarker(
 			deps,
@@ -1082,16 +1169,18 @@ async function rollbackConversation(
 			target.markerRestore.parentChatTabId,
 		);
 	}
-	try {
-		await deps.agentSessionService.stopSession({
-			sessionId: target.agentSessionId,
-			reason: 'agent-control-start-failed',
-		});
-	} catch (cause) {
-		console.warn('[agent-control] could not stop a failed spawn.', {
-			cause: cause instanceof Error ? cause.message : String(cause),
-			agentSessionId: target.agentSessionId,
-		});
+	if (target.agentSessionId) {
+		try {
+			await deps.agentSessionService.stopSession({
+				sessionId: target.agentSessionId,
+				reason: 'agent-control-start-failed',
+			});
+		} catch (cause) {
+			console.warn('[agent-control] could not stop a failed spawn.', {
+				cause: cause instanceof Error ? cause.message : String(cause),
+				agentSessionId: target.agentSessionId,
+			});
+		}
 	}
 	if (target.openedTabId) {
 		try {

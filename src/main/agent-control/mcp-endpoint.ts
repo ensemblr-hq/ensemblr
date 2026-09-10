@@ -345,9 +345,9 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 	{
 		name: 'ensemblr_focus_panel',
 		op: 'focusPanel',
-		description: 'Focus the Files, Changes, or Checks review panel.',
+		description: 'Focus the Agents, Files, Changes, or Checks workspace panel.',
 		shape: {
-			panel: z.enum(['files', 'changes', 'checks']),
+			panel: z.enum(['agents', 'files', 'changes', 'checks']),
 			workspaceId: z.string().optional(),
 		},
 	},

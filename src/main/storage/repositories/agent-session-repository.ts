@@ -101,6 +101,7 @@ export interface UpdateAgentSessionPatch {
 	runtimeSessionId?: string | null;
 	closedAt?: string | null;
 	lastError?: string | null;
+	metadata?: Record<string, unknown>;
 	model?: string | null;
 	status?: AgentSessionStatusValue;
 	thinkingLevel?: string | null;
@@ -264,6 +265,7 @@ export function listAgentSessionsByWorkspace({
 	database: DatabaseSync;
 	workspaceId: string;
 }): readonly AgentSessionRow[] {
+	// SAFETY: SELECT_SESSION aliases every column to the SessionRowShape contract.
 	const rows = database
 		.prepare(
 			`${SELECT_SESSION} WHERE workspace_id = ? ORDER BY updated_at DESC`,
@@ -271,6 +273,36 @@ export function listAgentSessionsByWorkspace({
 		.all(workspaceId) as unknown as SessionRowShape[];
 
 	return rows.map(mapSessionRow);
+}
+
+/** Deletes a session row and its cascading branches after a failed open. */
+export function deleteAgentSession({
+	database,
+	id,
+}: {
+	database: DatabaseSync;
+	id: string;
+}): boolean {
+	return (
+		database.prepare('DELETE FROM agent_sessions WHERE id = ?').run(id)
+			.changes > 0
+	);
+}
+
+/** Appends the serialized metadata assignment when a patch supplies one. */
+function appendSessionMetadataPatch({
+	fields,
+	metadata,
+	values,
+}: {
+	fields: string[];
+	metadata: Record<string, unknown> | undefined;
+	values: Array<string | null>;
+}): void {
+	if (metadata !== undefined) {
+		fields.push('metadata_json = ?');
+		values.push(serializeMetadata(metadata));
+	}
 }
 
 /** Patches one or more mutable session fields and bumps `updated_at`. */
@@ -310,6 +342,7 @@ export function updateAgentSession({
 		fields.push('closed_at = ?');
 		values.push(patch.closedAt ?? null);
 	}
+	appendSessionMetadataPatch({ fields, metadata: patch.metadata, values });
 
 	if (fields.length === 0) {
 		return getAgentSessionById({ database, id });
@@ -347,6 +380,7 @@ export function listAgentSessionBranches({
 	agentSessionId: string;
 	database: DatabaseSync;
 }): readonly AgentSessionBranchRow[] {
+	// SAFETY: SELECT_BRANCH aliases every column to the BranchRowShape contract.
 	const rows = database
 		.prepare(
 			`${SELECT_BRANCH} WHERE agent_session_id = ? ORDER BY created_at ASC`,
@@ -507,6 +541,7 @@ export function listTurns({
 	database: DatabaseSync;
 	branchId: string;
 }): readonly AgentTurnRow[] {
+	// SAFETY: SELECT_TURN aliases every column to the TurnRowShape contract.
 	const rows = database
 		.prepare(`${SELECT_TURN} WHERE branch_id = ? ORDER BY ordinal ASC`)
 		.all(branchId) as unknown as TurnRowShape[];

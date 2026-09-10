@@ -8,6 +8,11 @@ import type { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import type {
+	AgentControlEnvIdentity,
+	AgentControlEnvResolver,
+} from '../../src/main/agent-control/ports.ts';
+import * as sessionLineage from '../../src/main/agent-control/session-lineage.ts';
+import type {
 	AgentAdapter,
 	AgentAdapterSession,
 } from '../../src/main/agent-runtime/agent-adapter.ts';
@@ -30,8 +35,10 @@ import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executab
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import { listEventsByBranch } from '../../src/main/storage/repositories/agent-event-repository.ts';
 import {
+	getAgentSessionBranchById,
 	getAgentSessionById,
 	listTurns,
+	setBranchMetadata,
 } from '../../src/main/storage/repositories/agent-session-repository.ts';
 import {
 	getChatTabById,
@@ -389,6 +396,7 @@ function createService(
 		refreshPlanUsage?: () => Promise<boolean>;
 		rejectAbortFor?: (index: number) => boolean;
 		rejectSubmitFor?: (index: number) => boolean;
+		resolveAgentControlEnv?: AgentControlEnvResolver;
 		resolveSpawnedChildren?: (sessionId: string) => readonly string[];
 		sessionSummaryWriter?: SessionSummaryWriter;
 	} = {},
@@ -407,6 +415,7 @@ function createService(
 		eventSink: options.eventSink,
 		agentClient,
 		queueNaming: () => undefined,
+		resolveAgentControlEnv: options.resolveAgentControlEnv,
 		resolveSpawnedChildren: options.resolveSpawnedChildren,
 		sessionSummaryWriter: options.sessionSummaryWriter,
 	});
@@ -441,6 +450,169 @@ test('openSession persists an agent_sessions row plus a main branch', async (t) 
 	assert.equal(snapshot.label, 'first chat');
 	assert.equal(snapshot.status, 'starting');
 	assert.equal(snapshot.openedTabs.length, 1);
+	assert.equal(snapshot.contextUsage, null);
+	assert.deepEqual(snapshot.currentTools, []);
+});
+
+test('openSession persists root-child-leaf lineage and rejects a third edge before runtime creation', async (t) => {
+	const fixture = openFixture(t);
+	const identities: AgentControlEnvIdentity[] = [];
+	const { fake, service } = createService(fixture.database, {
+		resolveAgentControlEnv: (identity) => {
+			identities.push(identity);
+			return {};
+		},
+	});
+	const open = (parentSessionId?: string) =>
+		service.openSession({
+			executable: createReadyExecutable(),
+			...(parentSessionId ? { parentSessionId } : {}),
+			workspaceCwd: '/tmp/ensemblr/svc/ws',
+			workspaceId: fixture.workspaceId,
+		});
+	const root = await open();
+	const child = await open(root.id);
+	const leaf = await open(child.id);
+
+	assert.deepEqual(
+		identities.map((identity) => identity.lineage),
+		[
+			{ depth: 0, parentSessionId: null, rootSessionId: root.id },
+			{ depth: 1, parentSessionId: root.id, rootSessionId: root.id },
+			{ depth: 2, parentSessionId: child.id, rootSessionId: root.id },
+		],
+	);
+	await assert.rejects(open(leaf.id), /Cannot establish agent session lineage/);
+	assert.equal(fake.getOpenSessions().length, 3);
+	assert.equal(service.listSessionsForWorkspace(fixture.workspaceId).length, 3);
+});
+
+test('harness descendants retain durable lineage and Ensemblr delegation on resume', async (t) => {
+	const fixture = openFixture(t);
+	const identities: AgentControlEnvIdentity[] = [];
+	const first = createService(fixture.database, {
+		resolveAgentControlEnv: (identity) => {
+			identities.push(identity);
+			return {};
+		},
+	});
+	const manager = await first.service.openSession({
+		executable: createReadyExecutable(),
+		parentSessionId: `ws:${fixture.workspaceId}`,
+		parentSpecies: 'harness',
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const leaf = await first.service.openSession({
+		executable: createReadyExecutable(),
+		parentSessionId: manager.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	assert.deepEqual(
+		identities.map((identity) => identity.lineage),
+		[
+			{
+				depth: 1,
+				parentSessionId: `ws:${fixture.workspaceId}`,
+				rootSessionId: `ws:${fixture.workspaceId}`,
+			},
+			{
+				depth: 2,
+				parentSessionId: manager.id,
+				rootSessionId: `ws:${fixture.workspaceId}`,
+			},
+		],
+	);
+	assert.equal(identities[0]?.delegation, 'ensemblr');
+	assert.equal(identities[1]?.delegation, 'ensemblr');
+	await first.service.shutdown();
+
+	identities.length = 0;
+	const resumed = createService(fixture.database, {
+		resolveAgentControlEnv: (identity) => {
+			identities.push(identity);
+			return {};
+		},
+	});
+	await resumed.service.openSession({
+		executable: createReadyExecutable(),
+		resumeSessionId: leaf.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	assert.deepEqual(identities[0]?.lineage, {
+		depth: 2,
+		parentSessionId: manager.id,
+		rootSessionId: `ws:${fixture.workspaceId}`,
+	});
+	assert.equal(identities[0]?.delegation, 'ensemblr');
+});
+
+test('resume restores persisted lineage before creating a replacement runtime', async (t) => {
+	const fixture = openFixture(t);
+	const first = createService(fixture.database);
+	const root = await first.service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const child = await first.service.openSession({
+		executable: createReadyExecutable(),
+		parentSessionId: root.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await first.service.shutdown();
+
+	const identities: AgentControlEnvIdentity[] = [];
+	const resumed = createService(fixture.database, {
+		resolveAgentControlEnv: (identity) => {
+			identities.push(identity);
+			return {};
+		},
+	});
+	await resumed.service.openSession({
+		executable: createReadyExecutable(),
+		resumeSessionId: child.id,
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	assert.deepEqual(identities[0]?.lineage, {
+		depth: 1,
+		parentSessionId: root.id,
+		rootSessionId: root.id,
+	});
+});
+
+test('durable recursive stop reaches descendants without stopping a sibling', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database, {
+		resolveSpawnedChildren: (sessionId) =>
+			sessionLineage.listImmediateAgentSessionChildren({
+				database: fixture.database,
+				parentSessionId: sessionId,
+			}),
+	});
+	const open = (parentSessionId?: string) =>
+		service.openSession({
+			executable: createReadyExecutable(),
+			...(parentSessionId ? { parentSessionId } : {}),
+			workspaceCwd: '/tmp/ensemblr/svc/ws',
+			workspaceId: fixture.workspaceId,
+		});
+	const root = await open();
+	const child = await open(root.id);
+	const sibling = await open(root.id);
+	const leaf = await open(child.id);
+
+	await service.stopSession({ reason: 'user', sessionId: child.id });
+
+	assert.equal(service.getSession(child.id)?.runtimeOpen, false);
+	assert.equal(service.getSession(leaf.id)?.runtimeOpen, false);
+	assert.equal(service.getSession(root.id)?.runtimeOpen, true);
+	assert.equal(service.getSession(sibling.id)?.runtimeOpen, true);
 });
 
 test('getSession reports live status for an active session, not a frozen starting snapshot', async (t) => {
@@ -510,6 +682,262 @@ test('getContextUsage reports the newest reading the runtime sent', async (t) =>
 		percent: 55,
 		tokens: 110_000,
 	});
+});
+
+test('getSession projects live context and unresolved normalized tool calls', async (t) => {
+	const fixture = openFixture(t);
+	const { fake, service } = createService(fixture.database);
+	const opened = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(runtime, 'expected one open runtime session');
+	runtime.setStatus('streaming');
+	runtime.emit({
+		at: new Date().toISOString(),
+		type: 'context-usage',
+		usage: { contextWindow: 200_000, percent: 35, tokens: 70_000 },
+	});
+	runtime.emit({
+		at: new Date().toISOString(),
+		type: 'context-usage',
+		usage: { contextWindow: -1, percent: 101, tokens: -1 },
+	});
+	runtime.emit({
+		at: new Date().toISOString(),
+		payload: {
+			input: { path: 'src/main.ts' },
+			kind: 'tool-call',
+			name: 'read',
+			toolCallId: 'call-1',
+		},
+		role: 'agent',
+		turnId: 'runtime-turn',
+		type: 'message',
+	});
+	await delay(10);
+
+	const snapshot = service.getSession(opened.id);
+	assert.deepEqual(snapshot?.contextUsage, {
+		reading: 'live',
+		usage: { contextWindow: 200_000, percent: 35, tokens: 70_000 },
+	});
+	assert.deepEqual(snapshot?.currentTools, [
+		{
+			input: { path: 'src/main.ts' },
+			name: 'read',
+			toolCallId: 'call-1',
+		},
+	]);
+
+	runtime.emit({
+		at: new Date().toISOString(),
+		payload: {
+			isError: false,
+			kind: 'tool-result',
+			output: 'done',
+			toolCallId: 'call-1',
+		},
+		role: 'tool',
+		turnId: 'runtime-turn',
+		type: 'message',
+	});
+	runtime.setStatus('streaming');
+	for (const payload of [
+		{
+			input: { path: 'src/main.ts' },
+			kind: 'tool-call' as const,
+			name: 'read',
+			toolCallId: 'call-1',
+		},
+		{
+			kind: 'message' as const,
+			parts: [
+				{
+					input: { path: 'src/main.ts' },
+					kind: 'tool-call' as const,
+					name: 'read',
+					toolCallId: 'call-1',
+				},
+			],
+			role: 'assistant' as const,
+		},
+	]) {
+		runtime.emit({
+			at: new Date().toISOString(),
+			payload,
+			role: 'agent',
+			turnId: 'runtime-turn',
+			type: 'message',
+		});
+	}
+	await delay(10);
+	assert.deepEqual(service.getSession(opened.id)?.currentTools, []);
+
+	runtime.setStatus('idle');
+	runtime.emit({
+		at: new Date().toISOString(),
+		payload: {
+			input: { path: 'stale.ts' },
+			kind: 'tool-call',
+			name: 'read',
+			toolCallId: 'call-1',
+		},
+		role: 'agent',
+		turnId: 'old-runtime-turn',
+		type: 'message',
+	});
+	await delay(10);
+	assert.deepEqual(service.getSession(opened.id)?.currentTools, []);
+
+	runtime.setStatus('streaming');
+	runtime.emit({
+		at: new Date().toISOString(),
+		payload: {
+			input: { path: 'new.ts' },
+			kind: 'tool-call',
+			name: 'read',
+			toolCallId: 'call-1',
+		},
+		role: 'agent',
+		turnId: 'new-runtime-turn',
+		type: 'message',
+	});
+	await delay(10);
+	assert.equal(service.getSession(opened.id)?.currentTools?.[0]?.name, 'read');
+});
+
+test('archived snapshots use the latest valid persisted context reading', async (t) => {
+	const fixture = openFixture(t);
+	const { fake, service } = createService(fixture.database);
+	const opened = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(runtime, 'expected one open runtime session');
+	runtime.emit({
+		at: new Date().toISOString(),
+		type: 'context-usage',
+		usage: { contextWindow: 200_000, percent: 25, tokens: 50_000 },
+	});
+	runtime.emit({
+		at: new Date().toISOString(),
+		type: 'context-usage',
+		usage: { contextWindow: -1, percent: 101, tokens: -1 },
+	});
+	runtime.emit({
+		at: new Date().toISOString(),
+		reason: 'completed',
+		type: 'shutdown',
+	});
+	await delay(10);
+
+	assert.deepEqual(service.getSession(opened.id)?.contextUsage, {
+		reading: 'last-recorded',
+		usage: { contextWindow: 200_000, percent: 25, tokens: 50_000 },
+	});
+	assert.deepEqual(service.getSession(opened.id)?.currentTools, []);
+});
+
+test('persisted context lookup skips hidden checkpoint ordinals', async (t) => {
+	const fixture = openFixture(t);
+	const { fake, service } = createService(fixture.database);
+	const opened = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(runtime, 'expected one open runtime session');
+	for (const percent of [10, 80]) {
+		runtime.emit({
+			at: new Date().toISOString(),
+			type: 'context-usage',
+			usage: { contextWindow: 200_000, percent, tokens: percent * 2_000 },
+		});
+	}
+	runtime.emit({
+		at: new Date().toISOString(),
+		reason: 'completed',
+		type: 'shutdown',
+	});
+	await delay(10);
+	const events = listEventsByBranch({
+		branchId: opened.branchId,
+		database: fixture.database,
+	});
+	const newestUsage = events.findLast(
+		(event) => event.payload?.kind === 'context-usage',
+	);
+	assert.ok(newestUsage, 'expected a persisted usage event');
+	const branch = getAgentSessionBranchById({
+		database: fixture.database,
+		id: opened.branchId,
+	});
+	assert.ok(branch, 'expected a main branch');
+	setBranchMetadata({
+		database: fixture.database,
+		id: branch.id,
+		metadata: {
+			...branch.metadata,
+			hiddenEventRanges: [
+				{
+					afterOrdinal: newestUsage.ordinal - 1,
+					throughOrdinal: newestUsage.ordinal,
+				},
+			],
+		},
+	});
+
+	assert.deepEqual(service.getSession(opened.id)?.contextUsage, {
+		reading: 'last-recorded',
+		usage: { contextWindow: 200_000, percent: 10, tokens: 20_000 },
+	});
+});
+
+test('workspace snapshots include activity for unselected live sessions only', async (t) => {
+	const fixture = openFixture(t);
+	const { fake, service } = createService(fixture.database);
+	const first = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const second = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const secondRuntime = fake.getOpenSessions()[1];
+	assert.ok(secondRuntime, 'expected the second live runtime');
+	secondRuntime.emit({
+		at: new Date().toISOString(),
+		payload: {
+			input: { command: 'npm test' },
+			kind: 'tool-call',
+			name: 'bash',
+			toolCallId: 'call-2',
+		},
+		role: 'agent',
+		turnId: 'runtime-turn',
+		type: 'message',
+	});
+	await delay(10);
+
+	const sessions = service.listSessionsForWorkspace(fixture.workspaceId);
+	assert.deepEqual(
+		sessions.find((session) => session.id === first.id)?.currentTools,
+		[],
+	);
+	assert.equal(
+		sessions.find((session) => session.id === second.id)?.currentTools?.[0]
+			?.toolCallId,
+		'call-2',
+	);
 });
 
 // Usage is a property of the running session rather than of the transcript it

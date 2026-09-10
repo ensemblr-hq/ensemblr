@@ -10,6 +10,7 @@ import {
 	CONCIERGE_WITHHELD_OPS,
 	isSpawnOp,
 	isWriteOp,
+	MANAGER_SUBAGENT_DELEGATION_OPS,
 	SUBAGENT_UNUSABLE_OPS,
 	SUBAGENT_WITHHELD_OPS,
 	subAgentControlOpDenial,
@@ -45,8 +46,11 @@ const CHAT_TAB_ONLY_OPS = new Set(
 	].filter((op) => !CONCIERGE_ONLY_OPS.has(op)),
 );
 
-const DENIED_OPS = AGENT_CONTROL_OPS.filter(
+const LEAF_DENIED_OPS = AGENT_CONTROL_OPS.filter(
 	(op) => subAgentControlOpDenial(op) !== null,
+);
+const MANAGER_DENIED_OPS = LEAF_DENIED_OPS.filter(
+	(op) => !MANAGER_SUBAGENT_DELEGATION_OPS.has(op),
 );
 
 const LITERAL_UNION_PATTERN = /^'[^']*'( \| '[^']*')*$/;
@@ -156,7 +160,11 @@ const withheldFor = (op: AgentControlOp): readonly string[] =>
 		...(CHAT_TAB_ONLY_OPS.has(op) ? ['no chat tab'] : []),
 		...(CONCIERGE_ONLY_OPS.has(op) ? ['workspace agent'] : []),
 		...(CONCIERGE_WITHHELD_OPS.has(op) ? ['Concierge'] : []),
-		...(subAgentControlOpDenial(op) ? ['sub-agent'] : []),
+		...(subAgentControlOpDenial(op, 1) ? ['sub-agent'] : []),
+		...(subAgentControlOpDenial(op, 1) === null &&
+		subAgentControlOpDenial(op, 2)
+			? ['leaf']
+			: []),
 		...(SUBAGENT_UNUSABLE_OPS.has(op) ? ['sub-agent*'] : []),
 	].sort();
 
@@ -263,18 +271,28 @@ describe('agent-control tool reference', () => {
 // once as prose with a count in words. The count is what drifted last time, and a
 // number nobody can check is the part a doc edit forgets.
 describe('agent-control withholding prose', () => {
-	it('counts and lists the ops a sub-agent is denied', () => {
-		const anchor = /refuses a spawned sub-agent (\S+) ops with `denied-scope`/;
-		expect(claim(anchor)[1].toLowerCase()).toBe(numberWord(DENIED_OPS.length));
-		expect([...codeSpansIn(paragraphAfter(anchor))].sort()).toEqual(
-			[...DENIED_OPS].sort(),
+	it('counts and lists the ops each descendant depth is denied', () => {
+		const leafAnchor = /refuses a leaf (\S+) ops with `denied-scope`/;
+		expect(claim(leafAnchor)[1].toLowerCase()).toBe(
+			numberWord(LEAF_DENIED_OPS.length),
+		);
+		expect([...codeSpansIn(paragraphAfter(leafAnchor))].sort()).toEqual(
+			[...LEAF_DENIED_OPS].sort(),
+		);
+
+		const managerAnchor = /refuses a manager (\S+) ops with `denied-scope`/;
+		expect(claim(managerAnchor)[1].toLowerCase()).toBe(
+			numberWord(MANAGER_DENIED_OPS.length),
+		);
+		expect([...codeSpansIn(paragraphAfter(managerAnchor))].sort()).toEqual(
+			[...MANAGER_DENIED_OPS].sort(),
 		);
 	});
 
 	it('lists the ops withheld from a sub-agent as merely unusable', () => {
-		expect([...codeSpansIn(claim(/^(.+?) are not denied/)[1])].sort()).toEqual(
-			[...SUBAGENT_UNUSABLE_OPS].sort(),
-		);
+		expect(
+			[...codeSpansIn(claim(/^(.+?) (?:is|are) not denied/)[1])].sort(),
+		).toEqual([...SUBAGENT_UNUSABLE_OPS].sort());
 	});
 
 	it('counts every op a sub-agent tool list leaves out', () => {

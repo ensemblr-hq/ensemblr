@@ -81,6 +81,15 @@ describe('resolveDisallowedTools: exactly one mechanism survives', () => {
 			}),
 		).toEqual(MUTATING_TOOLS);
 	});
+
+	it('denies native delegation whenever authoritative depth is descendant', () => {
+		expect(
+			resolveDisallowedTools({
+				delegation: 'native',
+				depth: 1,
+			}),
+		).toEqual(NATIVE_SUBAGENT_TOOLS);
+	});
 });
 
 describe('withheldControlOps: the other half of the same choice', () => {
@@ -254,6 +263,26 @@ async function openClaudeSessions({
 	parentSessionId?: string;
 }): Promise<readonly Options[]> {
 	const database = openTestDatabase();
+	if (parentSessionId) {
+		database
+			.prepare(
+				'INSERT INTO agent_sessions (id, workspace_id, cwd, status, metadata_json) VALUES (?, ?, ?, ?, ?)',
+			)
+			.run(
+				parentSessionId,
+				WORKSPACE_ID,
+				WORKSPACE_CWD,
+				'idle',
+				JSON.stringify({
+					lineage: {
+						depth: 0,
+						parentSessionId: null,
+						rootSessionId: parentSessionId,
+						version: 1,
+					},
+				}),
+			);
+	}
 	const captured: Options[] = [];
 	const agentClient = createAgentClient({
 		adapters: {

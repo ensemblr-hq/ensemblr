@@ -5,12 +5,15 @@ import { createStore, Provider } from 'jotai';
 import { type ReactElement, type ReactNode, useEffect, useState } from 'react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-import { ReviewPanel } from '@/renderer/components/workbench-shell/review-panel';
-import { getDefaultWorkspace } from '@/renderer/fixtures/workbench';
-import { useReviewPanelCommands } from '@/renderer/hooks/workbench-shell/use-review-panel-commands';
-import { useMenuCommandBridge } from '@/renderer/state/menu-commands';
-import { changesSourceByWorkspaceAtom } from '@/renderer/state/workspace';
-import type { MenuCommandBroadcast, MenuContext } from '@/shared/menu-commands';
+import { ReviewPanel } from '../../src/renderer/components/workbench-shell/review-panel';
+import { getDefaultWorkspace } from '../../src/renderer/fixtures/workbench';
+import { useReviewPanelCommands } from '../../src/renderer/hooks/workbench-shell/use-review-panel-commands';
+import { useMenuCommandBridge } from '../../src/renderer/state/menu-commands';
+import { changesSourceByWorkspaceAtom } from '../../src/renderer/state/workspace';
+import type {
+	MenuCommandBroadcast,
+	MenuContext,
+} from '../../src/shared/menu-commands';
 
 import {
 	clearEnsemblrApi,
@@ -115,6 +118,11 @@ function Panel() {
 	return (
 		<ReviewPanel
 			activeTab='files'
+			agentsPanel={{
+				conversations: [],
+				onRestore: () => undefined,
+				onSelect: () => undefined,
+			}}
 			onFileSearchOpen={() => undefined}
 			onTabChange={() => undefined}
 			workspace={WORKSPACE}
@@ -190,6 +198,15 @@ test('⌥⌘U reveals the rail as well as selecting the tab', () => {
 
 	press('u', { alt: true });
 
+	expect(revealRail).toHaveBeenCalledTimes(1);
+});
+
+test('the native Agents command selects and reveals the panel', () => {
+	const { onTabChange, revealRail } = renderShell();
+
+	emit('panel.agents');
+
+	expect(onTabChange).toHaveBeenCalledWith('agents');
 	expect(revealRail).toHaveBeenCalledTimes(1);
 });
 

@@ -110,6 +110,7 @@ function toDocumentSessionTab(
 export function toSessionTabModel(
 	tab: ChatTabWire,
 	agentSession: AgentSessionSnapshotWire | undefined,
+	hierarchy?: { depth: 0 | 1 | 2; parentChatTabId: string | null },
 ): SessionTabModel {
 	const base: SessionTabBaseFields = {
 		agentSessionId: tab.agentSessionId,
@@ -117,10 +118,19 @@ export function toSessionTabModel(
 		fullLabel: tab.fullTitle || tab.title || untitledOpenTabLabel(tab),
 		id: tab.id,
 		isPreview: tab.isPreview,
-		isSubAgent: isSubAgentTab(tab),
-		...(metadataString(tab.metadata.parentChatTabId, '')
-			? { parentChatTabId: metadataString(tab.metadata.parentChatTabId, '') }
-			: {}),
+		isSubAgent: hierarchy ? hierarchy.depth > 0 : isSubAgentTab(tab),
+		...(hierarchy
+			? {
+					delegationDepth: hierarchy.depth,
+					...(hierarchy.parentChatTabId
+						? { parentChatTabId: hierarchy.parentChatTabId }
+						: {}),
+				}
+			: metadataString(tab.metadata.parentChatTabId, '')
+				? {
+						parentChatTabId: metadataString(tab.metadata.parentChatTabId, ''),
+					}
+				: {}),
 		label: tab.title || untitledOpenTabLabel(tab),
 		status: deriveTabStatus(agentSession),
 		summary: '',
@@ -169,6 +179,7 @@ function deriveTabStatus(
  */
 export function toClosedSessionTabModel(
 	entry: ChatTabSummaryEntryWire,
+	hierarchy?: { depth: 0 | 1 | 2; parentChatTabId: string | null },
 ): SessionTabModel {
 	const base: SessionTabBaseFields = {
 		agentSessionId: entry.tab.agentSessionId,
@@ -180,15 +191,22 @@ export function toClosedSessionTabModel(
 			untitledClosedTabLabel(),
 		id: entry.tab.id,
 		isPreview: false,
-		isSubAgent: isSubAgentTab(entry.tab),
-		...(metadataString(entry.tab.metadata.parentChatTabId, '')
+		isSubAgent: hierarchy ? hierarchy.depth > 0 : isSubAgentTab(entry.tab),
+		...(hierarchy
 			? {
-					parentChatTabId: metadataString(
-						entry.tab.metadata.parentChatTabId,
-						'',
-					),
+					delegationDepth: hierarchy.depth,
+					...(hierarchy.parentChatTabId
+						? { parentChatTabId: hierarchy.parentChatTabId }
+						: {}),
 				}
-			: {}),
+			: metadataString(entry.tab.metadata.parentChatTabId, '')
+				? {
+						parentChatTabId: metadataString(
+							entry.tab.metadata.parentChatTabId,
+							'',
+						),
+					}
+				: {}),
 		// Prefer the short chat-title that was visible on the open tab. The
 		// LLM-derived summary title is verbose and often diverges from what
 		// the user saw, so it is only used when no tab title exists.

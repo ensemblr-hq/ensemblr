@@ -45,7 +45,7 @@ A branch within an agent session's history that lets a user fork from an earlier
 _Avoid_: Git branch, forked workspace
 
 **Plan Mode**:
-A per-chat mode that holds an agent to planning until the user approves what it proposes, enforced per tool call at the control channel rather than by instruction, and inherited by spawned sub-agents.
+A per-chat mode that holds an agent to planning until the user approves what it proposes, enforced per tool call at the control channel and inherited down both permitted delegation edges. A planning manager may fan out only read-only leaves.
 _Avoid_: Read-only mode, dry run
 
 **Ensemblr Control**:
@@ -66,9 +66,9 @@ workspace and is not part of any repository, so it is addressed by its path rela
 home and read in the panel's own reader rather than opened as a file tab.
 _Avoid_: Output, document, deliverable, attachment (that names a file added to a prompt)
 
-**Orchestrator / Sub-agent**:
-Roles in multi-agent work. The orchestrator is the root agent (lineage depth 0) that may delegate; a sub-agent is a spawned child that does its delegated unit of work itself and never delegates onward.
-_Avoid_: Master/worker, parent/child thread
+**Orchestrator / Manager / Leaf**:
+Roles in multi-agent work. The orchestrator is the root agent (lineage depth 0). A manager is a depth-1 sub-agent that owns one delegated workstream, may open fresh depth-2 leaves, integrates their reports, and reports to the root. A leaf is a depth-2 sub-agent that does its unit itself and cannot delegate. Every descendant reports only to its immediate parent; missing descendant depth fails closed as leaf authority.
+_Avoid_: Master/worker, nested orchestrator, peer child
 
 **Base Branch**:
 The branch a workspace diffs against and opens pull requests into. It is the merge target only, distinct from the branch the workspace owns — which it may have cut fresh or taken over from an existing branch or pull-request head — and can be retargeted without touching the worktree.

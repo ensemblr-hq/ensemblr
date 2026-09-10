@@ -32,6 +32,7 @@ const origin = (overrides: Partial<AgentControlOrigin> = {}) =>
 		retired: false,
 		depth: 0,
 		parentSessionId: null,
+		rootSessionId: 'session-1',
 		sessionId: 'session-1',
 		species: 'pi',
 		token: 'token-1',

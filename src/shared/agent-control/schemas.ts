@@ -19,6 +19,7 @@ import {
 	ASK_USER_QUESTION_RESERVED_LABELS,
 	DIFF_COMMENT_LIMITS,
 	EXIT_PLAN_MODE_LIMITS,
+	FOCUS_PANEL_NAMES,
 	LINEAR_AGENT_LIMITS,
 	SET_BRANCH_NAME_LIMITS,
 	WORKSPACE_BOARD_STATUSES,
@@ -245,7 +246,7 @@ const focusDockTabSchema = z
 	});
 
 const focusPanelSchema = z.strictObject({
-	panel: z.enum(['files', 'changes', 'checks']),
+	panel: z.enum(FOCUS_PANEL_NAMES),
 	workspaceId: nonEmpty.optional(),
 });
 

@@ -6,10 +6,11 @@ import {
 	RefreshCwIcon,
 	SearchIcon,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-
 import { Button } from '@/renderer/components/ui/button';
 import { Tabs, TabsContent } from '@/renderer/components/ui/tabs';
+import { AgentsPanel } from '@/renderer/components/workbench-shell/agents-panel/agents-panel';
 import { useChangesSource } from '@/renderer/hooks/workbench-shell/review-files/use-changes-source';
 import { useDiscardChanges } from '@/renderer/hooks/workbench-shell/review-files/use-discard-changes';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
@@ -17,6 +18,7 @@ import { useWorkspaceConflicts } from '@/renderer/hooks/workbench-shell/review-f
 import { cn } from '@/renderer/lib/utils';
 import { useMenuCommand } from '@/renderer/state/menu-commands';
 import { changesViewModeAtom } from '@/renderer/state/workspace';
+import type { AgentsPanelProps } from '@/renderer/types/agents';
 import type {
 	ReviewPanelTab,
 	WorkspaceShellModel,
@@ -35,8 +37,47 @@ import {
 import { DiscardChangesDialog } from './review-files/discard-changes-dialog';
 import { ReviewFileList } from './review-files/review-file-list';
 
+/** One selectable destination in the shared right-sidebar tab header. */
+interface ReviewPanelHeaderTab<TabId extends string = string> {
+	count?: number;
+	id: TabId;
+	label: string;
+}
+
+/** Shared right-sidebar tab row used by review and fixture-fed preview panels. */
+export function ReviewPanelTabsHeader<TabId extends string>({
+	actions,
+	activeTab,
+	onTabChange,
+	tabs,
+}: {
+	actions?: ReactNode;
+	activeTab: TabId;
+	onTabChange: (tab: TabId) => void;
+	tabs: readonly ReviewPanelHeaderTab<TabId>[];
+}) {
+	return (
+		<div className='flex h-10 shrink-0 items-center justify-between gap-2 overflow-hidden border-border border-b px-3'>
+			<div className='no-scrollbar min-w-0 flex-1 overflow-x-auto overflow-y-hidden'>
+				<div className='flex w-max min-w-full items-center gap-1'>
+					{tabs.map((tab) => (
+						<ReviewTabButton
+							count={tab.count}
+							isActive={activeTab === tab.id}
+							key={tab.id}
+							label={tab.label}
+							onSelect={() => onTabChange(tab.id)}
+						/>
+					))}
+				</div>
+			</div>
+			{actions}
+		</div>
+	);
+}
+
 /**
- * Tabbed review surface for files, changes, and checks.
+ * Tabbed workspace side panel for agents, files, changes, and checks.
  *
  * `onFileSearchOpen` reaches the ⌘P palette, which the workspace shell hosts:
  * the panel unmounts with the narrow-window rail sheet and the palette has to
@@ -44,11 +85,13 @@ import { ReviewFileList } from './review-files/review-file-list';
  */
 export function ReviewPanel({
 	activeTab,
+	agentsPanel,
 	onFileSearchOpen,
 	onTabChange,
 	workspace,
 }: {
 	activeTab: ReviewPanelTab;
+	agentsPanel: AgentsPanelProps;
 	onFileSearchOpen: () => void;
 	onTabChange: (tab: ReviewPanelTab) => void;
 	workspace: WorkspaceShellModel;
@@ -77,11 +120,14 @@ export function ReviewPanel({
 		sourceFiles,
 	} = useChangesSource(workspace);
 
-	const reviewTabs: Array<{
-		count?: number;
-		id: ReviewPanelTab;
-		label: string;
-	}> = [
+	const reviewTabs: readonly ReviewPanelHeaderTab<ReviewPanelTab>[] = [
+		{
+			count: agentsPanel.conversations.filter(
+				(conversation) => !conversation.isClosed,
+			).length,
+			id: 'agents',
+			label: t('workbench:agents.label', 'Agents'),
+		},
 		{ id: 'files', label: t('review:review-panel.tabs.files', 'All files') },
 		{
 			count: changesCount,
@@ -113,36 +159,33 @@ export function ReviewPanel({
 			onValueChange={(value) => onTabChange(value as ReviewPanelTab)}
 			value={activeTab}
 		>
-			<div className='flex h-10 shrink-0 items-center justify-between gap-2 overflow-hidden border-border border-b px-3'>
-				<div className='no-scrollbar min-w-0 flex-1 overflow-x-auto overflow-y-hidden'>
-					<div className='flex w-max min-w-full items-center gap-1'>
-						{reviewTabs.map((tab) => (
-							<ReviewTabButton
-								count={tab.count}
-								isActive={activeTab === tab.id}
-								key={tab.id}
-								label={tab.label}
-								onSelect={() => onTabChange(tab.id)}
-							/>
-						))}
-					</div>
-				</div>
-				<ReviewPanelActions
-					activeTab={activeTab}
-					canReview={canReview}
-					changesViewMode={changesViewMode}
-					onChangesViewModeToggle={() =>
-						setChangesViewMode((current) =>
-							current === 'list' ? 'folders' : 'list',
-						)
-					}
-					onDiscardAll={handleDiscardAll}
-					onFileSearchOpen={onFileSearchOpen}
-					onSelectSource={setSource}
-					source={source}
-					workspace={workspace}
-				/>
-			</div>
+			<ReviewPanelTabsHeader
+				actions={
+					activeTab === 'agents' ? undefined : (
+						<ReviewPanelActions
+							activeTab={activeTab}
+							canReview={canReview}
+							changesViewMode={changesViewMode}
+							onChangesViewModeToggle={() =>
+								setChangesViewMode((current) =>
+									current === 'list' ? 'folders' : 'list',
+								)
+							}
+							onDiscardAll={handleDiscardAll}
+							onFileSearchOpen={onFileSearchOpen}
+							onSelectSource={setSource}
+							source={source}
+							workspace={workspace}
+						/>
+					)
+				}
+				activeTab={activeTab}
+				onTabChange={onTabChange}
+				tabs={reviewTabs}
+			/>
+			<TabsContent className='min-h-0 overflow-hidden' value='agents'>
+				<AgentsPanel {...agentsPanel} />
+			</TabsContent>
 			<TabsContent className='min-h-0 overflow-hidden' value='files'>
 				<AllFilesList
 					files={workspace.workspaceFiles}

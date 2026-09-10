@@ -106,4 +106,6 @@ export interface SessionTabActions {
 	closeSessionTabAsync: (
 		chatTabId: string,
 	) => Promise<{ replacementChatTabId: string | null }>;
+	/** Restores a closed tab and reports whether selection succeeded. */
+	restoreSessionTabAsync: (chatTabId: string) => Promise<boolean>;
 }

@@ -62,11 +62,30 @@ describe('context pressure: the threshold', () => {
 // The audience must track `withheldControlOps`, because the whole point of the
 // axis is naming a tool the caller actually holds.
 describe('context pressure: resolving the audience', () => {
-	it('gives a spawned sub-agent the no-delegation audience whatever its mechanism', () => {
+	it('gives a leaf or unverified descendant the no-delegation audience', () => {
 		for (const delegation of ['ensemblr', 'native'] as const) {
 			expect(
 				resolveContextPressureAudience({ delegation, role: 'subagent' }),
 			).toBe('cannot-delegate');
+			expect(
+				resolveContextPressureAudience({
+					delegation,
+					depth: 2,
+					role: 'subagent',
+				}),
+			).toBe('cannot-delegate');
+		}
+	});
+
+	it('gives a verified depth-1 manager the visible-tab spawn audience', () => {
+		for (const delegation of ['ensemblr', 'native'] as const) {
+			expect(
+				resolveContextPressureAudience({
+					delegation,
+					depth: 1,
+					role: 'subagent',
+				}),
+			).toBe('spawns-tabs');
 		}
 	});
 

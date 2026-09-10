@@ -128,8 +128,15 @@ describe('plan mode: control-op policy covers every op', () => {
 		}
 	});
 
-	it('still denies every conditional op to a sub-agent', () => {
+	it('allows conditional delegation for a verified depth-1 manager sub-agent', () => {
 		for (const op of PLAN_MODE_CONDITIONAL_OPS) {
+			expect(planModeControlOpDenial(op, 'subagent', 1)).toBeNull();
+		}
+	});
+
+	it('still denies every conditional op to a leaf or unverified sub-agent', () => {
+		for (const op of PLAN_MODE_CONDITIONAL_OPS) {
+			expect(planModeControlOpDenial(op, 'subagent', 2)).not.toBeNull();
 			expect(planModeControlOpDenial(op, 'subagent')).not.toBeNull();
 		}
 	});

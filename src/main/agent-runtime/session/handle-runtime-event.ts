@@ -1,4 +1,8 @@
 import type { DatabaseSync } from 'node:sqlite';
+import {
+	createAgentActivityState,
+	reduceAgentActivity,
+} from '../../../shared/agent-activity.ts';
 import type { AgentEventRow } from '../../storage/repositories';
 import {
 	type AgentTurnStatus,
@@ -7,6 +11,7 @@ import {
 	updateTurn,
 } from '../../storage/repositories/agent-session-repository.ts';
 import type { AgentSession } from '../agent-client.ts';
+import { eventPayload } from '../agent-session-persistence.ts';
 import type { AgentSessionEventSink } from '../agent-session-types.ts';
 import type {
 	AgentEvent,
@@ -19,6 +24,7 @@ import {
 	type ActiveSessionMap,
 	isTurnInFlight,
 } from './active-session.ts';
+import { isValidContextUsage } from './session-activity-snapshot.ts';
 import type { SummaryQueue } from './summary-queue.ts';
 
 /** Lifecycle calls this to mirror runtime events into `agent_session_events`. */
@@ -277,9 +283,22 @@ export function createRuntimeEventHandler({
 			active.deltaCounter = 0;
 		}
 
+		if (active) {
+			const activity = reduceAgentActivity(
+				active.activity ?? createAgentActivityState(),
+				eventPayload(event),
+			);
+			const projected =
+				event.type === 'context-usage' && isValidContextUsage(event.usage)
+					? { ...active, activity, contextUsage: event.usage }
+					: { ...active, activity };
+			activeSessions.set(sessionId, projected);
+		}
+		const projectedActive = activeSessions.get(sessionId);
+
 		if (persistedRow && eventSink) {
 			broadcastPersistedEvent({
-				active,
+				active: projectedActive,
 				database,
 				event: persistedRow,
 				eventSink,
@@ -287,19 +306,12 @@ export function createRuntimeEventHandler({
 			});
 		}
 
-		if (active && event.type === 'context-usage') {
-			activeSessions.set(sessionId, {
-				...active,
-				contextUsage: event.usage,
-			});
-		}
-
-		if (active && event.type === 'message' && event.role === 'agent') {
+		if (projectedActive && event.type === 'message' && event.role === 'agent') {
 			// Mark a summary as pending but defer the actual write to the next
 			// turn boundary (`status: 'idle'`) or shutdown — never mid-turn — so
 			// `.context/` is not created while a scaffolder needs an empty root.
 			activeSessions.set(sessionId, {
-				...active,
+				...projectedActive,
 				agentResponsePendingSummary: true,
 			});
 		}
@@ -313,7 +325,7 @@ export function createRuntimeEventHandler({
 		}
 		if (event.type === 'status') {
 			applyStatus({
-				active,
+				active: activeSessions.get(sessionId),
 				branchId,
 				database,
 				sessionId,
@@ -321,7 +333,12 @@ export function createRuntimeEventHandler({
 			});
 		}
 		if (event.type === 'shutdown') {
-			applyShutdown({ active, database, reason: event.reason, sessionId });
+			applyShutdown({
+				active: activeSessions.get(sessionId),
+				database,
+				reason: event.reason,
+				sessionId,
+			});
 		}
 	};
 

@@ -9,6 +9,7 @@ const ORIGIN: AgentControlOrigin = {
 	retired: false,
 	depth: 0,
 	parentSessionId: null,
+	rootSessionId: 'sess-1',
 	sessionId: 'sess-1',
 	species: 'pi',
 	token: 'tok',

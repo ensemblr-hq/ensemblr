@@ -8,6 +8,7 @@ import {
 import { SidebarInset } from '@/renderer/components/ui/sidebar';
 import { RIGHT_SIDEBAR_COLLAPSED_SIZE } from '@/renderer/hooks/workbench-shell/use-right-sidebar-controller';
 import { SHELL_INSET_CLASS } from '@/renderer/lib/workbench/shell-inset';
+import type { AgentsPanelProps } from '@/renderer/types/agents';
 import type {
 	DockTabId,
 	ProjectShellModel,
@@ -27,6 +28,7 @@ import { WorkbenchHeader } from './workbench-header';
 export function WorkbenchPanelLayout({
 	activeProject,
 	activeReviewTab,
+	agentsPanel,
 	activeWorkspace,
 	dockActions,
 	dockTabId,
@@ -37,6 +39,7 @@ export function WorkbenchPanelLayout({
 }: {
 	activeProject: ProjectShellModel;
 	activeReviewTab: ReviewPanelTab;
+	agentsPanel: AgentsPanelProps;
 	activeWorkspace: WorkspaceShellModel;
 	dockActions: WorkbenchDockActions;
 	dockTabId: DockTabId;
@@ -47,6 +50,7 @@ export function WorkbenchPanelLayout({
 }) {
 	const railProps = {
 		activeReviewTab,
+		agentsPanel,
 		activeWorkspace,
 		dockActions,
 		dockTabId,

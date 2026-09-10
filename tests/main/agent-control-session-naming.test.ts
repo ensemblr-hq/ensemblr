@@ -56,12 +56,21 @@ function setup(
 		coAuthor?: boolean;
 		subAgent?: boolean;
 		delegation?: SubagentMechanism;
+		depth?: 0 | 1 | 2;
 		afk?: boolean;
 	} = {},
 ) {
 	const registry = createOriginRegistry({ generateToken: () => 'tok' });
 	registry.register({
 		delegation: overrides.delegation ?? 'ensemblr',
+		lineage:
+			overrides.depth === undefined
+				? undefined
+				: {
+						depth: overrides.depth,
+						parentSessionId: overrides.depth === 0 ? null : 'parent',
+						rootSessionId: overrides.depth === 0 ? CALLER : 'root',
+					},
 		sessionId: CALLER,
 		species: overrides.species ?? 'pi',
 		workspaceCwd: '/ws',
@@ -556,12 +565,25 @@ describe('readTurnPreamble', () => {
 		);
 	});
 
-	it('renders the investigator variant for a planning sub-agent', async () => {
-		const { service } = setup({ planMode: true, subAgent: true });
+	it('renders the investigator variant for a planning leaf sub-agent', async () => {
+		const { service } = setup({ depth: 2, planMode: true, subAgent: true });
 
 		expect(await service.readTurnPreamble(CALLER)).toBe(
 			buildPlanModeDelegationDirective({
 				delegation: 'ensemblr',
+				depth: 2,
+				role: 'subagent',
+			}),
+		);
+	});
+
+	it('renders the manager variant for a planning depth-1 sub-agent', async () => {
+		const { service } = setup({ depth: 1, planMode: true, subAgent: true });
+
+		expect(await service.readTurnPreamble(CALLER)).toBe(
+			buildPlanModeDelegationDirective({
+				delegation: 'ensemblr',
+				depth: 1,
 				role: 'subagent',
 			}),
 		);

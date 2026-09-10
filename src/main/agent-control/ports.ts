@@ -17,6 +17,7 @@ import type {
 	AgentControlTerminalInfo,
 	AgentControlWorkspaceInfo,
 	AgentDiffComment,
+	AgentSessionLineage,
 	AskUserQuestionItem,
 	AskUserQuestionResult,
 	CreatedWorkspaceResult,
@@ -80,6 +81,8 @@ export interface AgentControlEnvIdentity {
 	workspaceId: string;
 	sessionId: string;
 	parentSessionId?: string | null;
+	/** Validated persisted lineage for native conversation sessions. */
+	lineage?: AgentSessionLineage;
 	species?: AgentSpecies;
 	/**
 	 * Registers the app-level Concierge, which belongs to no workspace and works
@@ -135,7 +138,9 @@ export interface AgentControlOrigin {
 	retired: boolean;
 	workspaceCwd: string;
 	parentSessionId: string | null;
-	depth: number;
+	/** Trusted delegation-tree root, null only when ancestry is unprovable. */
+	rootSessionId: string | null;
+	depth: AgentSessionLineage['depth'];
 	species: AgentSpecies;
 	delegation: SubagentMechanism;
 }
@@ -200,6 +205,8 @@ export interface TabPort {
 	}) => Promise<readonly AgentControlTabInfo[]>;
 	/** Owning workspace of a tab, or null when it does not exist. */
 	resolveTabWorkspace: (chatTabId: string) => Promise<string | null>;
+	/** Conversation bound to a tab, or null for missing/non-chat/unbound tabs. */
+	resolveTabAgentSession: (chatTabId: string) => Promise<string | null>;
 }
 
 /**
@@ -238,6 +245,8 @@ export interface ConversationPort {
 		 * name, and the spawn fails unless it names a model outright.
 		 */
 		callerRuntime: AgentProviderId | null;
+		/** Trusted caller species, used only to persist synthetic harness ancestry. */
+		callerSpecies?: AgentSpecies;
 		/**
 		 * Whether the app-level Concierge is the caller, carried across from its
 		 * control origin because nothing downstream can infer it. Two readers, one
@@ -353,20 +362,17 @@ export interface ConversationPort {
 		args: ReadConversationArgs,
 	) => Promise<ReadConversationResult>;
 	/**
-	 * Whether a Pi session's chat tab carries the sub-agent marker its spawn
-	 * persisted. Role resolution needs a signal that outlives the process: a
-	 * caller's `parentSessionId` is never stored, so a conversation resumed after
-	 * a restart re-registers at depth 0, while its Plan Mode comes back from the
-	 * renderer's per-tab store — lineage alone would hand a restored investigator
-	 * the orchestrator policy. An implementation that cannot read the marker
-	 * reports false rather than throwing, which leaves the role to depth exactly
-	 * as it was before the marker existed.
+	 * Whether a Pi session's chat tab carries the legacy sub-agent marker. Durable
+	 * lineage now survives restart; this remains a fail-closed compatibility signal
+	 * for older session rows and reports false when the tab cannot be read.
 	 */
 	isSpawnedSubAgent: (agentSessionId: string) => Promise<boolean>;
 	/** Owning workspace of a Pi session, or null when it does not exist. */
 	resolveConversationWorkspace: (
 		agentSessionId: string,
 	) => Promise<string | null>;
+	/** Durable validated immediate children, including closed and stopped sessions. */
+	listImmediateChildren: (parentSessionId: string) => readonly string[];
 }
 
 /**

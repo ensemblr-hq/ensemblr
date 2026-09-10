@@ -51,6 +51,7 @@ export function buildViewMenu(
 			{
 				label: labels.panel,
 				submenu: [
+					items.command('panel.agents', labels.panelAgents, { radio: true }),
 					items.command('panel.files', labels.panelFiles, { radio: true }),
 					items.command('panel.changes', labels.panelChanges, { radio: true }),
 					items.command('panel.checks', labels.panelChecks, { radio: true }),

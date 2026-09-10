@@ -3,6 +3,7 @@ const WAIT_FOR_AGENTS_TOOL = 'ensemblr_wait_for_agents';
 const SEND_FOLLOW_UP_TOOL = 'ensemblr_send_follow_up';
 const CLOSE_TAB_TOOL = 'ensemblr_close_tab';
 const ASK_USER_QUESTION_TOOL = 'ensemblr_ask_user_question';
+const NOTIFY_ORCHESTRATOR_TOOL = 'ensemblr_notify_orchestrator';
 
 /** A child tracked until the orchestrator has observed its final settled turn. */
 export interface DelegatedChild {
@@ -204,7 +205,8 @@ export function beforeDelegationToolCall(
 	}
 
 	if (
-		call.toolName === ASK_USER_QUESTION_TOOL &&
+		(call.toolName === ASK_USER_QUESTION_TOOL ||
+			call.toolName === NOTIFY_ORCHESTRATOR_TOOL) &&
 		delegationBarrierActive(state)
 	) {
 		return state.children.some((child) => child.phase === 'attention')
