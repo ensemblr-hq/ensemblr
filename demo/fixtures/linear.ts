@@ -1,4 +1,6 @@
 import type {
+	GetLinearIssueResult,
+	LinearCommentWire,
 	LinearIssueWire,
 	LinearMetadataWire,
 	LinearResourceWire,
@@ -9,6 +11,16 @@ import { DEMO_CLOCK } from './workspaces.ts';
 const ACCOUNT_ID = 'demo-linear-account';
 const ORGANIZATION = 'Northwind';
 const TEAM_ID = 'team-eng';
+
+/** Workflow state names used by the staged issue catalog. */
+type DemoStateName = 'Backlog' | 'Done' | 'In Progress' | 'In Review' | 'Todo';
+const STATE_ID_BY_NAME: Readonly<Record<DemoStateName, string>> = {
+	Backlog: 'state-backlog',
+	Done: 'state-done',
+	'In Progress': 'state-progress',
+	'In Review': 'state-review',
+	Todo: 'state-todo',
+};
 
 /**
  * Builds a metadata resource row.
@@ -78,7 +90,7 @@ function issue(options: {
 	labels?: readonly { color: string; name: string }[];
 	priority: number;
 	stateColor: string;
-	stateName: string;
+	stateName: DemoStateName;
 	stateType: string;
 	title: string;
 }): LinearIssueWire {
@@ -103,7 +115,7 @@ function issue(options: {
 		projectId: 'project-desktop',
 		projectName: 'Desktop 1.0',
 		stateColor: options.stateColor,
-		stateId: `state-${options.stateType}`,
+		stateId: STATE_ID_BY_NAME[options.stateName],
 		stateName: options.stateName,
 		stateType: options.stateType,
 		syncedAt: DEMO_CLOCK,
@@ -259,3 +271,33 @@ export const DEMO_LINEAR_ISSUES: readonly LinearIssueWire[] = [
 		title: 'Rate limit headers report the wrong window on burst',
 	}),
 ];
+
+/** Discussion attached to the release-notes issue detail. */
+export const DEMO_LINEAR_COMMENTS: LinearCommentWire[] = [
+	{
+		authorName: 'Mara Ellis',
+		body: 'The feed payload already contains the markdown body. Keep the renderer read-only and preserve links.',
+		createdAt: '2026-09-04T10:42:00.000Z',
+		id: 'comment-eng-412-1',
+	},
+	{
+		authorName: 'Philipp',
+		body: 'Agreed. Include empty notes and failed checks in the screenshot fixtures too.',
+		createdAt: '2026-09-04T10:48:00.000Z',
+		id: 'comment-eng-412-2',
+	},
+];
+
+/** Full Linear issue reads keyed by issue UUID for detail-page scenarios. */
+export const DEMO_LINEAR_ISSUE_DETAILS = Object.fromEntries(
+	DEMO_LINEAR_ISSUES.map((linearIssue) => [
+		linearIssue.id,
+		{
+			comments:
+				linearIssue.identifier === 'ENG-412' ? DEMO_LINEAR_COMMENTS : [],
+			issue: linearIssue,
+			source: 'cache' as const,
+			status: 'ok' as const,
+		},
+	]),
+) satisfies Readonly<Record<string, GetLinearIssueResult>>;

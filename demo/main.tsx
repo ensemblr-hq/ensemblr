@@ -32,6 +32,11 @@ const { registerIconCollections } = await import(
 	'@/renderer/lib/workbench/icon-collections'
 );
 const { queryClient } = await import('@/renderer/api/query-client');
+const {
+	healthQuery,
+	repositoryWorkspaceNavigationQuery,
+	setupDiagnosticsQuery,
+} = await import('@/renderer/api/ensemblr-queries');
 const { router } = await import('@/renderer/routing/router');
 const { DemoShell } = await import('./demo-shell.tsx');
 
@@ -57,6 +62,11 @@ document.documentElement.classList.remove(
 	scenario.theme === 'dark' ? 'light' : 'dark',
 );
 
+await Promise.all([
+	queryClient.ensureQueryData(healthQuery),
+	queryClient.ensureQueryData(repositoryWorkspaceNavigationQuery),
+	queryClient.ensureQueryData(setupDiagnosticsQuery),
+]);
 await router.navigate({ href: scenarioHref(scenario) });
 runtime.start(queryClient);
 

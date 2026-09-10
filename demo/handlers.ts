@@ -1,9 +1,5 @@
 import type { AgentProviderId } from '@/shared/agent-provider';
 import { DEFAULT_APP_SETTINGS } from '@/shared/config';
-import {
-	type AgentModelCatalog,
-	asModelVendorId,
-} from '@/shared/ipc/contracts/agent-models';
 import type {
 	AgentProviderReadinessWire,
 	ListAgentProviderSlashCommandsResult,
@@ -14,6 +10,7 @@ import type {
 	ListAgentSessionsResult,
 } from '@/shared/ipc/contracts/agent-session';
 import type { AppSettings } from '@/shared/ipc/contracts/app-settings';
+import type { GetArchitectureSnapshotResult } from '@/shared/ipc/contracts/architecture';
 import type {
 	ChatTabWire,
 	ListChatTabsResult,
@@ -24,9 +21,14 @@ import type {
 	ListConciergeEventsResult,
 	OpenConciergeSessionResult,
 } from '@/shared/ipc/contracts/concierge';
+import type {
+	EnvironmentFilesResult,
+	EnvironmentVariablesSnapshot,
+} from '@/shared/ipc/contracts/environment';
 import type { GetPullRequestSnapshotResult } from '@/shared/ipc/contracts/github';
 import type { HealthSnapshot } from '@/shared/ipc/contracts/health';
 import type {
+	GetLinearIssueResult,
 	GetLinearMetadataResult,
 	LinearConnectionSummary,
 	LinearMetadataWire,
@@ -46,10 +48,13 @@ import type {
 	TerminalSnapshotResult,
 } from '@/shared/ipc/contracts/terminal';
 import type { UpdateStatusSnapshot } from '@/shared/ipc/contracts/update';
+import type { ListAllWorkspacesResult } from '@/shared/ipc/contracts/workspace';
 import type { ListWorkspaceFilesResult } from '@/shared/ipc/contracts/workspace-files';
 import {
+	type GetWorkspaceCommitsResult,
 	type GetWorkspaceFileDiffResult,
 	type GetWorkspaceGitStatusResult,
+	type GetWorkspaceMergeConflictsResult,
 	summarizeWorkspaceGitFiles,
 } from '@/shared/ipc/contracts/workspace-git';
 import type {
@@ -64,6 +69,8 @@ import type {
 	DemoBridgeHandlers,
 	DemoBroadcastChannels,
 } from './demo-bridge.ts';
+import { DEMO_AGENT_HARNESSES } from './fixtures/agents.ts';
+import { DEMO_MODEL_CATALOG } from './fixtures/models.ts';
 import {
 	discoveredExecutable,
 	healthyReadiness,
@@ -130,7 +137,7 @@ function chatTab(
 ): ChatTabWire {
 	return {
 		agentSessionId: chat.agentSessionId,
-		closedAt: null,
+		closedAt: chat.closedAt ?? null,
 		fullTitle: chat.title,
 		id: chat.tabId ?? ACTIVE_TAB_ID,
 		isPreview: false,
@@ -158,18 +165,21 @@ function chatSession(
 ): AgentSessionSnapshotWire {
 	return {
 		branchId: chat.branchId,
-		closedAt: null,
+		closedAt: chat.closedAt ?? null,
+		contextUsage: chat.contextUsage,
 		createdAt: scenario.clock,
+		currentTools: chat.currentTools,
 		cwd: workspacePath(scenario),
 		id: chat.agentSessionId,
 		label: chat.title,
+		lineage: chat.lineage,
 		model: chat.model,
 		openedTabs: [],
-		provider: 'claude',
-		runtimeOpen: chat.isStreaming,
+		provider: chat.provider ?? 'claude',
+		runtimeOpen: !chat.closedAt && chat.isStreaming,
 		runtimeSessionId: `${chat.agentSessionId}-runtime`,
-		status: chat.isStreaming ? 'streaming' : 'idle',
-		thinkingLevel: null,
+		status: chat.closedAt ? 'closed' : chat.isStreaming ? 'streaming' : 'idle',
+		thinkingLevel: chat.thinkingLevel ?? null,
 		updatedAt: scenario.clock,
 		workspaceId: scenario.workspaceId,
 	};
@@ -276,14 +286,21 @@ function setupSnapshot(scenario: DemoScenario): SetupDiagnosticsSnapshot {
  * `.ensemblr/settings.toml` would produce, `available_in` and `default` spelling
  * included.
  * @param scenario - Scenario being applied.
- * @returns The resolution snapshot, with only the run-script entry populated.
+ * @returns The resolution snapshot with declared repository entries and current run scripts.
  */
-function scriptSettings(scenario: DemoScenario): SettingsResolutionSnapshot {
+function resolvedSettings(scenario: DemoScenario): SettingsResolutionSnapshot {
+	const repository = scenario.repositorySettings ?? {
+		diagnostics: [],
+		settings: [],
+	};
 	return {
 		app: { diagnostics: [], settings: [] },
 		repository: {
-			diagnostics: [],
+			...repository,
 			settings: [
+				...repository.settings.filter(
+					(setting) => setting.key !== 'scripts.runScripts',
+				),
 				{
 					candidates: [],
 					key: 'scripts.runScripts',
@@ -327,30 +344,6 @@ function cleanHealth(scenario: DemoScenario): HealthSnapshot {
 		versions: { chrome: '140.0.0.0', electron: '44.0.0', node: '24.18.1' },
 	};
 }
-
-/** The model catalogue the composer's picker renders. */
-const DEMO_MODEL_CATALOG: AgentModelCatalog = {
-	defaultModelId: 'claude-opus-5',
-	defaultThinkingLevel: null,
-	models: [
-		{
-			agentProvider: 'claude',
-			contextWindow: 1_000_000,
-			displayName: 'Opus 5',
-			id: 'claude-opus-5',
-			thinkingLevels: [],
-			vendor: asModelVendorId('anthropic'),
-		},
-		{
-			agentProvider: 'claude',
-			contextWindow: 200_000,
-			displayName: 'Sonnet 5',
-			id: 'claude-sonnet-5',
-			thinkingLevels: [],
-			vendor: asModelVendorId('anthropic'),
-		},
-	],
-};
 
 /** Reports no update available, so no update banner covers a scenario. */
 const DEMO_UPDATE_STATUS: UpdateStatusSnapshot = {
@@ -399,14 +392,15 @@ function demoAppSettings(scenario: DemoScenario): AppSettings {
 		concierge: {
 			...DEFAULT_APP_SETTINGS.concierge,
 			model: scenario.chat.model,
-			provider: 'claude',
-			thinkingLevel: 'medium',
+			provider: scenario.chat.provider ?? 'claude',
+			thinkingLevel: scenario.chat.thinkingLevel ?? 'medium',
 		},
 		models: {
 			...DEFAULT_APP_SETTINGS.models,
 			defaultModel: scenario.chat.model,
 		},
 		onboarding: { completedAt: scenario.clock },
+		...scenario.appSettings,
 	};
 }
 
@@ -460,6 +454,43 @@ function linearConnection(scenario: DemoScenario): LinearConnectionSummary {
 }
 
 /**
+ * Reads one scenario-backed Linear issue, falling back to its list row with no comments.
+ * @param scenario - Scenario being applied.
+ * @param payload - Request naming the issue by UUID or identifier.
+ * @returns The issue detail result or a typed not-found failure.
+ */
+function linearIssue(
+	scenario: DemoScenario,
+	payload: unknown,
+): GetLinearIssueResult {
+	const id = readField(payload, 'id');
+	const details = scenario.linear?.issueDetails ?? {};
+	const detail =
+		details[id] ??
+		Object.values(details).find(
+			(candidate) =>
+				candidate.status === 'ok' &&
+				(candidate.issue.id === id || candidate.issue.identifier === id),
+		);
+	if (detail) {
+		return detail;
+	}
+	const issue = scenario.linear?.issues.find(
+		(candidate) => candidate.id === id || candidate.identifier === id,
+	);
+	return issue
+		? { comments: [], issue, source: 'cache', status: 'ok' }
+		: {
+				failure: {
+					code: 'not-found',
+					message: `Linear issue ${id} was not found.`,
+					retryAfterSeconds: null,
+				},
+				status: 'error',
+			};
+}
+
+/**
  * Maps the demo bridge's method names onto scenario-derived answers.
  *
  * Everything not named here falls through to the Proxy's no-op, which is the
@@ -475,6 +506,15 @@ export function createDemoHandlers(
 	return {
 		conciergeContextPressure: (): ConciergeContextPressureWire =>
 			DEMO_CONTEXT_PRESSURE,
+		environmentVariables: (): EnvironmentVariablesSnapshot =>
+			getScenario().environment ?? {
+				catalog: [],
+				diagnostics: [],
+				generatedAt: getScenario().clock,
+				missingRequiredCount: 0,
+				requiredCount: 0,
+				variables: [],
+			},
 		getAgentProviderExecutablePath: (payload) =>
 			discoveredExecutable(
 				(readField(payload, 'provider') || 'claude') as AgentProviderId,
@@ -482,6 +522,8 @@ export function createDemoHandlers(
 		getAgentProviderReadiness: (payload): AgentProviderReadinessWire =>
 			providerReadiness(getScenario(), payload),
 		getAppSettings: (): AppSettings => demoAppSettings(getScenario()),
+		getArchitectureSnapshot: (): GetArchitectureSnapshotResult =>
+			getScenario().architecture ?? { current: null, previous: null },
 		getMenuBar: (): MenuBarDescriptor => EMPTY_MENU_BAR,
 		getPullRequestSnapshot: (): GetPullRequestSnapshotResult => {
 			const scenario = getScenario();
@@ -506,13 +548,19 @@ export function createDemoHandlers(
 			const path = readField(payload, 'path');
 			return { patch: getScenario().fileDiffs[path], path };
 		},
+		getWorkspaceCommits: (): GetWorkspaceCommitsResult => ({ commits: [] }),
 		getWorkspaceGitStatus: (payload): GetWorkspaceGitStatusResult =>
 			summarizeWorkspaceGitFiles(
 				getScenario().gitFilesByPath[readField(payload, 'workspaceCwd')] ?? [],
 			),
+		getWorkspaceMergeConflicts: (): GetWorkspaceMergeConflictsResult => ({
+			paths: [],
+		}),
 		health: (): HealthSnapshot => cleanHealth(getScenario()),
 		linearConnectionStatus: (): LinearConnectionSummary =>
 			linearConnection(getScenario()),
+		linearGetIssue: (payload): GetLinearIssueResult =>
+			linearIssue(getScenario(), payload),
 		linearListIssues: (): ListLinearIssuesResult => ({
 			accountFailures: [],
 			issues: [...(getScenario().linear?.issues ?? [])],
@@ -534,7 +582,8 @@ export function createDemoHandlers(
 						status: 'error',
 					};
 		},
-		listAgentModels: (): AgentModelCatalog => DEMO_MODEL_CATALOG,
+		listAgentHarnesses: () => DEMO_AGENT_HARNESSES,
+		listAgentModels: () => DEMO_MODEL_CATALOG,
 		listAgentProviderSlashCommands:
 			(): ListAgentProviderSlashCommandsResult => ({
 				commands: [],
@@ -555,11 +604,16 @@ export function createDemoHandlers(
 			};
 		},
 		listAllChatTabs: (): ListChatTabsResult => listTabs(getScenario()),
+		listAllWorkspaces: (): ListAllWorkspacesResult =>
+			getScenario().workspaceHistory ?? { entries: [] },
 		listChatTabs: (): ListChatTabsResult => listTabs(getScenario()),
 		listChatTabSummaries: () => ({ entries: [] }),
+		listConciergeArtifacts: () => ({ artifacts: [] }),
 		listConciergeEvents: (): ListConciergeEventsResult => ({
 			events: getScenario().concierge?.transcript ?? [],
 		}),
+		listEnvFiles: (): EnvironmentFilesResult =>
+			getScenario().envFiles ?? { paths: [] },
 		listRepositoryBranches: (payload): ListRepositoryBranchesResult => ({
 			branches: [
 				...(DEMO_REPOSITORY_BRANCHES[readField(payload, 'repositoryId')] ?? []),
@@ -604,6 +658,9 @@ export function createDemoHandlers(
 		}),
 		listWorkspaceOpenTargets: () => ({ targets: DEMO_OPEN_TARGETS }),
 		onAgentSessionEvent: channels.subscriber(AGENT_EVENT_CHANNEL),
+		onArchitectureSnapshotChanged: channels.subscriber(
+			'onArchitectureSnapshotChanged',
+		),
 		onExitPlanMode: channels.subscriber(EXIT_PLAN_MODE_CHANNEL),
 		onFocusConciergeRequested: channels.subscriber(CONCIERGE_FOCUS_CHANNEL),
 		onMenuBarChanged: channels.subscriber('onMenuBarChanged'),
@@ -638,7 +695,7 @@ export function createDemoHandlers(
 			}),
 		reportActiveChat: () => undefined,
 		resolveSettings: (): SettingsResolutionSnapshot =>
-			scriptSettings(getScenario()),
+			resolvedSettings(getScenario()),
 		rootDirectory: (): RootDirectorySnapshot => demoRootDirectory(),
 		setupDiagnostics: (): SetupDiagnosticsSnapshot =>
 			setupSnapshot(getScenario()),
@@ -654,7 +711,8 @@ export function createDemoHandlers(
 				session: terminal ? terminalSession(terminal, scenario) : null,
 			};
 		},
-		updateStatus: (): UpdateStatusSnapshot => DEMO_UPDATE_STATUS,
+		updateStatus: (): UpdateStatusSnapshot =>
+			getScenario().updateStatus ?? DEMO_UPDATE_STATUS,
 	};
 }
 
@@ -668,10 +726,27 @@ function listTabs(scenario: DemoScenario): ListChatTabsResult {
 	const tabs = allChats(scenario).map((chat, index) =>
 		chatTab(chat, scenario, index, index > 0),
 	);
+	const open = tabs.filter((tab) => tab.closedAt === null);
+	const closed = tabs.filter((tab) => tab.closedAt !== null);
 	if (scenario.openDiffPath) {
-		tabs.push(diffTab(scenario, scenario.openDiffPath, tabs.length));
+		open.push(diffTab(scenario, scenario.openDiffPath, open.length));
 	}
-	return { closed: [], open: tabs };
+	if (scenario.openArchitecture) {
+		open.push({
+			agentSessionId: null,
+			closedAt: null,
+			fullTitle: 'Architecture',
+			id: 'demo-architecture',
+			isPreview: false,
+			kind: 'diagram',
+			metadata: {},
+			openedAt: scenario.clock,
+			position: open.length,
+			title: 'Architecture',
+			workspaceId: scenario.workspaceId,
+		});
+	}
+	return { closed, open };
 }
 
 /**

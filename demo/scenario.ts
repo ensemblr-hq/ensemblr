@@ -1,19 +1,35 @@
 import type { DockTabId, ReviewPanelTab } from '@/renderer/types/workbench';
+import type { AgentSessionLineage } from '@/shared/agent-control/lineage';
+import type { AgentProviderId } from '@/shared/agent-provider';
 import type { AgentProviderReadinessWire } from '@/shared/ipc/contracts/agent-provider';
-import type { AgentSessionEventWire } from '@/shared/ipc/contracts/agent-session';
+import type {
+	AgentSessionContextSnapshotWire,
+	AgentSessionEventWire,
+	AgentSessionToolActivityWire,
+} from '@/shared/ipc/contracts/agent-session';
+import type { AppSettings } from '@/shared/ipc/contracts/app-settings';
+import type { GetArchitectureSnapshotResult } from '@/shared/ipc/contracts/architecture';
 import type { ConciergeSessionEventWire } from '@/shared/ipc/contracts/concierge';
+import type {
+	EnvironmentFilesResult,
+	EnvironmentVariablesSnapshot,
+} from '@/shared/ipc/contracts/environment';
 import type { GithubPullRequestWire } from '@/shared/ipc/contracts/github';
 import type {
+	GetLinearIssueResult,
 	LinearIssueWire,
 	LinearMetadataWire,
 } from '@/shared/ipc/contracts/linear';
 import type { RepositoryWorkspaceNavigationRepository } from '@/shared/ipc/contracts/repository-navigation';
 import type { ReviewCommentWire } from '@/shared/ipc/contracts/review-comments';
+import type { SettingsResolutionGroupSnapshot } from '@/shared/ipc/contracts/settings-resolution';
 import type { SetupCheckSnapshot } from '@/shared/ipc/contracts/setup';
 import type {
 	TerminalSessionKind,
 	TerminalSessionStatus,
 } from '@/shared/ipc/contracts/terminal';
+import type { UpdateStatusSnapshot } from '@/shared/ipc/contracts/update';
+import type { ListAllWorkspacesResult } from '@/shared/ipc/contracts/workspace';
 import type { WorkspaceFileEntryWire } from '@/shared/ipc/contracts/workspace-files';
 import type { WorkspaceGitFileWire } from '@/shared/ipc/contracts/workspace-git';
 import type { RunScriptDefinition } from '@/shared/scripts';
@@ -68,11 +84,17 @@ export interface DemoChat {
 	 */
 	afkMode?: boolean;
 	branchId: string;
+	closedAt?: string | null;
+	contextUsage?: AgentSessionContextSnapshotWire | null;
+	currentTools?: readonly AgentSessionToolActivityWire[];
 	/** Marks the session `streaming`, which is what raises the working indicator. */
 	isStreaming: boolean;
+	lineage?: AgentSessionLineage;
 	model: string;
+	provider?: AgentProviderId;
 	/** Tab id this chat is bound to; defaults to `demo-chat` for the active one. */
 	tabId?: string;
+	thinkingLevel?: string | null;
 	title: string;
 	transcript: readonly AgentSessionEventWire[];
 }
@@ -80,6 +102,8 @@ export interface DemoChat {
 /** The Linear data a scenario's Linear views render from. */
 export interface DemoLinear {
 	issues: readonly LinearIssueWire[];
+	/** Full issue reads keyed by UUID or human identifier. */
+	issueDetails?: Readonly<Record<string, GetLinearIssueResult>>;
 	metadata: LinearMetadataWire;
 	organizationName: string;
 }
@@ -143,18 +167,25 @@ export interface DemoPlanReview {
  * nothing else.
  */
 export interface DemoScenario {
+	/** Complete concern-level app settings layered over the demo defaults. */
+	appSettings?: Partial<AppSettings>;
+	architecture?: GetArchitectureSnapshotResult;
 	chat: DemoChat;
 	/** ISO instant every clock in the app reads, so no shot carries a live time. */
 	clock: string;
 	concierge?: DemoConcierge;
 	/** Dock tab to open, appended to the route as `?dock=`. */
 	dockTab?: DockTabId;
+	environment?: EnvironmentVariablesSnapshot;
+	envFiles?: EnvironmentFilesResult;
 	/**
 	 * Repo-relative path whose diff opens as the active tab. The diff viewer and
 	 * any review comments on that file render with it, which is the state a
 	 * review shot wants and the one a `reviewTab` alone does not reach.
 	 */
 	openDiffPath?: string;
+	/** Opens the stored architecture as a persisted diagram tab. */
+	openArchitecture?: boolean;
 	/**
 	 * Spawned delegates, each in its own tab beside the open chat.
 	 *
@@ -185,6 +216,8 @@ export interface DemoScenario {
 	providers?: Readonly<Record<string, AgentProviderReadinessWire>>;
 	pullRequest?: GithubPullRequestWire;
 	repositories: readonly RepositoryWorkspaceNavigationRepository[];
+	/** Repository half of the native settings-resolution snapshot. */
+	repositorySettings?: SettingsResolutionGroupSnapshot;
 	reviewComments: readonly ReviewCommentWire[];
 	/** Review panel tab to open, appended to the route as `?review=`. */
 	reviewTab?: ReviewPanelTab;
@@ -199,11 +232,13 @@ export interface DemoScenario {
 	setupChecks: readonly DemoSetupCheck[];
 	terminals: readonly DemoTerminal[];
 	theme: DemoTheme;
+	updateStatus?: UpdateStatusSnapshot;
 	window: DemoWindowSize;
 	/** File tree for the review panel's Files tab. */
 	workspaceFiles: readonly WorkspaceFileEntryWire[];
 	/** Workspace the route opens; must exist in `repositories`. */
 	workspaceId: string;
+	workspaceHistory?: ListAllWorkspacesResult;
 }
 
 /** Fields every scenario may leave out, defaulted by {@link defineScenario}. */
@@ -273,10 +308,13 @@ export function scenarioHref(scenario: DemoScenario): string {
 		search.set('dock', scenario.dockTab);
 	}
 	const query = search.toString();
-	// The diff opens as its own tab, so the route has to name that tab rather
-	// than the chat the scenario's transcript belongs to.
-	const path = scenario.openDiffPath
-		? scenario.route.replace(/\/chats\/[^/?]+$/, '/chats/demo-diff')
+	const auxiliaryTab = scenario.openDiffPath
+		? 'demo-diff'
+		: scenario.openArchitecture
+			? 'demo-architecture'
+			: null;
+	const path = auxiliaryTab
+		? scenario.route.replace(/\/chats\/[^/?]+$/, `/chats/${auxiliaryTab}`)
 		: scenario.route;
 	return query ? `${path}?${query}` : path;
 }

@@ -262,7 +262,7 @@ export const DEMO_GIT_FILES: Readonly<
 		{
 			additions: 34,
 			deletions: 2,
-			path: 'src/renderer/components/settings/updates-panel.tsx',
+			path: 'src/renderer/components/workbench-shell/navigation-sidebar/update-panel/update-panel.tsx',
 			status: 'modified',
 		},
 		{
@@ -410,6 +410,18 @@ export const DEMO_GIT_FILES: Readonly<
 
 /** File tree the review panel's Files tab renders. */
 export const DEMO_WORKSPACE_FILES = [
+	{
+		isIgnored: true,
+		kind: 'file' as const,
+		name: '.env.local',
+		path: '.env.local',
+	},
+	{
+		kind: 'file' as const,
+		name: 'CONTEXT.md',
+		path: 'CONTEXT.md',
+		symlinkTargetKind: 'file' as const,
+	},
 	{ kind: 'directory' as const, name: 'src', path: 'src' },
 	{ kind: 'directory' as const, name: 'main', path: 'src/main' },
 	{ kind: 'directory' as const, name: 'updates', path: 'src/main/updates' },

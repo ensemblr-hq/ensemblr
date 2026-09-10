@@ -1,4 +1,3 @@
-import type { QueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { DemoRuntime } from './demo-runtime.ts';
@@ -27,15 +26,9 @@ function applyTheme(theme: DemoTheme): void {
  * thing a promotional screenshot must not contain. The capture script never
  * shows it.
  */
-export function DemoToolbar({
-	queryClient,
-	runtime,
-}: {
-	queryClient: QueryClient;
-	runtime: DemoRuntime;
-}) {
+export function DemoToolbar({ runtime }: { runtime: DemoRuntime }) {
 	const [isVisible, setIsVisible] = useState(false);
-	const [scenarioId, setScenarioId] = useState(runtime.authored.id);
+	const scenarioId = runtime.authored.id;
 	const [theme, setTheme] = useState<DemoTheme>(runtime.authored.theme);
 	const [isFrozen, setIsFrozen] = useState(true);
 
@@ -54,20 +47,11 @@ export function DemoToolbar({
 		return () => window.removeEventListener('keydown', onKeyDown);
 	}, []);
 
-	const selectScenario = useCallback(
-		(id: string) => {
-			const next = DEMO_SCENARIOS.find((scenario) => scenario.id === id);
-			if (!next) {
-				return;
-			}
-			setScenarioId(id);
-			setTheme(next.theme);
-			applyTheme(next.theme);
-			runtime.apply(next, queryClient);
-			void window.ensemblrDemo?.setContentSize(next.window);
-		},
-		[queryClient, runtime],
-	);
+	const selectScenario = useCallback((id: string) => {
+		const search = new URLSearchParams(window.location.search);
+		search.set('scenario', id);
+		window.location.assign(`${window.location.pathname}?${search}`);
+	}, []);
 
 	const selectTheme = useCallback((next: DemoTheme) => {
 		setTheme(next);

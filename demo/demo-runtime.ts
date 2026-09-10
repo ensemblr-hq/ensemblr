@@ -151,22 +151,21 @@ export class DemoRuntime {
 	 * One per call rather than the whole list at once: a gesture that opens a
 	 * dialog only reaches the DOM after React has re-rendered and the queries it
 	 * kicked off have answered, so the next gesture has nothing to find until the
-	 * caller has polled again. A gesture that matches nothing is reported rather
-	 * than skipped silently — the failure mode it otherwise produces is a shot of
-	 * the wrong screen, which reads as correct.
-	 * @returns True when a gesture was applied, false once the list is spent.
+	 * caller has polled again. An unmatched gesture stays pending until its lazy
+	 * target mounts; a missing target times out capture rather than photographing
+	 * the wrong screen.
+	 * @returns True while a gesture is pending or was applied, false once the list is spent.
 	 */
 	applyNextInteraction(): boolean {
 		const interaction = this.scenario.interactions[this.interactionCursor];
 		if (!interaction) {
 			return false;
 		}
-		this.interactionCursor += 1;
 		const target = findInteractionTarget(interaction);
 		if (!target) {
-			console.error('Demo interaction matched no element:', interaction);
 			return true;
 		}
+		this.interactionCursor += 1;
 		if (interaction.kind === 'click') {
 			pressElement(target);
 			return true;
@@ -300,6 +299,7 @@ function findInteractionTarget(
 		return candidates.at(0) ?? null;
 	}
 	return (
+		candidates.find((candidate) => candidate.textContent?.trim() === text) ??
 		candidates.find((candidate) => candidate.textContent?.includes(text)) ??
 		null
 	);

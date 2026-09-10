@@ -1,6 +1,9 @@
 import type { DemoScenario } from '../scenario.ts';
 import afkMode from './afk-mode.ts';
 import afkModeReport from './afk-mode-report.ts';
+import agentsHistory from './agents-history.ts';
+import agentsPanel from './agents-panel.ts';
+import architecture from './architecture.ts';
 import board from './board.ts';
 import boardCardMenu from './board-card-menu.ts';
 import checksPullRequest from './checks-pull-request.ts';
@@ -10,18 +13,37 @@ import createWorkspaceBranches from './create-workspace-branches.ts';
 import createWorkspaceSources from './create-workspace-sources.ts';
 import dockRunPicker from './dock-run-picker.ts';
 import dockTerminal from './dock-terminal.ts';
+import harnessLauncher from './harness-launcher.ts';
 import heroOrchestrator from './hero-orchestrator.ts';
+import linearIssueDetail from './linear-issue-detail.ts';
 import linearIssues from './linear-issues.ts';
 import onboardingAgentCli from './onboarding-agent-cli.ts';
 import onboardingWelcome from './onboarding-welcome.ts';
 import planMode from './plan-mode.ts';
+import repoSettingsActions from './repo-settings-actions.ts';
+import repoSettingsEnvironment from './repo-settings-environment.ts';
+import repoSettingsGit from './repo-settings-git.ts';
+import repoSettingsMisc from './repo-settings-misc.ts';
+import repoSettingsScripts from './repo-settings-scripts.ts';
+import repoSettingsSecrets from './repo-settings-secrets.ts';
+import repoSettingsSecurity from './repo-settings-security.ts';
 import reviewChanges from './review-changes.ts';
+import settingsAppearance from './settings-appearance.ts';
 import settingsDiagnostics from './settings-diagnostics.ts';
+import settingsEnvironment from './settings-environment.ts';
+import settingsExperimental from './settings-experimental.ts';
 import settingsGeneral from './settings-general.ts';
+import settingsGit from './settings-git.ts';
+import settingsIntegrations from './settings-integrations.ts';
+import settingsModels from './settings-models.ts';
 import settingsProviders from './settings-providers.ts';
 import settingsProvidersClaude from './settings-providers-claude.ts';
 import settingsShortcuts from './settings-shortcuts.ts';
 import subagentFanout from './subagent-fanout.ts';
+import updateAvailable from './update-available.ts';
+import updateFailure from './update-failure.ts';
+import workspaceFiles from './workspace-files.ts';
+import workspaceHistory from './workspace-history.ts';
 import workspaceMidTurn from './workspace-mid-turn.ts';
 import workspaceMidTurnLight from './workspace-mid-turn-light.ts';
 
@@ -31,6 +53,15 @@ import workspaceMidTurnLight from './workspace-mid-turn-light.ts';
  */
 export const DEMO_SCENARIOS: readonly DemoScenario[] = [
 	heroOrchestrator,
+	agentsPanel,
+	agentsHistory,
+	architecture,
+	workspaceFiles,
+	workspaceHistory,
+	linearIssueDetail,
+	harnessLauncher,
+	updateAvailable,
+	updateFailure,
 	workspaceMidTurn,
 	workspaceMidTurnLight,
 	planMode,
@@ -55,6 +86,19 @@ export const DEMO_SCENARIOS: readonly DemoScenario[] = [
 	settingsGeneral,
 	settingsDiagnostics,
 	settingsShortcuts,
+	settingsAppearance,
+	settingsEnvironment,
+	settingsExperimental,
+	settingsGit,
+	settingsIntegrations,
+	settingsModels,
+	repoSettingsActions,
+	repoSettingsEnvironment,
+	repoSettingsGit,
+	repoSettingsMisc,
+	repoSettingsScripts,
+	repoSettingsSecrets,
+	repoSettingsSecurity,
 ];
 
 /**

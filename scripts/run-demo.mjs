@@ -27,12 +27,18 @@ const repositoryRoot = path.resolve(
  * @param watch - Whether to keep rebuilding as the sources change.
  */
 async function buildDemoMain(watch) {
-	await build({
-		build: { watch: watch ? {} : null },
-		configFile: path.join(repositoryRoot, 'vite.demo-main.config.mts'),
-		logLevel: 'warn',
-		root: repositoryRoot,
-	});
+	for (const mode of ['production', 'preload']) {
+		await build({
+			build: {
+				emptyOutDir: !watch && mode === 'production',
+				watch: watch ? {} : null,
+			},
+			configFile: path.join(repositoryRoot, 'vite.demo-main.config.mts'),
+			logLevel: 'warn',
+			mode,
+			root: repositoryRoot,
+		});
+	}
 }
 
 /**

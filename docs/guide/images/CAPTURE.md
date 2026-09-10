@@ -93,7 +93,7 @@ by the two commands above.
 | `07-dock-run-scripts.png` | `dock-run-picker` | `README.md`, `07-terminals-and-run-scripts.md` | The dock with a run script running **and** the run-script picker open, so the named scripts and their icons are legible. |
 | `08-changes.png` | `review-changes` | `README.md`, `08-reviewing-changes.md` | The diff viewer with an inline review comment thread open. |
 | `08-pr.png` | `checks-pull-request` | `08-reviewing-changes.md` | The Checks tab with the PR title and description editor filled in, over its check runs. |
-| `09-subagents.png` | `subagent-fanout` | `09-agent-control.md` | An orchestrator fanned out across four delegates, each a tab in the strip. |
+| `09-subagents.png` | `subagent-fanout` | `README.md`, `09-agent-control.md` | An orchestrator fanned out across four delegates, each a tab in the strip. |
 | `10-linear.png` | `linear-issues` | `10-integrations.md` | The Linear view, issues grouped by state. |
 | `11-settings-providers.png` | `settings-providers` | `11-app-settings.md` | The Providers pane on the Pi tab, with the executable override control visible. |
 | `11-settings-providers-claude.png` | `settings-providers-claude` | `11-app-settings.md` | The same pane on the Claude Code tab, for the Account block the Pi tab has no equivalent of. |
@@ -108,10 +108,32 @@ image belongs. Replace it with the image rather than adding one beside it:
 ```
 
 Every shot in the list has a scenario, so nothing here is taken by hand any
-more. `demo/README.md` lists two more that no page uses yet — `dock-terminal`,
-the dock with its picker closed, and `board`, the board with no menu open —
-kept because they are the cleaner shot when a page needs the surface without the
-control on top of it.
+more. Additional available scenarios not yet published on guide pages are:
+
+- `dock-terminal`, `board`
+- `agents-panel`, `agents-history`, `architecture`
+- `workspace-files`, `workspace-history`
+- `linear-issue-detail`, `harness-launcher`
+- `update-available`, `update-failure`
+- `settings-appearance`, `settings-environment`, `settings-experimental`,
+  `settings-git`, `settings-integrations`, `settings-models`
+- `repo-settings-actions`, `repo-settings-environment`, `repo-settings-git`,
+  `repo-settings-misc`, `repo-settings-scripts`, `repo-settings-secrets`,
+  `repo-settings-security`
+
+Keep these as source states until a guide page needs them; availability does not
+mean their PNGs have been published.
+
+## Verification captures are not native screenshots
+
+`.context/run-demo-verify.mjs` records `out/demo-verify/*.png` with Chromium's
+`webContents.capturePage()`. Those files are useful for DOM and layout checks,
+but contain content only: no macOS traffic lights, rounded native frame, or
+window shadow. Do not publish or describe them as finished desktop screenshots.
+The documented `npm run dev:demo -- --shoot --scenario=<id>` path uses
+`/usr/sbin/screencapture` and is the only path that verifies native chrome. If
+macOS screen-recording permission is unavailable, it exits with an error after
+the capture timeout rather than silently substituting a content-only image.
 
 ## Adding a shot
 

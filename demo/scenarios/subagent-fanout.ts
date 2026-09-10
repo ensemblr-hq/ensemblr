@@ -91,7 +91,7 @@ export default defineScenario({
 			toolCall('Task', 'call-panel', {
 				description: 'Review the updates panel',
 				prompt:
-					'Review src/renderer/components/settings/updates-panel.tsx for states it fails to render — empty notes, long notes, a failed check.',
+					'Review src/renderer/components/workbench-shell/navigation-sidebar/update-panel/update-panel.tsx for states it fails to render — empty notes, long notes, a failed check.',
 				subagent_type: 'code-reviewer',
 			}),
 			toolCall('Task', 'call-feed', {
@@ -155,10 +155,11 @@ export default defineScenario({
 			id: 'panel',
 			steps: [
 				userPrompt(
-					'Review src/renderer/components/settings/updates-panel.tsx for states it fails to render.',
+					'Review src/renderer/components/workbench-shell/navigation-sidebar/update-panel/update-panel.tsx for states it fails to render.',
 				),
 				toolCall('Read', 'p-1', {
-					file_path: 'src/renderer/components/settings/updates-panel.tsx',
+					file_path:
+						'src/renderer/components/workbench-shell/navigation-sidebar/update-panel/update-panel.tsx',
 				}),
 				toolResult('p-1', PANEL_BODY),
 				assistantText(

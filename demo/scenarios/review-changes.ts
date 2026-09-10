@@ -39,21 +39,20 @@ index 4a1c9f2..8b23d61 100644
  }
 `;
 
-const UPDATES_PANEL_DIFF = `diff --git a/src/renderer/components/settings/updates-panel.tsx b/src/renderer/components/settings/updates-panel.tsx
+const UPDATES_PANEL_DIFF = `diff --git a/src/renderer/components/workbench-shell/navigation-sidebar/update-panel/update-panel.tsx b/src/renderer/components/workbench-shell/navigation-sidebar/update-panel/update-panel.tsx
 index 91f0aa4..c7d1e08 100644
---- a/src/renderer/components/settings/updates-panel.tsx
-+++ b/src/renderer/components/settings/updates-panel.tsx
-@@ -42,6 +42,20 @@ export function UpdatesPanel() {
-       <p className='text-muted-foreground text-sm'>
-         {t('settings:updates.current', 'You are on the latest version.')}
+--- a/src/renderer/components/workbench-shell/navigation-sidebar/update-panel/update-panel.tsx
++++ b/src/renderer/components/workbench-shell/navigation-sidebar/update-panel/update-panel.tsx
+@@ -54,6 +54,16 @@ export function UpdatePanel() {
+           : panelDescription(kind, t)}
        </p>
-+      {status.notes ? (
-+        <section className='mt-4 border-border border-t pt-4'>
-+          <h3 className='font-medium text-sm'>
-+            {t('settings:updates.notes-heading', "What's new")}
++      {snapshot.notes ? (
++        <section className='mt-2 border-sidebar-border border-t pt-2'>
++          <h3 className='font-medium text-xs'>
++            {t('workbench:navigation-sidebar.update.notes', "What's new")}
 +          </h3>
-+          <Markdown className='mt-2 text-muted-foreground text-sm'>
-+            {status.notes}
++          <Markdown className='mt-1 text-muted-foreground text-xxs'>
++            {snapshot.notes}
 +          </Markdown>
 +        </section>
 +      ) : null}
@@ -90,7 +89,8 @@ export default defineScenario({
 	dockTab: 'run',
 	fileDiffs: {
 		'src/main/updates/update-service.ts': UPDATE_SERVICE_DIFF,
-		'src/renderer/components/settings/updates-panel.tsx': UPDATES_PANEL_DIFF,
+		'src/renderer/components/workbench-shell/navigation-sidebar/update-panel/update-panel.tsx':
+			UPDATES_PANEL_DIFF,
 	},
 	gitFilesByPath: DEMO_GIT_FILES,
 	id: 'review-changes',
@@ -112,7 +112,8 @@ export default defineScenario({
 		{
 			body: 'Markdown here is already sanitized upstream, so this can render the body directly.',
 			createdAt: DEMO_CLOCK,
-			filePath: 'src/renderer/components/settings/updates-panel.tsx',
+			filePath:
+				'src/renderer/components/workbench-shell/navigation-sidebar/update-panel/update-panel.tsx',
 			id: 'comment-markdown',
 			lineNumber: 48,
 			origin: 'agent',
