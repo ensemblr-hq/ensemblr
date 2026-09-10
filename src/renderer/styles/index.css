@@ -746,10 +746,11 @@
 
 	/* A left- or right-side sheet pins itself to the viewport's own top edge, so
 	   where Ensemblr draws the title bar it would slide out over that strip and
-	   its window controls. Same fix and same reason as the sidebar container
-	   above: the primitive is vendored. */
-	html.app-window-controls [data-slot="sheet-content"][data-side="left"],
-	html.app-window-controls [data-slot="sheet-content"][data-side="right"] {
+	   its window controls. Apply the resolved chrome variables directly rather
+	   than relying on a document marker; both resolve to the unmodified viewport
+	   size everywhere without a top inset. */
+	[data-slot="sheet-content"][data-side="left"],
+	[data-slot="sheet-content"][data-side="right"] {
 		block-size: var(--ensemblr-shell-height);
 		inset-block-start: var(--ensemblr-window-chrome-inset-top);
 	}
