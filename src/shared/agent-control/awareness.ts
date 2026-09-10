@@ -435,6 +435,9 @@ What makes a peer expensive is the checkout. You and it share one worktree, one 
  */
 const CHILD_TAB_CLEANUP = `Close a child's tab as soon as you have taken its report. A finished child's tab stays in the strip until somebody closes it, so a fan-out of four leaves four dead tabs beside the one the user actually works in, and a run of several rounds buries the strip — pass the \`chatTabId\` from the spawn to \`ensemblr_close_tab\` as each child settles, rather than sweeping up at the end of the turn or leaving it to the user. Closing costs nothing: the tab is archived rather than deleted, its transcript and its report survive it, \`ensemblr_get_last_message\` still reads that report, \`ensemblr_send_follow_up\` puts the tab back on screen if you do want another round from that child, and the user reopens it from the chat history whenever they want to read it. What stays open is what is still live — a child still working, one you are mid-round with — and what you did not open in the first place.`;
 
+/** Weighs useful parallelism and context preservation against delegation overhead. */
+const DELEGATION_DECISION_GUIDANCE = `Your own context window is precious, subagents are cheap. Delegate when the task genuinely splits into independent, substantial workstreams that can run in parallel, or when a self-contained task would fill your window with detail you only need summarized — even if there is only one workstream. Use Grunts for fully specified, zero-judgment work, including trivial tasks. Keep decisions and integration here; ask children for concise findings with evidence, not raw dumps. Task size alone is not a reason to work inline: keep work here when briefing and verifying would cost more of your context than doing it directly. Do not tell the user to click; drive the app yourself.`;
+
 /**
  * When a conversation is too full to be given the next unit of work, and what to
  * do about it.
@@ -588,8 +591,8 @@ ${APPROVAL_ETIQUETTE}`;
 const ORCHESTRATOR_ANSWER_LAST = `Your last message is your answer to the user, and it is the last thing you produce this turn. Finish every tool call before you write it — the work, the bookkeeping (\`ensemblr_set_summary\`), the cleanup (\`ensemblr_close_tab\`), the focusing — because the app shows a turn as one collapsed activity row plus the prose that follows the final call. Prose you write and then follow with another tool call is filed as working commentary and folded into that row, so a report written mid-turn is one the user has to go digging for. Everything the user needs has to be IN that final message — never a pointer to work earlier in the turn ("full report above", "as summarised", "see my findings"), because the folded-away copy is all they get. Produce nothing after it.`;
 
 /**
- * Playbook for a root orchestrator: inline-first by default, delegate only for
- * genuinely parallel multi-workstream tasks, then block on the wait loop.
+ * Playbook for a root orchestrator: delegate for useful parallelism or context
+ * preservation, including trivial Grunt work, then block on the wait loop.
  *
  * It is the only playbook carrying an answer-last rule, because it is the only
  * role whose reader is the user: the app renders a turn as collapsed activity
@@ -607,7 +610,7 @@ export const orchestratorAwareness = (features: AwarenessFeatures): string =>
 
 ${peerOrchestratorGuidance(features.tuiHarnesses)}
 
-Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper to do a single unit of work you could do in one pass, and never delegate a task just because you can. Do not tell the user to click; drive the app yourself.
+${DELEGATION_DECISION_GUIDANCE}
 
 ${ORCHESTRATOR_ANSWER_LAST}
 
@@ -665,7 +668,7 @@ export const nativeOrchestratorAwareness = (
 ): string =>
 	`${preambleFor(orchestratorInventory(NATIVE_ORCHESTRATOR_CONVERSATIONS, harnessInventory(features.tuiHarnesses), architectureInventory(features.architectureDiagram), ''), ORCHESTRATOR_LEGIBILITY, LINEAR_FOLLOW_THROUGH, TERMINAL_DISCIPLINE)}
 
-Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper to do a single unit of work you could do in one pass, and never delegate a task just because you can. Do not tell the user to click; drive the app yourself.
+${DELEGATION_DECISION_GUIDANCE}
 
 ${ORCHESTRATOR_ANSWER_LAST}
 
@@ -758,7 +761,7 @@ ${REVIEW_FOLLOW_THROUGH}
 
 ${peerOrchestratorGuidance(features.tuiHarnesses)}
 
-Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper for a single unit of work you could do in one pass. Do not tell the user to click; drive the app yourself.
+${DELEGATION_DECISION_GUIDANCE}
 
 Split the work before you split the agents. A child cold-starts with nothing but its brief, so every fact two children both need is a repository read paid for twice — and that re-derivation is what makes a fan-out cost more context than doing the work inline. When the workstreams share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and put the findings with full paths into every brief. Fan out cold only where the work is genuinely disjoint.
 
@@ -958,7 +961,7 @@ Your job this turn is to reach a shared understanding with the user before any c
 - Walk the decision tree in order. Settle a prerequisite before the decisions that hang off it, so an answer never invalidates three questions you already asked.
 - Challenge fuzzy or overloaded terms and propose a precise one. Stress-test the design with concrete scenarios — a real input, a real failure, a real edge case. When what the user says contradicts what the code does, say so plainly and show them the code.
 
-Finding those facts does not have to be serial. When the plan hinges on facts spread across two or more independent areas of the codebase — areas you would otherwise read one after another — fan out read-only investigators and read them at once. Never fan out for one file, one question, or anything you could answer in a single pass; a fan-out you did not need costs the user a tab and costs you a wait. Split the work before you split the investigators: a child cold-starts with nothing but its brief, so a fact two of them both need is a repository read paid for twice. When the areas share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and hand the findings with full paths to each investigator; fan out cold only where the questions are genuinely disjoint.
+Finding those facts does not have to be serial. Your own context window is precious, subagents are cheap. Delegate a self-contained investigation when you only need its findings rather than all its detail — even if there is only one workstream. Keep the interview and decisions here; ask children for concise findings with evidence, not raw dumps. When the plan hinges on facts spread across two or more independent areas of the codebase — areas you would otherwise read one after another — fan out read-only investigators and read them at once. Task size alone is not a reason to work inline: keep work here when briefing and verifying would cost more of your context than doing it directly. Split the work before you split the investigators: a child cold-starts with nothing but its brief, so a fact two of them both need is a repository read paid for twice. When the areas share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and hand the findings with full paths to each investigator; fan out cold only where the questions are genuinely disjoint.
 
 ${DELEGATION_ROLE_GUIDANCE}
 
