@@ -25,6 +25,9 @@ const STYLESHEET = readFileSync(
 
 const CLEARANCE =
 	'padding-block-start: var(--ensemblr-window-chrome-inset-top)';
+const SHEET_HEIGHT = 'block-size: var(--ensemblr-shell-height)';
+const SHEET_OFFSET =
+	'inset-block-start: var(--ensemblr-window-chrome-inset-top)';
 
 /**
  * Reads one top-level rule out of the stylesheet's `@layer base` block.
@@ -42,4 +45,14 @@ test('the app root clears the title bar Ensemblr draws above it', () => {
 
 test('body does not, because Radix rewrites its padding on every open menu', () => {
 	expect(declarationsFor('body')).not.toContain('padding');
+});
+
+test('side sheets clear the custom title bar without losing usable height', () => {
+	const sideSheetRule =
+		/\n\t\[data-slot="sheet-content"\]\[data-side="left"\],[^{]+\{([^{}]*)\}/.exec(
+			STYLESHEET,
+		)?.[1];
+
+	expect(sideSheetRule).toContain(SHEET_HEIGHT);
+	expect(sideSheetRule).toContain(SHEET_OFFSET);
 });
