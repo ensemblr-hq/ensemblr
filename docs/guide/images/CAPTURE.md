@@ -108,10 +108,32 @@ image belongs. Replace it with the image rather than adding one beside it:
 ```
 
 Every shot in the list has a scenario, so nothing here is taken by hand any
-more. `demo/README.md` lists two more that no page uses yet — `dock-terminal`,
-the dock with its picker closed, and `board`, the board with no menu open —
-kept because they are the cleaner shot when a page needs the surface without the
-control on top of it.
+more. Additional available scenarios not yet published on guide pages are:
+
+- `dock-terminal`, `board`
+- `agents-panel`, `agents-history`, `architecture`
+- `workspace-files`, `workspace-history`
+- `linear-issue-detail`, `harness-launcher`
+- `update-available`, `update-failure`
+- `settings-appearance`, `settings-environment`, `settings-experimental`,
+  `settings-git`, `settings-integrations`, `settings-models`
+- `repo-settings-actions`, `repo-settings-environment`, `repo-settings-git`,
+  `repo-settings-misc`, `repo-settings-scripts`, `repo-settings-secrets`,
+  `repo-settings-security`
+
+Keep these as source states until a guide page needs them; availability does not
+mean their PNGs have been published.
+
+## Verification captures are not native screenshots
+
+`.context/run-demo-verify.mjs` records `out/demo-verify/*.png` with Chromium's
+`webContents.capturePage()`. Those files are useful for DOM and layout checks,
+but contain content only: no macOS traffic lights, rounded native frame, or
+window shadow. Do not publish or describe them as finished desktop screenshots.
+The documented `npm run dev:demo -- --shoot --scenario=<id>` path uses
+`/usr/sbin/screencapture` and is the only path that verifies native chrome. If
+macOS screen-recording permission is unavailable, it exits with an error after
+the capture timeout rather than silently substituting a content-only image.
 
 ## Adding a shot
 

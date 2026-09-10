@@ -25,6 +25,9 @@ const CAPTURE_DIRECTORY = 'out/demo';
 /** How long a shoot waits for the renderer to settle before giving up on it. */
 const READY_TIMEOUT_MS = 20_000;
 
+/** How long native window capture may wait on macOS screen-recording access. */
+const CAPTURE_TIMEOUT_MS = 10_000;
+
 /** How often the shoot re-checks the renderer's readiness attribute. */
 const READY_POLL_MS = 200;
 
@@ -103,7 +106,9 @@ async function captureWindow(
 	if (!windowId) {
 		return null;
 	}
-	await execFileAsync('screencapture', ['-o', '-x', '-l', windowId, target]);
+	await execFileAsync('screencapture', ['-o', '-x', '-l', windowId, target], {
+		timeout: CAPTURE_TIMEOUT_MS,
+	});
 	return target;
 }
 
@@ -152,14 +157,20 @@ async function shootAndQuit(
 	}
 	window.focus();
 	await new Promise((resolve) => setTimeout(resolve, FOCUS_SETTLE_MS));
-	const target = await captureWindow(window, `${scenarioId}.png`);
-	if (!target) {
-		process.stderr.write(`not captured: ${scenarioId} had no window id\n`);
+	try {
+		const target = await captureWindow(window, `${scenarioId}.png`);
+		if (!target) {
+			process.stderr.write(`not captured: ${scenarioId} had no window id\n`);
+			app.exit(1);
+			return;
+		}
+		process.stdout.write(`captured ${target}\n`);
+		app.quit();
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		process.stderr.write(`not captured: ${scenarioId}: ${message}\n`);
 		app.exit(1);
-		return;
 	}
-	process.stdout.write(`captured ${target}\n`);
-	app.quit();
 }
 
 app.setName(DEMO_APP_NAME);

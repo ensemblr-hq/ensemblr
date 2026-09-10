@@ -9,7 +9,8 @@ npm run dev:demo
 
 Nothing under `src/` is modified to support this. Demo mode imports the app
 read-only, Forge is not involved, and the packaged build contains none of it.
-See [ADR 0058](../docs/adr/0058-capture-promotional-screenshots-from-a-separate-demo-electron-entrypoint.md).
+The launcher builds the main and sandboxed preload as separate Vite entries
+before starting the renderer. See [ADR 0058](../docs/adr/0058-capture-promotional-screenshots-from-a-separate-demo-electron-entrypoint.md).
 
 `playground/` is a **separate** thing — a component-review sandbox — and is off
 limits to this tree. The guard test in `tests/renderer/demo-isolation.test.ts`
@@ -44,13 +45,36 @@ enforces it in both directions.
 | `settings-general` | Settings → General, scrolled to the root directory row |
 | `settings-diagnostics` | Settings → Diagnostics, the full rollup with one warning |
 | `settings-shortcuts` | Settings → Shortcuts, the scope groups and their bindings |
+| `agents-panel` | Agents hierarchy: root, manager, two leaves, and the root's active wait tool |
+| `agents-history` | Closed agent sessions and their restorable delegate tabs |
+| `architecture` | A populated workspace architecture diagram tab |
+| `workspace-files` | The Files panel with nested files and a symlink |
+| `workspace-history` | Workspace history across repositories and outcomes |
+| `linear-issue-detail` | A Linear issue with properties, description, and comments |
+| `harness-launcher` | The native agent-harness launcher dialog |
+| `update-available` | An available app update with release notes |
+| `update-failure` | A failed update download with retry guidance |
+| `settings-appearance` | Settings → Appearance |
+| `settings-environment` | Settings → Environment with masked app variables |
+| `settings-experimental` | Settings → Experimental |
+| `settings-git` | Settings → Git defaults |
+| `settings-integrations` | Settings → Integrations with Linear connected and Infisical empty |
+| `settings-models` | Settings → Models with cross-runtime role assignments |
+| `repo-settings-actions` | Repository Settings → Actions and prompt overrides |
+| `repo-settings-environment` | Repository Settings → Environment with repository-scoped values |
+| `repo-settings-git` | Repository Settings → Git overrides |
+| `repo-settings-misc` | Repository Settings → Misc paths and lifecycle controls |
+| `repo-settings-scripts` | Repository Settings → Scripts with setup/run/archive configuration |
+| `repo-settings-secrets` | Repository Settings → Secrets with the explicit no-account state |
+| `repo-settings-security` | Repository Settings → Security permission mode |
 
 ## Composing a shot
 
 1. `npm run dev:demo` opens the window on the first scenario.
    `-- --scenario=<id>` opens a specific one.
 2. Edit a file under `scenarios/`. The window repaints over HMR — no restart.
-3. `⌘D` toggles the toolbar: scenario, theme, frozen/live motion, shoot.
+3. `⌘D` toggles the toolbar: scenario, theme, frozen/live motion, shoot. Picking
+   a scenario reloads its URL so route state, queries, and persisted atoms reset.
 
 The toolbar hides itself before capturing, because a toolbar in frame is the one
 thing a promotional screenshot must not contain.
@@ -87,6 +111,11 @@ export default defineScenario({
   },
 });
 ```
+
+Optional data-backed fields include `appSettings`, `environment`, `envFiles`,
+`repositorySettings`, `architecture`, `updateStatus`, and `workspaceHistory`.
+Set `openArchitecture` when the architecture snapshot should open as a diagram
+tab. `defineScenario` fills empty defaults for the common collections.
 
 A scenario's `subAgents` are full chats, not just tab rows: each carries its own
 `branchId`, its own session, and its own transcript, so opening a delegate's tab
@@ -139,9 +168,10 @@ field for each:
   controller that switches one off when the other goes on.
 - `interactions` covers everything else: state a component owns in a `useState`
   that no route reaches. A gesture is `click`, `context-menu`, `press-key`, or
-  `scroll-into-view`, addressed by CSS selector and optionally narrowed by
-  visible text. They run one per poll once the queries have settled, so a gesture
-  that opens a dialog has rendered before the next one looks for anything in it.
+  `scroll-into-view`, addressed by CSS selector and optionally narrowed by exact
+  visible text before substring matching. Missing targets stay pending and are
+  retried on the next poll. Gestures run one at a time after queries settle, so a
+  gesture that opens a dialog renders before the next one looks for anything in it.
 
 Reaching a surface this way is deliberate and is the only option: demo mode
 imports the app read-only, and `tests/renderer/demo-isolation.test.ts` enforces
@@ -178,6 +208,12 @@ Determinism comes from three things, none of them a timeout:
 Post-processing — cropping, downscaling, `pngquant`, `oxipng` — follows the
 recipes already written down in
 [`docs/guide/images/CAPTURE.md`](../docs/guide/images/CAPTURE.md).
+
+For automated DOM verification, `.context/run-demo-verify.mjs` uses
+`webContents.capturePage()`. Its `out/demo-verify/*.png` files intentionally
+contain renderer content only: they omit native traffic lights, window corners,
+and shadow, and are not finished screenshot assets. Only the `--shoot` path
+uses macOS `screencapture` for native-window output.
 
 ## Known limits
 

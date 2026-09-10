@@ -96,7 +96,7 @@ export function DemoShell({
 			{drawsOwnControls ? <WindowTitleBar /> : null}
 			<RouterProvider router={router} />
 			<Toaster position='bottom-right' />
-			<DemoToolbar queryClient={queryClient} runtime={runtime} />
+			<DemoToolbar runtime={runtime} />
 		</QueryClientProvider>
 	);
 }

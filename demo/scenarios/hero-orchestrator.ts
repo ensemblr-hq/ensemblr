@@ -92,7 +92,7 @@ export default defineScenario({
 			}),
 			toolCall('ensemblr_start_conversation', 'call-panel', {
 				prompt:
-					'Review src/renderer/components/settings/updates-panel.tsx for states it fails to render, then implement the missing ones.',
+					'Review src/renderer/components/workbench-shell/navigation-sidebar/update-panel/update-panel.tsx for states it fails to render, then implement the missing ones.',
 				title: 'Updates panel states',
 			}),
 			toolResult('call-resolver', 'Started in its own tab.'),
@@ -162,10 +162,11 @@ export default defineScenario({
 			id: 'panel',
 			steps: [
 				userPrompt(
-					'Review src/renderer/components/settings/updates-panel.tsx for states it fails to render, then implement the missing ones.',
+					'Review src/renderer/components/workbench-shell/navigation-sidebar/update-panel/update-panel.tsx for states it fails to render, then implement the missing ones.',
 				),
 				toolCall('Read', 'h-p-1', {
-					file_path: 'src/renderer/components/settings/updates-panel.tsx',
+					file_path:
+						'src/renderer/components/workbench-shell/navigation-sidebar/update-panel/update-panel.tsx',
 				}),
 				toolResult(
 					'h-p-1',
