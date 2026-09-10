@@ -886,9 +886,9 @@
 		display: inline;
 	}
 
-	@container (width < 24rem) {
+	@container (width < 32rem) {
 		.review-panel-action-label {
-			display: none;
+			@apply sr-only;
 		}
 	}
 

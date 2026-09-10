@@ -39,6 +39,74 @@ const conversations: readonly AgentConversation[] = [
 	},
 ];
 
+test('keeps closed conversations collapsed until toggled by mouse or keyboard', async () => {
+	const closed: AgentConversation = {
+		...conversations[1],
+		chatTabId: 'closed-child',
+		isClosed: true,
+		title: 'Archived child',
+	};
+	const onRestore = vi.fn();
+	renderWithProviders(
+		<AgentsPanel
+			conversations={[...conversations, closed]}
+			onRestore={onRestore}
+			onSelect={vi.fn()}
+		/>,
+	);
+
+	const toggle = screen.getByRole('button', { name: 'Closed 1' });
+	expect(toggle).toHaveAttribute('aria-expanded', 'false');
+	expect(
+		screen.queryByRole('button', { name: 'Restore Archived child' }),
+	).toBeNull();
+	expect(
+		screen.getByRole('button', { name: 'Open Parent chat' }),
+	).toBeVisible();
+
+	await userEvent.click(toggle);
+	expect(toggle).toHaveAttribute('aria-expanded', 'true');
+	await userEvent.click(
+		screen.getByRole('button', { name: 'Restore Archived child' }),
+	);
+	expect(onRestore).toHaveBeenCalledWith('closed-child');
+
+	toggle.focus();
+	await userEvent.keyboard('{Enter}');
+	expect(toggle).toHaveAttribute('aria-expanded', 'false');
+	expect(
+		screen.queryByRole('button', { name: 'Restore Archived child' }),
+	).toBeNull();
+	await userEvent.keyboard(' ');
+	expect(
+		screen.getByRole('button', { name: 'Restore Archived child' }),
+	).toBeVisible();
+});
+
+test('shows the closed count and updates it as conversations are restored', () => {
+	const closed = conversations.map((conversation) => ({
+		...conversation,
+		isClosed: true,
+	}));
+	const props = { onRestore: vi.fn(), onSelect: vi.fn() };
+	const view = renderWithProviders(
+		<AgentsPanel {...props} conversations={closed} />,
+	);
+	const toggle = screen.getByRole('button', { name: 'Closed 2' });
+	expect(toggle).toHaveAttribute('aria-expanded', 'false');
+	expect(within(toggle).getByText('2')).toBeVisible();
+
+	view.rerender(
+		<AgentsPanel {...props} conversations={[conversations[0], closed[1]]} />,
+	);
+	expect(screen.getByRole('button', { name: 'Closed 1' })).toBeVisible();
+
+	view.rerender(<AgentsPanel {...props} conversations={conversations} />);
+	expect(
+		screen.queryByRole('region', { name: 'Closed conversations' }),
+	).not.toBeInTheDocument();
+});
+
 test('renders the hierarchy and selects an open conversation', async () => {
 	const onSelect = vi.fn();
 	const { container } = renderWithProviders(
@@ -65,6 +133,86 @@ test('renders the hierarchy and selects an open conversation', async () => {
 	expect(child).toHaveAttribute('aria-current', 'true');
 	await userEvent.click(child);
 	expect(onSelect).toHaveBeenCalledWith('child');
+});
+
+test('fills only open idle preview lines with depth-specific readiness copy', async () => {
+	const idleRows: readonly AgentConversation[] = [
+		{ ...conversations[0], activity: null },
+		{
+			...conversations[1],
+			activity: null,
+			status: 'idle',
+		},
+		{
+			...conversations[1],
+			activity: null,
+			chatTabId: 'leaf',
+			depth: 2,
+			parentChatTabId: 'child',
+			status: 'idle',
+			title: 'Leaf chat',
+		},
+	];
+	const props = { onRestore: vi.fn(), onSelect: vi.fn() };
+	const view = renderWithProviders(
+		<AgentsPanel {...props} conversations={idleRows} />,
+	);
+
+	const rootPreview = screen
+		.getByRole('button', { name: 'Open Parent chat' })
+		.querySelector('.h-4');
+	expect(rootPreview).toHaveTextContent('Ready for your next message');
+	expect(rootPreview).toHaveClass('mt-1');
+	for (const title of ['Build the agents panel', 'Leaf chat']) {
+		const preview = screen
+			.getByRole('button', { name: `Open ${title}` })
+			.querySelector('.h-4');
+		expect(preview).toHaveTextContent('Ready for the parent chat');
+		expect(preview).toHaveClass('mt-1');
+		expect(preview?.querySelector('span')).toHaveClass('truncate');
+	}
+
+	for (const conversation of [
+		{ ...idleRows[0], status: 'working' as const },
+		{ ...idleRows[0], status: 'blocked' as const },
+	]) {
+		view.rerender(<AgentsPanel {...props} conversations={[conversation]} />);
+		const preview = screen
+			.getByRole('button', { name: 'Open Parent chat' })
+			.querySelector('.h-4');
+		expect(preview).toBeInTheDocument();
+		expect(preview).toHaveTextContent('');
+		expect(screen.queryByText(/Ready for/)).toBeNull();
+	}
+
+	view.rerender(
+		<AgentsPanel
+			{...props}
+			conversations={[
+				{
+					...idleRows[0],
+					activity: { title: 'Reading files' },
+					status: 'working',
+				},
+			]}
+		/>,
+	);
+	expect(screen.getByText('Reading files')).toBeVisible();
+	expect(screen.queryByText(/Ready for/)).toBeNull();
+
+	view.rerender(
+		<AgentsPanel
+			{...props}
+			conversations={[{ ...idleRows[0], isClosed: true }]}
+		/>,
+	);
+	await userEvent.click(screen.getByRole('button', { name: 'Closed 1' }));
+	expect(
+		screen
+			.getByRole('button', { name: 'Restore Parent chat' })
+			.querySelector('.h-4'),
+	).toBeNull();
+	expect(screen.queryByText(/Ready for/)).toBeNull();
 });
 
 test('shows explicit non-interactive runtime icons and tolerates an absent runtime', async () => {
@@ -155,7 +303,7 @@ test('keeps a closed parent above open descendants without counting it as open',
 	expect(onRestore).toHaveBeenCalledWith('archived-parent');
 });
 
-test('nests connected branches under their actual parents and leaves archive rows flat', () => {
+test('nests connected branches under their actual parents and leaves archive rows flat', async () => {
 	const leaf: AgentConversation = {
 		...conversations[1],
 		chatTabId: 'leaf',
@@ -187,6 +335,7 @@ test('nests connected branches under their actual parents and leaves archive row
 		.closest('li');
 	expect(root?.querySelector(':scope > ul')).toContainElement(child);
 	expect(child?.querySelector(':scope > ul')).toContainElement(leafRow);
+	await userEvent.click(screen.getByRole('button', { name: /^Closed \d+$/ }));
 	expect(
 		screen
 			.getByRole('region', { name: 'Closed conversations' })
@@ -241,6 +390,7 @@ test('explains a last-recorded context reading', async () => {
 		<AgentsPanel conversations={rows} onRestore={vi.fn()} onSelect={vi.fn()} />,
 	);
 
+	await userEvent.click(screen.getByRole('button', { name: 'Closed 1' }));
 	await userEvent.hover(screen.getByText('40%'));
 	expect(
 		await screen.findByText('Last recorded: 40,000 of 100,000 tokens'),
@@ -284,6 +434,7 @@ test('keeps a failed restoration retryable and disables it only while pending', 
 		/>,
 	);
 
+	await userEvent.click(screen.getByRole('button', { name: 'Closed 1' }));
 	expect(screen.getByText('Restore failed. Try again.')).toBeVisible();
 	const retryableRow = screen.getByRole('button', {
 		name: 'Restore Retryable chat',
@@ -306,7 +457,7 @@ test('keeps a failed restoration retryable and disables it only while pending', 
 	expect(pendingRow).toHaveTextContent('Restoring…');
 });
 
-test('describes archived context on the keyboard-accessible row and never animates it', () => {
+test('describes archived context on the keyboard-accessible row and never animates it', async () => {
 	const archived = {
 		...conversations[0],
 		isClosed: true,
@@ -319,6 +470,7 @@ test('describes archived context on the keyboard-accessible row and never animat
 			onSelect={vi.fn()}
 		/>,
 	);
+	await userEvent.click(screen.getByRole('button', { name: 'Closed 1' }));
 	expect(
 		screen.getByRole('button', { name: 'Restore Parent chat' }),
 	).toHaveAccessibleDescription(/Last recorded: 50,000 of 200,000 tokens/);
@@ -330,7 +482,11 @@ test('renders empty, loading, and retryable error states', async () => {
 	const view = renderWithProviders(
 		<AgentsPanel conversations={[]} onRestore={vi.fn()} onSelect={vi.fn()} />,
 	);
-	expect(screen.getByText('No agent conversations yet.')).toBeVisible();
+	expect(screen.getByText('No agent conversations yet')).toBeVisible();
+	expect(screen.getByText('Agent conversations appear here.')).toBeVisible();
+	expect(
+		screen.getByRole('complementary', { name: 'Agents' }).querySelector('svg'),
+	).toHaveAttribute('aria-hidden', 'true');
 
 	view.rerender(
 		<AgentsPanel

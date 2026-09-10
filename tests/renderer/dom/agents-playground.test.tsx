@@ -34,6 +34,7 @@ test('puts Agents first with only the open count and no duplicate heading', () =
 
 test('matrix restores and selects the same conversation', async () => {
 	renderWithProviders(<AgentsMatrixScene />);
+	await userEvent.click(screen.getByRole('button', { name: /^Closed \d+$/ }));
 	await userEvent.click(
 		screen.getByRole('button', { name: 'Restore Closed architecture audit' }),
 	);
@@ -97,6 +98,7 @@ test('closed ancestors remain once in the open hierarchy while descendants are o
 
 test('history and row restoration preserve identity and select the conversation', async () => {
 	renderWithProviders(<AgentsNavigationScene />);
+	await userEvent.click(screen.getByRole('button', { name: /^Closed \d+$/ }));
 
 	await userEvent.click(
 		screen.getByRole('button', { name: 'Restore Closed architecture audit' }),
@@ -128,6 +130,7 @@ test('narrow selection and restoration dismiss the sheet', async () => {
 	await userEvent.click(
 		screen.getByRole('button', { name: 'Open agents sidebar' }),
 	);
+	await userEvent.click(screen.getByRole('button', { name: /^Closed \d+$/ }));
 	await userEvent.click(
 		screen.getByRole('button', { name: 'Restore Closed architecture audit' }),
 	);
@@ -136,6 +139,7 @@ test('narrow selection and restoration dismiss the sheet', async () => {
 
 test('failed restoration stays closed and can be retried', async () => {
 	renderWithProviders(<AgentsNavigationScene initialRestoreFailure />);
+	await userEvent.click(screen.getByRole('button', { name: /^Closed \d+$/ }));
 
 	await userEvent.click(
 		screen.getByRole('button', { name: 'Restore Closed architecture audit' }),

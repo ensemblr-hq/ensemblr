@@ -2521,6 +2521,8 @@ export default interface Resources {
 			activity: {
 				parallel_one: '+{{count}} parallel';
 				parallel_other: '+{{count}} parallel';
+				'ready-parent': 'Ready for the parent chat';
+				'ready-root': 'Ready for your next message';
 			};
 			'closed-heading': 'Closed';
 			'closed-section': 'Closed conversations';
@@ -2530,7 +2532,8 @@ export default interface Resources {
 				live: '{{used}} of {{max}} tokens';
 				unavailable: 'Context unavailable';
 			};
-			empty: 'No agent conversations yet.';
+			empty: 'No agent conversations yet';
+			'empty-message': 'Agent conversations appear here.';
 			error: 'Could not load agent conversations.';
 			label: 'Agents';
 			loading: 'Loading agent conversations…';
