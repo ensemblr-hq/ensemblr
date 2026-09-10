@@ -11,13 +11,13 @@ you already run.**
 
 The agent inside a workspace can drive the app itself: spawn sub-agents into their own chat tabs, delegate
 a unit of work to each, block until they finish, read their reports, and integrate the results. That
-permission-gated surface is **Ensemblr Control**, and the worktree manager underneath it exists to make it
-safe — every stream of work gets its own git worktree, branch, and review path, so a fan-out of agents
-cannot collide.
+permission-gated surface is **Ensemblr Control**. Each workspace gets its own git worktree, branch, and
+review path. Agents inside it share that checkout, so the orchestrator splits file ownership and integrates
+the results; separate workspaces keep independent streams of work apart.
 
 **One agent sits above all of it.** The [**Concierge**](#the-concierge--one-agent-above-every-workspace)
 belongs to no workspace: it reads across every project you have open, remembers what it learns between
-conversations, and never writes a file itself — real change is delegated to an orchestrator it spawns into
+conversations, and never edits your project files — real change is delegated to an orchestrator it spawns into
 the workspace that needs it.
 
 **macOS on Apple silicon, or Linux on x86-64. Bring your own agent CLI — Pi or Claude Code, one is enough.
@@ -190,12 +190,10 @@ move its workspace across the board. Pi reaches it through a shipped extension; 
 MCP-capable harness reach the same operations through an embedded MCP server, so the two surfaces cannot
 drift.
 
-**Multi-agent orchestration, not just a fan-out button.** The root agent delegates a unit of work per
-sub-agent, each in its own tab and its own context, then blocks on `ensemblr_wait_for_agents` until they
-report back — no hand-rolled polling loop. Sub-agents do their own work and never delegate onward, so the
-tree stays one level deep. Depth, spawn count, and spawn rate are capped. Linear writes are withheld from
-sub-agents, and nothing at any depth can move an issue to a completed or canceled state: agent work stops
-at In Review, enforced in code rather than in a prompt.
+**Delegation with a bounded hierarchy.** A root agent can hand a workstream to a manager, which can split
+it into leaf tasks before reporting back. Each agent has its own chat tab and context. Choose model-role
+preferences and opt into delegation between Pi and Claude Code; the parent remains responsible for
+checking and integrating the results. [How delegation works ↓](#delegation-and-orchestration)
 
 **Two agent runtimes, one chat surface.** Pi runs as a CLI in RPC mode; Claude Code is driven through the
 Agent SDK against *your own* `claude` binary — Ensemblr ships none. Both share the same timeline, tool
@@ -243,6 +241,69 @@ agents write back. A user-facing string a change adds ships translated in the sa
 The scope rests on **five commitments**: the agent can drive the app under permission; isolation is the
 product; the agent runtime is pluggable and never privileged; review is local-first and ends in GitHub;
 configuration is committed, legible, and ours.
+
+---
+
+## Delegation and orchestration
+
+Give one agent the task. It can investigate the shared ground once, split independent work into clear
+briefs, and keep the decisions and final integration in the parent conversation. You can open each
+child's tab to see its work, rather than trusting a progress message from the parent.
+
+![An orchestrator reviewing the updates surface through four delegates, with their tabs above the conversation and the shared diff and running dev server beside it.](./docs/guide/images/09-subagents.png)
+
+### A manager can split its work too
+
+Delegation now has **two edges: root → manager → leaf**. A manager owns one workstream and can open fresh
+leaf conversations for independent parts of it. It collects their reports, checks the results, and sends
+one integrated account to its parent. Leaves cannot delegate further. A small task needs no extra layer.
+
+The whole tree shares a lifetime budget of **20 spawns**, with **10 per minute** allowed. Closing a child
+or restarting the app does not replenish it. Plan Mode and AFK Mode pass down both edges; a manager cannot
+give a leaf permissions it does not have.
+
+**Separate contexts, shared files.** Children use the parent's workspace, branch, and git index, not a
+worktree each. The parent must divide file ownership before parallel edits. A manager is still a
+sub-agent, not the separate root orchestrator you can explicitly request alongside an existing one.
+
+### Pick models for the work
+
+In **Settings → Models**, assign delegation roles to your models:
+
+| Role | Use it for |
+| --- | --- |
+| **Sage** | Architecture, difficult tradeoffs, and decisions with unresolved questions. |
+| **Coder** | Implementation where the design or approach still needs working out. |
+| **Builder** | Carrying a settled design or established pattern through to working code. |
+| **Grunt** | Fully specified mechanical work that needs no judgment. |
+| **Explorer** | Read-only investigation and an actionable implementation plan. |
+
+These are preferences the agent sees when choosing a delegate, not permission levels or a rigid routing
+system. A model can have several roles. The agent also chooses a thinking level for the task, using the
+levels that model actually supports.
+
+Children inherit the parent's model and runtime unless a model is explicitly selected. Turn on **Allow
+cross-runtime delegation** in the same settings pane to let a Pi parent choose a Claude Code child, or
+the reverse. Both runtimes must be configured; the switch does not widen filesystem permissions or bypass
+cost approvals. Choosing a frontier-tier model explicitly still asks for confirmation.
+
+Pi always delegates through Ensemblr. For Claude Code, choose **Ensemblr chat tabs** in
+**Settings → Providers → Claude Code** to use this routing; Claude's built-in sub-agents use its native
+mechanism instead.
+
+### Wait, verify, then integrate
+
+The parent follows **delegate → wait → evaluate → integrate**. `ensemblr_wait_for_agents` returns reports
+and identifies children still running; a blocked child can wake its parent for a decision. The parent can
+send follow-ups and inspect a child's actual tool calls before relying on what its report claims.
+
+**Pi enforces the wait.** Roots and managers cannot resume unrelated work while their delegated children
+are outstanding. The barrier survives reloads and requires a wait to collect every child's settled
+report. Finished tabs can be closed without losing their transcripts or reports, which remain readable
+after an app restart.
+
+The control contract is in [`docs/agent-control.md`](./docs/agent-control.md); the hierarchy decision is
+[ADR 0069](./docs/adr/0069-allow-one-manager-layer-between-root-and-leaves.md).
 
 ---
 
@@ -294,7 +355,7 @@ Toggle **AFK** (⌥⇧A) and the agent is told you are away: finish the task, or
 goes, without stopping to ask. It is plan mode's opposite number — planning exists to stop and ask, so
 switching one on switches the other off — and every conversation it spawns inherits it.
 
-![An unattended run part-way through the delivery loop: the AFK chip lit under a dashed composer border, the approach and the rejected alternative written into the timeline, and two delegates in the tab strip carrying the same away tint.](./docs/guide/images/06-afk-mode.png)
+![An unattended run part-way through the delivery loop: the AFK chip lit under a dashed composer border, the approach and the rejected alternative written into the timeline, and the delegated investigation and review in the tab strip carrying the same away tint.](./docs/guide/images/06-afk-mode.png)
 
 Three things change while the chip is on. **The question tool is refused** — `ensemblr_ask_user_question`
 has no time limit by design, which is right while you are watching and is exactly what strands an overnight
