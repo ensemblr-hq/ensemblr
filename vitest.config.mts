@@ -184,6 +184,7 @@ export default defineConfig({
 						'tests/main/linux-battery.test.ts',
 						'tests/main/workspace-commits.test.ts',
 						'tests/main/list-workspace-files.test.ts',
+						'tests/main/symlink-metadata.test.ts',
 						'tests/main/open-target-paths.test.ts',
 						'tests/main/linux-app-discovery.test.ts',
 						'tests/main/linux-app-launch.test.ts',

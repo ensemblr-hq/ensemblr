@@ -57,7 +57,11 @@ describe('registerIconCollections', () => {
 
 		registerIconCollections();
 
-		expect([...registeredPrefixes].sort()).toEqual(['logos', 'vscode-icons']);
+		expect([...registeredPrefixes].sort()).toEqual([
+			'ensemblr',
+			'logos',
+			'vscode-icons',
+		]);
 	});
 
 	it('runs from the renderer entry before the first render', () => {

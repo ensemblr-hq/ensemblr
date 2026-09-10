@@ -19,6 +19,7 @@ import type {
 	WorkspaceNavigationSelection,
 } from '@/renderer/types/workbench';
 import type { SettingsResolutionSnapshot } from '@/shared/ipc/contracts/settings-resolution';
+import type { WorkspaceFileEntryWire } from '@/shared/ipc/contracts/workspace-files';
 import { parseWorkspaceScriptSettings } from '@/shared/scripts';
 
 import { useEnsureWorkspaceSetup } from './use-ensure-workspace-setup';
@@ -34,10 +35,17 @@ import { useWorkspaceFilesWatch } from './use-workspace-files-watch';
  * @returns A newline-joined signature string.
  */
 function computeFilesSignature(
-	entries: readonly { isIgnored?: boolean; kind: string; path: string }[],
+	entries: readonly WorkspaceFileEntryWire[],
 ): string {
 	return entries
-		.map((entry) => JSON.stringify([entry.path, entry.kind, entry.isIgnored]))
+		.map((entry) =>
+			JSON.stringify([
+				entry.path,
+				entry.kind,
+				entry.isIgnored,
+				entry.symlinkTargetKind,
+			]),
+		)
 		.join('\n');
 }
 
@@ -135,6 +143,7 @@ export function useLiveWorkspaceModel({
 			kind: entry.kind,
 			name: entry.name,
 			path: entry.path,
+			symlinkTargetKind: entry.symlinkTargetKind,
 		}));
 	}, [remoteFiles, activeWorkspace.workspaceFiles]);
 	useEffect(() => {
