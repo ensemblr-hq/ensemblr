@@ -11,12 +11,10 @@
  * same missing lineage. The privileges invert exactly when they should not.
  *
  * This table takes the durable role instead, so the answer survives a restart and
- * matches what {@link SUBAGENT_AWARENESS} promises. Ops whose only problem is that
- * a sub-agent has no use for them — `waitForAgents` with no children to wait on,
- * `listModels` when it cannot spawn, `listRunScripts` when it cannot start one —
- * are absent on purpose: they are withheld
- * from the sub-agent's tool list rather than denied, because a denial implies a
- * hazard where there is only noise.
+ * matches what the depth-specific awareness promises. A leaf is denied the model
+ * and wait ops because they are delegation capabilities at its depth ceiling;
+ * `listRunScripts` alone remains merely unusable because no descendant can start
+ * a workspace-owned run script.
  *
  * Everything here is a pure function of its argument, so the parity test can
  * cross-check the playbook prose against it.
@@ -44,7 +42,7 @@ const SUBAGENT_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 	],
 	[
 		'startReview',
-		'You were spawned as a sub-agent to carry out one unit of work, and opening the workspace\u2019s Review conversation belongs to the orchestrator that spawned you \u2014 it opens a sibling sub-agent of that orchestrator, over the whole change rather than your part of it, and nested delegation is blocked here. Report what you did and let the orchestrator have it reviewed.',
+		'Opening the workspace\u2019s Review conversation belongs to the root orchestrator because it covers the whole change rather than your delegated workstream. Report what you did to your immediate parent instead.',
 	],
 	[
 		'sendFollowUp',
@@ -55,12 +53,20 @@ const SUBAGENT_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 		'You were spawned as a sub-agent, and launching a harness belongs to the orchestrator that spawned you. A harness is an unrestricted writer on the same worktree you and your orchestrator are working in, and it launches with approval prompts skipped. Do the work yourself, or report what would need one.',
 	],
 	[
+		'listModels',
+		'You are a leaf sub-agent at the maximum delegation depth. Model discovery is available only to an agent that can still open a fresh child.',
+	],
+	[
 		'startTerminal',
 		'You were spawned as a sub-agent, and the setup, run, and spawn terminals belong to the workspace rather than to your unit of work. Run what you need through `bash`, or say in your report which script should be started.',
 	],
 	[
 		'stopTerminal',
 		'You were spawned as a sub-agent, and the workspace terminals outlive your unit of work — the orchestrator or the user may be depending on the one you are stopping. Say in your report which terminal should be stopped and why.',
+	],
+	[
+		'waitForAgents',
+		'You are a leaf sub-agent at the maximum delegation depth and cannot own children to wait for. Report to your immediate parent instead.',
 	],
 	[
 		'writeTerminal',
@@ -114,27 +120,51 @@ const SUBAGENT_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
  * caller meets an ordinary result rather than a denial that overstates the stakes.
  */
 export const SUBAGENT_UNUSABLE_OPS: ReadonlySet<AgentControlOp> = new Set([
-	'waitForAgents',
-	'listModels',
 	'listRunScripts',
 ]);
 
+/** Delegation ops a verified depth-1 sub-agent may use for its own fresh leaf. */
+export const MANAGER_SUBAGENT_DELEGATION_OPS: ReadonlySet<AgentControlOp> =
+	new Set([
+		'startConversation',
+		'sendFollowUp',
+		'closeTab',
+		'listModels',
+		'waitForAgents',
+	]);
+
 /**
- * Every op a sub-agent's tool list omits: the denied ones plus the useless ones.
- * The Pi extension registers the complement of this set for a sub-agent, and the
- * parity test compares the two.
+ * Every op a leaf sub-agent's tool list omits: the denied ones plus the useless
+ * ones. Kept as the fail-closed default for callers that do not yet carry depth.
  */
 export const SUBAGENT_WITHHELD_OPS: ReadonlySet<AgentControlOp> = new Set([
 	...SUBAGENT_BLOCKED_OPS.keys(),
+	...MANAGER_SUBAGENT_DELEGATION_OPS,
 	...SUBAGENT_UNUSABLE_OPS,
 ]);
 
 /**
  * Reports why a spawned sub-agent may not dispatch a control op.
  * @param op - The control op being dispatched.
+ * @param depth - Validated lineage depth; missing input fails closed as a leaf.
  * @returns The model-facing denial reason, or null when the op may proceed.
  */
-export function subAgentControlOpDenial(op: AgentControlOp): string | null {
+export function subAgentControlOpDenial(
+	op: AgentControlOp,
+	depth: 1 | 2 = 2,
+): string | null {
+	if (depth === 1 && MANAGER_SUBAGENT_DELEGATION_OPS.has(op)) {
+		return null;
+	}
+	if (depth === 1 && op === 'spawnChatTab') {
+		return 'A manager may open only fresh leaf conversations through startConversation; opening an arbitrary chat tab belongs to the root orchestrator.';
+	}
+	if (depth === 2 && MANAGER_SUBAGENT_DELEGATION_OPS.has(op)) {
+		return (
+			SUBAGENT_BLOCKED_OPS.get(op) ??
+			'You are a leaf sub-agent at the maximum delegation depth. Report to your immediate parent instead of delegating or driving another conversation.'
+		);
+	}
 	return SUBAGENT_BLOCKED_OPS.get(op) ?? null;
 }
 
@@ -397,7 +427,13 @@ export function withheldControlOps(
 		...CONCIERGE_ONLY_OPS,
 		...featureWithheld,
 		...(audience.hasChatTab ? [] : CHAT_TAB_ONLY_OPS),
-		...(audience.role === 'subagent' ? SUBAGENT_WITHHELD_OPS : []),
+		...(audience.role === 'subagent'
+			? [...SUBAGENT_WITHHELD_OPS].filter(
+					(op) =>
+						subAgentControlOpDenial(op, audience.depth === 1 ? 1 : 2) !==
+							null || SUBAGENT_UNUSABLE_OPS.has(op),
+				)
+			: []),
 		...(delegatesNatively ? NATIVE_DELEGATION_WITHHELD_OPS : []),
 	]);
 }
@@ -421,9 +457,10 @@ export function withheldControlOps(
 export function resolveContextPressureAudience(audience: {
 	delegation: SubagentMechanism;
 	role: AgentControlRole;
+	depth?: 0 | 1 | 2;
 }): ContextPressureAudience {
 	if (audience.role === 'subagent') {
-		return 'cannot-delegate';
+		return audience.depth === 1 ? 'spawns-tabs' : 'cannot-delegate';
 	}
 	return audience.role === 'orchestrator' && audience.delegation === 'native'
 		? 'spawns-natively'

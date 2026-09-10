@@ -1,5 +1,7 @@
 import { AfkModeWarningScene } from './afk-mode-warning-preview.tsx';
 import { AgentErrorScene } from './agent-error-preview.tsx';
+import { AgentsMatrixScene } from './agents-matrix-preview.tsx';
+import { AgentsNavigationScene } from './agents-navigation-preview.tsx';
 import { AnswerPreview } from './answer-preview.tsx';
 import { ArchiveToastScene } from './archive-toast-preview.tsx';
 import { CommentPreviewScene } from './comment-preview.tsx';
@@ -145,6 +147,18 @@ export const SCENE_GROUPS = [
 	{
 		label: 'workbench',
 		scenes: [
+			{
+				id: 'agents-matrix',
+				label: 'agents matrix',
+				render: () => <AgentsMatrixScene />,
+				source: 'playground/agents-matrix-preview.tsx',
+			},
+			{
+				id: 'agents-navigation',
+				label: 'agents navigation',
+				render: () => <AgentsNavigationScene />,
+				source: 'playground/agents-navigation-preview.tsx',
+			},
 			{
 				id: 'tabs',
 				label: 'tabs',

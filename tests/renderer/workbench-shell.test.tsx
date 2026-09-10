@@ -135,6 +135,7 @@ function stubSessionNavigation(
 		reorderSessionTabs: () => undefined,
 		pinSessionTab: () => undefined,
 		restoreSessionTab: () => undefined,
+		restoreSessionTabAsync: () => Promise.resolve(true),
 		sessionTabs: activeWorkspace.sessions,
 	};
 }
@@ -241,6 +242,21 @@ function renderWorkbench(
 		store ? <Provider store={store}>{tree}</Provider> : tree,
 	);
 }
+
+test('keeps the pull request header above Agents like every other sidebar panel', () => {
+	const headerMarker = 'right-sidebar-header';
+	const agentsMarkup = renderWorkbench(null, undefined, 'agents');
+	const filesMarkup = renderWorkbench(null, undefined, 'files');
+
+	expect(agentsMarkup.match(new RegExp(headerMarker, 'g')) ?? []).toHaveLength(
+		1,
+	);
+	expect(filesMarkup.match(new RegExp(headerMarker, 'g')) ?? []).toHaveLength(
+		1,
+	);
+	expect(agentsMarkup).toContain('#13');
+	expect(filesMarkup).toContain('#13');
+});
 
 test('renders the workbench shell regions', () => {
 	const markup = renderWorkbench(

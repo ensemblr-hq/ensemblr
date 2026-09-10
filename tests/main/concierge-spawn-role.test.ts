@@ -157,7 +157,8 @@ describe('a conversation the Concierge opens is a root orchestrator', () => {
 	// parent — so the overlay it launches with says orchestrator.
 	it('leaves the child unmarked and hands it the orchestrator role', async () => {
 		const tabs = createTabStore();
-		const ports = createAgentControlPorts(makeDeps(tabs));
+		const deps = makeDeps(tabs);
+		const ports = createAgentControlPorts(deps);
 
 		const outcome = await ports.conversations.startConversation({
 			asPeer: false,
@@ -173,6 +174,9 @@ describe('a conversation the Concierge opens is a root orchestrator', () => {
 
 		expect(outcome.ok).toBe(true);
 		expect(tabs.roleOf('tab-opened')).toBeNull();
+		expect(
+			vi.mocked(deps.agentSessionService.openSession).mock.calls.at(0)?.[0],
+		).not.toHaveProperty('parentSessionId');
 
 		const { resolveAgentControlEnv } = makeOverlay(
 			() => tabs.roleOf('tab-opened') === 'subagent',

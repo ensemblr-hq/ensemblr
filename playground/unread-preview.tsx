@@ -126,7 +126,7 @@ export function UnreadScene() {
 
 			<SceneSection
 				label='tab strip'
-				note='An unread inactive tab lifts out of the muted text colour and carries a dot in the close-button slot; hover a tab to watch the close control take the slot back. The active tab never shows one.'
+				note='Unread labels lift out of the muted text colour. Only root chat icons carry a top-right dot; sub-agents and the active tab never show one.'
 			>
 				<div className='overflow-hidden rounded-lg border border-border'>
 					<SessionTabs

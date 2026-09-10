@@ -63,7 +63,7 @@ export type DockTabModel =
 
 // --- Review -----------------------------------------------------------------
 
-export type ReviewPanelTab = 'changes' | 'checks' | 'files';
+export type ReviewPanelTab = 'agents' | 'changes' | 'checks' | 'files';
 
 export interface ReviewFileSummary {
 	additions: number;
@@ -268,6 +268,8 @@ interface SessionTabBase {
 	isSubAgent: boolean;
 	/** Persisted chat-tab id of the parent chat that spawned this sub-agent. */
 	parentChatTabId?: string;
+	/** Persisted hierarchy depth, projected from the bound agent session lineage. */
+	delegationDepth?: 0 | 1 | 2;
 	/**
 	 * True while this tab holds the workspace's ephemeral preview slot: the next
 	 * preview open retargets it, and the strip renders its label in italics.

@@ -80,11 +80,13 @@ blocked on something outside this workspace, the brief it gave you is wrong, the
 work belongs in another repository, or you have finished. You pass no session id
 — its conversation is cleared and restarted routinely, so the app resolves the
 live one at send time. Refused outright when none is open (it is not queued), and
-capped per conversation. `ensemblr_notify_orchestrator` is the sub-agent's
-equivalent one level down.
+capped per conversation. `ensemblr_notify_orchestrator` always travels exactly one level up: leaf to
+manager, manager to root.
 
-Not every caller holds every tool. A spawned sub-agent may not delegate onward
-and may not write to Linear; a caller with no chat tab holds no chat-tab tools;
+Not every caller holds every tool. A depth-1 manager may delegate once more to
+fresh depth-2 leaves through Ensemblr; a leaf cannot delegate. No descendant may
+use native runtime delegation, open peers or Review, drive workspace-owned
+terminals, ask the user, or write to Linear; a caller with no chat tab holds no chat-tab tools;
 an optional feature the user has switched off withholds its own ops from
 everyone; Plan Mode withholds anything that would perform the work rather than
 plan it. What you actually hold is whatever your tool list shows — that list is
@@ -190,15 +192,17 @@ The guardrails, so you know what a denial means:
 
 | Limit | Default |
 | --- | --- |
-| Nesting depth | 1 — only you, the root, may spawn; children never delegate onward |
-| Spawns per session | 20 |
+| Nesting depth | 2 — root → depth-1 manager → depth-2 leaf |
+| Spawns per root tree | 20 (closing or stopping does not refund it) |
 | Spawns per minute | 10 |
 | One blocking wait | 300 s, then it returns `timedOut` |
 
 A blocking wait whose target is an ancestor of the caller is refused
 (`denied-deadlock`).
 
-The loop is **delegate → wait → evaluate → integrate**:
+The loop is **delegate → wait → evaluate → integrate** at either permitted edge.
+A manager uses it only for fresh immediate leaves, never reuses a tab, opens a
+peer or Review, overrides inherited Plan/AFK state, or steers another branch:
 
 1. `ensemblr_start_conversation` per helper, each in a fresh tab with its own
    `title`. Omit `chatTabId` — reusing a tab keeps its old title. Keep **both**
@@ -255,8 +259,8 @@ run it on another, never one you invented. Each row also carries the model's
   or pass a `standard` id.
 
 A child that cannot produce its deliverable until someone answers calls
-`ensemblr_notify_orchestrator` with `need_decision` or `blocked`, which wakes a
-pending wait whatever its mode. Ordinary open decisions do not arrive that way —
+`ensemblr_notify_orchestrator` with `need_decision` or `blocked`, which wakes its
+immediate parent's pending wait whatever its mode. Ordinary open decisions do not arrive that way —
 children park those in their reports.
 
 ### Advisory task roles
@@ -283,8 +287,10 @@ destructive step — not for anything you could settle by reading the repository
 
 A per-chat toggle that holds you to planning, enforced per tool call rather than
 requested in the prompt. Reads stay; anything that performs the work is refused.
-A sub-agent spawned by a planning agent inherits it. Nothing turns it off except
-the user approving a plan, submitted with `ensemblr_exit_plan_mode` — which ends
+A sub-agent spawned by a planning agent inherits it. A depth-1 planning manager
+may fan out read-only leaf investigations; a leaf cannot fan out. Nothing turns
+Plan Mode off except the user approving a plan, submitted by the root with
+`ensemblr_exit_plan_mode` — which ends
 your turn, so produce nothing after it.
 
 The app's own bookkeeping stays allowed while you plan: naming the tab, naming

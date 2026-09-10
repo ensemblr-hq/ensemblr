@@ -115,12 +115,16 @@ export const PLAN_MODE_CONDITIONAL_OPS: ReadonlySet<AgentControlOp> = new Set([
 export function planModeControlOpDenial(
 	op: AgentControlOp,
 	role: AgentControlRole,
+	depth: 1 | 2 = 2,
 ): string | null {
 	const cause = PLAN_MODE_BLOCKED_OPS.get(op);
 	if (cause !== undefined) {
 		return planModeBlockReason(cause);
 	}
 	if (role !== 'subagent') {
+		return null;
+	}
+	if (depth === 1 && (op === 'startConversation' || op === 'sendFollowUp')) {
 		return null;
 	}
 	return PLAN_MODE_SUBAGENT_BLOCKED_OPS.get(op) ?? null;

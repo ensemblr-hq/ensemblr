@@ -18,22 +18,24 @@ const NATIVE_SUBAGENT_TOOLS = ['Agent', 'Task'] as const;
  * them and hand a planning session an editor.
  *
  * Under `ensemblr` the runtime's sub-agent tool is denied so delegation runs
- * through the visible chat tabs the user chose; under `native` nothing is added
- * here, and the chat-tab spawn ops are withheld from the control tool list
- * instead. Either way exactly one mechanism is reachable.
- * @param input - The permission mode's deny list, and the session's mechanism.
+ * through visible chat tabs. A descendant is denied regardless of mechanism,
+ * because its one remaining edge must stay on authoritative Ensemblr lineage.
+ * Under `native`, only a root receives the SDK's native delegation tool.
+ * @param input - The permission deny list, mechanism, and validated depth.
  * @returns The deny list to pass to the SDK, or undefined when nothing is denied.
  */
 export function resolveDisallowedTools({
 	delegation,
+	depth = 0,
 	permissionDisallowedTools,
 }: {
 	delegation: SubagentMechanism;
+	depth?: 0 | 1 | 2;
 	permissionDisallowedTools?: readonly string[];
 }): string[] | undefined {
 	const denied = [
 		...(permissionDisallowedTools ?? []),
-		...(delegation === 'native' ? [] : NATIVE_SUBAGENT_TOOLS),
+		...(delegation === 'native' && depth === 0 ? [] : NATIVE_SUBAGENT_TOOLS),
 	];
 	return denied.length > 0 ? denied : undefined;
 }

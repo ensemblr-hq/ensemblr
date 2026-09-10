@@ -50,11 +50,15 @@ const waitFor = (
 };
 
 describe('Pi delegation barrier', () => {
-	it('wires the barrier into only root Pi sessions', () => {
+	it('wires the barrier into roots and verified depth-1 Pi managers', () => {
 		const source = readExtensionSource();
 		expect(source).toContain('import {\n\tafterDelegationToolResult');
 		expect(source).toContain(
-			'const delegationBarrierEnabled = !IS_SUBAGENT && !IS_CONCIERGE',
+			'const delegationBarrierEnabled = !IS_CONCIERGE && CONTROL_DEPTH < 2',
+		);
+		expect(source).toContain("process.env.ENSEMBLR_CONTROL_DEPTH === '1'");
+		expect(source).toContain(
+			'IS_SUBAGENT\n\t? process.env.ENSEMBLR_CONTROL_DEPTH',
 		);
 		expect(source).toContain("pi.on('tool_result'");
 		expect(source).toContain("pi.on('message_end'");
@@ -210,6 +214,44 @@ describe('Pi delegation barrier', () => {
 			).toBe(false);
 		},
 	);
+
+	it('lets a manager escalate leaf attention one level while keeping other work blocked', () => {
+		const managerBarrier = waitFor(startChild(), {
+			completed: [
+				{
+					agentSessionId: 'child-1',
+					signal: { message: 'Root decision needed', reason: 'need_decision' },
+					status: 'streaming',
+				},
+			],
+			pending: [],
+			timedOut: false,
+		});
+
+		const notifyParent = beforeDelegationToolCall(managerBarrier, {
+			batchStartsChild: false,
+			input: { message: 'Leaf needs a decision', reason: 'need_decision' },
+			toolCallId: 'notify-1',
+			toolName: 'ensemblr_notify_orchestrator',
+		});
+		expect(notifyParent.blockReason).toBeUndefined();
+		expect(
+			beforeDelegationToolCall(managerBarrier, {
+				batchStartsChild: false,
+				input: { path: 'src/index.ts' },
+				toolCallId: 'read-1',
+				toolName: 'read',
+			}).blockReason,
+		).toContain('ensemblr_wait_for_agents');
+		expect(
+			beforeDelegationToolCall(startChild(), {
+				batchStartsChild: false,
+				input: { message: 'Premature escalation', reason: 'need_decision' },
+				toolCallId: 'notify-2',
+				toolName: 'ensemblr_notify_orchestrator',
+			}).blockReason,
+		).toContain('ensemblr_wait_for_agents');
+	});
 
 	it('keeps signaled children outstanding until a follow-up settles', () => {
 		const signaled = waitFor(startChild(), {

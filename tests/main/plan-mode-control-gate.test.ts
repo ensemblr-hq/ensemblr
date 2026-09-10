@@ -98,26 +98,39 @@ const makePorts = (planningSessions: ReadonlySet<string>): AgentControlPorts =>
 	}) as unknown as AgentControlPorts;
 
 /**
- * Builds a service whose caller is `PLANNING_SESSION`. `subAgent` registers a
- * parent first so the caller resolves at depth 1, which is what selects the
- * sub-agent half of the plan-mode policy. `planningTargets` marks other sessions
- * as planning, for the follow-up cases that turn on the target's state.
+ * Builds a service whose caller is `PLANNING_SESSION`. `subAgent` preserves the
+ * depth-1 fixture; `subAgentDepth` can select a manager or leaf explicitly.
+ * `planningTargets` marks other sessions as planning for follow-up cases.
  */
 const setup = (options: {
 	planning: boolean;
 	species?: AgentSpecies;
 	subAgent?: boolean;
+	subAgentDepth?: 1 | 2;
 	planningTargets?: readonly string[];
 }) => {
-	const tokens = options.subAgent
-		? ['tok-parent', 'tok-caller']
-		: ['tok-caller'];
+	const depth = options.subAgentDepth ?? (options.subAgent ? 1 : 0);
+	const tokens =
+		depth === 2
+			? ['tok-grandparent', 'tok-parent', 'tok-caller']
+			: depth === 1
+				? ['tok-parent', 'tok-caller']
+				: ['tok-caller'];
 	let issued = 0;
 	const registry = createOriginRegistry({
 		generateToken: () => tokens[issued++] ?? `tok-${issued}`,
 	});
-	if (options.subAgent) {
+	if (depth === 2) {
 		registry.register({
+			sessionId: 'grandparent-session',
+			species: 'pi',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+	}
+	if (depth > 0) {
+		registry.register({
+			parentSessionId: depth === 2 ? 'grandparent-session' : undefined,
 			sessionId: PARENT_SESSION,
 			species: 'pi',
 			workspaceCwd: '/ws',
@@ -125,7 +138,7 @@ const setup = (options: {
 		});
 	}
 	registry.register({
-		parentSessionId: options.subAgent ? PARENT_SESSION : undefined,
+		parentSessionId: depth > 0 ? PARENT_SESSION : undefined,
 		sessionId: PLANNING_SESSION,
 		species: options.species ?? 'pi',
 		workspaceCwd: '/ws',
@@ -272,10 +285,19 @@ describe('plan mode: spawning while planning', () => {
 		);
 	});
 
-	// The depth cap already stops nested delegation, so the sub-agent policy never
-	// has to reason about a grandchild inheriting anything.
-	it('refuses a planning sub-agent the spawn route', async () => {
-		const { ports, service } = setup({ planning: true, subAgent: true });
+	it('lets a planning manager spawn an inherited planning leaf', async () => {
+		const { ports, service } = setup({ planning: true, subAgentDepth: 1 });
+
+		const result = await invoke(service, 'startConversation', { prompt: 'go' });
+
+		expect(result.ok).toBe(true);
+		expect(ports.conversations.startConversation).toHaveBeenCalledWith(
+			expect.objectContaining({ planMode: true }),
+		);
+	});
+
+	it('refuses a planning leaf the spawn route', async () => {
+		const { ports, service } = setup({ planning: true, subAgentDepth: 2 });
 
 		const result = await invoke(service, 'startConversation', { prompt: 'go' });
 

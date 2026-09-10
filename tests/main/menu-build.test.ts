@@ -6,6 +6,7 @@ vi.mock('electron', () => ({
 }));
 
 const { createMenuItemFactory } = await import('../../src/main/menu/menu-item');
+const { buildViewMenu } = await import('../../src/main/menu/view-menu');
 const { buildWorkspaceMenu } = await import(
 	'../../src/main/menu/workspace-menu'
 );
@@ -145,6 +146,21 @@ describe('createMenuItemFactory', () => {
 		expect(submenuOf(item)).toEqual([
 			{ enabled: false, label: 'No Run Scripts' },
 		]);
+	});
+});
+
+describe('buildViewMenu', () => {
+	test('lists Agents first in the panel radio group', () => {
+		const menu = buildViewMenu(LABELS, createMenuItemFactory(null));
+		const panel = itemLabelled(menu, LABELS.panel);
+
+		expect(submenuOf(panel).map((item) => item.label)).toEqual([
+			LABELS.panelAgents,
+			LABELS.panelFiles,
+			LABELS.panelChanges,
+			LABELS.panelChecks,
+		]);
+		expect(submenuOf(panel).every((item) => item.type === 'radio')).toBe(true);
 	});
 });
 

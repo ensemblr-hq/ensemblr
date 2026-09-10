@@ -43,6 +43,7 @@ const EXPECTED_MIGRATIONS = [
 	'025_worktree_prune',
 	'026_infisical_discovery_dismissals',
 	'027_architecture_diagram',
+	'028_agent_control_spawn_reservations',
 ];
 
 const AGENT_VOCABULARY_MIGRATION_VERSION = 14;
@@ -272,6 +273,7 @@ test('opens an isolated database and applies foundation migrations', (t) => {
 		.map((row) => (row as { name: string }).name);
 
 	assert.deepEqual(tables, [
+		'agent_control_spawn_reservations',
 		'agent_runtime_state',
 		'agent_session_branches',
 		'agent_session_events',

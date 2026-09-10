@@ -15,6 +15,7 @@ import {
 import type { ControlAudience } from '../../src/shared/agent-control.ts';
 import {
 	harnessAwareness,
+	managerSubagentAwareness,
 	nativeOrchestratorAwareness,
 	orchestratorAwareness,
 	subagentAwareness,
@@ -31,6 +32,10 @@ const NATIVE_ORCHESTRATOR_AWARENESS = nativeOrchestratorAwareness({
 	tuiHarnesses: true,
 });
 const ORCHESTRATOR_AWARENESS = orchestratorAwareness({
+	architectureDiagram: true,
+	tuiHarnesses: true,
+});
+const MANAGER_SUBAGENT_AWARENESS = managerSubagentAwareness({
 	architectureDiagram: true,
 	tuiHarnesses: true,
 });
@@ -215,6 +220,24 @@ describe('agent-control MCP endpoint', () => {
 		await client.close();
 	});
 
+	it('accepts Agents as a focusable workspace panel', async () => {
+		server = await startControlServer(stubService);
+		const client = await connect('secret-token');
+		await client.callTool({
+			name: 'ensemblr_focus_panel',
+			arguments: { panel: 'agents' },
+		});
+		expect(calls).toEqual([
+			{
+				op: 'focusPanel',
+				token: 'secret-token',
+				rawArgs: { panel: 'agents' },
+				signal: expect.any(AbortSignal),
+			},
+		]);
+		await client.close();
+	});
+
 	it('forwards the run script name a harness asked for', async () => {
 		server = await startControlServer(stubService);
 		const client = await connect('secret-token');
@@ -354,14 +377,15 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 		}
 	});
 
-	// The sub-agent axis is the one the Pi extension already applies to its own
-	// registrations; a first-class child over MCP has to land in the same place, or
-	// its list advertises a delegation surface the service refuses it.
-	it('withholds the delegation surface from a first-class sub-agent', async () => {
+	// The leaf axis is the one the Pi extension already applies to its own
+	// registrations; a first-class depth-2 child over MCP has to land in the same
+	// place, or its list advertises a delegation surface the service refuses it.
+	it('withholds the delegation surface from a first-class leaf', async () => {
 		const names = await toolNamesFor({
 			architectureDiagram: true,
 			tuiHarnesses: true,
 			delegation: 'ensemblr',
+			depth: 2,
 			hasChatTab: true,
 			role: 'subagent',
 		});
@@ -390,6 +414,35 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 		}
 	});
 
+	it('exposes only fresh-leaf delegation to a depth-1 manager', async () => {
+		const names = await toolNamesFor({
+			architectureDiagram: true,
+			tuiHarnesses: true,
+			delegation: 'ensemblr',
+			depth: 1,
+			hasChatTab: true,
+			role: 'subagent',
+		});
+
+		for (const tool of [
+			'ensemblr_start_conversation',
+			'ensemblr_list_models',
+			'ensemblr_wait_for_agents',
+			'ensemblr_send_follow_up',
+			'ensemblr_close_tab',
+		]) {
+			expect(names, tool).toContain(tool);
+		}
+		for (const tool of [
+			'ensemblr_spawn_chat_tab',
+			'ensemblr_start_review',
+			'ensemblr_start_terminal',
+			'ensemblr_ask_user_question',
+		]) {
+			expect(names, tool).not.toContain(tool);
+		}
+	});
+
 	it('serves the orchestrator playbook to a first-class root', async () => {
 		const client = await connectAs({
 			architectureDiagram: true,
@@ -404,18 +457,29 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 		await client.close();
 	});
 
-	it('serves the sub-agent playbook to a first-class sub-agent', async () => {
-		const client = await connectAs({
+	it('serves distinct manager and leaf playbooks by depth', async () => {
+		const manager = await connectAs({
 			architectureDiagram: true,
 			tuiHarnesses: true,
 			delegation: 'ensemblr',
+			depth: 1,
+			hasChatTab: true,
+			role: 'subagent',
+		});
+		const leaf = await connectAs({
+			architectureDiagram: true,
+			tuiHarnesses: true,
+			delegation: 'ensemblr',
+			depth: 2,
 			hasChatTab: true,
 			role: 'subagent',
 		});
 
-		expect(client.getInstructions()).toBe(SUBAGENT_AWARENESS);
+		expect(manager.getInstructions()).toBe(MANAGER_SUBAGENT_AWARENESS);
+		expect(leaf.getInstructions()).toBe(SUBAGENT_AWARENESS);
 
-		await client.close();
+		await manager.close();
+		await leaf.close();
 	});
 
 	// The harness variant tells its reader that naming a tab, summarizing, asking

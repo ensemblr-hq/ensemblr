@@ -1,3 +1,8 @@
+import type { AgentSessionLineage } from '../../shared/agent-control/lineage.ts';
+import type {
+	AgentSessionContextSnapshotWire,
+	AgentSessionToolActivityWire,
+} from '../../shared/ipc/contracts/agent-session.ts';
 import type {
 	AgentEventRow,
 	AgentSessionRow,
@@ -6,12 +11,17 @@ import type {
 
 /** Snapshot of a persisted agent session's state, including its open chat tabs and runtime status. */
 export interface AgentSessionSnapshot {
+	/** Highest persisted event ordinal represented by the activity projection. */
+	activityOrdinal?: number;
 	branchId: string;
 	closedAt: string | null;
+	contextUsage?: AgentSessionContextSnapshotWire | null;
 	createdAt: string;
+	currentTools?: readonly AgentSessionToolActivityWire[];
 	cwd: string;
 	id: string;
 	label: string | null;
+	lineage?: AgentSessionLineage;
 	model: string | null;
 	openedTabs: readonly ChatTabRow[];
 	provider: AgentSessionRow['provider'];

@@ -32,23 +32,20 @@ follows `git rev-parse --local-env-vars` and the
 [official Git environment documentation](https://git-scm.com/docs/git#_environment_variables).
 
 > The canonical guidance that teaches an agent to use the `ensemblr_*` control tools. The
-> authoritative text lives in `src/shared/agent-control/awareness.ts` as a **2×2 of role by Plan
-> Mode**: `orchestratorAwareness` / `subagentAwareness` for working agents, and
-> `planModeOrchestratorAwareness` / `planModeSubagentAwareness` for planning ones. The role axis
-> comes from `resolveAgentRole(marked, depth)`: the durable sub-agent marker on the chat tab decides
-> it, falling back to `roleForDepth` when there is none — a root (depth 0) is an orchestrator that may
-> delegate; a spawned child (depth ≥ 1) is a sub-agent that does its own work and never fans out. The
-> marker wins because depth lives in an in-memory registry a restart clears, which used to hand a
-> resumed child the whole surface back. The Plan Mode axis comes from
+> authoritative text lives in `src/shared/agent-control/awareness.ts` as three lineage audiences by
+> Plan Mode: root orchestrator, depth-1 manager, and depth-2 leaf. `managerSubagentAwareness` and
+> `planModeManagerSubagentAwareness` describe the middle layer; the existing sub-agent variants are
+> the leaf-safe fallback. The durable descendant role and validated persisted `depth` travel together;
+> missing or invalid descendant depth fails closed as a leaf, never a root or manager. The Plan Mode axis comes from
 > the app per turn, and it **replaces** the role playbook rather than stacking on it — see
 > [Planning with sub-agents](#planning-with-sub-agents). Both reach the two always-on injection
 > points:
 >
 > - **Pi** — the extension's `before_agent_start` hook appends the variant chosen by the
->   app-injected `ENSEMBLR_CONTROL_ROLE` env var (`orchestrator` | `subagent`) and this turn's
+>   app-injected `ENSEMBLR_CONTROL_ROLE` and validated `ENSEMBLR_CONTROL_DEPTH`, plus this turn's
 >   Plan Mode state from `getSessionBrief`. Because a packaged app cannot import `src/` at runtime,
->   `resources/pi-extensions/ensemblr-control.mts` embeds byte-identical copies of all four; a parity
->   test (`tests/main/agent-control-awareness-parity.test.ts`) fails if any drifts.
+>   `resources/pi-extensions/ensemblr-control.mts` carries matching root, manager, and leaf variants;
+>   parity tests cover the shared literals and depth-specific surface.
 > - **Harnesses** (Claude Code, Codex, Mistral Vibe) — a harness launches as a root session but
 >   owns a *terminal* tab, so it gets its own shorter variant, `harnessAwareness`. The MCP server's
 >   `instructions` field (`src/main/agent-control/mcp-endpoint.ts`) carries it, and
@@ -108,11 +105,11 @@ to read-only investigations; the interview and decisions stay with you. When del
 spawn helpers, **wait on them**, evaluate their output, and integrate the result — and never tell
 the user to click.
 
-Only the **root** orchestrator delegates. A spawned sub-agent does its assigned work itself and
-cannot delegate onward (see [Sub-agent side](#sub-agent-side)). Two independent checks say so: the
-role table refuses a marked child `denied-scope`, and the depth cap — default `1` — refuses any
-caller at depth ≥ 1 `denied-depth`. The role check is the durable one; the cap is what stops a root
-from fork-bombing.
+Delegation has **two edges**. A depth-0 root may open a depth-1 manager; that manager may open
+fresh depth-2 leaves for independent work it will integrate. A leaf cannot delegate. The shared role
+policy narrows the manager to five Ensemblr child-management ops, while authoritative depth, the
+root-tree quota, and the rolling rate cap stop recursion and fork-bombing. Missing descendant depth
+is leaf authority, not compatibility permission.
 
 ### Pi's delegation barrier
 
@@ -127,9 +124,9 @@ forever.
 Parallel fan-out still works: sibling start calls in one assistant tool batch may all run. A wait in
 that same batch is refused because Pi executes sibling tools concurrently and the app may not have
 registered the new child ids yet. On the next turn, the extension rewrites the wait to `mode: "all"`
-with every outstanding id. Explicit ids make the barrier survive an app restart even though the
-main process's parent→child lineage is in memory only. A reload during an in-flight spawn persists a
-recovery intent instead; the next wait uses the app's default child set without inventing an id. Any
+with every outstanding id. Explicit ids preserve the branch-local barrier across a Pi reload, while
+versioned parent→child lineage in SQLite preserves ownership across an app restart. A reload during
+an in-flight spawn persists a recovery intent instead; the next wait uses the app's default child set without inventing an id. Any
 returned child id is adopted without a tab id so attention signals can follow the normal follow-up
 cycle; the barrier stays closed until every recovered child settles without a signal. Recovery never
 auto-retries.
@@ -138,10 +135,11 @@ reload.
 
 The narrow escape surface while the barrier is active exists only to finish orchestration: further
 child starts, follow-ups to tracked children, tracked child-tab closure, a questionnaire prompted by
-a child's attention signal, and the all-child wait. Reads, edits, shell commands, terminal control,
+a child's attention signal, a manager's one-level `notifyOrchestrator` escalation of that signal, and
+the all-child wait. Reads, edits, shell commands, terminal control,
 and user-facing findings wait until the barrier closes. Peers and Concierge-spawned root
-orchestrators are not children and do not open this barrier; spawned sub-agents cannot delegate in
-the first place.
+orchestrators are not children and do not open this barrier. It runs for roots and depth-1 managers;
+a depth-2 leaf has no spawn surface to open it.
 
 ### Which mechanism delegates
 
@@ -354,20 +352,13 @@ safety. The renderer's per-chat atom is tri-state — `null` means "the user has
 tab" and the request omits `planMode` entirely, because sending `false` for no-opinion is what used to
 clear an inherited flag on the user's first message.
 
-What a **planning sub-agent** may not do, enforced in `src/shared/plan-mode/control-ops.ts`. All four
-are now also in the unconditional role table above, which runs first — this table is what a *planning*
-caller would have met, and it survives so the plan-mode policy stays complete on its own terms rather
-than depending on a second gate to cover a hole:
-
-| Denied | Why |
-| --- | --- |
-| `ensemblr_start_conversation` | Nested delegation is blocked; the investigation is its own to do. |
-| `ensemblr_send_follow_up` | It has no conversations of its own to steer. |
-| `ensemblr_exit_plan_mode` | The plan belongs to the orchestrator. A plan submitted here posts into the sub-agent's own tab and renders an Approve button whose handler clears that tab's Plan Mode and submits an implementation prompt — one click would turn a read-only investigator into a writer. |
-| `ensemblr_ask_user_question` | The modal renders in the sub-agent's tab while the orchestrator sits in `ensemblr_wait_for_agents`, so nobody is watching it and the child hangs to the wait timeout. `ensemblr_notify_orchestrator` reaches someone. |
-
-These four denials deliberately skip the shared escape-hatch sentence, which tells a caller to finish
-the plan and call `ensemblr_exit_plan_mode` — for a sub-agent that names a tool which just refused it.
+Plan Mode respects depth. A verified depth-1 manager may use
+`ensemblr_start_conversation` and `ensemblr_send_follow_up` for fresh planning
+leaves it owns; `planModeControlOpDenial` defaults missing descendant depth to 2,
+so an older caller still fails closed. Every descendant is denied
+`ensemblr_exit_plan_mode` and `ensemblr_ask_user_question`: the root owns plan
+submission and the user interview, while descendants report decisions to their
+immediate parent. A depth-2 leaf is denied all four.
 
 `ensemblr_launch_harness`, `ensemblr_start_terminal`, and `ensemblr_write_terminal` stay blocked for
 **both** roles: a harness has no Plan Mode and launches with approval prompts skipped, and a terminal
@@ -428,45 +419,26 @@ and the false-positive discipline they are held to.
 
 ## Sub-agent side
 
-If you were spawned as a sub-agent, you were given **one delegated unit of work** — do it yourself,
-end to end. The last message you leave is your report back to the orchestrator, and everything it
-needs has to be **in** it: the answer first, then the evidence with full file paths, then the gaps,
-then anything that changes the shape of the work. A pointer to work earlier in the turn ("report
-delivered above") is the one failure mode the playbook names outright — it is all the orchestrator
-would get if the turn were read one message at a time. Do **not** spawn
-further sub-agents, launch harnesses, or delegate onward; that is the orchestrator's job. You may
-still read and inspect freely, and focus a view so the user can follow along.
+Every spawned sub-agent owns one delegated workstream and reports to its
+**immediate parent**. A depth-1 manager may split that work once more across
+fresh depth-2 leaves, then evaluates, verifies, and integrates those reports into
+its own. A leaf does the work itself. Neither may open Review, peers, harnesses,
+terminals, user dialogs, or tracker writes, and neither may steer sideways or
+upward.
 
-**The surface is narrowed by role, not by depth.** `SUBAGENT_BLOCKED_OPS`
-(`src/shared/agent-control/subagent-policy.ts`) fails `denied-scope` for eighteen ops whatever mode
-the child is in — `spawnChatTab`, `startConversation`, `startReview`, `sendFollowUp`,
-`launchHarness`, `startTerminal`, `stopTerminal`, `writeTerminal`, `openTab`, `closeTab`,
-`setBranchName`, `setWorkspaceStatus`, `askUserQuestion`, `exitPlanMode`, `messageConcierge`,
-`linearCreateComment`, `linearCreateIssue`, `linearUpdateIssue` — and `gateSubAgentRole` runs it
-before the plan-mode gate on every dispatch.
+The last message is the report: answer first, full-path evidence, gaps,
+constraints, then `Open questions` for user decisions. A manager does not forward
+a leaf report as its own. It closes owned leaf tabs as they settle and keeps the
+root-tree lifetime/rate budget in mind; closing does not refund it.
 
-That check reads the **durable tab marker** via `resolveRole`, not `origin.depth`. The distinction
-is the whole point: lineage lives in the in-memory origin registry, so a child resumed after a
-restart re-registers at depth 0 and a depth-only test lets it through. Most of these ops used to be
-denied only as a side effect of the spawn guardrail refusing `depth >= 1`, which meant a restart
-handed a child the spawn tools back — while `notifyOrchestrator`, its one escape hatch, broke on the
-same missing lineage. It keys off the marker now too.
-
-The three ops with no gate at all before this — `stopTerminal`, `writeTerminal`, `setWorkspaceStatus`
-— were the sharpest of these. None is a spawn op, so no depth check ever saw them: a child could
-type into any terminal in the workspace (including a harness the orchestrator launched), kill the
-run script, or move the whole workspace's kanban card from inside one unit of work.
-
-`waitForAgents`, `listModels`, and `listRunScripts` are *not* denied, only withheld from the tool
-list: a child has no children to wait on, no spawn to pick a model for, and no `startTerminal` to
-pick a run script for, so refusing them would imply a hazard where there is only noise. The Pi
-extension registers the complement of `SUBAGENT_WITHHELD_OPS` for a sub-agent, and a parity test
-compares its embedded copy of that set against the shared one.
-
-Withholding and denying are complements. The child's tool list omits the tool so it never reaches;
-the service still refuses it so a stale or hand-rolled call fails closed. Listing a tool the service
-would only refuse is what teaches a model to keep reaching for it — the same reasoning that trims
-the harness MCP surface.
+The surface is narrowed by durable descendant role **and validated persisted
+depth**. `SUBAGENT_BLOCKED_OPS` contains the twenty leaf denials. A manager gets
+only five removed: `startConversation`, `listModels`, `waitForAgents`,
+`sendFollowUp`, and `closeTab`. The service additionally requires the spawn to be
+a fresh immediate leaf; `chatTabId`, `peer`, explicit Plan/AFK overrides, Review,
+and native runtime delegation remain unavailable. Missing or malformed depth on
+a descendant is depth 2. `listRunScripts` is the only merely unusable op and is
+withheld from both descendant depths.
 
 **Naming the workspace is root-only.** `ensemblr_set_branch_name` renames the workspace *and* its
 git branch, and that name describes the whole body of work rather than the one unit a child was
@@ -608,10 +580,9 @@ free.
   backticks — `src/renderer/components/message.tsx`, never a bare `message.tsx` or a trailing
   fragment like `components/message.tsx`. The timeline turns those into chips the user clicks to
   open the file, and only a path it can place in the file tree becomes clickable.
-- Delegation is **shallow by design** — only the root may spawn; children do their own work and
-  cannot delegate onward. Nesting depth (default cap `1`), per-session spawn count, and spawn rate are
-  all capped by the app; never fork-bomb. Waiting on an ancestor session is refused (it would
-  deadlock).
+- Delegation has **two edges** — root → manager → leaf. Leaves cannot delegate.
+  The root tree shares a lifetime count and rolling rate cap; never fork-bomb.
+  Waiting on an ancestor or non-immediate branch is refused.
 - **Writes** (spawn / close / launch / terminals / focus) act only on **your own workspace**;
   **reads** (including `wait_for_agents`) may span all open workspaces — inspect before acting.
 - **Close the tabs you opened** once they have served their purpose (`ensemblr_close_tab`); a

@@ -27,8 +27,10 @@ export {
 	awarenessForAudience,
 	conciergeAwareness,
 	harnessAwareness,
+	managerSubagentAwareness,
 	nativeOrchestratorAwareness,
 	orchestratorAwareness,
+	planModeManagerSubagentAwareness,
 	planModeOrchestratorAwareness,
 	planModeSubagentAwareness,
 	resolveAgentRole,
@@ -60,6 +62,7 @@ export {
 export * from './agent-control/contracts.ts';
 export { buildConversationTranscript } from './agent-control/conversation-transcript.ts';
 export { buildLanguageDirective } from './agent-control/language-directive.ts';
+export type { AgentSessionLineage } from './agent-control/lineage.ts';
 export {
 	buildLinkedIssueDirective,
 	LINKED_ISSUE_DIRECTIVE_HEADER,
@@ -92,6 +95,7 @@ export {
 	CONCIERGE_ONLY_OPS,
 	CONCIERGE_WITHHELD_OPS,
 	conciergeControlOpDenial,
+	MANAGER_SUBAGENT_DELEGATION_OPS,
 	resolveContextPressureAudience,
 	retiredControlOpDenial,
 	SUBAGENT_UNUSABLE_OPS,

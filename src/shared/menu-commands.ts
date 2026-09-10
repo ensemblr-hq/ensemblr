@@ -78,6 +78,7 @@ export const MENU_COMMANDS = {
 		ownsAccelerator: true,
 		shortcutId: 'changes.uncommitted',
 	},
+	'panel.agents': {},
 	'panel.files': {},
 	'panel.changes': {},
 	'panel.checks': {},

@@ -11,6 +11,7 @@ import path from 'node:path';
 import { type App, BrowserWindow, dialog } from 'electron';
 
 import {
+	type AgentSessionLineage,
 	type AwarenessFeatures,
 	buildCoAuthorDirective,
 	buildLanguageDirective,
@@ -23,6 +24,7 @@ import type { AppLanguage } from '../../shared/i18n.ts';
 import {
 	CONTROL_ARCHITECTURE_ENABLED,
 	CONTROL_ARCHITECTURE_ENV_KEY,
+	CONTROL_DEPTH_ENV_KEY,
 	CONTROL_ROLE_ENV_KEY,
 	CONTROL_TOKEN_ENV_KEY,
 	CONTROL_TUI_HARNESSES_ENABLED,
@@ -42,6 +44,8 @@ interface AgentControlIntegrationDeps {
 	originRegistry: OriginRegistry;
 	/** Absolute cwd of a workspace, or null when it has no resolvable path. */
 	resolveWorkspaceCwd: (workspaceId: string) => string | null;
+	/** Resolves validated persisted lineage for a native conversation session. */
+	resolveSessionLineage?: (sessionId: string) => AgentSessionLineage;
 	/**
 	 * Absolute path of the Concierge's home, which is its cwd and the only tree
 	 * it may write to. Omitted, a Concierge registers no origin and opens without
@@ -256,6 +260,7 @@ export function createAgentControlIntegration({
 	readSkillPluginDirectories = () => [],
 	readTuiHarnessesEnabled = () => false,
 	resolveConciergeCwd = () => null,
+	resolveSessionLineage,
 	resolveWorkspaceCwd,
 }: AgentControlIntegrationDeps): AgentControlIntegration {
 	const resolveAgentControlEnv: AgentControlEnvResolver = (
@@ -272,13 +277,20 @@ export function createAgentControlIntegration({
 		if (!cwd) {
 			return {};
 		}
+		const species = identity.species ?? 'pi';
+		const lineage =
+			identity.lineage ??
+			(!concierge && species !== 'harness'
+				? resolveSessionLineage?.(identity.sessionId)
+				: undefined);
 		const origin = originRegistry.register({
 			sessionId: identity.sessionId,
 			workspaceId: identity.workspaceId,
 			concierge,
 			workspaceCwd: cwd,
-			species: identity.species ?? 'pi',
+			species,
 			parentSessionId: identity.parentSessionId ?? null,
+			lineage,
 			delegation: identity.delegation,
 		});
 		// A Concierge can never carry the sub-agent marker, and reading it would
@@ -287,6 +299,7 @@ export function createAgentControlIntegration({
 		return {
 			[CONTROL_URL_ENV_KEY]: serverUrl,
 			[CONTROL_TOKEN_ENV_KEY]: origin.token,
+			[CONTROL_DEPTH_ENV_KEY]: String(origin.depth),
 			[CONTROL_ROLE_ENV_KEY]: resolveAgentRole(
 				marked,
 				origin.depth,

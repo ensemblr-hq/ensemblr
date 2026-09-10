@@ -10,6 +10,7 @@ import {
 	type GuardrailConfig,
 } from '../../src/main/agent-control/index.ts';
 import {
+	type AgentSessionLineage,
 	conciergeAwareness,
 	PLAN_REFINEMENT_DIRECTIVE,
 	type SubagentMechanism,
@@ -59,6 +60,7 @@ const makePorts = (
 			.mockResolvedValue(
 				overrides.tabWorkspace === undefined ? 'ws' : overrides.tabWorkspace,
 			),
+		resolveTabAgentSession: vi.fn().mockResolvedValue('pi-1'),
 	},
 	conversations: {
 		startConversation: vi
@@ -98,6 +100,7 @@ const makePorts = (
 					? 'ws'
 					: overrides.conversationWorkspace,
 			),
+		listImmediateChildren: vi.fn().mockReturnValue([]),
 	},
 	terminals: {
 		startTerminal: vi
@@ -283,6 +286,7 @@ const setup = (
 		dispatchTimeoutMs?: number;
 		architectureDiagram?: boolean;
 		tuiHarnesses?: boolean;
+		lineage?: AgentSessionLineage;
 	} = {},
 ) => {
 	// The caller keeps `tok-caller`; anything a test registers afterwards gets its
@@ -300,6 +304,7 @@ const setup = (
 		delegation: options.delegation,
 		workspaceCwd: '/ws',
 		species: options.species ?? 'pi',
+		lineage: options.lineage,
 	});
 	const ports = options.ports ?? makePorts();
 	const service = createAgentControlService({
@@ -865,8 +870,7 @@ describe('agent-control service: scope', () => {
 
 	// The workspace name and its git branch describe the whole body of work, so a
 	// child naming them from inside one delegated unit would label the workspace
-	// after a fragment. Marked-tab rather than depth, because lineage does not
-	// survive a restart and a resumed child re-registers at depth 0.
+	// after a fragment. The marker case stays as a fail-closed legacy regression.
 	it('denies setBranchName to a caller whose tab is marked a sub-agent', async () => {
 		const ports = makePorts({ spawnedSubAgent: true });
 		const { service } = setup({ ports });
@@ -1020,8 +1024,7 @@ describe('agent-control service: guardrails', () => {
 		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(result.code).toBe('denied-scope');
-			expect(result.error).toContain('no conversations of your own to steer');
+			expect(result.code).toBe('denied-deadlock');
 		}
 	});
 
@@ -1035,11 +1038,8 @@ describe('agent-control service: guardrails', () => {
 	});
 });
 
-// `parentSessionId` is never persisted, so a resumed conversation re-registers
-// with no parent and lands at depth 0 — while its Plan Mode comes back from the
-// renderer's per-tab store. Resolving the role from lineage alone would hand a
-// restored investigator the orchestrator policy after a restart, or after its tab
-// was closed and restored, and let it reach the three ops that policy denies.
+// Legacy sessions may still carry only a tab marker. A missing lineage record
+// must fail closed rather than handing that marked descendant root privileges.
 describe('agent-control service: role of a resumed sub-agent', () => {
 	const DENIED_WHILE_PLANNING: Record<string, Record<string, unknown>> = {
 		exitPlanMode: { plan: '# Findings', title: 'Findings' },
@@ -1101,11 +1101,8 @@ describe('agent-control service: role of a resumed sub-agent', () => {
 	});
 });
 
-// Every caller here is registered at depth 0 with no parent and is NOT planning,
-// which is exactly how a sub-agent comes back after a restart: the in-memory
-// lineage is gone, so the spawn guardrail no longer denies it anything. Only the
-// durable tab marker still says what it is, and these are the ops that used to
-// unlock when it stopped saying so.
+// Every caller here models a legacy marked descendant with unprovable lineage.
+// It must retain the leaf surface rather than being promoted to a root.
 describe('agent-control service: sub-agent role gate outside plan mode', () => {
 	const BLOCKED: Record<string, Record<string, unknown>> = {
 		spawnChatTab: {},
@@ -1230,11 +1227,30 @@ describe('agent-control service: sub-agent role gate outside plan mode', () => {
 	});
 });
 
-// The escape hatch used to key off `origin.parentSessionId`, which lives only in
-// the in-memory registry — so a restart took it away at exactly the moment the
-// depth counter stopped denying the child everything else.
 describe('agent-control service: notifying the orchestrator', () => {
-	it('accepts a signal from a marked sub-agent with no live lineage', async () => {
+	it('accepts a signal from either verified descendant level', async () => {
+		for (const depth of [1, 2] as const) {
+			const ports = makePorts({ spawnedSubAgent: true });
+			const { service } = setup({
+				ports,
+				lineage: {
+					depth,
+					parentSessionId: `parent-${depth}`,
+					rootSessionId: 'root',
+				},
+			});
+
+			const result = await service.invoke({
+				op: 'notifyOrchestrator',
+				token: 'tok-caller',
+				rawArgs: { message: 'which framework?', reason: 'need_decision' },
+			});
+
+			expect(result.ok).toBe(true);
+		}
+	});
+
+	it('fails closed when a marked legacy descendant has no verified parent', async () => {
 		const ports = makePorts({ spawnedSubAgent: true });
 		const { service } = setup({ ports });
 
@@ -1244,7 +1260,67 @@ describe('agent-control service: notifying the orchestrator', () => {
 			rawArgs: { message: 'which framework?', reason: 'need_decision' },
 		});
 
-		expect(result.ok).toBe(true);
+		expect(result).toMatchObject({ code: 'not-found', ok: false });
+	});
+
+	it('keeps a child signal until its immediate parent consumes it', async () => {
+		const ports = makePorts();
+		ports.conversations.isSpawnedSubAgent = vi
+			.fn()
+			.mockImplementation(async (sessionId) => sessionId === 'child');
+		const { registry, service } = setup({ ports });
+		const child = registry.register({
+			lineage: {
+				depth: 1,
+				parentSessionId: 'caller',
+				rootSessionId: 'caller',
+			},
+			sessionId: 'child',
+			species: 'pi',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+		const outsider = registry.register({
+			lineage: {
+				depth: 0,
+				parentSessionId: null,
+				rootSessionId: 'outsider',
+			},
+			sessionId: 'outsider',
+			species: 'pi',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+		await service.invoke({
+			op: 'notifyOrchestrator',
+			token: child.token,
+			rawArgs: { message: 'decision', reason: 'need_decision' },
+		});
+		const unrelated = await service.invoke({
+			op: 'waitForAgents',
+			token: outsider.token,
+			rawArgs: { targets: ['child'] },
+		});
+		service.releaseSession('child');
+
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: 'tok-caller',
+			rawArgs: { targets: ['child'] },
+		});
+
+		expect(unrelated).toMatchObject({
+			data: { completed: [{ signal: null }] },
+			ok: true,
+		});
+		expect(result).toMatchObject({
+			data: {
+				completed: [
+					{ signal: { message: 'decision', reason: 'need_decision' } },
+				],
+			},
+			ok: true,
+		});
 	});
 
 	it('refuses a signal from a caller nobody spawned', async () => {
@@ -1325,6 +1401,236 @@ describe('agent-control service: focus', () => {
 });
 
 describe('agent-control service: delegation', () => {
+	it('lets a verified depth-1 manager list models and open a fresh leaf', async () => {
+		const ports = makePorts({ spawnedSubAgent: true });
+		const { service } = setup({
+			ports,
+			lineage: {
+				depth: 1,
+				parentSessionId: 'root',
+				rootSessionId: 'root',
+			},
+		});
+
+		const models = await service.invoke({
+			op: 'listModels',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+		const spawn = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { model: 'm-default', prompt: 'leaf work' },
+		});
+
+		expect(models.ok).toBe(true);
+		expect(spawn.ok).toBe(true);
+		expect(ports.conversations.startConversation).toHaveBeenCalledWith(
+			expect.objectContaining({
+				asPeer: false,
+				parentSessionId: 'caller',
+			}),
+		);
+	});
+
+	it('lets a planning depth-1 manager spawn a leaf that inherits Plan Mode', async () => {
+		const ports = makePorts({ planning: true, spawnedSubAgent: true });
+		const { service } = setup({
+			ports,
+			lineage: {
+				depth: 1,
+				parentSessionId: 'root',
+				rootSessionId: 'root',
+			},
+		});
+
+		const result = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { prompt: 'plan leaf' },
+		});
+
+		expect(result.ok).toBe(true);
+		expect(ports.conversations.startConversation).toHaveBeenCalledWith(
+			expect.objectContaining({ planMode: true }),
+		);
+	});
+
+	it('denies delegation and model selection at depth 2', async () => {
+		const ports = makePorts({ spawnedSubAgent: true });
+		const { service } = setup({
+			ports,
+			lineage: {
+				depth: 2,
+				parentSessionId: 'manager',
+				rootSessionId: 'root',
+			},
+		});
+
+		for (const [op, rawArgs] of [
+			['listModels', {}],
+			['startConversation', { prompt: 'third level' }],
+		] as const) {
+			const result = await service.invoke({ op, rawArgs, token: 'tok-caller' });
+			expect(result).toMatchObject({ code: 'denied-scope', ok: false });
+		}
+		expect(ports.conversations.startConversation).not.toHaveBeenCalled();
+	});
+
+	it('limits a depth-1 manager wait, follow-up, and close to durable immediate children', async () => {
+		const ports = makePorts({ spawnedSubAgent: true });
+		vi.mocked(ports.conversations.listImmediateChildren).mockReturnValue([
+			'leaf',
+		]);
+		vi.mocked(ports.tabs.resolveTabAgentSession).mockImplementation(
+			async (chatTabId) => (chatTabId === 'leaf-tab' ? 'leaf' : 'sibling'),
+		);
+		const { service } = setup({
+			ports,
+			lineage: {
+				depth: 1,
+				parentSessionId: 'root',
+				rootSessionId: 'root',
+			},
+		});
+
+		const waited = await service.invoke({
+			op: 'waitForAgents',
+			token: 'tok-caller',
+			rawArgs: { mode: 'all' },
+		});
+		const followed = await service.invoke({
+			op: 'sendFollowUp',
+			token: 'tok-caller',
+			rawArgs: { agentSessionId: 'leaf', prompt: 'continue' },
+		});
+		const closed = await service.invoke({
+			op: 'closeTab',
+			token: 'tok-caller',
+			rawArgs: { chatTabId: 'leaf-tab' },
+		});
+
+		expect(waited.ok).toBe(true);
+		expect(followed.ok).toBe(true);
+		expect(closed.ok).toBe(true);
+		expect(ports.conversations.getStatus).toHaveBeenCalledWith('leaf');
+
+		for (const [op, rawArgs] of [
+			['waitForAgents', { targets: ['sibling'] }],
+			['sendFollowUp', { agentSessionId: 'sibling', prompt: 'continue' }],
+			['closeTab', { chatTabId: 'sibling-tab' }],
+		] as const) {
+			const result = await service.invoke({ op, rawArgs, token: 'tok-caller' });
+			expect(result).toMatchObject({ code: 'denied-scope', ok: false });
+		}
+	});
+
+	it('denies peer creation and tab reuse from a depth-1 manager', async () => {
+		const ports = makePorts({ spawnedSubAgent: true });
+		const { service } = setup({
+			ports,
+			lineage: {
+				depth: 1,
+				parentSessionId: 'root',
+				rootSessionId: 'root',
+			},
+		});
+
+		const peer = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { peer: true, prompt: 'peer', title: 'peer' },
+		});
+		const reused = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { chatTabId: 'existing', prompt: 'reuse' },
+		});
+
+		expect(peer).toMatchObject({ code: 'denied-scope', ok: false });
+		expect(reused).toMatchObject({ code: 'denied-scope', ok: false });
+		expect(ports.conversations.startConversation).not.toHaveBeenCalled();
+	});
+
+	it('atomically refuses a competing spawn at capacity', async () => {
+		const ports = makePorts();
+		let releaseFirst = (): void => {};
+		const firstOpening = new Promise<void>((resolve) => {
+			releaseFirst = resolve;
+		});
+		vi.mocked(ports.tabs.spawnChatTab).mockImplementationOnce(async () => {
+			await firstOpening;
+			return { chatTabId: 'first' };
+		});
+		const { service } = setup({
+			guardrails: { maxSpawnsPerSession: 1 },
+			ports,
+		});
+
+		const first = service.invoke({
+			op: 'spawnChatTab',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+		const second = await service.invoke({
+			op: 'spawnChatTab',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+		releaseFirst();
+
+		expect(second).toMatchObject({ code: 'denied-quota', ok: false });
+		expect((await first).ok).toBe(true);
+		expect(ports.tabs.spawnChatTab).toHaveBeenCalledOnce();
+	});
+
+	it('shares one spawn budget between a root and its depth-1 child', async () => {
+		const ports = makePorts();
+		ports.conversations.isSpawnedSubAgent = vi
+			.fn()
+			.mockImplementation(async (sessionId) => sessionId === 'child');
+		const { registry, service } = setup({
+			guardrails: { maxSpawnsPerSession: 2, maxSpawnsPerMinute: 10 },
+			ports,
+		});
+		const child = registry.register({
+			lineage: {
+				depth: 1,
+				parentSessionId: 'caller',
+				rootSessionId: 'caller',
+			},
+			sessionId: 'child',
+			species: 'pi',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+
+		expect(
+			(
+				await service.invoke({
+					op: 'startConversation',
+					token: 'tok-caller',
+					rawArgs: { prompt: 'child' },
+				})
+			).ok,
+		).toBe(true);
+		expect(
+			(
+				await service.invoke({
+					op: 'startConversation',
+					token: child.token,
+					rawArgs: { prompt: 'leaf' },
+				})
+			).ok,
+		).toBe(true);
+		const exhausted = await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { prompt: 'over budget' },
+		});
+		expect(exhausted).toMatchObject({ code: 'denied-quota', ok: false });
+	});
+
 	it('waits for the child conversation when asked', async () => {
 		const ports = makePorts();
 		const { service } = setup({ ports });
@@ -1392,7 +1698,11 @@ describe('agent-control service: delegation', () => {
 			rawArgs: { prompt: 'go' },
 		});
 		expect(ports.conversations.startConversation).toHaveBeenCalledWith(
-			expect.objectContaining({ callerRuntime: null }),
+			expect.objectContaining({
+				callerRuntime: null,
+				callerSpecies: 'harness',
+				parentSessionId: 'caller',
+			}),
 		);
 	});
 
@@ -3508,6 +3818,7 @@ describe('agent-control service: audience resolution', () => {
 			architectureDiagram: true,
 			tuiHarnesses: true,
 			delegation: 'ensemblr',
+			depth: 0,
 			hasChatTab: true,
 			retired: false,
 			role: 'orchestrator',
@@ -3521,6 +3832,7 @@ describe('agent-control service: audience resolution', () => {
 			architectureDiagram: true,
 			tuiHarnesses: true,
 			delegation: 'ensemblr',
+			depth: 0,
 			hasChatTab: true,
 			retired: false,
 			role: 'orchestrator',
@@ -3537,6 +3849,7 @@ describe('agent-control service: audience resolution', () => {
 			hasChatTab: false,
 			retired: false,
 			role: 'orchestrator',
+			depth: 0,
 		});
 	});
 
@@ -3553,6 +3866,7 @@ describe('agent-control service: audience resolution', () => {
 			hasChatTab: true,
 			retired: false,
 			role: 'subagent',
+			depth: 0,
 		});
 	});
 
@@ -3567,6 +3881,7 @@ describe('agent-control service: audience resolution', () => {
 			hasChatTab: true,
 			retired: true,
 			role: 'concierge',
+			depth: 0,
 		});
 	});
 
@@ -4219,6 +4534,36 @@ describe('agent-control service: reporting context usage', () => {
 			expect(note).toContain('71% full');
 			expect(note).toContain('cannot delegate onward');
 			expect(note).not.toContain('ensemblr_start_conversation');
+		}
+	});
+
+	it('gives a depth-1 manager delegation-aware context advice', async () => {
+		const ports = makePorts({ spawnedSubAgent: true });
+		ports.conversations.getStatus = vi.fn().mockResolvedValue({
+			agentSessionId: 'caller',
+			contextUsage: usage,
+			runtimeOpen: true,
+			status: 'streaming',
+		});
+		const { service } = setup({
+			ports,
+			lineage: {
+				depth: 1,
+				parentSessionId: 'root',
+				rootSessionId: 'root',
+			},
+		});
+
+		const result = await service.invoke({
+			op: 'getConversationStatus',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const { note } = result.data as { note?: string };
+			expect(note).toContain('ensemblr_start_conversation');
 		}
 	});
 

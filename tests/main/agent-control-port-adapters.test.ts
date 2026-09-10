@@ -9,6 +9,7 @@ import {
 	createBoardStatusStore,
 	type PortAdapterDeps,
 } from '../../src/main/agent-control/index.ts';
+import { listImmediateAgentSessionChildren } from '../../src/main/agent-control/session-lineage.ts';
 import { createAppSettingsService } from '../../src/main/config/app-settings-service.ts';
 import {
 	getChatTabByAgentSessionId,
@@ -35,6 +36,10 @@ import {
 	fakeSpawnModelResolver,
 	modelOption,
 } from './support/spawn-model-resolver.ts';
+
+vi.mock('../../src/main/agent-control/session-lineage.ts', () => ({
+	listImmediateAgentSessionChildren: vi.fn(() => []),
+}));
 
 vi.mock('../../src/main/storage/repositories/chat-tab-repository.ts', () => ({
 	getChatTabById: vi.fn(() => ({
@@ -186,6 +191,36 @@ describe('agent-control port adapters: tab-change broadcast', () => {
 		const built = makeDeps();
 		deps = built.deps;
 		broadcastTabsChanged = built.broadcastTabsChanged;
+	});
+
+	it('resolves the conversation bound to a tab', async () => {
+		vi.mocked(getChatTabById).mockReturnValue(
+			openChatRow({ agentSessionId: 'session-a' }) as unknown as ReturnType<
+				typeof getChatTabById
+			>,
+		);
+		const ports = createAgentControlPorts(deps);
+
+		await expect(ports.tabs.resolveTabAgentSession('tab-1')).resolves.toBe(
+			'session-a',
+		);
+	});
+
+	it('lists durable immediate children through the lineage repository', () => {
+		vi.mocked(listImmediateAgentSessionChildren).mockReturnValue([
+			'child-a',
+			'child-b',
+		]);
+		const ports = createAgentControlPorts(deps);
+
+		expect(ports.conversations.listImmediateChildren('parent')).toEqual([
+			'child-a',
+			'child-b',
+		]);
+		expect(listImmediateAgentSessionChildren).toHaveBeenCalledWith({
+			database: {},
+			parentSessionId: 'parent',
+		});
 	});
 
 	it('broadcasts the workspace after spawning a chat tab', async () => {
@@ -521,6 +556,45 @@ describe('agent-control port adapters: conversation naming', () => {
 		});
 	});
 
+	it('marks a harness synthetic parent as trusted on the session open request', async () => {
+		const openSession = vi.fn().mockResolvedValue({ id: 'sess-1' });
+		const { deps } = makeDeps();
+		(deps as { agentSessionService: unknown }).agentSessionService = {
+			openSession,
+			submitPrompt: vi.fn().mockResolvedValue({}),
+			setSessionName: vi.fn().mockResolvedValue({ applied: true }),
+			getSession: vi.fn(),
+			listSessionsForWorkspace: () => [],
+		};
+		(deps as { piExecutableService: unknown }).piExecutableService = {
+			getSnapshot: vi
+				.fn()
+				.mockResolvedValue({ status: 'ready', command: 'pi' }),
+		};
+		const ports = createAgentControlPorts(deps);
+
+		await ports.conversations.startConversation({
+			afkMode: false,
+			asPeer: false,
+			callerConcierge: false,
+			callerRuntime: null,
+			callerSpecies: 'harness',
+			model: 'anthropic/sonnet',
+			parentSessionId: 'ws:ws',
+			planMode: false,
+			prompt: 'do it',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+
+		expect(openSession).toHaveBeenCalledWith(
+			expect.objectContaining({
+				parentSessionId: 'ws:ws',
+				parentSpecies: 'harness',
+			}),
+		);
+	});
+
 	// The renderer opens an empty chat tab for every workspace that has none, so a
 	// spawn that always opened its own left a freshly created workspace showing
 	// two tabs, one of them permanently blank. Only that placeholder is offered —
@@ -596,6 +670,89 @@ describe('agent-control port adapters: conversation naming', () => {
 
 	// Rollback closes what the spawn created, and a tab that was already there is
 	// not that — closing it would take the user's own empty tab away with it.
+	it('startConversation closes only its allocated tab when session open fails', async () => {
+		const { deps } = makeDeps();
+		const closeTab = vi.fn(() => ({ deleted: false }));
+		deps.chatTabService.closeTab = closeTab;
+		(deps as { agentSessionService: unknown }).agentSessionService = {
+			openSession: vi.fn().mockRejectedValue(new Error('lineage rejected')),
+			getSession: vi.fn(),
+			listSessionsForWorkspace: () => [],
+		};
+		(deps as { piExecutableService: unknown }).piExecutableService = {
+			getSnapshot: vi
+				.fn()
+				.mockResolvedValue({ status: 'ready', command: 'pi' }),
+		};
+		const ports = createAgentControlPorts(deps);
+
+		await expect(
+			ports.conversations.startConversation({
+				afkMode: false,
+				asPeer: false,
+				callerConcierge: false,
+				callerRuntime: 'pi',
+				parentSessionId: 'missing',
+				planMode: false,
+				prompt: 'do it',
+				workspaceCwd: '/ws',
+				workspaceId: 'ws',
+			}),
+		).rejects.toThrow('lineage rejected');
+		expect(closeTab).toHaveBeenCalledWith({ chatTabId: 'tab-1' });
+	});
+
+	it.each(['activate', 'broadcast'] as const)(
+		'startConversation rolls back when inherited mode %s fails before submission',
+		async (failure) => {
+			const { deps } = makeDeps();
+			const stopSession = vi.fn().mockResolvedValue(undefined);
+			const submitPrompt = vi.fn();
+			(deps as { agentSessionService: unknown }).agentSessionService = {
+				getSession: vi.fn(),
+				openSession: vi.fn().mockResolvedValue({ id: 'sess-1' }),
+				stopSession,
+				submitPrompt,
+			};
+			(deps as { piExecutableService: unknown }).piExecutableService = {
+				getSnapshot: vi
+					.fn()
+					.mockResolvedValue({ status: 'ready', command: 'pi' }),
+			};
+			const failedOperation =
+				failure === 'activate'
+					? deps.planMode.activateForSpawn
+					: deps.broadcastPlanMode;
+			vi.mocked(failedOperation).mockImplementation(() => {
+				throw new Error('mode failed');
+			});
+
+			await expect(
+				createAgentControlPorts(deps).conversations.startConversation({
+					afkMode: false,
+					asPeer: false,
+					callerConcierge: false,
+					callerRuntime: 'pi',
+					parentSessionId: 'parent-1',
+					planMode: true,
+					prompt: 'do it',
+					workspaceCwd: '/ws',
+					workspaceId: 'ws',
+				}),
+			).rejects.toThrow('mode failed');
+			expect(submitPrompt).not.toHaveBeenCalled();
+			expect(stopSession).toHaveBeenCalledWith({
+				reason: 'agent-control-start-failed',
+				sessionId: 'sess-1',
+			});
+			expect(deps.planMode.releaseSession).toHaveBeenCalledWith('sess-1');
+			expect(deps.afkMode.releaseSession).toHaveBeenCalledWith('sess-1');
+			expect(deps.chatTabService.closeTab).toHaveBeenCalledWith({
+				chatTabId: 'tab-1',
+			});
+		},
+	);
+
 	it('startConversation leaves a claimed tab open when the submit fails', async () => {
 		const { claimPlaceholderChatTab, deps } = makeDeps();
 		claimPlaceholderChatTab.mockReturnValue({ id: 'tab-idle', kind: 'chat' });
@@ -1069,8 +1226,9 @@ describe('agent-control port adapters: branch naming', () => {
 		delegation: 'ensemblr' as const,
 		concierge: false,
 		retired: false,
-		depth: 0,
+		depth: 0 as const,
 		parentSessionId: null,
+		rootSessionId: 'sess-1',
 		sessionId: 'sess-1',
 		species: 'pi' as const,
 		token: 'tok',
@@ -1150,8 +1308,9 @@ describe('agent-control port adapters: diagram upkeep', () => {
 		delegation: 'ensemblr' as const,
 		concierge: false,
 		retired: false,
-		depth: 0,
+		depth: 0 as const,
 		parentSessionId: null,
+		rootSessionId: 'sess-1',
 		sessionId: 'sess-1',
 		species: 'pi' as const,
 		token: 'tok',
@@ -1196,7 +1355,9 @@ describe('agent-control port adapters: diagram upkeep', () => {
 	}
 
 	const withCaller = (
-		overrides: Partial<typeof origin> & { depth?: number } = {},
+		overrides: Omit<Partial<typeof origin>, 'depth'> & {
+			depth?: 0 | 1 | 2;
+		} = {},
 	) => {
 		const { deps } = makeDeps();
 		const listChangedPaths = vi.fn().mockResolvedValue([]);

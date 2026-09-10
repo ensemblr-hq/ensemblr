@@ -1,13 +1,21 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { AgentControlOrigin } from '../../src/main/agent-control/index.ts';
-import { createGuardrails } from '../../src/main/agent-control/index.ts';
+import {
+	createGuardrails,
+	DEFAULT_GUARDRAIL_CONFIG,
+} from '../../src/main/agent-control/index.ts';
+import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 
-const originAt = (depth: number): AgentControlOrigin => ({
+const originAt = (depth: AgentControlOrigin['depth']): AgentControlOrigin => ({
 	token: 'tok',
 	sessionId: 'sess',
 	workspaceId: 'ws',
 	workspaceCwd: '/ws',
 	parentSessionId: null,
+	rootSessionId: 'sess',
 	depth,
 	species: 'pi',
 	delegation: 'ensemblr',
@@ -16,20 +24,37 @@ const originAt = (depth: number): AgentControlOrigin => ({
 });
 
 describe('guardrails: depth', () => {
-	it('denies a spawn once depth reaches the limit', () => {
-		const guardrails = createGuardrails({ maxSpawnDepth: 2 });
-		expect(guardrails.evaluateSpawn(originAt(1)).ok).toBe(true);
-		const denied = guardrails.evaluateSpawn(originAt(2));
+	it('defaults to two edges, 20 lifetime spawns, and 10 spawns per minute', () => {
+		expect(DEFAULT_GUARDRAIL_CONFIG).toMatchObject({
+			maxSpawnDepth: 2,
+			maxSpawnsPerMinute: 10,
+			maxSpawnsPerSession: 20,
+		});
+	});
+
+	it('allows root and depth-1 spawns but denies depth 2 by default', () => {
+		const guardrails = createGuardrails();
+		expect(guardrails.reserveSpawn(originAt(0)).ok).toBe(true);
+		expect(
+			guardrails.reserveSpawn({
+				...originAt(1),
+				parentSessionId: 'root',
+				rootSessionId: 'root',
+				sessionId: 'child',
+			}).ok,
+		).toBe(true);
+		const denied = guardrails.reserveSpawn(originAt(2));
 		expect(denied.ok).toBe(false);
 		if (!denied.ok) {
 			expect(denied.code).toBe('denied-depth');
 		}
 	});
 
-	it('by default lets only the root spawn: a sub-agent is denied', () => {
-		const guardrails = createGuardrails();
-		expect(guardrails.evaluateSpawn(originAt(0)).ok).toBe(true);
-		const denied = guardrails.evaluateSpawn(originAt(1));
+	it('fails closed when a delegation root cannot be verified', () => {
+		const denied = createGuardrails().reserveSpawn({
+			...originAt(1),
+			rootSessionId: null,
+		});
 		expect(denied.ok).toBe(false);
 		if (!denied.ok) {
 			expect(denied.code).toBe('denied-depth');
@@ -37,57 +62,136 @@ describe('guardrails: depth', () => {
 	});
 });
 
-describe('guardrails: quota', () => {
-	it('denies once the per-session total is exhausted', () => {
-		let clock = 1_000;
-		const guardrails = createGuardrails(
-			{ maxSpawnsPerSession: 3, maxSpawnsPerMinute: 100 },
-			() => clock,
-		);
-		const origin = originAt(0);
-		for (let i = 0; i < 3; i += 1) {
-			expect(guardrails.evaluateSpawn(origin).ok).toBe(true);
-			guardrails.recordSpawn(origin.sessionId);
-			clock += 1;
-		}
-		const denied = guardrails.evaluateSpawn(origin);
+describe('guardrails: shared root-tree quota', () => {
+	it('shares the lifetime total between a root and its descendants', () => {
+		const guardrails = createGuardrails({
+			maxSpawnsPerSession: 2,
+			maxSpawnsPerMinute: 100,
+		});
+		const root = originAt(0);
+		const child = {
+			...originAt(1),
+			parentSessionId: root.sessionId,
+			rootSessionId: root.sessionId,
+			sessionId: 'child',
+		};
+		expect(guardrails.reserveSpawn(root).ok).toBe(true);
+		expect(guardrails.reserveSpawn(child).ok).toBe(true);
+		const denied = guardrails.reserveSpawn(root);
 		expect(denied.ok).toBe(false);
 		if (!denied.ok) {
 			expect(denied.code).toBe('denied-quota');
 		}
 	});
 
-	it('keeps the lifetime total across rate-window boundaries', () => {
+	it('keeps the lifetime total across rate windows and session release', () => {
 		let clock = 0;
-		const guardrails = createGuardrails(
-			{ maxSpawnsPerSession: 3, maxSpawnsPerMinute: 100 },
-			() => clock,
-		);
-		const origin = originAt(0);
-		for (let i = 0; i < 3; i += 1) {
-			expect(guardrails.evaluateSpawn(origin).ok).toBe(true);
-			guardrails.recordSpawn(origin.sessionId);
-			clock += 61_000;
-		}
-		const denied = guardrails.evaluateSpawn(origin);
-		expect(denied.ok).toBe(false);
-		if (!denied.ok) {
-			expect(denied.code).toBe('denied-quota');
-		}
-	});
-
-	it('drops a released session so its counters reset', () => {
-		let clock = 1_000;
 		const guardrails = createGuardrails(
 			{ maxSpawnsPerSession: 1, maxSpawnsPerMinute: 100 },
 			() => clock,
 		);
 		const origin = originAt(0);
-		guardrails.recordSpawn(origin.sessionId);
-		expect(guardrails.evaluateSpawn(origin).ok).toBe(false);
+		expect(guardrails.reserveSpawn(origin).ok).toBe(true);
+		clock += 61_000;
 		guardrails.release(origin.sessionId);
-		clock += 1;
-		expect(guardrails.evaluateSpawn(origin).ok).toBe(true);
+		const denied = guardrails.reserveSpawn(origin);
+		expect(denied.ok).toBe(false);
+		if (!denied.ok) {
+			expect(denied.code).toBe('denied-quota');
+		}
+	});
+
+	it('refunds a failed reservation exactly once', () => {
+		const guardrails = createGuardrails({ maxSpawnsPerSession: 1 });
+		const reserved = guardrails.reserveSpawn(originAt(0));
+		expect(reserved.ok).toBe(true);
+		if (reserved.ok) {
+			reserved.refund();
+			reserved.refund();
+		}
+		expect(guardrails.reserveSpawn(originAt(0)).ok).toBe(true);
+	});
+});
+
+describe('guardrails: durable root-tree quota', () => {
+	it('persists lifetime reservations beyond the rolling window across database reopen', () => {
+		const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-guardrails-'));
+		const databasePath = path.join(directory, 'guardrails.db');
+		try {
+			let connection = openEnsemblrDatabase({ databasePath });
+			const first = createGuardrails(
+				{ maxSpawnsPerMinute: 2, maxSpawnsPerSession: 2 },
+				() => 1_000,
+				() => connection.database,
+			);
+			expect(first.reserveSpawn(originAt(0)).ok).toBe(true);
+			connection.database.close();
+
+			connection = openEnsemblrDatabase({ databasePath });
+			const reopened = createGuardrails(
+				{ maxSpawnsPerMinute: 2, maxSpawnsPerSession: 2 },
+				() => 62_001,
+				() => connection.database,
+			);
+			expect(reopened.reserveSpawn(originAt(0)).ok).toBe(true);
+			const denied = reopened.reserveSpawn(originAt(0));
+			expect(denied.ok).toBe(false);
+			if (!denied.ok) {
+				expect(denied.code).toBe('denied-quota');
+			}
+			connection.database.close();
+		} finally {
+			rmSync(directory, { force: true, recursive: true });
+		}
+	});
+
+	it('keeps the rolling rate window across service recreation', () => {
+		const connection = openEnsemblrDatabase({ databasePath: ':memory:' });
+		try {
+			const first = createGuardrails(
+				{ maxSpawnsPerMinute: 1, maxSpawnsPerSession: 100 },
+				() => 1_000,
+				() => connection.database,
+			);
+			expect(first.reserveSpawn(originAt(0)).ok).toBe(true);
+			const recreated = createGuardrails(
+				{ maxSpawnsPerMinute: 1, maxSpawnsPerSession: 100 },
+				() => 1_001,
+				() => connection.database,
+			);
+			const denied = recreated.reserveSpawn(originAt(0));
+			expect(denied.ok).toBe(false);
+			if (!denied.ok) {
+				expect(denied.code).toBe('denied-rate');
+			}
+		} finally {
+			connection.database.close();
+		}
+	});
+
+	it('atomically reserves parallel capacity and refunds only the failed creation', async () => {
+		const connection = openEnsemblrDatabase({ databasePath: ':memory:' });
+		try {
+			const guardrails = createGuardrails(
+				{ maxSpawnsPerMinute: 100, maxSpawnsPerSession: 2 },
+				() => 1_000,
+				() => connection.database,
+			);
+			const reservations = await Promise.all(
+				[0, 1, 2].map(async () => guardrails.reserveSpawn(originAt(0))),
+			);
+			expect(reservations.filter((reservation) => reservation.ok)).toHaveLength(
+				2,
+			);
+			const accepted = reservations.find((reservation) => reservation.ok);
+			if (accepted?.ok) {
+				accepted.refund();
+				accepted.refund();
+			}
+			expect(guardrails.reserveSpawn(originAt(0)).ok).toBe(true);
+		} finally {
+			connection.database.close();
+		}
 	});
 });
 
@@ -99,15 +203,15 @@ describe('guardrails: rate', () => {
 			() => clock,
 		);
 		const origin = originAt(0);
-		guardrails.recordSpawn(origin.sessionId);
-		guardrails.recordSpawn(origin.sessionId);
-		const denied = guardrails.evaluateSpawn(origin);
+		expect(guardrails.reserveSpawn(origin).ok).toBe(true);
+		expect(guardrails.reserveSpawn(origin).ok).toBe(true);
+		const denied = guardrails.reserveSpawn(origin);
 		expect(denied.ok).toBe(false);
 		if (!denied.ok) {
 			expect(denied.code).toBe('denied-rate');
 		}
 		clock += 61_000;
-		expect(guardrails.evaluateSpawn(origin).ok).toBe(true);
+		expect(guardrails.reserveSpawn(origin).ok).toBe(true);
 	});
 });
 
@@ -170,8 +274,8 @@ describe('guardrails: messaging the Concierge', () => {
 	it('counts messages apart from spawns', () => {
 		const guardrails = createGuardrails({ maxConciergeMessagesPerSession: 1 });
 
-		guardrails.recordSpawn('sess');
-		guardrails.recordSpawn('sess');
+		guardrails.reserveSpawn(originAt(0));
+		guardrails.reserveSpawn(originAt(0));
 
 		expect(guardrails.evaluateConciergeMessage('sess').ok).toBe(true);
 	});

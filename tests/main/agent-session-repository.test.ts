@@ -131,6 +131,7 @@ test('updateAgentSession patches status, model, thinking, runtime session id', (
 		database,
 		id: session.id,
 		patch: {
+			metadata: { lineage: { depth: 0, version: 1 } },
 			model: 'gpt-5.5',
 			runtimeSessionId: 'agent-runtime-99',
 			status: 'streaming',
@@ -139,6 +140,9 @@ test('updateAgentSession patches status, model, thinking, runtime session id', (
 	});
 
 	assert.equal(patched?.status, 'streaming');
+	assert.deepEqual(patched?.metadata, {
+		lineage: { depth: 0, version: 1 },
+	});
 	assert.equal(patched?.model, 'gpt-5.5');
 	assert.equal(patched?.thinkingLevel, 'medium');
 	assert.equal(patched?.runtimeSessionId, 'agent-runtime-99');

@@ -278,5 +278,10 @@ function hasDockTab(
 
 /** Type guard for review-panel tab enum values. */
 function isReviewTab(value: unknown): value is ReviewPanelTab {
-	return value === 'files' || value === 'changes' || value === 'checks';
+	return (
+		value === 'agents' ||
+		value === 'files' ||
+		value === 'changes' ||
+		value === 'checks'
+	);
 }

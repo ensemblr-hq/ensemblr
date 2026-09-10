@@ -1,11 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
+import type { AgentSessionLineage } from '../../../shared/agent-control.ts';
 import {
 	type AgentProviderId,
 	DEFAULT_AGENT_PROVIDER,
 } from '../../../shared/agent-provider.ts';
 import type { PermissionMode } from '../../../shared/permissions.ts';
 import type { AgentControlEnvResolver } from '../../agent-control/ports.ts';
+import {
+	establishAgentSessionLineage,
+	resolveAgentSessionLineage,
+} from '../../agent-control/session-lineage.ts';
 import type { PiExecutableSnapshot } from '../../pi-runtime';
 import type {
 	AgentSessionBranchRow,
@@ -14,6 +19,7 @@ import type {
 import { getMaxOrdinalForBranch } from '../../storage/repositories/agent-event-repository.ts';
 import {
 	createAgentSession,
+	deleteAgentSession,
 	getAgentSessionById,
 	getMainBranchForSession,
 	updateAgentSession,
@@ -69,6 +75,8 @@ interface OpenRequest {
 	model?: string | null;
 	/** Spawning agent's session id when opened via the control layer, else absent. */
 	parentSessionId?: string | null;
+	/** Marks a trusted synthetic workspace parent minted for a terminal harness. */
+	parentSpecies?: 'harness';
 	/**
 	 * Whether the chat's Plan Mode toggle is on. Absent means the caller states no
 	 * opinion, and the plan-mode registry decides for a session it already knows.
@@ -181,6 +189,53 @@ interface ReplacementOperation {
 }
 
 /**
+ * Creates a fresh persisted row and either establishes lineage or removes it.
+ * @param input - Database, open request, provider, and runtime identity to persist.
+ * @returns The new session, branch, and verified lineage.
+ */
+function createPersistedSessionWithLineage({
+	database,
+	provider,
+	request,
+	runtimeSessionId,
+}: {
+	database: DatabaseSync;
+	provider: AgentProviderId;
+	request: OpenRequest;
+	runtimeSessionId: string;
+}): ReturnType<typeof createAgentSession> & { lineage: AgentSessionLineage } {
+	const created = createAgentSession({
+		database,
+		input: {
+			cwd: request.workspaceCwd,
+			executableId: request.executable.command ?? null,
+			executablePath: request.executable.command ?? null,
+			label: request.label ?? null,
+			metadata: { runtimeSessionId },
+			model: request.model ?? null,
+			provider,
+			runtimeSessionId,
+			thinkingLevel: request.thinkingLevel ?? null,
+			workspaceId: request.workspaceId,
+		},
+	});
+	try {
+		return {
+			...created,
+			lineage: establishAgentSessionLineage({
+				database,
+				parentSessionId: request.parentSessionId ?? null,
+				parentSpecies: request.parentSpecies,
+				sessionId: created.session.id,
+			}),
+		};
+	} catch (cause) {
+		deleteAgentSession({ database, id: created.session.id });
+		throw cause;
+	}
+}
+
+/**
  * Owns the open/resume flow: row creation, runtime session attachment, active
  * map insertion, and snapshot projection. Stays free of summary-queue and
  * runtime-event handler internals — those are wired by the lifecycle via the
@@ -242,6 +297,10 @@ export function createSessionOpener({
 			});
 		}
 		assertProviderPin({ pinned: row.provider, requested: request.provider });
+		const lineage = resolveAgentSessionLineage({
+			database,
+			sessionId: row.id,
+		});
 		const inFlight = replacingSessions.get(row.id);
 		if (inFlight) {
 			throw inFlight.isGrantChange
@@ -350,7 +409,8 @@ export function createSessionOpener({
 			const runtimeSession = await createRuntimeSessionOrFail({
 				control: resolveAgentControlWiring({
 					isSpawnedSubAgent,
-					parentSessionId: request.parentSessionId ?? null,
+					lineage,
+					parentSessionId: lineage.parentSessionId,
 					provider: row.provider,
 					readArchitectureDiagramEnabled,
 					readClaudeSubagentMode,
@@ -448,20 +508,11 @@ export function createSessionOpener({
 
 		const provider = request.provider ?? DEFAULT_AGENT_PROVIDER;
 		const runtimeSessionId = randomUUID();
-		const { mainBranch, session } = createAgentSession({
+		const { lineage, mainBranch, session } = createPersistedSessionWithLineage({
 			database,
-			input: {
-				cwd: request.workspaceCwd,
-				executableId: request.executable.command ?? null,
-				executablePath: request.executable.command ?? null,
-				label: request.label ?? null,
-				metadata: { runtimeSessionId },
-				model: request.model ?? null,
-				provider,
-				runtimeSessionId,
-				thinkingLevel: request.thinkingLevel ?? null,
-				workspaceId: request.workspaceId,
-			},
+			provider,
+			request,
+			runtimeSessionId,
 		});
 
 		const attachedTab = attachSessionToChatTab({
@@ -475,7 +526,8 @@ export function createSessionOpener({
 		const runtimeSession = await createRuntimeSessionOrFail({
 			control: resolveAgentControlWiring({
 				isSpawnedSubAgent,
-				parentSessionId: request.parentSessionId ?? null,
+				lineage,
+				parentSessionId: lineage.parentSessionId,
 				provider,
 				readArchitectureDiagramEnabled,
 				readClaudeSubagentMode,

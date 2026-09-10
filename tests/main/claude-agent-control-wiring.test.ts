@@ -15,6 +15,7 @@ import { resolveAgentControlWiring } from '../../src/main/agent-runtime/session/
 import { buildClaudeMcpServers } from '../../src/main/claude-agent/claude-mcp-config.ts';
 import {
 	harnessAwareness,
+	managerSubagentAwareness,
 	orchestratorAwareness,
 	subagentAwareness,
 } from '../../src/shared/agent-control.ts';
@@ -25,6 +26,10 @@ const HARNESS_AWARENESS = harnessAwareness({
 	tuiHarnesses: true,
 });
 const ORCHESTRATOR_AWARENESS = orchestratorAwareness({
+	architectureDiagram: true,
+	tuiHarnesses: true,
+});
+const MANAGER_SUBAGENT_AWARENESS = managerSubagentAwareness({
 	architectureDiagram: true,
 	tuiHarnesses: true,
 });
@@ -261,7 +266,7 @@ describe('agent-control wiring: the playbook appended to Claude', () => {
 		expect(wiring.systemPromptAppend).toBe(ORCHESTRATOR_AWARENESS);
 	});
 
-	it('gives a spawned child the sub-agent playbook', () => {
+	it('gives a depth-1 child the manager sub-agent playbook', () => {
 		const { wire } = setup();
 
 		wire({ provider: 'claude', sessionId: 'root' });
@@ -269,6 +274,20 @@ describe('agent-control wiring: the playbook appended to Claude', () => {
 			parentSessionId: 'root',
 			provider: 'claude',
 			sessionId: 'child',
+		});
+
+		expect(wiring.systemPromptAppend).toBe(MANAGER_SUBAGENT_AWARENESS);
+	});
+
+	it('gives a depth-2 grandchild the leaf playbook', () => {
+		const { wire } = setup();
+
+		wire({ provider: 'claude', sessionId: 'root' });
+		wire({ parentSessionId: 'root', provider: 'claude', sessionId: 'child' });
+		const wiring = wire({
+			parentSessionId: 'child',
+			provider: 'claude',
+			sessionId: 'leaf',
 		});
 
 		expect(wiring.systemPromptAppend).toBe(SUBAGENT_AWARENESS);

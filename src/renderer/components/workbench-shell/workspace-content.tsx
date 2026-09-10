@@ -9,6 +9,7 @@ import { useReviewPanelCommands } from '@/renderer/hooks/workbench-shell/use-rev
 import { useRightSidebarController } from '@/renderer/hooks/workbench-shell/use-right-sidebar-controller';
 import { useRunScriptCommands } from '@/renderer/hooks/workbench-shell/use-run-script-commands';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
+import { useAgentsPanelState } from '@/renderer/state/agents';
 import {
 	useRequestDiffLineReveal,
 	workspaceDirectoryRevealRequestAtom,
@@ -107,6 +108,18 @@ export function WorkspaceWorkbenchContent({
 	const dismissReviewRailSheet = useCallback(() => {
 		setRightSidebarSheetOpen(false);
 	}, [setRightSidebarSheetOpen]);
+	const selectedAgentChatTabId =
+		sessionNavigation.effectiveActiveSession.kind === undefined ||
+		sessionNavigation.effectiveActiveSession.kind === 'chat'
+			? sessionNavigation.effectiveActiveSession.id
+			: null;
+	const agentsPanel = useAgentsPanelState({
+		onDismiss: dismissReviewRailSheet,
+		onRestore: sessionNavigation.restoreSessionTabAsync,
+		onSelect: onSessionTabChange,
+		selectedChatTabId: selectedAgentChatTabId,
+		workspaceId: activeWorkspace.id,
+	});
 	const setDirectoryRevealRequest = useSetAtom(
 		workspaceDirectoryRevealRequestAtom,
 	);
@@ -298,6 +311,7 @@ export function WorkspaceWorkbenchContent({
 							<WorkbenchPanelLayout
 								activeProject={activeProject}
 								activeReviewTab={activeReviewTab}
+								agentsPanel={agentsPanel}
 								activeWorkspace={activeWorkspace}
 								dockActions={dockActions}
 								dockTabId={dockTabId}

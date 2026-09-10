@@ -71,6 +71,8 @@ export interface AgentSessionOpenRequest extends OpenAgentSessionWireRequest {
 	 * lineage (depth, deadlock) guardrails apply. Absent for user-opened sessions.
 	 */
 	parentSessionId?: string | null;
+	/** Marks the trusted synthetic workspace parent used by a terminal harness. */
+	parentSpecies?: 'harness';
 	/**
 	 * Agent runtime the requested model needs, derived in the main process from
 	 * the merged model catalog rather than accepted off the wire. Pins a new
@@ -107,7 +109,8 @@ export type QueueNamingPort = (input: SessionNamingInput) => void;
 
 /**
  * Lineage port — resolves the sessions a given session spawned as sub-agents, so
- * a stop can reach them. Backed by the agent-control origin registry.
+ * a stop can reach them. Production reads validated persisted lineage, including
+ * descendants absent from the live origin registry.
  */
 export type SpawnedChildrenPort = (sessionId: string) => readonly string[];
 
@@ -166,8 +169,8 @@ interface AgentSessionLifecycleOptions {
 	/** Resolves the binary a non-Pi runtime should launch; see {@link ProviderExecutablePort}. */
 	resolveProviderExecutable?: ProviderExecutablePort;
 	/**
-	 * Resolves a session's spawned sub-agents so stopping it stops them too.
-	 * Omitted, a stop reaches only the session it names.
+	 * Resolves a session's durable immediate children so stopping it stops the
+	 * whole persisted tree too. Omitted, a stop reaches only the session it names.
 	 */
 	resolveSpawnedChildren?: SpawnedChildrenPort;
 	sessionSummaryWriter?: SessionSummaryWriter;

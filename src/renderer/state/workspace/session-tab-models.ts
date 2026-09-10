@@ -7,6 +7,7 @@ import {
 	listChatTabSummariesQuery,
 	listChatTabsQuery,
 } from '@/renderer/api/ensemblr-queries';
+import { sessionTabHolderIds } from '@/renderer/lib/agents';
 import type {
 	SessionTabModel,
 	WorkspaceShellModel,
@@ -102,6 +103,29 @@ export function useSessionTabModels({
 		}
 		return map;
 	}, [agentSessions]);
+	const hierarchyByAgentSessionId = useMemo(() => {
+		const chatTabIdBySessionId = sessionTabHolderIds({
+			closedTabs: (closedEntries ?? []).map((entry) => entry.tab),
+			openTabs: openTabs ?? [],
+		});
+		const map = new Map<
+			string,
+			{ depth: 0 | 1 | 2; parentChatTabId: string | null }
+		>();
+		for (const session of agentSessions ?? []) {
+			const lineage = session.lineage;
+			if (!lineage) {
+				continue;
+			}
+			map.set(session.id, {
+				depth: lineage.depth,
+				parentChatTabId: lineage.parentSessionId
+					? (chatTabIdBySessionId.get(lineage.parentSessionId) ?? null)
+					: null,
+			});
+		}
+		return map;
+	}, [agentSessions, closedEntries, openTabs]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: the mappers name untitled tabs and relative times through the i18n singleton, so the language is a real input Biome cannot see.
 	const sessionTabs = useMemo<SessionTabModel[]>(() => {
@@ -112,6 +136,7 @@ export function useSessionTabModels({
 			const model = toSessionTabModel(
 				tab,
 				agentStatusByAgentSessionId.get(tab.agentSessionId ?? ''),
+				hierarchyByAgentSessionId.get(tab.agentSessionId ?? ''),
 			);
 			if (model.kind !== 'terminal') {
 				return model;
@@ -130,6 +155,7 @@ export function useSessionTabModels({
 	}, [
 		agentStatusByAgentSessionId,
 		busyTerminalIds,
+		hierarchyByAgentSessionId,
 		language,
 		openTabs,
 		terminalTitles,
@@ -179,8 +205,14 @@ export function useSessionTabModels({
 	return {
 		// biome-ignore lint/correctness/useExhaustiveDependencies: the mapper names untitled tabs and relative times through the i18n singleton, so the language is a real input Biome cannot see.
 		closedSessions: useMemo<SessionTabModel[]>(
-			() => (closedEntries ?? []).map(toClosedSessionTabModel),
-			[closedEntries, language],
+			() =>
+				(closedEntries ?? []).map((entry) =>
+					toClosedSessionTabModel(
+						entry,
+						hierarchyByAgentSessionId.get(entry.tab.agentSessionId ?? ''),
+					),
+				),
+			[closedEntries, hierarchyByAgentSessionId, language],
 		),
 		effectiveActiveSession,
 		/** True once the tab list has settled, so a bootstrap can trust an empty result. */

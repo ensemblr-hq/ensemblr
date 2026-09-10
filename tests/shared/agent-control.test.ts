@@ -143,7 +143,8 @@ describe('validateArgs', () => {
 		expect(validateArgs('focusDockTab', {}).ok).toBe(false);
 	});
 
-	it('restricts focusPanel to files/changes/checks', () => {
+	it('restricts focusPanel to workspace side-panel tabs', () => {
+		expect(validateArgs('focusPanel', { panel: 'agents' }).ok).toBe(true);
 		expect(validateArgs('focusPanel', { panel: 'files' }).ok).toBe(true);
 		expect(validateArgs('focusPanel', { panel: 'nope' }).ok).toBe(false);
 	});

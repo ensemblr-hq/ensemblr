@@ -17,6 +17,9 @@ export const CONTROL_TOKEN_ENV_KEY = 'ENSEMBLR_CONTROL_TOKEN';
 /** Env var carrying the caller's resolved control role. */
 export const CONTROL_ROLE_ENV_KEY = 'ENSEMBLR_CONTROL_ROLE';
 
+/** Env var carrying validated delegation depth (`0`, `1`, or fail-closed `2`). */
+export const CONTROL_DEPTH_ENV_KEY = 'ENSEMBLR_CONTROL_DEPTH';
+
 /**
  * Env var telling the Pi extension whether the architecture diagram feature is
  * on. The extension registers its own tools and injects its own playbook, so it

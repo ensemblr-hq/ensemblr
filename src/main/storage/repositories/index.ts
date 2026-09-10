@@ -1,3 +1,8 @@
+export type { AgentControlSpawnReservationResult } from './agent-control-spawn-repository.ts';
+export {
+	refundAgentControlSpawn,
+	reserveAgentControlSpawn,
+} from './agent-control-spawn-repository.ts';
 export type {
 	AgentEventRow,
 	AgentEventStream,
@@ -28,6 +33,7 @@ export {
 	createAgentSession,
 	createBranch,
 	createTurn,
+	deleteAgentSession,
 	getAgentSessionBranchById,
 	getAgentSessionById,
 	getTurnById,

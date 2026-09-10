@@ -1133,10 +1133,18 @@ export interface FocusDockTabArgs {
 	workspaceId?: string;
 }
 
-/** Review-panel tabs an agent can focus. */
-export type FocusPanelName = 'files' | 'changes' | 'checks';
+/** Workspace side-panel tabs accepted by both agent-control transports. */
+export const FOCUS_PANEL_NAMES = [
+	'agents',
+	'files',
+	'changes',
+	'checks',
+] as const;
 
-/** Args for `focusPanel`: focus the Files, Changes, or Checks review panel. */
+/** Workspace side-panel tab an agent can focus. */
+export type FocusPanelName = (typeof FOCUS_PANEL_NAMES)[number];
+
+/** Args for `focusPanel`: focus the Agents, Files, Changes, or Checks panel. */
 export interface FocusPanelArgs {
 	panel: FocusPanelName;
 	/** Concierge-only; every other caller may name only its own workspace. */

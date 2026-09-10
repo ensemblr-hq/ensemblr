@@ -1,5 +1,8 @@
+import type { AgentSessionLineage } from '../../agent-control/lineage.ts';
 import type { AgentProviderId } from '../../agent-provider.ts';
+import type { ToolPresentationV1 } from '../../tool-presentation.ts';
 import type {
+	AgentContextUsageWire,
 	AgentEventStreamWire,
 	AgentPersistedEnvelope,
 	AgentSessionStatusWire,
@@ -7,6 +10,7 @@ import type {
 import type { AgentModelCatalog } from './agent-models.ts';
 
 export type {
+	AgentContextUsageWire,
 	AgentEventStreamWire,
 	AgentPersistedEnvelope,
 	AgentPlanLimitStatusWire,
@@ -49,14 +53,35 @@ export interface AgentChatTabWire {
 	workspaceId: string;
 }
 
+/** Unresolved normalized tool call projected into a compact session snapshot. */
+export interface AgentSessionToolActivityWire {
+	input: unknown;
+	name: string;
+	presentation?: ToolPresentationV1 | null;
+	toolCallId: string;
+}
+
+/** Context reading projected into a session snapshot with its freshness source. */
+export interface AgentSessionContextSnapshotWire {
+	reading: 'last-recorded' | 'live';
+	usage: AgentContextUsageWire;
+}
+
 /** Renderer-facing snapshot of an agent session row plus its tab/branch context. */
 export interface AgentSessionSnapshotWire {
+	/** Highest persisted event ordinal incorporated into this activity snapshot. */
+	activityOrdinal?: number;
 	branchId: string;
 	closedAt: string | null;
+	/** Latest valid usage reading, absent on snapshots produced before this field shipped. */
+	contextUsage?: AgentSessionContextSnapshotWire | null;
 	createdAt: string;
+	/** Unresolved live calls only; persisted and closed sessions never expose archived calls. */
+	currentTools?: readonly AgentSessionToolActivityWire[];
 	cwd: string;
 	id: string;
 	label: string | null;
+	lineage?: AgentSessionLineage;
 	model: string | null;
 	openedTabs: readonly AgentChatTabWire[];
 	/**

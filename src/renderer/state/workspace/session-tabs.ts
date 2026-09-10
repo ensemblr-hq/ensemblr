@@ -113,6 +113,7 @@ export function useSessionTabState({
 		chatTabId: string,
 	) => Promise<CloseSessionTabHandlerResult>;
 	closeActiveOrReset: () => void;
+	restoreSessionTabAsync: (chatTabId: string) => Promise<boolean>;
 } {
 	const workspaceId = activeWorkspace.id;
 	const { t } = useTranslation();
@@ -341,18 +342,19 @@ export function useSessionTabState({
 	 * the same conversation is already open, it focuses that tab instead of
 	 * spawning a second PTY against one shared session log.
 	 */
-	const restoreSessionTab = useCallback(
-		(chatTabId: string) => {
-			void restoreChatTab({ chatTabId }).then((result) => {
+	const restoreSessionTabAsync = useCallback(
+		async (chatTabId: string): Promise<boolean> => {
+			try {
+				const result = await restoreChatTab({ chatTabId });
 				const tab = result.tab;
 				if (!tab) {
 					invalidateChatTabs();
-					return;
+					return false;
 				}
 				if (tab.kind !== 'terminal') {
 					invalidateChatTabs();
 					onSessionTabChange(tab.id);
-					return;
+					return true;
 				}
 				resumeRestoredTerminalTab(tab, {
 					claimTab,
@@ -363,7 +365,11 @@ export function useSessionTabState({
 					sessionTabs,
 					workspaceId,
 				});
-			});
+				return true;
+			} catch {
+				invalidateChatTabs();
+				return false;
+			}
 		},
 		[
 			claimTab,
@@ -374,6 +380,12 @@ export function useSessionTabState({
 			sessionTabs,
 			workspaceId,
 		],
+	);
+	const restoreSessionTab = useCallback(
+		(chatTabId: string) => {
+			void restoreSessionTabAsync(chatTabId);
+		},
+		[restoreSessionTabAsync],
 	);
 
 	return {
@@ -395,6 +407,7 @@ export function useSessionTabState({
 		reorderSessionTabs,
 		resolvedActiveChatId,
 		restoreSessionTab,
+		restoreSessionTabAsync,
 		sessionTabs,
 	};
 }

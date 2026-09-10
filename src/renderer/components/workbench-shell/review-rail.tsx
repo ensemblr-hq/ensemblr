@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { type ReactNode, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -13,6 +13,7 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from '@/renderer/components/ui/sheet';
+import type { AgentsPanelProps } from '@/renderer/types/agents';
 import type {
 	DockTabId,
 	ReviewPanelTab,
@@ -27,12 +28,22 @@ import { useWorkbenchLayout } from './shell-contexts';
 /** Everything the review rail renders, in either of the two hosts below. */
 export interface ReviewRailProps {
 	activeReviewTab: ReviewPanelTab;
+	agentsPanel: AgentsPanelProps;
 	activeWorkspace: WorkspaceShellModel;
 	dockActions: WorkbenchDockActions;
 	dockTabId: DockTabId;
 	onDockTabChange: (tab: DockTabId) => void;
 	onFileSearchOpen: () => void;
 	onReviewTabChange: (tab: ReviewPanelTab) => void;
+}
+
+/** Shared right-sidebar frame used by desktop rails and narrow sheets. */
+export function ReviewRailFrame({ children }: { children: ReactNode }) {
+	return (
+		<aside className='flex h-full min-h-0 w-full min-w-0 flex-col bg-card'>
+			{children}
+		</aside>
+	);
 }
 
 /**
@@ -46,6 +57,7 @@ export interface ReviewRailProps {
  */
 export function ReviewRail({
 	activeReviewTab,
+	agentsPanel,
 	activeWorkspace,
 	dockActions,
 	dockTabId,
@@ -57,7 +69,7 @@ export function ReviewRail({
 	const { actions, meta } = useWorkbenchLayout();
 
 	return (
-		<aside className='flex h-full min-h-0 w-full min-w-0 flex-col bg-card'>
+		<ReviewRailFrame>
 			<RightSidebarHeader
 				activeWorkspace={activeWorkspace}
 				onDismiss={onDismiss}
@@ -66,6 +78,7 @@ export function ReviewRail({
 				<ResizablePanel className='min-h-0' defaultSize='62%' minSize='8rem'>
 					<ReviewPanel
 						activeTab={activeReviewTab}
+						agentsPanel={agentsPanel}
 						onFileSearchOpen={onFileSearchOpen}
 						onTabChange={onReviewTabChange}
 						workspace={activeWorkspace}
@@ -93,18 +106,20 @@ export function ReviewRail({
 					/>
 				</ResizablePanel>
 			</ResizablePanelGroup>
-		</aside>
+		</ReviewRailFrame>
 	);
 }
 
-/**
- * Narrow-window host for the review rail: a sheet that slides in over the
- * content when something calls the rail, rather than the resizable panel there
- * is no room for. The width classes carry the primitive's own `data-[side]`
- * modifier so they replace its defaults instead of racing them.
- */
-export function ReviewRailSheet(props: ReviewRailProps) {
-	const { t } = useTranslation();
+/** Shared narrow-window sheet host for right-sidebar presentation. */
+export function ReviewRailSheetHost({
+	children,
+	description,
+	title,
+}: {
+	children: (onDismiss: () => void) => ReactNode;
+	description: string;
+	title: string;
+}) {
 	const { state, actions } = useWorkbenchLayout();
 	const sheetRef = useRef<HTMLDivElement | null>(null);
 	// A press the rail itself consumed is not a press outside the sheet.
@@ -137,21 +152,27 @@ export function ReviewRailSheet(props: ReviewRailProps) {
 				side='right'
 			>
 				<SheetHeader className='sr-only'>
-					<SheetTitle>
-						{t('workbench:review-rail-sheet.title', 'Review sidebar')}
-					</SheetTitle>
-					<SheetDescription>
-						{t(
-							'workbench:review-rail-sheet.description',
-							'Pull request status, files, changes, checks and the terminal area for this workspace.',
-						)}
-					</SheetDescription>
+					<SheetTitle>{title}</SheetTitle>
+					<SheetDescription>{description}</SheetDescription>
 				</SheetHeader>
-				<ReviewRail
-					{...props}
-					onDismiss={() => actions.setRightSidebarSheetOpen(false)}
-				/>
+				{children(() => actions.setRightSidebarSheetOpen(false))}
 			</SheetContent>
 		</Sheet>
+	);
+}
+
+/** Narrow-window host for the review rail and terminal dock. */
+export function ReviewRailSheet(props: ReviewRailProps) {
+	const { t } = useTranslation();
+	return (
+		<ReviewRailSheetHost
+			description={t(
+				'workbench:review-rail-sheet.description',
+				'Pull request status, files, changes, checks and the terminal area for this workspace.',
+			)}
+			title={t('workbench:review-rail-sheet.title', 'Review sidebar')}
+		>
+			{(onDismiss) => <ReviewRail {...props} onDismiss={onDismiss} />}
+		</ReviewRailSheetHost>
 	);
 }

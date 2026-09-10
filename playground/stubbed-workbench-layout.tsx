@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 
 import { SidebarProvider } from '@/renderer/components/ui/sidebar';
@@ -22,35 +22,43 @@ import type { WorkbenchLayoutContextValue } from '@/renderer/types/contexts';
  */
 export function StubbedWorkbenchLayout({
 	children,
+	initialRightSidebarSheetOpen = false,
+	isNarrowViewport = false,
 	isRightSidebarCollapsed = true,
 }: {
 	children: React.ReactNode;
+	initialRightSidebarSheetOpen?: boolean;
+	isNarrowViewport?: boolean;
 	isRightSidebarCollapsed?: boolean;
 }) {
 	const dockPanelRef = useRef<PanelImperativeHandle | null>(null);
 	const rightSidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
+	const [isRightSidebarSheetOpen, setRightSidebarSheetOpen] = useState(
+		initialRightSidebarSheetOpen,
+	);
 
 	const layout = useMemo<WorkbenchLayoutContextValue>(
 		() => ({
 			actions: {
 				collapseRightSidebar: () => undefined,
 				expandDockPanel: () => undefined,
-				expandRightSidebar: () => undefined,
+				expandRightSidebar: () =>
+					isNarrowViewport ? setRightSidebarSheetOpen(true) : undefined,
 				handleDockResize: () => undefined,
 				handleRightSidebarResize: () => undefined,
-				setRightSidebarSheetOpen: () => undefined,
+				setRightSidebarSheetOpen,
 				toggleDockPanel: () => undefined,
 			},
 			meta: { dockPanelRef, rightSidebarPanelRef },
 			state: {
 				initialRightSidebarSize: '34%',
 				isDockCollapsed: false,
-				isNarrowViewport: false,
+				isNarrowViewport,
 				isRightSidebarCollapsed,
-				isRightSidebarSheetOpen: false,
+				isRightSidebarSheetOpen,
 			},
 		}),
-		[isRightSidebarCollapsed],
+		[isNarrowViewport, isRightSidebarCollapsed, isRightSidebarSheetOpen],
 	);
 
 	return (

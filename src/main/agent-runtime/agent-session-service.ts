@@ -88,6 +88,7 @@ import type {
 	SubagentMechanismReader,
 	TurnPreambleResolver,
 } from './session/agent-control-wiring.ts';
+import { projectSessionActivity } from './session/session-activity-snapshot.ts';
 import type { SummaryPersistedListener } from './session/summary-queue.ts';
 import type { SessionSummaryWriter } from './session-summary-writer.ts';
 
@@ -398,11 +399,15 @@ export function createAgentSessionService({
 				// `waitForAgents`) observe streaming → idle, not a stuck `starting`.
 				const freshRow =
 					getAgentSessionById({ database, id: sessionId }) ?? active.row;
-				return toSnapshot({
-					branchId: active.branch.id,
+				return projectSessionActivity({
+					active,
 					database,
-					row: freshRow,
-					runtimeOpen: true,
+					snapshot: toSnapshot({
+						branchId: active.branch.id,
+						database,
+						row: freshRow,
+						runtimeOpen: true,
+					}),
 				});
 			}
 			const row = getAgentSessionById({ database, id: sessionId });
@@ -416,11 +421,15 @@ export function createAgentSessionService({
 			if (!mainBranch) {
 				return null;
 			}
-			return toSnapshot({
-				branchId: mainBranch.id,
+			return projectSessionActivity({
+				active: null,
 				database,
-				row,
-				runtimeOpen: false,
+				snapshot: toSnapshot({
+					branchId: mainBranch.id,
+					database,
+					row,
+					runtimeOpen: false,
+				}),
 			});
 		},
 		listEvents: (branchId) => {
@@ -463,19 +472,33 @@ export function createAgentSessionService({
 					if (!mainBranch) {
 						return null;
 					}
-					return toSnapshot({
-						branchId: mainBranch.id,
+					const active = lifecycle.getActiveSession(row.id);
+					return projectSessionActivity({
+						active,
 						database,
-						openedTabs,
-						row,
-						runtimeOpen: lifecycle.getActiveSession(row.id) !== null,
+						snapshot: toSnapshot({
+							branchId: mainBranch.id,
+							database,
+							openedTabs,
+							row,
+							runtimeOpen: active !== null,
+						}),
 					});
 				})
 				.filter(
 					(snapshot): snapshot is AgentSessionSnapshot => snapshot !== null,
 				);
 		},
-		openSession: lifecycle.openSession,
+		/** Opens a runtime session and enriches its initial persisted snapshot. */
+		openSession: async (request) => {
+			const snapshot = await lifecycle.openSession(request);
+			const database = requireSessionDatabase();
+			return projectSessionActivity({
+				active: lifecycle.getActiveSession(snapshot.id),
+				database,
+				snapshot,
+			});
+		},
 		appendAgentMessage: ({ sessionId, text }) => {
 			const database = requireSessionDatabase();
 			const target = resolveTimelineTarget(database, sessionId);
@@ -706,12 +729,16 @@ export function snapshotToWire(
 		workspaceId: tab.workspaceId,
 	}));
 	return {
+		activityOrdinal: snapshot.activityOrdinal,
 		branchId: snapshot.branchId,
 		closedAt: snapshot.closedAt,
+		contextUsage: snapshot.contextUsage,
 		createdAt: snapshot.createdAt,
+		currentTools: snapshot.currentTools,
 		cwd: snapshot.cwd,
 		id: snapshot.id,
 		label: snapshot.label,
+		lineage: snapshot.lineage,
 		model: snapshot.model,
 		openedTabs: tabs,
 		provider: snapshot.provider,

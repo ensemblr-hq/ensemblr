@@ -10,11 +10,13 @@
  */
 import {
 	type AgentControlRole,
+	type AgentSessionLineage,
 	awarenessForAudience,
 	type SubagentMechanism,
 } from '../../../shared/agent-control.ts';
 import type { AgentProviderId } from '../../../shared/agent-provider.ts';
 import {
+	CONTROL_DEPTH_ENV_KEY,
 	CONTROL_ROLE_ENV_KEY,
 	CONTROL_TOKEN_ENV_KEY,
 	CONTROL_URL_ENV_KEY,
@@ -67,20 +69,16 @@ export type SubAgentMarkerReader = (sessionId: string) => boolean;
  * Resolves the mechanism a session opens under from its lineage, the runtime it
  * is pinned to, and the user's setting.
  *
- * A spawned child takes `ensemblr` whatever the setting says. The setting picks
- * how a *root* fans out, and nested delegation is blocked on every other axis —
- * `SUBAGENT_BLOCKED_OPS` refuses the spawn ops and `SUBAGENT_AWARENESS` says a
- * child never fans out — so letting a child open under `native` would leave the
- * runtime's own sub-agent tool live and route an unbounded fan-out around the
- * depth cap.
+ * A spawned descendant takes `ensemblr` whatever the setting says. The setting
+ * picks how a root fans out; a depth-1 manager's remaining edge must stay in
+ * visible Ensemblr tabs and a depth-2 leaf cannot fan out. Letting either open
+ * under `native` would route delegation around authoritative lineage and caps.
  *
- * Lineage alone cannot say whether a session is a child. `parentSessionId` rides
- * the open request, and a resume carries none, so a child reopened after a
- * restart would read as a root and pick up the user's `native` setting — the
- * exact escape the paragraph above rules out. The durable marker is checked
- * alongside it for the same reason the control layer's role resolution prefers
- * it: it is a column on the chat tab rather than a process fact.
- * @param isSpawnedSubAgent - Reads the durable sub-agent marker, when available.
+ * Persisted lineage is authoritative for production opens and survives a cold
+ * origin registry. The parent request and durable tab marker remain only as a
+ * compatibility fallback for callers that do not supply resolved lineage.
+ * @param isSpawnedSubAgent - Reads the legacy durable sub-agent marker, when available.
+ * @param lineage - Validated persisted lineage, when the caller owns a session row.
  * @param parentSessionId - The session that spawned this one, when any.
  * @param provider - The runtime the session runs on.
  * @param readClaudeSubagentMode - Reads the persisted Claude Code preference.
@@ -89,18 +87,24 @@ export type SubAgentMarkerReader = (sessionId: string) => boolean;
  */
 function resolveDelegation({
 	isSpawnedSubAgent,
+	lineage,
 	parentSessionId,
 	provider,
 	readClaudeSubagentMode,
 	sessionId,
 }: {
 	isSpawnedSubAgent: SubAgentMarkerReader | undefined;
+	lineage?: AgentSessionLineage;
 	parentSessionId: string | null;
 	provider: AgentProviderId;
 	readClaudeSubagentMode: SubagentMechanismReader | undefined;
 	sessionId: string;
 }): SubagentMechanism {
-	if (parentSessionId || isSpawnedSubAgent?.(sessionId) === true) {
+	if (
+		lineage?.depth !== undefined
+			? lineage.depth > 0
+			: parentSessionId || isSpawnedSubAgent?.(sessionId) === true
+	) {
 		return 'ensemblr';
 	}
 	if (!NATIVE_SUBAGENT_PROVIDERS.has(provider) || !readClaudeSubagentMode) {
@@ -143,9 +147,9 @@ function speciesForProvider(provider: AgentProviderId): AgentSpecies {
 }
 
 /**
- * Reads the caller's role back off the overlay. Resolving it needs the durable
- * sub-agent marker and the registry's lineage depth, both of which only the
- * resolver holds, so the resolved answer travels in the record.
+ * Reads the caller's role back off the overlay. Resolving it needs the registry's
+ * validated lineage depth, which only the resolver holds, so the resolved answer
+ * travels in the record.
  * @param env - The control-env overlay, or undefined when control is disabled.
  * @returns The caller's role, orchestrator unless the overlay says otherwise.
  */
@@ -155,6 +159,23 @@ function readControlRole(
 	return env?.[CONTROL_ROLE_ENV_KEY] === SUBAGENT_ROLE
 		? 'subagent'
 		: 'orchestrator';
+}
+
+/**
+ * Reads validated lineage depth from the control overlay. Descendants fail
+ * closed as leaves when an older or malformed resolver omits their depth.
+ * @param env - The control-env overlay, or undefined when control is disabled.
+ * @param role - The already-resolved control role.
+ * @returns Root, manager, or leaf depth for awareness selection.
+ */
+function readControlDepth(
+	env: Record<string, string> | undefined,
+	role: AgentControlRole,
+): 0 | 1 | 2 {
+	if (role !== 'subagent') {
+		return 0;
+	}
+	return env?.[CONTROL_DEPTH_ENV_KEY] === '1' ? 1 : 2;
 }
 
 /**
@@ -188,6 +209,7 @@ function readControlMcp(
  */
 export function resolveAgentControlWiring({
 	isSpawnedSubAgent,
+	lineage,
 	parentSessionId,
 	provider,
 	readArchitectureDiagramEnabled,
@@ -199,6 +221,7 @@ export function resolveAgentControlWiring({
 	workspaceId,
 }: {
 	isSpawnedSubAgent: SubAgentMarkerReader | undefined;
+	lineage?: AgentSessionLineage;
 	parentSessionId: string | null;
 	provider: AgentProviderId;
 	/** Whether the architecture diagram feature is on, for the playbook this session receives. */
@@ -213,6 +236,7 @@ export function resolveAgentControlWiring({
 }): AgentControlWiring {
 	const delegation = resolveDelegation({
 		isSpawnedSubAgent,
+		lineage,
 		parentSessionId,
 		provider,
 		readClaudeSubagentMode,
@@ -220,6 +244,7 @@ export function resolveAgentControlWiring({
 	});
 	const env = resolveAgentControlEnv?.({
 		delegation,
+		lineage,
 		parentSessionId,
 		sessionId,
 		species: speciesForProvider(provider),
@@ -239,6 +264,7 @@ export function resolveAgentControlWiring({
 		};
 	}
 
+	const role = readControlRole(env);
 	return {
 		controlMcp,
 		delegation,
@@ -249,8 +275,9 @@ export function resolveAgentControlWiring({
 		systemPromptAppend: awarenessForAudience({
 			architectureDiagram: readArchitectureDiagramEnabled?.() ?? false,
 			delegation,
+			depth: readControlDepth(env, role),
 			hasChatTab: true,
-			role: readControlRole(env),
+			role,
 			tuiHarnesses: readTuiHarnessesEnabled?.() ?? false,
 		}),
 	};

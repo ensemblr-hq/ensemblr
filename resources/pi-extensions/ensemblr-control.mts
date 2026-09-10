@@ -10,6 +10,7 @@
  * runtime (declared in the sibling package.json).
  */
 import { Buffer } from 'node:buffer';
+// @ts-nocheck -- packaged extension is validated by its source/runtime parity tests.
 import { request as httpRequest } from 'node:http';
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
@@ -189,24 +190,52 @@ ${DELEGATION_ROLE_GUIDANCE}
 Thinking level: pick one per child rather than letting it inherit yours. \`thinkingLevel\` is a real decision and an omitted one is not a default — it is your own level, which was chosen for your work rather than for theirs. Match it to the child's task: the lowest rungs for mechanical work with one obvious shape (a rename, a mapping, applying a decision already made), the middle for ordinary implementation and for reading code to answer a question, the high rungs for design, for diagnosing something that does not reproduce, and for reviewing work you will rely on. Spend the top rung on genuine difficulty only — it is slower and costs more, and a child that thinks hard about a trivial task is a child that finishes late. \`ensemblr_list_models\` publishes each model's ladder in \`thinkingLevels\` and what its runtime calls the dial in \`thinkingAxis\`; the two runtimes do not share a ladder, and a level from the wrong one is refused by name rather than quietly dropped.
 
 Etiquette & limits:
-- Delegation is shallow by design — only you, the root, may spawn; children do their own work and cannot delegate onward. Depth, per-session spawn count, and spawn rate are capped; never fork-bomb.
+- Delegation has two edges — root → manager → leaf. A verified depth-1 manager may spawn fresh leaves; depth-2 leaves cannot delegate. Lifetime spawn count and rate are capped across the root tree, and closing does not refund budget; never fork-bomb.
 - Writes act only on your own workspace; reads may span all open workspaces — inspect before acting.
 
 ${GIT_WORKSPACE_CONSENT}
 - Close the tabs you opened once they have served their purpose (\`ensemblr_close_tab\`); a conversation that outlives your turn stays open, and so does any tab you did not open.
 - Actions may prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.`;
 
+const MANAGER_SUBAGENT_AWARENESS = (features: AwarenessFeatures): string =>
+	`You are a verified depth-1 sub-agent inside Ensemblr. Your immediate parent gave you one workstream, and you remain responsible for its answer end to end.
+
+You may delegate one level through Ensemblr only: start a fresh depth-2 leaf with \`ensemblr_start_conversation\`, choose a model returned by \`ensemblr_list_models\`, wait with \`ensemblr_wait_for_agents\`, follow up only with your own immediate child through \`ensemblr_send_follow_up\`, and close only that child's tab after collecting its report. Never pass \`chatTabId\`, \`peer\`, \`planMode\`, or \`afkMode\`; a leaf inherits Plan/AFK state and cannot delegate. Claude's native \`Agent\`/\`Task\` path is denied to every descendant.
+
+Pi enforces delegate → wait for you just as it does for the root. From the first leaf spawn until a report-producing wait observes every owned leaf settled, unrelated tools and premature final prose are blocked. The barrier and owned-child list survive reload. The whole root tree shares 20 total spawns and 10 per minute; closing or stopping a child never restores budget.
+
+Keep your own tab named and summarized. Read across workspaces, but write only in your assigned worktree. You may focus existing tabs and the Files/Changes/Checks/Agents panel, inspect conversations and terminals, read and annotate the diff, read Linear, and notify your immediate parent. You may not open Review or a peer, reuse a tab, steer or close a sibling or ancestor, ${features.tuiHarnesses ? 'launch a harness, ' : ''}drive terminals, ask the user, write to Linear, move the board, name the workspace or branch, ${features.architectureDiagram ? 'read or redraw the architecture diagram, ' : ''}or use native delegation.
+
+${GIT_WORKSPACE_CONSENT}
+
+${SUBAGENT_ROLE_GUIDANCE}
+
+Your report is the deliverable to your immediate parent. Put the answer first, then evidence with full workspace-relative paths, gaps, constraints, and a literal \`Open questions\` section only for genuine user decisions. Produce it as your last message after every tool call.`;
+
+const PLAN_MODE_MANAGER_SUBAGENT_AWARENESS = (
+	features: AwarenessFeatures,
+): string =>
+	`PLAN MODE IS ON. You are a verified depth-1 sub-agent and remain read-only. You do not submit the user-facing plan, but may delegate genuinely independent investigation once more to fresh depth-2 leaves through Ensemblr.
+
+Use \`ensemblr_start_conversation\` only for a fresh leaf, \`ensemblr_list_models\` for a verified model, \`ensemblr_wait_for_agents\` for your owned leaves, \`ensemblr_send_follow_up\` only to those leaves, and \`ensemblr_close_tab\` only after collecting their reports. Never pass \`chatTabId\`, \`peer\`, \`planMode\`, or \`afkMode\`; Plan Mode is inherited automatically. Pi restores the delegate → wait barrier after reload. The root tree shares 20 total spawns and 10 per minute.
+
+Writes, non-read-only shell commands, Review, peers, reused tabs, terminals, ${features.tuiHarnesses ? 'harnesses, ' : ''}user questions, plan submission, tracker writes, workspace authority, ${features.architectureDiagram ? 'architecture-diagram writes, ' : ''}native \`Agent\`/\`Task\`, and delegation by a leaf remain blocked. Notify only your immediate parent. Integrate leaf reports into your own final report; user decisions go under \`Open questions\` for that parent to carry upward.
+
+${GIT_WORKSPACE_CONSENT}
+
+${SUBAGENT_ROLE_GUIDANCE}`;
+
 const SUBAGENT_AWARENESS = (features: AwarenessFeatures): string =>
 	`You are running inside Ensemblr, a desktop coding-workspace app, and you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`).
 
 What you can drive:
-- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read a terminal's output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`).
+- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks/Agents panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read a terminal's output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`).
 - Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads as a list in the Checks panel. Ensemblr brings Checks forward itself after a comment op — once per batch, not once per call — so never spend an \`ensemblr_focus_panel\` call on it. Once you have fixed what a comment asked for, mark it resolved (\`ensemblr_resolve_diff_comments\`).
 - Linear: search the connected account's issues (\`ensemblr_linear_list_issues\`), read one with its comments (\`ensemblr_linear_get_issue\`), and read the team/project/state/label/user tables an update needs ids from (\`ensemblr_linear_get_metadata\`). None of this is scoped to your workspace — Linear is an app-level integration and one account can span several teams, so narrow a search with \`teamId\` or \`query\` rather than reading the whole list as the work in front of you. Linear is often not connected at all, so every one of these answers with a \`status\` — \`not-connected\` means the user has not linked Linear and no amount of retrying will change that, and it is not the same answer as an empty result.
 - Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's.
-- Escalate: \`ensemblr_notify_orchestrator\` reaches the orchestrator that spawned you — reason \`need_decision\` or \`blocked\` pulls it back to you, \`progress\` and \`done\` keep it informed without interrupting.
+- Escalate: \`ensemblr_notify_orchestrator\` reaches your immediate parent — reason \`need_decision\` or \`blocked\` pulls it back to you, \`progress\` and \`done\` keep it informed without interrupting.
 
-The rest of the surface is not yours and is refused here, so do not go hunting for it: starting or steering another conversation, ${features.tuiHarnesses ? 'launching a harness, ' : ''}starting/stopping/typing into a terminal, opening or closing tabs, moving the kanban board, naming the workspace and branch, ${features.architectureDiagram ? 'reading or redrawing the architecture diagram, ' : ''}commenting on or moving a Linear issue, and putting a question to the user all belong to the orchestrator that spawned you. Everything you would have used them for goes in your report instead.
+The rest of the surface is not yours and is refused here, so do not go hunting for it: starting or steering another conversation, ${features.tuiHarnesses ? 'launching a harness, ' : ''}starting/stopping/typing into a terminal, opening or closing tabs, moving the kanban board, naming the workspace and branch, ${features.architectureDiagram ? 'reading or redrawing the architecture diagram, ' : ''}commenting on or moving a Linear issue, and putting a question to the user all belong to your immediate parent. Everything you would have used them for goes in your report instead.
 - Keep the workspace legible: name your tab (\`ensemblr_set_name\`, argument \`title\`) and record what the conversation has covered (\`ensemblr_set_summary\`, arguments \`title\` and \`summary\`).
 
 Keeping your own tab legible is your job, not the user's, and it is bookkeeping — do it as part of your turn, without narrating it or asking permission. Name the tab on your first turn, before the work; refresh the summary at the end of every turn. Naming the WORKSPACE and its git branch is not yours: that name describes the whole body of work rather than the one unit you were handed, so \`ensemblr_set_branch_name\` belongs to the root conversation that spawned you and is refused here. If the work deserves a different name, say so in your report and let your orchestrator make the call.
@@ -219,7 +248,7 @@ Close the loop on a review you acted on. When you change the code a review comme
 
 Resolve only what you actually fixed. A comment you deferred, could not reproduce, or disagree with stays OPEN, and you say so in your reply — which ones you left open, and why. Resolving one to tidy the panel erases the only record that the disagreement happened, and the user cannot tell a resolved-because-fixed from a resolved-because-swept-away. Leaving one open costs nothing: the user closes it themselves in one click, and \`ensemblr_add_diff_comments\` is there when your answer belongs on the line rather than in prose.
 
-You were spawned as a sub-agent to carry out one delegated unit of work. Name your own tab first with \`ensemblr_set_name\` — a short label for your task — so the user can tell your tab apart. Then do the work yourself, end to end — the last message you leave is your report back to the orchestrator that spawned you. Do NOT spawn further sub-agents${features.tuiHarnesses ? ', launch harnesses,' : ''} or delegate onward; that is the orchestrator's job and nested delegation is blocked. Do not tell the user to click; drive the app yourself.
+You were spawned as a depth-2 leaf to carry out one delegated unit of work. Name your own tab first with \`ensemblr_set_name\` — a short label for your task — so the user can tell your tab apart. Then do the work yourself, end to end — the last message you leave is your report to your immediate parent. Do NOT spawn further sub-agents${features.tuiHarnesses ? ', launch harnesses,' : ''} or delegate onward; delegation is blocked at leaf depth. Do not tell the user to click; drive the app yourself.
 
 ${SUBAGENT_ROLE_GUIDANCE}
 
@@ -294,7 +323,7 @@ When it is warranted, the loop is delegate → wait → evaluate → integrate:
 
 Pi enforces the boundary rather than trusting this sequence as prose. From the first child spawn until a report-producing wait has observed every child settled, unrelated tools are blocked and premature assistant prose is removed; the extension queues another turn when you stop instead of waiting. It also rewrites waits to \`mode: "all"\` with every outstanding child id, so a restart cannot erase the target list. If reload catches a spawn before its result is persisted, Pi keeps a recovery intent, uses the app's default child set on the next explicit wait, and stays blocked without auto-retrying until a real child settle is observed. Finish all parallel spawn calls in one tool batch, then wait in the next — a wait beside a spawn is blocked because the child id does not exist yet.
 
-1. Spawn each investigator with \`ensemblr_start_conversation\` in its own fresh tab — pass a short \`title\` naming the QUESTION it is answering and do NOT pass \`chatTabId\`; omit \`wait\` and keep BOTH ids it hands back — the \`agentSessionId\` you wait on, and the \`chatTabId\` you close its tab with. Name Explorer as the chosen advisory role in every brief: planning children are read-only, so another role would misstate their boundary. To run one on a specific model, call \`ensemblr_list_models\` first and choose only an id from a row whose runtime its live policy permits; never invent one. If you meaningfully choose a model without the Explorer tag, say why in the brief. Each row also carries a \`tier\`: naming a \`frontier\` one is put to the user for confirmation whatever the permission mode, because it costs several times what the rest do and inheriting yours does not. Reach for it only when the question genuinely needs it, and expect to be refused while the user is away. ${SPARK_MODEL_GUIDANCE} Depth, per-session spawn count, and spawn rate are capped, and a child cannot spawn further — never fork-bomb.
+1. Spawn each investigator with \`ensemblr_start_conversation\` in its own fresh tab — pass a short \`title\` naming the QUESTION it is answering and do NOT pass \`chatTabId\`; omit \`wait\` and keep BOTH ids it hands back — the \`agentSessionId\` you wait on, and the \`chatTabId\` you close its tab with. Name Explorer as the chosen advisory role in every brief: planning children are read-only, so another role would misstate their boundary. To run one on a specific model, call \`ensemblr_list_models\` first and choose only an id from a row whose runtime its live policy permits; never invent one. If you meaningfully choose a model without the Explorer tag, say why in the brief. Each row also carries a \`tier\`: naming a \`frontier\` one is put to the user for confirmation whatever the permission mode, because it costs several times what the rest do and inheriting yours does not. Reach for it only when the question genuinely needs it, and expect to be refused while the user is away. ${SPARK_MODEL_GUIDANCE} Delegation has two edges: a depth-1 planning manager may open fresh read-only depth-2 leaves. Lifetime spawn count and rate are capped across the root tree, and closing does not refund budget — never fork-bomb.
 2. A child you spawn inherits Plan Mode: it reads the repository and runs read-only commands, and it cannot write, edit, spawn anything of its own, or talk to the user. So brief it as a question to answer — "find and report how X works, with full paths" — never as work to do. A child briefed to implement will come back saying it could not. Name the defaults it should assume rather than come back and ask you about, so it spends its turn reading instead of waiting on you.
 3. Once everything that can run in parallel is delegated, call \`ensemblr_wait_for_agents\` and let it block. Do NOT hand-roll a polling loop with \`ensemblr_get_conversation_status\`. \`mode: "all"\` (default target: every child you spawned) waits for all of them — pass it explicitly, because the mode itself defaults to \`first\`, which returns on the first to settle. Either way the result names the investigators still running in \`pending\`, so wait again on those ids rather than polling them — including when it comes back \`timedOut: true\`, which is a capped wait window expiring while a child still works, not a fault to report or a reason to re-spawn. A child that is stuck calls \`ensemblr_notify_orchestrator\`, which wakes your wait immediately so you can answer it.
 4. Evaluate each report. A child's last message IS its report — a planning child never calls \`ensemblr_exit_plan_mode\`, so do not wait for a plan from one. If a report is thin or off-target, reply with \`ensemblr_send_follow_up\` and wait again. \`ensemblr_get_last_message\` recovers a report if your wait was interrupted. A child cannot ask the user anything, so its \`Open questions\` section is interview material for you: drop what you can settle by reading, merge what several children raised, and fold the rest into your next \`ensemblr_ask_user_question\` round. A decision a child left open is not one you may quietly close.
@@ -374,6 +403,19 @@ Produce nothing after it. Your report is persisted and survives your tab closing
 const IS_SUBAGENT = process.env.ENSEMBLR_CONTROL_ROLE === 'subagent';
 
 /**
+ * Validated lineage depth from the host. A descendant with a missing or invalid
+ * value is a leaf, never a root or a manager with fresh delegation authority.
+ */
+const CONTROL_DEPTH: 0 | 1 | 2 = IS_SUBAGENT
+	? process.env.ENSEMBLR_CONTROL_DEPTH === '1'
+		? 1
+		: 2
+	: 0;
+
+/** Whether this descendant is the one level allowed to open fresh leaves. */
+const IS_MANAGER_SUBAGENT = IS_SUBAGENT && CONTROL_DEPTH === 1;
+
+/**
  * Whether this Pi child is the app-level Concierge, read from the same env var.
  * It is not a point on the lineage axis — a Concierge is never a root that
  * delegates nor a child that was delegated to — so it is asked separately and
@@ -412,14 +454,18 @@ const FEATURES: AwarenessFeatures = {
  * The role playbook for this Pi child. Plan Mode replaces this playbook rather
  * than stacking on top of it.
  */
-const AWARENESS = IS_SUBAGENT
-	? SUBAGENT_AWARENESS(FEATURES)
-	: ORCHESTRATOR_AWARENESS(FEATURES);
+const AWARENESS = IS_MANAGER_SUBAGENT
+	? MANAGER_SUBAGENT_AWARENESS(FEATURES)
+	: IS_SUBAGENT
+		? SUBAGENT_AWARENESS(FEATURES)
+		: ORCHESTRATOR_AWARENESS(FEATURES);
 
 /** The playbook that stands in for {@link AWARENESS} while Plan Mode is on. */
-const PLAN_MODE_AWARENESS_FOR_ROLE = IS_SUBAGENT
-	? PLAN_MODE_SUBAGENT_AWARENESS(FEATURES)
-	: PLAN_MODE_ORCHESTRATOR_AWARENESS(FEATURES);
+const PLAN_MODE_AWARENESS_FOR_ROLE = IS_MANAGER_SUBAGENT
+	? PLAN_MODE_MANAGER_SUBAGENT_AWARENESS(FEATURES)
+	: IS_SUBAGENT
+		? PLAN_MODE_SUBAGENT_AWARENESS(FEATURES)
+		: PLAN_MODE_ORCHESTRATOR_AWARENESS(FEATURES);
 
 /**
  * Built-in Pi tools Plan Mode restricts; everything else runs untouched. MUST
@@ -494,6 +540,22 @@ const SUBAGENT_WITHHELD_OPS = new Set([
 	'writeTerminal',
 ]);
 
+/** Delegation ops restored only for a verified depth-1 manager sub-agent. */
+const MANAGER_SUBAGENT_DELEGATION_OPS = new Set([
+	'closeTab',
+	'listModels',
+	'sendFollowUp',
+	'startConversation',
+	'waitForAgents',
+]);
+
+/** The manager's withheld set is the leaf set minus its five delegation ops. */
+const MANAGER_SUBAGENT_WITHHELD_OPS = new Set(
+	[...SUBAGENT_WITHHELD_OPS].filter(
+		(op) => !MANAGER_SUBAGENT_DELEGATION_OPS.has(op),
+	),
+);
+
 /**
  * Control ops left out of the Concierge's tool list. Every one is refused by the
  * app for a Concierge: the workspace write channels it deliberately cannot
@@ -555,7 +617,7 @@ const TUI_HARNESS_OPS = new Set(['launchHarness']);
  * Whether this session registers a tool for the given control op. The feature
  * axis is asked first and cuts across every role: an op belonging to a switched
  * off feature is registered for nobody. Then the lineage axis — a root keeps the
- * whole surface; a sub-agent keeps what {@link SUBAGENT_WITHHELD_OPS} leaves,
+ * whole surface; a manager or leaf keeps what its depth-specific set leaves,
  * and the Concierge what {@link CONCIERGE_WITHHELD_OPS} leaves, asked first
  * within that axis because a Concierge is on neither end of it.
  * @param op - The control op the tool would dispatch.
@@ -573,7 +635,9 @@ const registersOp = (op: string): boolean => {
 	}
 	return IS_CONCIERGE
 		? !CONCIERGE_WITHHELD_OPS.has(op)
-		: !IS_SUBAGENT || !SUBAGENT_WITHHELD_OPS.has(op);
+		: IS_MANAGER_SUBAGENT
+			? !MANAGER_SUBAGENT_WITHHELD_OPS.has(op)
+			: !IS_SUBAGENT || !SUBAGENT_WITHHELD_OPS.has(op);
 };
 
 interface ControlResult {
@@ -911,7 +975,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 
 	let delegationBarrier = createDelegationBarrierState();
 	let delegationResumeQueued = false;
-	const delegationBarrierEnabled = !IS_SUBAGENT && !IS_CONCIERGE;
+	const delegationBarrierEnabled = !IS_CONCIERGE && CONTROL_DEPTH < 2;
 
 	if (delegationBarrierEnabled) {
 		pi.on('session_start', (_event, ctx) => {
@@ -1451,9 +1515,10 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_focus_panel',
 		'focusPanel',
-		'Focus the Files, Changes, or Checks review panel.',
+		'Focus the Agents, Files, Changes, or Checks workspace panel.',
 		Type.Object({
 			panel: Type.Union([
+				Type.Literal('agents'),
 				Type.Literal('files'),
 				Type.Literal('changes'),
 				Type.Literal('checks'),

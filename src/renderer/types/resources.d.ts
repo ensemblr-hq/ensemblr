@@ -2517,6 +2517,47 @@ export default interface Resources {
 				'token-cost': 'AFK mode is token-intensive and can use substantially more tokens than attended work.';
 			};
 		};
+		agents: {
+			activity: {
+				parallel_one: '+{{count}} parallel';
+				parallel_other: '+{{count}} parallel';
+			};
+			'closed-heading': 'Closed';
+			'closed-section': 'Closed conversations';
+			context: {
+				label: 'Context';
+				'last-recorded': 'Last recorded: {{used}} of {{max}} tokens';
+				live: '{{used}} of {{max}} tokens';
+				unavailable: 'Context unavailable';
+			};
+			empty: 'No agent conversations yet.';
+			error: 'Could not load agent conversations.';
+			label: 'Agents';
+			loading: 'Loading agent conversations…';
+			model: {
+				unavailable: 'Model unavailable';
+			};
+			'no-open': 'No open conversations.';
+			'open-section': 'Open conversations';
+			restore: {
+				action: 'Restore';
+				failed: 'Restore failed. Try again.';
+				pending: 'Restoring…';
+			};
+			retry: 'Retry';
+			row: {
+				'closed-parent': 'Closed parent chat';
+				open: 'Open {{title}}';
+				parent: 'Parent chat: {{title}}';
+				restore: 'Restore {{title}}';
+			};
+			status: {
+				blocked: 'Blocked';
+				closed: 'Closed';
+				idle: 'Idle';
+				working: 'Working';
+			};
+		};
 		'all-files': {
 			empty: {
 				message: 'Files appear here as soon as they are created.';

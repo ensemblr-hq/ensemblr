@@ -14,6 +14,7 @@ export {
 export {
 	CONTROL_ARCHITECTURE_ENABLED,
 	CONTROL_ARCHITECTURE_ENV_KEY,
+	CONTROL_DEPTH_ENV_KEY,
 	CONTROL_ROLE_ENV_KEY,
 	CONTROL_TOKEN_ENV_KEY,
 	CONTROL_TUI_HARNESSES_ENABLED,
@@ -34,6 +35,7 @@ export {
 	DEFAULT_GUARDRAIL_CONFIG,
 	type GuardrailConfig,
 	type Guardrails,
+	type SpawnReservation,
 } from './guardrails.ts';
 export {
 	buildHarnessLaunchDecoration,
@@ -92,5 +94,10 @@ export {
 	REVIEW_BRIEF_TIMEOUT_MS,
 	type ReviewLaunchCoordinator,
 } from './review-launch.ts';
+export {
+	establishAgentSessionLineage,
+	listImmediateAgentSessionChildren,
+	resolveAgentSessionLineage,
+} from './session-lineage.ts';
 export { isSessionTabMarkedSubAgent } from './sub-agent-marker.ts';
 export { readWorkspaceLinkedIssue } from './workspace-linked-issue.ts';

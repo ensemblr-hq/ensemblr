@@ -54,9 +54,12 @@ function createFileTab(id: string, isPreview: boolean): SessionTabModel {
  * @param isPreview - Whether the file tab holds the preview slot
  * @returns The render result and the ids the strip asked to pin
  */
-function renderStrip(isPreview: boolean) {
+function renderStrip(
+	isPreview: boolean,
+	previewTab = createFileTab('preview', isPreview),
+) {
 	const pinned: string[] = [];
-	const sessions = [createChatTab('chat'), createFileTab('preview', isPreview)];
+	const sessions = [createChatTab('chat'), previewTab];
 	const rendered = renderWithProviders(
 		<SessionTabs
 			activeSession={sessions[1]}
@@ -85,6 +88,14 @@ beforeEach(() => {
 
 afterEach(() => {
 	clearEnsemblrApi();
+});
+
+test('never italicizes chat labels even with a stale preview flag', () => {
+	const { getByText } = renderStrip(true, {
+		...createChatTab('Review agent'),
+		isPreview: true,
+	});
+	expect(getByText('Review agent')).not.toHaveClass('italic');
 });
 
 test('renders a preview tab label in italics', () => {

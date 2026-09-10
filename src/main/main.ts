@@ -59,8 +59,10 @@ import {
 	createOriginRegistry,
 	createReviewLaunchCoordinator,
 	isSessionTabMarkedSubAgent,
+	listImmediateAgentSessionChildren,
 	makeReviewBriefFallback,
 	readWorkspaceLinkedIssue,
+	resolveAgentSessionLineage,
 	startControlServer,
 } from './agent-control';
 import {
@@ -613,7 +615,11 @@ const broadcastRawFrame = (sample: {
 // per-workspace token plus the server URL so its control tools can call back.
 // ---------------------------------------------------------------------------
 const agentControlOriginRegistry = createOriginRegistry();
-const agentControlGuardrails = createGuardrails();
+const agentControlGuardrails = createGuardrails(
+	{},
+	() => Date.now(),
+	() => requireOpenDatabase(),
+);
 let agentControlServer: ControlServer | null = null;
 // Assigned once its delegating services exist (below); the pi event sink is
 // wired before that point, so it reads this ref lazily to release a session's
@@ -662,6 +668,13 @@ const {
 	readCoAuthorEnabled,
 	readSkillPluginDirectories: () => readAgentSkillBundle().pluginDirectories,
 	readTuiHarnessesEnabled,
+	/** Resolves durable lineage before a native runtime receives control authority. */
+	resolveSessionLineage: (sessionId) => {
+		const database = databaseService.getConnection()?.database;
+		return database
+			? resolveAgentSessionLineage({ database, sessionId })
+			: { depth: 2, parentSessionId: null, rootSessionId: null };
+	},
 	/** Resolves a workspace's checkout path, or null before the database is open. */
 	resolveWorkspaceCwd: (workspaceId) => {
 		const database = databaseService.getConnection()?.database;
@@ -909,7 +922,7 @@ const agentSessionService = createAgentSessionService({
 		broadcastToAllWindows(IPC_CHANNELS.agentControlTabsChanged, {
 			workspaceId,
 		}),
-	/** Keeps a resumed child on `ensemblr`, whose lineage a restart forgot. */
+	/** Keeps legacy marked children narrowed when no lineage record can be recovered. */
 	isSpawnedSubAgent: readSubAgentMarker,
 	queueNaming: sessionNamingQueue,
 	readArchitectureDiagramEnabled,
@@ -925,9 +938,12 @@ const agentSessionService = createAgentSessionService({
 	/** Renders this turn's naming upkeep for runtimes the app prompts directly. */
 	resolveTurnPreamble: async (sessionId) =>
 		(await agentControlService?.readTurnPreamble(sessionId)) ?? null,
-	/** Live sub-agents of a session, so stopping an orchestrator stops its children. */
+	/** Durable immediate children, including stopped sessions absent from the live registry. */
 	resolveSpawnedChildren: (sessionId) =>
-		agentControlOriginRegistry.childrenOf(sessionId),
+		listImmediateAgentSessionChildren({
+			database: requireOpenDatabase(),
+			parentSessionId: sessionId,
+		}),
 	sessionSummaryWriter,
 });
 const localRepositoryRegistrationService =

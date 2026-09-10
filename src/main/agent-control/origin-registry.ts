@@ -3,12 +3,15 @@
  * a session here, minting a secret token the bridges inject into the agent's
  * environment. Inbound commands carry only that token; the registry resolves it
  * back to the trusted {@link AgentControlOrigin}, so agent-supplied identity is
- * never believed. Lineage (parent + depth) is derived here for the guardrails.
+ * never believed. Native conversations arrive with validated persisted lineage;
+ * only non-persisted harness and Concierge origins use the registry fallback.
  */
 import { randomUUID } from 'node:crypto';
 
-import type { SubagentMechanism } from '../../shared/agent-control.ts';
-import { spawnedChildRole } from '../../shared/agent-control.ts';
+import type {
+	AgentSessionLineage,
+	SubagentMechanism,
+} from '../../shared/agent-control.ts';
 import type { AgentControlOrigin, AgentSpecies } from './ports.ts';
 
 /** Details supplied when registering a freshly spawned agent session. */
@@ -22,6 +25,8 @@ export interface RegisterOriginInput {
 	species: AgentSpecies;
 	/** Session id of the agent that spawned this one, when any. */
 	parentSessionId?: string | null;
+	/** Durable lineage resolved from persistence before runtime creation. */
+	lineage?: AgentSessionLineage;
 	/**
 	 * Delegation mechanism this session opened under. Pinned at registration
 	 * rather than read per request: a runtime fixes its own deny list at session
@@ -79,21 +84,39 @@ export function createOriginRegistry(
 	const byToken = new Map<string, AgentControlOrigin>();
 	const bySession = new Map<string, AgentControlOrigin>();
 
-	// A Concierge parent does not spend depth: what it opens is a root
-	// orchestrator with its own delegation budget, not a sub-agent of the
-	// Concierge. Counting it as depth 1 would hand the child the sub-agent policy
-	// and strip the fan-out that is the whole point of putting it there. The
-	// exemption is `spawnedChildRole`'s to grant rather than this function's, so
-	// the marker the spawn path writes cannot decide it differently.
-	const resolveDepth = (parentSessionId: string | null): number => {
-		if (!parentSessionId) {
-			return 0;
+	/** Resolves fallback lineage for non-persisted harness and Concierge origins. */
+	const resolveFallbackLineage = (
+		input: RegisterOriginInput,
+	): AgentSessionLineage => {
+		const parentSessionId = input.parentSessionId ?? null;
+		if (input.concierge || !parentSessionId) {
+			return {
+				depth: 0,
+				parentSessionId: null,
+				rootSessionId: input.sessionId,
+			};
 		}
 		const parent = bySession.get(parentSessionId);
-		if (!parent || spawnedChildRole(parent) === 'orchestrator') {
-			return 0;
+		if (parent?.concierge) {
+			return {
+				depth: 0,
+				parentSessionId: null,
+				rootSessionId: input.sessionId,
+			};
 		}
-		return parent.depth + 1;
+		if (
+			!parent ||
+			parent.workspaceId !== input.workspaceId ||
+			parent.rootSessionId === null ||
+			parent.depth >= 2
+		) {
+			return { depth: 2, parentSessionId, rootSessionId: null };
+		}
+		return {
+			depth: (parent.depth + 1) as 1 | 2,
+			parentSessionId,
+			rootSessionId: parent.rootSessionId,
+		};
 	};
 
 	const register = (input: RegisterOriginInput): AgentControlOrigin => {
@@ -101,7 +124,7 @@ export function createOriginRegistry(
 		if (existing) {
 			return existing;
 		}
-		const parentSessionId = input.parentSessionId ?? null;
+		const lineage = input.lineage ?? resolveFallbackLineage(input);
 		const origin: AgentControlOrigin = {
 			token: generateToken(),
 			sessionId: input.sessionId,
@@ -109,8 +132,9 @@ export function createOriginRegistry(
 			concierge: input.concierge ?? false,
 			retired: false,
 			workspaceCwd: input.workspaceCwd,
-			parentSessionId,
-			depth: resolveDepth(parentSessionId),
+			parentSessionId: lineage.parentSessionId,
+			rootSessionId: lineage.rootSessionId,
+			depth: lineage.depth,
 			species: input.species,
 			delegation: input.delegation ?? 'ensemblr',
 		};

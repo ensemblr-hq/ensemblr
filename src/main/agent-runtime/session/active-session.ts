@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
+import type { AgentActivityState } from '../../../shared/agent-activity.ts';
 import type {
 	AgentSessionBranchRow,
 	AgentSessionRow,
@@ -11,6 +12,8 @@ import type { AgentContextUsage, AgentSubscription } from '../agent-types.ts';
 /** Live binding between a persisted agent session row and a runtime AgentSession. */
 export interface ActiveSession {
 	activeTurnId: string | null;
+	/** Compact unresolved-tool projection, created when the first relevant event arrives. */
+	activity?: AgentActivityState;
 	agentResponsePendingSummary: boolean;
 	branch: AgentSessionBranchRow;
 	chatTabId: string;
