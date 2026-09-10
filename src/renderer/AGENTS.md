@@ -67,9 +67,12 @@ These instructions apply to everything under `src/renderer/`.
 - `i18n.t()` is for `lib/` only. Anything reachable from a component or a hook
   must use `useTranslation()`, or it will not re-render when the language
   changes.
-- Never hand-edit `lib/i18n/locales/**`. Run `npm run i18n:extract` and then
-  `npm run i18n:types` after adding keys; `npm run i18n:status` reports
-  per-locale completion.
+- Never hand-edit `lib/i18n/locales/en/**`; change the English default at its
+  `t()` call site and run `npm run i18n:extract`. The extractor generates the
+  key skeletons for `lib/i18n/locales/ru/**` and `lib/i18n/locales/el/**`, but
+  their translation values are hand-filled there, not generated from call sites.
+  Fill new values after extraction, then run `npm run i18n:types` and
+  `npm run i18n:status` to confirm per-locale completion.
 - Plurals pass `count` with `defaultValue_one` / `defaultValue_other`. Never
   concatenate a plural — Russian has four categories and changes the verb too.
   One `t()` call pluralises exactly one noun; a sentence with two countable
