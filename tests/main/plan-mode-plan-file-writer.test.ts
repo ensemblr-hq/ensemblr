@@ -9,12 +9,17 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
 	createPlanFileWriter,
 	type WritePlanFileInput,
 } from '../../src/main/plan-mode/plan-file-writer.ts';
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('node:fs/promises')>();
+	return { ...actual, readFile: vi.fn(actual.readFile), rm: vi.fn(actual.rm) };
+});
 
 const CREATED_AT = new Date('2026-07-28T14:32:07.000Z');
 
@@ -75,6 +80,8 @@ Old body
 `;
 
 afterEach(async () => {
+	vi.mocked(readFile).mockReset();
+	vi.mocked(rm).mockReset();
 	await Promise.all(
 		temporaryDirectories
 			.splice(0)
@@ -142,6 +149,46 @@ describe('createPlanFileWriter', () => {
 		expect(contents).toContain('Refined steps');
 		expect(contents).not.toContain('1. Do the thing');
 	});
+
+	it('continues saving when a candidate disappears after the directory listing', async () => {
+		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+		const writer = createWriter();
+		const relativePath = await writer.writePlanFile(makeInput(workspaceCwd));
+		const absolutePath = path.join(workspaceCwd, relativePath);
+		vi.mocked(readFile).mockImplementationOnce(async () => {
+			await rm(absolutePath);
+			throw Object.assign(new Error('candidate removed'), { code: 'ENOENT' });
+		});
+
+		await expect(
+			writer.writePlanFile(makeInput(workspaceCwd, { plan: 'Updated plan' })),
+		).resolves.toBe(relativePath);
+		expect(await readFile(absolutePath, 'utf8')).toContain('Updated plan');
+		expect(await readdir(plansDirectory(workspaceCwd))).toEqual([
+			path.basename(relativePath),
+		]);
+	});
+
+	it.each(['EACCES', 'EPERM', 'EIO'])(
+		'rejects %s candidate read failures without creating another plan',
+		async (code) => {
+			const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+			const writer = createWriter();
+			const relativePath = await writer.writePlanFile(makeInput(workspaceCwd));
+			const absolutePath = path.join(workspaceCwd, relativePath);
+			const originalContents = await readFile(absolutePath, 'utf8');
+			const error = Object.assign(new Error('candidate unreadable'), { code });
+			vi.mocked(readFile).mockRejectedValueOnce(error);
+
+			await expect(
+				writer.writePlanFile(makeInput(workspaceCwd, { plan: 'Unsaved plan' })),
+			).rejects.toBe(error);
+			expect(await readFile(absolutePath, 'utf8')).toBe(originalContents);
+			expect(await readdir(plansDirectory(workspaceCwd))).toEqual([
+				path.basename(relativePath),
+			]);
+		},
+	);
 
 	it('serializes overlapping writes for the same plan identity', async () => {
 		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
@@ -340,24 +387,54 @@ describe('createPlanFileWriter', () => {
 		).toContain('Refined across batches');
 	});
 
-	it('keeps the previous plan intact when a refinement write fails', async () => {
+	it('returns the saved plan path even when temporary-file cleanup fails', async () => {
 		const workspaceCwd = await makeTemporaryDirectory('plan-writer');
-		const relativePath = await createWriter().writePlanFile(
-			makeInput(workspaceCwd),
+		const writer = createWriter();
+		const relativePath = await writer.writePlanFile(makeInput(workspaceCwd));
+		vi.mocked(rm).mockRejectedValueOnce(
+			Object.assign(new Error('cleanup denied'), { code: 'EACCES' }),
 		);
-		const absolutePath = path.join(workspaceCwd, relativePath);
-		const originalContents = await readFile(absolutePath, 'utf8');
-		const failingWriter = createPlanFileWriter({
-			writeFile: () => Promise.reject(new Error('disk full')),
-		});
 
 		await expect(
-			failingWriter.writePlanFile(
-				makeInput(workspaceCwd, { plan: 'Unsaved refinement' }),
+			writer.writePlanFile(
+				makeInput(workspaceCwd, { plan: 'Saved refinement' }),
 			),
-		).rejects.toThrow('disk full');
-		expect(await readFile(absolutePath, 'utf8')).toBe(originalContents);
+		).resolves.toBe(relativePath);
+		expect(
+			await readFile(path.join(workspaceCwd, relativePath), 'utf8'),
+		).toContain('Saved refinement');
+		expect(await readdir(plansDirectory(workspaceCwd))).toEqual([
+			path.basename(relativePath),
+		]);
 	});
+
+	it.each([false, true])(
+		'preserves the original write failure and plan (cleanup fails: %s)',
+		async (cleanupFails) => {
+			const workspaceCwd = await makeTemporaryDirectory('plan-writer');
+			const relativePath = await createWriter().writePlanFile(
+				makeInput(workspaceCwd),
+			);
+			const absolutePath = path.join(workspaceCwd, relativePath);
+			const originalContents = await readFile(absolutePath, 'utf8');
+			const failingWriter = createPlanFileWriter({
+				writeFile: () => Promise.reject(new Error('disk full')),
+			});
+			if (cleanupFails) {
+				vi.mocked(rm).mockRejectedValueOnce(new Error('cleanup denied'));
+			}
+
+			await expect(
+				failingWriter.writePlanFile(
+					makeInput(workspaceCwd, { plan: 'Unsaved refinement' }),
+				),
+			).rejects.toThrow('disk full');
+			expect(await readFile(absolutePath, 'utf8')).toBe(originalContents);
+			expect(rm).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), {
+				force: true,
+			});
+		},
+	);
 
 	it('does not follow a colliding plan-file symlink', async () => {
 		const workspaceCwd = await makeTemporaryDirectory('plan-writer');

@@ -205,7 +205,7 @@ function parsePlanMetadata(contents: string): PlanFileMetadata | null {
  * @param directory - Validated plans directory.
  * @param fileName - Markdown filename to inspect.
  * @param input - Identity to match.
- * @returns The matching plan candidate, or null.
+ * @returns The matching plan candidate, or null for a missing or unrelated file.
  */
 async function readPlanCandidate(
 	directory: string,
@@ -213,7 +213,16 @@ async function readPlanCandidate(
 	input: WritePlanFileInput,
 ): Promise<ExistingPlanFile | null> {
 	const filePath = path.join(directory, fileName);
-	const metadata = parsePlanMetadata(await readFile(filePath, 'utf8'));
+	let contents: string;
+	try {
+		contents = await readFile(filePath, 'utf8');
+	} catch (error) {
+		if (!hasErrorCode(error, 'ENOENT')) {
+			throw error;
+		}
+		return null;
+	}
+	const metadata = parsePlanMetadata(contents);
 	return metadata?.agentSessionId === input.agentSessionId &&
 		metadata.workspaceId === input.workspaceId
 		? { createdAt: metadata.createdAt, filePath }
@@ -287,6 +296,7 @@ function renderPlan(input: WritePlanFileInput, createdAt: string): string {
 
 /**
  * Replaces an existing plan only after its complete successor is on disk.
+ * Cleanup failures are logged without changing the replacement outcome.
  * @param filePath - Original plan path to preserve.
  * @param contents - Refined plan document.
  * @param writeExclusive - Exclusive temporary-file writer.
@@ -304,7 +314,9 @@ async function replacePlanFile(
 		await writeExclusive(temporaryPath, contents);
 		await rename(temporaryPath, filePath);
 	} finally {
-		await rm(temporaryPath, { force: true });
+		await rm(temporaryPath, { force: true }).catch((error: unknown) => {
+			console.warn('[plan-mode] failed to remove temporary plan file', error);
+		});
 	}
 }
 
