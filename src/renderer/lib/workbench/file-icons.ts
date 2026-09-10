@@ -142,6 +142,10 @@ export function getWorkspaceFileIconName(
 		return `${iconPrefix}:${iconName}`;
 	}
 
+	if (file.name === '.env' || file.name.startsWith('.env.')) {
+		return `${iconPrefix}:file-type-dotenv`;
+	}
+
 	const iconName =
 		fileIconByName[file.name] ??
 		fileIconByExtension[getFileExtension(file.name)] ??
