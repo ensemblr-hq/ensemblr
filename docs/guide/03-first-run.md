@@ -95,13 +95,14 @@ it: **`~/Ensemblr`**, unless a config file says otherwise.
 ![Settings → General scrolled to the Ensemblr root directory row, with its Browse button and the resolved path below.](./images/03-root-directory.png)
 
 The root directory is where Ensemblr keeps everything it manages on your behalf.
-Inside it, three subdirectories:
+Inside it, four subdirectories:
 
-```
+```text
 ~/Ensemblr/
 ├── repos/               # cloned repositories, one folder per project
 ├── workspaces/          # git worktrees, one folder per workspace
-└── archived-contexts/   # handoff files preserved from archived workspaces
+├── archived-contexts/   # handoff files preserved from archived workspaces
+└── concierge/           # the Concierge's memory and artifacts
 ```
 
 To use a different location, go to **Settings → General → Ensemblr root
@@ -112,11 +113,11 @@ actions.
 **Use a dedicated, empty directory.** Ensemblr treats the root as its own and
 tells you when it is not:
 
-- **Unmanaged top-level content** — anything in the root other than the three
+- **Unmanaged top-level content** — anything in the root other than the four
   managed directories (and `.DS_Store`) is reported as an error, and Ensemblr
   declines to create its subdirectories there. Pointing the root at your
   existing `~/Projects` folder will fail this way.
-- **Shared or previously used root** — if one of the three managed directories
+- **Shared or previously used root** — if one of the four managed directories
   already has content in it, you get a warning naming which. That is the
   expected state when you re-point Ensemblr at a root it used before, and the
   wrong state when two installs are quietly sharing one.
@@ -130,11 +131,14 @@ Past the wizard, the workbench opens on the welcome screen with three ways in:
 | Action | What it does |
 | --- | --- |
 | **Open GitHub project** | Clone a repo from GitHub. Lists your repositories via `gh`, or takes a URL you paste. |
-| **Open project** | Point at a git repository already on your disk. Ensemblr clones its tracked files into the managed `repos/` folder — your original is left alone. |
+| **Open project** | Register a git repository already on your disk in place. Its workspaces become worktrees of that repository under the managed `workspaces/` folder. |
 | **Quick start** | Create a new folder, initialize a fresh git repository in it, and publish it to GitHub as a **private** repository via `gh`. |
 
-All three land the project under `repos/` in your root directory and open its
-first workspace.
+All three open the project's first workspace. `repos/` is the default
+repository location. **Open GitHub project** can override it with **Location**,
+and **Quick start** can override it with **Parent folder**; those choices keep
+the repository at the selected path. **Open project** always keeps the
+repository at the path you selected.
 
 **Quick start can publish into an organization, not just your own account.** The
 dialog offers a **GitHub owner** picker listing every account you can create a
@@ -154,10 +158,9 @@ are warned and the local project still survives.
 
 ![The create-workspace dialog, with Pull requests, Branches, and Issues source tabs above a searchable list and a repository picker.](./images/03-create-workspace.png)
 
-Opening a local project is not an in-place adoption: Ensemblr copies the tracked
-git files into its own managed location, so the folder you selected stays where
-it is and is not touched. Large repositories with deep history can take a minute
-or two.
+Opening a local project does not clone or move it. Workspaces share its git
+object store and history, but have separate working trees and checked-out
+branches. Keep the registered repository available: its worktrees depend on it.
 
 ## Creating your first workspace
 
@@ -180,16 +183,18 @@ issues by number, title, or description.
 
 ## What just happened on disk
 
-After cloning one project and creating one workspace, your root looks like this:
+Assuming the default repository location, after cloning one project and
+creating one workspace, your root looks like this:
 
-```
+```text
 ~/Ensemblr/
 ├── repos/
 │   └── my-project/            # the clone — its own git repository
 ├── workspaces/
 │   └── my-project/
 │       └── first-workspace/   # a git worktree of the clone, on its own branch
-└── archived-contexts/         # empty until you archive a workspace
+├── archived-contexts/         # empty until you archive a workspace
+└── concierge/                 # the Concierge's memory and artifacts
 ```
 
 The workspace is a genuine git worktree of the repository in `repos/`, not a
@@ -199,8 +204,9 @@ in parallel safe — they cannot overwrite each other's files, because they are
 not in the same files.
 
 Elsewhere: your project and workspace records land in the SQLite database at
-`~/Library/Application Support/dev.ensemblr.app/ensemblr.db`, and your app
-settings in `~/.config/ensemblr/config.json`.
+`~/Library/Application Support/dev.ensemblr.app/ensemblr.db` on macOS or
+`~/.config/ensemblr/ensemblr.db` on Linux, and your app settings in
+`~/.config/ensemblr/config.json`.
 
 ## Next
 

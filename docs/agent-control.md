@@ -75,8 +75,10 @@ skill directory nest rather than conflict:
 
 Nothing is written into the user's repository or into `~/.claude`, so the skill
 is scoped to sessions Ensemblr launched and leaves nothing behind. Paths are
-resolved by `src/main/agent-skills/`, which reports `null` when the bundle is
-absent — a runtime then launches exactly as it did before skills existed.
+resolved by `resolveAgentSkillBundle` in
+`src/main/agent-skills/skill-bundle-paths.ts`, which returns empty
+`pluginDirectories` and `skillDirectories` arrays when no bundle is found.
+The runtime still launches, without the bundled skills.
 
 The SDK's sibling `skills` option is deliberately **not** set: it is a context
 filter, so naming ours there would hide every skill the user already has.
@@ -94,8 +96,9 @@ The decision is [ADR 0053](./adr/0053-ship-a-bundled-ensemblr-skill-to-both-runt
 
 ## Permissions
 
-Control actions follow the **workspace permission mode** (the same setting that
-gates the agent's local tool use):
+Control actions follow the **workspace permission mode**. Claude Code also
+applies that setting to its local tools; Pi's own file and shell tools are not
+restricted by it (Plan Mode is a separate gate):
 
 | Mode | Reads | Writes (spawn, launch, terminals, focus, board, review comments, Linear) |
 | --- | --- | --- |

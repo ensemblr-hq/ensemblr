@@ -147,10 +147,10 @@ that ignores the signal is left behind rather than blocking your launch.
 Setup and archive are single commands rather than named lists — `setup` and
 `archive` under `[scripts]`.
 
-**Setup** runs when a workspace opens, so dependencies are installed before you
-or an agent start work. It does not re-run on every open: Ensemblr fingerprints
-the resolved setup command together with the contents of every dependency
-lockfile in the worktree, and skips the run when that fingerprint is unchanged
+**Setup** starts automatically after workspace creation. Opening a workspace
+also checks whether setup is current: Ensemblr fingerprints the resolved setup
+command together with the contents of every dependency lockfile in the
+worktree, and skips the run when that fingerprint is unchanged
 ([ADR 0034](../adr/0034-skip-unchanged-workspace-setup-runs.md)). The
 fingerprint tracks *declared* dependencies, not installed ones — deleting
 `node_modules` without touching a lockfile does not re-trigger setup, so a

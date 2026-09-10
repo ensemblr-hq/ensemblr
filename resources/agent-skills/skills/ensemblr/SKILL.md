@@ -28,8 +28,10 @@ Harnesses are an **opt-in Experimental feature**, absent unless the user has
 switched them on — so if nothing in your tool list launches one, that is the
 switch being off rather than a tool to hunt for.
 
-Either way you reach the app through tools named `ensemblr_*`, served over an
-MCP endpoint. **A harness may re-expose them under its own naming scheme** — an
+Either way you reach the app through tools named `ensemblr_*`. Claude and
+harnesses use the loopback MCP endpoint; Pi's bundled extension registers the
+tools and calls the same control service through `/invoke`.
+**A harness may re-expose them under its own naming scheme** — an
 extra `ensemblr` segment in front, an `mcp__` wrapper — so match on the tail of
 the name rather than the whole of it. It is the same tool.
 
