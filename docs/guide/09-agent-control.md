@@ -22,6 +22,7 @@ to move, so the agent keeps the ticket current instead of waiting for you to ask
 for each transition by hand. What that block permits is cut to what the caller
 may actually do — a sub-agent is denied tracker writes, a planning agent is
 denied the move.
+
 - name its own tab and record a summary of what the conversation covered
 - **ask you a question** and block until you answer
 
