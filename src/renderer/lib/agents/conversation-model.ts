@@ -1,6 +1,7 @@
 import type { DynamicToolUIPart } from 'ai';
 
 import { presentToolCall } from '@/renderer/lib/agent-timeline/tool-presentation';
+import { i18n } from '@/renderer/lib/i18n';
 import type { AgentConversationLiveState } from '@/renderer/state/agents';
 import { toComposerContextUsage } from '@/renderer/state/composer/agent-session-event-sync';
 import type { AgentConversation } from '@/renderer/types/agents';
@@ -96,10 +97,14 @@ function modelLabel(
 	);
 }
 
-/** Maps one persisted chat row and optional live session into the Agents panel model. */
+/** Maps a persisted chat and optional live session into a localized Agents row.
+ * @param options - Chat identity, runtime readings, lineage, model catalogue, and display language.
+ * @returns Conversation with a nonempty title even before the agent names its tab.
+ */
 function conversationOf({
 	blocked,
 	catalog,
+	language,
 	lineage,
 	live,
 	session,
@@ -107,6 +112,7 @@ function conversationOf({
 }: {
 	blocked: boolean;
 	catalog: AgentModelCatalog | undefined;
+	language: string;
 	lineage: AgentSessionLineage | undefined;
 	live: AgentConversationLiveState | undefined;
 	session: AgentSessionSnapshotWire | undefined;
@@ -132,13 +138,24 @@ function conversationOf({
 		parentChatTabId: null,
 		runtime: session?.provider ?? null,
 		status,
-		title: tab.fullTitle || tab.title,
+		title:
+			tab.fullTitle.trim() ||
+			tab.title.trim() ||
+			(isClosed
+				? i18n.t('workbench:session-tabs.untitled-closed', 'Untitled chat', {
+						lng: language,
+					})
+				: i18n.t('workbench:session-tabs.untitled', 'New chat', {
+						lng: language,
+					})),
 	};
 }
 
 /**
  * Builds stable session-backed Agents rows and resolves session lineage to chat ids.
  * A fresh chat has no agent-session foreign key until its first submission opens one.
+ * @param options - Workspace chats, session state, lineage, and display language.
+ * @returns Session-backed conversations with localized fallback titles and resolved parents.
  */
 export function toAgentConversations({
 	blockedSessionIds,
@@ -159,7 +176,6 @@ export function toAgentConversations({
 	openTabs: readonly ChatTabWire[];
 	sessions: readonly AgentSessionSnapshotWire[];
 }): AgentConversation[] {
-	void language;
 	const sessionById = new Map(sessions.map((session) => [session.id, session]));
 	const openSessionTabs = openTabs.filter(
 		(tab) => tab.kind === 'chat' && tab.agentSessionId !== null,
@@ -180,6 +196,7 @@ export function toAgentConversations({
 		const conversation = conversationOf({
 			blocked: blockedSessionIds.has(sessionId),
 			catalog,
+			language,
 			lineage,
 			live: liveBySessionId[sessionId],
 			session: sessionById.get(sessionId),

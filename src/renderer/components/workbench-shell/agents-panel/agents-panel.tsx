@@ -2,6 +2,7 @@ import type { TFunction } from 'i18next';
 import {
 	AlertCircleIcon,
 	BotIcon,
+	ChevronRightIcon,
 	LeafIcon,
 	Loader2Icon,
 	MessageSquareIcon,
@@ -11,10 +12,16 @@ import { useTranslation } from 'react-i18next';
 import { AgentProviderLogo } from '@/renderer/components/agent-provider-brand';
 import { Button } from '@/renderer/components/ui/button';
 import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from '@/renderer/components/ui/collapsible';
+import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
+import { PanelPlaceholder } from '@/renderer/components/workbench-shell/panel-placeholder';
 import { cn } from '@/renderer/lib/utils';
 import type {
 	AgentContextUsage,
@@ -233,20 +240,48 @@ function rowStatusLabel(
 	return t('workbench:agents.status.closed', 'Closed');
 }
 
-/** Current prepared tool summary for a working, open conversation. */
+/** Reserves a stable line for an open conversation's tool summary or idle readiness. */
 function AgentActivityPreview({
 	activity,
+	depth,
+	status,
 }: {
 	activity: AgentConversationActivity | null | undefined;
+	depth: AgentConversation['depth'];
+	status: AgentConversationStatus;
 }) {
 	const { t } = useTranslation();
 	if (!activity) {
-		return null;
+		let readyText: string | null = null;
+		if (status === 'idle') {
+			readyText =
+				depth === 0
+					? t(
+							'workbench:agents.activity.ready-root',
+							'Ready for your next message',
+						)
+					: t(
+							'workbench:agents.activity.ready-parent',
+							'Ready for the parent chat',
+						);
+		}
+		return (
+			<div
+				aria-hidden={readyText ? undefined : 'true'}
+				className='mt-1 flex h-4 min-w-0 items-center text-muted-foreground text-xxs leading-4'
+			>
+				{readyText ? (
+					<span className='min-w-0 truncate' title={readyText}>
+						{readyText}
+					</span>
+				) : null}
+			</div>
+		);
 	}
 	const additionalCalls = Math.max(0, (activity.parallelCount ?? 1) - 1);
 
 	return (
-		<div className='mt-1 flex min-w-0 items-center gap-1.5 text-muted-foreground text-xxs leading-4'>
+		<div className='mt-1 flex h-4 min-w-0 items-center gap-1.5 text-muted-foreground text-xxs leading-4'>
 			<span
 				className='min-w-0 truncate text-foreground/80'
 				title={activity.title}
@@ -483,7 +518,13 @@ function AgentRow({
 					isPlaceholder={isPlaceholder}
 					parentTitle={parentTitle}
 				/>
-				<AgentActivityPreview activity={activity} />
+				{!conversation.isClosed ? (
+					<AgentActivityPreview
+						activity={activity}
+						depth={conversation.depth}
+						status={conversation.status}
+					/>
+				) : null}
 				<RestoreError visible={conversation.restoreState === 'error'} />
 			</span>
 		</button>
@@ -570,7 +611,7 @@ function OpenConversationSection({
 	);
 }
 
-/** Muted restorable history with immediate-parent context. */
+/** Initially collapsed restorable history with its count and immediate-parent context. */
 function ClosedConversationSection({
 	onRestore,
 	onSelect,
@@ -587,32 +628,48 @@ function ClosedConversationSection({
 		return null;
 	}
 	return (
-		<section
-			aria-label={t('workbench:agents.closed-section', 'Closed conversations')}
-			className='mt-3 border-border border-t pt-2'
-		>
-			<h3 className='px-2 py-1 font-medium text-muted-foreground text-xxs uppercase tracking-wide'>
-				{t('workbench:agents.closed-heading', 'Closed')}
-			</h3>
-			<ul className='flex flex-col gap-1'>
-				{rows.map((conversation) => (
-					<li key={`closed-${conversation.chatTabId}`}>
-						<AgentRow
-							conversation={conversation}
-							isPlaceholder={false}
-							isSelected={false}
-							onRestore={onRestore}
-							onSelect={onSelect}
-							parentTitle={
-								conversation.parentChatTabId
-									? titles.get(conversation.parentChatTabId)
-									: undefined
-							}
+		<Collapsible asChild defaultOpen={false}>
+			<section
+				aria-label={t(
+					'workbench:agents.closed-section',
+					'Closed conversations',
+				)}
+				className='mt-3 border-border border-t pt-2'
+			>
+				<h3>
+					<CollapsibleTrigger className='group flex w-full items-center gap-1 rounded-md px-2 py-1 font-medium text-muted-foreground text-xxs uppercase tracking-wide outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50'>
+						<ChevronRightIcon
+							aria-hidden='true'
+							className='size-3 shrink-0 group-data-[state=open]:rotate-90'
 						/>
-					</li>
-				))}
-			</ul>
-		</section>
+						{t('workbench:agents.closed-heading', 'Closed')}
+						<span className='ml-auto shrink-0 font-mono tabular-nums'>
+							{rows.length}
+						</span>
+					</CollapsibleTrigger>
+				</h3>
+				<CollapsibleContent asChild>
+					<ul className='flex flex-col gap-1'>
+						{rows.map((conversation) => (
+							<li key={`closed-${conversation.chatTabId}`}>
+								<AgentRow
+									conversation={conversation}
+									isPlaceholder={false}
+									isSelected={false}
+									onRestore={onRestore}
+									onSelect={onSelect}
+									parentTitle={
+										conversation.parentChatTabId
+											? titles.get(conversation.parentChatTabId)
+											: undefined
+									}
+								/>
+							</li>
+						))}
+					</ul>
+				</CollapsibleContent>
+			</section>
+		</Collapsible>
 	);
 }
 
@@ -666,9 +723,14 @@ function AgentsPanelBody({
 	}
 	if (conversations.length === 0) {
 		return (
-			<p className='flex h-32 items-center justify-center text-center text-muted-foreground text-xs'>
-				{t('workbench:agents.empty', 'No agent conversations yet.')}
-			</p>
+			<PanelPlaceholder
+				icon={BotIcon}
+				message={t(
+					'workbench:agents.empty-message',
+					'Agent conversations appear here.',
+				)}
+				title={t('workbench:agents.empty', 'No agent conversations yet')}
+			/>
 		);
 	}
 
@@ -716,7 +778,12 @@ export function AgentsPanel({
 			aria-label={t('workbench:agents.label', 'Agents')}
 			className='h-full min-h-0 bg-transparent'
 		>
-			<div className='sleek-scrollbar h-full min-h-0 overflow-y-auto p-2'>
+			<div
+				className={cn(
+					'sleek-scrollbar h-full min-h-0 overflow-y-auto',
+					(state !== 'ready' || conversations.length > 0) && 'p-2',
+				)}
+			>
 				<AgentsPanelBody
 					conversations={conversations}
 					onRestore={onRestore}

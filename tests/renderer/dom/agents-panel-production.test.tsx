@@ -151,8 +151,8 @@ describe('production Agents panel navigation', () => {
 			screen.getByRole('button', { name: 'Open Open chat' }),
 		).toBeInTheDocument();
 		expect(
-			screen.getByRole('button', { name: 'Restore Closed chat' }),
-		).toBeInTheDocument();
+			screen.queryByRole('button', { name: 'Restore Closed chat' }),
+		).not.toBeInTheDocument();
 
 		client.setQueryData(ensemblrQueryKeys.chatTabs('workspace-1'), {
 			closed: [chatTab('closed-chat', '2026-01-02T00:00:00.000Z', 'session-2')],
@@ -169,6 +169,35 @@ describe('production Agents panel navigation', () => {
 		expect(
 			await screen.findByRole('button', { name: 'Open Fresh chat' }),
 		).toBeInTheDocument();
+	});
+
+	test('shows a placeholder until the spawned agent assigns its tab title', async () => {
+		installEnsemblrApi({ onAgentSessionEvent: () => () => undefined });
+		const { client } = renderProductionPanel(async () => true);
+		const spawned = {
+			...chatTab('spawned-chat', null, 'spawned-session'),
+			fullTitle: '',
+			title: '',
+		};
+		client.setQueryData(ensemblrQueryKeys.chatTabs('workspace-1'), {
+			closed: [],
+			open: [spawned],
+		});
+
+		const row = await screen.findByRole('button', { name: 'Open New chat' });
+		expect(row).toHaveTextContent('New chat');
+		expect(row).toHaveAttribute('title', expect.stringContaining('New chat'));
+
+		client.setQueryData(ensemblrQueryKeys.chatTabs('workspace-1'), {
+			closed: [],
+			open: [
+				{ ...spawned, fullTitle: 'Build the panel', title: 'Build panel' },
+			],
+		});
+		expect(
+			await screen.findByRole('button', { name: 'Open Build the panel' }),
+		).toHaveTextContent('Build the panel');
+		expect(screen.queryByText('New chat')).not.toBeInTheDocument();
 	});
 
 	test('selects an open chat and dismisses the narrow host', () => {
@@ -390,6 +419,7 @@ describe('production Agents panel navigation', () => {
 			.mockResolvedValueOnce(false)
 			.mockResolvedValueOnce(true);
 		const { onDismiss } = renderProductionPanel(onRestore);
+		fireEvent.click(screen.getByRole('button', { name: 'Closed 1' }));
 		const restore = screen.getByRole('button', { name: 'Restore Closed chat' });
 
 		fireEvent.click(restore);

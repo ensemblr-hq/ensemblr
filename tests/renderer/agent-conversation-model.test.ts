@@ -62,6 +62,57 @@ function session(
 }
 
 describe('toAgentConversations', () => {
+	test.each([
+		['en', 'New chat', 'Untitled chat'],
+		['ru', 'Новый чат', 'Диалог без названия'],
+		['el', 'Νέα συνομιλία', 'Συνομιλία χωρίς τίτλο'],
+	])(
+		'uses localized placeholders until an agent names its tab (%s)',
+		(language, openTitle, closedTitle) => {
+			const unnamed = {
+				...chatTab('new-agent', 'new-session'),
+				fullTitle: '',
+				title: '',
+			};
+			const input = {
+				blockedSessionIds: new Set<string>(),
+				catalog: undefined,
+				closedTabs: [
+					{
+						...unnamed,
+						id: 'closed-agent',
+						closedAt: '2026-01-02T00:00:00.000Z',
+						fullTitle: '  ',
+						title: '\t',
+					},
+				],
+				language,
+				lineageBySessionId: new Map<string, AgentSessionLineage>(),
+				liveBySessionId: {},
+				openTabs: [unnamed],
+				sessions: [],
+			};
+			expect(toAgentConversations(input).map((row) => row.title)).toEqual([
+				openTitle,
+				closedTitle,
+			]);
+			expect(
+				toAgentConversations({
+					...input,
+					openTabs: [
+						{ ...unnamed, title: 'Agent title', fullTitle: 'Full agent title' },
+					],
+				})[0].title,
+			).toBe('Full agent title');
+			expect(
+				toAgentConversations({
+					...input,
+					openTabs: [{ ...unnamed, title: 'Agent title', fullTitle: '  ' }],
+				})[0].title,
+			).toBe('Agent title');
+		},
+	);
+
 	test('hides untouched chats while retaining started and completed sessions', () => {
 		const started = session('started-session', {
 			depth: 0,
@@ -299,6 +350,95 @@ describe('toAgentConversations', () => {
 			status: 'blocked',
 		});
 		expect(JSON.stringify(conversation)).not.toContain('not rendered');
+	});
+
+	test.each([
+		[
+			'ensemblr_focus_workspace',
+			{ workspaceId: 'workspace-target' },
+			'workspace-target',
+		],
+		['ensemblr_focus_tab', { chatTabId: 'chat-target' }, 'chat-target'],
+		['private_tool', {}, 'Safe preview'],
+	])(
+		'projects the prepared target for %s without raw payloads',
+		(name, input, target) => {
+			const snapshot = session('session-1', {
+				depth: 0,
+				parentSessionId: null,
+				rootSessionId: 'session-1',
+			});
+			const [conversation] = toAgentConversations({
+				blockedSessionIds: new Set(),
+				catalog: undefined,
+				closedTabs: [],
+				language: 'en',
+				lineageBySessionId: new Map(),
+				liveBySessionId: {
+					'session-1': {
+						activity: createAgentActivityState([
+							{
+								input: { ...input, secret: 'never render raw payload' },
+								name,
+								presentation: {
+									version: 1,
+									title: 'Safe activity',
+									preview: { font: 'sans', text: 'Safe preview' },
+								},
+								toolCallId: 'tool-1',
+							},
+						]),
+						branchId: snapshot.branchId,
+						contextUsage: null,
+						lastEventOrdinal: -1,
+						runtimeIdentity: 'pi:runtime-session-1',
+						snapshotUpdatedAt: snapshot.updatedAt,
+						status: 'streaming',
+					},
+				},
+				openTabs: [chatTab('chat-1', 'session-1')],
+				sessions: [snapshot],
+			});
+
+			expect(conversation.activity).toMatchObject({ parallelCount: 1, target });
+			expect(JSON.stringify(conversation)).not.toContain(
+				'never render raw payload',
+			);
+		},
+	);
+
+	test('uses legacy hierarchy only when durable lineage is absent', () => {
+		const conversations = toAgentConversations({
+			blockedSessionIds: new Set(),
+			catalog: undefined,
+			closedTabs: [],
+			language: 'en',
+			lineageBySessionId: new Map([
+				[
+					'durable-session',
+					{
+						depth: 2,
+						parentSessionId: 'missing-parent',
+						rootSessionId: 'root-session',
+					},
+				],
+			]),
+			liveBySessionId: {},
+			openTabs: [
+				chatTab('legacy-child', 'legacy-session', {
+					parentChatTabId: 'legacy-parent',
+				}),
+				chatTab('durable-child', 'durable-session', {
+					parentChatTabId: 'stale-parent',
+				}),
+			],
+			sessions: [],
+		});
+
+		expect(conversations).toMatchObject([
+			{ chatTabId: 'legacy-child', depth: 1, parentChatTabId: 'legacy-parent' },
+			{ chatTabId: 'durable-child', depth: 2, parentChatTabId: null },
+		]);
 	});
 
 	test('preserves unknown nested model ids and omits generic tool payloads', () => {
