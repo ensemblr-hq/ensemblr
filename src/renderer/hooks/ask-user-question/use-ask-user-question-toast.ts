@@ -28,16 +28,16 @@ export function useAskUserQuestionToast(): void {
 		const translationChanged = previousTranslation.current !== t;
 		previousTranslation.current = t;
 		const requests = Object.values(pending);
-		const pendingIds = new Set(requests.map((request) => request.requestId));
+		const requestsById = new Map(
+			requests.map((request) => [request.requestId, request]),
+		);
 		for (const requestId of seenRequestIds.current) {
-			if (!pendingIds.has(requestId)) {
+			if (!requestsById.has(requestId)) {
 				seenRequestIds.current.delete(requestId);
 			}
 		}
 		for (const [requestId, toastId] of shownToastIds.current) {
-			const request = requests.find(
-				(candidate) => candidate.requestId === requestId,
-			);
+			const request = requestsById.get(requestId);
 			const isFocused =
 				request !== undefined &&
 				activeChat !== null &&
