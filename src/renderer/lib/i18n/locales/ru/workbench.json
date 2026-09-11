@@ -139,6 +139,10 @@
 		"uncommitted_many": "В этом рабочем пространстве {{count}} незакоммиченных изменений — архивация не сделает для них commit и push.",
 		"uncommitted_other": "В этом рабочем пространстве {{count}} незакоммиченных изменения — архивация не сделает для них commit и push."
 	},
+	"ask-user-question-toast": {
+		"focus": "Открыть чат",
+		"title": "Агенту нужен ваш ответ"
+	},
 	"attach-to-chat": {
 		"attached": "Прикреплено к диалогу: {{label}}",
 		"diff-attached": "Diff для {{label}} прикреплён к диалогу.",
