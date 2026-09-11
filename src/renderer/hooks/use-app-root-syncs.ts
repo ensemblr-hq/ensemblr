@@ -1,3 +1,4 @@
+import { useAskUserQuestionToast } from '@/renderer/hooks/ask-user-question/use-ask-user-question-toast';
 import { useConciergeActivityWatch } from '@/renderer/hooks/concierge/use-concierge-activity-watch';
 import { useConfigReloadSync } from '@/renderer/hooks/use-config-reload-sync';
 import { useModalInertBodyGuard } from '@/renderer/hooks/use-modal-inert-body-guard';
@@ -37,6 +38,7 @@ export function useAppRootSyncs(): void {
 	useNotificationFocusSync();
 	useConciergeActivityWatch();
 	useAskUserQuestionSync();
+	useAskUserQuestionToast();
 	useReviewBriefSync();
 	useToolApprovalSync();
 	usePlanReviewSync();

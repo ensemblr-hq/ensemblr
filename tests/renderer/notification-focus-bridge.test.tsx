@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { QueryClientProvider } from '@tanstack/react-query';
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createStore, Provider } from 'jotai';
 import type { ReactNode } from 'react';
 import { act } from 'react';
@@ -32,9 +32,13 @@ vi.mock('@/renderer/api/ensemblr-queries', () => ({
 	}),
 }));
 
+import { Toaster } from '../../src/renderer/components/ui/sonner';
 import { NotificationFocusBridge } from '../../src/renderer/components/workbench-shell/route-layout/notification-focus-bridge';
 import { WorkbenchLayoutModelProvider } from '../../src/renderer/components/workbench-shell/shell-contexts';
 import { shellFixtureProjects } from '../../src/renderer/fixtures/workbench';
+import { useAskUserQuestionToast } from '../../src/renderer/hooks/ask-user-question/use-ask-user-question-toast';
+import { i18n } from '../../src/renderer/lib/i18n';
+import { pendingAskUserQuestionsAtom } from '../../src/renderer/state/ask-user-question';
 import { pendingNotificationFocusAtom } from '../../src/renderer/state/unread';
 import type { WorkbenchLayoutModel } from '../../src/renderer/types/workbench-shell';
 import type { FocusChatBroadcast } from '../../src/shared/ipc/contracts/notifications';
@@ -50,7 +54,10 @@ const layoutModel = {
 } as unknown as WorkbenchLayoutModel;
 
 /** Mounts the bridge over a store a case can park a focus request in. */
-function mountBridge(store = createStore()) {
+function mountBridge(
+	store = createStore(),
+	content = <NotificationFocusBridge />,
+) {
 	const client = createTestQueryClient();
 	const wrapper = ({ children }: { children: ReactNode }) => (
 		<Provider store={store}>
@@ -61,7 +68,7 @@ function mountBridge(store = createStore()) {
 			</QueryClientProvider>
 		</Provider>
 	);
-	return render(<NotificationFocusBridge />, { wrapper });
+	return render(content, { wrapper });
 }
 
 /** Parks the chat a clicked notification named, the way the root sync does. */
@@ -131,6 +138,74 @@ test('resolves the tab itself when main could not', async () => {
 
 	expect(listChatTabs).toHaveBeenCalledWith(workspace.id);
 	expect(navigate.mock.calls[0][0].params.chatId).toBe('tab-7');
+});
+
+/** Renders the actual question toast and its cross-workspace navigation bridge. */
+function QuestionToastFocusHarness() {
+	useAskUserQuestionToast();
+	return (
+		<>
+			<NotificationFocusBridge />
+			<Toaster />
+		</>
+	);
+}
+
+test('a question toast stays translated and focuses its chat only after the action is clicked', async () => {
+	listChatTabs.mockResolvedValue({
+		closed: [],
+		open: [{ agentSessionId: 'session-7', id: 'tab-7' }],
+	});
+	const store = createStore();
+	mountBridge(store, <QuestionToastFocusHarness />);
+	act(() => {
+		store.set(pendingAskUserQuestionsAtom, {
+			'session-7': {
+				agentSessionId: 'session-7',
+				questions: [
+					{
+						question: 'Which approach should we use?',
+						options: [{ label: 'Small change' }, { label: 'Full rewrite' }],
+					},
+				],
+				requestId: 'question-focus-integration',
+				workspaceId: workspace.id,
+			},
+		});
+	});
+	await screen.findByRole('button', { name: 'Focus chat' });
+	for (const { language, title, label } of [
+		{ language: 'ru', title: 'Агенту нужен ваш ответ', label: 'Открыть чат' },
+		{
+			language: 'el',
+			title: 'Ο πράκτορας χρειάζεται την απάντησή σας',
+			label: 'Άνοιξε τη συνομιλία',
+		},
+	]) {
+		await act(async () => {
+			await i18n.changeLanguage(language);
+		});
+		await screen.findByRole('button', { name: label });
+		expect(screen.getByText(title)).toBeInTheDocument();
+		expect(screen.getAllByText('Which approach should we use?')).toHaveLength(
+			1,
+		);
+	}
+	expect(screen.queryByText('Agent needs your input')).not.toBeInTheDocument();
+	expect(navigate).not.toHaveBeenCalled();
+	fireEvent.click(screen.getByRole('button', { name: 'Άνοιξε τη συνομιλία' }));
+
+	await waitFor(() => {
+		expect(navigate).toHaveBeenCalledWith({
+			params: {
+				chatId: 'tab-7',
+				projectId: project.id,
+				workspaceId: workspace.id,
+			},
+			search: { dock: 'setup', review: 'files' },
+			to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
+		});
+	});
 });
 
 test('falls back to the workspace when the tab is gone', async () => {

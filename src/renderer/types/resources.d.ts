@@ -2620,6 +2620,10 @@ export default interface Resources {
 			uncommitted_one: 'This workspace has {{count}} uncommitted change that archiving will not commit or push.';
 			uncommitted_other: 'This workspace has {{count}} uncommitted changes that archiving will not commit or push.';
 		};
+		'ask-user-question-toast': {
+			focus: 'Focus chat';
+			title: 'Agent needs your input';
+		};
 		'attach-to-chat': {
 			attached: '{{label}} is attached to the chat.';
 			'diff-attached': 'Diff for {{label}} is attached to the chat.';
