@@ -63,6 +63,7 @@ const makePorts = (planningSessions: ReadonlySet<string>): AgentControlPorts =>
 		},
 		permissions: { getMode: () => 'workspace-trusted' },
 		language: { getLanguage: () => 'en' },
+		commitCredit: { isCoAuthorEnabled: () => false },
 		confirm: { confirm: vi.fn().mockResolvedValue(true) },
 		ask: { ask: vi.fn(), releaseSession: vi.fn() },
 		planMode: {

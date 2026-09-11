@@ -12,6 +12,7 @@ import type { SubagentMechanism } from '../../src/shared/agent-control.ts';
 import {
 	AFK_WORKFLOW_HEADER,
 	buildAfkWorkflowDirective,
+	buildCoAuthorDirective,
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
 	buildPlanModeDelegationDirective,
@@ -334,6 +335,26 @@ describe('getSessionBrief', () => {
 			expect(result.data).toMatchObject({
 				issueDirective: buildLinkedIssueDirective(LINKED_ISSUE),
 			});
+		}
+	});
+
+	it('carries the live commit co-author directive on each brief', async () => {
+		const settings = { coAuthor: true };
+		const { invoke } = setup(settings);
+
+		const enabled = await invoke('getSessionBrief');
+		expect(enabled.ok).toBe(true);
+		if (enabled.ok) {
+			expect(enabled.data).toMatchObject({
+				coAuthorDirective: buildCoAuthorDirective(true),
+			});
+		}
+
+		settings.coAuthor = false;
+		const disabled = await invoke('getSessionBrief');
+		expect(disabled.ok).toBe(true);
+		if (disabled.ok) {
+			expect(disabled.data).toMatchObject({ coAuthorDirective: null });
 		}
 	});
 

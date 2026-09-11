@@ -1060,8 +1060,8 @@ export interface SessionBriefNaming {
 /**
  * Result of `getSessionBrief`: everything the Pi extension needs to assemble
  * this turn's system prompt in one round trip. `nudge`, `planRefinement`,
- * `languageDirective`, and `afkDirective` are all rendered by the app rather
- * than the extension so
+ * `languageDirective`, `afkDirective`, and `coAuthorDirective` are all rendered
+ * by the app rather than the extension so
  * there is no second copy of the wording to drift — the extension appends
  * strings it never authors.
  */
@@ -1110,6 +1110,11 @@ export interface GetSessionBriefResult {
 	 * tracker, or null when the workspace was not created from a Linear issue.
 	 */
 	issueDirective: string | null;
+	/**
+	 * Ready-to-append commit co-author instruction, or null when Ensemblr commit
+	 * credit is disabled.
+	 */
+	coAuthorDirective: string | null;
 	/**
 	 * The role playbook to use in place of the one the extension holds, or null
 	 * when the extension's own copy is the right one. The Concierge is the case

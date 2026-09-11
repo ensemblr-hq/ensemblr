@@ -827,6 +827,7 @@ interface SessionBrief {
 	readonly planRefinement: string | null;
 	readonly languageDirective: string | null;
 	readonly issueDirective: string | null;
+	readonly coAuthorDirective: string | null;
 	readonly afkDirective: string | null;
 	readonly afkWorkflowDirective: string | null;
 	readonly rolePlaybook: string | null;
@@ -836,6 +837,7 @@ interface SessionBrief {
 const EMPTY_SESSION_BRIEF: SessionBrief = {
 	afkDirective: null,
 	afkWorkflowDirective: null,
+	coAuthorDirective: null,
 	issueDirective: null,
 	languageDirective: null,
 	nudge: null,
@@ -876,6 +878,7 @@ function normalizeSessionBrief(value: unknown): SessionBrief {
 	return {
 		afkDirective: sessionBriefString(brief.afkDirective),
 		afkWorkflowDirective: sessionBriefString(brief.afkWorkflowDirective),
+		coAuthorDirective: sessionBriefString(brief.coAuthorDirective),
 		issueDirective: sessionBriefString(brief.issueDirective),
 		languageDirective: sessionBriefString(brief.languageDirective),
 		nudge: sessionBriefString(brief.nudge),
@@ -1061,6 +1064,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 		const {
 			afkDirective,
 			afkWorkflowDirective,
+			coAuthorDirective,
 			issueDirective,
 			languageDirective,
 			nudge,
@@ -1080,6 +1084,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			afkWorkflowDirective,
 			languageDirective,
 			issueDirective,
+			coAuthorDirective,
 		].filter((block) => typeof block === 'string' && block.length > 0);
 		return { systemPrompt: blocks.join('\n\n') };
 	});

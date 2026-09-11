@@ -974,7 +974,7 @@ describe('agent-control AWARENESS parity', () => {
 	// order pins the two hand-maintained copies of that sequence together.
 	it('appends every rendered brief block, in the order the app joins them', () => {
 		expect(readExtensionSource()).toMatch(
-			/event\.systemPrompt,\s*playbook,\s*nudge,\s*planRefinement,\s*afkDirective,\s*afkWorkflowDirective,\s*languageDirective,\s*issueDirective,/,
+			/event\.systemPrompt,\s*playbook,\s*nudge,\s*planRefinement,\s*afkDirective,\s*afkWorkflowDirective,\s*languageDirective,\s*issueDirective,\s*coAuthorDirective,/,
 		);
 	});
 
@@ -982,11 +982,17 @@ describe('agent-control AWARENESS parity', () => {
 	// appended here, so a field the extension never reads is a directive that
 	// silently stops reaching Pi. Holding the contract's keys against the ones the
 	// extension destructures is what catches the next one added.
-	it('reads every directive the brief contract carries', () => {
+	it('normalizes and safely defaults every directive the brief contract carries', () => {
 		const source = readExtensionSource();
 		const fields = readSessionBriefDirectiveFields();
+		const emptyBriefStart = source.indexOf('const EMPTY_SESSION_BRIEF');
+		const emptyBrief = source.slice(
+			emptyBriefStart,
+			source.indexOf('};', emptyBriefStart),
+		);
 
 		expect(fields).toContain('issueDirective');
+		expect(fields).toContain('coAuthorDirective');
 		expect(fields.length).toBeGreaterThanOrEqual(4);
 		for (const field of fields) {
 			const normalizer =
@@ -994,6 +1000,7 @@ describe('agent-control AWARENESS parity', () => {
 					? 'nonEmptySessionBriefString'
 					: 'sessionBriefString';
 			expect(source).toContain(`${normalizer}(brief.${field})`);
+			expect(emptyBrief).toContain(`${field}: null`);
 		}
 	});
 
