@@ -37,7 +37,8 @@
 			"parallel_many": "+{{count}} параллельно",
 			"parallel_other": "+{{count}} параллельно",
 			"ready-parent": "Готов для родительского чата",
-			"ready-root": "Готов к вашему следующему сообщению"
+			"ready-root": "Готов к вашему следующему сообщению",
+			"working": "Работает..."
 		},
 		"closed-heading": "Закрытые",
 		"closed-section": "Закрытые диалоги",
