@@ -222,7 +222,10 @@ describe('production Agents panel navigation', () => {
 		});
 		renderProductionPanel(async () => true);
 
-		expect(screen.getByText('Idle')).toBeInTheDocument();
+		expect(
+			screen.getByRole('button', { name: 'Open Open chat' }),
+		).toHaveAccessibleDescription(/^Idle/);
+		expect(screen.queryByRole('status')).toBeNull();
 		emitEvent?.({
 			event: {
 				branchId: 'branch-session-1',
@@ -238,7 +241,10 @@ describe('production Agents panel navigation', () => {
 			workspaceId: 'workspace-1',
 		});
 
-		await screen.findByText('Working');
+		expect(
+			await screen.findByRole('status', { name: 'Working' }),
+		).toBeVisible();
+		expect(screen.getByText('Working...')).toBeVisible();
 	});
 
 	test('keeps live events over a stale refetch and refreshes missed workspace activity on return', async () => {

@@ -119,7 +119,16 @@ test('renders the hierarchy and selects an open conversation', async () => {
 	);
 
 	expect(container.querySelector('.rounded-full')).toBeNull();
-	expect(screen.getByText('Working')).toBeVisible();
+	expect(screen.getByRole('status', { name: 'Working' })).toHaveClass(
+		'size-3',
+		'animate-spin',
+		'motion-reduce:animate-none',
+	);
+	expect(screen.queryByText('Working')).toBeNull();
+	expect(screen.queryByText('Idle')).toBeNull();
+	expect(
+		screen.getByRole('button', { name: 'Open Parent chat' }),
+	).toHaveAccessibleDescription(/^Idle/);
 	expect(container.querySelector('header')).toBeNull();
 	expect(screen.queryByRole('heading', { name: 'Agents' })).toBeNull();
 	expect(screen.getAllByText('Context')).toHaveLength(2);
@@ -135,7 +144,7 @@ test('renders the hierarchy and selects an open conversation', async () => {
 	expect(onSelect).toHaveBeenCalledWith('child');
 });
 
-test('fills only open idle preview lines with depth-specific readiness copy', async () => {
+test('fills open preview lines with readiness or working copy only without a tool call', async () => {
 	const idleRows: readonly AgentConversation[] = [
 		{ ...conversations[0], activity: null },
 		{
@@ -181,7 +190,13 @@ test('fills only open idle preview lines with depth-specific readiness copy', as
 			.getByRole('button', { name: 'Open Parent chat' })
 			.querySelector('.h-4');
 		expect(preview).toBeInTheDocument();
-		expect(preview).toHaveTextContent('');
+		expect(preview?.textContent).toBe(
+			conversation.status === 'working' ? 'Working...' : '',
+		);
+		if (conversation.status === 'blocked') {
+			expect(screen.getByText('Blocked')).toBeVisible();
+			expect(screen.queryByRole('status')).toBeNull();
+		}
 		expect(screen.queryByText(/Ready for/)).toBeNull();
 	}
 
@@ -198,6 +213,8 @@ test('fills only open idle preview lines with depth-specific readiness copy', as
 		/>,
 	);
 	expect(screen.getByText('Reading files')).toBeVisible();
+	expect(screen.getByRole('status', { name: 'Working' })).toBeVisible();
+	expect(screen.queryByText('Working...')).toBeNull();
 	expect(screen.queryByText(/Ready for/)).toBeNull();
 
 	view.rerender(
@@ -475,6 +492,8 @@ test('describes archived context on the keyboard-accessible row and never animat
 		screen.getByRole('button', { name: 'Restore Parent chat' }),
 	).toHaveAccessibleDescription(/Last recorded: 50,000 of 200,000 tokens/);
 	expect(container.querySelector('.animate-pulse')).toBeNull();
+	expect(container.querySelector('.animate-spin')).toBeNull();
+	expect(screen.queryByRole('status')).toBeNull();
 });
 
 test('renders empty, loading, and retryable error states', async () => {

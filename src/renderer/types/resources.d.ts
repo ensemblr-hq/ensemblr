@@ -2523,6 +2523,7 @@ export default interface Resources {
 				parallel_other: '+{{count}} parallel';
 				'ready-parent': 'Ready for the parent chat';
 				'ready-root': 'Ready for your next message';
+				working: 'Working...';
 			};
 			'closed-heading': 'Closed';
 			'closed-section': 'Closed conversations';

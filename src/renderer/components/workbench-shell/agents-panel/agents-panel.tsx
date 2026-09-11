@@ -16,6 +16,7 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from '@/renderer/components/ui/collapsible';
+import { Spinner } from '@/renderer/components/ui/spinner';
 import {
 	Tooltip,
 	TooltipContent,
@@ -240,7 +241,7 @@ function rowStatusLabel(
 	return t('workbench:agents.status.closed', 'Closed');
 }
 
-/** Reserves a stable line for an open conversation's tool summary or idle readiness. */
+/** Reserves a stable line for tool activity, working progress, or idle readiness. */
 function AgentActivityPreview({
 	activity,
 	depth,
@@ -252,9 +253,11 @@ function AgentActivityPreview({
 }) {
 	const { t } = useTranslation();
 	if (!activity) {
-		let readyText: string | null = null;
-		if (status === 'idle') {
-			readyText =
+		let placeholder: string | null = null;
+		if (status === 'working') {
+			placeholder = t('workbench:agents.activity.working', 'Working...');
+		} else if (status === 'idle') {
+			placeholder =
 				depth === 0
 					? t(
 							'workbench:agents.activity.ready-root',
@@ -267,12 +270,12 @@ function AgentActivityPreview({
 		}
 		return (
 			<div
-				aria-hidden={readyText ? undefined : 'true'}
+				aria-hidden={placeholder ? undefined : 'true'}
 				className='mt-1 flex h-4 min-w-0 items-center text-muted-foreground text-xxs leading-4'
 			>
-				{readyText ? (
-					<span className='min-w-0 truncate' title={readyText}>
-						{readyText}
+				{placeholder ? (
+					<span className='min-w-0 truncate' title={placeholder}>
+						{placeholder}
 					</span>
 				) : null}
 			</div>
@@ -373,7 +376,7 @@ function AgentIdentityIcon({ depth }: { depth: AgentConversation['depth'] }) {
 	);
 }
 
-/** Title and status line for one agent conversation. */
+/** Conversation title with a working spinner or exceptional state label. */
 function AgentRowHeading({
 	conversation,
 	isPending,
@@ -392,14 +395,21 @@ function AgentRowHeading({
 			>
 				{conversation.title}
 			</span>
-			<span
-				className={cn(
-					'shrink-0 text-xxs leading-5',
-					conversation.isClosed ? 'text-muted-foreground' : 'text-foreground',
-				)}
-			>
-				{rowStatusLabel(conversation, isPending, t)}
-			</span>
+			{!conversation.isClosed && conversation.status === 'working' ? (
+				<Spinner
+					aria-label={statusLabel(conversation.status, t)}
+					className='size-3 shrink-0 self-center text-muted-foreground motion-reduce:animate-none'
+				/>
+			) : conversation.isClosed || conversation.status === 'blocked' ? (
+				<span
+					className={cn(
+						'shrink-0 text-xxs leading-5',
+						conversation.isClosed ? 'text-muted-foreground' : 'text-foreground',
+					)}
+				>
+					{rowStatusLabel(conversation, isPending, t)}
+				</span>
+			) : null}
 			{conversation.isClosed && !isPending ? (
 				<span className='shrink-0 font-medium text-foreground text-xxs leading-5'>
 					{t('workbench:agents.restore.action', 'Restore')}

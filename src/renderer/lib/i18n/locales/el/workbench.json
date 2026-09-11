@@ -35,7 +35,8 @@
 			"parallel_one": "+{{count}} παράλληλα",
 			"parallel_other": "+{{count}} παράλληλα",
 			"ready-parent": "Έτοιμος για τη γονική συνομιλία",
-			"ready-root": "Έτοιμος για το επόμενο μήνυμά σας"
+			"ready-root": "Έτοιμος για το επόμενο μήνυμά σας",
+			"working": "Εργάζεται..."
 		},
 		"closed-heading": "Κλειστές",
 		"closed-section": "Κλειστές συνομιλίες",
