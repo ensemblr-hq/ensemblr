@@ -2249,9 +2249,8 @@ export function createAgentControlService({
 	/**
 	 * Reports everything the Pi extension needs to assemble a turn's system
 	 * prompt in one round trip: whether the session is planning, what naming
-	 * upkeep it still owes, the rendered upkeep block to append, the language
-	 * directive to append with it, and the role playbook when the caller's is one
-	 * the extension does not hold.
+	 * upkeep it still owes, the rendered directive blocks to append, and the role
+	 * playbook when the caller's is one the extension does not hold.
 	 * @param origin - Resolved caller identity.
 	 * @returns The session brief.
 	 */
@@ -2265,6 +2264,7 @@ export function createAgentControlService({
 		return ok({
 			afkDirective: buildAfkDirective(afkMode),
 			afkMode,
+			coAuthorDirective: readCoAuthorDirective(),
 			afkWorkflowDirective: buildAfkWorkflowDirective({
 				delegation: origin.delegation,
 				role,
