@@ -87,6 +87,31 @@ function availableProbeSlots(): number {
 }
 
 /**
+ * Runs a phase's probes in batches sized to the free slots, so both phases fill
+ * the cap instead of leaving it idle behind one in-flight probe, and neither
+ * launches a batch once its budget is spent.
+ * @param targets - Work items this phase still has to probe, in listing order.
+ * @param budget - Wait budget shared by every probe in the phase.
+ * @param probe - Records one item's classification.
+ */
+async function probeInBatches<Target>(
+	targets: readonly Target[],
+	budget: ProbeBudget,
+	probe: (target: Target) => Promise<void>,
+): Promise<void> {
+	let cursor = 0;
+	while (cursor < targets.length) {
+		const slots = availableProbeSlots();
+		if (budget.hasExpired() || slots <= 0) {
+			break;
+		}
+		const batch = targets.slice(cursor, cursor + slots);
+		cursor += batch.length;
+		await Promise.all(batch.map((target) => probe(target)));
+	}
+}
+
+/**
  * Marks a symlink before target probing so a skipped or timed-out target keeps a badge.
  * @param workspaceCwd - Workspace root the entry belongs to.
  * @param entry - Listed file to inspect without following the link.
@@ -132,21 +157,9 @@ async function markSymlinks(
 	const unclassified = annotated.flatMap((entry, index) =>
 		entry === null ? [index] : [],
 	);
-	let cursor = 0;
-	while (cursor < unclassified.length) {
-		const slots = availableProbeSlots();
-		if (budget.hasExpired() || slots <= 0) {
-			break;
-		}
-		const batch = unclassified.slice(cursor, cursor + slots);
-		cursor += batch.length;
-		const classified = await Promise.all(
-			batch.map((index) => markSymlink(workspaceCwd, entries[index], budget)),
-		);
-		for (const [offset, entry] of classified.entries()) {
-			annotated[batch[offset]] = entry;
-		}
-	}
+	await probeInBatches(unclassified, budget, async (index) => {
+		annotated[index] = await markSymlink(workspaceCwd, entries[index], budget);
+	});
 	return annotated;
 }
 
@@ -162,26 +175,23 @@ async function resolveSymlinkTargets(
 	annotated: (WorkspaceFileEntryWire | null)[],
 	budget: ProbeBudget,
 ): Promise<void> {
-	for (const [index, entry] of annotated.entries()) {
-		if (budget.hasExpired()) {
-			break;
-		}
-		if (entry?.symlinkTargetKind !== 'unknown') {
-			continue;
-		}
+	const unresolved = annotated.flatMap((entry, index) =>
+		entry?.symlinkTargetKind === 'unknown' ? [{ entry, index }] : [],
+	);
+	await probeInBatches(unresolved, budget, async ({ entry, index }) => {
 		const target = await readMetadata(
 			path.join(workspaceCwd, entry.path),
 			'stat',
 			budget,
 		);
 		if (!target) {
-			continue;
+			return;
 		}
 		annotated[index] = {
 			...entry,
 			symlinkTargetKind: target.isDirectory() ? 'directory' : 'file',
 		};
-	}
+	});
 }
 
 /**

@@ -236,15 +236,15 @@ test('shares one wait budget across targets and stops launching probes after it 
 		expect(completed).toHaveBeenCalledWith(
 			entries.map((entry, index) => ({
 				...entry,
-				symlinkTargetKind: index < 2 ? 'directory' : 'unknown',
+				symlinkTargetKind: index < 4 ? 'directory' : 'unknown',
 			})),
 		);
-		expect(stat).toHaveBeenCalledTimes(3);
+		expect(stat).toHaveBeenCalledTimes(6);
 	} finally {
 		await vi.runAllTimersAsync();
 		await listing;
 	}
-	expect(stat).toHaveBeenCalledTimes(3);
+	expect(stat).toHaveBeenCalledTimes(6);
 	expect(vi.getTimerCount()).toBe(0);
 });
 
