@@ -46,7 +46,10 @@ export {
 	resolveWorkspaceNavigationSelection,
 	resolveWorkspaceRouteParams,
 } from './navigation-selection';
-export { normalizeWorkbenchSearch } from './route-search';
+export {
+	isTerminalDockTabId,
+	normalizeWorkbenchSearch,
+} from './route-search';
 export {
 	getStringRouteParam,
 	getWorkbenchStaticView,

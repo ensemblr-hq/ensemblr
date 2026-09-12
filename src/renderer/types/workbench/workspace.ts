@@ -626,6 +626,14 @@ export interface WorkspaceShellModel {
 	sourceSummary: string;
 	status: WorkspaceStatus;
 	/**
+	 * Whether `dockTabs` holds this workspace's full set of `terminal:*` tabs.
+	 * Only the routed workspace's live model sets it, and only once the session
+	 * list has answered and any dock restore it triggered has finished — so an
+	 * absent value means "not known yet" rather than "no terminals", which is
+	 * what a remembered terminal preference has to be held against.
+	 */
+	terminalTabsLoaded?: boolean;
+	/**
 	 * ISO timestamp of the workspace's last change, carried from the navigation
 	 * snapshot so the dashboard board can sort by recency. Absent on optimistic
 	 * rows the snapshot has not replaced yet.

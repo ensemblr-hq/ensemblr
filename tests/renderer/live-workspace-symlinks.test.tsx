@@ -60,6 +60,7 @@ test('updates the live icon when an unchanged path becomes a link or changes tar
 			activeTerminalIds: new Set<string>(),
 			closeTerminal: async () => undefined,
 			createTerminal: async () => ({ diagnostics: [], session: null }),
+			isLoaded: true,
 			sessions: [],
 		},
 	};

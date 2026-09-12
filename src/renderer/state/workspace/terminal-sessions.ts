@@ -23,6 +23,14 @@ interface WorkspaceTerminalSessionsState {
 		command?: string;
 		title?: string;
 	}) => Promise<CreateTerminalSessionResult>;
+	/**
+	 * Whether `sessions` holds the workspace's full set: the session list has
+	 * answered and any dock restore it triggered has finished. False covers the
+	 * mount window, where an empty list means "not asked yet" rather than "no
+	 * terminals" — a distinction the dock's tab memory depends on. A failed
+	 * listing still settles, since lifecycle broadcasts are all that will arrive.
+	 */
+	isLoaded: boolean;
 	sessions: TerminalSessionSnapshot[];
 }
 
@@ -86,6 +94,7 @@ export function useWorkspaceTerminalSessions(
 	workspaceId: string,
 ): WorkspaceTerminalSessionsState {
 	const [sessions, setSessions] = useState<TerminalSessionSnapshot[]>([]);
+	const [isLoaded, setIsLoaded] = useState(false);
 	const activeTerminalIds = useAtomValue(activeTerminalIdsAtom);
 	// Tabs the user explicitly closed, covering the window before main has marked
 	// the session closed and stopped broadcasting for it — and the case where
@@ -103,15 +112,21 @@ export function useWorkspaceTerminalSessions(
 	if (prevWorkspaceId !== workspaceId) {
 		setPrevWorkspaceId(workspaceId);
 		setSessions([]);
+		setIsLoaded(false);
 		closedTerminalIdsRef.current.clear();
 	}
 
 	useEffect(() => {
 		let cancelled = false;
+		const bridge = window.ensemblr;
 
-		window.ensemblr
+		if (!bridge) {
+			setIsLoaded(true);
+		}
+
+		bridge
 			?.listTerminalSessions({ workspaceId })
-			.then((result) => {
+			.then(async (result) => {
 				if (cancelled) {
 					return;
 				}
@@ -124,27 +139,28 @@ export function useWorkspaceTerminalSessions(
 					(session) => session.kind === 'terminal',
 				);
 				if (!hasLiveDockTerminal) {
-					void restoreDockTerminals(workspaceId, () => cancelled, setSessions);
+					await restoreDockTerminals(workspaceId, () => cancelled, setSessions);
 				}
 			})
 			.catch(() => {
 				// Listing is best-effort; lifecycle broadcasts still hydrate state.
+			})
+			.finally(() => {
+				if (!cancelled) {
+					setIsLoaded(true);
+				}
 			});
 
-		const unsubscribeLifecycle = window.ensemblr?.onTerminalLifecycle(
-			(event) => {
-				if (
-					event.workspaceId !== workspaceId ||
-					closedTerminalIdsRef.current.has(event.terminalId)
-				) {
-					return;
-				}
+		const unsubscribeLifecycle = bridge?.onTerminalLifecycle((event) => {
+			if (
+				event.workspaceId !== workspaceId ||
+				closedTerminalIdsRef.current.has(event.terminalId)
+			) {
+				return;
+			}
 
-				setSessions((previous) =>
-					upsertTerminalSession(previous, event.session),
-				);
-			},
-		);
+			setSessions((previous) => upsertTerminalSession(previous, event.session));
+		});
 
 		return () => {
 			cancelled = true;
@@ -195,5 +211,11 @@ export function useWorkspaceTerminalSessions(
 		}
 	}, []);
 
-	return { activeTerminalIds, closeTerminal, createTerminal, sessions };
+	return {
+		activeTerminalIds,
+		closeTerminal,
+		createTerminal,
+		isLoaded,
+		sessions,
+	};
 }

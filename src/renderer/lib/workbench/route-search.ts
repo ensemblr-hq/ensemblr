@@ -50,7 +50,9 @@ export function isDockTab(value: unknown): value is DockTabId {
 }
 
 /** Type guard for `terminal:*` dock tab ids. */
-function isTerminalDockTabId(value: unknown): value is TerminalDockTabId {
+export function isTerminalDockTabId(
+	value: unknown,
+): value is TerminalDockTabId {
 	return (
 		typeof value === 'string' &&
 		value.startsWith('terminal:') &&

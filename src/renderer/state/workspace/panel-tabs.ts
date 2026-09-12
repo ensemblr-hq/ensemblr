@@ -4,6 +4,7 @@ import {
 	DEFAULT_DOCK_TAB,
 	DEFAULT_REVIEW_TAB,
 	getPreferredSession,
+	isTerminalDockTabId,
 } from '@/renderer/lib/workbench';
 import type {
 	DockTabId,
@@ -196,6 +197,12 @@ export function getPreferredReviewTab({
  * preference, then the most recently visited tab still open, then the default,
  * then the first available tab on the workspace. The visit fallback is what
  * keeps a closed terminal from dumping the user back on Setup.
+ *
+ * A `terminal:*` preference the workspace cannot yet corroborate is returned
+ * unchanged rather than falling through, for as long as the strip is still
+ * loading — see {@link isUnresolvedTerminalTab}. Once it has loaded, a
+ * preference matching none of its tabs is a closed terminal and falls through
+ * like any other, so nothing holds a dead id indefinitely.
  * @param input - Persisted prefs, URL override, visit history and workspace.
  * @returns The chosen dock tab.
  */
@@ -213,6 +220,10 @@ export function getPreferredDockTab({
 	const preferredDockTab = routeDockTab ?? dockTabsByWorkspace[workspace.id];
 
 	if (preferredDockTab && hasDockTab(workspace, preferredDockTab)) {
+		return preferredDockTab;
+	}
+
+	if (isUnresolvedTerminalTab(workspace, preferredDockTab)) {
 		return preferredDockTab;
 	}
 
@@ -274,6 +285,39 @@ function hasDockTab(
 		typeof dockTab === 'string' &&
 		workspace.dockTabs.some((tab) => tab.id === dockTab)
 	);
+}
+
+/**
+ * Whether a remembered `terminal:*` tab is merely unresolvable rather than gone,
+ * so it should be held onto instead of replaced by a fallback. Only the routed
+ * workspace's shell model carries live terminal tabs, and even there they arrive
+ * one main-process round trip after the workspace mounts — so a terminal
+ * preference names no visible tab both while a workspace loads and whenever a
+ * link is built for a workspace the user is not on. Falling back in that window
+ * is what the caller then persists, discarding the user's own tab before it
+ * could ever match.
+ *
+ * `terminalTabsLoaded` is the only signal that separates the two, and the
+ * distinction has to be that signal rather than an empty strip: a workspace with
+ * no terminals open is an ordinary steady state, and a dock restore relaunches
+ * serially, so "the strip holds some terminal tab" goes true while later ones
+ * are still arriving. Once it is loaded, a preference naming none of the tabs is
+ * genuinely closed and falls through to the visit fallback, which is what settles
+ * the stale preference.
+ *
+ * So this covers a workspace being opened or switched to within one app run,
+ * where main keeps the session ids. A relaunched dock restores under fresh ids,
+ * which no remembered preference can match — the hold ends when the strip loads
+ * and the visit fallback picks the tab, as it does for a terminal that is gone.
+ * @param workspace - The workspace whose dock tabs are in view.
+ * @param dockTab - The remembered or routed preference.
+ * @returns True when the preference is a terminal tab whose strip has not loaded.
+ */
+function isUnresolvedTerminalTab(
+	workspace: WorkspaceShellModel,
+	dockTab: unknown,
+): dockTab is DockTabId {
+	return isTerminalDockTabId(dockTab) && workspace.terminalTabsLoaded !== true;
 }
 
 /** Type guard for review-panel tab enum values. */
