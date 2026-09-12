@@ -19,11 +19,17 @@ export interface JsonlLineStreamOptions {
 	maxLineBytes?: number;
 	/** Called once per complete line (without the trailing LF). */
 	onLine: (line: string) => void;
-	/** Called when a single line exceeds `maxLineBytes`. The bad line is discarded. */
+	/**
+	 * Called when a single line exceeds `maxLineBytes`. The bad line is
+	 * discarded, and `firstBytes` is the only trace of it left: long enough to
+	 * carry a JSON frame's leading identity fields so a consumer can reconcile
+	 * whatever the lost frame would have settled. Truncate it before display.
+	 */
 	onOversize?: (info: { droppedBytes: number; firstBytes: string }) => void;
 }
 
 const DEFAULT_MAX_LINE_BYTES = 1024 * 1024;
+const DISCARDED_LINE_PREVIEW_CHARS = 1024;
 
 /** Public surface of a chunked LF-delimited line buffer: feed chunks, flush, or reset. */
 export interface JsonlLineStream {
@@ -51,22 +57,49 @@ export function createJsonlLineStream({
 	onOversize,
 }: JsonlLineStreamOptions): JsonlLineStream {
 	let buffer = '';
+	let bufferedBytes = 0;
+	let preview = '';
 	let oversizeActive = false;
 	let decoder = new StringDecoder('utf8');
+
+	const clearBuffer = (): void => {
+		buffer = '';
+		bufferedBytes = 0;
+		preview = '';
+	};
+
+	// Byte length and preview are both accumulated per chunk rather than derived
+	// from `buffer` on demand: a multi-megabyte frame arrives in thousands of
+	// chunks, and both remeasuring and slicing the accumulated line force V8 to
+	// flatten the whole rope, which is quadratic across the frame.
+	const appendToLine = (text: string): void => {
+		buffer += text;
+		bufferedBytes += Buffer.byteLength(text, 'utf8');
+		if (preview.length < DISCARDED_LINE_PREVIEW_CHARS) {
+			preview += text.slice(0, DISCARDED_LINE_PREVIEW_CHARS - preview.length);
+		}
+	};
 
 	const flushBufferedLine = (): void => {
 		if (oversizeActive) {
 			// Reached the cap before LF; drop everything until we see the next LF.
 			oversizeActive = false;
-			buffer = '';
+			clearBuffer();
 			return;
 		}
 		if (buffer.length === 0) {
 			return;
 		}
 		const line = stripTrailingCarriageReturn(buffer);
-		buffer = '';
+		clearBuffer();
 		onLine(line);
+	};
+
+	const discardBufferedLine = (): void => {
+		const droppedBytes = bufferedBytes;
+		const firstBytes = preview;
+		clearBuffer();
+		onOversize?.({ droppedBytes, firstBytes });
 	};
 
 	const tripOversize = (): void => {
@@ -74,10 +107,7 @@ export function createJsonlLineStream({
 			return;
 		}
 		oversizeActive = true;
-		const droppedBytes = Buffer.byteLength(buffer, 'utf8');
-		const firstBytes = buffer.slice(0, Math.min(128, buffer.length));
-		buffer = '';
-		onOversize?.({ droppedBytes, firstBytes });
+		discardBufferedLine();
 	};
 
 	const ingest = (text: string): void => {
@@ -96,20 +126,18 @@ export function createJsonlLineStream({
 			if (oversizeActive) {
 				// Discard remainder of the oversized line up to and including LF.
 				oversizeActive = false;
-				buffer = '';
+				clearBuffer();
 				continue;
 			}
 
-			const combined = buffer + slice;
-			buffer = '';
-			if (Buffer.byteLength(combined, 'utf8') > maxLineBytes) {
-				onOversize?.({
-					droppedBytes: Buffer.byteLength(combined, 'utf8'),
-					firstBytes: combined.slice(0, Math.min(128, combined.length)),
-				});
+			appendToLine(slice);
+			if (bufferedBytes > maxLineBytes) {
+				discardBufferedLine();
 				continue;
 			}
-			onLine(stripTrailingCarriageReturn(combined));
+			const line = stripTrailingCarriageReturn(buffer);
+			clearBuffer();
+			onLine(line);
 		}
 
 		if (start < text.length) {
@@ -117,14 +145,10 @@ export function createJsonlLineStream({
 				// Already tripped; keep dropping until the next LF.
 				return;
 			}
-			const remainder = text.slice(start);
-			const projectedBytes = Buffer.byteLength(buffer + remainder, 'utf8');
-			if (projectedBytes > maxLineBytes) {
-				buffer += remainder;
+			appendToLine(text.slice(start));
+			if (bufferedBytes > maxLineBytes) {
 				tripOversize();
-				return;
 			}
-			buffer += remainder;
 		}
 	};
 
@@ -147,7 +171,7 @@ export function createJsonlLineStream({
 			flushBufferedLine();
 		},
 		reset: () => {
-			buffer = '';
+			clearBuffer();
 			oversizeActive = false;
 			decoder = new StringDecoder('utf8');
 		},

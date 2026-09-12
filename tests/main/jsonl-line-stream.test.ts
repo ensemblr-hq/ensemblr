@@ -147,3 +147,58 @@ test('flushes a trailing partial multibyte char without a spurious replacement',
 
 	assert.deepEqual(lines, ['日本語']);
 });
+
+test('retains enough of a discarded line to carry a frame identity', () => {
+	const oversize: Array<{ droppedBytes: number; firstBytes: string }> = [];
+	const stream = createJsonlLineStream({
+		maxLineBytes: 4096,
+		onLine: () => undefined,
+		onOversize: (info) => oversize.push(info),
+	});
+
+	const toolCallId = `call_${'x'.repeat(26)}|fc_${'0'.repeat(48)}`;
+	const head = `{"type":"tool_execution_end","toolCallId":"${toolCallId}","toolName":"read","result":{"content":[{"type":"text","text":"`;
+	stream.feed(head);
+	stream.feed('A'.repeat(8192));
+	stream.feed('"}]}}\nnext\n');
+
+	const dropped = oversize[0];
+	assert.ok(dropped);
+	assert.ok(dropped.firstBytes.includes(`"toolCallId":"${toolCallId}"`));
+});
+
+test('bounds the retained prefix and never carries it into the next line', () => {
+	const oversize: Array<{ droppedBytes: number; firstBytes: string }> = [];
+	const stream = createJsonlLineStream({
+		maxLineBytes: 4096,
+		onLine: () => undefined,
+		onOversize: (info) => oversize.push(info),
+	});
+
+	stream.feed(`{"first":"${'A'.repeat(8192)}"}\n`);
+	stream.feed(`{"second":"${'B'.repeat(8192)}"}\n`);
+
+	assert.equal(oversize.length, 2);
+	for (const dropped of oversize) {
+		assert.ok(dropped.firstBytes.length <= 1024);
+	}
+	assert.ok(oversize[0]?.firstBytes.startsWith('{"first":"'));
+	assert.ok(oversize[1]?.firstBytes.startsWith('{"second":"'));
+	assert.ok(!oversize[1]?.firstBytes.includes('A'));
+});
+
+test('counts buffered bytes without rescanning the accumulated line', () => {
+	const oversize: Array<{ droppedBytes: number; firstBytes: string }> = [];
+	const stream = createJsonlLineStream({
+		maxLineBytes: 1024,
+		onLine: () => undefined,
+		onOversize: (info) => oversize.push(info),
+	});
+
+	for (let index = 0; index < 8; index += 1) {
+		stream.feed('日'.repeat(64));
+	}
+
+	assert.equal(oversize.length, 1);
+	assert.equal(oversize[0]?.droppedBytes, 6 * 64 * 3);
+});

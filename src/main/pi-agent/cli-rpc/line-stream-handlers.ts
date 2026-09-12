@@ -1,12 +1,19 @@
 import type { AgentErrorCode } from '../../agent-runtime/agent-types.ts';
 import type { JsonlLineStream } from '../../pi-ipc';
 import { createJsonlLineStream } from '../../pi-ipc/jsonl-line-stream.ts';
+import { recoverToolCompletion } from './discarded-frame.ts';
+
+const OVERSIZE_DETAIL_CHARS = 128;
 
 /**
  * Builds the JSONL stream used to parse Pi RPC stdout. Each non-empty line is
  * tapped (`onRawLine`) for the debug surface, then JSON-parsed and forwarded
  * to `onFrame`. Parse failures and oversize lines surface as recoverable
  * `adapter-failure` errors so the channel can keep running.
+ *
+ * A discarded line that was carrying a tool's result is additionally recovered
+ * into a synthetic completion frame, so the call settles as failed instead of
+ * running forever — see {@link recoverToolCompletion}.
  *
  * Pulled out of the adapter so the adapter file can stay focused on
  * orchestration rather than transport plumbing.
@@ -49,12 +56,17 @@ export function createPiRpcLineStream({
 			onFrame(parsed);
 		},
 		onOversize: ({ droppedBytes, firstBytes }) => {
+			const message = `Discarded oversize Pi RPC line (${droppedBytes} bytes > ${maxLineBytes} cap).`;
 			emitError(
 				'adapter-failure',
-				`Discarded oversize Pi RPC line (${droppedBytes} bytes > ${maxLineBytes} cap).`,
-				firstBytes,
+				message,
+				firstBytes.slice(0, OVERSIZE_DETAIL_CHARS),
 				true,
 			);
+			const recovered = recoverToolCompletion(firstBytes, message);
+			if (recovered) {
+				onFrame(recovered);
+			}
 		},
 	});
 }
