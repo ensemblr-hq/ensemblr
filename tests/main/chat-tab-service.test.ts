@@ -743,6 +743,7 @@ test('service surfaces a clear error when the database is closed', (t) => {
 			close: () => undefined,
 			getConnection: () => null,
 			getHealth: () => ({ path: '', schemaVersion: 0, status: 'error' }),
+			vacuum: () => undefined,
 			open: () => ({ path: '', schemaVersion: 0, status: 'error' }),
 		},
 		lookups: {

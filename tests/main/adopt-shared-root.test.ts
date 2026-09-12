@@ -78,6 +78,7 @@ function databaseServiceFor(harness: Harness): EnsemblrDatabaseService {
 			schemaVersion: harness.connection.schemaVersion,
 			status: 'ok',
 		}),
+		vacuum: () => undefined,
 		open: () => ({
 			path: harness.connection.path,
 			schemaVersion: harness.connection.schemaVersion,

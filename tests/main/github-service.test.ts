@@ -105,6 +105,7 @@ function stubDatabaseService(database: DatabaseSync): EnsemblrDatabaseService {
 		close: () => undefined,
 		getConnection: () => ({ database }) as never,
 		getHealth: () => ({}) as never,
+		vacuum: () => undefined,
 		open: () => ({}) as never,
 	};
 }

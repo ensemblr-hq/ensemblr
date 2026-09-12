@@ -1491,13 +1491,61 @@ test('database service reports health without throwing on open', (t) => {
 	});
 	t.after(service.close);
 
-	assert.deepEqual(service.open(), {
-		path: fixture.databasePath,
-		schemaVersion: LATEST_SCHEMA_VERSION,
-		status: 'ok',
-	});
+	const health = service.open();
+	assert.equal(health.path, fixture.databasePath);
+	assert.equal(health.schemaVersion, LATEST_SCHEMA_VERSION);
+	assert.equal(health.status, 'ok');
+	assert.equal(typeof health.sizeBytes, 'number');
+	assert.ok((health.sizeBytes ?? 0) > 0);
 	assert.equal(service.getConnection()?.path, fixture.databasePath);
 	assert.equal(service.getHealth().status, 'ok');
+});
+
+test('vacuum shrinks the file after bulk deletes reclaim pages', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const service = createEnsemblrDatabaseService({
+		databasePath: fixture.databasePath,
+	});
+	t.after(service.close);
+	service.open();
+
+	const database = service.getConnection()?.database;
+	assert.ok(database);
+	database.exec(`
+INSERT INTO repositories (id, slug, name, path)
+VALUES ('repo-vacuum', 'repo-vacuum', 'Repo Vacuum', '/tmp/repo-vacuum');
+INSERT INTO workspaces (id, repository_id, slug, name, path)
+VALUES ('ws-vacuum', 'repo-vacuum', 'ws-vacuum', 'Workspace Vacuum', '/tmp/repo-vacuum/ws-vacuum');
+`);
+	const insertComment = database.prepare(
+		"INSERT INTO comments (id, workspace_id, file_path, body) VALUES (?, 'ws-vacuum', 'file.ts', ?)",
+	);
+	for (let index = 0; index < 2000; index += 1) {
+		insertComment.run(`comment-${index}`, 'x'.repeat(4096));
+	}
+	database.exec("DELETE FROM comments WHERE id LIKE 'comment-%';");
+
+	const sizeBeforeVacuum = service.getHealth().sizeBytes;
+	assert.ok(sizeBeforeVacuum);
+
+	service.vacuum();
+
+	const sizeAfterVacuum = service.getHealth().sizeBytes;
+	assert.ok(sizeAfterVacuum);
+	assert.ok(sizeAfterVacuum < sizeBeforeVacuum);
+});
+
+test('vacuum refuses to run against a closed database', () => {
+	const fixture = createTestDatabasePath();
+	fixture.cleanup();
+
+	const service = createEnsemblrDatabaseService({
+		databasePath: fixture.databasePath,
+	});
+
+	assert.throws(() => service.vacuum(), /not open/);
 });
 
 test('repository workspace navigation snapshot nests active workspaces', (t) => {

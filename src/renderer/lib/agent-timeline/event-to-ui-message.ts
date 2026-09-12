@@ -24,6 +24,7 @@ import {
 	buildErrorMessage,
 	buildInterruptedMessage,
 } from './diagnostic-event-mapper';
+import { withTruncationNotice } from './payload-truncation.ts';
 import { parentToolCallIdOf } from './subagent-parts.ts';
 import {
 	dropStreamedFailureEcho,
@@ -66,7 +67,7 @@ export function eventsToUIMessages(
 interface ProjectionCursor {
 	folded: readonly AgentEventFrame[];
 	pending: PendingGroup | null;
-	result: readonly UIMessage[];
+	result: UIMessage[];
 }
 
 /**
@@ -96,11 +97,15 @@ interface SkillActivation {
 	source: UIMessage;
 }
 
-const EMPTY_CURSOR: ProjectionCursor = {
-	folded: [],
-	pending: null,
-	result: [],
-};
+/**
+ * The cursor a projector starts on. Built per projector rather than shared,
+ * because the fold appends into `result` in place: a shared starting cursor
+ * would have every projector's first call pushing into one array.
+ * @returns A cursor that has folded nothing
+ */
+function emptyCursor(): ProjectionCursor {
+	return { folded: [], pending: null, result: [] };
+}
 
 /**
  * Builds a projector that folds only the events which arrived since its last
@@ -123,11 +128,14 @@ export function createTimelineProjector(): (
 		skillCommand: new WeakMap(),
 		skillMarker: new WeakMap(),
 	};
-	let cursor = EMPTY_CURSOR;
+	let cursor = emptyCursor();
 
 	return (events) => {
 		const resumed = canResumeProjection(cursor, events);
-		const result: UIMessage[] = resumed ? [...cursor.result] : [];
+		// The cursor's own array, not a copy: this runs once per animation frame of
+		// a stream, and copying made one delta cost a walk of the whole transcript.
+		// Safe because `finalizeProjection` never hands its input back.
+		const result: UIMessage[] = resumed ? cursor.result : [];
 		let pending = resumed ? cursor.pending : null;
 
 		for (const event of events.slice(resumed ? cursor.folded.length : 0)) {
@@ -239,7 +247,7 @@ function dedupTurnKey(message: UIMessage): string | null {
  */
 function dropFlushedSkillDuplicates(
 	messages: readonly UIMessage[],
-): UIMessage[] {
+): readonly UIMessage[] {
 	const expandedKeysByTurn = new Map<string | null, Set<string>>();
 	for (const message of messages) {
 		if (message.role !== 'user') {
@@ -259,7 +267,7 @@ function dropFlushedSkillDuplicates(
 		expandedKeysByTurn.set(turnKey, keys);
 	}
 	if (expandedKeysByTurn.size === 0) {
-		return [...messages];
+		return messages;
 	}
 	return messages.filter((message) => {
 		if (message.role !== 'user') {
@@ -658,11 +666,23 @@ function projectMessagePayload(
 	switch (payload.kind) {
 		case 'text':
 			return payload.text
-				? [{ ...link, state: 'done', text: payload.text, type: 'text' }]
+				? [
+						{
+							...link,
+							state: 'done',
+							text: withTruncationNotice(payload.text, payload.truncatedBytes),
+							type: 'text',
+						},
+					]
 				: [];
 		case 'reasoning':
 			return [
-				{ ...link, state: 'done', text: payload.text, type: 'reasoning' },
+				{
+					...link,
+					state: 'done',
+					text: withTruncationNotice(payload.text, payload.truncatedBytes),
+					type: 'reasoning',
+				},
 			];
 		case 'custom':
 			return payload.text
@@ -694,7 +714,17 @@ function projectMessagePayload(
 				: [];
 		case 'prompt':
 			return payload.prompt
-				? [{ ...link, state: 'done', text: payload.prompt, type: 'text' }]
+				? [
+						{
+							...link,
+							state: 'done',
+							text: withTruncationNotice(
+								payload.prompt,
+								payload.truncatedBytes,
+							),
+							type: 'text',
+						},
+					]
 				: [];
 		case 'tool-call':
 			return [buildToolCallPart(payload, event, parentToolCallId)];
@@ -733,10 +763,24 @@ function projectMessagePart(
 	switch (part.kind) {
 		case 'text':
 			return part.text
-				? [{ ...link, state: 'done', text: part.text, type: 'text' }]
+				? [
+						{
+							...link,
+							state: 'done',
+							text: withTruncationNotice(part.text, part.truncatedBytes),
+							type: 'text',
+						},
+					]
 				: [];
 		case 'reasoning':
-			return [{ ...link, state: 'done', text: part.text, type: 'reasoning' }];
+			return [
+				{
+					...link,
+					state: 'done',
+					text: withTruncationNotice(part.text, part.truncatedBytes),
+					type: 'reasoning',
+				},
+			];
 		case 'tool-call':
 			return [buildToolCallPart(part, event, parentToolCallId)];
 		case 'tool-result':

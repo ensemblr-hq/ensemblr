@@ -1,29 +1,5 @@
+/// <reference types="vite/client" />
 import type { AppLanguage } from '@/shared/i18n';
-
-import elCommon from './locales/el/common.json';
-import elErrors from './locales/el/errors.json';
-import elGit from './locales/el/git.json';
-import elLinear from './locales/el/linear.json';
-import elOnboarding from './locales/el/onboarding.json';
-import elReview from './locales/el/review.json';
-import elSettings from './locales/el/settings.json';
-import elWorkbench from './locales/el/workbench.json';
-import enCommon from './locales/en/common.json';
-import enErrors from './locales/en/errors.json';
-import enGit from './locales/en/git.json';
-import enLinear from './locales/en/linear.json';
-import enOnboarding from './locales/en/onboarding.json';
-import enReview from './locales/en/review.json';
-import enSettings from './locales/en/settings.json';
-import enWorkbench from './locales/en/workbench.json';
-import ruCommon from './locales/ru/common.json';
-import ruErrors from './locales/ru/errors.json';
-import ruGit from './locales/ru/git.json';
-import ruLinear from './locales/ru/linear.json';
-import ruOnboarding from './locales/ru/onboarding.json';
-import ruReview from './locales/ru/review.json';
-import ruSettings from './locales/ru/settings.json';
-import ruWorkbench from './locales/ru/workbench.json';
 
 /**
  * Message namespaces, one per broad UI surface. Each maps onto one migration
@@ -46,42 +22,46 @@ export type I18nNamespace = (typeof I18N_NAMESPACES)[number];
 /** Namespace resolved when a key carries no `<namespace>:` prefix. */
 export const DEFAULT_NAMESPACE = 'common' satisfies I18nNamespace;
 
+/** Every namespace of one language, keyed the way i18next's `resources` are. */
+export type LanguageCatalogue = Record<I18nNamespace, object>;
+
 /**
- * Every catalogue, bundled into the renderer chunk rather than fetched. The
- * packaged renderer loads from `file://`, where an HTTP backend cannot resolve
- * relative URLs, and passing `resources` is what makes i18next's `init` run
- * synchronously — which two `lib/workbench/` modules rely on to call `t()` at
- * module scope.
+ * The 24 catalogue files, each its own lazily-fetched chunk.
+ *
+ * Statically importing all three languages put 1.03 MB raw / 272 KB gzip on the
+ * critical path for the ~166 KB one launch renders; the other two are reachable
+ * only after the user switches language. The packaged renderer loads from
+ * `file://`, where an HTTP backend cannot resolve relative URLs — a glob keeps
+ * every catalogue a build-time-resolved module specifier instead, so nothing
+ * depends on a base URL at runtime.
  */
-export const resources = {
-	el: {
-		common: elCommon,
-		errors: elErrors,
-		git: elGit,
-		linear: elLinear,
-		onboarding: elOnboarding,
-		review: elReview,
-		settings: elSettings,
-		workbench: elWorkbench,
-	},
-	en: {
-		common: enCommon,
-		errors: enErrors,
-		git: enGit,
-		linear: enLinear,
-		onboarding: enOnboarding,
-		review: enReview,
-		settings: enSettings,
-		workbench: enWorkbench,
-	},
-	ru: {
-		common: ruCommon,
-		errors: ruErrors,
-		git: ruGit,
-		linear: ruLinear,
-		onboarding: ruOnboarding,
-		review: ruReview,
-		settings: ruSettings,
-		workbench: ruWorkbench,
-	},
-} as const satisfies Record<AppLanguage, Record<I18nNamespace, object>>;
+const catalogueModules = import.meta.glob<{ default: object }>(
+	'./locales/*/*.json',
+);
+
+/**
+ * Loads every namespace of one language.
+ * @param language - The language whose catalogue to fetch
+ * @returns The language's eight namespaces, ready to hand i18next
+ * @throws When the glob carries no module for one of the namespaces, which
+ *   means a catalogue file is missing from `locales/<language>/`
+ */
+export async function loadCatalogue(
+	language: AppLanguage,
+): Promise<LanguageCatalogue> {
+	const namespaces = await Promise.all(
+		I18N_NAMESPACES.map(async (namespace) => {
+			const load = catalogueModules[`./locales/${language}/${namespace}.json`];
+
+			if (!load) {
+				throw new Error(
+					`Missing i18n catalogue for ${language}:${namespace}.json`,
+				);
+			}
+
+			return [namespace, (await load()).default] as const;
+		}),
+	);
+
+	return Object.fromEntries(namespaces) as LanguageCatalogue;
+}

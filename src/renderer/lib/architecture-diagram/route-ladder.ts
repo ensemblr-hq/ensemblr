@@ -26,6 +26,7 @@ import type {
 
 import { nearestLane } from './lanes';
 import type { DiagramNode } from './layout-types';
+import { nodeIndexFor } from './node-index';
 import {
 	automaticPortRhythmBridge,
 	collinearBacktrack,
@@ -38,6 +39,9 @@ import {
 
 /** Shortest stub the automatic router will fall back to when doglegging. */
 const MINIMUM_STUB_PX = 8;
+
+/** Clearance a route keeps from a component box it is not attached to. */
+const COMPONENT_CLEARANCE_PX = 2;
 
 /** How far a lane route leaves its endpoint before turning into the lane. */
 const LANE_STUB = 12;
@@ -123,6 +127,12 @@ export function selfLoopPoints(node: MeasuredRect): readonly DiagramPoint[] {
 
 /**
  * True when no component other than the edge's own endpoints sits on the route.
+ *
+ * Each segment is tested only against the boxes its own bounding box reaches,
+ * looked up through the compile's bucket index. The ladder offers a candidate
+ * per rung per edge and each candidate is several segments, so testing every
+ * box against every segment is what made routing super-quadratic in the
+ * component count.
  * @param connection - The edge being routed
  * @param points - The candidate route
  * @param nodes - Every measured component
@@ -134,24 +144,29 @@ function routeClearsComponents(
 	nodes: readonly DiagramNode[],
 ): boolean {
 	const endpointIds = new Set([connection.from, connection.to]);
-	return nodes.every((node) => {
-		if (endpointIds.has(node.id) || !Number.isFinite(node.x)) {
-			return true;
-		}
-		for (let index = 0; index < points.length - 1; index += 1) {
-			if (
-				segmentIntersectsRect(
-					points[index] as DiagramPoint,
-					points[index + 1] as DiagramPoint,
-					node,
-					2,
-				)
-			) {
+	const index = nodeIndexFor(nodes);
+
+	for (let index_ = 0; index_ < points.length - 1; index_ += 1) {
+		const start = points[index_] as DiagramPoint;
+		const end = points[index_ + 1] as DiagramPoint;
+		const near = index.near(
+			Math.min(start[0], end[0]) - COMPONENT_CLEARANCE_PX,
+			Math.min(start[1], end[1]) - COMPONENT_CLEARANCE_PX,
+			Math.max(start[0], end[0]) + COMPONENT_CLEARANCE_PX,
+			Math.max(start[1], end[1]) + COMPONENT_CLEARANCE_PX,
+		);
+
+		for (const node of near) {
+			if (endpointIds.has(node.id) || !Number.isFinite(node.x)) {
+				continue;
+			}
+			if (segmentIntersectsRect(start, end, node, COMPONENT_CLEARANCE_PX)) {
 				return false;
 			}
 		}
-		return true;
-	});
+	}
+
+	return true;
 }
 
 /**

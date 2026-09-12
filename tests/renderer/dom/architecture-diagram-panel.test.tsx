@@ -382,6 +382,46 @@ describe('ArchitectureDiagramPanel', () => {
 		expect(revealDirectory).not.toHaveBeenCalled();
 	});
 
+	it('opens nothing for a source path that leaves the workspace', async () => {
+		installBridge({
+			current: snapshot({
+				ir: ir({
+					boundaries: [],
+					components: [
+						{
+							col: 0,
+							id: 'storage',
+							label: 'storage',
+							row: 0,
+							sources: [{ path: '../../../../.ssh/id_rsa' }],
+							sublabel: 'src/main',
+							type: 'database',
+						},
+					],
+					connections: [],
+				}),
+			}),
+			previous: null,
+		});
+		const openFilePreview = vi.fn();
+		renderWithProviders(
+			<FilePreviewOpenerProvider value={openFilePreview}>
+				<ArchitectureDiagramPanel
+					onDirectoryReveal={revealDirectory}
+					workspaceId='ws-1'
+				/>
+			</FilePreviewOpenerProvider>,
+		);
+
+		await userEvent.click(
+			await screen.findByRole('button', {
+				name: 'Open ../../../../.ssh/id_rsa',
+			}),
+		);
+		expect(openFilePreview).not.toHaveBeenCalled();
+		expect(revealDirectory).not.toHaveBeenCalled();
+	});
+
 	it('gives a node with no source no open control', async () => {
 		installBridge({ current: snapshot(), previous: null });
 		renderWithProviders(

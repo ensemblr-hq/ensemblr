@@ -1,6 +1,6 @@
 import type { UIMessage } from 'ai';
 import type { TFunction } from 'i18next';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChatAssistantTurn } from '@/renderer/components/chat-assistant-turn';
 import { ChatWorkingIndicator } from '@/renderer/components/chat-turn-timer';
@@ -75,6 +75,60 @@ function resolveStartingLabel(
 		: null;
 }
 
+/**
+ * How many of a transcript's newest messages mount at once.
+ *
+ * Every message renders its whole markdown answer on mount — one 17 KB answer
+ * measured at 66–90 ms — and the conversation subtree remounts on each chat-tab
+ * switch, so an unwindowed hundred-turn transcript is a second of blocking work
+ * per open. Sixty turns is well past what a reader scrolls back through without
+ * asking for more, and the control above the window is what asks.
+ */
+const TRANSCRIPT_WINDOW = 60;
+
+/**
+ * The band above the transcript that reaches further back, in the two senses a
+ * transcript can be short: messages the window is holding back, and events the
+ * persisted read stopped short of. The first is free, so it is offered first;
+ * only once the window covers everything in hand does the control go to the
+ * database for an older page.
+ */
+function EarlierMessagesControl({
+	hasOlder,
+	isLoadingOlder,
+	onLoadOlder,
+	onWiden,
+	withheldMessages,
+}: {
+	hasOlder: boolean;
+	isLoadingOlder: boolean;
+	onLoadOlder: () => void;
+	onWiden: () => void;
+	withheldMessages: number;
+}) {
+	const { t } = useTranslation();
+	if (withheldMessages === 0 && !hasOlder) {
+		return null;
+	}
+	const widens = withheldMessages > 0;
+	return (
+		<button
+			className='mx-auto rounded-md border border-border/60 px-3 py-1.5 text-muted-foreground text-xs hover:text-foreground disabled:opacity-60'
+			disabled={!widens && isLoadingOlder}
+			onClick={widens ? onWiden : onLoadOlder}
+			type='button'
+		>
+			{widens
+				? t('workbench:timeline.show-earlier', {
+						count: withheldMessages,
+						defaultValue_one: 'Show {{count}} earlier message',
+						defaultValue_other: 'Show {{count}} earlier messages',
+					})
+				: t('workbench:timeline.load-earlier', 'Load earlier messages')}
+		</button>
+	);
+}
+
 export function AgentSessionTimeline({
 	activeAgentSessionId,
 	activeSession,
@@ -98,10 +152,11 @@ export function AgentSessionTimeline({
 		tabAgentSessionId,
 	} = useTimelineSession({ activeAgentSessionId, activeSession, workspace });
 
-	const { error, events } = useTimelineEvents({
-		branchId,
-		sessionId: agentSessionId,
-	});
+	const { error, events, hasOlder, isLoadingOlder, loadOlder } =
+		useTimelineEvents({
+			branchId,
+			sessionId: agentSessionId,
+		});
 
 	const fork = useForkConversation({
 		branchId,
@@ -142,6 +197,20 @@ export function AgentSessionTimeline({
 		() => retryPromptsByMessageId(messages),
 		[messages],
 	);
+
+	const [windowSize, setWindowSize] = useState(TRANSCRIPT_WINDOW);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the window resets per chat tab, not on anything the effect reads.
+	useEffect(() => {
+		setWindowSize(TRANSCRIPT_WINDOW);
+	}, [activeSession.chatTabId]);
+	const withheldMessages = Math.max(0, messages.length - windowSize);
+	const visibleMessages = useMemo(
+		() => (withheldMessages > 0 ? messages.slice(withheldMessages) : messages),
+		[messages, withheldMessages],
+	);
+	const widenWindow = useCallback(() => {
+		setWindowSize((previous) => previous + TRANSCRIPT_WINDOW);
+	}, []);
 
 	if (agentSessionId && error) {
 		return (
@@ -220,12 +289,19 @@ export function AgentSessionTimeline({
 						followKey={promptCount}
 						scrollKey={activeSession.chatTabId}
 					>
-						{messages.map((message, index) => (
+						<EarlierMessagesControl
+							hasOlder={hasOlder}
+							isLoadingOlder={isLoadingOlder}
+							onLoadOlder={loadOlder}
+							onWiden={widenWindow}
+							withheldMessages={withheldMessages}
+						/>
+						{visibleMessages.map((message, index) => (
 							<TimelineMessage
 								checkpointsByTurnId={checkpointsByTurnId}
 								errorRecovery={errorRecovery}
 								fork={canFork ? fork : null}
-								isLastMessage={index === messages.length - 1}
+								isLastMessage={index === visibleMessages.length - 1}
 								isStreaming={isStreaming}
 								key={message.id}
 								message={message}

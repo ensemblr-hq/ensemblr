@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 
 import { FilePathLabel } from '@/renderer/components/file-path-label';
 import { Button } from '@/renderer/components/ui/button';
+import { externalHref } from '@/renderer/lib/external-url';
 import { cn } from '@/renderer/lib/utils';
 import { getProviderLabel } from '@/renderer/lib/workbench/provider-label';
 import type {
@@ -21,7 +22,6 @@ import type {
 	PullRequestCheckStatus,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-
 import { ProviderMark } from './provider-mark';
 
 /** Row showing the PR's current git status with optional action button. */
@@ -195,7 +195,7 @@ export function PullRequestCheckRow({
 					'outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-1 focus-visible:ring-ring',
 				)}
 				data-check-status={check.status}
-				href={check.url}
+				href={externalHref(check.url)}
 				rel='noreferrer'
 				target='_blank'
 			>

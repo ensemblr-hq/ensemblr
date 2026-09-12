@@ -133,6 +133,7 @@ function createDatabaseService(
 		close: () => undefined,
 		getConnection: () => null,
 		getHealth: () => snapshot,
+		vacuum: () => undefined,
 		open: () => snapshot,
 	};
 }

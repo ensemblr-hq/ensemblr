@@ -51,25 +51,30 @@ fails, surfaces an error, and leaves the file byte-for-byte intact.
 
 | Key | Type | What it does |
 | --- | --- | --- |
-| `environment_variables` | table | Repository-scoped env vars, assembled into the environment of terminals and scripts — an agent session's own shell tool does not carry them. Names must be valid POSIX identifiers. |
 | `file_include_globs` | array of strings | Gitignore-style patterns for untracked files copied into every new workspace. Defaults to `[".env*"]`. |
-
-**Never put a secret in `environment_variables`** — the file is committed. Link
-an Infisical project, or use the Keychain-backed rows in Settings.
+| `environment_variables` | table | Accepted and validated, but **inert** — see below. Names must be valid POSIX identifiers. |
 
 `.worktreeinclude` in the repository root outranks `file_include_globs`.
 
 ### Keys that are accepted but inert
 
 These parse and type-check, and **nothing reads them**:
-`enterprise_data_privacy` (boolean), `spotlight_testing` (table), and the
-executable overrides `amp_executable_path`, `claude_executable_path`,
-`codex_executable_path`, `copilot_executable_path`, `gemini_executable_path`,
-`opencode_executable_path` (also accepted as `open_code_executable_path`), and
-`pi_executable_path` (all strings).
+`environment_variables` (table), `enterprise_data_privacy` (boolean),
+`spotlight_testing` (table), and the executable overrides
+`amp_executable_path`, `claude_executable_path`, `codex_executable_path`,
+`copilot_executable_path`, `gemini_executable_path`, `opencode_executable_path`
+(also accepted as `open_code_executable_path`), and `pi_executable_path` (all
+strings).
 
-To actually pin a runtime's executable, use **Settings → Providers**. That
-override is app-wide, not per repository.
+**`environment_variables` does not reach any terminal.** The key normalises into
+the repository scope and stops there: the environment a terminal or script
+launches with is assembled from env files, Infisical, Ensemblr's own plain
+values, and the platform secret store — never from a repository's committed
+settings. Do not tell a user a command will see a variable because the
+repository declares one, and do not route a secret-dependent command through a
+terminal on that basis. To actually set a variable, use **Settings →
+Environment** or an env file; to pin a runtime's executable, use **Settings →
+Providers**. Both are app-wide, not per repository.
 
 ## `[scripts]`
 
@@ -146,8 +151,8 @@ and the string is ignored.
 
 Every terminal Ensemblr launches — the setup script, a run script, a spawn
 terminal, a harness — is handed five reserved variables, populated per
-workspace. They are reserved: a same-named row in `environment_variables` or in
-Settings is overridden rather than honoured.
+workspace. They are reserved: a same-named row in Settings is overridden rather
+than honoured.
 
 | Variable | Value |
 | --- | --- |

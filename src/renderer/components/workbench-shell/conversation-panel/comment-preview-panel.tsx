@@ -6,6 +6,7 @@ import { CommentMarkdown } from '@/renderer/components/comment-markdown';
 import { Button } from '@/renderer/components/ui/button';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { useReviewCommentAttachments } from '@/renderer/hooks/workbench-shell/composer/use-review-comment-attachments';
+import { externalHref } from '@/renderer/lib/external-url';
 import { cn } from '@/renderer/lib/utils';
 import { formatCommentLocation } from '@/renderer/lib/workbench/comment-body';
 import { getProviderLabel } from '@/renderer/lib/workbench/provider-label';
@@ -132,7 +133,7 @@ function CommentPreviewHeader({
 									'Open comment on {{provider}}',
 									{ provider: getProviderLabel(comment.provider) },
 								)}
-								href={comment.url}
+								href={externalHref(comment.url)}
 								rel='noreferrer'
 								target='_blank'
 							>

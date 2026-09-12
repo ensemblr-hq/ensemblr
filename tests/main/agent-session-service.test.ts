@@ -410,6 +410,7 @@ function createService(
 			close: () => undefined,
 			getConnection: () => ({ database, path: ':memory:', schemaVersion: 5 }),
 			getHealth: () => ({ path: ':memory:', schemaVersion: 5, status: 'ok' }),
+			vacuum: () => undefined,
 			open: () => ({ path: ':memory:', schemaVersion: 5, status: 'ok' }),
 		},
 		eventSink: options.eventSink,

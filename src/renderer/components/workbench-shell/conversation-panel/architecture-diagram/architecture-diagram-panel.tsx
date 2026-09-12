@@ -19,6 +19,7 @@ import { useDiagramViewport } from '@/renderer/hooks/workbench-shell/architectur
 import { compileArchitectureLayout } from '@/renderer/lib/architecture-diagram';
 import { ZOOM } from '@/renderer/lib/architecture-diagram/viewport';
 import { failureText } from '@/renderer/lib/failure-text';
+import { staysInsideWorkspace } from '@/renderer/lib/markdown-references';
 import { formatRelativeTimestamp } from '@/renderer/lib/workbench/relative-time';
 import {
 	ARCHITECTURE_COMPONENT_TYPES,
@@ -62,6 +63,13 @@ function useSnapshotBroadcast(workspaceId: string): void {
  * A node usually stands for a *directory*, which the file preview cannot render
  * — it answers "is a directory and cannot be previewed" — but a diagram may
  * name a real file instead, so the path decides.
+ *
+ * A path that leaves the workspace opens nothing. `sources[].path` is
+ * workspace-relative by contract, and the snapshot it comes from is a tracked
+ * repository file an agent may have written — so `../../../.ssh/id_rsa` under an
+ * innocuous node name is a click that reads one thing and opens another. The
+ * preview IPC reads an escaping path perfectly happily, which is what lets a
+ * file tab open `/tmp`, so the refusal has to sit here.
  * @param onDirectoryReveal - Selects All files and expands a directory
  * @returns The open handler for a node's first source
  */
@@ -71,6 +79,9 @@ function useSourceOpener(
 	const openFilePreview = useFilePreviewOpener();
 	return useCallback(
 		(sourcePath: string) => {
+			if (!staysInsideWorkspace(sourcePath)) {
+				return;
+			}
 			if (namesAFile(sourcePath)) {
 				openFilePreview?.(sourcePath);
 				return;

@@ -64,6 +64,7 @@ function databaseServiceStub(): EnsemblrDatabaseService {
 		close: () => undefined,
 		getConnection: () => null,
 		getHealth: () => snapshot,
+		vacuum: () => undefined,
 		open: () => snapshot,
 	};
 }
@@ -234,6 +235,7 @@ test('prepare rejects the clone when another repository already tracks the remot
 			schemaVersion: connection.schemaVersion,
 			status: 'ok',
 		}),
+		vacuum: () => undefined,
 		open: () => ({
 			path: connection.path,
 			schemaVersion: connection.schemaVersion,
@@ -571,6 +573,7 @@ test('start records branchFrom as the new repository personal setting', async (t
 			schemaVersion: connection.schemaVersion,
 			status: 'ok',
 		}),
+		vacuum: () => undefined,
 		open: () => ({
 			path: connection.path,
 			schemaVersion: connection.schemaVersion,
@@ -626,6 +629,7 @@ test('start writes no branchFrom row when the picker was left alone', async (t) 
 			schemaVersion: connection.schemaVersion,
 			status: 'ok',
 		}),
+		vacuum: () => undefined,
 		open: () => ({
 			path: connection.path,
 			schemaVersion: connection.schemaVersion,

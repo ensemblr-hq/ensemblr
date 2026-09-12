@@ -4,7 +4,7 @@ import { fireEvent, screen } from '@testing-library/react';
 import { useAtom } from 'jotai';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { i18n } from '@/renderer/lib/i18n';
+import { changeAppLanguage } from '@/renderer/lib/i18n';
 import { languageAtom } from '@/renderer/state/preferences';
 import { APP_LANGUAGES, LANGUAGE_ENDONYMS } from '@/shared/i18n';
 
@@ -62,7 +62,7 @@ describe('language setting', () => {
 		renderWithProviders(<LanguagePicker />);
 		expect(screen.getByText('Ελληνικά')).toBeInTheDocument();
 
-		await i18n.changeLanguage('ru');
+		await changeAppLanguage('ru');
 		expect(screen.getByText('English')).toBeInTheDocument();
 		expect(screen.getByText('Ελληνικά')).toBeInTheDocument();
 	});

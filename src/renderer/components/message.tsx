@@ -1,7 +1,6 @@
 'use client';
 
 import { cjk } from '@streamdown/cjk';
-import { createCodePlugin } from '@streamdown/code';
 import { math } from '@streamdown/math';
 import { mermaid } from '@streamdown/mermaid';
 import { useAtomValue } from 'jotai';
@@ -28,10 +27,7 @@ import {
 	MARKDOWN_REHYPE_PLUGINS,
 } from '@/renderer/lib/markdown-rehype-plugins';
 import { cn } from '@/renderer/lib/utils';
-import {
-	markdownStyleAtom,
-	useResolvedCodeTheme,
-} from '@/renderer/state/preferences';
+import { markdownStyleAtom } from '@/renderer/state/preferences';
 import type {
 	WorkspacePathMatch,
 	WorkspacePathResolver,
@@ -53,22 +49,25 @@ type InlineCodeProps = ComponentProps<'code'> & { node?: unknown };
 /** Props received by Streamdown's fenced code-block renderer. */
 type FencedCodeProps = ComponentProps<'code'> & { node?: unknown };
 
-/** Renders assistant markdown through Streamdown, honoring the user's chosen code theme and markdown style. */
+/**
+ * Renders assistant markdown through Streamdown, honoring the user's chosen
+ * markdown style.
+ *
+ * `cjk` and `math` are the only two plugin slots Streamdown reads: the first
+ * contributes remark plugins, the second a remark and a rehype plugin. A `code`
+ * plugin is reached only to default the `shikiTheme` Streamdown's own fenced-code
+ * component reads, and the `code` slot below replaces that component with the
+ * app's own code surface — so one built here would be constructed per instance
+ * and never consulted. `mermaid` is the same story one step out: Streamdown takes
+ * a diagram plugin as a top-level prop rather than off `plugins`, and routes
+ * mermaid fences through the very component slot the override claims, so a
+ * mermaid fence renders as a plain code panel today. Restoring that is a feature,
+ * not a memoization.
+ */
 export const MessageResponse = memo(
 	({ className, components, ...props }: MessageResponseProps) => {
-		const codeTheme = useResolvedCodeTheme();
 		const markdownStyle = useAtomValue(markdownStyleAtom);
-		// Rebuild the code plugin when the picked theme changes so fenced blocks
-		// honor Settings → Appearance → Code theme in both light and dark modes.
-		const plugins = useMemo(
-			() => ({
-				cjk,
-				code: createCodePlugin({ themes: [codeTheme, codeTheme] }),
-				math,
-				mermaid,
-			}),
-			[codeTheme],
-		);
+		const plugins = useMemo(() => ({ cjk, math, mermaid }), []);
 		// Streamdown routes fenced blocks and inline spans through one `code`
 		// slot, splitting them on a `data-block` prop once `inlineCode` is set.
 		// Overriding both replaces fenced blocks with the timeline's code surface

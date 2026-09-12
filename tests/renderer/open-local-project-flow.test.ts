@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 import { beforeEach, expect, test, vi } from 'vitest';
-import { i18n } from '../../src/renderer/lib/i18n';
+import { changeAppLanguage } from '../../src/renderer/lib/i18n';
 import type { RegisterLocalRepositoryResult } from '../../src/shared/ipc/contracts/repository';
 
 const selectLocalRepository = vi.hoisted(() => vi.fn());
@@ -24,7 +24,7 @@ beforeEach(() => {
 	selectLocalRepository.mockReset();
 	registerLocalRepository.mockReset();
 	seedFirstWorkspace.mockReset();
-	void i18n.changeLanguage('en');
+	void changeAppLanguage('en');
 });
 
 const registration: RegisterLocalRepositoryResult = {
@@ -94,7 +94,7 @@ test('localizes known registration diagnostics and falls back for unknown codes'
 	});
 	const setLocalProjectOpen = vi.fn();
 
-	await i18n.changeLanguage('ru');
+	await changeAppLanguage('ru');
 	await openLocalProjectFlow({
 		navigate: vi.fn(),
 		setLastWorkspaceSelection: vi.fn(),
@@ -105,7 +105,7 @@ test('localizes known registration diagnostics and falls back for unknown codes'
 	);
 
 	vi.clearAllMocks();
-	await i18n.changeLanguage('el');
+	await changeAppLanguage('el');
 	await openLocalProjectFlow({
 		navigate: vi.fn(),
 		setLastWorkspaceSelection: vi.fn(),

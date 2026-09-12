@@ -3,8 +3,9 @@ import {
 	useQuery,
 	useQueryClient,
 } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { getEnsemblrApiOrNull } from '@/renderer/api/ensemblr';
 import {
 	agentSessionEventsQuery,
 	ensemblrQueryKeys,
@@ -31,6 +32,12 @@ const MAX_BUFFERED_EVENTS = 512;
  * `ensemblr:list-agent-session-events`. Live events arrive through the preload
  * broadcast channel and are appended to the same query cache so the UI does
  * not need a second source of truth.
+ *
+ * The persisted read is a bounded *window* onto the newest events rather than
+ * the whole branch — an unbounded read of a long branch blocks the main process
+ * and ships megabytes through one reply. `hasOlder` says the window stopped
+ * short of the branch's start, and `loadOlder` pages one window further back
+ * from the oldest ordinal currently held.
  */
 export function useTimelineEvents({
 	branchId,
@@ -41,12 +48,16 @@ export function useTimelineEvents({
 }): {
 	error: unknown;
 	events: readonly AgentSessionEventWire[];
+	hasOlder: boolean;
 	isLoading: boolean;
+	isLoadingOlder: boolean;
+	loadOlder: () => void;
 } {
 	const queryClient = useQueryClient();
 	const { data, error, isPending } = useQuery(
 		agentSessionEventsQuery(branchId),
 	);
+	const [isLoadingOlder, setIsLoadingOlder] = useState(false);
 
 	useEffect(() => {
 		if (!sessionId) {
@@ -73,10 +84,62 @@ export function useTimelineEvents({
 		[data?.events],
 	);
 
+	const oldestOrdinal = events[0]?.ordinal;
+	const loadOlder = useCallback(() => {
+		const api = getEnsemblrApiOrNull();
+		if (!api || oldestOrdinal === undefined) {
+			return;
+		}
+		setIsLoadingOlder(true);
+		void api
+			.listAgentSessionEvents({ beforeOrdinal: oldestOrdinal, branchId })
+			// oxlint-disable-next-line eslint-plugin-promise(prefer-await-to-then)
+			.then((older) => {
+				queryClient.setQueryData<ListAgentSessionEventsResult | undefined>(
+					ensemblrQueryKeys.agentSessionEvents(branchId),
+					(previous) => prependOlder(previous, older),
+				);
+			})
+			// oxlint-disable-next-line eslint-plugin-promise(prefer-await-to-then), eslint-plugin-promise(prefer-await-to-callbacks)
+			.catch((cause) => {
+				console.error('Failed to load earlier timeline events:', cause);
+			})
+			// oxlint-disable-next-line eslint-plugin-promise(prefer-await-to-then)
+			.finally(() => {
+				setIsLoadingOlder(false);
+			});
+	}, [branchId, oldestOrdinal, queryClient]);
+
 	return {
 		error,
 		events,
+		hasOlder: data?.hasOlder === true,
 		isLoading: isPending,
+		isLoadingOlder,
+		loadOlder,
+	};
+}
+
+/**
+ * Folds a page of older events onto the front of the cached window.
+ *
+ * `hasOlder` is taken from the page that was just read, because that is the only
+ * answer that describes where the window now starts; keeping the previous value
+ * would leave the control offering a page that no longer exists.
+ * @param previous - Previously cached events result, if any
+ * @param older - The page read with a `beforeOrdinal` cursor
+ * @returns The widened window
+ */
+function prependOlder(
+	previous: ListAgentSessionEventsResult | undefined,
+	older: ListAgentSessionEventsResult,
+): ListAgentSessionEventsResult {
+	const existing = previous?.events ?? [];
+	const knownIds = new Set(existing.map((row) => row.id));
+	const fresh = older.events.filter((row) => !knownIds.has(row.id));
+	return {
+		events: fresh.length > 0 ? [...fresh, ...existing] : existing,
+		hasOlder: older.hasOlder === true,
 	};
 }
 
@@ -139,6 +202,10 @@ function createBroadcastBuffer(queryClient: QueryClient): {
 /**
  * Merges a frame's worth of broadcast events into the cached event list, keeping
  * it ordered by ordinal and de-duplicated by id.
+ *
+ * `hasOlder` is carried through untouched: it describes where the *start* of the
+ * window sits, and appending live events at the end cannot move that. Dropping
+ * it would retire the scroll-back control on the first streamed token.
  * @param previous - Previously cached events result, if any
  * @param incoming - Newly received events, in the order they were broadcast
  * @returns The updated event list result, or the previous one when nothing was new
@@ -148,13 +215,16 @@ function mergeBroadcasts(
 	incoming: readonly AgentSessionEventWire[],
 ): ListAgentSessionEventsResult {
 	const existing = previous?.events ?? [];
+	const hasOlder = previous?.hasOlder === true ? { hasOlder: true } : {};
 	// Fast path: deltas stream in monotonic order, so one append covers the whole
 	// batch and skips both the id set and the O(n log n) sort.
 	if (incoming.length > 0 && extendsInOrder(existing, incoming)) {
-		return { events: [...existing, ...incoming] };
+		return { events: [...existing, ...incoming], ...hasOlder };
 	}
 	const merged = sortedUnion(existing, incoming);
-	return merged ? { events: merged } : (previous ?? { events: existing });
+	return merged
+		? { events: merged, ...hasOlder }
+		: (previous ?? { events: existing });
 }
 
 /**

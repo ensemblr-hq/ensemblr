@@ -14,7 +14,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
-
+import { externalHref } from '@/renderer/lib/external-url';
 import { useReviewActions } from '../review-actions/review-actions-context';
 
 /**
@@ -68,7 +68,7 @@ export function PullRequestMenu({
 				</DropdownMenuItem>
 				{url ? (
 					<DropdownMenuItem asChild>
-						<a href={url} rel='noreferrer' target='_blank'>
+						<a href={externalHref(url)} rel='noreferrer' target='_blank'>
 							<ExternalLinkIcon aria-hidden='true' />
 							{t('git:pull-request-menu.open-on-github', 'Open on GitHub')}
 						</a>

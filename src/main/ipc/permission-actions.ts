@@ -125,6 +125,7 @@ export const IPC_PERMISSION_ACTIONS = {
 	listRepositoryPullRequests: null,
 	listRepositoryIssues: null,
 	health: null,
+	compactDatabase: 'app-settings-change',
 	updateStatus: null,
 	checkForUpdates: null,
 	installUpdate: 'app-settings-change',

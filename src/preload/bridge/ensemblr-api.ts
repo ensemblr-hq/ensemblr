@@ -207,6 +207,7 @@ export function createEnsemblrApi(): EnsemblrApi {
 			invoke('githubRemoteBranchList', request),
 		githubRepositoryList: (request) => invoke('githubRepositoryList', request),
 		health: () => invoke('health'),
+		compactDatabase: () => invoke('compactDatabase'),
 		updateStatus: () => invoke('updateStatus'),
 		checkForUpdates: () => invoke('checkForUpdates'),
 		installUpdate: () => invoke('installUpdate'),

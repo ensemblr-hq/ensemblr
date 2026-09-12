@@ -607,6 +607,7 @@ test('service does not cache snapshot when applyChange fails (managed-locked)', 
 			schemaVersion: 1,
 		}),
 		getHealth: () => ({ path: ':memory:', schemaVersion: 1, status: 'ok' }),
+		vacuum: () => undefined,
 		open: () => ({ path: ':memory:', schemaVersion: 1, status: 'ok' }),
 	};
 	const settingsResolutionService = {

@@ -110,6 +110,7 @@ export const IPC_CHANNELS = {
 	listRepositoryPullRequests: 'ensemblr:list-repository-pull-requests',
 	listRepositoryIssues: 'ensemblr:list-repository-issues',
 	health: 'ensemblr:health',
+	compactDatabase: 'ensemblr:compact-database',
 	updateStatus: 'ensemblr:update-status',
 	checkForUpdates: 'ensemblr:check-for-updates',
 	installUpdate: 'ensemblr:install-update',

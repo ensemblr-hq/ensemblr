@@ -34,7 +34,13 @@ interface MarkdownFileLinkProps {
  *
  * A destination outside the workspace still opens, unlike the images beside it:
  * following a link is the reader's own decision, and agents write `~/.claude/`
- * and `/tmp` paths constantly.
+ * and `/tmp` paths constantly. It does not open *silently*, though — the
+ * markdown this renders is not always the reader's own (a pull-request comment
+ * and an agent-written document reach the same surface as a repository file the
+ * user chose to trust), and the link text is whatever its author wrote, so
+ * `[see the contributing guide](~/.aws/credentials)` reads as one thing and
+ * opens another. An escaping destination therefore carries its real path beside
+ * the text, which makes the click target what the reader is looking at.
  */
 export function MarkdownFileLink({
 	children,
@@ -58,6 +64,11 @@ export function MarkdownFileLink({
 			type='button'
 		>
 			{children}
+			{match.scope === 'external' ? (
+				<span className='ml-1 text-muted-foreground text-xs'>
+					({match.path})
+				</span>
+			) : null}
 		</button>
 	);
 }

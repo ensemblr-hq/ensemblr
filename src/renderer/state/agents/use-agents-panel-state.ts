@@ -20,7 +20,7 @@ import type {
 import type { AgentSessionLineage } from '@/shared/agent-control';
 import type { AgentSessionSnapshotWire } from '@/shared/ipc/contracts/agent-session';
 import {
-	agentConversationLiveStateAtom,
+	agentWorkspaceLiveStateAtomFamily,
 	applyAgentConversationEventAtom,
 	seedAgentConversationSnapshotsAtom,
 } from './atoms';
@@ -49,7 +49,9 @@ export function useAgentsPanelState({
 	const modelsQuery = useQuery(agentModelsQuery);
 	const pendingQuestions = useAtomValue(pendingAskUserQuestionsAtom);
 	const pendingApprovals = useAtomValue(pendingToolApprovalsAtom);
-	const liveByWorkspace = useAtomValue(agentConversationLiveStateAtom);
+	const liveBySessionId = useAtomValue(
+		agentWorkspaceLiveStateAtomFamily(workspaceId),
+	);
 	const seedSnapshots = useSetAtom(seedAgentConversationSnapshotsAtom);
 	const applyEvent = useSetAtom(applyAgentConversationEventAtom);
 	const [restoreStates, setRestoreStates] = useState<
@@ -143,7 +145,7 @@ export function useAgentsPanelState({
 			closedTabs: tabsQuery.data?.closed ?? [],
 			language,
 			lineageBySessionId,
-			liveBySessionId: liveByWorkspace[workspaceId] ?? {},
+			liveBySessionId,
 			openTabs: tabsQuery.data?.open ?? [],
 			sessions,
 		}).map((conversation) => ({
@@ -154,14 +156,13 @@ export function useAgentsPanelState({
 		}));
 	}, [
 		language,
-		liveByWorkspace,
+		liveBySessionId,
 		modelsQuery.data,
 		pendingApprovals,
 		pendingQuestions,
 		restoreStates,
 		sessions,
 		tabsQuery.data,
-		workspaceId,
 	]);
 
 	return {

@@ -9,6 +9,7 @@ import {
 	setupDiagnosticsQuery,
 	updateAppSettings,
 } from '@/renderer/api/ensemblr';
+import { DatabaseMaintenanceRow } from '@/renderer/components/settings/database-maintenance-row';
 import { ObfuscatedStorageNotice } from '@/renderer/components/settings/obfuscated-storage-notice';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
@@ -122,6 +123,8 @@ function DiagnosticsRoute() {
 			/>
 
 			<ObfuscatedStorageNotice />
+
+			<DatabaseMaintenanceRow />
 
 			<SettingRow
 				control={

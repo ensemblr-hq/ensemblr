@@ -63,6 +63,15 @@ export function DockPanel({
 	const setupTabLabel = fixedDockTabLabel(workspace.dockTabs, 'setup');
 	const runTabLabel = fixedDockTabLabel(workspace.dockTabs, 'run');
 	const activeRunScript = useActiveRunScript(workspace);
+	/**
+	 * Whether a force-mounted pane is actually on screen. Every tab stays mounted
+	 * to keep its scrollback and PTY binding, so this is what tells each surface
+	 * it may hold a WebGL context.
+	 * @param tabId - The dock tab the pane belongs to
+	 * @returns True when that tab is selected and the dock is expanded
+	 */
+	const isPaneVisible = (tabId: DockTabId): boolean =>
+		!isCollapsed && activeDockTab === tabId;
 
 	return (
 		<Tabs
@@ -175,6 +184,7 @@ export function DockPanel({
 				value='setup'
 			>
 				<SetupScriptOutputPanel
+					isVisible={isPaneVisible('setup')}
 					onAskAgentSetupScript={actions.onAskAgentSetupScript}
 					onOpenSetupScripts={actions.onOpenSetupScripts}
 					onRunSetupScript={actions.onRunSetupScript}
@@ -191,6 +201,7 @@ export function DockPanel({
 			>
 				<RunScriptOutputPanel
 					activeRunScriptName={activeRunScript?.name ?? null}
+					isVisible={isPaneVisible('run')}
 					onOpenSetupScripts={actions.onOpenSetupScripts}
 					onRunScript={actions.onRunScript}
 					script={workspace.scripts.run}
@@ -206,6 +217,7 @@ export function DockPanel({
 					value={tab.id}
 				>
 					<XtermTerminal
+						isVisible={isPaneVisible(tab.id)}
 						sessionStatus={tab.sessionStatus}
 						terminalId={tab.terminalId}
 						terminalLabel={tab.label}

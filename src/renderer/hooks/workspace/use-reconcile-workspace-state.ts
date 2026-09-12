@@ -6,7 +6,10 @@ import {
 	allWorkspacesHistoryQuery,
 	isEnsemblrApiAvailable,
 } from '@/renderer/api/ensemblr';
-import { retainLastRunScripts } from '@/renderer/state/preferences';
+import {
+	retainLastRunScripts,
+	retainPrDetailsDrafts,
+} from '@/renderer/state/preferences';
 import { pruneWorkspaceStateAtom } from '@/renderer/state/workspace';
 import { retainLastUsedOpenTargets } from '@/renderer/state/workspace/open-target-history';
 
@@ -49,5 +52,6 @@ export function useReconcileWorkspaceState(): void {
 		pruneWorkspaceState(existingWorkspaceIds);
 		retainLastUsedOpenTargets(existingWorkspaceIds);
 		retainLastRunScripts(existingWorkspaceIds);
+		retainPrDetailsDrafts(existingWorkspaceIds);
 	}, [existingWorkspaceIds, pruneWorkspaceState]);
 }

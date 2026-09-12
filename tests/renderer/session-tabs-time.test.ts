@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { i18n } from '../../src/renderer/lib/i18n';
+import { changeAppLanguage } from '../../src/renderer/lib/i18n';
 import { formatRelativeTimestamp } from '../../src/renderer/lib/workbench/relative-time';
 
 const NOW = new Date('2026-06-08T12:00:00.000Z').getTime();
@@ -7,7 +7,7 @@ let dateSpy: ReturnType<typeof vi.spyOn> | null = null;
 
 beforeEach(async () => {
 	dateSpy = vi.spyOn(Date, 'now').mockImplementation(() => NOW);
-	await i18n.changeLanguage('en');
+	await changeAppLanguage('en');
 });
 
 afterEach(() => {
@@ -44,7 +44,7 @@ test('formatRelativeTimestamp returns the input when unparseable', () => {
 });
 
 test('formatRelativeTimestamp follows the active language', async () => {
-	await i18n.changeLanguage('ru');
+	await changeAppLanguage('ru');
 	expect(formatRelativeTimestamp('2026-06-08T11:59:59.000Z')).toBe(
 		'только что',
 	);
@@ -52,7 +52,7 @@ test('formatRelativeTimestamp follows the active language', async () => {
 		/^2 дн\.? назад$/,
 	);
 
-	await i18n.changeLanguage('el');
+	await changeAppLanguage('el');
 	expect(formatRelativeTimestamp('2026-06-08T11:55:00.000Z')).toMatch(
 		/^πριν από 5 λεπ\.?$/,
 	);

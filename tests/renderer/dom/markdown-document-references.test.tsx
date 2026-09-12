@@ -170,16 +170,20 @@ describe('links a document writes to its neighbours', () => {
 		).toHaveAttribute('title', 'Read this first');
 	});
 
-	test('still opens a destination outside the workspace, which a click asks for', async () => {
+	test('still opens a destination outside the workspace, but names it first', async () => {
 		const openFilePreview = vi.fn();
 		renderDocument(
 			'See [the plan](~/.claude/plans/notes.md).',
 			openFilePreview,
 		);
 
-		await userEvent.click(
-			await screen.findByRole('button', { name: 'the plan' }),
-		);
+		// The link text is the author's, and the markdown is not always the
+		// reader's own — so an escaping destination carries its real path beside
+		// the text rather than opening silently behind it.
+		const link = await screen.findByRole('button', {
+			name: 'the plan (~/.claude/plans/notes.md)',
+		});
+		await userEvent.click(link);
 		expect(openFilePreview).toHaveBeenCalledWith('~/.claude/plans/notes.md');
 	});
 });

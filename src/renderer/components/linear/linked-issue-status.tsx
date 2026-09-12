@@ -24,6 +24,7 @@ import {
 } from '@/renderer/components/ui/dropdown-menu';
 import { LinearLogo } from '@/renderer/components/workbench-shell/source-provider-logo';
 import { useLinearRefresh } from '@/renderer/hooks/linear/use-linear-refresh';
+import { externalHref } from '@/renderer/lib/external-url';
 import {
 	deriveLinearGateState,
 	describeLinearFailure,
@@ -31,7 +32,6 @@ import {
 } from '@/renderer/lib/linear';
 import type { WorkspaceLinkedIssueSummary } from '@/renderer/types/workbench';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
-
 import { LinearStateBadge } from './issue-state-badge';
 
 /**
@@ -330,7 +330,7 @@ function LinkedIssueReference({
 		return (
 			<a
 				className='flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs hover:text-foreground'
-				href={linkedIssue.url}
+				href={externalHref(linkedIssue.url)}
 				rel='noreferrer'
 				target='_blank'
 			>

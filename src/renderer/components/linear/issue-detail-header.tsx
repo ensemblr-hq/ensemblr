@@ -27,9 +27,9 @@ import { useLinearRefresh } from '@/renderer/hooks/linear/use-linear-refresh';
 import { useRefreshSpin } from '@/renderer/hooks/linear/use-refresh-spin';
 import { useCopyToClipboard } from '@/renderer/hooks/use-copy-to-clipboard';
 import { useCreateWorkspaceFromProject } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
+import { externalHref } from '@/renderer/lib/external-url';
 import { buildWorkspaceSeedFromLinearIssue } from '@/renderer/lib/linear';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
-
 import { LinearIssueEditorDialog } from './issue-editor-dialog';
 
 /** How long the copy button stays in its confirmed state before reverting. */
@@ -102,7 +102,7 @@ function IssueCommands({
 							'linear:issue-detail.open-external',
 							'Open in Linear',
 						)}
-						href={issue.url}
+						href={externalHref(issue.url)}
 						rel='noreferrer'
 						target='_blank'
 						title={t('linear:issue-detail.open-external', 'Open in Linear')}

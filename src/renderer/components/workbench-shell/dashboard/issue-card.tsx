@@ -18,9 +18,9 @@ import {
 	LinearLogo,
 } from '@/renderer/components/workbench-shell/source-provider-logo';
 import { WorkbenchContextMenuContent } from '@/renderer/components/workbench-shell/workbench-context-menu-content';
+import { externalHref } from '@/renderer/lib/external-url';
 import { cn } from '@/renderer/lib/utils';
 import type { BoardIssueCard } from '@/renderer/types/workbench-shell';
-
 import { BoardDropIndicator } from './board-drop-indicator';
 import { useCardDnd } from './use-card-dnd';
 
@@ -201,7 +201,7 @@ function IssueCardLink({
 			aria-label={ariaLabel}
 			className={className}
 			draggable={false}
-			href={issue.url}
+			href={externalHref(issue.url)}
 			rel='noreferrer'
 			target='_blank'
 		>

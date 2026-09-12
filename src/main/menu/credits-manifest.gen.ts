@@ -66,12 +66,6 @@ export const CREDITS_PACKAGES = [
 		kind: 'runtime',
 	},
 	{
-		name: '@streamdown/code',
-		license: 'Apache-2.0',
-		url: 'https://github.com/vercel/streamdown',
-		kind: 'runtime',
-	},
-	{
 		name: '@streamdown/math',
 		license: 'Apache-2.0',
 		url: 'https://github.com/vercel/streamdown',

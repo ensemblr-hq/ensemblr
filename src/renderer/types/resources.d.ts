@@ -1580,6 +1580,8 @@ export default interface Resources {
 			'add-comment': 'Add comment';
 			'hidden-line-count_one': '{{count}} unchanged line';
 			'hidden-line-count_other': '{{count}} unchanged lines';
+			'show-remaining-rows_one': 'Show the remaining {{count}} line';
+			'show-remaining-rows_other': 'Show the remaining {{count}} lines';
 			'unchanged-lines': 'Unchanged lines';
 		};
 		'discard-changes': {
@@ -1711,6 +1713,16 @@ export default interface Resources {
 		};
 		diagnostics: {
 			'copy-bundle': 'Copy diagnostics bundle';
+			database: {
+				compact: 'Compact database';
+				'compact-confirm': 'Click again to confirm';
+				compacting: 'Compacting…';
+				description: 'Ensemblr prunes old agent history automatically, but SQLite does not shrink the file on disk by itself. Compacting rewrites the whole file to reclaim that space, and blocks other database activity while it runs.';
+				failed: 'Could not compact the database: {{error}}.';
+				label: 'Database';
+				result: 'Reclaimed {{size}}.';
+				size: '{{size}} on disk';
+			};
 			description: 'Setup gate checks for Pi, git, GitHub, Linear, and the Ensemblr runtime. The diagnostics bundle redacts secrets, account ids, and full paths before going to the clipboard.';
 			'obfuscated-storage': {
 				acknowledge: 'Accept and store secrets anyway';
@@ -3935,8 +3947,12 @@ export default interface Resources {
 				'open-settings': 'Open settings';
 				retry: 'Send again';
 			};
+			'load-earlier': 'Load earlier messages';
 			'load-failed': 'Could not load timeline events.';
+			'payload-truncated': '[output truncated — {{size}} not shown]';
 			'runtime-error': 'Runtime error';
+			'show-earlier_one': 'Show {{count}} earlier message';
+			'show-earlier_other': 'Show {{count}} earlier messages';
 			starting: {
 				agent: 'Starting agent';
 				loading: 'Loading conversation';

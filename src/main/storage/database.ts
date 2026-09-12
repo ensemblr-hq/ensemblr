@@ -24,6 +24,13 @@ export interface EnsemblrDatabaseService {
 	getConnection: () => EnsemblrDatabaseConnection | null;
 	getHealth: () => DatabaseHealthSnapshot;
 	open: () => DatabaseHealthSnapshot;
+	/**
+	 * Runs `VACUUM` against the open database, rewriting the whole file to
+	 * reclaim pages retention has already freed onto SQLite's freelist. Blocks
+	 * the calling thread for the duration and cannot run inside a transaction.
+	 * @throws When the database is not open.
+	 */
+	vacuum: () => void;
 }
 
 /**
@@ -1436,7 +1443,7 @@ export function createEnsemblrDatabaseService(
 	options: OpenDatabaseOptions = {},
 ): EnsemblrDatabaseService {
 	let connection: EnsemblrDatabaseConnection | null = null;
-	let health: DatabaseHealthSnapshot = {
+	let health: Omit<DatabaseHealthSnapshot, 'sizeBytes'> = {
 		path: options.databasePath ?? resolveDefaultDatabasePath(),
 		schemaVersion: 0,
 		status: 'error',
@@ -1445,7 +1452,7 @@ export function createEnsemblrDatabaseService(
 	/** Opens the database if not already open; returns the current health snapshot. */
 	function open(): DatabaseHealthSnapshot {
 		if (connection) {
-			return health;
+			return getHealth();
 		}
 
 		try {
@@ -1464,7 +1471,7 @@ export function createEnsemblrDatabaseService(
 			};
 		}
 
-		return health;
+		return getHealth();
 	}
 
 	/**
@@ -1482,12 +1489,87 @@ export function createEnsemblrDatabaseService(
 		connection = null;
 	}
 
+	/**
+	 * Reads the current health snapshot, computing the on-disk size live off
+	 * the open connection so it reflects growth and compaction between opens
+	 * rather than the size at the last `open()` call.
+	 */
+	function getHealth(): DatabaseHealthSnapshot {
+		return { ...health, sizeBytes: readDatabaseSizeBytes(connection) };
+	}
+
+	/** Runs `VACUUM` against the open database, rewriting the whole file to reclaim freed pages. */
+	function vacuum(): void {
+		const database = requireDatabase(
+			connection?.database,
+			() => new Error('Database is not open.'),
+		);
+		database.exec('VACUUM;');
+	}
+
 	return {
 		close,
 		getConnection: () => connection,
-		getHealth: () => health,
+		getHealth,
 		open,
+		vacuum,
 	};
+}
+
+/**
+ * Reads the main database file's size as `PRAGMA page_count * PRAGMA
+ * page_size`. Deliberately excludes the `-wal` and `-shm` companion files, per
+ * {@link DatabaseHealthSnapshot.sizeBytes}.
+ * @param connection - The live connection, or `null` when the database is not open.
+ * @returns The size in bytes, or `null` when there is no open connection or the pragmas fail.
+ */
+function readDatabaseSizeBytes(
+	connection: EnsemblrDatabaseConnection | null,
+): number | null {
+	if (!connection) {
+		return null;
+	}
+
+	try {
+		const pageCountRow = connection.database.prepare('PRAGMA page_count').get();
+		const pageSizeRow = connection.database.prepare('PRAGMA page_size').get();
+
+		if (!isPageCountRow(pageCountRow) || !isPageSizeRow(pageSizeRow)) {
+			return null;
+		}
+
+		return pageCountRow.page_count * pageSizeRow.page_size;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Type guard for the row shape of `PRAGMA page_count`.
+ * @param row - Candidate row.
+ * @returns True when the row has a numeric `page_count` column.
+ */
+function isPageCountRow(row: unknown): row is { page_count: number } {
+	return (
+		typeof row === 'object' &&
+		row !== null &&
+		'page_count' in row &&
+		typeof row.page_count === 'number'
+	);
+}
+
+/**
+ * Type guard for the row shape of `PRAGMA page_size`.
+ * @param row - Candidate row.
+ * @returns True when the row has a numeric `page_size` column.
+ */
+function isPageSizeRow(row: unknown): row is { page_size: number } {
+	return (
+		typeof row === 'object' &&
+		row !== null &&
+		'page_size' in row &&
+		typeof row.page_size === 'number'
+	);
 }
 
 /**

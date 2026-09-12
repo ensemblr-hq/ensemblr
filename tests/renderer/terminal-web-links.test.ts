@@ -95,6 +95,32 @@ describe('terminal web links', () => {
 		expect(openExternal).toHaveBeenCalledWith('https://ensemblr.dev');
 	});
 
+	// `WebLinksAddon` only ever matches http(s), but the OSC 8 URI is chosen by
+	// whatever writes to the PTY — any command, agent harness, or build script in
+	// an untrusted repository — and the display text is independent of it, so the
+	// link can read `https://docs.example` and point anywhere.
+	it('refuses an OSC 8 URI whose scheme is not http(s)', () => {
+		const openExternal = vi.fn(() => Promise.resolve());
+		installEnsemblrApi({ openExternal });
+		const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		createXtermAdapter();
+
+		const activate = terminalOptions.at(0)?.linkHandler?.activate;
+
+		for (const uri of [
+			'javascript:alert(1)',
+			'file:///etc/passwd',
+			'vscode://file/etc/passwd',
+			'itms-services://?action=download-manifest',
+			'smb://host/share',
+		]) {
+			activate?.(new MouseEvent('click'), uri, CLICK_RANGE);
+		}
+
+		expect(openExternal).not.toHaveBeenCalled();
+		expect(consoleWarn).toHaveBeenCalledTimes(5);
+	});
+
 	it('leaves OSC 8 links on the default http-only protocol policy', () => {
 		createXtermAdapter();
 

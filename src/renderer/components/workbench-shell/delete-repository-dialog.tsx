@@ -22,6 +22,7 @@ import { LifecycleSummary } from '@/renderer/components/workbench-shell/lifecycl
 import { useLifecycleDialogAction } from '@/renderer/hooks/workbench-shell/use-lifecycle-dialog-action';
 import { failureText } from '@/renderer/lib/failure-text';
 import { projectSummaryRows } from '@/renderer/lib/workbench/lifecycle-summary-rows';
+import { forgetRepoSettingsOverride } from '@/renderer/state/preferences';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type {
 	DeleteRepositoryDiagnostic,
@@ -172,6 +173,7 @@ function DeleteRepositoryDialogForm({
 					description: surviving.path,
 				});
 			}
+			forgetRepoSettingsOverride(project.id);
 			return onDeleted(project.id);
 		},
 		operationKey: `delete-repository:${project.id}`,
