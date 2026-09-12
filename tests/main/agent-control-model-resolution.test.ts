@@ -676,6 +676,91 @@ describe('an unreadable model catalog', () => {
 
 		expect(message).toContain('No Pi models are available');
 	});
+
+	// Each runtime's listing degrades on its own, so a `pi --list-models` that
+	// failed leaves a Pi caller unable to name any Pi model. Telling it the model
+	// does not exist sends it to ensemblr_list_models for a listing that is empty
+	// for the same reason, which is the loop this message exists to break.
+	it('names the empty runtime rather than claiming the model does not exist', async () => {
+		const message = await refusal({
+			caller: { model: PI_MODEL, thinkingLevel: null },
+			callerRuntime: 'pi',
+			model: 'openai-codex/gpt-5.6-sol',
+			models: [
+				modelOption({ id: CLAUDE_MODEL, runtime: 'claude' }),
+				modelOption({ id: CLAUDE_ANTHROPIC_MODEL, runtime: 'claude' }),
+			],
+		});
+
+		expect(message).toContain('lists no Pi models');
+		expect(message).toContain('Omit "model" to inherit');
+		expect(message).not.toContain('is available in this app');
+	});
+
+	// Emptiness is measured over the listing the caller is actually served rather
+	// than its own runtime's rows. With cross-runtime delegation on, the other
+	// runtime's models are on offer, so claiming ensemblr_list_models has nothing
+	// would deny the one recovery that works — the same loop, one setting over.
+	it('keeps pointing at the listing when cross-runtime delegation offers one', async () => {
+		const message = await refusal({
+			caller: { model: PI_MODEL, thinkingLevel: null },
+			callerRuntime: 'pi',
+			model: 'openai-codex/gpt-5.6-sol',
+			models: [
+				modelOption({ id: CLAUDE_MODEL, runtime: 'claude' }),
+				modelOption({ id: CLAUDE_ANTHROPIC_MODEL, runtime: 'claude' }),
+			],
+			readCrossRuntimeDelegationEnabled: () => true,
+		});
+
+		expect(message).toContain(
+			'No model "openai-codex/gpt-5.6-sol" is available in this app',
+		);
+		expect(message).not.toContain('lists no Pi models');
+	});
+
+	// The way out is only a way out when the caller has something to pass down.
+	// A session holding no model of its own would be refused a second time for
+	// omitting exactly what the first refusal told it to omit, and no catalog
+	// default can rescue it — this branch is reached only when the runtime has no
+	// rows for `defaultModelFor` to draw from.
+	it('does not offer inheritance to a caller with no model of its own', async () => {
+		const message = await refusal({
+			caller: { model: null, thinkingLevel: null },
+			callerRuntime: 'pi',
+			model: 'openai-codex/gpt-5.6-sol',
+			models: [modelOption({ id: CLAUDE_MODEL, runtime: 'claude' })],
+		});
+
+		expect(message).toContain('lists no Pi models');
+		expect(message).toContain('no model of its own to pass down');
+		expect(message).not.toContain('Omit "model" to inherit');
+	});
+
+	it('still names the empty runtime when crossing would reach nothing either', async () => {
+		const message = await refusal({
+			caller: { model: PI_MODEL, thinkingLevel: null },
+			callerRuntime: 'pi',
+			model: 'openai-codex/gpt-5.6-sol',
+			models: [],
+			readCrossRuntimeDelegationEnabled: () => true,
+		});
+
+		expect(message).toContain('lists no Pi models');
+		expect(message).toContain('Omit "model" to inherit');
+	});
+
+	it('still reports an unknown id plainly while that runtime lists models', async () => {
+		const message = await refusal({
+			caller: { model: PI_MODEL, thinkingLevel: null },
+			callerRuntime: 'pi',
+			model: 'anthropic/not-a-model',
+		});
+
+		expect(message).toContain(
+			'No model "anthropic/not-a-model" is available in this app',
+		);
+	});
 });
 
 describe('the model list a caller is served', () => {

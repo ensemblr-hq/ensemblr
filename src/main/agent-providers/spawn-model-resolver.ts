@@ -158,34 +158,112 @@ function withoutHiddenModels(
 /**
  * The models in scope for one caller: its own runtime's, or every runtime's when
  * the caller has none the app can name and therefore has to pick explicitly.
- * @param snapshot - The catalog's models.
+ * @param models - The catalog's models.
  * @param runtime - The runtime to narrow to, or null to leave every runtime's in.
  * @returns The models that caller may spawn a child on.
  */
 function modelsOn(
-	snapshot: CatalogSnapshot,
+	models: readonly AgentModelOption[],
 	runtime: AgentProviderId | null,
 ): readonly AgentModelOption[] {
 	return runtime === null
-		? snapshot.models
-		: snapshot.models.filter((option) => option.agentProvider === runtime);
+		? models
+		: models.filter((option) => option.agentProvider === runtime);
 }
 
 /**
  * Lists the catalog rows the caller may explicitly target under current policy.
- * @param snapshot - Available, non-hidden catalog rows.
+ * @param models - Available, non-hidden catalog rows.
  * @param callerRuntime - The caller's native runtime, when known.
  * @param allowCrossRuntime - Whether a native caller may target the other runtime.
  * @returns Every permitted explicit destination model.
  */
 function availableModelsFor(
-	snapshot: CatalogSnapshot,
+	models: readonly AgentModelOption[],
 	callerRuntime: AgentProviderId | null,
 	allowCrossRuntime: boolean,
 ): readonly AgentModelOption[] {
 	return callerRuntime === null || allowCrossRuntime
-		? snapshot.models
-		: modelsOn(snapshot, callerRuntime);
+		? models
+		: modelsOn(models, callerRuntime);
+}
+
+/**
+ * The caller's own model, in freshness order: the live one its runtime forwarded
+ * when the catalog places it on the caller's runtime, else the persisted session
+ * row. A row the catalog cannot place is still inherited, because the caller's
+ * runtime came from the control origin rather than from the model id — but one
+ * the catalog places on the *other* runtime is dropped, so a mislabelled session
+ * row cannot smuggle a model across.
+ * @param input - The caller's identity, the rows in scope, and the runtime the child is pinned to.
+ * @returns What an omitted "model" would resolve to, or null when the caller has nothing to pass down.
+ */
+function inheritableModel(input: {
+	caller: SpawnCallerIdentity;
+	models: readonly AgentModelOption[];
+	runtime: AgentProviderId;
+}): { model: AgentModelOption | undefined; modelId: string } | null {
+	const live = input.models.find(
+		(option) => option.id === input.caller.liveModelId,
+	);
+	if (live && live.agentProvider === input.runtime) {
+		return { model: live, modelId: live.id };
+	}
+	const persisted = input.caller.sessionModelId;
+	const persistedModel = input.models.find((option) => option.id === persisted);
+	if (
+		persisted &&
+		(persistedModel === undefined ||
+			persistedModel.agentProvider === input.runtime)
+	) {
+		return { model: persistedModel, modelId: persisted };
+	}
+	return null;
+}
+
+/**
+ * Why a named model could not be used. "No such model" is only true when the
+ * caller has a listing to be sent to: each runtime's catalog degrades to nothing
+ * on its own, so a `pi --list-models` that failed leaves a pi caller unable to
+ * name any pi model — and sending it to `listModels` would hand it a listing
+ * that is empty for the same reason. Emptiness is measured over
+ * {@link availableModelsFor}, the set `listModelsFor` itself publishes, so the
+ * claim stays true when cross-runtime delegation is on and the other runtime's
+ * rows *are* on offer.
+ *
+ * Inheritance is offered as the way out only when {@link inheritableModel} would
+ * actually produce one — a caller's own model id is honoured even while the
+ * catalog cannot place it, but a session holding no model at all would be
+ * refused a second time for omitting what it was just told to omit. No fallback
+ * default can rescue that case: this branch is reached only when the runtime has
+ * no rows, which is the same set {@link defaultModelFor} draws from.
+ * @param input - The requested id, the rows in scope, the caller's identity, and the cross-runtime opt-in.
+ * @returns Prose for the calling agent.
+ */
+function unavailableModelReason(input: {
+	allowCrossRuntime: boolean;
+	caller: SpawnCallerIdentity;
+	models: readonly AgentModelOption[];
+	requestedModelId: string;
+}): string {
+	const runtime = input.caller.runtime;
+	const offered = availableModelsFor(
+		input.models,
+		runtime,
+		input.allowCrossRuntime,
+	);
+	if (runtime === null || offered.length > 0) {
+		return `No model "${input.requestedModelId}" is available in this app. Call ensemblr_list_models and pass an id that appears there.`;
+	}
+	const wayOut =
+		inheritableModel({
+			caller: input.caller,
+			models: input.models,
+			runtime,
+		}) === null
+			? 'This conversation has no model of its own to pass down either, so omitting "model" would be refused too — tell the user to check Settings → Providers.'
+			: 'Omit "model" to inherit this conversation\'s own, which still works, or tell the user to check Settings → Providers.';
+	return `Ensemblr currently lists no ${getAgentProviderLabel(runtime)} models, so "${input.requestedModelId}" cannot be matched and ensemblr_list_models has nothing to offer you either — that runtime's catalog is unreadable right now, or every one of its models is hidden in Settings → Models. ${wayOut}`;
 }
 
 /**
@@ -229,7 +307,7 @@ function defaultModelFor(
 	snapshot: CatalogSnapshot,
 	runtime: AgentProviderId | null,
 ): AgentModelOption | undefined {
-	const inScope = modelsOn(snapshot, runtime);
+	const inScope = modelsOn(snapshot.models, runtime);
 	const affordable = inScope.filter(
 		(option) => classifyAgentModelTier(option) !== 'frontier',
 	);
@@ -343,7 +421,12 @@ export function createSpawnModelResolver({
 		if (!model) {
 			return {
 				ok: false,
-				reason: `No model "${input.requestedModelId}" is available in this app. Call ensemblr_list_models and pass an id that appears there.`,
+				reason: unavailableModelReason({
+					allowCrossRuntime: input.allowCrossRuntime,
+					caller: input.caller,
+					models: input.models,
+					requestedModelId: input.requestedModelId,
+				}),
 			};
 		}
 		const callerRuntime = input.caller.runtime;
@@ -364,39 +447,6 @@ export function createSpawnModelResolver({
 			requestedThinkingLevel: input.requestedThinkingLevel,
 			runtime: model.agentProvider,
 		});
-	};
-
-	/**
-	 * The caller's own model, in freshness order: the live one its runtime
-	 * forwarded when the catalog places it on the caller's runtime, else the
-	 * persisted session row. A row the catalog cannot place is still inherited,
-	 * because the caller's runtime came from the control origin rather than from
-	 * the model id — but one the catalog places on the *other* runtime is dropped,
-	 * so a mislabelled session row cannot smuggle a model across.
-	 */
-	const inheritableModel = (input: {
-		caller: SpawnCallerIdentity;
-		models: readonly AgentModelOption[];
-		runtime: AgentProviderId;
-	}): { model: AgentModelOption | undefined; modelId: string } | null => {
-		const live = input.models.find(
-			(option) => option.id === input.caller.liveModelId,
-		);
-		if (live && live.agentProvider === input.runtime) {
-			return { model: live, modelId: live.id };
-		}
-		const persisted = input.caller.sessionModelId;
-		const persistedModel = input.models.find(
-			(option) => option.id === persisted,
-		);
-		if (
-			persisted &&
-			(persistedModel === undefined ||
-				persistedModel.agentProvider === input.runtime)
-		) {
-			return { model: persistedModel, modelId: persisted };
-		}
-		return null;
 	};
 
 	/**
@@ -448,7 +498,7 @@ export function createSpawnModelResolver({
 				crossRuntimeDelegationEnabled,
 				defaultModelId: defaultModelFor(snapshot, callerRuntime)?.id ?? null,
 				models: availableModelsFor(
-					snapshot,
+					snapshot.models,
 					callerRuntime,
 					crossRuntimeDelegationEnabled,
 				),
