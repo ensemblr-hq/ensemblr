@@ -86,6 +86,12 @@ function editorRoot(): HTMLElement {
 	return root;
 }
 
+function editorRootTags(): string[] {
+	return [...editorRoot().children]
+		.filter((child) => !child.hasAttribute('data-lexical-decorator-boundary'))
+		.map((child) => child.tagName);
+}
+
 /** The live editor behind the mounted composer, to dispatch commands straight at. */
 function mountedEditor(): LexicalEditor {
 	const editor = getNearestEditorFromDOMNode(editorRoot());
@@ -414,10 +420,7 @@ describe('composer editor', () => {
 		await waitFor(() => {
 			expect(chipHost(0).parentElement).toBe(editorRoot());
 		});
-		expect([...editorRoot().children].map((child) => child.tagName)).toEqual([
-			'SPAN',
-			'P',
-		]);
+		expect(editorRootTags()).toEqual(['SPAN', 'P']);
 		expect(chipHost(0).className).not.toContain('h-[1.625em]');
 	});
 
@@ -564,10 +567,7 @@ describe('composer editor', () => {
 		await waitFor(() => {
 			expect(latest()?.attachments).toEqual([TERMINAL_OUTPUT]);
 		});
-		expect([...editorRoot().children].map((child) => child.tagName)).toEqual([
-			'SPAN',
-			'P',
-		]);
+		expect(editorRootTags()).toEqual(['SPAN', 'P']);
 	});
 
 	// A bare Backspace is not the only way back into the tray. Lexical sends ⌥⌫
