@@ -15,15 +15,50 @@ type Metadata = Stats | undefined | null;
  */
 const pendingMetadata = new Map<string, Promise<Metadata>>();
 
+/** One phase's shared wait budget: the single timer every probe in it races against. */
+interface ProbeBudget {
+	/** Resolves null once the phase's wait budget is spent. */
+	expired: Promise<null>;
+	/** Reports whether the budget is already spent, so no further probe launches. */
+	hasExpired: () => boolean;
+	/** Clears the budget's timer so a finished listing leaves none pending. */
+	dispose: () => void;
+}
+
+/**
+ * Opens one wait budget for a classification phase, shared by every probe in it.
+ * The wait belongs to the phase rather than to each probe, so a batch launched
+ * just before the deadline is abandoned with it instead of extending the listing
+ * by another full timeout.
+ * @returns The budget's expiry promise, its spent check, and its disposer.
+ */
+function openProbeBudget(): ProbeBudget {
+	let didExpire = false;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const expired = new Promise<null>((resolve) => {
+		timer = setTimeout(() => {
+			didExpire = true;
+			resolve(null);
+		}, METADATA_TIMEOUT_MS);
+	});
+	return {
+		dispose: () => clearTimeout(timer),
+		expired,
+		hasExpired: () => didExpire,
+	};
+}
+
 /**
  * Shares and bounds metadata probes without mistaking a timeout for cancellation.
  * @param absolutePath - Entry whose metadata to inspect.
  * @param operation - Whether to inspect the link itself or follow its target.
+ * @param budget - Wait budget this probe races against.
  * @returns Completed metadata, undefined on failure, or null when too slow or saturated.
  */
 function readMetadata(
 	absolutePath: string,
 	operation: 'lstat' | 'stat',
+	budget: ProbeBudget,
 ): Promise<Metadata> {
 	const key = `${operation}:${absolutePath}`;
 	const pending = pendingMetadata.get(key);
@@ -33,37 +68,40 @@ function readMetadata(
 	if (pendingMetadata.size >= MAX_PENDING_PROBES) {
 		return Promise.resolve(null);
 	}
-	let timer: ReturnType<typeof setTimeout> | undefined;
-	const expired = new Promise<Metadata>((resolve) => {
-		timer = setTimeout(() => resolve(null), METADATA_TIMEOUT_MS);
-	});
 	const work = (operation === 'lstat' ? lstat : stat)(absolutePath).catch(
 		() => undefined,
 	);
-	const result = Promise.race([work, expired]).finally(() =>
-		clearTimeout(timer),
-	);
+	const result = Promise.race<Metadata>([work, budget.expired]);
 	pendingMetadata.set(key, result);
 	void work.then(() => pendingMetadata.delete(key));
 	return result;
 }
 
 /**
- * Marks symlinks before target probing so skipped or timed-out targets keep a badge.
+ * Reports how many probes may still be launched process-wide, so a batch never
+ * includes work the cap would drop unprobed while a stalled probe holds a slot.
+ * @returns The number of free slots, zero once the cap is reached.
+ */
+function availableProbeSlots(): number {
+	return MAX_PENDING_PROBES - pendingMetadata.size;
+}
+
+/**
+ * Marks a symlink before target probing so a skipped or timed-out target keeps a badge.
  * @param workspaceCwd - Workspace root the entry belongs to.
- * @param entry - Listed file or directory to inspect without following the link.
+ * @param entry - Listed file to inspect without following the link.
+ * @param budget - Wait budget the link probe races against.
  * @returns A marked symlink, the original non-link or inaccessible entry, or null if unfinished.
  */
 async function markSymlink(
 	workspaceCwd: string,
 	entry: WorkspaceFileEntryWire,
+	budget: ProbeBudget,
 ): Promise<WorkspaceFileEntryWire | null> {
-	if (entry.kind === 'directory') {
-		return entry;
-	}
 	const linkStat = await readMetadata(
 		path.join(workspaceCwd, entry.path),
 		'lstat',
+		budget,
 	);
 	if (linkStat === null) {
 		return null;
@@ -74,86 +112,118 @@ async function markSymlink(
 }
 
 /**
- * Classifies entries in small batches, stopping new work after a short listing budget.
+ * Probes the entries the caller could not classify from git or a directory read,
+ * in small batches, stopping new work once the phase budget is spent.
  * @param workspaceCwd - Workspace root the entries belong to.
- * @param entries - Listed entries to inspect without following links.
- * @returns Ordered classifications, with null for unfinished files and directories unchanged.
+ * @param entries - Listed entries, already marked where the caller knew.
+ * @param probePaths - Paths whose symlink status only an lstat can settle.
+ * @param budget - Wait budget shared by every probe in this phase.
+ * @returns Ordered classifications, with null for unfinished probes and every other entry as given.
  */
 async function markSymlinks(
 	workspaceCwd: string,
 	entries: readonly WorkspaceFileEntryWire[],
+	probePaths: ReadonlySet<string>,
+	budget: ProbeBudget,
 ): Promise<(WorkspaceFileEntryWire | null)[]> {
 	const annotated = entries.map((entry) =>
-		entry.kind === 'directory' ? entry : null,
+		entry.kind === 'file' && probePaths.has(entry.path) ? null : entry,
 	);
-	const deadline = Date.now() + METADATA_TIMEOUT_MS;
-	for (let index = 0; index < entries.length; index += MAX_PENDING_PROBES) {
-		if (Date.now() >= deadline) {
+	const unclassified = annotated.flatMap((entry, index) =>
+		entry === null ? [index] : [],
+	);
+	let cursor = 0;
+	while (cursor < unclassified.length) {
+		const slots = availableProbeSlots();
+		if (budget.hasExpired() || slots <= 0) {
 			break;
 		}
-		const batch = await Promise.all(
-			entries
-				.slice(index, index + MAX_PENDING_PROBES)
-				.map((entry) => markSymlink(workspaceCwd, entry)),
+		const batch = unclassified.slice(cursor, cursor + slots);
+		cursor += batch.length;
+		const classified = await Promise.all(
+			batch.map((index) => markSymlink(workspaceCwd, entries[index], budget)),
 		);
-		for (const [offset, entry] of batch.entries()) {
-			annotated[index + offset] = entry;
+		for (const [offset, entry] of classified.entries()) {
+			annotated[batch[offset]] = entry;
 		}
 	}
 	return annotated;
 }
 
 /**
+ * Resolves the target kind of every entry a completed lstat proved to be a symlink,
+ * leaving an unresolved target on its unknown marker so the link keeps its badge.
+ * @param workspaceCwd - Workspace root the entries belong to.
+ * @param annotated - Classifications from the symlink phase, edited in place.
+ * @param budget - Wait budget shared by every target probe.
+ */
+async function resolveSymlinkTargets(
+	workspaceCwd: string,
+	annotated: (WorkspaceFileEntryWire | null)[],
+	budget: ProbeBudget,
+): Promise<void> {
+	for (const [index, entry] of annotated.entries()) {
+		if (budget.hasExpired()) {
+			break;
+		}
+		if (entry?.symlinkTargetKind !== 'unknown') {
+			continue;
+		}
+		const target = await readMetadata(
+			path.join(workspaceCwd, entry.path),
+			'stat',
+			budget,
+		);
+		if (!target) {
+			continue;
+		}
+		annotated[index] = {
+			...entry,
+			symlinkTargetKind: target.isDirectory() ? 'directory' : 'file',
+		};
+	}
+}
+
+/**
  * Adds icon-only target metadata without changing a link's leaf kind or reading
- * its contents. Initial batches and serial target classification each have a short
- * listing budget, and every probe has a deadline. Unfinished classifications keep
- * an unknown marker; target probing requires a completed symlink classification.
+ * its contents. Entries already marked by the caller — from a git index mode or
+ * a directory read — cost nothing here; only `probePaths` is lstat'd, and
+ * classification and target resolution each get their own wait budget so a
+ * stalled filesystem bounds the listing rather than blocking it.
+ *
+ * An entry whose probe never completed stays unmarked: a marker means a link was
+ * observed, never that one was assumed. Probing cannot cover a large listing —
+ * an lstat round trip runs 0.1ms to 4ms depending on filesystem load, so the
+ * budget buys anywhere from a few dozen entries to a few thousand — which is
+ * why the free sources carry the common cases and the fallback under-reports
+ * rather than turning an unprobed tail into a tree of shortcuts.
  * @param workspaceCwd - Workspace root the listed paths are relative to.
  * @param entries - Bounded listing of files and directories to annotate.
- * @returns Entries with target kinds for known links and unknown markers for unfinished files.
+ * @param probePaths - Paths the caller could not classify, to be lstat'd here.
+ * @returns Entries with target kinds for observed links and no marker elsewhere.
  */
 export async function annotateSymlinkTargets(
 	workspaceCwd: string,
 	entries: readonly WorkspaceFileEntryWire[],
+	probePaths: ReadonlySet<string>,
 ): Promise<WorkspaceFileEntryWire[]> {
-	const annotated = await markSymlinks(workspaceCwd, entries);
-	let timer: ReturnType<typeof setTimeout> | undefined;
-	let didExpire = false;
-	const expired = new Promise<null>((resolve) => {
-		timer = setTimeout(() => {
-			didExpire = true;
-			resolve(null);
-		}, METADATA_TIMEOUT_MS);
-	});
+	const classification = openProbeBudget();
+	let annotated: (WorkspaceFileEntryWire | null)[];
 	try {
-		for (const [index, entry] of annotated.entries()) {
-			if (didExpire) {
-				break;
-			}
-			if (entry?.symlinkTargetKind !== 'unknown') {
-				continue;
-			}
-			const target = await Promise.race([
-				readMetadata(path.join(workspaceCwd, entry.path), 'stat'),
-				expired,
-			]);
-			if (didExpire) {
-				break;
-			}
-			annotated[index] = {
-				...entry,
-				symlinkTargetKind: target
-					? target.isDirectory()
-						? 'directory'
-						: 'file'
-					: 'unknown',
-			};
-		}
-		return annotated.map(
-			(entry, index) =>
-				entry ?? { ...entries[index], symlinkTargetKind: 'unknown' },
+		annotated = await markSymlinks(
+			workspaceCwd,
+			entries,
+			probePaths,
+			classification,
 		);
 	} finally {
-		clearTimeout(timer);
+		classification.dispose();
 	}
+	const targets = openProbeBudget();
+	try {
+		await resolveSymlinkTargets(workspaceCwd, annotated, targets);
+	} finally {
+		targets.dispose();
+	}
+	return annotated.map((entry, index) => entry ?? entries[index]);
 }
