@@ -121,6 +121,14 @@ removes premature assistant prose at `message_end`, and queues a follow-up turn 
 when the model stops instead of waiting. A hard wait failure stays blocked but does not auto-retry
 forever.
 
+That resume is capped too. Two consecutive turns that settle without a single *permitted* tool call
+stop it, and the sanitized prose says so instead of repeating the waiting line: a turn that produced
+nothing died in the runtime, and a turn whose only calls the barrier refused came from a model that
+already read the refusal mid-turn, so neither is repaired by nudging again while both bill a provider
+call. Any permitted call re-arms it. The count (`staleResumes`) is persisted with the rest of the
+barrier and restored on reload, clamped to the cap so a corrupt snapshot cannot wedge resuming off
+for good; continuing or re-sending the turn yourself always picks the wait back up.
+
 Parallel fan-out still works: sibling start calls in one assistant tool batch may all run. A wait in
 that same batch is refused because Pi executes sibling tools concurrently and the app may not have
 registered the new child ids yet. On the next turn, the extension rewrites the wait to `mode: "all"`

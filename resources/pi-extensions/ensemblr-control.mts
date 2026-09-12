@@ -21,6 +21,7 @@ import {
 	beforeDelegationToolCall,
 	createDelegationBarrierState,
 	delegationBarrierActive,
+	noteStalledDelegationTurn,
 	restoreDelegationBarrierState,
 	sanitizeDelegationMessageContent,
 	shouldResumeDelegationWait,
@@ -978,16 +979,19 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 
 	let delegationBarrier = createDelegationBarrierState();
 	let delegationResumeQueued = false;
+	let delegationTurnRanTool = false;
 	const delegationBarrierEnabled = !IS_CONCIERGE && CONTROL_DEPTH < 2;
 
 	if (delegationBarrierEnabled) {
 		pi.on('session_start', (_event, ctx) => {
 			delegationBarrier = restoreDelegationBarrier(ctx);
 			delegationResumeQueued = false;
+			delegationTurnRanTool = false;
 		});
 
 		pi.on('agent_start', () => {
 			delegationResumeQueued = false;
+			delegationTurnRanTool = false;
 		});
 
 		pi.on('tool_call', (event, ctx) => {
@@ -1000,6 +1004,9 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			if (decision.state !== delegationBarrier) {
 				delegationBarrier = decision.state;
 				pi.appendEntry(DELEGATION_BARRIER_ENTRY, delegationBarrier);
+			}
+			if (!decision.blockReason) {
+				delegationTurnRanTool = true;
 			}
 			if (decision.input && typeof event.input === 'object' && event.input) {
 				if (decision.clearWaitTargets) {
@@ -1035,7 +1042,10 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			return {
 				message: {
 					...event.message,
-					content: sanitizeDelegationMessageContent(event.message.content),
+					content: sanitizeDelegationMessageContent(
+						delegationBarrier,
+						event.message.content,
+					),
 				},
 			};
 		});
@@ -1046,6 +1056,13 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 				!shouldResumeDelegationWait(delegationBarrier)
 			) {
 				return;
+			}
+			if (!delegationTurnRanTool) {
+				delegationBarrier = noteStalledDelegationTurn(delegationBarrier);
+				pi.appendEntry(DELEGATION_BARRIER_ENTRY, delegationBarrier);
+				if (!shouldResumeDelegationWait(delegationBarrier)) {
+					return;
+				}
 			}
 			delegationResumeQueued = true;
 			pi.sendMessage(

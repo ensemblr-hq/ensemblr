@@ -5,6 +5,7 @@ import {
 	beforeDelegationToolCall,
 	createDelegationBarrierState,
 	delegationBarrierActive,
+	noteStalledDelegationTurn,
 	restoreDelegationBarrierState,
 	sanitizeDelegationMessageContent,
 	shouldResumeDelegationWait,
@@ -63,6 +64,75 @@ describe('Pi delegation barrier', () => {
 		expect(source).toContain("pi.on('tool_result'");
 		expect(source).toContain("pi.on('message_end'");
 		expect(source).toContain("pi.on('agent_settled'");
+	});
+
+	it('passes the barrier into every call whose signature needs it', () => {
+		const source = readExtensionSource();
+		expect(source).toContain(
+			'content: sanitizeDelegationMessageContent(\n\t\t\t\t\t\tdelegationBarrier,\n\t\t\t\t\t\tevent.message.content,\n\t\t\t\t\t),',
+		);
+		expect(source).toContain(
+			'if (!decision.blockReason) {\n\t\t\t\tdelegationTurnRanTool = true;\n\t\t\t}',
+		);
+		expect(source).toContain(
+			'if (!delegationTurnRanTool) {\n\t\t\t\tdelegationBarrier = noteStalledDelegationTurn(delegationBarrier);',
+		);
+	});
+
+	it('gives up resuming after repeated turns that run no tool at all', () => {
+		let state = startChild();
+		expect(shouldResumeDelegationWait(state)).toBe(true);
+
+		state = noteStalledDelegationTurn(state);
+		expect(shouldResumeDelegationWait(state)).toBe(true);
+
+		state = noteStalledDelegationTurn(state);
+		expect(delegationBarrierActive(state)).toBe(true);
+		expect(shouldResumeDelegationWait(state)).toBe(false);
+	});
+
+	it('re-arms automatic resuming once a tool call is allowed through again', () => {
+		const stalled = noteStalledDelegationTurn(
+			noteStalledDelegationTurn(startChild()),
+		);
+		expect(shouldResumeDelegationWait(stalled)).toBe(false);
+
+		const wait = beforeDelegationToolCall(stalled, {
+			batchStartsChild: false,
+			input: { mode: 'all' },
+			toolCallId: 'wait-1',
+			toolName: 'ensemblr_wait_for_agents',
+		});
+		expect(shouldResumeDelegationWait(wait.state)).toBe(true);
+	});
+
+	it('keeps the stale count while a blocked call is refused', () => {
+		const stalled = noteStalledDelegationTurn(startChild());
+		const read = beforeDelegationToolCall(stalled, {
+			batchStartsChild: false,
+			input: { path: 'src/index.ts' },
+			toolCallId: 'read-1',
+			toolName: 'read',
+		});
+
+		expect(read.blockReason).toBeTruthy();
+		expect(read.state.staleResumes).toBe(1);
+	});
+
+	it('carries the stale count across a Pi reload', () => {
+		const stalled = noteStalledDelegationTurn(startChild());
+		expect(restoreDelegationBarrierState(stalled).staleResumes).toBe(1);
+		expect(
+			restoreDelegationBarrierState({ ...stalled, staleResumes: -3 })
+				.staleResumes,
+		).toBe(0);
+
+		const clamped = restoreDelegationBarrierState({
+			...stalled,
+			staleResumes: 5,
+		});
+		expect(clamped.staleResumes).toBe(2);
+		expect(shouldResumeDelegationWait(clamped)).toBe(false);
 	});
 
 	it('opens on a successful child spawn and blocks unrelated work', () => {
@@ -385,7 +455,7 @@ describe('Pi delegation barrier', () => {
 
 	it('removes premature prose while preserving tool calls', () => {
 		expect(
-			sanitizeDelegationMessageContent([
+			sanitizeDelegationMessageContent(createDelegationBarrierState(), [
 				{ text: 'I will continue with the finding.', type: 'text' },
 				{
 					arguments: { prompt: 'inspect' },
@@ -403,7 +473,7 @@ describe('Pi delegation barrier', () => {
 			},
 		]);
 		expect(
-			sanitizeDelegationMessageContent([
+			sanitizeDelegationMessageContent(createDelegationBarrierState(), [
 				{ text: 'The answer is ready.', type: 'text' },
 			]),
 		).toEqual([
@@ -412,6 +482,16 @@ describe('Pi delegation barrier', () => {
 				type: 'text',
 			},
 		]);
+	});
+
+	it('says the resume stalled rather than repeating the waiting line', () => {
+		const stalled = noteStalledDelegationTurn(createDelegationBarrierState());
+		const [block] = sanitizeDelegationMessageContent(stalled, [
+			{ text: 'The answer is ready.', type: 'text' },
+		]) as readonly { text: string }[];
+
+		expect(block.text).toContain('no permitted tool call');
+		expect(block.text).not.toContain('press Continue');
 	});
 
 	it('restores a valid persisted snapshot and rejects malformed state', () => {
