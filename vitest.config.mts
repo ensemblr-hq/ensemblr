@@ -110,6 +110,8 @@ export default defineConfig({
 						'tests/main/concierge-tool-policy.test.ts',
 						'tests/main/dictation-service.test.ts',
 						'tests/main/project-listing.test.ts',
+						'tests/main/renderer-storage-mirror.test.ts',
+						'tests/main/renderer-storage-seed.test.ts',
 						'tests/main/pi-wire-content-blocks.test.ts',
 						'tests/main/sanitize-title.test.ts',
 						'tests/main/decode-html-entities.test.ts',

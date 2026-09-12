@@ -126,6 +126,8 @@ export const IPC_CHANNELS = {
 	infisicalTestAccount: 'ensemblr:infisical-test-account',
 	initialShellSnapshot: 'ensemblr:initial-shell-snapshot',
 	killTerminalSession: 'ensemblr:kill-terminal-session',
+	mirrorRendererStorage: 'ensemblr:mirror-renderer-storage',
+	rendererStorageSeed: 'ensemblr:renderer-storage-seed',
 	linearCancelLogin: 'ensemblr:linear-cancel-login',
 	linearConnectionStatus: 'ensemblr:linear-connection-status',
 	linearCreateComment: 'ensemblr:linear-create-comment',

@@ -397,8 +397,15 @@ const config: ForgeConfig = {
 			// schemes: … http, https"), so the window comes up blank. Closing it for
 			// real means serving the renderer from a custom `app://` scheme first —
 			// which also moves the origin, orphaning the localStorage the renderer
-			// keeps its preferences and per-chat overrides in. Declared rather than
-			// defaulted so the next reader finds this note instead of re-deriving it.
+			// keeps its preferences and per-chat overrides in.
+			//
+			// That orphaning is now handled: the renderer mirrors its localStorage
+			// into the main process and the preload replays it into an empty origin
+			// (ADR 0071). What is still outstanding is the switch itself, and it has
+			// to ship after a release carrying the mirror — flipping this fuse in the
+			// same release as the move would leave nothing to replay. Declared rather
+			// than defaulted so the next reader finds this note instead of
+			// re-deriving it.
 			[FuseV1Options.GrantFileProtocolExtraPrivileges]: true,
 		}),
 	],

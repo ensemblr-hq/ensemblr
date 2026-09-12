@@ -7,6 +7,7 @@ import { queryClient } from './api/query-client';
 import { Toaster } from './components/ui/sonner';
 import { WindowChromeSync } from './components/workbench-shell/window-controls/window-chrome-sync';
 import { WindowTitleBar } from './components/workbench-shell/window-controls/window-title-bar';
+import { startLocalStorageMirror } from './lib/storage-mirror';
 import { applyWindowChrome, readWindowChrome } from './lib/window-chrome';
 import { registerIconCollections } from './lib/workbench/icon-collections';
 import { syncQueryFocusWithWindow } from './lib/workbench/query-focus';
@@ -30,6 +31,8 @@ if (import.meta.env.DEV) {
 }
 
 registerIconCollections();
+
+startLocalStorageMirror();
 
 // A desktop window the user has clicked away from is still `document.visible`,
 // so every polling query kept firing against it until this taught TanStack

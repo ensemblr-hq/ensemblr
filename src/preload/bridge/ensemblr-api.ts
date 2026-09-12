@@ -157,6 +157,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 		conciergeContextPressure: () => invoke('conciergeContextPressure'),
 		listConciergeArtifacts: () => invoke('listConciergeArtifacts'),
 		closeWindow: () => invoke('closeWindow'),
+		mirrorRendererStorage: (request) =>
+			invoke('mirrorRendererStorage', request),
 		minimizeWindow: () => invoke('minimizeWindow'),
 		toggleMaximizeWindow: () => invoke('toggleMaximizeWindow'),
 		relaunchApp: () => invoke('relaunchApp'),

@@ -140,6 +140,10 @@ import type {
 	QuickStartProjectResult,
 } from './contracts/quick-start';
 import type {
+	RendererStorageMirrorResult,
+	RendererStorageSnapshot,
+} from './contracts/renderer-storage';
+import type {
 	DeleteRepositoryRequest,
 	DeleteRepositoryResult,
 	LocalRepositorySelectionResult,
@@ -413,6 +417,14 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.killTerminalSession]: IpcHandlerEntry<
 		KillTerminalRequest,
 		KillTerminalResult
+	>;
+	[IPC_CHANNELS.mirrorRendererStorage]: IpcHandlerEntry<
+		RendererStorageSnapshot,
+		RendererStorageMirrorResult
+	>;
+	[IPC_CHANNELS.rendererStorageSeed]: IpcHandlerEntry<
+		void,
+		RendererStorageSnapshot | null
 	>;
 	[IPC_CHANNELS.linearCancelLogin]: IpcHandlerEntry<void, void>;
 	[IPC_CHANNELS.linearConnectionStatus]: IpcHandlerEntry<
