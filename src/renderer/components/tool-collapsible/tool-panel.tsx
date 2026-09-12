@@ -1,25 +1,8 @@
 import type { ReactNode } from 'react';
+import { TextSurface } from '@/renderer/components/code-surface';
+import { withListKeys } from '@/renderer/lib/list-keys';
 import { cn } from '@/renderer/lib/utils';
 import type { ToolPanelSectionDescriptor } from '@/renderer/types/tool-presentation';
-
-/**
- * Panel shared by tool bodies that show plain payloads rather than code. Sits
- * on the app's code surface, like the code bodies do, so every tool body reads
- * as one family; it wraps instead of scrolling sideways.
- *
- * Scrolls natively under `sleek-scrollbar`, the same way the code surfaces and
- * the file and diff viewers do, so its scrollbar neither looks nor behaves like
- * a different component's.
- */
-export function ToolPanel({ children }: { children: ReactNode }) {
-	return (
-		<div className='select-text rounded-md border border-code-border bg-code p-3 font-mono text-code-foreground text-xs'>
-			<div className='sleek-scrollbar max-h-96 overflow-auto overscroll-contain'>
-				{children}
-			</div>
-		</div>
-	);
-}
 
 /**
  * Body for a tool whose payload is labelled plain text — an extension call's
@@ -33,31 +16,31 @@ export function ToolLabeledPanel({
 }: {
 	sections: readonly ToolPanelSectionDescriptor[];
 }) {
-	const keyOccurrences = new Map<string, number>();
 	return (
-		<ToolPanel>
+		<TextSurface>
 			<div className='space-y-3'>
-				{sections.map((section) => {
-					const keyBase = `${section.label}:${section.text}:${section.muted}`;
-					const occurrence = keyOccurrences.get(keyBase) ?? 0;
-					keyOccurrences.set(keyBase, occurrence + 1);
-					return (
-						<ToolPanelSection
-							key={`${keyBase}:${occurrence}`}
-							label={section.label}
-							muted={section.muted}
-						>
-							{section.text}
-						</ToolPanelSection>
-					);
-				})}
+				{withListKeys(sections, sectionIdentity).map(({ item, key }) => (
+					<ToolPanelSection key={key} label={item.label} muted={item.muted}>
+						{item.text}
+					</ToolPanelSection>
+				))}
 			</div>
-		</ToolPanel>
+		</TextSurface>
 	);
 }
 
 /**
- * One labelled payload block inside a {@link ToolPanel}. Punctuation belongs to
+ * What a labelled section is, for keying: its label, its payload, and whether it
+ * reads as context.
+ * @param section - The section to identify
+ * @returns A stable identity string
+ */
+function sectionIdentity(section: ToolPanelSectionDescriptor): string {
+	return `${section.label}:${section.text}:${section.muted}`;
+}
+
+/**
+ * One labelled payload block inside a {@link TextSurface}. Punctuation belongs to
  * `label` — pass `'Input:'` or `'Command'` as it should be painted, so the
  * component never has to special-case a trailing colon.
  */

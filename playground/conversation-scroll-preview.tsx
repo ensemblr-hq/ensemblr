@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { ChatMessageText } from '@/renderer/components/chat-message-text';
 import { ChatTurnSummary } from '@/renderer/components/chat-turn-summary';
+import { TextSurface } from '@/renderer/components/code-surface';
 import {
 	Conversation,
 	ConversationContent,
 	ConversationScrollButton,
 } from '@/renderer/components/conversation';
 import { ToolCollapsible } from '@/renderer/components/tool-collapsible';
-import { ToolPanel } from '@/renderer/components/tool-collapsible/tool-panel';
 
 const SHORT_TRANSCRIPT_TURNS = 3;
 const LONG_TRANSCRIPT_TURNS = 14;
@@ -119,14 +119,14 @@ function ConversationScrollTurn({ index }: { index: number }) {
 				glyph='terminal'
 				title={`Ran a command (turn ${index + 1})`}
 			>
-				<ToolPanel>
+				<TextSurface>
 					<pre className='m-0 whitespace-pre-wrap p-0 font-mono text-xs'>
 						{Array.from(
 							{ length: BODY_LINES },
 							(_, line) => `line ${line + 1} of the tool output`,
 						).join('\n')}
 					</pre>
-				</ToolPanel>
+				</TextSurface>
 			</ToolCollapsible>
 		</div>
 	);

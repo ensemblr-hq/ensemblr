@@ -16,6 +16,7 @@
 		"copied": "Copied",
 		"copy": "Copy",
 		"copy-code": "Copy code",
+		"copy-output": "Copy output",
 		"copy-path": "Copy path",
 		"copy-response": "Copy response",
 		"create": "Create",
@@ -396,9 +397,6 @@
 	},
 	"status": {
 		"coming-soon": "Coming soon"
-	},
-	"terminal": {
-		"title": "Terminal"
 	},
 	"thinking": {
 		"reasoned": "Reasoned for {{seconds}}s",

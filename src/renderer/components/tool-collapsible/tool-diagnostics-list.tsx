@@ -1,9 +1,10 @@
+import { TextSurface } from '@/renderer/components/code-surface';
+import { withListKeys } from '@/renderer/lib/list-keys';
 import { cn } from '@/renderer/lib/utils';
 import type {
 	ToolDiagnosticEntry,
 	ToolDiagnosticSeverity,
 } from '@/renderer/types/tool-presentation';
-import { ToolPanel } from './tool-panel';
 
 const SEVERITY_COLOR: Record<ToolDiagnosticSeverity, string> = {
 	error: 'text-status-danger',
@@ -24,27 +25,22 @@ export function ToolDiagnosticsList({
 }: {
 	entries: readonly ToolDiagnosticEntry[];
 }) {
-	const keyOccurrences = new Map<string, number>();
 	return (
-		<ToolPanel>
+		<TextSurface>
 			<div className='flex flex-col gap-2'>
-				{entries.map((entry) => {
-					const keyBase = diagnosticKey(entry);
-					const occurrence = keyOccurrences.get(keyBase) ?? 0;
-					keyOccurrences.set(keyBase, occurrence + 1);
-					return (
-						<ToolDiagnosticRow entry={entry} key={`${keyBase}:${occurrence}`} />
-					);
-				})}
+				{withListKeys(entries, diagnosticKey).map(({ item, key }) => (
+					<ToolDiagnosticRow entry={item} key={key} />
+				))}
 			</div>
-		</ToolPanel>
+		</TextSurface>
 	);
 }
 
 /**
- * Builds the content-derived portion of a diagnostic's collision-safe list key.
+ * What a diagnostic is, for keying: severity, position, reporting server, and
+ * message together.
  * @param entry - The diagnostic to identify
- * @returns A key derived from severity, position, source, and message
+ * @returns A stable identity string
  */
 function diagnosticKey(entry: ToolDiagnosticEntry): string {
 	return `${entry.severity}:${entry.line}:${entry.column}:${entry.source}:${entry.message}`;

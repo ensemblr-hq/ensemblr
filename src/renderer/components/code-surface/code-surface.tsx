@@ -3,7 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/renderer/lib/utils';
 import { BlockControls } from '../block-controls';
 import { CopyResponseButton } from '../copy-response-button';
-import { CODE_CHAT_TEXT_CLASSES, CODE_SURFACE_CLASSES } from './code-style';
+import {
+	CODE_CHAT_TEXT_CLASSES,
+	CODE_SURFACE_CLASSES,
+	CODE_SURFACE_MAX_HEIGHT,
+} from './code-style';
 
 /**
  * Scroll shell every conversation-embedded code body sits in. Wrap rows of
@@ -22,7 +26,7 @@ import { CODE_CHAT_TEXT_CLASSES, CODE_SURFACE_CLASSES } from './code-style';
  * itself light inside a dark window because a light Shiki theme was chosen.
  *
  * Children must not wrap — the surface scrolls sideways rather than reflowing.
- * For payloads that should wrap, use `ToolPanel` instead.
+ * For payloads that should wrap, use {@link TextSurface} instead.
  *
  * A surface that carries the copy control also carries a floor on its height:
  * a single-line body is shorter than the control itself, which would otherwise
@@ -45,7 +49,12 @@ export function CodeSurface({
 				copyText !== undefined && 'flex min-h-10 flex-col justify-center',
 			)}
 		>
-			<div className='sleek-scrollbar max-h-80 overflow-auto overscroll-contain'>
+			<div
+				className={cn(
+					'sleek-scrollbar overflow-auto overscroll-contain',
+					CODE_SURFACE_MAX_HEIGHT,
+				)}
+			>
 				<div className={cn('min-w-max py-1', CODE_CHAT_TEXT_CLASSES)}>
 					{children}
 				</div>

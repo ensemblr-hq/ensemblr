@@ -16,6 +16,7 @@
 		"copied": "Скопировано",
 		"copy": "Копировать",
 		"copy-code": "Копировать код",
+		"copy-output": "Копировать вывод",
 		"copy-path": "Копировать путь",
 		"copy-response": "Копировать ответ",
 		"create": "Создать",
@@ -420,9 +421,6 @@
 	},
 	"status": {
 		"coming-soon": "Скоро"
-	},
-	"terminal": {
-		"title": "Терминал"
 	},
 	"thinking": {
 		"reasoned": "Размышление заняло {{seconds}} с",

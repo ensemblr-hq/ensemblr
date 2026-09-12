@@ -18,6 +18,7 @@ export default interface Resources {
 			copied: 'Copied';
 			copy: 'Copy';
 			'copy-code': 'Copy code';
+			'copy-output': 'Copy output';
 			'copy-path': 'Copy path';
 			'copy-response': 'Copy response';
 			create: 'Create';
@@ -398,9 +399,6 @@ export default interface Resources {
 		};
 		status: {
 			'coming-soon': 'Coming soon';
-		};
-		terminal: {
-			title: 'Terminal';
 		};
 		thinking: {
 			reasoned: 'Reasoned for {{seconds}}s';
@@ -3920,7 +3918,6 @@ export default interface Resources {
 			'aria-label': 'Agent session timeline';
 			error: {
 				continue: 'Continue';
-				'copy-detail': 'Copy the runtime detail';
 				details: 'Runtime detail';
 				'edit-prompt': 'Edit the prompt';
 				fork: 'Fork chat';

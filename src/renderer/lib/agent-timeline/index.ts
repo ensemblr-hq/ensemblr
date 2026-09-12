@@ -31,6 +31,7 @@ export {
 	chipLabelForPath,
 	parsePromptAttachments,
 } from './prompt-attachment-parser.ts';
+export { parseStackTrace } from './stack-trace.ts';
 export {
 	countNestedToolCalls,
 	dropEchoedSubagentReports,

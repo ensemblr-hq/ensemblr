@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BundledLanguage } from 'shiki';
 import { CodeBlock } from '@/renderer/components/code-block';
-import { Terminal } from '@/renderer/components/terminal';
+import { TerminalOutput } from '@/renderer/components/terminal-output';
 import {
 	Collapsible,
 	CollapsibleContent,
@@ -32,8 +32,8 @@ const ERROR_TAIL_LINES = 10;
 /**
  * One tool call as a collapsed-by-default card: status icon, tool name, and a
  * one-line arg summary. Expanding reveals the full args plus the accumulated
- * output in a scroll-contained block (ANSI rendered via Terminal for shell
- * output, diff rendering for edits). Failed calls auto-expand showing only
+ * output in a scroll-contained block (ANSI rendered via TerminalOutput for
+ * shell output, diff rendering for edits). Failed calls auto-expand showing only
  * the last ~10 lines of their error output.
  */
 export function PiToolCard({
@@ -173,8 +173,8 @@ function ToolArgs({ args }: { args: Readonly<Record<string, unknown>> }) {
 /**
  * Scroll-contained output block. Long output collapses to the trailing lines
  * with a "Show all N lines" toggle; failed calls show only the error tail.
- * Edits render their unified diff; shell output renders through Terminal so
- * ANSI colors survive (verified against unicode-and-ansi.jsonl).
+ * Edits render their unified diff; shell output renders through TerminalOutput
+ * so ANSI colors survive (verified against unicode-and-ansi.jsonl).
  */
 function ToolOutput({
 	call,
@@ -220,9 +220,9 @@ function ToolOutput({
 			) : null}
 			<div className='max-h-72 overflow-auto'>
 				{call.toolName === 'bash' ? (
-					<Terminal
+					<TerminalOutput
 						isStreaming={call.status === 'running'}
-						output={visible.join('\n')}
+						text={visible.join('\n')}
 					/>
 				) : (
 					<pre

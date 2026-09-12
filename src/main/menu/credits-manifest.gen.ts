@@ -60,12 +60,6 @@ export const CREDITS_PACKAGES = [
 		kind: 'runtime',
 	},
 	{
-		name: '@radix-ui/react-use-controllable-state',
-		license: 'MIT',
-		url: 'https://radix-ui.com/primitives',
-		kind: 'runtime',
-	},
-	{
 		name: '@streamdown/cjk',
 		license: 'Apache-2.0',
 		url: 'https://github.com/vercel/streamdown',

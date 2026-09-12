@@ -12,6 +12,14 @@
 /** Fill, ink, and typeface shared by every code surface, at either density. */
 export const CODE_SURFACE_CLASSES = 'bg-code font-mono text-code-foreground';
 
+/**
+ * Height a conversation-embedded surface stops growing at and starts scrolling.
+ * Named rather than written twice: `CodeSurface` and `TextSurface` are meant to
+ * be the same box holding different payloads, and two literals drifted apart
+ * once already.
+ */
+export const CODE_SURFACE_MAX_HEIGHT = 'max-h-80';
+
 /** Type size for a code surface that fills a panel or a tab. */
 export const CODE_PANEL_TEXT_CLASSES = 'text-code-body leading-code';
 

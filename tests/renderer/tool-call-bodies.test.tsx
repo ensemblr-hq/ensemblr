@@ -264,7 +264,7 @@ describe('tool call bodies', () => {
 		expect(within(body).getAllByText('typescript')).toHaveLength(2);
 	});
 
-	test('paints ANSI shell output through the terminal rather than verbatim', () => {
+	test('paints ANSI shell output on the code surface rather than verbatim', () => {
 		renderRow(
 			<ChatToolCall
 				part={toolPart('bash', { command: 'npm test' }, ANSI_OUTPUT)}
@@ -273,7 +273,8 @@ describe('tool call bodies', () => {
 
 		const body = openRow('Running tests');
 
-		expect(within(body).getByText('Terminal')).toBeInTheDocument();
+		expect(body.querySelector('.bg-code')).not.toBeNull();
+		expect(within(body).getByLabelText('Copy output')).toBeInTheDocument();
 		expect(within(body).getByText('FAIL')).toBeInTheDocument();
 		expect(body.textContent).toContain(
 			'tests/renderer/tool-call-bodies.test.tsx',
@@ -292,35 +293,22 @@ describe('tool call bodies', () => {
 		expect(body.querySelector('[aria-expanded]')).toBeNull();
 	});
 
-	test('paints a failure carrying a traceback as a collapsed stack trace', () => {
+	test('paints a failure carrying a traceback as its error line and app frames', () => {
 		renderRow(<ChatToolCall part={failedPart('edit', STACK_TRACE)} />);
 
 		const body = openRow('Edit failed');
-		const errorType = within(body).getByText('TypeError');
-		const trace = errorType.closest('[aria-expanded]');
 
+		expect(within(body).getByText('TypeError:')).toBeInTheDocument();
 		expect(
 			within(body).getByText(/Cannot read properties of undefined/),
 		).toBeInTheDocument();
-		expect(trace).toHaveAttribute('aria-expanded', 'false');
-		expect(
-			within(body).queryByText(
-				'/repo/src/renderer/lib/agent-timeline/tool-presentation.ts:329:32',
-			),
-		).toBeNull();
-
-		fireEvent.click(trace as HTMLElement);
-
-		expect(
-			within(body).getByText(
-				'/repo/src/renderer/lib/agent-timeline/tool-presentation.ts:329:32',
-			),
-		).toBeInTheDocument();
-		expect(
-			within(body).getByText(
-				'/repo/src/renderer/lib/agent-timeline/tool-presentation.ts:524:26',
-			),
-		).toBeInTheDocument();
+		expect(body.querySelector('[aria-expanded]')).toBeNull();
+		expect(body.textContent).toContain(
+			'/repo/src/renderer/lib/agent-timeline/tool-presentation.ts:329:32',
+		);
+		expect(body.textContent).toContain(
+			'/repo/src/renderer/lib/agent-timeline/tool-presentation.ts:524:26',
+		);
 	});
 
 	test('paints an unknown extension call as its labelled request and reply', () => {

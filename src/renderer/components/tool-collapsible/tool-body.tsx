@@ -1,7 +1,7 @@
 import { CodePanel } from '@/renderer/components/code-surface';
 import { MessageResponse } from '@/renderer/components/message';
 import { StackTraceDiagnostic } from '@/renderer/components/stack-trace-diagnostic';
-import { Terminal } from '@/renderer/components/terminal';
+import { TerminalOutput } from '@/renderer/components/terminal-output';
 import { cn } from '@/renderer/lib/utils';
 import type { ToolBodyDescriptor } from '@/renderer/types/tool-presentation';
 import { ToolChecklist } from './tool-checklist';
@@ -81,14 +81,9 @@ export function ToolBody({ body }: { body: ToolBodyDescriptor }) {
 		case 'pending':
 			return null;
 		case 'stack-trace':
-			return (
-				<StackTraceDiagnostic
-					className='border-destructive/20'
-					trace={body.trace}
-				/>
-			);
+			return <StackTraceDiagnostic trace={body.trace} />;
 		case 'terminal':
-			return <Terminal isStreaming={false} output={body.text} />;
+			return <TerminalOutput text={body.text} />;
 		default: {
 			const exhaustive: never = body;
 			void exhaustive;

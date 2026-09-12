@@ -23,7 +23,7 @@ import {
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { CopyResponseButton } from '@/renderer/components/copy-response-button';
+import { TextSurface } from '@/renderer/components/code-surface';
 import { StackTraceDiagnostic } from '@/renderer/components/stack-trace-diagnostic';
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -224,9 +224,10 @@ function RecoveryButton({
  * The runtime's own words, folded away behind a disclosure so the designed copy
  * leads and the untranslated provider string stays available for a bug report.
  *
- * A detail that is a stack trace gets the frame-parsing viewer instead of a
- * plain block — it carries its own disclosure and copy button, so the row lets
- * it own the fold rather than nesting two.
+ * A detail that is a stack trace gets the frame-parsing viewer; anything else
+ * goes on the same text surface verbatim. Both sit behind one disclosure and
+ * carry their copy control in the same corner, so the two readings of a failure
+ * differ only in what the panel holds.
  */
 function RuntimeErrorDetails({
 	detail,
@@ -242,36 +243,25 @@ function RuntimeErrorDetails({
 		return null;
 	}
 
-	if (looksLikeStackTrace(body)) {
-		return (
-			<div className='pl-6'>
-				<StackTraceDiagnostic className='border-border/60' trace={body} />
-			</div>
-		);
-	}
-
 	return (
 		<Collapsible className='pl-6'>
-			<div className='flex items-center gap-1'>
-				<CollapsibleTrigger className='group inline-flex items-center gap-1 text-muted-foreground text-xs transition-colors hover:text-foreground'>
-					<ChevronRightIcon
-						aria-hidden='true'
-						className='size-3.5 transition-transform group-data-[state=open]:rotate-90'
-					/>
-					{t('workbench:timeline.error.details', 'Runtime detail')}
-				</CollapsibleTrigger>
-				<CopyResponseButton
-					label={t(
-						'workbench:timeline.error.copy-detail',
-						'Copy the runtime detail',
-					)}
-					text={body}
+			<CollapsibleTrigger className='group inline-flex items-center gap-1 text-muted-foreground text-xs transition-colors hover:text-foreground'>
+				<ChevronRightIcon
+					aria-hidden='true'
+					className='size-3.5 transition-transform group-data-[state=open]:rotate-90'
 				/>
-			</div>
-			<CollapsibleContent>
-				<pre className='wrap-break-word mt-1.5 max-h-64 overflow-auto whitespace-pre-wrap rounded-md border border-border/60 bg-background/60 p-2 font-mono text-muted-foreground text-xs'>
-					{body}
-				</pre>
+				{t('workbench:timeline.error.details', 'Runtime detail')}
+			</CollapsibleTrigger>
+			<CollapsibleContent className='mt-1.5'>
+				{looksLikeStackTrace(body) ? (
+					<StackTraceDiagnostic trace={body} />
+				) : (
+					<TextSurface copyText={body}>
+						<pre className='wrap-break-word m-0 whitespace-pre-wrap p-0'>
+							{body}
+						</pre>
+					</TextSurface>
+				)}
 			</CollapsibleContent>
 		</Collapsible>
 	);
