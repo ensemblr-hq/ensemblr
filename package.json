@@ -50,7 +50,7 @@
 		"test:scripts": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/script-lifecycle.test.ts",
 		"test:app": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/main-window-state.test.ts",
 		"test:pi": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/pi-executable.test.ts tests/main/pi-readiness.test.ts",
-		"test:agent-runtime": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/agent-client.test.ts tests/main/jsonl-line-stream.test.ts tests/main/pi-cli-rpc-adapter.test.ts tests/main/claude-agent-normalizer.test.ts",
+		"test:agent-runtime": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/agent-client.test.ts tests/main/jsonl-line-stream.test.ts tests/main/pi-rpc-oversize-recovery.test.ts tests/main/pi-cli-rpc-adapter.test.ts tests/main/claude-agent-normalizer.test.ts",
 		"test:agent-session": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/agent-session-service.test.ts",
 		"test:pi-rpc": "vitest run tests/shared/pi-rpc-parse.test.ts",
 		"test:keymap": "vitest run tests/shared/keymap-matcher.test.ts",

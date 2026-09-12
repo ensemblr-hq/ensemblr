@@ -39,7 +39,11 @@ export type { ChildLike, SpawnFn } from './cli-rpc/spawn-env.ts';
 export { normalizePiPayload } from './pi-wire-normalizer.ts';
 
 const DEFAULT_PI_RPC_ARGS = ['--mode', 'rpc'] as const;
-const DEFAULT_MAX_LINE_BYTES = 1024 * 1024;
+// A whole tool result rides on one JSONL line, and a `read` of an image inlines
+// it as base64: a routine screenshot clears the 1 MiB this used to be, and
+// tripping the cap loses the frame that says the tool finished along with the
+// payload. Sized to clear the image and large-file reads Pi does every session.
+const DEFAULT_MAX_LINE_BYTES = 16 * 1024 * 1024;
 const DEFAULT_STDERR_RING_BYTES = 64 * 1024;
 const DEFAULT_KILL_GRACE_MS = 750;
 // Extra slack past the SIGKILL deadline before `close()` stops waiting on the
@@ -54,6 +58,27 @@ const STATE_TIMEOUT_MS = 5000;
 const STARTUP_TIMEOUT_MS = 120_000;
 // Keep late injection echoes deduplicated without retaining an unbounded queue.
 const MAX_INJECTED_PROMPT_DEDUPE = 32;
+// The raw-frame tap broadcasts to every window over IPC on the hot path, and it
+// is not gated on anyone listening, so a line is sampled rather than forwarded
+// whole: at the line cap above, one inlined image would otherwise be structured-
+// cloned per window three times over — Pi reports a finished tool as
+// `tool_execution_end` plus a `message_start`/`message_end` pair, each carrying
+// the same payload. A frame worth reading in the debug panel fits in this.
+const RAW_FRAME_SAMPLE_CHARS = 8 * 1024;
+
+/**
+ * Trims a JSONL frame to the sample the debug panel broadcasts, naming what it
+ * cut so a truncated line is never mistaken for the frame Pi actually sent.
+ * @param line - The verbatim JSONL line read from or written to the child
+ * @returns The line itself when small, otherwise its head plus a cut marker
+ */
+function sampleRawFrame(line: string): string {
+	if (line.length <= RAW_FRAME_SAMPLE_CHARS) {
+		return line;
+	}
+	const truncated = line.length - RAW_FRAME_SAMPLE_CHARS;
+	return `${line.slice(0, RAW_FRAME_SAMPLE_CHARS)}… [${truncated} more characters truncated]`;
+}
 
 /** Reads `sessionName` out of a raw `get_state` response payload, defensively. */
 function normalizeSessionState(data: unknown): AgentSessionState {
@@ -327,7 +352,7 @@ function createCliRpcSession({
 				at: now().toISOString(),
 				direction,
 				label: input.metadata.label,
-				line,
+				line: sampleRawFrame(line),
 				sessionId: input.request.agentSessionId,
 			});
 		} catch {

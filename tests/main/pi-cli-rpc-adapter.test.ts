@@ -656,6 +656,29 @@ test('raw frames name the agent_sessions.id the debug panel scopes by', async ()
 	await adapter.shutdown();
 });
 
+test('raw frames sample a megabyte line instead of broadcasting it whole', async () => {
+	const recorder = createSpawnRecorder();
+	const frames: Array<{ line: string }> = [];
+	const adapter = createPiCliRpcAdapter({
+		onRawFrame: (frame) => frames.push(frame),
+		spawn: recorder.spawn,
+	});
+	await adapter.createSession(buildInput());
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	const inlined = 'A'.repeat(1024 * 1024);
+	child.emitStdout(
+		`{"type":"tool_execution_end","toolCallId":"call-1","toolName":"read","result":{"content":[{"type":"text","text":"${inlined}"}]},"isError":false}\n`,
+	);
+
+	const received = frames.find((frame) => frame.line.includes('call-1'));
+	assert.ok(received);
+	assert.ok(received.line.length < 1024 * 1024);
+	assert.match(received.line, /\[\d+ more characters truncated\]$/);
+	await adapter.shutdown();
+});
+
 test('invalid JSON lines surface as recoverable error events', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createPiCliRpcAdapter({ spawn: recorder.spawn });
