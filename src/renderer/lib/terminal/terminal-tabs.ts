@@ -128,15 +128,19 @@ export function terminalSessionToDockStatus(
  * clears the moment the command finishes, so the tab falls back to its own name.
  * That name is whatever the terminal was titled, or its position in the strip
  * when nobody titled it — main leaves an unnamed session's `title` as an English
- * stand-in, so the number is rendered here rather than travelling as text.
+ * stand-in, so the number is rendered here rather than travelling as text. A
+ * lone terminal is named without one: a number distinguishes tabs from each
+ * other, and with nothing to distinguish it from it is only noise.
  * @param session - The interactive session backing the tab.
  * @param position - Where the tab sits in the terminal strip, counting from 1.
+ * @param stripLength - How many terminal tabs the strip holds in total.
  * @param t - Translator bound to the active language.
  * @returns The label to show on the tab.
  */
 function terminalDockTabLabel(
 	session: TerminalSessionSnapshot,
 	position: number,
+	stripLength: number,
 	t: TFunction,
 ): string {
 	if (session.foregroundCommand) {
@@ -144,6 +148,9 @@ function terminalDockTabLabel(
 	}
 	if (!session.titleIsDefault) {
 		return session.title;
+	}
+	if (stripLength < 2) {
+		return t('workbench:dock-tab.terminal.label', 'Terminal');
 	}
 	return t(
 		'workbench:dock-tab.terminal.numbered-label',
@@ -163,6 +170,7 @@ function terminalDockTabLabel(
  * order: closing one renumbers those after it, and reordering the strip reorders
  * the numbers with it. A named tab occupies a position without consuming a
  * number, so the numbered tabs are ordered but need not form an unbroken 1..n.
+ * A strip of one drops the number altogether and reads simply "Terminal".
  * @param options - Live sessions plus the interactive terminal ids with recent output activity.
  * @returns The terminal dock tabs (empty when no interactive session exists).
  */
@@ -175,24 +183,25 @@ export function mapTerminalSessionsToDockTabs({
 	sessions: readonly TerminalSessionSnapshot[];
 	t: TFunction;
 }): TerminalDockTabModel[] {
-	const tabs: TerminalDockTabModel[] = [];
-	for (const session of sessions) {
-		if (session.kind !== 'terminal') {
-			continue;
-		}
-		tabs.push({
-			id: `terminal:${session.id}` as const,
-			kind: 'terminal',
-			label: terminalDockTabLabel(session, tabs.length + 1, t),
-			sessionStatus: session.status,
-			status:
-				session.status === 'running' && activeTerminalIds.has(session.id)
-					? 'running'
-					: terminalSessionToDockStatus(session.status),
-			terminalId: session.id,
-		});
-	}
-	return tabs;
+	const interactiveSessions = sessions.filter(
+		(session) => session.kind === 'terminal',
+	);
+	return interactiveSessions.map((session, index) => ({
+		id: `terminal:${session.id}` as const,
+		kind: 'terminal',
+		label: terminalDockTabLabel(
+			session,
+			index + 1,
+			interactiveSessions.length,
+			t,
+		),
+		sessionStatus: session.status,
+		status:
+			session.status === 'running' && activeTerminalIds.has(session.id)
+				? 'running'
+				: terminalSessionToDockStatus(session.status),
+		terminalId: session.id,
+	}));
 }
 
 /**
