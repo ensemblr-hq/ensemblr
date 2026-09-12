@@ -158,34 +158,64 @@ function withoutHiddenModels(
 /**
  * The models in scope for one caller: its own runtime's, or every runtime's when
  * the caller has none the app can name and therefore has to pick explicitly.
- * @param snapshot - The catalog's models.
+ * @param models - The catalog's models.
  * @param runtime - The runtime to narrow to, or null to leave every runtime's in.
  * @returns The models that caller may spawn a child on.
  */
 function modelsOn(
-	snapshot: CatalogSnapshot,
+	models: readonly AgentModelOption[],
 	runtime: AgentProviderId | null,
 ): readonly AgentModelOption[] {
 	return runtime === null
-		? snapshot.models
-		: snapshot.models.filter((option) => option.agentProvider === runtime);
+		? models
+		: models.filter((option) => option.agentProvider === runtime);
 }
 
 /**
  * Lists the catalog rows the caller may explicitly target under current policy.
- * @param snapshot - Available, non-hidden catalog rows.
+ * @param models - Available, non-hidden catalog rows.
  * @param callerRuntime - The caller's native runtime, when known.
  * @param allowCrossRuntime - Whether a native caller may target the other runtime.
  * @returns Every permitted explicit destination model.
  */
 function availableModelsFor(
-	snapshot: CatalogSnapshot,
+	models: readonly AgentModelOption[],
 	callerRuntime: AgentProviderId | null,
 	allowCrossRuntime: boolean,
 ): readonly AgentModelOption[] {
 	return callerRuntime === null || allowCrossRuntime
-		? snapshot.models
-		: modelsOn(snapshot, callerRuntime);
+		? models
+		: modelsOn(models, callerRuntime);
+}
+
+/**
+ * Why a named model could not be used. "No such model" is only true when the
+ * caller has a listing to be sent to: each runtime's catalog degrades to nothing
+ * on its own, so a `pi --list-models` that failed leaves a pi caller unable to
+ * name any pi model — and sending it to `listModels` would hand it a listing
+ * that is empty for the same reason. Emptiness is measured over
+ * {@link availableModelsFor}, the set `listModelsFor` itself publishes, so the
+ * claim stays true when cross-runtime delegation is on and the other runtime's
+ * rows *are* on offer. Naming inheritance as the way out matters because a
+ * caller's own model id is honoured even while the catalog cannot place it.
+ * @param input - The requested id, the rows in scope, the caller's runtime, and the cross-runtime opt-in.
+ * @returns Prose for the calling agent.
+ */
+function unavailableModelReason(input: {
+	allowCrossRuntime: boolean;
+	callerRuntime: AgentProviderId | null;
+	models: readonly AgentModelOption[];
+	requestedModelId: string;
+}): string {
+	const runtime = input.callerRuntime;
+	const offered = availableModelsFor(
+		input.models,
+		runtime,
+		input.allowCrossRuntime,
+	);
+	return runtime !== null && offered.length === 0
+		? `Ensemblr currently lists no ${getAgentProviderLabel(runtime)} models, so "${input.requestedModelId}" cannot be matched and ensemblr_list_models has nothing to offer you either — that runtime's catalog is unreadable right now, or every one of its models is hidden in Settings → Models. Omit "model" to inherit this conversation's own, which still works, or tell the user to check Settings → Providers.`
+		: `No model "${input.requestedModelId}" is available in this app. Call ensemblr_list_models and pass an id that appears there.`;
 }
 
 /**
@@ -229,7 +259,7 @@ function defaultModelFor(
 	snapshot: CatalogSnapshot,
 	runtime: AgentProviderId | null,
 ): AgentModelOption | undefined {
-	const inScope = modelsOn(snapshot, runtime);
+	const inScope = modelsOn(snapshot.models, runtime);
 	const affordable = inScope.filter(
 		(option) => classifyAgentModelTier(option) !== 'frontier',
 	);
@@ -343,7 +373,12 @@ export function createSpawnModelResolver({
 		if (!model) {
 			return {
 				ok: false,
-				reason: `No model "${input.requestedModelId}" is available in this app. Call ensemblr_list_models and pass an id that appears there.`,
+				reason: unavailableModelReason({
+					allowCrossRuntime: input.allowCrossRuntime,
+					callerRuntime: input.caller.runtime,
+					models: input.models,
+					requestedModelId: input.requestedModelId,
+				}),
 			};
 		}
 		const callerRuntime = input.caller.runtime;
@@ -448,7 +483,7 @@ export function createSpawnModelResolver({
 				crossRuntimeDelegationEnabled,
 				defaultModelId: defaultModelFor(snapshot, callerRuntime)?.id ?? null,
 				models: availableModelsFor(
-					snapshot,
+					snapshot.models,
 					callerRuntime,
 					crossRuntimeDelegationEnabled,
 				),
