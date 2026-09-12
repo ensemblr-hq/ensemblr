@@ -68,7 +68,10 @@ const EXPECTED_DENIALS: Record<
 	readTerminalOutput: [],
 	resolveDiffComments: ['orchestrator', 'subagent'],
 	sendFollowUp: 'conditional',
-	setBranchName: [],
+	// Denied for both roles: it renames the git branch, which is what `git branch
+	// -m` does and the bash guard denies by name, and a branch moved under the
+	// user mid-plan breaks upstream tracking on the old name.
+	setBranchName: ['orchestrator', 'subagent'],
 	setName: [],
 	setSummary: [],
 	setWorkspaceStatus: [],

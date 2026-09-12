@@ -43,6 +43,26 @@ export const CONTROL_TUI_HARNESSES_ENV_KEY = 'ENSEMBLR_CONTROL_TUI_HARNESSES';
 export const CONTROL_TUI_HARNESSES_ENABLED = '1';
 
 /**
+ * Every variable the control overlay writes, for the environment catalog to
+ * reserve.
+ *
+ * Reserving them is what makes "a repository cannot redirect the control
+ * channel" true by construction rather than by the order of two object spreads:
+ * every environment layer skips a reserved key, so a `.ensemblr/settings.toml`,
+ * an env file, or a secret provider declaring `ENSEMBLR_CONTROL_URL` can no
+ * longer reach an assembled workspace environment — and the shipped extension
+ * posts its bearer token to whatever that variable names.
+ */
+export const CONTROL_ENV_KEYS: readonly string[] = [
+	CONTROL_URL_ENV_KEY,
+	CONTROL_TOKEN_ENV_KEY,
+	CONTROL_ROLE_ENV_KEY,
+	CONTROL_DEPTH_ENV_KEY,
+	CONTROL_ARCHITECTURE_ENV_KEY,
+	CONTROL_TUI_HARNESSES_ENV_KEY,
+];
+
+/**
  * Renders a shell-style reference to an env var, for configs the agent's own
  * CLI expands at launch. Passing the reference instead of the value keeps the
  * secret out of the child's argv, where any process on the machine can read it.

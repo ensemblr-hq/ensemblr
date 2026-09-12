@@ -816,7 +816,7 @@
 				"workspace-trusted": "Workspace trusted",
 				"workspace-trusted-description": "Agents act freely inside the workspace; anything outside it still asks."
 			},
-			"scope-note": "This repository’s mode is the one every gate enforces. Reset it and workspaces of this repo fall back to the app-wide default.",
+			"scope-note": "This repository’s mode is the one Ensemblr enforces. Reset it and workspaces of this repo fall back to the app-wide default.",
 			"title": "Security"
 		},
 		"setup-script": {

@@ -1,10 +1,13 @@
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { BrowserWindow, screen } from 'electron';
 import {
 	resolveWindowChrome,
 	type TitleBarPreference,
 } from '../../shared/window-chrome.ts';
+import { installContentSecurityPolicy } from './content-security-policy';
 import { routeExternalLinksToBrowser } from './external-links';
+import type { AppDocument } from './external-links-policy';
 import { linuxWindowIconPath } from './linux-desktop-identity';
 import { restrictMediaPermissions } from './media-permissions';
 import { forwardTextContextMenus } from './text-context-menu-forwarding';
@@ -19,6 +22,36 @@ import {
 	type MainWindowStateStore,
 	trackMainWindowState,
 } from './window-state';
+
+/**
+ * Where the renderer is served from in this build: the Vite dev origin, or the
+ * `file:` URL of the packaged `index.html`. Both the navigation policy and the
+ * Content-Security-Policy key off it, and the packaged entry doubles as the
+ * path `loadFile` is given.
+ * @returns The app's own document, in the shape the policies read.
+ */
+export function rendererDocument(): AppDocument {
+	return MAIN_WINDOW_VITE_DEV_SERVER_URL
+		? {
+				appDocumentUrl: null,
+				appOrigin: new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin,
+			}
+		: {
+				appDocumentUrl: pathToFileURL(packagedRendererEntry()).href,
+				appOrigin: null,
+			};
+}
+
+/**
+ * The packaged renderer's `index.html` on disk, beside the main bundle.
+ * @returns The absolute path Vite's renderer build wrote.
+ */
+function packagedRendererEntry(): string {
+	return path.join(
+		__dirname,
+		`../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`,
+	);
+}
 
 /**
  * Creates the Ensemblr main BrowserWindow, restoring persisted bounds and
@@ -59,6 +92,18 @@ export function createMainWindow({
 			// only plugin modern Chromium still carries, so this grants nothing else.
 			plugins: true,
 			preload: path.join(__dirname, 'preload.js'),
+			// Electron ≥20 already infers all three from `nodeIntegration: false`
+			// and a preload that imports nothing outside `electron`. Declared anyway
+			// so the guarantee survives a preload that later reaches for `node:fs`,
+			// and so a future `<webview>` is a deliberate edit rather than a default
+			// quietly changing under the app.
+			sandbox: true,
+			webviewTag: false,
+			// On macOS this is the OS spellchecker and fetches nothing; on Linux it
+			// is Chromium's, which downloads the locale's Hunspell dictionary from
+			// Google's CDN on first use. Left on because the renderer draws its own
+			// text context menu from Chromium's verdict.
+			spellcheck: true,
 		},
 	});
 
@@ -79,18 +124,18 @@ export function createMainWindow({
 	// permissive default.
 	restrictMediaPermissions(mainWindow.webContents.session);
 
+	installContentSecurityPolicy(
+		mainWindow.webContents.session,
+		MAIN_WINDOW_VITE_DEV_SERVER_URL ?? null,
+	);
+
 	// The renderer draws the text context menu itself, but only Chromium knows
 	// the spellchecker's verdict for the word under the cursor.
 	forwardTextContextMenus(mainWindow.webContents);
 
-	// Send every external link to the default system browser. In dev the renderer
-	// is served from the Vite origin (treated as internal); in prod it is a file:
-	// bundle, which has no http(s) origin to match.
-	routeExternalLinksToBrowser(mainWindow.webContents, {
-		appOrigin: MAIN_WINDOW_VITE_DEV_SERVER_URL
-			? new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin
-			: null,
-	});
+	// Send every external link to the default system browser and cancel every
+	// navigation that is neither that nor the app's own document.
+	routeExternalLinksToBrowser(mainWindow.webContents, rendererDocument());
 
 	mainWindow.once('ready-to-show', () => {
 		restoreMainWindowState(mainWindow, restoredState);
@@ -104,9 +149,7 @@ export function createMainWindow({
 	if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
 		void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
 	} else {
-		void mainWindow.loadFile(
-			path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-		);
+		void mainWindow.loadFile(packagedRendererEntry());
 	}
 
 	return mainWindow;

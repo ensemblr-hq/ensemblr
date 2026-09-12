@@ -50,6 +50,20 @@ describe('parseDeepLink', () => {
 		expect(result.kind).toBe('invalid');
 	});
 
+	test('rejects malformed percent-encoding instead of throwing', () => {
+		const result = parseDeepLink('ensemblr://repo/%');
+		expect(result.kind).toBe('invalid');
+		if (result.kind === 'invalid') {
+			expect(result.reason).toBe('malformed-escape');
+		}
+	});
+
+	test('rejects a malformed escape in a later segment', () => {
+		expect(parseDeepLink('ensemblr://workspace/r1/%E0%A4%A').kind).toBe(
+			'invalid',
+		);
+	});
+
 	test('rejects unsupported protocol', () => {
 		const result = parseDeepLink('file:///etc/passwd');
 		expect(result.kind).toBe('invalid');

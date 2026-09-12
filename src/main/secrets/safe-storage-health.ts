@@ -30,7 +30,7 @@ export interface SafeStorageStatus {
  * @param backend - Backend id from `getSelectedStorageBackend()`.
  * @returns How much protection that backend provides.
  */
-function gradeBackend(
+function gradeSafeStorageBackend(
 	backend: ReturnType<Electron.SafeStorage['getSelectedStorageBackend']>,
 ): SafeStorageProtection {
 	switch (backend) {
@@ -67,5 +67,5 @@ export function readSafeStorageStatus(): SafeStorageStatus {
 
 	const backend = safeStorage.getSelectedStorageBackend();
 
-	return { backend, protection: gradeBackend(backend) };
+	return { backend, protection: gradeSafeStorageBackend(backend) };
 }

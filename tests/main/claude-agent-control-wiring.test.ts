@@ -81,7 +81,13 @@ const setup = (
 		resolveAgentControlWiring({
 			isSpawnedSubAgent: (sessionId) => marked.has(sessionId),
 			...(input.lineage
-				? { lineage: { depth: input.lineage.depth, rootSessionId: 'root' } }
+				? {
+						lineage: {
+							depth: input.lineage.depth,
+							parentSessionId: 'root',
+							rootSessionId: 'root',
+						},
+					}
 				: {}),
 			parentSessionId: input.parentSessionId ?? null,
 			provider: input.provider,

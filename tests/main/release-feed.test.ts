@@ -508,6 +508,67 @@ describe('createReleaseFeed — failures and caching', () => {
 		});
 	});
 
+	test('an asset download URL off the trusted GitHub hosts is malformed', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: {
+				body: [
+					release('v0.2.0', {
+						feedUrl: 'https://attacker.example/update-darwin-arm64.json',
+					}),
+				],
+			},
+		});
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
+
+		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
+			failure: { code: 'update-feed-malformed' },
+			status: 'error',
+		});
+	});
+
+	test('a feed document URL off the trusted GitHub hosts is malformed', async () => {
+		const { fetchImpl } = stubFetch({
+			[RELEASES_URL]: { body: [release('v0.2.0')] },
+			[`https://github.com/${SLUG}/releases/download/v0.2.0/${UPDATE_FEED_ASSET_NAME}`]:
+				{
+					body: {
+						name: '0.2.0',
+						url: 'https://attacker.example/Ensemblr.zip',
+					},
+				},
+		});
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
+
+		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
+			failure: { code: 'update-feed-malformed' },
+			status: 'error',
+		});
+	});
+
+	test('a release list larger than a release list can be is malformed', async () => {
+		const oversized = `[${'1'.repeat(2 * 1024 * 1024 + 1)}]`;
+		const fetchImpl = (async () =>
+			new Response(oversized)) as unknown as typeof fetch;
+		const feed = createReleaseFeed({
+			fetchImpl,
+			platform: 'darwin',
+			repositorySlug: SLUG,
+		});
+
+		expect(await feed.resolve('release', '0.1.0')).toMatchObject({
+			failure: { code: 'update-feed-malformed' },
+			status: 'error',
+		});
+	});
+
 	test('Linux carries no installable asset when GitHub published no digest', async () => {
 		const { fetchImpl } = stubFetch({
 			[RELEASES_URL]: {

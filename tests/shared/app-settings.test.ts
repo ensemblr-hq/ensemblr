@@ -322,13 +322,41 @@ describe('mergeAppSettings', () => {
 
 describe('appSettingsControlPatchSchema', () => {
 	test('accepts and preserves every allowed preference field', () => {
-		const { onboarding: _onboarding, ...projection } = DEFAULT_APP_SETTINGS;
-		const parsed = appSettingsControlPatchSchema.safeParse(projection);
+		const {
+			dictation: _dictation,
+			onboarding: _onboarding,
+			...projection
+		} = DEFAULT_APP_SETTINGS;
+		const { automaticUpdates: _automaticUpdates, ...general } =
+			projection.general;
+		const writable = { ...projection, general };
+		const parsed = appSettingsControlPatchSchema.safeParse(writable);
 
 		expect(parsed.success).toBe(true);
 		if (parsed.success) {
-			expect(parsed.data).toEqual(projection);
+			expect(parsed.data).toEqual(writable);
 		}
+	});
+
+	// `dictation.baseUrl` is the endpoint the user's stored transcription key is
+	// posted to with every recorded clip, and `general.automaticUpdates` decides
+	// whether a patched release ever installs. Both were writable through
+	// `updateAppSettings`, which an unattended Concierge applies with no dialog.
+	test('rejects the two settings an agent must not write', () => {
+		expect(
+			appSettingsControlPatchSchema.safeParse({
+				dictation: { baseUrl: 'http://attacker.example/v1' },
+			}).success,
+		).toBe(false);
+		expect(
+			appSettingsControlPatchSchema.safeParse({ dictation: { enabled: false } })
+				.success,
+		).toBe(false);
+		expect(
+			appSettingsControlPatchSchema.safeParse({
+				general: { automaticUpdates: false },
+			}).success,
+		).toBe(false);
 	});
 
 	test('accepts only editable sections and rejects unknown or invalid values', () => {

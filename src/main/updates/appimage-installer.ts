@@ -111,6 +111,7 @@ export function createAppImageInstaller({
 	const partialPath = `${stagedPath}.part`;
 	let handlers: UpdaterEventHandlers | null = null;
 	let stagedVersion: string | null = null;
+	let stagedDigest: string | null = null;
 
 	/**
 	 * Deletes a path, ignoring its absence. Cleanup runs on failure paths where a
@@ -232,12 +233,40 @@ export function createAppImageInstaller({
 				return;
 			}
 			stagedVersion = version;
+			stagedDigest = expected;
 			handlers?.onDownloaded();
 		})();
 	};
 
+	/**
+	 * Re-hashes the staged file against the digest it was verified with at
+	 * download time. The staged file can sit on disk for days before
+	 * {@link applyStaged} runs, and that whole window is otherwise unguarded —
+	 * anyone able to write the staging directory could swap it.
+	 * @returns True when the staged file still matches the recorded digest
+	 */
+	const stagedFileStillMatchesDigest = (): boolean => {
+		if (!stagedDigest) {
+			return true;
+		}
+		const digest = createHash('sha256')
+			.update(readFileSync(stagedPath))
+			.digest('hex');
+		return digest === stagedDigest;
+	};
+
 	const applyStaged = (): boolean => {
 		if (!existsSync(stagedPath)) {
+			return false;
+		}
+		if (!stagedFileStillMatchesDigest()) {
+			removeQuietly(stagedPath);
+			stagedVersion = null;
+			stagedDigest = null;
+			handlers?.onError(
+				new Error('The staged AppImage no longer matches its recorded digest.'),
+				'update-verification-failed',
+			);
 			return false;
 		}
 		renameSync(stagedPath, appImagePath);
@@ -245,6 +274,7 @@ export function createAppImageInstaller({
 			syncInstallManifest(stagedVersion);
 		}
 		stagedVersion = null;
+		stagedDigest = null;
 		return true;
 	};
 
@@ -252,6 +282,7 @@ export function createAppImageInstaller({
 		removeQuietly(partialPath);
 		removeQuietly(stagedPath);
 		stagedVersion = null;
+		stagedDigest = null;
 	};
 
 	return {

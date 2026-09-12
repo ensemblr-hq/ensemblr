@@ -29,7 +29,17 @@ port), serving three routes: `POST /invoke` (plain JSON, for the shipped Pi
 extension), `POST /mcp` (MCP streamable HTTP, for every MCP client), and
 `GET /health`. The MCP endpoint is stateless — a fresh server and transport per
 request — which is what lets the tool list and the playbook be cut to the caller
-on every connection.
+on every connection. It answers `POST` alone: a `GET` there was served as an
+SSE stream the server then held open indefinitely, and stateless mode has no use
+for either that or the session `DELETE`, so both are `405`.
+
+**Every route authenticates, `/health` included, and the token has to resolve
+rather than merely be present.** The MCP endpoint builds a tool list and a
+playbook shaped to its caller before the first op is dispatched, so a bearer
+token the origin registry does not know is refused with `401` at the transport
+— it used to be answered with the widest of both. `/health` is authenticated for
+a smaller reason: an unauthenticated `{"ok":true}` confirms to any local process
+that a given ephemeral port is Ensemblr's control server.
 
 Every request carries a bearer token that Ensemblr injects into the agent's
 environment; the agent never supplies its own identity. An **agent conversation**
@@ -114,9 +124,14 @@ The write set is `WRITE_OPS` in `src/shared/agent-control/contracts.ts`, and
 three ops that look like writes are deliberately outside it. `askUserQuestion`
 and `notifyOrchestrator` only move prose to a human or an orchestrator, so an
 agent in `read-only` mode can still ask and still escalate. `exitPlanMode` writes
-a plan file yet is exempt too: it is the only exit from Plan Mode, so gating it
-would strand a planning agent with every editing tool denied and no way out — it
-is gated on active Plan Mode instead.
+a plan file yet is outside `WRITE_OPS` too: it is the only exit from Plan Mode,
+so *blocking* it would strand a planning agent with every editing tool denied and
+no way out. Being outside that set no longer makes it a read, which is what let a
+`read-only` workspace gain a file under `.context/plans/` with nothing shown to
+the user: it resolves to the `plan-submission` action, which
+`classifyPermissionAction` allows in `workspace-trusted` and `approval-required`
+and *confirms* — never blocks — under `read-only`. It is still additionally gated
+on active Plan Mode.
 
 ## Guardrails
 
@@ -126,7 +141,12 @@ Delegation is bounded so a runaway agent cannot fork-bomb the app
 - **Two edges at most** — a root may open a depth-1 manager, and that manager may
   open fresh depth-2 leaves. Leaves cannot delegate (spawn depth capped at **2**).
 - **20 spawns per root tree** (lifetime) and **10 per minute** (rolling). Closing
-  or stopping a child does not restore either budget.
+  or stopping a child does not restore either budget. A chat tab's root tree is
+  its own conversation; a workspace's terminals share one harness origin, whose
+  root is `ws:<workspaceId>:<appRunId>` — scoped to this run of the app, because
+  a workspace id never changes and the ledger is append-only, so the lifetime
+  budget would otherwise have become a permanent cap on the whole history of a
+  workspace's terminals.
 - **Plan Mode and AFK Mode are inherited** — a descendant receives the caller's
   mode snapshot. A depth-1 planning manager may fan out read-only leaves; the
   inherited depth-2 policy prevents further recursion.
@@ -153,20 +173,22 @@ from. A tab the Concierge reuses has any marker its last tenant left cleared,
 because the tab now hosts a root; a spawn that fails to submit puts back whatever
 the tab carried before rather than assuming which way the write went.
 
-The policy refuses a leaf twenty ops with `denied-scope`:
+The policy refuses a leaf twenty-two ops with `denied-scope`:
 
 `spawnChatTab`, `startConversation`, `startReview`, `sendFollowUp`,
 `launchHarness`, `listModels`, `startTerminal`, `stopTerminal`, `waitForAgents`,
 `writeTerminal`, `openTab`, `closeTab`, `setBranchName`, `setWorkspaceStatus`,
-`askUserQuestion`, `exitPlanMode`, `linearCreateComment`, `linearCreateIssue`,
-`linearUpdateIssue`, `messageConcierge`.
+`getArchitectureDiagram`, `updateArchitectureDiagram`, `askUserQuestion`,
+`exitPlanMode`, `linearCreateComment`, `linearCreateIssue`, `linearUpdateIssue`,
+`messageConcierge`.
 
-The policy refuses a manager fifteen ops with `denied-scope`:
+The policy refuses a manager seventeen ops with `denied-scope`:
 
 `spawnChatTab`, `startReview`, `launchHarness`, `startTerminal`, `stopTerminal`,
 `writeTerminal`, `openTab`, `setBranchName`, `setWorkspaceStatus`,
-`askUserQuestion`, `exitPlanMode`, `linearCreateComment`, `linearCreateIssue`,
-`linearUpdateIssue`, `messageConcierge`.
+`getArchitectureDiagram`, `updateArchitectureDiagram`, `askUserQuestion`,
+`exitPlanMode`, `linearCreateComment`, `linearCreateIssue`, `linearUpdateIssue`,
+`messageConcierge`.
 
 The five differences are one visible Ensemblr edge: a verified depth-1 manager
 keeps `startConversation`, `listModels`, `waitForAgents`, `sendFollowUp`, and
@@ -178,7 +200,7 @@ always treated as a depth-2 leaf.
 `listRunScripts` is not denied — no descendant can start a workspace-owned run
 script, so the listing is merely unusable. It is the sole member of
 `SUBAGENT_UNUSABLE_OPS` and is withheld from every descendant.
-`SUBAGENT_WITHHELD_OPS` — twenty-one ops in all — is the leaf-safe default. The
+`SUBAGENT_WITHHELD_OPS` — twenty-three ops in all — is the leaf-safe default. The
 Pi extension uses `ENSEMBLR_CONTROL_DEPTH` to select the manager or leaf set and
 defaults an unrecognized descendant value to leaf.
 
@@ -476,7 +498,7 @@ fragment and a colour code cut before its `ESC` reads as ordinary text.
 
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
-| `ensemblr_open_tab` | **`variant: 'file' \| 'diff' \| 'comment'`**, `filePath?: string`, `turnId?: string`, `commentBody?: string`, `prNumber?: number` | write, spawn | Concierge, sub-agent |
+| `ensemblr_open_tab` | **`variant: 'file' \| 'diff' \| 'comment'`**, `filePath?: string` (workspace-relative), `turnId?: string`, `commentBody?: string`, `prNumber?: number` | write, spawn | Concierge, sub-agent |
 | `ensemblr_focus_tab` | **`chatTabId: string`** | write | — |
 | `ensemblr_focus_dock_tab` | `terminalId?: string`, `kind?: 'setup' \| 'run'` — exactly one — `workspaceId?: string` | write | — |
 | `ensemblr_focus_panel` | **`panel: 'agents' \| 'files' \| 'changes' \| 'checks'`**, `workspaceId?: string` | write | — |
@@ -536,8 +558,8 @@ it was found. Reopening is best-effort: it never costs the op it accompanies.
 
 | Tool | Arguments | Gate | Withheld from |
 | --- | --- | --- | --- |
-| `ensemblr_get_architecture_diagram` | *(none)* | read | Concierge |
-| `ensemblr_update_architecture_diagram` | **`diagram: unknown`** | write | Concierge |
+| `ensemblr_get_architecture_diagram` | *(none)* | read | Concierge, sub-agent |
+| `ensemblr_update_architecture_diagram` | **`diagram: unknown`** | write | Concierge, sub-agent |
 
 **The whole feature is off by default**, behind Settings → Experimental →
 *Architecture diagram* (`app.experimental.architectureDiagram`). Off, it is
@@ -937,7 +959,7 @@ route to an `assigneeId` is matching a display name against the users table.
 | --- | --- | --- | --- |
 | `ensemblr_recall_memory` | **`query: string`**, `limit?: number` | read | workspace agent |
 | `ensemblr_get_app_settings` | *(none)* | read | workspace agent |
-| `ensemblr_update_app_settings` | `general?: object`, `models?: object`, `providers?: object`, `git?: object`, `appearance?: object`, `dictation?: object`, `concierge?: object`, `experimental?: object` | write | workspace agent |
+| `ensemblr_update_app_settings` | `general?: object`, `models?: object`, `providers?: object`, `git?: object`, `appearance?: object`, `concierge?: object`, `experimental?: object` | write | workspace agent |
 
 App-preference requests are handled directly by the Concierge, not delegated to a
 workspace. `ensemblr_get_app_settings` reads the eight editable sections of

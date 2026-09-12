@@ -907,7 +907,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			const deadline = Date.now() + timeoutMs;
 			while (Date.now() < deadline && !signal?.aborted) {
 				const status =
-					deps.agentSessionService.getSession(agentSessionId)?.status;
+					deps.agentSessionService.readStatus(agentSessionId)?.status;
 				if (!status || IDLE_STATUSES.has(status)) {
 					return 'completed';
 				}
@@ -915,16 +915,22 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			}
 			return 'timeout';
 		},
+		// `readStatus` rather than `getSession`, and that is the whole point: this
+		// runs per waited target every 250 ms, and `getSession` builds the
+		// renderer's projection — including a descending `JSON.parse` over the
+		// branch when the live context reading is missing, measured at ~500 ms on a
+		// long-lived branch. The one field it was wanted for, `contextUsage`, is
+		// already served from memory by the call below.
 		getStatus: async (agentSessionId) => {
-			const snapshot = deps.agentSessionService.getSession(agentSessionId);
-			if (!snapshot) {
+			const session = deps.agentSessionService.readStatus(agentSessionId);
+			if (!session) {
 				return null;
 			}
 			return {
-				agentSessionId: snapshot.id,
+				agentSessionId: session.id,
 				contextUsage: deps.agentSessionService.getContextUsage(agentSessionId),
-				status: snapshot.status,
-				runtimeOpen: snapshot.runtimeOpen,
+				status: session.status,
+				runtimeOpen: session.runtimeOpen,
 			};
 		},
 		hasFinalMessage: async (agentSessionId) => {

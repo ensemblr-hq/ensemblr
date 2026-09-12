@@ -116,6 +116,29 @@ export async function startLinearOauthCallbackServer({
 			return;
 		}
 
+		// Linear's redirect is always a top-level GET navigation; a page's own
+		// script cannot forge `sec-fetch-mode: navigate`, so requiring it when
+		// present keeps a page open during login from hitting this endpoint itself.
+		if (request.method !== 'GET') {
+			response.writeHead(405, { 'content-type': 'text/plain' });
+			response.end('Method not allowed');
+			return;
+		}
+		const secFetchMode = request.headers['sec-fetch-mode'];
+		if (typeof secFetchMode === 'string' && secFetchMode !== 'navigate') {
+			response.writeHead(403, { 'content-type': 'text/plain' });
+			response.end('Forbidden');
+			return;
+		}
+		// Linear echoes `state` back on every callback, success or provider
+		// error, so a request without one is not a real redirect — refusing to
+		// settle on it keeps a probe from consuming the single-use slot.
+		if (!url.searchParams.has('state')) {
+			response.writeHead(400, { 'content-type': 'text/plain' });
+			response.end('Bad request');
+			return;
+		}
+
 		response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
 		response.end(renderCallbackPage(language));
 

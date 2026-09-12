@@ -9,7 +9,6 @@ import {
 	ipcMain,
 	nativeTheme,
 	safeStorage,
-	shell,
 } from 'electron';
 import type { DelegationInitiative } from '../shared/agent-control.ts';
 import {
@@ -98,8 +97,9 @@ import { resolveNotificationTarget } from './agent-runtime/notification-target';
 import { createSessionSummaryWriter } from './agent-runtime/session-summary-writer';
 import { resolveAgentSkillBundle } from './agent-skills';
 import { createHarnessDetectionService } from './agents';
+import { guardEveryWebContents, openExternalUrl } from './app/external-links';
 import { applyLinuxDesktopIdentity } from './app/linux-desktop-identity';
-import { createMainWindow } from './app/main-window';
+import { createMainWindow, rendererDocument } from './app/main-window';
 import type { QuitExit } from './app/quit-coordinator';
 import { createQuitCoordinator } from './app/quit-coordinator';
 import { createQuitGuard } from './app/quit-guard';
@@ -159,7 +159,7 @@ import {
 	createLinearClient,
 	createLinearService,
 	registerLinearAssetProtocol,
-	registerLinearAssetScheme,
+	registerPrivilegedSchemes,
 } from './linear';
 import { installApplicationMenu, MenuBarStore, MenuContextStore } from './menu';
 import { createOpenTargetService } from './open-target';
@@ -702,6 +702,7 @@ const {
 	augmentHarnessCommand,
 	confirmAgentControlAction,
 	piControlExtensionPath,
+	releaseWorkspaceHarnessOrigins,
 } = createAgentControlIntegration({
 	app,
 	originRegistry: agentControlOriginRegistry,
@@ -1285,6 +1286,7 @@ const terminalService = createTerminalService({
 	/** Broadcasts terminal output to all windows. */
 	onOutput: (event: TerminalOutputBroadcast) =>
 		broadcastToAllWindows(IPC_CHANNELS.terminalOutput, event),
+	releaseAgentControlOrigins: releaseWorkspaceHarnessOrigins,
 	resolveAgentControlEnv,
 	/** Resolves the shell-derived base environment for terminal and script PTYs. */
 	resolveBaseEnv: async () => (await localCommandService.getEnvironment()).env,
@@ -1407,15 +1409,22 @@ const planSubmission = createPlanSubmission({
 });
 // Declaring the scheme has to happen before `ready`, which module scope is; the
 // handler that serves it is registered inside `whenReady` below.
-registerLinearAssetScheme();
+registerPrivilegedSchemes();
+// Module scope so no WebContents can be created ahead of the policy — the main
+// window's own handlers are installed in `createMainWindow`, and this is what
+// carries the same rules onto anything else Electron ever constructs.
+guardEveryWebContents(rendererDocument());
 const linearAuthService = createLinearAuthService({
 	configService,
 	databaseService,
 	getLanguage: resolveAppLanguage,
 	/** Releases the asset bytes cached under an account the user just disconnected. */
 	onDisconnect: (accountId) => linearAssetProxy.forgetAccount(accountId),
-	/** Opens an external URL in the user's default browser. */
-	openExternal: (url) => shell.openExternal(url),
+	// Routed through the vetted opener rather than `shell.openExternal`: the
+	// authorize base URL is hardcoded today, but a self-hosted Linear option
+	// would make it configuration, and a custom scheme there launches whatever
+	// app registered it.
+	openExternal: openExternalUrl,
 	secretStoreFactory: createSecretStore,
 });
 // Built at module scope so the auth service above can reach it on disconnect;
@@ -1786,6 +1795,12 @@ app.whenReady().then(() => {
 	configService.load();
 	databaseService.open();
 	registerLinearAssetProtocol(linearAssetProxy);
+	// Everything the first paint depends on is now in place, and the renderer is
+	// a separate process: asking it to start here lets its own boot overlap with
+	// the handler graph below instead of queueing behind it. The IPC it sends
+	// back cannot arrive before this synchronous body finishes, so the handlers
+	// are registered by the time any of it is answered.
+	openMainWindow();
 	ensureConciergeHome(rootDirectoryService.ensure().conciergePath);
 	conciergeMemoryService.reconcile();
 	void sharedRootAdoptionService.reconcile();
@@ -1921,7 +1936,6 @@ app.whenReady().then(() => {
 	// listeners and the check timer there would be a side effect the
 	// construction-only rule above exists to keep out.
 	updateService.start();
-	openMainWindow();
 });
 
 const quitGuard = createQuitGuard({
@@ -2057,16 +2071,33 @@ app.on('activate', () => {
 	}
 });
 
+/** How much of one externally supplied argument ever reaches the log. */
+const MAX_LOGGED_ARGUMENT_CHARS = 256;
+
+/**
+ * Caps one externally supplied string before it is logged, marking the cut so a
+ * truncated value is never mistaken for the whole of one.
+ * @param value - The argument exactly as the OS handed it over
+ * @returns The value, or its first {@link MAX_LOGGED_ARGUMENT_CHARS} characters followed by an ellipsis
+ */
+function truncateForLog(value: string): string {
+	return value.length <= MAX_LOGGED_ARGUMENT_CHARS
+		? value
+		: `${value.slice(0, MAX_LOGGED_ARGUMENT_CHARS)}…`;
+}
+
 // A blocked second launch (see the single-instance lock above) fires this in the
 // already-running instance. Surface the existing window instead of letting a new
 // instance spawn; recreate only if every window was closed (on macOS the app
 // stays alive with no windows).
 app.on('second-instance', (_event, argv, workingDirectory) => {
 	// Forensics for the Dock-flash bug: record who exec'd the blocked instance
-	// so a surviving relaunch trigger can be identified from Console.app.
+	// so a surviving relaunch trigger can be identified from Console.app. Bounded
+	// because argv is attacker-supplied wherever a URL scheme is registered with
+	// the desktop, and an unbounded one is an unbounded write to the log.
 	console.warn('[single-instance] blocked a second launch', {
-		argv,
-		workingDirectory,
+		argv: argv.map(truncateForLog),
+		workingDirectory: truncateForLog(workingDirectory),
 	});
 	const [existing] = BrowserWindow.getAllWindows();
 	if (existing) {

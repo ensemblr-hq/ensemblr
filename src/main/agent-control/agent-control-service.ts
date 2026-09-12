@@ -4,6 +4,7 @@
  * call is validated, its origin resolved from an injected token, permission- and
  * scope-checked, guardrailed, then delegated to an existing service via a port.
  */
+import { randomUUID } from 'node:crypto';
 
 import { afkModeControlOpDenial } from '../../shared/afk-mode.ts';
 import type {
@@ -101,6 +102,7 @@ import {
 	ownContextPressureNote,
 	PEER_ORCHESTRATOR_LIMITS,
 	PLAN_REFINEMENT_DIRECTIVE,
+	REVIEW_PEER_BRIEF_HEADER,
 	resolveAgentRole,
 	resolveContextPressureAudience,
 	retiredControlOpDenial,
@@ -180,12 +182,22 @@ export interface AgentControlService {
 		command: AgentControlCommand,
 	) => Promise<AgentControlResult<unknown>>;
 	/**
+	 * Whether a token resolves to a live origin, for the transport to answer 401
+	 * before it builds anything. A bridge that shapes a surface to its caller —
+	 * the MCP tool list, the playbook served with it — does real work before the
+	 * first op is dispatched, and that work must not be done for a token the
+	 * registry does not know. Identity stays the service's to resolve, so a
+	 * transport never reaches into the origin registry itself.
+	 */
+	isKnownToken: (token: string) => boolean;
+	/**
 	 * Resolves who a token's caller is, for the bridges that shape a whole surface
 	 * to the caller rather than validating one call: the MCP tool list and the
 	 * playbook served alongside it. Identity stays the service's to resolve, so a
 	 * bridge never reaches into the origin registry itself. A token that resolves
-	 * to nothing reads as a harness root — the narrowest first-class-free surface,
-	 * and every call it goes on to make is refused anyway.
+	 * to nothing reads as a leaf sub-agent — the narrowest surface the endpoint
+	 * serves — so a caller that reached here without passing
+	 * {@link AgentControlService.isKnownToken} is told about less rather than more.
 	 */
 	describeAudience: (token: string) => Promise<ControlAudience>;
 	/**
@@ -474,6 +486,95 @@ function reviewThinkingLevel(
  */
 function reusedReviewMessage(agentSessionId: string): string {
 	return `You already have a review open on this workspace, and this is it: session \`${agentSessionId}\`, handed back rather than replaced by a second reader. Steer it with \`ensemblr_send_follow_up\` against that id — send it the findings to fix, or the rebuilt change to read again. It holds every round that led here, where a reviewer opened now would re-read the whole diff from cold to arrive where this one is already standing. Nothing was spawned, so this cost you no spawn quota.`;
+}
+
+/** Longest rendered value a confirmation line carries before it is cut. */
+const MAX_CONFIRMATION_VALUE_CHARS = 80;
+
+/**
+ * Renders one leaf of a settings patch as `section.key = value`.
+ * @param path - Dotted path of the field, e.g. `appearance.theme`.
+ * @param value - The value the patch would write.
+ * @returns One line for the dialog.
+ */
+function describePatchLeaf(path: string, value: unknown): string {
+	const rendered =
+		typeof value === 'string'
+			? value
+			: (JSON.stringify(value) ?? String(value));
+	const cut =
+		rendered.length > MAX_CONFIRMATION_VALUE_CHARS
+			? `${rendered.slice(0, MAX_CONFIRMATION_VALUE_CHARS)}…`
+			: rendered;
+	return `${path} = ${cut}`;
+}
+
+/**
+ * Flattens a settings patch into one line per field it would write.
+ * @param patch - The validated patch object.
+ * @param prefix - Dotted path accumulated from the enclosing sections.
+ * @returns One line per leaf, in the order the patch declares them.
+ */
+function describePatch(patch: unknown, prefix = ''): readonly string[] {
+	if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) {
+		return [describePatchLeaf(prefix, patch)];
+	}
+	return Object.entries(patch).flatMap(([key, value]) =>
+		describePatch(value, prefix ? `${prefix}.${key}` : key),
+	);
+}
+
+/**
+ * Renders what the user is being asked to approve.
+ *
+ * The op name and a workspace id were the whole of it, which for
+ * `updateAppSettings` is a prompt nobody can act on: the one dialog between an
+ * agent and a sensitive settings write said nothing about which sections, keys,
+ * or values it carried, so approving it on the strength of having seen the agent
+ * adjust appearance settings before authorised whatever the patch actually held.
+ * @param op - The op being confirmed.
+ * @param origin - Resolved caller identity.
+ * @param args - The validated arguments, rendered for a settings patch.
+ * @returns The dialog's detail text.
+ */
+function confirmationSummary(
+	op: AgentControlOp,
+	origin: AgentControlOrigin,
+	args: unknown,
+): string {
+	const head = `Agent requests ${op} in workspace ${origin.workspaceId}.`;
+	if (op !== 'updateAppSettings') {
+		return head;
+	}
+	const lines = describePatch(args);
+	return lines.length > 0
+		? `${head}\n\nIt would write:\n${lines.map((line) => `  ${line}`).join('\n')}`
+		: `${head}\n\nThe patch is empty and would write nothing.`;
+}
+
+/**
+ * Logs an unhandled port failure main-side and returns what the agent is told.
+ *
+ * The raw `Error.message` used to go into the envelope verbatim, and Node's
+ * `fs`, `node:sqlite`, and `child_process` errors routinely embed absolute
+ * paths — so an agent scoped to one workspace learned the names and layout of
+ * the others from a failure in its own. The correlation id is what keeps the
+ * report actionable: the user finds the same id beside the full error in the
+ * console, which the agent never sees. Most ports return a typed failure
+ * envelope rather than throwing, so this path is a genuine fault.
+ * @param op - The op whose dispatch threw.
+ * @param error - The thrown value.
+ * @returns The agent-facing message, carrying the correlation id.
+ */
+function reportUnhandledOpFailure(op: AgentControlOp, error: unknown): string {
+	const incidentId = randomUUID().slice(0, 8);
+	console.error('[agent-control] control op failed.', {
+		cause:
+			error instanceof Error ? (error.stack ?? error.message) : String(error),
+		incidentId,
+		op,
+	});
+	return `Control op failed inside the app (incident \`${incidentId}\`). Nothing about your call was wrong to retry once, but if it fails again report the incident id to the user rather than working around it — the app logged the details.`;
 }
 
 /**
@@ -1163,11 +1264,14 @@ export function createAgentControlService({
 	const gatePermission = async (
 		op: AgentControlOp,
 		origin: AgentControlOrigin,
+		args: unknown,
 		signal: AbortSignal | undefined,
 	): Promise<AgentControlResult<never> | null> => {
 		let action: PermissionActionKind = 'app-control-read';
 		if (op === 'updateAppSettings') {
 			action = 'app-settings-change';
+		} else if (op === 'exitPlanMode') {
+			action = 'plan-submission';
 		} else if (isWriteOp(op)) {
 			action = 'app-control-write';
 		}
@@ -1189,7 +1293,7 @@ export function createAgentControlService({
 		const approved = await ports.confirm.confirm({
 			origin,
 			signal,
-			summary: `Agent requests ${op} in workspace ${origin.workspaceId}.`,
+			summary: confirmationSummary(op, origin, args),
 		});
 		if (signal?.aborted) {
 			return fail('timeout', ABANDONED_CONFIRMATION);
@@ -1915,6 +2019,37 @@ export function createAgentControlService({
 	 * @param origin - Resolved caller identity, naming the caller and its workspace.
 	 * @returns The open review's session and tab, or null when there is none.
 	 */
+	/**
+	 * Whether a session is itself a review this app opened.
+	 *
+	 * {@link openedReviewSessions} answers in-process, and on its own that is what
+	 * a restart erases: a resumed Review conversation re-registers as the root
+	 * orchestrator it is, meets an empty Set, and opens a reviewer of its own. So
+	 * the miss falls back to the conversation's own opening prompt, which carries
+	 * {@link REVIEW_PEER_BRIEF_HEADER} and is persisted — the durable half the
+	 * Set cannot be. Read only on `startReview`, never on a poll path, because it
+	 * loads a page of the branch.
+	 * @param sessionId - The caller's session.
+	 * @returns True when this session was opened as a review.
+	 */
+	const isReviewSession = async (sessionId: string): Promise<boolean> => {
+		if (openedReviewSessions.has(sessionId)) {
+			return true;
+		}
+		try {
+			const page = await ports.conversations.readTranscript({
+				agentSessionId: sessionId,
+			});
+			return page.entries.some(
+				(entry) =>
+					entry.kind === 'prompt' &&
+					entry.text.includes(REVIEW_PEER_BRIEF_HEADER),
+			);
+		} catch {
+			return false;
+		}
+	};
+
 	const reusableReview = async (
 		origin: AgentControlOrigin,
 	): Promise<{ agentSessionId: string; chatTabId: string } | null> => {
@@ -2074,7 +2209,7 @@ export function createAgentControlService({
 		args: StartReviewArgs,
 		callerModel: string | undefined,
 	): Promise<AgentControlResult<unknown>> => {
-		if (openedReviewSessions.has(origin.sessionId)) {
+		if (await isReviewSession(origin.sessionId)) {
 			return fail(
 				'denied-scope',
 				'You are the review. The change in this workspace is already under review — by you — so opening another one would seat a third writer over the same whole diff to read what you were opened to read. Report what you found, and let the orchestrator that opened you decide what happens to the change.',
@@ -3745,6 +3880,7 @@ export function createAgentControlService({
 		const permissionDenied = await gatePermission(
 			command.op,
 			origin,
+			validated.value,
 			command.signal,
 		);
 		if (permissionDenied) {
@@ -3764,10 +3900,12 @@ export function createAgentControlService({
 				dispatchTimeoutMs,
 			);
 		} catch (error) {
-			const detail = error instanceof Error ? error.message : String(error);
-			return fail('internal', `Control op failed: ${detail}`);
+			return fail('internal', reportUnhandledOpFailure(command.op, error));
 		}
 	};
+
+	const isKnownToken = (token: string): boolean =>
+		originRegistry.resolveByToken(token) !== null;
 
 	const describeAudience = async (token: string): Promise<ControlAudience> => {
 		const architectureDiagram = readArchitectureDiagramEnabled();
@@ -3777,8 +3915,9 @@ export function createAgentControlService({
 			return {
 				architectureDiagram,
 				delegation: 'ensemblr',
+				depth: 2,
 				hasChatTab: false,
-				role: 'orchestrator',
+				role: 'subagent',
 				tuiHarnesses,
 			};
 		}
@@ -3853,6 +3992,7 @@ export function createAgentControlService({
 	return {
 		describeAudience,
 		invoke,
+		isKnownToken,
 		readCoAuthorDirective,
 		readDelegationDirective,
 		readIssueDirective,

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -242,6 +242,31 @@ test('resolves the macOS app-support database path', () => {
 	}
 
 	assert.equal(databasePath, '/Users/example/.config/ensemblr/ensemblr.db');
+});
+
+test('creates the database directory 0700 and the database file 0600', (t) => {
+	if (process.platform === 'win32') {
+		t.skip('POSIX modes are not meaningful on Windows.');
+		return;
+	}
+
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const nestedDirectory = path.join(fixture.databasePath, 'nested');
+	const databasePath = path.join(nestedDirectory, 'ensemblr-test.db');
+	const connection = openEnsemblrDatabase({ databasePath });
+	t.after(() => connection.database.close());
+
+	assert.equal(statSync(nestedDirectory).mode & 0o777, 0o700);
+	assert.equal(statSync(databasePath).mode & 0o777, 0o600);
+
+	for (const suffix of ['-wal', '-shm']) {
+		const sidecar = `${databasePath}${suffix}`;
+		if (existsSync(sidecar)) {
+			assert.equal(statSync(sidecar).mode & 0o777, 0o600);
+		}
+	}
 });
 
 test('opens an isolated database and applies foundation migrations', (t) => {

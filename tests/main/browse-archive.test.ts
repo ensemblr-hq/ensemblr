@@ -27,7 +27,10 @@ import {
 	type EnsemblrDatabaseService,
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
-import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
+import {
+	buildRootDirectoryStub,
+	persistManagedRootsRow,
+} from './helpers/root-directory-stub.ts';
 import { buildWorkspaceTeardownStub } from './helpers/workspace-teardown-stub.ts';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
@@ -82,6 +85,10 @@ function createHarness(t: TestContext): Harness {
 		);
 
 	const databaseService = wrapConnection(connection);
+	persistManagedRootsRow(connection.database, {
+		archivedContextsPath,
+		workspacesPath,
+	});
 
 	t.after(() => {
 		connection.database.close();
@@ -332,6 +339,38 @@ test('pre-unarchive hook abort short-circuits before archived_at is cleared', as
 	);
 	const row = workspaceRow(harness.databaseService, workspace.id);
 	assert.notEqual(row?.archived_at, null);
+});
+
+test('delete-from-archive keeps a preserved context that sits outside the managed root', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'keep-me');
+
+	const { archive, purge } = makeArchiveService(harness);
+	const archived = await archive.archive({ workspaceId: workspace.id });
+	const preservedPath = archived.workspace?.archivedContextPath ?? null;
+	assert.ok(preservedPath);
+	if (!preservedPath) {
+		return;
+	}
+
+	persistManagedRootsRow(
+		harness.databaseService.getConnection()?.database as DatabaseSync,
+		{
+			archivedContextsPath: path.join(harness.rootPath, 'other-archives'),
+			workspacesPath: harness.workspacesPath,
+		},
+	);
+
+	const result = await purge.delete({ workspaceId: workspace.id });
+
+	assert.equal(result.contextRemoved, false);
+	assert.equal(existsSync(preservedPath), true);
+	assert.equal(
+		result.diagnostics.some(
+			(diagnostic) => diagnostic.code === 'archived-context-cleanup-failed',
+		),
+		true,
+	);
 });
 
 test('delete-from-archive removes preserved context, worktree, branch, and row', async (t) => {

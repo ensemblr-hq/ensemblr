@@ -674,6 +674,7 @@ export default interface Resources {
 			'command-failed': 'The command failed.';
 			'configured-base-invalid': 'The branch new workspaces fork from is not a usable branch name, so this workspace took the repository default as its base instead.';
 			'configured-base-unresolvable': 'The branch new workspaces fork from could not be resolved, so this workspace took the repository default as its base instead.';
+			'context-exclude-failed': 'Ensemblr could not add .context/ to this repository’s git exclude file, so the workspace handoff directory may show up in git status. Terminal logs are written there, so check it before committing.';
 			'copy-failed': 'The files could not be copied.';
 			'database-error': 'The local database is unavailable, so the Linear account was not saved.';
 			'database-unavailable': 'The local database is unavailable, so nothing was changed.';
@@ -686,7 +687,7 @@ export default interface Resources {
 			'diagram-unreadable': 'The stored architecture diagram cannot be read. Repair or delete the file, then ask an agent to draw a new one.';
 			'dictation-disabled': 'Dictation is turned off in Settings.';
 			'dictation-empty-transcript': 'No speech was detected in the recording.';
-			'dictation-invalid-endpoint': 'The transcription endpoint must be a full http:// or https:// address.';
+			'dictation-invalid-endpoint': 'The transcription endpoint must be a full https:// address. http:// is accepted only for a server on this machine.';
 			'dictation-key-store-unavailable': 'The stored transcription API key could not be read from the Keychain.';
 			'dictation-microphone-denied': 'Ensemblr needs microphone access. Grant it in System Settings › Privacy & Security › Microphone.';
 			'dictation-microphone-missing': 'No microphone was found.';
@@ -2461,7 +2462,7 @@ export default interface Resources {
 					'workspace-trusted': 'Workspace trusted';
 					'workspace-trusted-description': 'Agents act freely inside the workspace; anything outside it still asks.';
 				};
-				'scope-note': 'This repository’s mode is the one every gate enforces. Reset it and workspaces of this repo fall back to the app-wide default.';
+				'scope-note': 'This repository’s mode is the one Ensemblr enforces. Reset it and workspaces of this repo fall back to the app-wide default.';
 				title: 'Security';
 			};
 			'setup-script': {

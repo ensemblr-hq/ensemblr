@@ -547,6 +547,74 @@ describe('agent-control startReview', () => {
 		expect(startConversation).not.toHaveBeenCalled();
 	});
 
+	// The in-memory set does not survive a restart: a resumed Review conversation
+	// re-registers as the root orchestrator it is, meets an empty set, and opens a
+	// reviewer of its own over the same whole diff. Its first prompt does survive,
+	// and it carries the review directive.
+	it('refuses a resumed review that the set has forgotten', async () => {
+		const { ports, registry, service, startConversation } = setup({
+			unattended: true,
+		});
+		const reviewer = registry.register({
+			concierge: false,
+			sessionId: 'review-1',
+			species: 'pi',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+		ports.conversations.readTranscript = vi.fn().mockResolvedValue({
+			agentSessionId: 'review-1',
+			entries: [
+				{
+					kind: 'prompt',
+					ordinal: 1,
+					text: `${REVIEW_PEER_BRIEF_HEADER} — review this change`,
+				},
+			],
+			entryCount: 1,
+			firstOrdinal: 1,
+			lastOrdinal: 1,
+			nextOrdinal: null,
+			turnCount: 1,
+		});
+
+		const refusal = refused(
+			await service.invoke({
+				op: 'startReview',
+				rawArgs: {},
+				token: reviewer.token,
+			}),
+		);
+
+		expect(refusal.code).toBe('denied-scope');
+		expect(refusal.error).toContain('You are the review');
+		expect(startConversation).not.toHaveBeenCalled();
+	});
+
+	it('lets an ordinary orchestrator through, transcript and all', async () => {
+		const { ports, service } = setup();
+		ports.conversations.readTranscript = vi.fn().mockResolvedValue({
+			agentSessionId: CALLER,
+			entries: [{ kind: 'prompt', ordinal: 1, text: 'add dark mode' }],
+			entryCount: 1,
+			firstOrdinal: 1,
+			lastOrdinal: 1,
+			nextOrdinal: null,
+			turnCount: 1,
+		});
+
+		succeeded(await startReview(service));
+	});
+
+	it('opens the review when the transcript cannot be read', async () => {
+		const { ports, service } = setup();
+		ports.conversations.readTranscript = vi
+			.fn()
+			.mockRejectedValue(new Error('branch is gone'));
+
+		succeeded(await startReview(service));
+	});
+
 	// The set is keyed by session id, so without the teardown beside
 	// `reviewsByCaller` a later conversation issued the same id would be refused a
 	// review it is entitled to.

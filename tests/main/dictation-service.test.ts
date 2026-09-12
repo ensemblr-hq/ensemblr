@@ -139,6 +139,13 @@ describe('transcribe', () => {
 		['not-a-url/v1', 'a value that is not a URL'],
 		['api.example.test/v1', 'a host with no scheme'],
 		['file:///tmp/whisper', 'a scheme fetch cannot post to'],
+		// The `http:` allowance exists for a locally-run whisper-server. A remote
+		// one receives the user's stored transcription key and the recorded clip in
+		// cleartext, which is what made a redirected endpoint an exfiltration route.
+		['http://attacker.example/v1', 'a remote host over cleartext'],
+		['http://127.0.0.1.attacker.example/v1', 'a host that only looks loopback'],
+		['http://10.0.0.4:8080/v1', 'another machine on the LAN'],
+		['http://[2001:db8::1]/v1', 'a remote IPv6 host'],
 	])('refuses %s (%s) before sending the key', async (baseUrl) => {
 		const settings = enabledSettings();
 		settings.dictation.baseUrl = baseUrl;
@@ -154,6 +161,28 @@ describe('transcribe', () => {
 			status: 'error',
 		});
 		expect(fetchImpl).not.toHaveBeenCalled();
+	});
+
+	test.each([
+		'http://127.0.0.1:8080/v1',
+		'http://127.1.2.3:8080/v1',
+		'http://localhost:8080/v1',
+		'http://[::1]:8080/v1',
+	])('allows %s, which whisper-server serves on', async (baseUrl) => {
+		const settings = enabledSettings();
+		settings.dictation.baseUrl = baseUrl;
+		const { service } = buildService({
+			fetchImpl: fetchImpl as unknown as typeof fetch,
+			settings,
+		});
+
+		const result = await service.transcribe(clip);
+
+		expect(result.status).toBe('ok');
+		expect(fetchImpl).toHaveBeenCalledWith(
+			`${baseUrl}/audio/transcriptions`,
+			expect.anything(),
+		);
 	});
 
 	test('allows a local http endpoint, which whisper-server serves on', async () => {

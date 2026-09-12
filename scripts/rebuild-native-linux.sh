@@ -13,7 +13,15 @@
 set -euo pipefail
 
 # Bookworm's node:24 image is FROM buildpack-deps, so g++/make are already there.
-IMAGE=${ENSEMBLR_NATIVE_REBUILD_IMAGE:-node:24-bookworm}
+#
+# Pinned by digest, not by tag. This build runs unattended — the toolchain
+# preflight shells out to it from `dev`, `package:linux` and `make:linux` — with
+# the whole worktree bind-mounted writable, and its output is the `pty.node` that
+# ships inside the AppImage. A floating tag makes that an unreviewed third-party
+# artifact in the release path; the digest makes it a line in the repo, bumped
+# the way `package-lock.json` integrity hashes are. Resolve a new one with:
+#   docker buildx imagetools inspect node:24-bookworm --format '{{.Manifest.Digest}}'
+IMAGE=${ENSEMBLR_NATIVE_REBUILD_IMAGE:-node:24-bookworm@sha256:6dac556d980b7f0e5498d08f08cee0ca67798b4ad6c23964a9214920e67758d0}
 MODULE=node_modules/node-pty
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)

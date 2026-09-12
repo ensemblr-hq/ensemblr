@@ -357,6 +357,11 @@ export const APP_FAILURE_TEXT: Record<
 			'errors:failure.configured-base-unresolvable',
 			'The branch new workspaces fork from could not be resolved, so this workspace took the repository default as its base instead.',
 		),
+	'context-exclude-failed': (t) =>
+		t(
+			'errors:failure.context-exclude-failed',
+			'Ensemblr could not add .context/ to this repository\u2019s git exclude file, so the workspace handoff directory may show up in git status. Terminal logs are written there, so check it before committing.',
+		),
 	'copy-failed': (t) =>
 		t('errors:failure.copy-failed', 'The files could not be copied.'),
 	'database-unavailable': (t) =>
@@ -407,7 +412,7 @@ export const APP_FAILURE_TEXT: Record<
 	'dictation-invalid-endpoint': (t) =>
 		t(
 			'errors:failure.dictation-invalid-endpoint',
-			'The transcription endpoint must be a full http:// or https:// address.',
+			'The transcription endpoint must be a full https:// address. http:// is accepted only for a server on this machine.',
 		),
 	'dictation-key-store-unavailable': (t) =>
 		t(

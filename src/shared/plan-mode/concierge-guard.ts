@@ -68,6 +68,62 @@ export const CONCIERGE_GUARDED_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Tool names cleared without a policy of their own, because none of them can
+ * write a file or run a command: the non-mutating built-ins of both first-class
+ * runtimes, under each one's own spelling.
+ *
+ * Everything outside this set and the two above is **refused** — see
+ * {@link evaluateConciergeTool}. So a name missing here is a false block rather
+ * than a hole, which is the direction this policy has to fail in: the previous
+ * posture cleared every unrecognized name, and Pi's own `powershell` runs a
+ * shell the bash classifier cannot read while an MCP server's `write_file`
+ * writes anywhere on disk. Add a runtime's new read-only built-in here; a
+ * mutating one belongs in {@link CONCIERGE_WRITE_TOOLS} or
+ * {@link CONCIERGE_SHELL_TOOLS}, which also forwards it.
+ */
+const CONCIERGE_READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
+	'AskUserQuestion',
+	'BashOutput',
+	'ExitPlanMode',
+	'Glob',
+	'Grep',
+	'KillShell',
+	'ListMcpResources',
+	'NotebookRead',
+	'Read',
+	'ReadMcpResource',
+	'Skill',
+	'SlashCommand',
+	'Task',
+	'TodoWrite',
+	'WebFetch',
+	'WebSearch',
+	'find',
+	'grep',
+	'ls',
+	'read',
+]);
+
+/**
+ * Prefix of Ensemblr's own control tools, cleared here because they are gated
+ * somewhere better: the control server answers for each by op and by the
+ * caller's role before it runs, and `CONCIERGE_BLOCKED_OPS` is what holds the
+ * Concierge out of a workspace's write channels.
+ */
+const CONTROL_TOOL_PREFIX = 'ensemblr_';
+
+/**
+ * Reports whether a tool needs no Concierge opinion of its own.
+ * @param tool - The tool name being classified.
+ * @returns True for a known read-only built-in or an Ensemblr control tool.
+ */
+function runsUntouched(tool: string): boolean {
+	return (
+		CONCIERGE_READ_ONLY_TOOLS.has(tool) || tool.startsWith(CONTROL_TOOL_PREFIX)
+	);
+}
+
+/**
  * Splits a path into its segments over either separator.
  *
  * Both are handled because a Windows-style path reaches a POSIX runtime as one
@@ -171,8 +227,18 @@ function blocked(cause: string): ConciergeToolVerdict {
 
 /**
  * Classifies a Concierge tool call: a file write is allowed only inside the
- * Concierge home, `bash` is restricted to read-only commands, and every other
- * tool runs untouched.
+ * Concierge home, `bash` is restricted to read-only commands, the known
+ * read-only built-ins and Ensemblr's own control tools run untouched, and
+ * **anything else is blocked**.
+ *
+ * Deny by default, for the reason the Plan Mode tool guard is. The tool set a
+ * session holds is open — the user can install another extension or point a
+ * runtime at an MCP server — and the shipped Pi extension now forwards every
+ * name it does not already know to be a read, so an unrecognized tool arrives
+ * here rather than running unclassified. Clearing it was how `powershell` and an
+ * MCP `write_file` reached a Concierge that is meant to be read-only outside its
+ * own folder. A false block costs a turn and a reason the model can read; a
+ * false allow writes into a workspace the Concierge deliberately cannot reach.
  * @param request - The tool name, the path it targets, the command it would run, and the home.
  * @returns Whether the call is blocked, with a reason when it is.
  */
@@ -202,5 +268,11 @@ export function evaluateConciergeTool({
 				);
 	}
 
-	return { blocked: false };
+	if (runsUntouched(tool)) {
+		return { blocked: false };
+	}
+
+	return blocked(
+		`\`${tool}\` is not a tool this app knows to be read-only, so it is refused rather than guessed at — a tool from an MCP server or another extension can write files and run commands just as \`write\` and \`bash\` do.`,
+	);
 }

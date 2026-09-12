@@ -11,6 +11,15 @@ import { fileURLToPath } from 'node:url';
 
 const DEVELOPER_ID_AUTHORITY = 'Developer ID Application';
 
+// `Authority=Developer ID Application: <Name> (<TEAMID>)` — matching only the
+// authority string (above) accepts *any* Developer ID certificate from *any*
+// Apple developer account, not just this project's. `ENSEMBLR_TEAM_ID`, set by
+// the release job from the `APPLE_TEAM_ID` repository secret, pins it. Optional
+// rather than required: until that secret is provisioned, the check is skipped
+// with a warning rather than failing every release.
+const AUTHORITY_LINE_PATTERN =
+	/^Authority=Developer ID Application:.*\(([A-Z0-9]{10})\)\s*$/m;
+
 /**
  * Run a command and capture both streams, since `codesign` reports on stderr.
  * @param command - Executable to run
@@ -74,6 +83,32 @@ function verifyDeveloperIdSignature(artifactPath) {
 	if (!signature.output.includes(DEVELOPER_ID_AUTHORITY)) {
 		return [
 			`signed by something other than a ${DEVELOPER_ID_AUTHORITY} certificate (ad-hoc or self-signed).`,
+		];
+	}
+	return verifyTeamId(signature.output, artifactPath);
+}
+
+/**
+ * Assert the signing certificate's Team ID matches `ENSEMBLR_TEAM_ID`, when
+ * set. Skipped, not failed, when unset: this is a defence-in-depth pin over
+ * the authority check above, not the thing that makes a build trustworthy.
+ * @param codesignOutput - Combined stdout/stderr of `codesign -dv --verbose=4`
+ * @param artifactPath - Absolute path to the artifact being checked, for the message
+ * @returns One message when the Team ID does not match; empty otherwise
+ */
+function verifyTeamId(codesignOutput, artifactPath) {
+	const expected = process.env.ENSEMBLR_TEAM_ID;
+	if (!expected) return [];
+	const match = codesignOutput.match(AUTHORITY_LINE_PATTERN);
+	if (!match) {
+		return [
+			`ENSEMBLR_TEAM_ID is set but no Developer ID Application authority line with a Team ID was found for ${artifactPath}.`,
+		];
+	}
+	const [, actual] = match;
+	if (actual !== expected) {
+		return [
+			`signed by Team ID ${actual}, expected ${expected} (ENSEMBLR_TEAM_ID).`,
 		];
 	}
 	return [];

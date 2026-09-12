@@ -34,26 +34,78 @@ export function parseAllowedExternalUrl(url: string): URL | null {
 }
 
 /**
- * Decides whether a full-page navigation to `url` should be sent to the system
- * browser. Returns the parsed URL to open externally, or `null` to let the
- * navigation proceed in-app.
+ * What should happen to a navigation the renderer attempted.
  *
- * In-app (returns `null`): non-http(s) schemes — the production `file:` bundle —
- * and same-origin navigations against `appOrigin` (the dev-server origin). Every
- * other http(s) origin is external and returns the parsed URL.
- *
- * @param url - The navigation target.
- * @param appOrigin - The app's own origin, or `null` when served from `file:`.
+ * `allow` is the app's own document; `external` hands the URL to the default
+ * browser; `block` cancels it and names the scheme that was refused, so the
+ * refusal is greppable in a support bundle.
  */
-export function externalNavigationTarget(
-	url: string,
-	appOrigin: string | null,
-): URL | null {
-	const parsed = parseAllowedExternalUrl(url);
+export type NavigationDecision =
+	| { action: 'allow' }
+	| { action: 'external'; url: URL }
+	| { action: 'block'; reason: string };
 
-	if (!parsed || (appOrigin && parsed.origin === appOrigin)) {
-		return null;
+/**
+ * The app's own document, however it is being served: the dev server's origin,
+ * or the packaged `index.html` the production build loads from `file:`.
+ */
+export interface AppDocument {
+	/** `file:` URL of the packaged renderer entry, or `null` in development. */
+	appDocumentUrl: string | null;
+	/** The dev-server origin to treat as internal, or `null` in production. */
+	appOrigin: string | null;
+}
+
+/**
+ * Strips the query and fragment so a hash-routed navigation still compares
+ * equal to the document it happens inside.
+ * @param url - The URL to reduce to its document identity
+ * @returns The href with `search` and `hash` removed
+ */
+function documentIdentity(url: URL): string {
+	const identity = new URL(url.href);
+	identity.hash = '';
+	identity.search = '';
+	return identity.href;
+}
+
+/**
+ * Decides what to do with a navigation the renderer attempted, denying by
+ * default.
+ *
+ * Only two destinations stay in the window: the app's own document (the dev
+ * origin, or the packaged `index.html`) and, in development, anything else on
+ * the dev-server origin that Vite serves. Every other http(s) URL goes to the
+ * system browser, and everything else — `file:` outside the bundle, `blob:`,
+ * `data:`, `javascript:`, an unparseable string — is cancelled rather than
+ * followed, because nothing the app itself does produces one.
+ *
+ * @param url - The navigation target, exactly as the renderer gave it.
+ * @param appDocumentUrl - `file:` URL of the packaged renderer entry, or `null` in development.
+ * @param appOrigin - The dev-server origin to treat as internal, or `null` in production.
+ * @returns The decision the Electron handler should act on.
+ */
+export function navigationDecision(
+	url: string,
+	{ appDocumentUrl, appOrigin }: AppDocument,
+): NavigationDecision {
+	let parsed: URL;
+
+	try {
+		parsed = new URL(url);
+	} catch {
+		return { action: 'block', reason: 'unparseable' };
 	}
 
-	return parsed;
+	if (ALLOWED_EXTERNAL_PROTOCOLS.has(parsed.protocol)) {
+		return appOrigin && parsed.origin === appOrigin
+			? { action: 'allow' }
+			: { action: 'external', url: parsed };
+	}
+
+	if (appDocumentUrl && documentIdentity(parsed) === appDocumentUrl) {
+		return { action: 'allow' };
+	}
+
+	return { action: 'block', reason: parsed.protocol };
 }

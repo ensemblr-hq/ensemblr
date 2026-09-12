@@ -1,21 +1,30 @@
+import {
+	collectRedactableValues,
+	createTextRedactor,
+	isRedactableKeyName,
+	REDACTED,
+	type TextRedactor,
+} from '../../shared/redaction.ts';
 import type { LocalCommandSanitizedLogs } from './command-types.ts';
 
-const REDACTED = '[REDACTED]';
-const SENSITIVE_KEY_PARTS = [
-	'accesstoken',
-	'apikey',
-	'auth',
-	'credential',
-	'password',
-	'privatekey',
-	'secret',
-	'token',
-];
-const SENSITIVE_ASSIGNMENT_PATTERN =
-	/\b([A-Z0-9_.-]*(?:ACCESS[_-]?TOKEN|API[_-]?KEY|CREDENTIAL|PASSWORD|PRIVATE[_-]?KEY|SECRET|TOKEN)[A-Z0-9_.-]*)(\s*[=:]\s*)(["']?)([^\s"',;]+)/gi;
+/** Everything {@link createSanitizedLogs} needs to redact one command's record. */
+export interface SanitizedLogsInput {
+	args: readonly string[];
+	command: string;
+	cwd: string;
+	env: Record<string, string>;
+	redactValues?: readonly string[];
+	stderr: string;
+	stdout: string;
+}
 
 /**
  * Builds the sanitized log payload by redacting secrets in every textual field.
+ *
+ * Redaction runs on three grounds, all from `src/shared/redaction.ts` so the
+ * setup-diagnostics and support-bundle sinks apply the same corpus: the literal
+ * values this command's environment carries, the provider-shaped secrets any
+ * output may contain, and secret-named assignments in free text.
  * @param input - Raw command, args, env and output streams.
  * @returns A {@link LocalCommandSanitizedLogs} payload safe to persist.
  */
@@ -27,74 +36,59 @@ export function createSanitizedLogs({
 	redactValues = [],
 	stderr,
 	stdout,
-}: {
-	args: readonly string[];
-	command: string;
-	cwd: string;
-	env: Record<string, string>;
-	redactValues?: readonly string[];
-	stderr: string;
-	stdout: string;
-}): LocalCommandSanitizedLogs {
-	const redactor = createRedactor(env, redactValues);
+}: SanitizedLogsInput): LocalCommandSanitizedLogs {
+	const redact = createTextRedactor(collectRedactableValues(env, redactValues));
 
 	return {
-		command: formatCommandLabel(command, args, redactor),
-		cwd: redactor.redact(cwd),
-		env: sanitizeEnvironment(env, redactor),
-		stderr: redactor.redact(stderr),
-		stdout: redactor.redact(stdout),
+		command: formatCommandLabel(command, args, redact),
+		cwd: redact(cwd),
+		env: sanitizeEnvironment(env, redact),
+		stderr: redact(stderr),
+		stdout: redact(stdout),
 	};
 }
 
 /**
- * Builds a redactor that replaces sensitive environment values and inline
- * secret-shaped assignments with a placeholder.
- * @param env - Environment to scan for sensitive entries.
- * @param explicitValues - Caller-supplied secret values to redact.
- * @returns A `{ redact }` helper.
+ * Wraps {@link createSanitizedLogs} in a payload that redacts on first property
+ * read and memoizes the result.
+ *
+ * Sanitizing is linear in the output size — 41 ms on an 8 MB stdout — and every
+ * command result used to pay it on settle, while only the setup checks and the
+ * Pi readiness probe ever read the payload. Every `git status`, `git diff`, and
+ * `du` in the app discarded it unread.
+ * @param input - Raw command, args, env and output streams.
+ * @returns A {@link LocalCommandSanitizedLogs} whose fields sanitize on demand.
  */
-function createRedactor(
-	env: Record<string, string>,
-	explicitValues: readonly string[],
-): { redact: (value: string) => string } {
-	const sensitiveValues = new Set<string>();
+export function createLazySanitizedLogs(
+	input: SanitizedLogsInput,
+): LocalCommandSanitizedLogs {
+	let sanitized: LocalCommandSanitizedLogs | null = null;
 
-	for (const [key, value] of Object.entries(env)) {
-		if (isSensitiveKey(key) && value.length >= 4) {
-			sensitiveValues.add(value);
-		}
+	/**
+	 * Sanitizes once and reuses the result for every later field read.
+	 * @returns The fully sanitized payload.
+	 */
+	function resolve(): LocalCommandSanitizedLogs {
+		sanitized ??= createSanitizedLogs(input);
+
+		return sanitized;
 	}
-
-	for (const value of explicitValues) {
-		if (value.length >= 4) {
-			sensitiveValues.add(value);
-		}
-	}
-
-	const values = Array.from(sensitiveValues).sort(
-		(left, right) => right.length - left.length,
-	);
 
 	return {
-		/**
-		 * Returns the input with all known secret values and inline secret
-		 * assignments replaced by the redaction placeholder.
-		 * @param value - Text to redact.
-		 * @returns Redacted text.
-		 */
-		redact(value) {
-			let redacted = value;
-
-			for (const sensitiveValue of values) {
-				redacted = redacted.split(sensitiveValue).join(REDACTED);
-			}
-
-			return redacted.replace(
-				SENSITIVE_ASSIGNMENT_PATTERN,
-				(_match, key: string, separator: string, quote: string) =>
-					`${key}${separator}${quote}${REDACTED}`,
-			);
+		get command() {
+			return resolve().command;
+		},
+		get cwd() {
+			return resolve().cwd;
+		},
+		get env() {
+			return resolve().env;
+		},
+		get stderr() {
+			return resolve().stderr;
+		},
+		get stdout() {
+			return resolve().stdout;
 		},
 	};
 }
@@ -103,17 +97,17 @@ function createRedactor(
  * Returns a sorted clone of `env` where sensitive keys are wholly redacted and
  * other values pass through the redactor.
  * @param env - Environment to sanitize.
- * @param redactor - Redactor used for non-sensitive values.
+ * @param redact - Redactor used for non-sensitive values.
  * @returns The sanitized environment map.
  */
 function sanitizeEnvironment(
 	env: Record<string, string>,
-	redactor: { redact: (value: string) => string },
+	redact: TextRedactor,
 ): Record<string, string> {
 	const sanitized: Record<string, string> = {};
 
 	for (const key of Object.keys(env).sort()) {
-		sanitized[key] = isSensitiveKey(key) ? REDACTED : redactor.redact(env[key]);
+		sanitized[key] = isRedactableKeyName(key) ? REDACTED : redact(env[key]);
 	}
 
 	return sanitized;
@@ -123,16 +117,16 @@ function sanitizeEnvironment(
  * Renders the command line as a shell-safe, redacted single-line string.
  * @param command - Command executable.
  * @param args - Positional arguments.
- * @param redactor - Redactor applied to each rendered part.
+ * @param redact - Redactor applied to each rendered part.
  * @returns The sanitized command line.
  */
 function formatCommandLabel(
 	command: string,
 	args: readonly string[],
-	redactor: { redact: (value: string) => string },
+	redact: TextRedactor,
 ): string {
-	return [command, ...sanitizeArgs(args, redactor)]
-		.map((part) => quoteCommandPart(redactor.redact(part)))
+	return [command, ...sanitizeArgs(args, redact)]
+		.map((part) => quoteCommandPart(redact(part)))
 		.join(' ');
 }
 
@@ -140,13 +134,10 @@ function formatCommandLabel(
  * Redacts argument values that follow a known secret-shaped flag and any inline
  * `--secret=value` arguments.
  * @param args - Positional arguments.
- * @param redactor - Redactor for arguments that don't match the secret patterns.
+ * @param redact - Redactor for arguments that don't match the secret patterns.
  * @returns A new array of sanitized arguments.
  */
-function sanitizeArgs(
-	args: readonly string[],
-	redactor: { redact: (value: string) => string },
-): string[] {
+function sanitizeArgs(args: readonly string[], redact: TextRedactor): string[] {
 	const sanitized: string[] = [];
 	let redactNext = false;
 
@@ -163,7 +154,7 @@ function sanitizeArgs(
 			continue;
 		}
 
-		sanitized.push(redactSensitiveInlineArg(arg, redactor));
+		sanitized.push(redactSensitiveInlineArg(arg, redact));
 	}
 
 	return sanitized;
@@ -180,27 +171,24 @@ function isSensitiveFlag(arg: string): boolean {
 		return false;
 	}
 
-	return isSensitiveKey(arg.replace(/^-+/, ''));
+	return isRedactableKeyName(arg.replace(/^-+/, ''));
 }
 
 /**
  * Redacts a single inline `key=value` argument when the key matches a known
  * sensitive name; otherwise defers to the generic redactor.
  * @param arg - Argument to consider.
- * @param redactor - Fallback redactor.
+ * @param redact - Fallback redactor.
  * @returns The (possibly) redacted argument.
  */
-function redactSensitiveInlineArg(
-	arg: string,
-	redactor: { redact: (value: string) => string },
-): string {
+function redactSensitiveInlineArg(arg: string, redact: TextRedactor): string {
 	const separatorIndex = arg.indexOf('=');
 
-	if (separatorIndex > 0 && isSensitiveKey(arg.slice(0, separatorIndex))) {
+	if (separatorIndex > 0 && isRedactableKeyName(arg.slice(0, separatorIndex))) {
 		return `${arg.slice(0, separatorIndex + 1)}${REDACTED}`;
 	}
 
-	return redactor.redact(arg);
+	return redact(arg);
 }
 
 /**
@@ -218,15 +206,4 @@ function quoteCommandPart(part: string): string {
 	}
 
 	return `'${part.replace(/'/g, "'\\''")}'`;
-}
-
-/**
- * Tests whether a key name looks sensitive (e.g. contains "token" or "secret").
- * @param key - Key to test.
- * @returns True when the normalised key contains a sensitive substring.
- */
-function isSensitiveKey(key: string): boolean {
-	const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-	return SENSITIVE_KEY_PARTS.some((part) => normalized.includes(part));
 }

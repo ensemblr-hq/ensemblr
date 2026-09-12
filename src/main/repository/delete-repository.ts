@@ -153,6 +153,8 @@ async function deleteRepository({
 			repositoryPath: source.path,
 			workspace,
 			workspaceTeardownService,
+			workspacesRoot:
+				rootDirectoryService.getSnapshot()?.workspacesPath ?? null,
 		});
 		if (ownershipRefusal === null) {
 			await removeManagedRepositoryWorkspaceBranch({
@@ -234,12 +236,15 @@ async function removeManagedWorktree({
 	repositoryPath,
 	workspace,
 	workspaceTeardownService,
+	workspacesRoot,
 }: {
 	diagnostics: DeleteRepositoryDiagnostic[];
 	localCommandService: LocalCommandService;
 	repositoryPath: string;
 	workspace: SourceWorkspace;
 	workspaceTeardownService: WorkspaceTeardownService;
+	/** Managed workspaces root the worktree removal must resolve inside. */
+	workspacesRoot: string | null;
 }): Promise<void> {
 	const teardown = await workspaceTeardownService.teardown({
 		workspaceId: workspace.id,
@@ -259,6 +264,7 @@ async function removeManagedWorktree({
 		deletingWorkspace: true,
 		repositoryPath,
 		workspacePath: workspace.path,
+		workspacesRoot,
 	});
 	if (worktreeOutcome.status !== 'success') {
 		diagnostics.push({

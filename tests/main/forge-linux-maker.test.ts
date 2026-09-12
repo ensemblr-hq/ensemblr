@@ -88,8 +88,11 @@ describe('the AppImage maker', () => {
 		expect(options?.productName).toBe(APP_NAMES.release);
 	});
 
-	test('registers the deep-link scheme so the desktop entry claims it', () => {
-		expect(appImageOptions()?.mimeType).toEqual(['x-scheme-handler/ensemblr']);
+	// `src/shared/deep-link.ts` has no consumer, so claiming the scheme only gave
+	// any web page a way to raise the window, and macOS registers nothing. Restore
+	// this in the same change that wires a handler for it.
+	test('claims no URL scheme while nothing handles one', () => {
+		expect(appImageOptions()?.mimeType).toBeUndefined();
 	});
 
 	// Electron derives the XDG app id and `WM_CLASS` from the desktop entry's

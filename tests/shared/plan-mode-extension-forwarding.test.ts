@@ -61,7 +61,7 @@ describe('the Pi extension forwards by default rather than by name', () => {
 			/UNFORWARDED_TOOLS\.has\(toolName\) \|\|\s*toolName\.startsWith\(CONTROL_TOOL_PREFIX\)/,
 		);
 		expect(source).toMatch(
-			/if \(!GUARDED_TOOLS\.has\(event\.toolName\)\) \{\s*if \(answersWithoutTheApp\(event\.toolName\)\) \{\s*return;/,
+			/if \(\s*!GUARDED_TOOLS\.has\(event\.toolName\) &&\s*answersWithoutTheApp\(event\.toolName\)\s*\) \{\s*return;/,
 		);
 	});
 

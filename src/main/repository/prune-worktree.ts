@@ -76,6 +76,7 @@ export async function pruneWorktree({
 	repositoryPath,
 	workspaceId,
 	workspacePath,
+	workspacesRoot,
 }: {
 	/** Preserved archive directory the files-to-copy matches are copied under. */
 	archivedContextPath: string | null;
@@ -85,6 +86,8 @@ export async function pruneWorktree({
 	repositoryPath: string;
 	workspaceId: string;
 	workspacePath: string;
+	/** Managed workspaces root the worktree removal must resolve inside. */
+	workspacesRoot: string | null;
 }): Promise<PruneWorktreeOutcome> {
 	if (!existsSync(workspacePath)) {
 		return {
@@ -156,6 +159,7 @@ export async function pruneWorktree({
 		localCommandService,
 		repositoryPath,
 		workspacePath,
+		workspacesRoot,
 	});
 	if (removal.status === 'failure') {
 		return {

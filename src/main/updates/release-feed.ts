@@ -38,6 +38,38 @@ const RELEASES_PAGE_SIZE = 30;
 /** Upper bound on a feed document, which is a handful of fields and never large. */
 const MAX_FEED_BYTES = 64 * 1024;
 
+/** Upper bound on the releases list body, generous for 30 releases' worth of JSON. */
+const MAX_RELEASES_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Hosts a downloadable release asset or feed document may legitimately live on.
+ * `z.url()` alone only proves the string parses as a URL — it accepts
+ * `http://evil.test/x` and `file:///etc/passwd` just as readily — so every URL
+ * this resolver hands to `fetch` or to the platform updater is narrowed to
+ * `https:` and one of these hosts as a second, independent barrier over the
+ * GitHub API response.
+ */
+const TRUSTED_UPDATE_HOSTS = new Set([
+	'github.com',
+	'objects.githubusercontent.com',
+	'release-assets.githubusercontent.com',
+]);
+
+/**
+ * Zod refinement requiring a URL to be `https:` on a {@link TRUSTED_UPDATE_HOSTS} host.
+ * @param value - The URL string to check
+ * @returns True when the URL is trusted
+ */
+function isTrustedUpdateUrl(value: string): boolean {
+	let url: URL;
+	try {
+		url = new URL(value);
+	} catch {
+		return false;
+	}
+	return url.protocol === 'https:' && TRUSTED_UPDATE_HOSTS.has(url.hostname);
+}
+
 /**
  * The GitHub release fields this resolver reads. `unknown` elsewhere on the
  * object is expected — the API returns far more than this and none of it is
@@ -47,7 +79,9 @@ const MAX_FEED_BYTES = 64 * 1024;
 const releaseSchema = z.object({
 	assets: z
 		.object({
-			browser_download_url: z.url(),
+			browser_download_url: z.url().refine(isTrustedUpdateUrl, {
+				message: 'Asset download URL is not on a trusted GitHub host.',
+			}),
 			// GitHub computes this over what it actually stored, as `sha256:<hex>`,
 			// and `.github/workflows/release.yml` already reads it to bump the
 			// Homebrew cask. Optional because it postdates the API: a release old
@@ -66,7 +100,9 @@ const releaseSchema = z.object({
 const feedDocumentSchema = z.object({
 	name: z.string().min(1),
 	notes: z.string().optional(),
-	url: z.url(),
+	url: z.url().refine(isTrustedUpdateUrl, {
+		message: 'Feed URL is not on a trusted GitHub host.',
+	}),
 });
 
 /** One GitHub release, narrowed to the fields this resolver trusts. */
@@ -331,7 +367,14 @@ export function createReleaseFeed({
 			);
 		}
 
-		const parsed = releaseSchema.array().safeParse(await response.json());
+		const body = await readBoundedText(response, MAX_RELEASES_BYTES);
+		if (body === null) {
+			return fail(
+				'update-feed-malformed',
+				'The release feed was larger than a release list can be.',
+			);
+		}
+		const parsed = releaseSchema.array().safeParse(safeParseJson(body));
 		if (!parsed.success) {
 			return fail(
 				'update-feed-malformed',

@@ -191,6 +191,25 @@ export interface AgentSessionService {
 	flushSummaryForChatTab: (chatTabId: string) => Promise<void>;
 	getSession: (sessionId: string) => AgentSessionSnapshot | null;
 	/**
+	 * The lifecycle fields a status poll needs, off the row and the active map,
+	 * with none of the projection {@link AgentSessionService.getSession} builds.
+	 *
+	 * `getSession` is a renderer-facing projection: it computes context usage,
+	 * an activity ordinal, the current tool list, and a recursive lineage walk,
+	 * and where the live context reading is absent it falls back to a descending
+	 * scan that `JSON.parse`s every event on the branch until it meets a
+	 * `context-usage` one. On a long-lived branch that measured ~500 ms of
+	 * blocking work on the main thread — which the agent-control wait loop was
+	 * asking for per target every 250 ms, for two fields it read off the row.
+	 * @param sessionId - The session to report on.
+	 * @returns Its id, status, and whether a runtime is attached; null when the session does not exist.
+	 */
+	readStatus: (sessionId: string) => {
+		id: string;
+		status: AgentSessionRow['status'];
+		runtimeOpen: boolean;
+	} | null;
+	/**
 	 * How full a live session's context window is, as its runtime last reported
 	 * it, or null when the session has no runtime attached or has reported
 	 * nothing yet.
@@ -388,6 +407,21 @@ export function createAgentSessionService({
 		flushSummaryForChatTab: lifecycle.flushSummaryForChatTab,
 		getContextUsage: (sessionId) =>
 			lifecycle.getActiveSession(sessionId)?.contextUsage ?? null,
+		readStatus: (sessionId) => {
+			const active = lifecycle.getActiveSession(sessionId);
+			// The active map caches the row from open time, so its status is frozen
+			// at `starting`; the live one is on the row the runtime handlers update.
+			const row =
+				getAgentSessionById({
+					database: requireSessionDatabase(),
+					id: sessionId,
+				}) ??
+				active?.row ??
+				null;
+			return row
+				? { id: row.id, runtimeOpen: active !== null, status: row.status }
+				: null;
+		},
 		getSession: (sessionId) => {
 			const database = requireSessionDatabase();
 			const active = lifecycle.getActiveSession(sessionId);

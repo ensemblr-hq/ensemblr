@@ -134,6 +134,22 @@ describe('validateArgs', () => {
 		expect(validateArgs('openTab', { variant: 'comment' }).ok).toBe(false);
 	});
 
+	// The one path-taking op that skipped the shared path validator. The preview
+	// resolver behind it expands `~` and accepts an absolute path, so a tab titled
+	// with the basename alone could render `~/.ssh/id_rsa` inside the workspace's
+	// own tab strip.
+	it.each([
+		'/etc/passwd',
+		'~/.aws/credentials',
+		'../sibling/notes.md',
+		'src/../../outside.ts',
+		'C:\\Users\\me\\secrets.txt',
+	])('refuses %s as an openTab path', (filePath) => {
+		expect(validateArgs('openTab', { variant: 'file', filePath }).ok).toBe(
+			false,
+		);
+	});
+
 	it('defaults missing args to an empty object for no-arg ops', () => {
 		expect(validateArgs('listWorkspaces', undefined).ok).toBe(true);
 	});

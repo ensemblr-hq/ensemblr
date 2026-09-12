@@ -55,6 +55,10 @@ const PLAN_MODE_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 		'`ensemblr_update_architecture_diagram` writes `.ensemblr/architecture.json`, which is a tracked file — a redraw from here lands in the user’s `git status` and in the Changes panel, and a working tree left untouched is the one thing planning promises. Reading it is not blocked: `ensemblr_get_architecture_diagram` is how you describe the architecture in the plan, and redrawing it is work the approved plan can carry',
 	],
 	[
+		'setBranchName',
+		'`ensemblr_set_branch_name` renames the git branch as well as the workspace, which is what `git branch -m` does and the bash guard denies by name — a branch moved under the user while they are still reading a plan they have not approved breaks upstream tracking on the old name. Naming the tab and the summary stay available: they label the conversation without touching the repository. Put the branch name in the plan and apply it once the plan is approved',
+	],
+	[
 		'linearCreateIssue',
 		'`ensemblr_linear_create_issue` files a ticket the whole team reads, and nothing on this surface can delete one afterwards — a plan the user has not approved yet should not have left rows on their board. Name the follow-ups the plan should file, and file them once the plan is approved. Commenting on an issue that already exists is not blocked: `ensemblr_linear_create_comment` records what you found, which is planning output',
 	],

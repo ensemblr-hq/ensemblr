@@ -25,6 +25,7 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
+import { validateGitRef } from '../repository/validate-git-ref.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import { selectWorkspaceBaseBranchById } from '../storage/repositories/workspace-repository.ts';
 import { classifyCommandFailure } from './gh-failures.ts';
@@ -259,9 +260,13 @@ export function createGithubService({
 			return null;
 		}
 		const mergeRef = result.stdout.trim();
-		return mergeRef.startsWith('refs/heads/')
-			? mergeRef.slice('refs/heads/'.length) || null
-			: null;
+		if (!mergeRef.startsWith('refs/heads/')) {
+			return null;
+		}
+		const branch = mergeRef.slice('refs/heads/'.length);
+		// A leading `-` would make `gh pr view`/`gh pr merge` read this as a flag
+		// rather than a positional branch name once it is passed on argv.
+		return validateGitRef(branch) ? null : branch;
 	}
 
 	/**
@@ -459,17 +464,17 @@ export function createGithubService({
 		}
 
 		const statuses = new Map<string, readonly unknown[]>();
-		await Promise.all(
-			deployments.map(async (deployment) => {
-				const id = String(
-					(deployment as Record<string, unknown> | null)?.id ?? '',
-				);
-				const rows = id ? await fetchDeploymentStatuses(cwd, id) : [];
-				if (rows.length > 0) {
-					statuses.set(id, rows);
-				}
-			}),
-		);
+		// Sequential to match the sweeper's own one-gh-call-at-a-time intent —
+		// up to DEPLOYMENT_PAGE_SIZE concurrent calls here previously undercut it.
+		for (const deployment of deployments) {
+			const id = String(
+				(deployment as Record<string, unknown> | null)?.id ?? '',
+			);
+			const rows = id ? await fetchDeploymentStatuses(cwd, id) : [];
+			if (rows.length > 0) {
+				statuses.set(id, rows);
+			}
+		}
 		return parseDeployments(deployments, statuses);
 	}
 

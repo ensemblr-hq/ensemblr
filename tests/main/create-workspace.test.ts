@@ -1783,6 +1783,7 @@ test('a bare create placement cuts at the base instead of hunting a branch', asy
 			branchName: 'cut-me',
 			plan: { kind: 'create' },
 			workspacePath,
+			workspacesRoot: harness.workspacesPath,
 		},
 	});
 

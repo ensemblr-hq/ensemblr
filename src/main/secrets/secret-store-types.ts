@@ -19,6 +19,7 @@ export type SecretStoreErrorCode =
 	| 'keychain-error'
 	| 'metadata-error'
 	| 'not-found'
+	| 'obfuscated-storage-unacknowledged'
 	| 'unsupported-platform';
 
 /** Identifies a secret entry by `(scope, scopeId, key)`. */
@@ -99,6 +100,13 @@ export interface SafeStorageSecretStoreOptions {
 	database: DatabaseSync;
 	idFactory?: () => string;
 	now?: () => Date;
+	/** Platform whose keyring semantics apply; defaults to `process.platform`. */
+	platform?: NodeJS.Platform;
+	/**
+	 * Overrides how the store learns whether the user accepted an obfuscating
+	 * keyring. Defaults to the app-scope settings row.
+	 */
+	readObfuscatedStorageAcknowledgement?: () => boolean;
 	safeStorage?: SafeStorageApi;
 	serviceName?: string;
 }

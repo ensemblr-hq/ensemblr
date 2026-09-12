@@ -72,7 +72,7 @@ Node 24 `make` dies on `NODE_MODULE_VERSION` mismatch. Node 24 is also the Activ
 LTS line the Electron 44 runtime embeds.
 
 **`@types/node` stays on `^24`, tracking the runtime rather than the latest
-release.** Electron 44 embeds Node 24.18.1, so typing against a newer major makes
+release.** Electron 44.3.0 embeds Node 24.20.0, so typing against a newer major makes
 the compiler accept APIs that do not exist at runtime — a green
 `npm run typecheck` then ships a `TypeError`. Dependabot proposes the bump anyway,
 because it reads `@types/node` as an ordinary devDependency rather than a mirror

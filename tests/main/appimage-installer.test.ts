@@ -224,6 +224,25 @@ describe('createAppImageInstaller', () => {
 		expect(h.installer.applyStaged()).toBe(false);
 	});
 
+	test('applyStaged refuses a staged file tampered with after download', async () => {
+		const h = harness();
+		h.installer.arm(
+			{ digest: digestOf(h.body), url: 'https://x.invalid/a' },
+			'0.2.0',
+		);
+		await h.events.settled;
+
+		const stagingPath = join(root, 'apps', `.${APPIMAGE_NAME}.ensemblr-update`);
+		writeFileSync(stagingPath, 'tampered after verification');
+
+		expect(h.installer.applyStaged()).toBe(false);
+		expect(existsSync(stagingPath)).toBe(false);
+		expect(readFileSync(h.appImagePath, 'utf8')).toBe('the running build');
+		expect(h.events.errors.at(-1)?.code).toBe(
+			'update-verification-failed' satisfies UpdateFailureCode,
+		);
+	});
+
 	test('discardStaged drops a staged download so it can never be applied', async () => {
 		const h = harness();
 		h.installer.arm(

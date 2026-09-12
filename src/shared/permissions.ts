@@ -15,6 +15,7 @@ export type PermissionActionKind =
 	| 'app-settings-change'
 	| 'outside-workspace-write'
 	| 'pi-global-config-change'
+	| 'plan-submission'
 	| 'pull-request-merge'
 	| 'repository-removal'
 	| 'root-directory-change'
@@ -146,6 +147,21 @@ export function classifyPermissionAction({
 			boundary: 'allowed',
 			mode,
 			reason: 'Read/search/list-style actions are allowed in every mode.',
+		});
+	}
+
+	// Submitting a plan writes one file into `.context/plans/`, and it is the only
+	// exit from Plan Mode — so it is never blocked, because blocking it strands a
+	// planning agent with every editing tool denied and no way out. It is not a
+	// read either: classifying it as one made a `read-only` workspace gain a file
+	// with nothing shown to the user. Under `read-only` the user is asked.
+	if (action === 'plan-submission') {
+		return createBoundary({
+			action,
+			boundary: mode === 'read-only' ? 'confirmation-required' : 'allowed',
+			mode,
+			reason:
+				'Submitting a plan writes one file under .context/plans/ and is the only exit from Plan Mode, so it is confirmed rather than blocked.',
 		});
 	}
 

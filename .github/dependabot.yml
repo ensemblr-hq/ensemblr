@@ -7,8 +7,20 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
+      # Electron carries the Chromium and Node the app runs on, so a patch
+      # release is a security update. Grouped alone so it is never buried in a
+      # batched dev-dependency pull request nobody reads line by line.
+      electron:
+        patterns:
+          - electron
+          - "@electron/*"
+          - "@electron-forge/*"
       dev-dependencies:
         dependency-type: development
+        exclude-patterns:
+          - electron
+          - "@electron/*"
+          - "@electron-forge/*"
     ignore:
       # @types/node mirrors the Node major that Electron embeds (24), not the
       # latest release; a newer major type-checks green and fails at runtime.

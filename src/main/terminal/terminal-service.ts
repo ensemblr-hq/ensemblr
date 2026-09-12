@@ -87,6 +87,23 @@ const OUTPUT_FLUSH_DEBOUNCE_MS = 1_000;
 const RESTORE_BANNER = `\r\n${String.fromCharCode(27)}[2m── restored session — output above is from the previous run ──${String.fromCharCode(27)}[0m\r\n`;
 
 /**
+ * Session kinds that receive the agent-control overlay — the live control-server
+ * URL and the workspace's harness bearer token.
+ *
+ * The script kinds are deliberately absent. `setup`, `run`, and `archive` run a
+ * command the *repository* wrote, and handing that command a capability into the
+ * control channel widens the blast radius of the one actor the permission model
+ * cannot gate; `env` in one of those also prints the token into scrollback that
+ * is persisted under `.context/terminals/`. An agent tab and a dock terminal
+ * keep it: the harness launcher turns it into an MCP client, and a user who
+ * starts a CLI agent by hand in a plain terminal has the same claim on it.
+ */
+const CONTROL_TOKEN_TERMINAL_KINDS: ReadonlySet<TerminalSessionKind> = new Set([
+	'agent',
+	'terminal',
+]);
+
+/**
  * Reports whether a session kind is persisted to disk and offered for dock
  * restore after a restart. Only plain interactive terminals qualify: agent tabs
  * carry their own on-disk session logs and resume through the harness path, and
@@ -297,10 +314,20 @@ export interface CreateTerminalServiceOptions {
 	resolveBaseEnv?: TerminalBaseEnvResolver;
 	/**
 	 * Injects the agent-control env (control-server URL + a workspace-scoped
-	 * harness token) into every terminal/harness process so a launched harness can
-	 * call back into the app. Absent when the control layer is disabled.
+	 * harness token) into the terminal and harness processes that can use it, so a
+	 * launched harness can call back into the app. Absent when the control layer
+	 * is disabled.
 	 */
 	resolveAgentControlEnv?: AgentControlEnvResolver;
+	/**
+	 * Invalidates the workspace's shared harness control token once its last
+	 * terminal is gone. That origin is registered on the first terminal of any
+	 * kind and has no session of its own to be released with, so without this the
+	 * token minted for a workspace stays valid — along with the worktree path
+	 * captured at registration — for the whole run of the app, outliving the
+	 * workspace itself. Absent when the control layer is disabled.
+	 */
+	releaseAgentControlOrigins?: (workspaceId: string) => void;
 	/**
 	 * Resolves the pty scrollback byte limit from the user's
 	 * `appearance.terminalScrollbackMb` setting. Read per new session so an edited
@@ -577,6 +604,7 @@ export function createTerminalService({
 	onLifecycle,
 	onOutput,
 	readConversationInfo = readAgentConversationInfo,
+	releaseAgentControlOrigins,
 	resolveAgentControlEnv,
 	resolveBaseEnv = () => process.env,
 	resolveScrollbackLimit = () => DEFAULT_SCROLLBACK_LIMIT,
@@ -1096,6 +1124,32 @@ export function createTerminalService({
 	}
 
 	/**
+	 * Invalidates a workspace's shared harness control token once nothing is left
+	 * in that workspace to use it.
+	 *
+	 * The origin behind that token belongs to no session, so no `releaseSession`
+	 * call reaches it; this is the one moment the terminal service can observe
+	 * that the workspace has no live PTY left. A workspace whose terminals all
+	 * exited keeps its worktree path and its token otherwise, and archiving or
+	 * deleting the workspace does not invalidate either.
+	 * @param workspaceId - Workspace whose last terminal has just finished
+	 */
+	function releaseHarnessOriginWhenIdle(workspaceId: string): void {
+		if (!releaseAgentControlOrigins) {
+			return;
+		}
+		for (const session of sessions.values()) {
+			if (
+				session.snapshot.workspaceId === workspaceId &&
+				!isSessionOver(session)
+			) {
+				return;
+			}
+		}
+		releaseAgentControlOrigins(workspaceId);
+	}
+
+	/**
 	 * Tears down a session's PTY subscriptions, records its terminal status and
 	 * exit code, persists the outcome when a database is available, and wakes any
 	 * exit waiters and lifecycle listeners.
@@ -1163,17 +1217,20 @@ export function createTerminalService({
 		}
 
 		broadcastLifecycle(session);
+		releaseHarnessOriginWhenIdle(session.snapshot.workspaceId);
 	}
 
 	/**
 	 * Assembles the workspace environment a session launches in and layers the
-	 * agent-control variables on top, turning a known environment failure into a
-	 * diagnostic rather than letting it throw.
+	 * agent-control variables on top for the kinds that can use them, turning a
+	 * known environment failure into a diagnostic rather than letting it throw.
 	 * @param workspaceId - Workspace whose environment to assemble
+	 * @param kind - What the session hosts, which decides whether it receives the control overlay
 	 * @returns The assembled environment, or the diagnostic explaining why it is unavailable
 	 */
 	async function assembleSessionEnvironment(
 		workspaceId: string,
+		kind: TerminalSessionKind,
 	): Promise<SessionStep<'environment', AssembledWorkspaceEnvironment>> {
 		let assembled: AssembledWorkspaceEnvironment;
 
@@ -1193,11 +1250,13 @@ export function createTerminalService({
 			throw error;
 		}
 
-		const controlEnv = resolveAgentControlEnv?.({
-			workspaceId,
-			sessionId: `ws:${workspaceId}`,
-			species: 'harness',
-		});
+		const controlEnv = CONTROL_TOKEN_TERMINAL_KINDS.has(kind)
+			? resolveAgentControlEnv?.({
+					workspaceId,
+					sessionId: `ws:${workspaceId}`,
+					species: 'harness',
+				})
+			: undefined;
 
 		return {
 			environment: controlEnv
@@ -1421,7 +1480,7 @@ export function createTerminalService({
 		title,
 		workspaceId,
 	}: CreateTerminalSessionOptions): Promise<CreateTerminalSessionResult> {
-		const assembly = await assembleSessionEnvironment(workspaceId);
+		const assembly = await assembleSessionEnvironment(workspaceId, kind);
 
 		if (assembly.failure) {
 			return { diagnostics: [assembly.failure], session: null };

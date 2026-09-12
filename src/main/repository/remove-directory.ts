@@ -13,6 +13,18 @@ export interface RemoveDirectoryOutcome {
 	removed: boolean;
 }
 
+/**
+ * How deep a workspace worktree sits under the managed workspaces root:
+ * `<workspaces>/<repository-slug>/<workspace-slug>`.
+ */
+export const WORKTREE_DEPTH = 2;
+
+/**
+ * How deep a preserved archive sits under the managed archived-contexts root:
+ * `<archived-contexts>/<repository-slug>/<workspace-slug>-<timestamp>`.
+ */
+export const ARCHIVED_CONTEXT_DEPTH = 2;
+
 const REMOVE_MAX_RETRIES = 3;
 const REMOVE_RETRY_DELAY_MS = 100;
 const UNKNOWN_REMOVE_ERROR = 'Failed to remove the directory.';

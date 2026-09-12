@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { chmodSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -1238,8 +1238,59 @@ export function resolveDefaultDatabasePath(homeDirectory = homedir()): string {
 }
 
 /**
+ * Owner-only directory mode for the database's parent. On Linux the path is
+ * `~/.config/ensemblr`, whose parent is not reliably `0700` across
+ * distributions, and on Linux this file holds `safeStorage` ciphertext for
+ * every secret rather than a Keychain reference (ADR 0056).
+ */
+const DATABASE_DIRECTORY_MODE = 0o700;
+
+/** Owner-only file mode for the database and its write-ahead log siblings. */
+const DATABASE_FILE_MODE = 0o600;
+
+/**
+ * Suffixes SQLite creates alongside the database file in WAL mode. Each is
+ * readable on its own and the `-wal` carries pages not yet checkpointed, so
+ * tightening only the `.db` would leave recent writes world-readable.
+ */
+const DATABASE_SIDECAR_SUFFIXES = ['-wal', '-shm'] as const;
+
+/**
+ * Narrows an existing path's permissions, ignoring a path that is absent or
+ * whose mode the platform will not take.
+ *
+ * Best-effort by design: an install already sitting on a correctly restricted
+ * directory needs nothing, and a filesystem that does not carry POSIX modes
+ * (a mounted share, Windows) must not stop the app from opening its database.
+ * @param target - Path whose mode to narrow.
+ * @param mode - Mode to apply.
+ */
+function restrictMode(target: string, mode: number): void {
+	try {
+		chmodSync(target, mode);
+	} catch {}
+}
+
+/**
+ * Restricts the database file and its WAL sidecars to owner-only.
+ * @param databasePath - Path the connection was opened against.
+ */
+function restrictDatabaseFileModes(databasePath: string): void {
+	restrictMode(databasePath, DATABASE_FILE_MODE);
+
+	for (const suffix of DATABASE_SIDECAR_SUFFIXES) {
+		restrictMode(`${databasePath}${suffix}`, DATABASE_FILE_MODE);
+	}
+}
+
+/**
  * Opens the SQLite database, ensures its parent directory exists, configures
  * pragmas, and applies any pending migrations.
+ *
+ * The directory is created `0700` and the file plus its WAL sidecars narrowed
+ * to `0600` once the connection exists, because SQLite creates them under the
+ * process umask — `0644` on a typical Linux host, where this file is where
+ * secrets actually live.
  * @param options - Optional path override; `:memory:` is honored for tests.
  * @returns An open {@link EnsemblrDatabaseConnection}.
  */
@@ -1249,7 +1300,11 @@ export function openEnsemblrDatabase(
 	const databasePath = options.databasePath ?? resolveDefaultDatabasePath();
 
 	if (databasePath !== SQLITE_MEMORY_PATH) {
-		mkdirSync(path.dirname(databasePath), { recursive: true });
+		mkdirSync(path.dirname(databasePath), {
+			mode: DATABASE_DIRECTORY_MODE,
+			recursive: true,
+		});
+		restrictMode(path.dirname(databasePath), DATABASE_DIRECTORY_MODE);
 	}
 
 	const database = new DatabaseSync(databasePath, {
@@ -1261,6 +1316,7 @@ export function openEnsemblrDatabase(
 
 	try {
 		configureDatabase(database);
+		restrictDatabaseFileModes(databasePath);
 		const schemaVersion = runMigrations(database);
 
 		return {

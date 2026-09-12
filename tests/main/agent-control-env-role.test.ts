@@ -32,22 +32,25 @@ const setup = (
 			return `tok-${issued}`;
 		},
 	});
-	const { resolveAgentControlEnv } = createAgentControlIntegration({
-		app: {
-			isPackaged: false,
-			getAppPath: () => process.cwd(),
-			getPath: () => '/tmp/userData',
-		} as never,
-		originRegistry: registry,
-		resolveConciergeCwd: () =>
-			options.conciergeCwd === undefined ? CONCIERGE_CWD : options.conciergeCwd,
-		resolveWorkspaceCwd: (workspaceId) =>
-			workspaceId === WORKSPACE ? CWD : null,
-		getLanguage: () => 'en' as const,
-		getServerUrl: () => 'http://127.0.0.1:1234',
-		isSpawnedSubAgent: (agentSessionId) => marked.has(agentSessionId),
-	});
-	return { registry, resolveAgentControlEnv };
+	const { releaseWorkspaceHarnessOrigins, resolveAgentControlEnv } =
+		createAgentControlIntegration({
+			app: {
+				isPackaged: false,
+				getAppPath: () => process.cwd(),
+				getPath: () => '/tmp/userData',
+			} as never,
+			originRegistry: registry,
+			resolveConciergeCwd: () =>
+				options.conciergeCwd === undefined
+					? CONCIERGE_CWD
+					: options.conciergeCwd,
+			resolveWorkspaceCwd: (workspaceId) =>
+				workspaceId === WORKSPACE ? CWD : null,
+			getLanguage: () => 'en' as const,
+			getServerUrl: () => 'http://127.0.0.1:1234',
+			isSpawnedSubAgent: (agentSessionId) => marked.has(agentSessionId),
+		});
+	return { registry, releaseWorkspaceHarnessOrigins, resolveAgentControlEnv };
 };
 
 describe('agent-control env: the role handed to a spawned agent', () => {
@@ -231,5 +234,108 @@ describe('agent-control env: when there is nothing to hand out', () => {
 		expect(
 			resolveAgentControlEnv({ sessionId: 's', workspaceId: 'missing' }),
 		).toEqual({});
+	});
+});
+
+// The harness origin is shared by every terminal in a workspace under the
+// synthetic session id `ws:<workspaceId>`, and that id is also the root of its
+// own lineage — so the durable 20-spawn ledger counted against a key that never
+// changes. Twenty file tabs over as many weeks exhausted a workspace's whole
+// terminal budget, permanently and across restarts.
+describe('agent-control env: the harness origin is scoped to one app run', () => {
+	it('roots a harness origin at a session id this run alone can produce', () => {
+		const { registry, resolveAgentControlEnv } = setup();
+		const env = resolveAgentControlEnv({
+			sessionId: `ws:${WORKSPACE}`,
+			workspaceId: WORKSPACE,
+			species: 'harness',
+		});
+		const origin = registry.resolveByToken(env.ENSEMBLR_CONTROL_TOKEN ?? '');
+
+		expect(origin?.sessionId).toMatch(new RegExp(`^ws:${WORKSPACE}:.+`));
+		expect(origin?.sessionId).not.toBe(`ws:${WORKSPACE}`);
+		expect(origin?.rootSessionId).toBe(origin?.sessionId);
+		expect(origin?.workspaceId).toBe(WORKSPACE);
+		expect(origin?.depth).toBe(0);
+	});
+
+	it('hands every terminal in one run the same origin', () => {
+		const { resolveAgentControlEnv } = setup();
+		const first = resolveAgentControlEnv({
+			sessionId: `ws:${WORKSPACE}`,
+			workspaceId: WORKSPACE,
+			species: 'harness',
+		});
+		const second = resolveAgentControlEnv({
+			sessionId: `ws:${WORKSPACE}`,
+			workspaceId: WORKSPACE,
+			species: 'harness',
+		});
+
+		expect(second.ENSEMBLR_CONTROL_TOKEN).toBe(first.ENSEMBLR_CONTROL_TOKEN);
+	});
+
+	it('gives the next run a root of its own', () => {
+		const previousRun = setup().resolveAgentControlEnv({
+			sessionId: `ws:${WORKSPACE}`,
+			workspaceId: WORKSPACE,
+			species: 'harness',
+		});
+		const { registry, resolveAgentControlEnv } = setup();
+		const thisRun = resolveAgentControlEnv({
+			sessionId: `ws:${WORKSPACE}`,
+			workspaceId: WORKSPACE,
+			species: 'harness',
+		});
+
+		expect(
+			registry.resolveByToken(thisRun.ENSEMBLR_CONTROL_TOKEN ?? '')?.sessionId,
+		).not.toBe(previousRun.ENSEMBLR_CONTROL_TOKEN);
+	});
+
+	it('leaves a conversation session id alone', () => {
+		const { registry, resolveAgentControlEnv } = setup();
+		const env = resolveAgentControlEnv({
+			sessionId: 'root',
+			workspaceId: WORKSPACE,
+		});
+
+		expect(
+			registry.resolveByToken(env.ENSEMBLR_CONTROL_TOKEN ?? '')?.sessionId,
+		).toBe('root');
+	});
+});
+
+// Nothing calls `releaseSession` for the workspace harness origin, so the token
+// minted for the first terminal in a workspace stayed valid for the app's whole
+// life — along with the worktree path captured with it, whether or not the
+// workspace still exists.
+describe('agent-control env: releasing a workspace’s harness origin', () => {
+	it('invalidates the harness token and leaves conversations alone', () => {
+		const { registry, releaseWorkspaceHarnessOrigins, resolveAgentControlEnv } =
+			setup();
+		const harness = resolveAgentControlEnv({
+			sessionId: `ws:${WORKSPACE}`,
+			workspaceId: WORKSPACE,
+			species: 'harness',
+		});
+		const conversation = resolveAgentControlEnv({
+			sessionId: 'root',
+			workspaceId: WORKSPACE,
+		});
+
+		releaseWorkspaceHarnessOrigins(WORKSPACE);
+
+		expect(
+			registry.resolveByToken(harness.ENSEMBLR_CONTROL_TOKEN ?? ''),
+		).toBeNull();
+		expect(
+			registry.resolveByToken(conversation.ENSEMBLR_CONTROL_TOKEN ?? ''),
+		).not.toBeNull();
+	});
+
+	it('is a no-op for a workspace with no harness origin', () => {
+		const { releaseWorkspaceHarnessOrigins } = setup();
+		expect(() => releaseWorkspaceHarnessOrigins('missing')).not.toThrow();
 	});
 });

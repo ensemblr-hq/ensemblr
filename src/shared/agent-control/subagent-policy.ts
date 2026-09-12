@@ -89,6 +89,14 @@ const SUBAGENT_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 		'The kanban status describes the whole workspace, not the one unit of work you were handed, so moving the board belongs to the root conversation that spawned you. Say in your report where you think the work now stands.',
 	],
 	[
+		'getArchitectureDiagram',
+		'The architecture diagram describes the whole codebase, not the one unit of work you were handed, so reading and redrawing it both belong to the root conversation that spawned you — which is what your playbook tells you. Read the code you were pointed at instead, and put what you learned about the shape of it in your report.',
+	],
+	[
+		'updateArchitectureDiagram',
+		'The architecture diagram describes the whole codebase, not the one unit of work you were handed, so redrawing it belongs to the root conversation that spawned you. There is no patch op either: a redraw replaces the whole tracked document, so a correction scoped to your area would silently delete every component you did not re-send — including your siblings’. Say in your report what you found mis-drawn.',
+	],
+	[
 		'askUserQuestion',
 		'You were spawned as a sub-agent, and the orchestrator that spawned you owns the conversation with the user and is blocked waiting on you — a question raised here opens a dialog in a tab nobody is watching. Put the decision under the `Open questions` heading of your report, which your orchestrator turns into a questionnaire, or call `ensemblr_notify_orchestrator` with reason `need_decision` when you cannot produce your deliverable at all without an answer.',
 	],

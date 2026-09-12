@@ -536,7 +536,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_update_app_settings',
 		op: 'updateAppSettings',
 		description:
-			'Concierge-only. Apply a partial app-preference patch directly as section objects (no app or patch wrapper) and return saved preferences. Call ensemblr_get_app_settings first. Unknown/excluded keys and invalid values reject the whole patch; omitted fields stay unchanged, arrays are replaced. Uses existing write permissions. Environment, repository settings, onboarding and account/system actions are excluded. Dictation preferences exclude its API key. Runtime/delegation changes may require a new session; Linux title-bar changes need relaunch.',
+			'Concierge-only. Apply a partial app-preference patch directly as section objects (no app or patch wrapper) and return saved preferences. Call ensemblr_get_app_settings first. Unknown/excluded keys and invalid values reject the whole patch; omitted fields stay unchanged, arrays are replaced. Uses existing write permissions. Environment, repository settings, onboarding and account/system actions are excluded, as are the dictation section and general.automaticUpdates — the transcription endpoint receives the stored API key and the update setting decides whether a patched release installs, so both stay under user control in Settings. Runtime/delegation changes may require a new session; Linux title-bar changes need relaunch.',
 		shape: appSettingsControlPatchSchema.shape,
 	},
 	{

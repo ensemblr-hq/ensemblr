@@ -237,8 +237,23 @@ export const appSettingsPatchSchema = z.object({
 	onboarding: onboardingSettingsSchema.partial().optional(),
 });
 
-/** Section-scoped patch accepted by the agent-control settings operations. */
-export type AppSettingsControlPatch = Omit<AppSettingsPatch, 'onboarding'>;
+/**
+ * Section-scoped patch accepted by the agent-control settings operations.
+ *
+ * Narrower than {@link AppSettingsPatch} by two deliberate omissions, both of
+ * which an agent could otherwise set on the user's behalf with real
+ * consequences. `dictation` carries `baseUrl`, the endpoint the user's stored
+ * transcription key is posted to with every recorded clip — a preference in
+ * shape, a credential destination in fact. `general.automaticUpdates` decides
+ * whether a patched release ever installs. Neither belongs to a supervising
+ * agent, and an unattended Concierge writes app settings without a dialog.
+ */
+export type AppSettingsControlPatch = Omit<
+	AppSettingsPatch,
+	'dictation' | 'general' | 'onboarding'
+> & {
+	general?: Omit<Partial<GeneralSettings>, 'automaticUpdates'>;
+};
 
 /** Strict agent-control validator; unlike the IPC parser it rejects unknown keys and invalid values. */
 export const appSettingsControlPatchSchema = z.strictObject({
@@ -258,8 +273,6 @@ export const appSettingsControlPatchSchema = z.strictObject({
 				generalSettingsSchema.shape.alwaysShowContextUsage.removeCatch(),
 			caffeinateWhileRunning:
 				generalSettingsSchema.shape.caffeinateWhileRunning.removeCatch(),
-			automaticUpdates:
-				generalSettingsSchema.shape.automaticUpdates.removeCatch(),
 			toolCallCollapse:
 				generalSettingsSchema.shape.toolCallCollapse.removeCatch(),
 		})
@@ -325,15 +338,6 @@ export const appSettingsControlPatchSchema = z.strictObject({
 				appearanceSettingsSchema.shape.terminalFontSize.removeCatch(),
 			terminalScrollbackMb:
 				appearanceSettingsSchema.shape.terminalScrollbackMb.removeCatch(),
-		})
-		.partial()
-		.optional(),
-	dictation: z
-		.strictObject({
-			enabled: dictationSettingsSchema.shape.enabled.removeCatch(),
-			baseUrl: dictationSettingsSchema.shape.baseUrl.removeCatch(),
-			model: dictationSettingsSchema.shape.model.removeCatch(),
-			language: dictationSettingsSchema.shape.language.removeCatch(),
 		})
 		.partial()
 		.optional(),

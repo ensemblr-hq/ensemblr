@@ -1159,7 +1159,7 @@ describe('agent-control port adapters: app settings', () => {
 			deps.onAppSettingsUpdated = onAppSettingsUpdated;
 
 			const result = createAgentControlPorts(deps).appSettings.update({
-				general: { automaticUpdates: false },
+				general: { notificationSound: false },
 				appearance: { theme: 'dark' },
 			});
 			const persisted = JSON.parse(await readFile(configPath, 'utf8')) as {
@@ -1169,7 +1169,7 @@ describe('agent-control port adapters: app settings', () => {
 				repositoryRules: readonly Record<string, unknown>[];
 			};
 
-			expect(result.general.automaticUpdates).toBe(false);
+			expect(result.general.notificationSound).toBe(false);
 			expect(result.appearance.theme).toBe('dark');
 			expect(result).not.toHaveProperty('onboarding');
 			expect(persisted.app.onboarding).toEqual({
@@ -1182,7 +1182,7 @@ describe('agent-control port adapters: app settings', () => {
 			expect(persisted.repositoryRules).toEqual([{ match: 'preserve' }]);
 			expect(onAppSettingsUpdated).toHaveBeenCalledWith(
 				expect.objectContaining({
-					general: expect.objectContaining({ automaticUpdates: false }),
+					general: expect.objectContaining({ notificationSound: false }),
 				}),
 			);
 		} finally {
@@ -1193,7 +1193,7 @@ describe('agent-control port adapters: app settings', () => {
 	it('returns the safe projection and notifies consumers after a control write', () => {
 		const settings = {
 			...DEFAULT_APP_SETTINGS,
-			general: { ...DEFAULT_APP_SETTINGS.general, automaticUpdates: false },
+			general: { ...DEFAULT_APP_SETTINGS.general, notificationSound: false },
 		};
 		const update = vi.fn(() => settings);
 		const onAppSettingsUpdated = vi.fn();
@@ -1209,13 +1209,13 @@ describe('agent-control port adapters: app settings', () => {
 		deps.onAppSettingsUpdated = onAppSettingsUpdated;
 
 		const result = createAgentControlPorts(deps).appSettings.update({
-			general: { automaticUpdates: false },
+			general: { notificationSound: false },
 		});
 
 		expect(result).not.toHaveProperty('onboarding');
-		expect(result.general.automaticUpdates).toBe(false);
+		expect(result.general.notificationSound).toBe(false);
 		expect(update).toHaveBeenCalledWith({
-			general: { automaticUpdates: false },
+			general: { notificationSound: false },
 		});
 		expect(onAppSettingsUpdated).toHaveBeenCalledWith(settings);
 	});
@@ -1751,23 +1751,30 @@ describe('agent-control port adapters: conversation status', () => {
 		(deps as { agentSessionService: unknown }).agentSessionService = {
 			getContextUsage: vi.fn(() => null),
 			getSession: vi.fn(() => snapshot),
+			readStatus: vi.fn(() => snapshot ?? null),
 			iterateEventPayloadsDescending: vi.fn(() => payloads),
 		};
 		return createAgentControlPorts(deps);
 	};
 
-	it('returns the live snapshot without scanning persisted events', async () => {
+	// The poll loop calls this every 250ms per waited child. `getSession` builds
+	// the renderer's projection — context usage, activity ordinal, current tools,
+	// a recursive lineage walk, and a descending `JSON.parse` over the whole
+	// branch whenever the live context reading is missing — for two fields this
+	// adapter reads off the row.
+	it('reads the row without the renderer projection or the event store', async () => {
 		const { deps } = makeDeps();
 		const iterateEventPayloadsDescending = vi.fn(() => []);
+		const getSession = vi.fn(() => null);
 		(deps as { agentSessionService: unknown }).agentSessionService = {
 			getContextUsage: vi.fn(() => ({
 				contextWindow: 200_000,
 				percent: 31.5,
 				tokens: 63_000,
 			})),
-			getSession: vi.fn(() => ({
+			getSession,
+			readStatus: vi.fn(() => ({
 				id: 'sess-1',
-				branchId: 'b1',
 				status: 'closed',
 				runtimeOpen: false,
 			})),
@@ -1781,8 +1788,7 @@ describe('agent-control port adapters: conversation status', () => {
 			status: 'closed',
 			runtimeOpen: false,
 		});
-		// The `waitForAgents` poll loop calls this every 250ms per child, so it
-		// must never touch the event store.
+		expect(getSession).not.toHaveBeenCalled();
 		expect(iterateEventPayloadsDescending).not.toHaveBeenCalled();
 	});
 

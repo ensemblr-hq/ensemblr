@@ -125,6 +125,8 @@ jobs:
         run: npm run make
 
       - name: Verify every artifact is signed, notarized and stapled
+        env:
+          ENSEMBLR_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run verify:signing
 
       # Fixed filenames: the canary product name contains a space, and a rolling

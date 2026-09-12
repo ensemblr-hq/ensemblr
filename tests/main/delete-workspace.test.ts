@@ -24,7 +24,10 @@ import {
 	type EnsemblrDatabaseService,
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
-import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
+import {
+	buildRootDirectoryStub,
+	persistManagedRootsRow,
+} from './helpers/root-directory-stub.ts';
 import { buildWorkspaceTeardownStub } from './helpers/workspace-teardown-stub.ts';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
@@ -75,6 +78,10 @@ function createHarness(t: TestContext): Harness {
 		);
 
 	const databaseService = wrapConnection(connection);
+	persistManagedRootsRow(connection.database, {
+		archivedContextsPath: path.join(rootPath, 'archived-contexts'),
+		workspacesPath,
+	});
 
 	t.after(() => {
 		connection.database.close();

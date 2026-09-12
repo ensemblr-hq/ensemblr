@@ -42,6 +42,37 @@ describe('createInfisicalCache', () => {
 		expect(entry.fetchedAt).toBe('2026-01-01T00:00:00.000Z');
 	});
 
+	test('skips a repeat write whose values have not changed', async () => {
+		const store = fakeSecretStore();
+		const cache = createInfisicalCache({ secretStore: store });
+
+		await cache.write({ ...SCOPE, values: { API_KEY: 'sk-1' } });
+		await cache.write({ ...SCOPE, values: { API_KEY: 'sk-1' } });
+
+		expect(store.update).toHaveBeenCalledTimes(1);
+	});
+
+	test('writes again once a value changes', async () => {
+		const store = fakeSecretStore();
+		const cache = createInfisicalCache({ secretStore: store });
+
+		await cache.write({ ...SCOPE, values: { API_KEY: 'sk-1' } });
+		await cache.write({ ...SCOPE, values: { API_KEY: 'sk-2' } });
+
+		expect(store.update).toHaveBeenCalledTimes(2);
+	});
+
+	test('writes again after the entry is cleared', async () => {
+		const store = fakeSecretStore();
+		const cache = createInfisicalCache({ secretStore: store });
+
+		await cache.write({ ...SCOPE, values: { API_KEY: 'sk-1' } });
+		await cache.clear(SCOPE);
+		await cache.write({ ...SCOPE, values: { API_KEY: 'sk-1' } });
+
+		expect(store.update).toHaveBeenCalledTimes(2);
+	});
+
 	test('round-trips values through the secret store', async () => {
 		const cache = createInfisicalCache({ secretStore: fakeSecretStore() });
 

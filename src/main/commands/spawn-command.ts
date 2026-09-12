@@ -6,7 +6,7 @@ import {
 	STREAM_DRAIN_GRACE_MS,
 	wireChildSettlement,
 } from './child-settle-guard.ts';
-import { createSanitizedLogs } from './command-redaction.ts';
+import { createLazySanitizedLogs } from './command-redaction.ts';
 import {
 	createFailure,
 	createLocalCommandResult,
@@ -123,7 +123,7 @@ export function runSpawnedCommand({
 					environment,
 					exitCode,
 					failure,
-					logs: createSanitizedLogs({
+					logs: createLazySanitizedLogs({
 						args,
 						command,
 						cwd,

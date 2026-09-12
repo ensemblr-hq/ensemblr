@@ -1,7 +1,13 @@
 /// <reference types="node" />
 
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	statSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test, { type TestContext } from 'node:test';
@@ -99,6 +105,39 @@ test('writeArchivedTerminalOutput writes under the archived context', (t) => {
 			'utf8',
 		),
 		OUTPUT,
+	);
+});
+
+test('scrollback logs and their directory are owner-only', (t) => {
+	if (process.platform === 'win32') {
+		t.skip('POSIX modes are not meaningful on Windows.');
+		return;
+	}
+
+	const worktreePath = createWorktree(t);
+	writeTerminalOutput(worktreePath, 'term-1', OUTPUT);
+
+	assert.equal(
+		statSync(path.join(worktreePath, '.context', 'terminals', 'term-1.log'))
+			.mode & 0o777,
+		0o600,
+	);
+
+	const contextDirectory = path.join(createWorktree(t), '.context');
+	assert.equal(
+		writeArchivedTerminalOutput(contextDirectory, {
+			id: 'term-2',
+			text: OUTPUT,
+			title: 'Dev',
+		}),
+		null,
+	);
+
+	const archivedDirectory = path.join(contextDirectory, 'terminals');
+	assert.equal(statSync(archivedDirectory).mode & 0o777, 0o700);
+	assert.equal(
+		statSync(path.join(archivedDirectory, 'term-2.log')).mode & 0o777,
+		0o600,
 	);
 });
 

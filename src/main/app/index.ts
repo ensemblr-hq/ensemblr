@@ -1,5 +1,6 @@
+export { guardEveryWebContents } from './external-links';
 export { linuxWindowIconPath } from './linux-desktop-identity';
-export { createMainWindow } from './main-window';
+export { createMainWindow, rendererDocument } from './main-window';
 export type {
 	QuitCoordinator,
 	QuitCoordinatorOptions,

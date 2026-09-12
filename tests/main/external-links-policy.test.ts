@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import {
-	externalNavigationTarget,
+	navigationDecision,
 	parseAllowedExternalUrl,
 } from '../../src/main/app/external-links-policy';
 
@@ -27,42 +27,72 @@ describe('parseAllowedExternalUrl', () => {
 	});
 });
 
-describe('externalNavigationTarget', () => {
-	const APP_ORIGIN = 'http://localhost:5173';
+describe('navigationDecision', () => {
+	const DEV = { appDocumentUrl: null, appOrigin: 'http://localhost:5173' };
+	const PROD = {
+		appDocumentUrl: 'file:///Applications/Ensemblr.app/renderer/index.html',
+		appOrigin: null,
+	};
 
 	test('routes a foreign http(s) origin to the browser', () => {
-		expect(
-			externalNavigationTarget('https://github.com/x/y', APP_ORIGIN)?.href,
-		).toBe('https://github.com/x/y');
+		const decision = navigationDecision('https://github.com/x/y', DEV);
+
+		expect(decision.action).toBe('external');
+		expect(decision.action === 'external' && decision.url.href).toBe(
+			'https://github.com/x/y',
+		);
 	});
 
 	test('keeps same-origin navigation in-app (dev server)', () => {
 		expect(
-			externalNavigationTarget('http://localhost:5173/workspace/1', APP_ORIGIN),
-		).toBeNull();
+			navigationDecision('http://localhost:5173/workspace/1', DEV).action,
+		).toBe('allow');
 	});
 
-	test('keeps the production file: bundle in-app', () => {
+	test('keeps the app document in-app, hash routing included', () => {
+		expect(navigationDecision(PROD.appDocumentUrl, PROD).action).toBe('allow');
 		expect(
-			externalNavigationTarget(
-				'file:///Applications/Ensemblr.app/index.html',
-				null,
-			),
-		).toBeNull();
+			navigationDecision(`${PROD.appDocumentUrl}#/workspace/1`, PROD).action,
+		).toBe('allow');
+		expect(
+			navigationDecision(`${PROD.appDocumentUrl}?x=1#/settings`, PROD).action,
+		).toBe('allow');
+	});
+
+	test('blocks any other file: document', () => {
+		expect(navigationDecision('file:///etc/passwd', PROD).action).toBe('block');
+		expect(
+			navigationDecision(
+				'file:///Applications/Ensemblr.app/renderer/../../../etc/passwd',
+				PROD,
+			).action,
+		).toBe('block');
+	});
+
+	test('blocks file:, blob: and data: navigations in dev too', () => {
+		expect(navigationDecision('file:///etc/passwd', DEV).action).toBe('block');
+		expect(navigationDecision('blob:http://localhost:5173/x', DEV).action).toBe(
+			'block',
+		);
+		expect(
+			navigationDecision('data:text/html,<script>1</script>', DEV).action,
+		).toBe('block');
+	});
+
+	test('blocks javascript: rather than handing it to the browser', () => {
+		expect(navigationDecision('javascript:alert(1)', DEV).action).toBe('block');
+	});
+
+	test('blocks unparseable input', () => {
+		expect(navigationDecision('not a url', DEV).action).toBe('block');
+		expect(navigationDecision('', PROD).action).toBe('block');
 	});
 
 	test('with no app origin (production), foreign http(s) still routes out', () => {
-		expect(externalNavigationTarget('https://example.com/', null)?.href).toBe(
+		const decision = navigationDecision('https://example.com/', PROD);
+
+		expect(decision.action === 'external' && decision.url.href).toBe(
 			'https://example.com/',
 		);
-	});
-
-	test('never routes a disallowed scheme out, regardless of origin', () => {
-		expect(
-			externalNavigationTarget('javascript:alert(1)', APP_ORIGIN),
-		).toBeNull();
-		expect(
-			externalNavigationTarget('file:///etc/passwd', APP_ORIGIN),
-		).toBeNull();
 	});
 });

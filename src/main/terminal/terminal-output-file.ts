@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
 import {
@@ -27,6 +27,13 @@ export interface TerminalScrollbackCapture {
 
 /** File extension for a persisted terminal output log. */
 const TERMINAL_OUTPUT_EXTENSION = '.log';
+
+/**
+ * Owner-only mode for the directory holding raw scrollback. The logs are
+ * unredacted by design — they are what the user saw — so a terminal that echoed
+ * a credential leaves it here, and no other local user has business reading it.
+ */
+const TERMINAL_OUTPUT_DIRECTORY_MODE = 0o700;
 
 /**
  * Absolute path to a session's persisted output log under `.context/terminals`.
@@ -84,6 +91,10 @@ export function writeTerminalOutput(
  * Unlike {@link writeTerminalOutput} this reports its failure: the archive is
  * the last copy of a scrollback whose worktree is about to be removed, so a
  * failed write is worth a diagnostic rather than a silent gap.
+ *
+ * Written through {@link writeFileAtomicExclusive} for the mode it stages with
+ * (`0600`) as much as for the exclusive create, since the bytes are raw
+ * scrollback.
  * @param contextDirectory - Absolute path of the archived `.context` directory.
  * @param capture - Session id and raw scrollback bytes to write.
  * @returns The failure message, or null when the write landed.
@@ -106,8 +117,11 @@ export function writeArchivedTerminalOutput(
 	);
 
 	try {
-		mkdirSync(path.dirname(outputPath), { recursive: true });
-		writeFileSync(outputPath, capture.text);
+		mkdirSync(path.dirname(outputPath), {
+			mode: TERMINAL_OUTPUT_DIRECTORY_MODE,
+			recursive: true,
+		});
+		writeFileAtomicExclusive(outputPath, capture.text);
 		return null;
 	} catch (error) {
 		return error instanceof Error

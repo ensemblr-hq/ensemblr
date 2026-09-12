@@ -18,7 +18,12 @@ import {
 	toAccountSnapshot,
 } from './linear-account-store.ts';
 import { LinearAuthError } from './linear-auth-error.ts';
-import { formatError, toFailure, truncate } from './linear-auth-failures.ts';
+import {
+	formatError,
+	redactSecrets,
+	toFailure,
+	truncate,
+} from './linear-auth-failures.ts';
 import {
 	adoptLegacyConnection,
 	nullViewer,
@@ -314,7 +319,11 @@ export function createLinearAuthService({
 		}
 
 		if (!response.ok) {
-			const detail = await response.text().catch(() => '');
+			const rawDetail = await response.text().catch(() => '');
+			const detail = redactSecrets(rawDetail, [
+				body.refresh_token,
+				body.client_secret,
+			]);
 			throw new LinearAuthError(
 				body.grant_type === 'refresh_token'
 					? 'refresh-failed'

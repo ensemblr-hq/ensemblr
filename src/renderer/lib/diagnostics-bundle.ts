@@ -4,14 +4,14 @@ import type {
 	SetupDiagnosticsSnapshot,
 	SetupRemediationAction,
 } from '@/shared/ipc/contracts/setup';
+import { maskHomeDirectories, redactSecrets } from '@/shared/redaction.ts';
 
-const SECRET_KEY_PATTERN =
-	/(token|secret|password|api[_-]?key|bearer|authorization|cookie)/i;
-const HOME_PATH_PATTERN = /\/Users\/[^/\s'"]+/g;
+/**
+ * Email addresses are PII rather than a secret shape, so they are masked here
+ * rather than in the shared corpus every log sink runs.
+ */
 const EMAIL_PATTERN = /[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi;
-const JWT_LIKE_PATTERN =
-	/\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
-const HEX_TOKEN_PATTERN = /\b[a-f0-9]{32,}\b/gi;
+const MASKED_EMAIL = '***@***';
 
 /**
  * Returns a copy of the setup-diagnostics snapshot with sensitive substrings
@@ -89,28 +89,19 @@ function sanitizeRemediation(
 }
 
 /**
- * Redacts secrets and PII (JWTs, hex tokens, emails, home paths, and key/value secrets) from a string.
+ * Redacts secrets and PII from a string before it leaves the app.
+ *
+ * The secret corpus itself lives in `src/shared/redaction.ts` and is shared
+ * with the main-process sinks, so a provider prefix added for one is carried by
+ * all three; only the email mask is specific to this surface.
  * @param input - Text to sanitize
  * @returns The sanitized text
  */
 function sanitizeText(input: string): string {
 	if (!input) return input;
-	let next = input;
-	next = next.replace(JWT_LIKE_PATTERN, '***');
-	next = next.replace(HEX_TOKEN_PATTERN, '***');
-	next = next.replace(EMAIL_PATTERN, '***@***');
-	next = next.replace(HOME_PATH_PATTERN, '/Users/~');
-	next = next.replace(
-		/("?[\w-]*(?:token|secret|password|api[_-]?key|bearer|authorization|cookie)[\w-]*"?\s*[:=]\s*)"[^"\s]+"/gi,
-		(_match, prefix) => `${prefix}"***"`,
+
+	return maskHomeDirectories(redactSecrets(input)).replace(
+		EMAIL_PATTERN,
+		MASKED_EMAIL,
 	);
-	// Replace bare assignments like FOO_TOKEN=value
-	next = next.replace(
-		new RegExp(
-			`((?:\\w*${SECRET_KEY_PATTERN.source}\\w*)\\s*[:=]\\s*)([^\\s'"]+)`,
-			'gi',
-		),
-		(_match, prefix) => `${prefix}***`,
-	);
-	return next;
 }

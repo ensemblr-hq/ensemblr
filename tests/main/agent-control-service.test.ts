@@ -362,7 +362,7 @@ describe('agent-control service: app settings', () => {
 			const update = await service.invoke({
 				op: 'updateAppSettings',
 				token: 'tok-caller',
-				rawArgs: { general: { automaticUpdates: false } },
+				rawArgs: { general: { notificationSound: false } },
 			});
 
 			expect(read.ok).toBe(true);
@@ -389,11 +389,11 @@ describe('agent-control service: app settings', () => {
 		const updated = await service.invoke({
 			op: 'updateAppSettings',
 			token: 'tok-caller',
-			rawArgs: { general: { automaticUpdates: false } },
+			rawArgs: { general: { notificationSound: false } },
 		});
 		expect(updated.ok).toBe(true);
 		expect(ports.appSettings.update).toHaveBeenCalledWith({
-			general: { automaticUpdates: false },
+			general: { notificationSound: false },
 		});
 	});
 
@@ -416,7 +416,7 @@ describe('agent-control service: app settings', () => {
 			const update = await service.invoke({
 				op: 'updateAppSettings',
 				token: 'tok-caller',
-				rawArgs: { general: { automaticUpdates: false } },
+				rawArgs: { general: { notificationSound: false } },
 			});
 
 			expect(read).toMatchObject({ ok: false, code: 'denied-scope' });
@@ -437,12 +437,65 @@ describe('agent-control service: app settings', () => {
 		const update = await retired.service.invoke({
 			op: 'updateAppSettings',
 			token: 'tok-caller',
-			rawArgs: { general: { automaticUpdates: false } },
+			rawArgs: { general: { notificationSound: false } },
 		});
 		expect(read).toMatchObject({ ok: false, code: 'denied-scope' });
 		expect(update).toMatchObject({ ok: false, code: 'denied-scope' });
 		expect(retired.ports.appSettings.get).not.toHaveBeenCalled();
 		expect(retired.ports.appSettings.update).not.toHaveBeenCalled();
+	});
+
+	// The dialog said "Agent requests updateAppSettings in workspace <id>" and
+	// nothing else, so the one gate between an agent and a sensitive settings
+	// write asked the user to approve a patch they could not read.
+	it('shows the patch it is asking the user to approve', async () => {
+		const ports = makePorts({ mode: 'approval-required' });
+		const { service } = setup({ concierge: true, ports });
+
+		await service.invoke({
+			op: 'updateAppSettings',
+			token: 'tok-caller',
+			rawArgs: {
+				appearance: { theme: 'dark' },
+				general: { notificationSound: false },
+			},
+		});
+
+		const summary = vi.mocked(ports.confirm.confirm).mock.calls[0]?.[0]
+			?.summary;
+		expect(summary).toContain('updateAppSettings');
+		expect(summary).toContain('appearance.theme = dark');
+		expect(summary).toContain('general.notificationSound = false');
+	});
+
+	it('says so rather than showing nothing for an empty patch', async () => {
+		const ports = makePorts({ mode: 'approval-required' });
+		const { service } = setup({ concierge: true, ports });
+
+		await service.invoke({
+			op: 'updateAppSettings',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(
+			vi.mocked(ports.confirm.confirm).mock.calls[0]?.[0]?.summary,
+		).toContain('would write nothing');
+	});
+
+	it('leaves every other op’s confirmation naming just the op', async () => {
+		const ports = makePorts({ mode: 'approval-required' });
+		const { service } = setup({ ports });
+
+		await service.invoke({
+			op: 'spawnChatTab',
+			token: 'tok-caller',
+			rawArgs: { title: 'scout' },
+		});
+
+		expect(vi.mocked(ports.confirm.confirm).mock.calls[0]?.[0]?.summary).toBe(
+			'Agent requests spawnChatTab in workspace ws.',
+		);
 	});
 
 	it('does not mutate settings when approval is declined', async () => {
@@ -451,7 +504,7 @@ describe('agent-control service: app settings', () => {
 		const result = await service.invoke({
 			op: 'updateAppSettings',
 			token: 'tok-caller',
-			rawArgs: { general: { automaticUpdates: false } },
+			rawArgs: { general: { notificationSound: false } },
 		});
 
 		expect(result).toMatchObject({ ok: false, code: 'denied-permission' });
@@ -464,7 +517,7 @@ describe('agent-control service: app settings', () => {
 			op: 'updateAppSettings',
 			token: 'tok-caller',
 			rawArgs: {
-				general: { automaticUpdates: false },
+				general: { notificationSound: false },
 				onboarding: { completedAt: null },
 			},
 		});
@@ -490,7 +543,7 @@ describe('agent-control service: app settings', () => {
 		const pending = service.invoke({
 			op: 'updateAppSettings',
 			token: 'tok-caller',
-			rawArgs: { general: { automaticUpdates: false } },
+			rawArgs: { general: { notificationSound: false } },
 		});
 		await vi.waitFor(() =>
 			expect(ports.confirm.confirm).toHaveBeenCalledOnce(),
@@ -575,6 +628,58 @@ describe('agent-control service: gating', () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.code).toBe('denied-permission');
+		}
+	});
+
+	// `exitPlanMode` is the only exit from Plan Mode, so it is never blocked — but
+	// keeping it out of `WRITE_OPS` made it a *read*, and a read-only workspace
+	// gained a file under `.context/plans/` without the user being asked.
+	it('asks the user before writing a plan file in read-only mode', async () => {
+		const ports = makePorts({ mode: 'read-only', planning: true });
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'exitPlanMode',
+			token: 'tok-caller',
+			rawArgs: { plan: '# Plan', title: 'Plan' },
+		});
+
+		expect(result.ok).toBe(true);
+		expect(ports.confirm.confirm).toHaveBeenCalledTimes(1);
+		expect(ports.planMode.exit).toHaveBeenCalledTimes(1);
+	});
+
+	it('refuses the plan submission the user declines, without writing', async () => {
+		const ports = makePorts({
+			confirm: false,
+			mode: 'read-only',
+			planning: true,
+		});
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'exitPlanMode',
+			token: 'tok-caller',
+			rawArgs: { plan: '# Plan', title: 'Plan' },
+		});
+
+		expect(result.ok).toBe(false);
+		expect(ports.planMode.exit).not.toHaveBeenCalled();
+	});
+
+	it('does not ask in the modes a plan submission is ordinary in', async () => {
+		for (const mode of ['workspace-trusted', 'approval-required'] as const) {
+			const ports = makePorts({ mode, planning: true });
+			const { service } = setup({ ports });
+
+			const result = await service.invoke({
+				op: 'exitPlanMode',
+				token: 'tok-caller',
+				rawArgs: { plan: '# Plan', title: 'Plan' },
+			});
+
+			expect(result.ok, mode).toBe(true);
+			expect(ports.confirm.confirm, mode).not.toHaveBeenCalled();
 		}
 	});
 
@@ -2547,9 +2652,16 @@ describe('agent-control service: delegation', () => {
 		}
 	});
 
-	it('maps a delegate failure to an internal error', async () => {
+	// The raw `Error.message` used to reach the agent verbatim, and fs, sqlite and
+	// child_process errors routinely embed absolute paths — so a failure in one
+	// workspace taught an agent the names and layout of the others. The message is
+	// now a correlation id the user can find beside the real error in the console.
+	it('maps a delegate failure to an internal error without its detail', async () => {
 		const ports = makePorts();
-		ports.tabs.spawnChatTab = vi.fn().mockRejectedValue(new Error('boom'));
+		const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+		ports.tabs.spawnChatTab = vi
+			.fn()
+			.mockRejectedValue(new Error('ENOENT: open /Users/someone/other-ws/x'));
 		const { service } = setup({ ports });
 		const result = await service.invoke({
 			op: 'spawnChatTab',
@@ -2559,8 +2671,14 @@ describe('agent-control service: delegation', () => {
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.code).toBe('internal');
-			expect(result.error).toContain('boom');
+			expect(result.error).not.toContain('/Users/someone/other-ws');
+			expect(result.error).toMatch(/incident `[0-9a-f]{8}`/);
 		}
+		expect(logged).toHaveBeenCalledWith(
+			'[agent-control] control op failed.',
+			expect.objectContaining({ op: 'spawnChatTab' }),
+		);
+		logged.mockRestore();
 	});
 });
 
@@ -2779,6 +2897,7 @@ describe('agent-control service: review', () => {
 
 	it('reports a git failure as an internal error rather than an empty diff', async () => {
 		const ports = makePorts();
+		const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 		ports.diff.readWorkspaceDiff = vi
 			.fn()
 			.mockRejectedValue(new Error('fatal: not a git repository'));
@@ -2790,8 +2909,16 @@ describe('agent-control service: review', () => {
 		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(result.error).toContain('not a git repository');
+			expect(result.code).toBe('internal');
+			expect(result.error).toMatch(/incident `[0-9a-f]{8}`/);
 		}
+		expect(logged).toHaveBeenCalledWith(
+			'[agent-control] control op failed.',
+			expect.objectContaining({
+				cause: expect.stringContaining('not a git repository'),
+			}),
+		);
+		logged.mockRestore();
 	});
 });
 
@@ -3910,18 +4037,29 @@ describe('agent-control service: audience resolution', () => {
 		});
 	});
 
-	// An unresolvable token is refused by every op it goes on to call, so the list
-	// it sees barely matters — but it must not be the widest one on offer.
+	// An unresolvable token is refused at the transport now, so nothing should
+	// reach this fallback at all — and if something does, the list it is shown
+	// must be the narrowest on offer rather than the widest.
 	it('falls back to the narrowest surface for an unknown token', async () => {
 		const { service } = setup({ ports: makePorts() });
 
+		expect(service.isKnownToken('bogus')).toBe(false);
 		expect(await service.describeAudience('bogus')).toEqual({
 			architectureDiagram: true,
 			tuiHarnesses: true,
 			delegation: 'ensemblr',
+			depth: 2,
 			hasChatTab: false,
-			role: 'orchestrator',
+			role: 'subagent',
 		});
+	});
+
+	it('reports a live origin’s token as known', async () => {
+		const { registry, service } = setup({ ports: makePorts() });
+
+		expect(service.isKnownToken('tok-caller')).toBe(true);
+		registry.release('caller');
+		expect(service.isKnownToken('tok-caller')).toBe(false);
 	});
 });
 
