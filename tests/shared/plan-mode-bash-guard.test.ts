@@ -307,6 +307,41 @@ const DENIED = [
 	'fd --exe rm .',
 ];
 
+/**
+ * Every flag on an allowlisted command whose *value* is a program the command
+ * then executes, or a file it writes. This is the one shape the allowlist can
+ * still be escaped through — the head word is genuinely read-only and a flag
+ * turns it into something else — so the table is the sweep's result rather than
+ * a sample, and a flag added to a guard belongs here too.
+ *
+ * `sort --compress-program` was an arbitrary-code escape confirmed by execution:
+ * `sort` execs the named program whenever it spills a run to disk.
+ */
+const PROGRAM_AND_OUTPUT_FLAGS: readonly (readonly [string, string])[] = [
+	['date', 'date --set "2026-01-01"'],
+	['date', 'date -s "2026-01-01"'],
+	['fd', 'fd --exec rm .'],
+	['fd', 'fd --exec-batch rm .'],
+	['fd', 'fd -X rm .'],
+	['fd', 'fd -x rm .'],
+	['file', 'file --compile -m /tmp/magic'],
+	['file', 'file -C -m /tmp/magic'],
+	['file', 'file -Cm /tmp/magic'],
+	['git grep', 'git grep --open-files-in-pager=./evil.sh pattern'],
+	['git grep', 'git grep -O./evil.sh pattern'],
+	['git log', 'git log --output=out.txt'],
+	['rg', 'rg --hostname-bin ./evil.sh pattern'],
+	['rg', 'rg --pre ./evil.sh pattern'],
+	['sort', 'sort --compress-program=/tmp/evil.sh in.txt'],
+	['sort', 'sort --compress-program /tmp/evil.sh in.txt'],
+	['sort', 'sort -S 1 --compress-program=/tmp/evil.sh in.txt >/dev/null'],
+	['sort', 'sort --compress-pro=/tmp/evil.sh in.txt'],
+	['sort', 'sort --output=out.txt in.txt'],
+	['sort', 'sort -o out.txt in.txt'],
+	['tree', 'tree --output out.txt'],
+	['tree', 'tree -o out.txt'],
+];
+
 describe('isReadOnlyBashCommand', () => {
 	it.each(ALLOWED)('allows %j', (command) => {
 		expect(isReadOnlyBashCommand(command)).toEqual({ ok: true });
@@ -317,6 +352,56 @@ describe('isReadOnlyBashCommand', () => {
 		expect(verdict.ok).toBe(false);
 		if (!verdict.ok) {
 			expect(verdict.reason.length).toBeGreaterThan(0);
+		}
+	});
+
+	it.each(PROGRAM_AND_OUTPUT_FLAGS)(
+		'guards %s against %j, which runs a program or writes a file',
+		(_command, invocation) => {
+			expect(isReadOnlyBashCommand(invocation).ok).toBe(false);
+		},
+	);
+
+	it('says `sort --compress-program` runs a program, not that it writes a file', () => {
+		const verdict = isReadOnlyBashCommand(
+			'sort -S 1 --compress-program=/tmp/evil.sh med.txt > /dev/null',
+		);
+		expect(verdict.ok).toBe(false);
+		if (!verdict.ok) {
+			expect(verdict.reason).toContain('--compress-program');
+			expect(verdict.reason).toContain('runs a program');
+		}
+	});
+
+	it('leaves the sort flags that only name a scratch directory or a size', () => {
+		expect(isReadOnlyBashCommand('sort -S 1 -T /tmp/sort-work in.txt')).toEqual(
+			{ ok: true },
+		);
+		expect(isReadOnlyBashCommand('sort -T/tmp/sort-work in.txt')).toEqual({
+			ok: true,
+		});
+	});
+
+	it('says `file -C` writes a compiled magic file', () => {
+		const verdict = isReadOnlyBashCommand('file -C -m /tmp/magic');
+		expect(verdict.ok).toBe(false);
+		if (!verdict.ok) {
+			expect(verdict.reason).toContain('-C');
+			expect(verdict.reason).toContain('magic file');
+		}
+	});
+
+	// `-m`, `-M`, `-e` and `-F` each consume their value attached, so a value that
+	// happens to start with the guarded letter is an argument rather than a flag.
+	it('leaves `file` readable in every form that only inspects', () => {
+		for (const command of [
+			'file README.md',
+			'file -b README.md',
+			'file -m /tmp/magic README.md',
+			'file -mC README.md',
+			'file --mime-type README.md',
+		]) {
+			expect(isReadOnlyBashCommand(command)).toEqual({ ok: true });
 		}
 	});
 

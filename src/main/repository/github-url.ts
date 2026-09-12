@@ -22,6 +22,26 @@ const SSH_URL_PATTERN = /^git@github\.com:([\w.-]+)\/([\w.-]+?)(?:\.git)?$/i;
 const SHORTHAND_URL_PATTERN = /^(?:gh:)?([\w.-]+)\/([\w.-]+?)(?:\.git)?$/i;
 
 /**
+ * Rejects the owner and repository names GitHub itself does not issue but the
+ * character class admits.
+ *
+ * A leading `-` reads as a flag bundle to the `gh repo clone` positional, and
+ * `.`/`..` resolve the clone destination out of the managed repositories root
+ * before anything downstream is asked to catch it — `allocateUniqueTargetPath`
+ * is `path.resolve(parent, name)`.
+ * @param component - Owner or repository name captured from the URL.
+ * @returns True when the name is one GitHub could actually have issued.
+ */
+function isAcceptableNameComponent(component: string): boolean {
+	return (
+		component.length > 0 &&
+		!component.startsWith('-') &&
+		component !== '.' &&
+		component !== '..'
+	);
+}
+
+/**
  * Recognises the GitHub URL forms Ensemblr accepts and returns the canonical
  * `https://github.com/owner/repo.git` form plus the bare `owner/repo` slug
  * passed to `gh repo clone`. Returns `null` for any other input.
@@ -51,7 +71,10 @@ export function parseGithubUrl(url: unknown): ParsedGithubUrl | null {
 		return null;
 	}
 	const repositoryName = repoNameRaw.replace(/\.git$/i, '');
-	if (!repositoryName) {
+	if (
+		!isAcceptableNameComponent(owner) ||
+		!isAcceptableNameComponent(repositoryName)
+	) {
 		return null;
 	}
 

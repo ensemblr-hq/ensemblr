@@ -330,12 +330,27 @@ const startTerminalAs = (
 
 describe('agent-control service: app settings', () => {
 	it.each([
-		{ mode: 'workspace-trusted', updateAllowed: true, confirm: true },
-		{ mode: 'approval-required', updateAllowed: true, confirm: true },
-		{ mode: 'read-only', updateAllowed: false, confirm: false },
+		{
+			confirm: true,
+			confirmAsked: true,
+			mode: 'workspace-trusted',
+			updateAllowed: true,
+		},
+		{
+			confirm: true,
+			confirmAsked: true,
+			mode: 'approval-required',
+			updateAllowed: true,
+		},
+		{
+			confirm: false,
+			confirmAsked: false,
+			mode: 'read-only',
+			updateAllowed: false,
+		},
 	] as const)(
 		'requires confirmation for app settings writes in $mode mode',
-		async ({ mode, updateAllowed, confirm }) => {
+		async ({ confirm, confirmAsked, mode, updateAllowed }) => {
 			const ports = makePorts({ mode, confirm });
 			const { service } = setup({ concierge: true, ports });
 
@@ -352,7 +367,7 @@ describe('agent-control service: app settings', () => {
 
 			expect(read.ok).toBe(true);
 			expect(update.ok).toBe(updateAllowed);
-			expect(ports.confirm.confirm).toHaveBeenCalledOnce();
+			expect(ports.confirm.confirm).toHaveBeenCalledTimes(confirmAsked ? 1 : 0);
 			expect(ports.appSettings.update).toHaveBeenCalledTimes(
 				updateAllowed ? 1 : 0,
 			);
@@ -561,6 +576,16 @@ describe('agent-control service: gating', () => {
 		if (!result.ok) {
 			expect(result.code).toBe('denied-permission');
 		}
+	});
+
+	it('resolves the mode for the calling origin workspace', async () => {
+		const getMode = vi.fn().mockReturnValue('workspace-trusted');
+		const ports = makePorts();
+		const { service } = setup({
+			ports: { ...ports, permissions: { getMode } },
+		});
+		await service.invoke({ op: 'listTabs', token: 'tok-caller', rawArgs: {} });
+		expect(getMode).toHaveBeenCalledWith('ws');
 	});
 
 	it('runs a write when approval is granted', async () => {

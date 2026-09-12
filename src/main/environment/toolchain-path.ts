@@ -11,6 +11,14 @@ import type { LocalCommandService } from '../commands/command-types.ts';
  * snapshot carries the app's inherited PATH, which the caller already has — so
  * the workspace environment keeps the inherited PATH rather than overwriting it
  * with an identical value.
+ *
+ * This is the one caller that passes a `cwd`, so a directory-aware tool the
+ * *user* hooked into their own shell rc — `direnv`, `mise` — evaluates that
+ * workspace's `.envrc` or `mise.toml` while the environment is captured. That
+ * evaluation is done by the user's own shell configuration, which the threat
+ * model places outside the boundary, and `direnv` requires an explicit
+ * `direnv allow` per directory. The app's own git is unaffected:
+ * `LocalCommandService.run` captures with no `cwd` at all.
  * @param localCommandService - Service whose `getEnvironment` captures and
  * memoizes the per-directory login-shell environment.
  * @returns A resolver from workspace directory to its toolchain PATH, or null.

@@ -1,12 +1,5 @@
-import {
-	existsSync,
-	mkdirSync,
-	readFileSync,
-	renameSync,
-	writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-
 import {
 	type AppSettings,
 	type AppSettingsPatch,
@@ -14,6 +7,7 @@ import {
 	mergeAppSettings,
 	parseAppSettings,
 } from '../../shared/config.ts';
+import { writeFileAtomicExclusive } from '../safe-fs/index.ts';
 import {
 	ENSEMBLR_CONFIG_SCHEMA_URL,
 	resolveEnsemblrConfigPath,
@@ -127,9 +121,7 @@ export function createAppSettingsService(
 	const writeRaw = (config: Record<string, unknown>): void => {
 		const serialized = `${JSON.stringify(config, null, 2)}\n`;
 		mkdirSync(path.dirname(configPath), { recursive: true });
-		const tempPath = `${configPath}.tmp`;
-		writeFileSync(tempPath, serialized, 'utf8');
-		renameSync(tempPath, configPath);
+		writeFileAtomicExclusive(configPath, serialized);
 		lastWritten = serialized;
 	};
 

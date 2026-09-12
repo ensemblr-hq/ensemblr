@@ -1,13 +1,16 @@
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-
+import { MANAGED_CHILD_DEPTH } from '../../shared/managed-path.ts';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsemblrRootDirectoryService } from '../root';
 import type { EnsemblrDatabaseService } from '../storage';
 import { listAllWorkspaceRows } from '../storage/repositories/workspace-repository.ts';
 import { measureDirectoryBytes } from './directory-bytes.ts';
 import { canonicalPath, containmentRefusal } from './managed-path.ts';
-import { removeDirectoryTree } from './remove-directory.ts';
+import {
+	removeDirectoryTree,
+	removeManagedDirectory,
+} from './remove-directory.ts';
 import { isRecord } from './row-guards.ts';
 
 /**
@@ -499,7 +502,11 @@ async function removeEmptyRepositoryDirectories({
 	const removals = await Promise.all(
 		empty.map(async (directoryPath) => ({
 			directoryPath,
-			outcome: await removeDirectoryTree(directoryPath),
+			outcome: await removeManagedDirectory({
+				candidatePath: directoryPath,
+				expectedDepth: MANAGED_CHILD_DEPTH,
+				root: workspacesRoot,
+			}),
 		})),
 	);
 

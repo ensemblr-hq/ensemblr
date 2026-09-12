@@ -8,11 +8,28 @@ import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 
 const execFileAsync = promisify(execFile);
 
+/** Largest stdout any checkpoint git step will buffer before the child is killed. */
+const GIT_CHECKPOINT_MAX_BUFFER_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Deadline for one checkpoint git step. Capture runs on the agent's turn
+ * boundary, so a git that wedges — a stuck `.git/index.lock`, a slow network
+ * filesystem — must surface as a failed checkpoint rather than a turn that
+ * never settles.
+ */
+const GIT_CHECKPOINT_TIMEOUT_MS = 60_000;
+
 /**
  * Captures the full working-tree state of a git workspace (tracked changes AND
  * untracked files, `.gitignore` respected) into a commit reachable only from a
  * private ref. Uses a temporary index file so the user's real index, HEAD, and
  * branches are never touched (ADR 0012).
+ *
+ * The ref and its objects live in the repository's shared object store, not the
+ * worktree's, because `refs/ensemblr/` is a common ref namespace. A checkpoint
+ * is therefore readable from every workspace of the same repository — scoped to
+ * the repository rather than the workspace — which is what makes the snapshots
+ * cheap to deduplicate.
  */
 interface CaptureWorkspaceCheckpointInput {
 	cwd: string;
@@ -196,7 +213,13 @@ export interface GitDiffResult {
 	patch: string;
 }
 
-/** Diffs two tree-ish revisions (commit or tree hashes). */
+/**
+ * Diffs two tree-ish revisions (commit or tree hashes).
+ *
+ * The three passes run one after another rather than concurrently: each buffers
+ * up to {@link GIT_CHECKPOINT_MAX_BUFFER_BYTES}, and a turn that regenerates a
+ * lockfile made all three hold that much in the main process at once.
+ */
 export async function diffTrees({
 	cwd,
 	fromRev,
@@ -206,23 +229,21 @@ export async function diffTrees({
 	fromRev: string;
 	toRev: string;
 }): Promise<GitDiffResult> {
-	const [numstat, nameStatus, patch] = await Promise.all([
-		runGit({
-			args: ['diff', '--numstat', '-M', fromRev, toRev],
-			cwd,
-			step: 'diff-numstat',
-		}),
-		runGit({
-			args: ['diff', '--name-status', '-M', fromRev, toRev],
-			cwd,
-			step: 'diff-name-status',
-		}),
-		runGit({
-			args: ['diff', '-M', fromRev, toRev],
-			cwd,
-			step: 'diff-patch',
-		}),
-	]);
+	const numstat = await runGit({
+		args: ['diff', '--numstat', '-M', fromRev, toRev],
+		cwd,
+		step: 'diff-numstat',
+	});
+	const nameStatus = await runGit({
+		args: ['diff', '--name-status', '-M', fromRev, toRev],
+		cwd,
+		step: 'diff-name-status',
+	});
+	const patch = await runGit({
+		args: ['diff', '-M', fromRev, toRev],
+		cwd,
+		step: 'diff-patch',
+	});
 
 	const statusByPath = new Map<string, GitDiffFile['status']>();
 	for (const line of nameStatus.split('\n')) {
@@ -328,7 +349,8 @@ async function runGit({
 		const { stdout } = await execFileAsync('git', [...args], {
 			cwd,
 			env: { ...stripLaunchContextEnv(process.env), ...env },
-			maxBuffer: 16 * 1024 * 1024,
+			maxBuffer: GIT_CHECKPOINT_MAX_BUFFER_BYTES,
+			timeout: GIT_CHECKPOINT_TIMEOUT_MS,
 		});
 		return stdout.trim();
 	} catch (error) {

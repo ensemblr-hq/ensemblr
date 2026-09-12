@@ -55,7 +55,6 @@ const setup = () => {
 		} as never,
 		planModeRegistry,
 		provisionalNamingQueue: () => undefined,
-		withPermissionGate: () => undefined,
 	});
 	const channels = new Map<
 		string,

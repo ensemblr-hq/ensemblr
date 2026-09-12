@@ -1171,7 +1171,7 @@ export function createAgentControlService({
 		} else if (isWriteOp(op)) {
 			action = 'app-control-write';
 		}
-		const mode = ports.permissions.getMode();
+		const mode = ports.permissions.getMode(origin.workspaceId);
 		const boundary = classifyPermissionAction({ action, mode }).boundary;
 		if (boundary === 'blocked') {
 			return fail('denied-permission', `Blocked by ${mode} permission mode.`);

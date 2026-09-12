@@ -189,7 +189,11 @@ export interface PortAdapterDeps {
 		memory: MemoryPort;
 		workspaceCreation: WorkspaceCreationPort;
 	} | null;
-	getPermissionMode: () => PermissionMode;
+	/**
+	 * Reads the permission mode the named workspace's repository owns, falling
+	 * back to the app scope when no workspace is named.
+	 */
+	getPermissionMode: (workspaceId?: string) => PermissionMode;
 	/** Reads the language the app renders in, for the playbooks' language directive. */
 	getLanguage: () => AppLanguage;
 	/** Adds the agent-control MCP config and playbook to a harness launch command. */
@@ -1715,7 +1719,9 @@ export function createAgentControlPorts(
 		review: makeReviewPort(deps),
 		linear: makeLinearPort(deps),
 		sessionNaming: makeSessionNamingPort(deps),
-		permissions: { getMode: () => deps.getPermissionMode() },
+		permissions: {
+			getMode: (workspaceId) => deps.getPermissionMode(workspaceId),
+		},
 		language: { getLanguage: () => deps.getLanguage() },
 		commitCredit: {
 			isCoAuthorEnabled: () =>

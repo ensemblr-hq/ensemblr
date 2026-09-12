@@ -8,7 +8,6 @@ import type {
 } from '../../../shared/ipc/contracts/root-directory';
 import type { SharedRootAdoptionService } from '../../repository';
 import type { EnsemblrRootDirectoryService } from '../../root';
-import type { WithPermissionGate } from '../permission-gate.ts';
 import { parseRootDirectoryChangeRequest } from '../request-schemas.ts';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
@@ -20,11 +19,9 @@ import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 export function registerRootHandlers({
 	rootDirectoryService,
 	sharedRootAdoptionService,
-	withPermissionGate,
 }: {
 	rootDirectoryService: EnsemblrRootDirectoryService;
 	sharedRootAdoptionService: SharedRootAdoptionService;
-	withPermissionGate: WithPermissionGate;
 }): void {
 	ipcMain.handle(IPC_CHANNELS.rootDirectory, (): RootDirectorySnapshot => {
 		return rootDirectoryService.getSnapshot() ?? rootDirectoryService.ensure();
@@ -62,9 +59,8 @@ export function registerRootHandlers({
 		},
 	);
 
-	withPermissionGate(
+	ipcMain.handle(
 		IPC_CHANNELS.confirmRootDirectoryChange,
-		'root-directory-change',
 		(_event, request: unknown): RootDirectoryChangeApplyResult => {
 			const normalizedRequest = parseRootDirectoryChangeRequest(request);
 

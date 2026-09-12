@@ -497,15 +497,47 @@ const CONCIERGE_GUARDED_TOOLS = new Set([
 ]);
 
 /**
- * Every tool call the app is asked about. Gating on the union rather than on the
- * set for this session's role is what keeps the policed set and the forwarded
- * set the same one: the app decides which policy applies from the caller's
- * origin, and a tool this hook filters out is a call no policy ever sees.
+ * Every tool call the app is asked about by name. Gating on the union rather
+ * than on the set for this session's role is what keeps the policed set and the
+ * forwarded set the same one: the app decides which policy applies from the
+ * caller's origin, and a tool this hook filters out is a call no policy ever
+ * sees.
  */
 const GUARDED_TOOLS = new Set([
 	...PLAN_MODE_GUARDED_TOOLS,
 	...CONCIERGE_GUARDED_TOOLS,
 ]);
+
+/**
+ * Tool names answered locally instead of forwarded. Everything else — including
+ * a name neither policy lists — goes to the app, which refuses a tool it cannot
+ * vouch for while planning.
+ *
+ * The set a Pi session holds is open: the user can install another extension or
+ * point Pi at an MCP server, so the eight literal names above are the tools
+ * somebody thought of rather than the tools that exist. `mcp__fs__write_file`
+ * bypassed Plan Mode entirely under the old filter.
+ *
+ * Two kinds skip the round trip. Pi's read-only built-ins (`find`, `grep`, `ls`,
+ * `read` — its tool modules declare exactly these alongside `bash`, `edit`,
+ * `powershell` and `write`) can do nothing either policy cares about. Ensemblr's
+ * own `ensemblr_*` tools are gated better elsewhere: the control server answers
+ * for each by op and role before it runs, and forwarding them here would put a
+ * second, blunter verdict in front of the reads planning is for.
+ */
+const UNFORWARDED_TOOLS = new Set(['find', 'grep', 'ls', 'read']);
+
+/** Prefix of Ensemblr's own control tools, gated per op by the control server. */
+const CONTROL_TOOL_PREFIX = 'ensemblr_';
+
+/**
+ * Reports whether a tool neither policy names can still be let through without
+ * asking the app.
+ * @param toolName - The tool being called.
+ * @returns True for a read-only built-in or an Ensemblr control tool.
+ */
+const answersWithoutTheApp = (toolName: string): boolean =>
+	UNFORWARDED_TOOLS.has(toolName) || toolName.startsWith(CONTROL_TOOL_PREFIX);
 
 /**
  * Control ops left out of a spawned sub-agent's tool list. Most are refused by
@@ -1116,7 +1148,9 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	// planning" cache would silently let the agent edit files it was told not to.
 	pi.on('tool_call', async (event) => {
 		if (!GUARDED_TOOLS.has(event.toolName)) {
-			return;
+			if (answersWithoutTheApp(event.toolName)) {
+				return;
+			}
 		}
 		// Pi has never published the parameter name its edit tools use, so both
 		// spellings are read: the Concierge policy blocks a write it cannot see a

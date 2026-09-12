@@ -31,7 +31,10 @@ import {
 } from './git-ops.ts';
 import { deleteCachedRepositoryIssues } from './issue-cache.ts';
 import { containmentRefusal } from './managed-path.ts';
-import { removeDirectoryTree } from './remove-directory.ts';
+import {
+	removeDirectoryTree,
+	removeManagedDirectory,
+} from './remove-directory.ts';
 import type { WorkspaceTeardownService } from './workspace-teardown.ts';
 
 /** Public surface of the repository delete (destructive) service. */
@@ -486,22 +489,11 @@ async function removeWorkspacesDirectory({
 		return;
 	}
 
-	const refusal = containmentRefusal({
+	const outcome = await removeManagedDirectory({
 		candidatePath: directoryPath,
 		expectedDepth: MANAGED_CHILD_DEPTH,
 		root: snapshot.workspacesPath,
 	});
-	if (refusal !== null) {
-		diagnostics.push({
-			code: 'workspace-cleanup-failed',
-			message: refusal,
-			path: directoryPath,
-			severity: 'warning',
-		});
-		return;
-	}
-
-	const outcome = await removeDirectoryTree(directoryPath);
 	if (!outcome.removed) {
 		diagnostics.push({
 			code: 'workspace-cleanup-failed',
@@ -689,7 +681,11 @@ async function removeArchivedContextsForRepository({
 		return;
 	}
 
-	const outcome = await removeDirectoryTree(repositoryArchivePath);
+	const outcome = await removeManagedDirectory({
+		candidatePath: repositoryArchivePath,
+		expectedDepth: MANAGED_CHILD_DEPTH,
+		root: snapshot.archivedContextsPath,
+	});
 
 	if (outcome.error !== null || !outcome.removed) {
 		diagnostics.push({

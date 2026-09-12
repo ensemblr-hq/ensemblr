@@ -5,6 +5,7 @@ import {
 	ensureContextPath,
 	resolveContextPath,
 } from '../config/context-directory.ts';
+import { writeFileAtomicExclusive } from '../safe-fs/index.ts';
 
 /**
  * Subdirectory under a worktree's `.context` that holds per-session terminal
@@ -27,8 +28,20 @@ export interface TerminalScrollbackCapture {
 /** File extension for a persisted terminal output log. */
 const TERMINAL_OUTPUT_EXTENSION = '.log';
 
-/** Absolute path to a session's persisted output log under `.context/terminals`. */
-function terminalOutputPath(worktreePath: string, terminalId: string): string {
+/**
+ * Absolute path to a session's persisted output log under `.context/terminals`.
+ *
+ * Session ids are generated, but `restoredFromId` arrives from the renderer as
+ * an opaque string and reaches the delete path, so the refusal belongs here
+ * rather than at each of the three callers that share this builder.
+ * @param worktreePath - Absolute path to the workspace worktree root.
+ * @param terminalId - Id of the terminal session whose log to address.
+ * @returns The absolute log path, or null when the id is not a usable filename.
+ */
+function terminalOutputPath(
+	worktreePath: string,
+	terminalId: string,
+): string | null {
 	return resolveContextPath(
 		worktreePath,
 		TERMINAL_OUTPUT_SUBDIR,
@@ -59,7 +72,7 @@ export function writeTerminalOutput(
 		if (outputPath === null) {
 			return;
 		}
-		writeFileSync(outputPath, text);
+		writeFileAtomicExclusive(outputPath, text);
 	} catch {}
 }
 
@@ -113,8 +126,13 @@ export function readTerminalOutput(
 	worktreePath: string,
 	terminalId: string,
 ): string | null {
+	const outputPath = terminalOutputPath(worktreePath, terminalId);
+	if (outputPath === null) {
+		return null;
+	}
+
 	try {
-		return readFileSync(terminalOutputPath(worktreePath, terminalId), 'utf8');
+		return readFileSync(outputPath, 'utf8');
 	} catch {
 		return null;
 	}
@@ -130,7 +148,12 @@ export function deleteTerminalOutput(
 	worktreePath: string,
 	terminalId: string,
 ): void {
+	const outputPath = terminalOutputPath(worktreePath, terminalId);
+	if (outputPath === null) {
+		return;
+	}
+
 	try {
-		rmSync(terminalOutputPath(worktreePath, terminalId), { force: true });
+		rmSync(outputPath, { force: true });
 	} catch {}
 }

@@ -14,6 +14,26 @@
 import { z } from 'zod';
 
 /**
+ * {@link import('../../../shared/ipc').ListWorkspaceFilesRequest} and
+ * {@link import('../../../shared/ipc').WatchWorkspaceFilesRequest}, which carry
+ * the workspace root and nothing else. Used via `safeParse`: both handlers
+ * answer a malformed payload with their own typed envelope rather than throwing.
+ */
+export const workspaceCwdRequestSchema = z.object({
+	workspaceCwd: z.string().min(1).max(4096),
+});
+
+/**
+ * {@link import('../../../shared/ipc').ReadWorkspaceDirectoryRequest}. The
+ * repo-relative `path` is length-capped here and containment-checked by the
+ * service; used via `safeParse` for the same reason as the sibling read.
+ */
+export const readWorkspaceDirectoryRequestSchema = z.object({
+	path: z.string().max(4096),
+	workspaceCwd: z.string().min(1).max(4096),
+});
+
+/**
  * {@link import('../../../shared/ipc').ReadWorkspaceFileRequest}. `path` may be
  * absolute, `~`-prefixed, or repo-relative — the preview reads outside the
  * workspace root, and `resolvePreviewPath` in the service decides the scope. The

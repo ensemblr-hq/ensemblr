@@ -150,10 +150,11 @@ interface SessionOpenerOptions {
 	 */
 	resolveTurnPreamble?: TurnPreambleResolver;
 	/**
-	 * Reads the workspace's permission mode. Called per open rather than captured
-	 * once, so a mode the user changes between sessions reaches the next one.
+	 * Reads the permission mode the workspace's repository owns. Called per open
+	 * rather than captured once, so a mode the user changes between sessions
+	 * reaches the next one.
 	 */
-	resolvePermissionMode: () => PermissionMode;
+	resolvePermissionMode: (workspaceId?: string) => PermissionMode;
 	/**
 	 * Resolves the binary a non-Pi runtime should launch. Omitted, every runtime
 	 * but Pi opens on whatever binary it ships with.
@@ -424,7 +425,7 @@ export function createSessionOpener({
 				modelOverride: request.model ?? row.model,
 				now,
 				agentClient,
-				permissionMode: resolvePermissionMode(),
+				permissionMode: resolvePermissionMode(request.workspaceId),
 				planMode: request.planMode ?? isPlanModeActive(row.id),
 				afkMode: request.afkMode ?? isAfkModeActive(row.id),
 				// A chat is pinned to the provider its session was opened on; a resume
@@ -541,7 +542,7 @@ export function createSessionOpener({
 			modelOverride: request.model ?? null,
 			now,
 			agentClient,
-			permissionMode: resolvePermissionMode(),
+			permissionMode: resolvePermissionMode(request.workspaceId),
 			planMode: request.planMode ?? isPlanModeActive(session.id),
 			afkMode: request.afkMode ?? isAfkModeActive(session.id),
 			provider,
@@ -790,6 +791,7 @@ async function createRuntimeSessionOrFail({
 			controlMcp: control.controlMcp,
 			delegation: control.delegation,
 			env: control.env,
+			lineageDepth: control.depth,
 			executable: sessionInput.executable,
 			label: sessionInput.label,
 			linkedDirectories: sessionInput.linkedDirectories,

@@ -177,6 +177,16 @@ export interface AgentSessionRequest {
 	 * no sub-agent tool ignore it. Defaults to `ensemblr`.
 	 */
 	delegation?: SubagentMechanism;
+	/**
+	 * How far down the delegation tree this session sits: 0 for a conversation the
+	 * user opened, 1 for a sub-agent it spawned, 2 for that sub-agent's own leaf.
+	 *
+	 * Carried because a runtime shipping its own sub-agent tool must deny that
+	 * tool to every descendant regardless of {@link delegation}, and the deny list
+	 * is composed at session open where no other lineage is in scope. Absent means
+	 * "root", which is what a caller that knows no lineage is asserting anyway.
+	 */
+	lineageDepth?: 0 | 1 | 2;
 	/** Extra instructions appended to the runtime's own system prompt. */
 	systemPromptAppend?: string | null;
 	/**

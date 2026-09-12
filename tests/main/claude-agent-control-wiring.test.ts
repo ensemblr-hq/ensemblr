@@ -73,12 +73,16 @@ const setup = (
 	});
 
 	const wire = (input: {
+		lineage?: { depth: 0 | 1 | 2 };
 		parentSessionId?: string | null;
 		provider: 'claude' | 'pi';
 		sessionId: string;
 	}) =>
 		resolveAgentControlWiring({
 			isSpawnedSubAgent: (sessionId) => marked.has(sessionId),
+			...(input.lineage
+				? { lineage: { depth: input.lineage.depth, rootSessionId: 'root' } }
+				: {}),
 			parentSessionId: input.parentSessionId ?? null,
 			provider: input.provider,
 			readArchitectureDiagramEnabled: () => true,
@@ -92,6 +96,18 @@ const setup = (
 
 	return { registry, wire };
 };
+
+describe('agent-control wiring: the depth a session reports', () => {
+	it('reports the persisted lineage depth so a descendant is not read as a root', () => {
+		const { wire } = setup();
+
+		expect(wire({ provider: 'claude', sessionId: 'root' }).depth).toBe(0);
+		expect(
+			wire({ lineage: { depth: 2 }, provider: 'claude', sessionId: 'leaf' })
+				.depth,
+		).toBe(2);
+	});
+});
 
 describe('agent-control wiring: the species a session registers under', () => {
 	it('registers a Claude session as its own species, not as Pi', () => {
@@ -194,6 +210,7 @@ describe('agent-control wiring: the control MCP endpoint', () => {
 		expect(wiring).toEqual({
 			controlMcp: null,
 			delegation: 'ensemblr',
+			depth: 0,
 			env: undefined,
 			resolveTurnPreamble: null,
 			systemPromptAppend: null,

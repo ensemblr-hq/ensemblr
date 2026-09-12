@@ -37,6 +37,16 @@ export interface ClaudePlanSubmittedEvent {
  * Claude's tool takes only `plan`; the review panel wants a title too, so the
  * plan's first markdown heading (or first line) is used, matching what a user
  * would read as its name.
+ *
+ * Deliberately keyed on the tool *call* rather than its result: the two are not
+ * the same event, and a call the CLI's permission engine then refuses still
+ * files a plan and still raises a panel. That is the accepted trade, because the
+ * panel is dismissible and the alternative is worse — with no `canUseTool`
+ * wired the SDK answers a `can_use_tool` control request by throwing, so waiting
+ * for a result would mean waiting for one that may never arrive and leaving the
+ * user's Plan Mode with no way out. Enforcement does not ride on this: the
+ * adapter re-asserts the permission mode on the same event and the `PreToolUse`
+ * guard reads live state, so a plan filed early grants nothing.
  * @param event - One normalized event off the session stream.
  * @returns The submission when this event is an `ExitPlanMode` call, else null.
  */

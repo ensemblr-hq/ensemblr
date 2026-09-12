@@ -42,6 +42,7 @@ import type {
 } from '../shared/ipc/contracts/terminal';
 import type { UpdateStatusChangedBroadcast } from '../shared/ipc/contracts/update';
 import type { WorkspaceFilesChangedBroadcast } from '../shared/ipc/contracts/workspace-files';
+import type { PermissionMode } from '../shared/permissions.ts';
 import { scrollbackMbToBytes } from '../shared/terminal.ts';
 import { resolveWindowChrome } from '../shared/window-chrome.ts';
 import { createAfkModeRegistry } from './afk-mode';
@@ -151,7 +152,7 @@ import {
 } from './infisical';
 import { type IpcHandlersHandle, registerIpcHandlers } from './ipc';
 import { trackWindowMaximizedState } from './ipc/handlers/window.ts';
-import { readPermissionModeFromSnapshot } from './ipc/permission-gate.ts';
+import { createPermissionModeResolver } from './ipc/permission-mode-resolver.ts';
 import {
 	createLinearAssetProxy,
 	createLinearAuthService,
@@ -556,6 +557,21 @@ const settingsResolutionService = createEnsemblrConfigResolutionService({
 	rootDirectory: isDev ? devRootDirectory : undefined,
 });
 /**
+ * Resolves the permission mode a workspace runs under. Repository scope is
+ * authoritative and the app scope is the fallback, so the mode the Security
+ * screen writes is the mode every gate reads. Naming no workspace resolves at
+ * app scope, which is what a surface with no workspace in hand gets.
+ * @param workspaceId - Workspace whose repository owns the mode, when known.
+ * @returns The mode to enforce.
+ */
+const resolvePermissionMode = createPermissionModeResolver({
+	databaseService,
+	resolveSettings: (request) => settingsResolutionService.resolve(request),
+});
+const resolvePermissionModeForWorkspace = (
+	workspaceId?: string,
+): PermissionMode => resolvePermissionMode({ workspaceId });
+/**
  * Resolves the language the app is rendering in, the same way the native menu
  * and the shell snapshot do. Read per call rather than captured so a language
  * the user switches mid-session reaches the next agent turn, and defensive
@@ -958,8 +974,7 @@ const agentSessionService = createAgentSessionService({
 	readTuiHarnessesEnabled,
 	resolveAgentControlEnv,
 	/** Reads the workspace permission mode each new agent session must honour. */
-	resolvePermissionMode: () =>
-		readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
+	resolvePermissionMode: resolvePermissionModeForWorkspace,
 	resolveProviderExecutable,
 	/** Renders this turn's naming upkeep for runtimes the app prompts directly. */
 	resolveTurnPreamble: async (sessionId) =>
@@ -1541,8 +1556,7 @@ agentControlService = createAgentControlService({
 		databaseService,
 		renameWorkspace: renameWorkspaceService.rename,
 		/** Reads the currently resolved permission mode that gates control ops. */
-		getPermissionMode: () =>
-			readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
+		getPermissionMode: resolvePermissionModeForWorkspace,
 		getLanguage: resolveAppLanguage,
 		harnessDetectionService,
 		linearService,

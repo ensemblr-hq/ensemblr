@@ -12,7 +12,6 @@ import type {
 	GithubRemoteBranchListService,
 	GithubRepositoryListService,
 } from '../../repository';
-import type { WithPermissionGate } from '../permission-gate.ts';
 import {
 	parseCloneGithubRepositoryRequest,
 	parseCloneGithubRepositoryStartRequest,
@@ -30,12 +29,10 @@ export function registerCloneHandlers({
 	githubCloneService,
 	githubRemoteBranchListService,
 	githubRepositoryListService,
-	withPermissionGate,
 }: {
 	githubCloneService: GithubCloneService;
 	githubRemoteBranchListService: GithubRemoteBranchListService;
 	githubRepositoryListService: GithubRepositoryListService;
-	withPermissionGate: WithPermissionGate;
 }): void {
 	ipcMain.handle(
 		IPC_CHANNELS.githubRepositoryList,
@@ -76,9 +73,8 @@ export function registerCloneHandlers({
 		},
 	);
 
-	withPermissionGate(
+	ipcMain.handle(
 		IPC_CHANNELS.cloneGithubRepositoryStart,
-		'outside-workspace-write',
 		(event, request: unknown): Promise<CloneGithubRepositoryStartResult> => {
 			const normalized = parseCloneGithubRepositoryStartRequest(request);
 			return githubCloneService.start(normalized, {

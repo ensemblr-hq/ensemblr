@@ -130,7 +130,7 @@ async function openClaudeSessions({
 	planMode = () => false,
 }: {
 	canUseTool?: ClaudeApprovalGate;
-	mode: () => PermissionMode;
+	mode: (workspaceId?: string) => PermissionMode;
 	opens: ReadonlyArray<{
 		planMode?: boolean;
 		linkedDirectories?: readonly string[];
@@ -234,6 +234,12 @@ function systemPromptAppendOf(options: Options): string | undefined {
 }
 
 describe('Claude session options: the workspace permission mode reaches the SDK', () => {
+	it('resolves the mode for the workspace the session opens in', async () => {
+		const mode = vi.fn().mockReturnValue('read-only');
+		await openClaudeSessions({ mode, opens: [{}] });
+		expect(mode).toHaveBeenCalledWith(WORKSPACE_ID);
+	});
+
 	it('applies additions and removals by resuming the same idle chat', async () => {
 		const { options, sessionIds } = await openClaudeSessions({
 			mode: () => 'approval-required',

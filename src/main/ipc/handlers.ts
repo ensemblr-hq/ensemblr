@@ -26,6 +26,7 @@ import type { EnvironmentVariablesService } from '../environment';
 import {
 	createGithubService,
 	createWorkspacePrStatusSweeper,
+	type GithubService,
 	listSweepableWorkspaces,
 } from '../github/index.ts';
 import type { InfisicalService } from '../infisical';
@@ -106,10 +107,16 @@ import { registerWindowHandlers } from './handlers/window';
 import { registerWorkspaceFilesHandlers } from './handlers/workspace-files';
 import { registerWorkspaceGitHandlers } from './handlers/workspace-git';
 import { registerWorkspaceScriptHandlers } from './handlers/workspace-scripts';
-import {
-	createPermissionGate,
-	readPermissionModeFromSnapshot,
-} from './permission-gate';
+import { installPermissionGate } from './permission-gate.ts';
+import { createPermissionModeResolver } from './permission-mode-resolver.ts';
+
+/**
+ * How long the PR-status sweeper waits before its first pass. Registration runs
+ * before the window exists, and the first tick sweeps every workspace at once,
+ * so arming it immediately spends `gh` spawns and network against renderer
+ * startup for nothing the sidebar reads yet.
+ */
+const PR_SWEEP_START_DELAY_MS = 15_000;
 
 /** Dependency bundle wired into the renderer-facing IPC handlers. */
 interface RegisterIpcHandlersOptions {
@@ -263,133 +270,172 @@ export function registerIpcHandlers({
 	unarchiveWorkspaceService,
 	workspaceFilesWatcher,
 }: RegisterIpcHandlersOptions): IpcHandlersHandle {
-	// Permission gate is wired here so all handler groups share one instance.
-	// `getMode` re-resolves on every gated call so settings changes apply live.
-	const withPermissionGate = createPermissionGate({
-		getMode: () =>
-			readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
+	const resolvePermissionMode = createPermissionModeResolver({
+		databaseService,
+		resolveSettings: (request) => settingsResolutionService.resolve(request),
+	});
+	const restorePermissionGate = installPermissionGate({
+		databaseService,
+		getLanguage,
+		resolveMode: resolvePermissionMode,
 	});
 
-	registerWindowHandlers({ requestRelaunch });
-	registerTextEditingHandlers();
-	registerMenuHandlers({ menuBarStore, menuContextStore, rebuildMenu });
-	registerActiveChatHandlers({ activeChatStore });
-	registerAppSettingsHandlers({ appSettingsService, onAppSettingsUpdated });
-	registerDictationHandlers({ dictationService });
-	registerEnvironmentHandlers({ environmentVariablesService });
-	registerInfisicalHandlers({ getInfisicalService });
-	registerHealthHandlers({ configService, databaseService });
-	registerShellSnapshotHandlers({
-		appSettingsService,
-		configService,
-		databaseService,
-		openTargetService,
-		readWindowChrome,
-	});
-	registerNavigationHandlers({ databaseService });
-	registerSettingsHandlers({ settingsResolutionService });
-	registerRootHandlers({
-		rootDirectoryService,
-		sharedRootAdoptionService,
-		withPermissionGate,
-	});
-	registerRepositoryConfigHandlers({
-		databaseService,
-		repositoryConfigService,
-	});
-	registerRepositoryHandlers({
-		archiveWorkspaceService,
-		continueWorkspaceBranchService,
-		createWorkspaceService,
-		deleteArchivedWorkspaceService,
-		deleteRepositoryService,
-		deleteWorkspaceService,
-		githubOwnerListService,
-		getLanguage,
-		listAllWorkspacesService,
-		listArchivedWorkspacesService,
-		localRepositoryRegistrationService,
-		quickStartProjectService,
-		renameWorkspaceService,
-		setWorkspaceBaseBranchService,
-		sharedRootAdoptionService,
-		unarchiveWorkspaceService,
-		withPermissionGate,
-	});
-	registerCloneHandlers({
-		githubCloneService,
-		githubRemoteBranchListService,
-		githubRepositoryListService,
-		withPermissionGate,
-	});
-	registerAgentProviderHandlers({ agentProviderService, openTargetService });
-	registerAgentSessionHandlers({
-		agentModelCatalog,
-		agentSessionService,
-		piExecutableService,
-		afkModeRegistry,
-		planModeRegistry,
-		provisionalNamingQueue,
-		withPermissionGate,
-	});
-	registerConciergeHandlers({ conciergeSessionService, resolveConciergeHome });
-	registerChatTabHandlers({
-		chatTabService: createChatTabService({
-			databaseService,
-			lookups: {
-				agentSessionExists: ({ agentSessionId }) => {
-					const database = databaseService.getConnection()?.database;
-					if (!database) {
-						return false;
-					}
-					return getAgentSessionById({ database, id: agentSessionId }) !== null;
-				},
-			},
-		}),
-		flushSummaryForChatTab: agentSessionService.flushSummaryForChatTab,
-	});
-	registerArchitectureHandlers({ architectureService });
-	registerCheckpointHandlers({ databaseService });
-	registerReviewHandlers({
-		reviewService: createReviewService({ databaseService }),
-	});
-	registerLinearHandlers({ linearAuthService, linearService });
-	registerLinkedDirectoryHandlers({
-		linkedDirectoryService: createLinkedDirectoryService({ databaseService }),
-	});
-	registerOpenTargetHandlers({
-		appSettingsService,
-		databaseService,
-		openTargetService,
-	});
-	registerSetupHandlers({ setupDiagnosticsService });
-	registerTerminalHandlers({ terminalService });
-	registerUpdateHandlers({ updateService });
-	registerAgentHandlers({
-		augmentHarnessCommand,
-		databaseService,
-		harnessDetectionService,
-		readTuiHarnessesEnabled: () =>
-			appSettingsService.read().experimental.tuiHarnesses,
-		terminalService,
-	});
-	registerWorkspaceScriptHandlers({ databaseService, scriptLifecycleService });
-	registerRepositorySettingsHandlers({ databaseService });
-	registerSettingsPublicationHandlers({ service: settingsPublicationService });
-	registerWorkspaceFilesHandlers({
-		listWorkspaceFilesService,
-		workspaceFilesWatcher,
-		withPermissionGate,
-	});
-	registerWorkspaceGitHandlers({
-		workspaceGitService: createWorkspaceGitService({ localCommandService }),
-	});
-	const githubService = createGithubService({
-		databaseService,
-		localCommandService,
-		readCoAuthorEnabled: () => appSettingsService.read().git.coAuthorEnsemblr,
-	});
-	registerGithubHandlers({ githubService, withPermissionGate });
+	/**
+	 * Registers every handler group while the permission gate is intercepting
+	 * `ipcMain.handle`, and restores the original before returning so nothing
+	 * registered later is silently gated by a table it was never checked against.
+	 * @returns The GitHub service the PR sweeper outlives registration with.
+	 */
+	const registerGatedHandlerGroups = (): GithubService => {
+		try {
+			registerWindowHandlers({ requestRelaunch });
+			registerTextEditingHandlers();
+			registerMenuHandlers({ menuBarStore, menuContextStore, rebuildMenu });
+			registerActiveChatHandlers({ activeChatStore });
+			registerAppSettingsHandlers({ appSettingsService, onAppSettingsUpdated });
+			registerDictationHandlers({ dictationService });
+			registerEnvironmentHandlers({ environmentVariablesService });
+			registerInfisicalHandlers({ getInfisicalService });
+			registerHealthHandlers({ configService, databaseService });
+			registerShellSnapshotHandlers({
+				appSettingsService,
+				configService,
+				databaseService,
+				openTargetService,
+				readWindowChrome,
+			});
+			registerNavigationHandlers({ databaseService });
+			registerSettingsHandlers({ settingsResolutionService });
+			registerRootHandlers({
+				rootDirectoryService,
+				sharedRootAdoptionService,
+			});
+			registerRepositoryConfigHandlers({
+				databaseService,
+				repositoryConfigService,
+			});
+			registerRepositoryHandlers({
+				archiveWorkspaceService,
+				continueWorkspaceBranchService,
+				createWorkspaceService,
+				deleteArchivedWorkspaceService,
+				deleteRepositoryService,
+				deleteWorkspaceService,
+				githubOwnerListService,
+				getLanguage,
+				listAllWorkspacesService,
+				listArchivedWorkspacesService,
+				localRepositoryRegistrationService,
+				quickStartProjectService,
+				renameWorkspaceService,
+				setWorkspaceBaseBranchService,
+				sharedRootAdoptionService,
+				unarchiveWorkspaceService,
+			});
+			registerCloneHandlers({
+				githubCloneService,
+				githubRemoteBranchListService,
+				githubRepositoryListService,
+			});
+			registerAgentProviderHandlers({
+				agentProviderService,
+				openTargetService,
+			});
+			registerAgentSessionHandlers({
+				agentModelCatalog,
+				agentSessionService,
+				piExecutableService,
+				afkModeRegistry,
+				planModeRegistry,
+				provisionalNamingQueue,
+			});
+			registerConciergeHandlers({
+				conciergeSessionService,
+				resolveConciergeHome,
+			});
+			registerChatTabHandlers({
+				chatTabService: createChatTabService({
+					databaseService,
+					lookups: {
+						agentSessionExists: ({ agentSessionId }) => {
+							const database = databaseService.getConnection()?.database;
+							if (!database) {
+								return false;
+							}
+							return (
+								getAgentSessionById({ database, id: agentSessionId }) !== null
+							);
+						},
+					},
+				}),
+				flushSummaryForChatTab: agentSessionService.flushSummaryForChatTab,
+			});
+			registerArchitectureHandlers({ architectureService });
+			registerCheckpointHandlers({ databaseService });
+			registerReviewHandlers({
+				reviewService: createReviewService({ databaseService }),
+			});
+			registerLinearHandlers({ linearAuthService, linearService });
+			registerLinkedDirectoryHandlers({
+				linkedDirectoryService: createLinkedDirectoryService({
+					databaseService,
+				}),
+			});
+			registerOpenTargetHandlers({
+				appSettingsService,
+				databaseService,
+				openTargetService,
+			});
+			registerSetupHandlers({ setupDiagnosticsService });
+			registerTerminalHandlers({ terminalService });
+			registerUpdateHandlers({ updateService });
+			registerAgentHandlers({
+				augmentHarnessCommand,
+				databaseService,
+				harnessDetectionService,
+				readTuiHarnessesEnabled: () =>
+					appSettingsService.read().experimental.tuiHarnesses,
+				terminalService,
+			});
+			registerWorkspaceScriptHandlers({
+				databaseService,
+				scriptLifecycleService,
+			});
+			registerRepositorySettingsHandlers({
+				databaseService,
+				getLanguage,
+				resolvePermissionMode,
+			});
+			registerSettingsPublicationHandlers({
+				service: settingsPublicationService,
+			});
+			registerWorkspaceFilesHandlers({
+				listWorkspaceFilesService,
+				workspaceFilesWatcher,
+			});
+			registerWorkspaceGitHandlers({
+				workspaceGitService: createWorkspaceGitService({ localCommandService }),
+			});
+			const service = createGithubService({
+				databaseService,
+				localCommandService,
+				readCoAuthorEnabled: () =>
+					appSettingsService.read().git.coAuthorEnsemblr,
+			});
+			registerGithubHandlers({ githubService: service });
+			registerRepositorySourcesHandlers({
+				repositorySourcesService: createRepositorySourcesService({
+					databaseService,
+					localCommandService,
+				}),
+			});
+			return service;
+		} finally {
+			restorePermissionGate();
+		}
+	};
+	const githubService = registerGatedHandlerGroups();
+
 	const prStatusSweeper = createWorkspacePrStatusSweeper({
 		listActiveWorkspaces: () => {
 			const database = databaseService.getConnection()?.database ?? null;
@@ -399,13 +445,15 @@ export function registerIpcHandlers({
 			await githubService.getPullRequestSnapshot({ workspaceCwd, workspaceId });
 		},
 	});
-	prStatusSweeper.start();
-	registerRepositorySourcesHandlers({
-		repositorySourcesService: createRepositorySourcesService({
-			databaseService,
-			localCommandService,
-		}),
-	});
+	const armSweeper = setTimeout(
+		() => prStatusSweeper.start(),
+		PR_SWEEP_START_DELAY_MS,
+	);
 
-	return { dispose: () => prStatusSweeper.dispose() };
+	return {
+		dispose: () => {
+			clearTimeout(armSweeper);
+			prStatusSweeper.dispose();
+		},
+	};
 }

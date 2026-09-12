@@ -7,6 +7,7 @@ import {
 	type CloneCommandRunner,
 	createGithubCloneService,
 } from '../../src/main/repository/clone-repository.ts';
+import { parseGithubUrl } from '../../src/main/repository/github-url.ts';
 import type { LocalRepositoryRegistrationService } from '../../src/main/repository/register-repository.ts';
 import type { EnsemblrDatabaseService } from '../../src/main/storage/database.ts';
 import { buildRegistrationStub } from './helpers/registration-stub.ts';
@@ -658,4 +659,26 @@ test('start writes no branchFrom row when the picker was left alone', async (t) 
 		)
 		.get() as { value_json: string } | undefined;
 	assert.equal(row, undefined);
+});
+
+test('parseGithubUrl rejects an owner or repository name GitHub cannot issue', () => {
+	assert.equal(parseGithubUrl('https://github.com/owner/..'), null);
+	assert.equal(parseGithubUrl('https://github.com/../repo'), null);
+	assert.equal(parseGithubUrl('https://github.com/./repo'), null);
+	assert.equal(parseGithubUrl('https://github.com/-x/repo'), null);
+	assert.equal(parseGithubUrl('https://github.com/owner/-repo'), null);
+	assert.equal(parseGithubUrl('git@github.com:-x/repo.git'), null);
+	assert.equal(parseGithubUrl('gh:owner/..'), null);
+});
+
+test('parseGithubUrl still accepts the names GitHub does issue', () => {
+	assert.equal(
+		parseGithubUrl('https://github.com/ensemblr-hq/ensemblr')?.validatedUrl,
+		'ensemblr-hq/ensemblr',
+	);
+	assert.equal(
+		parseGithubUrl('https://github.com/some.owner/repo.name.git')
+			?.repositoryName,
+		'repo.name',
+	);
 });

@@ -24,7 +24,6 @@ import type { QueueProvisionalNamingPort } from '../../agent-runtime/naming/prov
 import type { PiExecutableService } from '../../pi-runtime';
 import { isBlockedByPiExecutable } from '../../pi-runtime/pi-executable-gate.ts';
 import type { PlanModeRegistry } from '../../plan-mode';
-import type { WithPermissionGate } from '../permission-gate.ts';
 import {
 	listAgentSessionEventsRequestSchema,
 	listAgentSessionsRequestSchema,
@@ -92,7 +91,6 @@ export function registerAgentSessionHandlers({
 	piExecutableService,
 	planModeRegistry,
 	provisionalNamingQueue,
-	withPermissionGate,
 }: {
 	/**
 	 * Mirror of the renderer's per-chat AFK toggle, written here for the reason
@@ -133,7 +131,6 @@ export function registerAgentSessionHandlers({
 	 * beat it by seconds.
 	 */
 	provisionalNamingQueue: QueueProvisionalNamingPort;
-	withPermissionGate: WithPermissionGate;
 }): void {
 	ipcMain.handle(
 		IPC_CHANNELS.openAgentSession,
@@ -332,9 +329,8 @@ export function registerAgentSessionHandlers({
 		},
 	);
 
-	withPermissionGate(
+	ipcMain.handle(
 		IPC_CHANNELS.writeForkSummary,
-		'workspace-write',
 		(_event, raw: unknown): Promise<WriteForkSummaryResult> => {
 			const request = writeForkSummaryRequestSchema.parse(raw);
 			return agentSessionService.writeForkSummary(request);

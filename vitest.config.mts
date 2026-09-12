@@ -237,6 +237,7 @@ export default defineConfig({
 						'tests/main/plan-mode-control-gate.test.ts',
 						'tests/main/plan-mode-spawn-inheritance.test.ts',
 						'tests/main/plan-mode-op-policy.test.ts',
+						'tests/main/plan-mode-claude-hook.test.ts',
 						'tests/main/agent-control-env-role.test.ts',
 						'tests/main/agent-model-catalog.test.ts',
 						'tests/main/agent-model-tier.test.ts',

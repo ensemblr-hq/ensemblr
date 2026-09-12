@@ -41,6 +41,7 @@ import {
 	type ClaudePlanSubmittedEvent,
 	detectPlanSubmission,
 } from './claude-plan-mode.ts';
+import { withPlanModeHooks } from './claude-plan-mode-guard.ts';
 import { resolveDisallowedTools } from './claude-subagent-mode.ts';
 import {
 	CLAUDE_THINKING_CONFIG,
@@ -219,6 +220,11 @@ function createClaudeSession({
 	// Null means "the SDK moved the permission mode behind our back", which makes
 	// the next turn re-assert whichever way the toggle is pointing.
 	let appliedPlanMode: boolean | null = input.request.planMode === true;
+	// The toggle itself, which `appliedPlanMode` is not: that one is reset to null
+	// the moment a plan is submitted, and the submitting turn is precisely when
+	// the `PreToolUse` guard still has to answer "yes, planning". Read at
+	// tool-call time so a toggle moved mid-turn reaches the running turn.
+	let planning = input.request.planMode === true;
 	// Read by the AFK PreToolUse hook at tool-call time rather than captured into
 	// the SDK options, so the composer's chip reaches a session already running.
 	let unattended = input.request.afkMode === true;
@@ -363,6 +369,31 @@ function createClaudeSession({
 	};
 
 	/**
+	 * Puts the live session back on the permission mode this turn should be
+	 * running at, after Claude's own `ExitPlanMode` moved it.
+	 *
+	 * The CLI leaves plan mode as it runs that tool and tells nobody, so without
+	 * this the remainder of the turn runs at the workspace mode's own level —
+	 * `bypassPermissions` on a trusted workspace — while the registry, the
+	 * composer lock and the toggle all still say "planning". Fire-and-forget with
+	 * its failure logged rather than awaited: the caller is the synchronous event
+	 * pump, and the `PreToolUse` guard holds the same window even if this call
+	 * loses a race with the model's next tool use.
+	 */
+	const reassertPermissionMode = (): void => {
+		const { permissionMode: resolved } = resolvePermissionSettings({
+			mode: permissionMode,
+			planMode: planning,
+		});
+		activeQuery?.setPermissionMode(resolved).catch((cause: unknown) => {
+			console.warn('[claude-agent] could not re-assert the permission mode.', {
+				cause: cause instanceof Error ? cause.message : String(cause),
+				sessionId: agentSessionId,
+			});
+		});
+	};
+
+	/**
 	 * Emits one normalized event and reports it as a plan submission when it is
 	 * one, so plan mode sees the exit through the same stream as the timeline.
 	 *
@@ -387,6 +418,7 @@ function createClaudeSession({
 		// Refine has to restore `plan`, and Approve has to restore the baseline
 		// rather than accept whatever the SDK picked.
 		appliedPlanMode = null;
+		reassertPermissionMode();
 		onPlanSubmitted?.({ agentSessionId, controlToken, submission });
 	};
 
@@ -479,6 +511,7 @@ function createClaudeSession({
 				canUseTool: approval?.canUseTool,
 				conciergeHome,
 				input,
+				isPlanning: () => planning,
 				isUnattended: () => unattended,
 				onStderr: (chunk) => {
 					stderr = `${stderr}${chunk}`.slice(-STDERR_RING_BYTES);
@@ -609,6 +642,7 @@ function createClaudeSession({
 			appliedThinking = request.thinkingLevel?.trim() || appliedThinking;
 			if (request.planMode !== undefined && !request.streamingBehavior) {
 				appliedPlanMode = request.planMode;
+				planning = request.planMode;
 			}
 			// Applied on a steer and a follow-up too, unlike the plan mode above:
 			// that one feeds the SDK's permission mode, which cannot move mid-turn,
@@ -726,6 +760,7 @@ function buildQueryOptions({
 	canUseTool,
 	conciergeHome,
 	input,
+	isPlanning,
 	isUnattended,
 	onStderr,
 	pluginDirectories,
@@ -734,6 +769,8 @@ function buildQueryOptions({
 	canUseTool?: ClaudeCanUseTool;
 	conciergeHome: string | null;
 	input: AgentAdapterCreateSessionInput;
+	/** Reads the session's live Plan Mode flag, for the hook that refuses writes. */
+	isPlanning: () => boolean;
 	/** Reads the session's live AFK flag, for the hook that withholds `AskUserQuestion`. */
 	isUnattended: () => boolean;
 	onStderr: (chunk: string) => void;
@@ -755,6 +792,7 @@ function buildQueryOptions({
 	const mcpServers = buildClaudeMcpServers(request.controlMcp);
 	const disallowedTools = resolveDisallowedTools({
 		delegation: request.delegation ?? 'ensemblr',
+		depth: request.lineageDepth ?? 0,
 		permissionDisallowedTools: permission.disallowedTools,
 	});
 
@@ -777,7 +815,13 @@ function buildQueryOptions({
 			concierge?.canUseTool ??
 			withAfkAutoApproval(buildCanUseTool({ canUseTool, mode }), isUnattended),
 		cwd: metadata.cwd,
-		hooks: withAfkHooks(concierge?.hooks, isUnattended),
+		// Both guards refuse and neither pre-approves, so they compose: a session
+		// can be planning, unattended and a Concierge at once, and a deny from any
+		// of the three stands.
+		hooks: withAfkHooks(
+			withPlanModeHooks(concierge?.hooks, isPlanning),
+			isUnattended,
+		),
 		env: stripLaunchContextEnv({ ...baseEnv, ...metadata.env }),
 		// Without this the SDK forwards only a subagent's tool_use/tool_result
 		// blocks, so a `Task` card would nest tool rows with none of the prose that

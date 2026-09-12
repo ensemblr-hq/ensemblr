@@ -149,16 +149,6 @@ export function classifyPermissionAction({
 		});
 	}
 
-	if (SENSITIVE_ACTIONS.has(action)) {
-		return createBoundary({
-			action,
-			boundary: 'confirmation-required',
-			mode,
-			reason:
-				'This action can affect files outside the current workspace, app state, Pi global configuration, or externally visible project state.',
-		});
-	}
-
 	if (mode === 'read-only') {
 		return createBoundary({
 			action,
@@ -166,6 +156,16 @@ export function classifyPermissionAction({
 			mode,
 			reason:
 				'Read-only mode restricts workspace write, shell, script, terminal, and tool execution where enforcement is available.',
+		});
+	}
+
+	if (SENSITIVE_ACTIONS.has(action)) {
+		return createBoundary({
+			action,
+			boundary: 'confirmation-required',
+			mode,
+			reason:
+				'This action can affect files outside the current workspace, app state, Pi global configuration, or externally visible project state.',
 		});
 	}
 

@@ -137,3 +137,60 @@ describe('unbalanced quotes', () => {
 		expect(lexCommand("rg 'foo src").violation).toContain('unbalanced');
 	});
 });
+
+describe('line continuations', () => {
+	// Bash deletes `\<newline>` outright. Pushing the newline in as a token landed
+	// a phantom argument between the head word and its own arguments, and every
+	// multi-line command an agent wrote came back falsely denied.
+	it('deletes a continuation rather than tokenizing the newline', () => {
+		expect(segmentsOf('git \\\nstatus')).toEqual([['git', 'status']]);
+		expect(segmentsOf('cat \\\nfoo')).toEqual([['cat', 'foo']]);
+		expect(segmentsOf('rg \\\n  --files \\\n  src')).toEqual([
+			['rg', '--files', 'src'],
+		]);
+	});
+
+	it('joins a word split across a continuation, as bash does', () => {
+		expect(segmentsOf('l\\\ns -la')).toEqual([['ls', '-la']]);
+		expect(segmentsOf('git sta\\\ntus')).toEqual([['git', 'status']]);
+	});
+
+	it('deletes a continuation inside double quotes too', () => {
+		expect(segmentsOf('grep "foo\\\nbar" src')).toEqual([
+			['grep', 'foobar', 'src'],
+		]);
+	});
+
+	it('still escapes every other character', () => {
+		expect(segmentsOf('ls /tmp/my\\ dir')).toEqual([['ls', '/tmp/my dir']]);
+		expect(segmentsOf('grep "a\\"b" src')).toEqual([['grep', 'a"b', 'src']]);
+	});
+
+	it('reads a real newline as the separator it is', () => {
+		expect(segmentsOf('ls\ncat foo')).toEqual([['ls'], ['cat', 'foo']]);
+	});
+});
+
+describe('word boundaries are bash s blanks, not JavaScript s whitespace', () => {
+	// Bash's blanks are space and tab alone. JavaScript's `\s` also matches each
+	// of these, so the lexer used to split words bash keeps whole — a view of the
+	// command that was provably not the shell's, which any rule reasoning from
+	// token positions inherits.
+	it.each([
+		['\u00A0', 'no-break space'],
+		['\u000B', 'vertical tab'],
+		['\u000C', 'form feed'],
+		['\u2028', 'line separator'],
+		['\u2003', 'em space'],
+		['\r', 'carriage return'],
+	])('keeps a word whole across %j (%s)', (blank) => {
+		expect(segmentsOf(`cat a${blank}rm b`)).toEqual([
+			['cat', `a${blank}rm`, 'b'],
+		]);
+	});
+
+	it('still splits on a space and a tab', () => {
+		expect(segmentsOf('cat\ta\tb')).toEqual([['cat', 'a', 'b']]);
+		expect(segmentsOf('cat  a   b')).toEqual([['cat', 'a', 'b']]);
+	});
+});

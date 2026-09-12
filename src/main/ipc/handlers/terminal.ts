@@ -18,6 +18,7 @@ import type {
 } from '../../../shared/ipc/contracts/terminal';
 import type { TerminalService } from '../../terminal';
 import { TerminalServiceError } from '../../terminal/terminal-service';
+import { sanitizeCreateTerminalSessionRequest } from '../request-schemas/terminal.ts';
 
 /**
  * Registers the IPC handlers for PTY-backed terminal sessions: create, input,
@@ -33,9 +34,11 @@ export function registerTerminalHandlers({
 		IPC_CHANNELS.createTerminalSession,
 		(
 			_event,
-			request: CreateTerminalSessionRequest,
-		): Promise<CreateTerminalSessionResult> =>
-			terminalService.create({
+			rawRequest: CreateTerminalSessionRequest,
+		): Promise<CreateTerminalSessionResult> => {
+			const request = sanitizeCreateTerminalSessionRequest(rawRequest);
+
+			return terminalService.create({
 				cols: request.cols,
 				command: request.command,
 				kind: request.kind,
@@ -44,7 +47,8 @@ export function registerTerminalHandlers({
 				seedOutput: request.seedOutput,
 				title: request.title,
 				workspaceId: request.workspaceId,
-			}),
+			});
+		},
 	);
 
 	ipcMain.handle(

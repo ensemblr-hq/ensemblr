@@ -297,11 +297,46 @@ const GIT_OUTPUT_FILE_GUARD: FlagGuard = {
 };
 
 /**
+ * The guard for `sort --compress-program=PROG`, which names a program `sort`
+ * **execs** whenever it spills a run to a temporary file. It is a full
+ * arbitrary-code escape from the allowlist — `sort -S 1 --compress-program=x f`
+ * runs `x` — and it is GNU coreutils' flag adopted by the BSD/Apple `sort`, so
+ * both target platforms carry it. Separate from
+ * {@link SORT_OUTPUT_FILE_GUARD} because the two do different things and the
+ * denial names which one fired. No short spelling exists, so the cluster scan is
+ * untouched and `sort -S`, `sort -T/tmp/x` and `sort -no` keep working.
+ */
+const SORT_COMPRESS_PROGRAM_GUARD: FlagGuard = {
+	flags: new Set(['--compress-program']),
+	label: 'runs a program to compress its temporary files',
+};
+
+/**
+ * The guard for `file -C`, which compiles the named magic source and writes
+ * `<magicfile>.mgc` beside it — a file created where the agent chooses while
+ * writes are blocked. `file -m <magicfile>` on its own only reads.
+ *
+ * `valueLetters` holds `e`, `F`, `m` and `M`, each **measured** against the
+ * installed `file` (every one answers `option requires an argument` bare), so
+ * `file -mC` is the magic file named `C` rather than the compile flag. `-C`
+ * itself takes no argument, which the same probe confirmed.
+ */
+const FILE_COMPILE_GUARD: FlagGuard = {
+	flags: new Set(['--compile', '-C']),
+	label: 'compiles a magic file and writes it to disk',
+	valueLetters: new Set(['F', 'M', 'e', 'm']),
+};
+
+/**
  * Allowlisted commands that a single flag turns into a writer or a command
  * runner, screened before the allowlist clears them. `fd -x`/`rg --pre` execute
  * arbitrary programs and `date -s` sets the clock, yet the plain read forms
  * (`fd -tf`, `rg -o`, `date +%s`) still pass. `--pre-glob` is deliberately not
  * caught: it only filters which files `--pre` runs on and executes nothing.
+ *
+ * Each command maps to a *list* of guards rather than one, because a command can
+ * carry two unrelated escapes and a single `label` could only name one of them:
+ * `sort` both writes a file (`-o`) and runs a program (`--compress-program`).
  *
  * `fd -t`/`-e` and `date -I`/`-d`/`-f`/`-r`/`-v` are the value-taking letters
  * whose own values collide with a guarded one — `fd -tx` is `--type executable`,
@@ -311,34 +346,49 @@ const GIT_OUTPUT_FILE_GUARD: FlagGuard = {
  * written against macOS alone would deny it on the platform where it works.
  * Each was confirmed to consume its value rather than fall through to `-s`.
  * `rg` needs none, its guards being long-only.
+ *
+ * The whole of {@link READ_ONLY_COMMANDS} was swept for this shape — an
+ * allowlisted command carrying a flag whose *value* is a program or an output
+ * path — against both the BSD binaries this machine ships and GNU coreutils.
+ * `sort --compress-program` and `file -C` were what that sweep turned up;
+ * `tests/shared/plan-mode-bash-guard.test.ts` pins the result so the next one
+ * fails a test rather than reaching a report.
  */
-const FLAG_GUARDED_COMMANDS: ReadonlyMap<string, FlagGuard> = new Map([
-	[
-		'fd',
-		{
-			flags: new Set(['--exec', '--exec-batch', '-X', '-x']),
-			label: 'runs a command for every match',
-			valueLetters: new Set(['e', 't']),
-		},
-	],
-	[
-		'rg',
-		{
-			flags: new Set(['--hostname-bin', '--pre']),
-			label: 'runs a program for every file',
-		},
-	],
-	[
-		'date',
-		{
-			flags: new Set(['--set', '-s']),
-			label: 'sets the system clock',
-			valueLetters: new Set(['I', 'd', 'f', 'r', 'v']),
-		},
-	],
-	['sort', SORT_OUTPUT_FILE_GUARD],
-	['tree', TREE_OUTPUT_FILE_GUARD],
-]);
+const FLAG_GUARDED_COMMANDS: ReadonlyMap<string, readonly FlagGuard[]> =
+	new Map([
+		[
+			'fd',
+			[
+				{
+					flags: new Set(['--exec', '--exec-batch', '-X', '-x']),
+					label: 'runs a command for every match',
+					valueLetters: new Set(['e', 't']),
+				},
+			],
+		],
+		['file', [FILE_COMPILE_GUARD]],
+		[
+			'rg',
+			[
+				{
+					flags: new Set(['--hostname-bin', '--pre']),
+					label: 'runs a program for every file',
+				},
+			],
+		],
+		[
+			'date',
+			[
+				{
+					flags: new Set(['--set', '-s']),
+					label: 'sets the system clock',
+					valueLetters: new Set(['I', 'd', 'f', 'r', 'v']),
+				},
+			],
+		],
+		['sort', [SORT_OUTPUT_FILE_GUARD, SORT_COMPRESS_PROGRAM_GUARD]],
+		['tree', [TREE_OUTPUT_FILE_GUARD]],
+	]);
 
 /**
  * Extra flag guards for individual read-only `git` subcommands, screened
@@ -728,7 +778,9 @@ function evaluateGh(args: readonly string[]): BashGuardVerdict {
 
 /**
  * Denies an allowlisted command that a flag turned into a writer or a command
- * runner (`fd -x`, `rg --pre`, `date -s`, `sort -o`).
+ * runner (`fd -x`, `rg --pre`, `date -s`, `sort -o`, `sort --compress-program`,
+ * `file -C`). Every guard the command carries is tried, so the denial names the
+ * flag that actually fired rather than the first one declared.
  * @param head - The classified command.
  * @param args - Tokens after the head word.
  * @returns A denial when a guarded flag is present; null when the command is not
@@ -738,12 +790,13 @@ function evaluateFlagGuard(
 	head: string,
 	args: readonly string[],
 ): BashGuardVerdict | null {
-	const guard = FLAG_GUARDED_COMMANDS.get(head);
-	if (guard === undefined) {
-		return null;
+	for (const guard of FLAG_GUARDED_COMMANDS.get(head) ?? []) {
+		const flag = findGuardedFlag(args, guard);
+		if (flag !== null) {
+			return deny(`\`${head} ${flag}\` ${guard.label}`);
+		}
 	}
-	const flag = findGuardedFlag(args, guard);
-	return flag === null ? null : deny(`\`${head} ${flag}\` ${guard.label}`);
+	return null;
 }
 
 /**

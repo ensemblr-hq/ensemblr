@@ -1,18 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import {
-	closeSync,
 	existsSync,
-	fstatSync,
-	lstatSync,
 	mkdirSync,
 	mkdtempSync,
-	openSync,
-	readSync,
 	realpathSync,
-	renameSync,
 	rmSync,
-	type Stats,
 	unlinkSync,
 	writeFileSync,
 } from 'node:fs';
@@ -22,18 +15,23 @@ import path from 'node:path';
 import { load } from 'js-toml';
 
 import type { SettingsPublicationFailureCode } from '../../shared/ipc/contracts/settings-publication.ts';
+import { writeFileAtomicExclusive } from '../safe-fs/index.ts';
 import { isPlainRecord } from './json-utils.ts';
 import {
 	ENSEMBLR_DIRECTORY,
 	ENSEMBLR_SETTINGS_FILENAME,
 } from './repository-config.ts';
+import {
+	MAX_SETTINGS_BYTES,
+	readBoundedSettingsFile,
+	settingsPathRefusal,
+} from './settings-file-access.ts';
 import type {
 	CapturedSettingsFile,
 	SettingsGitFingerprint,
 } from './settings-publication-recovery.ts';
 import type { WorkspaceSettingsTarget } from './workspace-settings-target.ts';
 
-const MAX_SETTINGS_BYTES = 1024 * 1024;
 const GIT_TIMEOUT_MS = 5_000;
 const SETTINGS_RELATIVE_PATH = `${ENSEMBLR_DIRECTORY}/${ENSEMBLR_SETTINGS_FILENAME}`;
 const UNSAFE_PATH_MESSAGE =
@@ -316,14 +314,7 @@ export function writeCapturedSettings(
 	const directory = path.dirname(filePath);
 	mkdirSync(directory, { recursive: true, mode: 0o700 });
 	validateSettingsPath(repositoryPath);
-	const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
-	const descriptor = openSync(temporaryPath, 'wx', 0o600);
-	try {
-		writeFileSync(descriptor, bytes);
-	} finally {
-		closeSync(descriptor);
-	}
-	renameSync(temporaryPath, filePath);
+	writeFileAtomicExclusive(filePath, bytes);
 }
 
 /**
@@ -381,30 +372,23 @@ function ensureBounded(bytes: Buffer): void {
 }
 
 /**
- * Reads a settings file without ever allocating more than the publication
- * limit, so an oversized file on disk is refused rather than pulled into the
- * main process first. A file that grew past the size just measured is refused
- * on the same path, since the bytes read would be a truncated prefix.
+ * Reads a settings file through the shared size bound, raising the publication
+ * surface's own failure when the file is too large to admit.
  * @param filePath - Settings file to read.
  * @returns The file's bytes, always within the publication limit.
  */
 function readBoundedSettings(filePath: string): Buffer {
-	const descriptor = openSync(filePath, 'r');
-	try {
-		const size = fstatSync(descriptor).size;
-		if (size > MAX_SETTINGS_BYTES) {
-			throw settingsTooLarge();
-		}
-		const capacity = size + 1;
-		const buffer = Buffer.alloc(capacity);
-		const read = readSync(descriptor, buffer, 0, capacity, 0);
-		if (read >= capacity) {
-			throw settingsTooLarge();
-		}
-		return buffer.subarray(0, read);
-	} finally {
-		closeSync(descriptor);
+	const result = readBoundedSettingsFile(filePath);
+	if (!result.ok) {
+		throw result.reason === 'too-large'
+			? settingsTooLarge()
+			: new SettingsPublicationError(
+					'source-unreadable',
+					'Settings could not be read.',
+				);
 	}
+
+	return result.bytes;
 }
 
 /** Builds the shared oversized-settings failure. */
@@ -415,34 +399,14 @@ function settingsTooLarge(): SettingsPublicationError {
 	);
 }
 
-/** Rejects symlinked roots, config directories, and settings files. */
-function validateSettingsPath(repositoryPath: string): void {
-	const root = statEntry(repositoryPath);
-	if (!root?.isDirectory() || root.isSymbolicLink()) {
-		throw unsafeSettingsPath();
-	}
-	const configDirectory = statEntry(
-		path.join(repositoryPath, ENSEMBLR_DIRECTORY),
-	);
-	if (configDirectory?.isSymbolicLink()) {
-		throw unsafeSettingsPath();
-	}
-	const file = statEntry(settingsPath(repositoryPath));
-	if (file && (file.isSymbolicLink() || !file.isFile())) {
-		throw unsafeSettingsPath();
-	}
-}
-
 /**
- * Reads one entry's link-level stats, reporting an unreadable path as absent.
- * @param target - Path to inspect without following a final symlink.
- * @returns The entry's stats, or null when it cannot be read.
+ * Rejects symlinked roots, config directories, and settings files, raising the
+ * publication surface's own failure for the shared refusal.
+ * @param repositoryPath - Absolute repository root.
  */
-function statEntry(target: string): Stats | null {
-	try {
-		return lstatSync(target);
-	} catch {
-		return null;
+function validateSettingsPath(repositoryPath: string): void {
+	if (settingsPathRefusal(repositoryPath) !== null) {
+		throw unsafeSettingsPath();
 	}
 }
 

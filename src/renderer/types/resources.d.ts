@@ -2451,7 +2451,6 @@ export default interface Resources {
 				title: 'Secrets';
 			};
 			security: {
-				'committed-note': 'A committed <file>.ensemblr/settings.toml</file> value shared with the team still wins over this personal override — a repository can raise its own floor and you cannot lower it locally.';
 				description: 'How much an agent may do on its own in this repository. Applies to every workspace of the repo, and to the tools agents reach over the control server.';
 				'permission-mode': {
 					'approval-required': 'Approval required';
@@ -2462,6 +2461,7 @@ export default interface Resources {
 					'workspace-trusted': 'Workspace trusted';
 					'workspace-trusted-description': 'Agents act freely inside the workspace; anything outside it still asks.';
 				};
+				'scope-note': 'This repository’s mode is the one every gate enforces. Reset it and workspaces of this repo fall back to the app-wide default.';
 				title: 'Security';
 			};
 			'setup-script': {

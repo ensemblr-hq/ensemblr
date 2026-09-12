@@ -26,6 +26,7 @@ import type {
 	WriteWorkspaceImageAttachmentResult,
 } from '../../shared/ipc/contracts/workspace-files';
 import { bytesLookLikeText } from '../../shared/preview-media.ts';
+import { writeFileAtomicExclusive } from '../safe-fs/index.ts';
 import { resolveWorkspaceCwd } from './workspace-cwd.ts';
 import {
 	extensionForImageMimeType,
@@ -180,7 +181,7 @@ export async function writeContextActionPrompt(
 		if (!target.ok) {
 			return { error: { code: 'invalid-path', message: target.message } };
 		}
-		await writeFile(target.absolutePath, request.content, { flag: 'w' });
+		writeFileAtomicExclusive(target.absolutePath, request.content);
 		return { file: ignoredEntry(target.relativePath, 'file') };
 	} catch (cause) {
 		return {

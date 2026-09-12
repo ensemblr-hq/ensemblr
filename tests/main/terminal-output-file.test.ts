@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test, { type TestContext } from 'node:test';
-
+import { sanitizeCreateTerminalSessionRequest } from '../../src/main/ipc/request-schemas/terminal.ts';
 import {
 	deleteTerminalOutput,
 	readTerminalOutput,
@@ -115,5 +115,38 @@ test('writeArchivedTerminalOutput refuses an id that would escape the archive', 
 	assert.equal(
 		existsSync(path.join(path.dirname(contextDirectory), 'escape.log')),
 		false,
+	);
+});
+
+test('writeTerminalOutput ignores a session id that is not a single filename', (t) => {
+	const worktreePath = createWorktree(t);
+
+	writeTerminalOutput(worktreePath, '../escaped', OUTPUT);
+
+	assert.equal(
+		existsSync(path.join(path.dirname(worktreePath), 'escaped.log')),
+		false,
+	);
+});
+
+test('sanitizeCreateTerminalSessionRequest drops a traversal restoredFromId', () => {
+	const sanitized = sanitizeCreateTerminalSessionRequest({
+		restoredFromId: '../../../etc/passwd',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(sanitized.restoredFromId, undefined);
+	assert.equal(sanitized.workspaceId, 'ws-1');
+});
+
+test('sanitizeCreateTerminalSessionRequest keeps a plain session id', () => {
+	const sanitized = sanitizeCreateTerminalSessionRequest({
+		restoredFromId: 'c6f6b0e2-0e5f-4f0a-9f3b-8c0a1f4f2a11',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(
+		sanitized.restoredFromId,
+		'c6f6b0e2-0e5f-4f0a-9f3b-8c0a1f4f2a11',
 	);
 });

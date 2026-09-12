@@ -26,14 +26,39 @@ const NULL_SINK = '/dev/null';
  * Characters a backslash escapes inside double quotes. Bash keeps the backslash
  * literal before anything else, so `"\w+"` stays `\w+` and a pattern argument
  * survives lexing unchanged.
+ *
+ * A newline is not here: bash removes `\<newline>` outright rather than
+ * unescaping it to a newline, inside double quotes as well as outside. See
+ * {@link LINE_CONTINUATION_LENGTH}.
  */
 const DOUBLE_QUOTE_ESCAPABLE: ReadonlySet<string> = new Set([
 	'"',
 	'$',
 	'\\',
 	'`',
-	'\n',
 ]);
+
+/**
+ * Width of a `\<newline>` line continuation, which the walk skips whole.
+ *
+ * Bash deletes both characters before it words the line, so a continuation
+ * contributes nothing at all — not even a boundary. Pushing the newline in as a
+ * token instead landed a phantom argument between a head word and its own
+ * arguments, and `git \`⏎`status` came back denied as "`git \n status` is not a
+ * read-only git subcommand".
+ */
+const LINE_CONTINUATION_LENGTH = 2;
+
+/**
+ * Bash's own blanks, which are space and tab alone.
+ *
+ * Narrower than JavaScript's `\s`, which additionally matches `\r`, `\v`, `\f`,
+ * U+00A0 and the Unicode space separators: bash passes every one of those to the
+ * command as part of a word, so splitting on them gave the classifier a view of
+ * the command that was provably not the shell's. The `\n` that really does
+ * separate is a member of {@link SEPARATORS} and is tested before this.
+ */
+const BLANK = /[ \t]/;
 
 const REDIRECTION_VIOLATION = 'output redirection `>` can write files';
 
@@ -54,7 +79,7 @@ type Scan = { next: number; text: string } | { violation: string };
 function isWordBoundary(char: string | undefined): boolean {
 	return (
 		char === undefined ||
-		/\s/.test(char) ||
+		BLANK.test(char) ||
 		SEPARATORS.has(char) ||
 		char === '>' ||
 		char === '<' ||
@@ -127,6 +152,10 @@ function scanDoubleQuoted(command: string, index: number): Scan {
 			return { violation: expansion };
 		}
 		const escaped = command[cursor + 1];
+		if (char === '\\' && escaped === '\n') {
+			cursor += LINE_CONTINUATION_LENGTH;
+			continue;
+		}
 		if (
 			char === '\\' &&
 			escaped !== undefined &&
@@ -152,7 +181,7 @@ function scanDoubleQuoted(command: string, index: number): Scan {
  */
 function skipRedirectionBlanks(command: string, index: number): number {
 	let cursor = index;
-	while (cursor < command.length && /[ \t]/.test(command[cursor] as string)) {
+	while (cursor < command.length && BLANK.test(command[cursor] as string)) {
 		cursor += 1;
 	}
 	return cursor;
@@ -322,8 +351,11 @@ function step(command: string, index: number, sink: TokenSink): Step {
 		return stepQuoted(command, index, sink);
 	}
 	if (char === '\\') {
+		if (command[index + 1] === '\n') {
+			return { next: index + LINE_CONTINUATION_LENGTH };
+		}
 		sink.push(command[index + 1] ?? '');
-		return { next: index + 2 };
+		return { next: index + LINE_CONTINUATION_LENGTH };
 	}
 	if (char === '<') {
 		return stepInput(command, index, sink);
@@ -335,7 +367,7 @@ function step(command: string, index: number, sink: TokenSink): Step {
 		sink.endSegment();
 		return { next: index + 1 };
 	}
-	if (/\s/.test(char)) {
+	if (BLANK.test(char)) {
 		sink.endToken();
 		return { next: index + 1 };
 	}

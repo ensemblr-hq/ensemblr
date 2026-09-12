@@ -21,6 +21,14 @@ const NATIVE_SUBAGENT_TOOLS = ['Agent', 'Task'] as const;
  * through visible chat tabs. A descendant is denied regardless of mechanism,
  * because its one remaining edge must stay on authoritative Ensemblr lineage.
  * Under `native`, only a root receives the SDK's native delegation tool.
+ *
+ * `depth` is the second reading of that lineage rather than the only one:
+ * `resolveDelegation` already pins `ensemblr` on any session whose persisted
+ * lineage has a parent, so a descendant is denied by mechanism before it is
+ * denied by depth. It is carried anyway because the two readings come from
+ * different sources and the claim above is about lineage, not about a setting.
+ * The adapter passes `AgentSessionRequest.lineageDepth`; a caller that supplies
+ * none is asserting a root.
  * @param input - The permission deny list, mechanism, and validated depth.
  * @returns The deny list to pass to the SDK, or undefined when nothing is denied.
  */

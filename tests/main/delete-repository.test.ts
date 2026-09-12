@@ -17,6 +17,10 @@ import { createLocalCommandService } from '../../src/main/commands/local-command
 import { createWorkspaceService } from '../../src/main/repository/create-workspace.ts';
 import { createDeleteRepositoryService } from '../../src/main/repository/delete-repository.ts';
 import {
+	removeDirectoryTree,
+	removeManagedDirectory,
+} from '../../src/main/repository/remove-directory.ts';
+import {
 	type EnsemblrDatabaseConnection,
 	type EnsemblrDatabaseService,
 	openEnsemblrDatabase,
@@ -538,4 +542,68 @@ test('delete drops the repository-scoped Infisical link row', async (t) => {
 		.prepare('SELECT * FROM infisical_links WHERE scope = ? AND scope_id = ?')
 		.all('repository', harness.repositoryId);
 	assert.equal(remaining.length, 0);
+});
+
+test('removeDirectoryTree refuses a path too close to the filesystem root', async () => {
+	const outcome = await removeDirectoryTree('/Users');
+
+	assert.equal(outcome.removed, false);
+	assert.match(outcome.error ?? '', /too close to the filesystem root/);
+});
+
+test('removeDirectoryTree refuses a relative path', async () => {
+	const outcome = await removeDirectoryTree('relative/path');
+
+	assert.equal(outcome.removed, false);
+	assert.match(outcome.error ?? '', /not an absolute path/);
+});
+
+test('removeDirectoryTree refuses a symlink rather than unlinking it', async (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), 'ensemblr-remove-guard-'));
+	t.after(() => rmSync(root, { force: true, recursive: true }));
+	const realDirectory = path.join(root, 'real');
+	mkdirSync(realDirectory);
+	const link = path.join(root, 'link');
+	symlinkSync(realDirectory, link);
+
+	const outcome = await removeDirectoryTree(link);
+
+	assert.equal(outcome.removed, false);
+	assert.match(outcome.error ?? '', /symbolic link/);
+	assert.equal(existsSync(link), true);
+});
+
+test('removeManagedDirectory refuses a path outside the managed root', async (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), 'ensemblr-managed-root-'));
+	const outside = mkdtempSync(path.join(tmpdir(), 'ensemblr-outside-'));
+	t.after(() => {
+		rmSync(root, { force: true, recursive: true });
+		rmSync(outside, { force: true, recursive: true });
+	});
+
+	const outcome = await removeManagedDirectory({
+		candidatePath: outside,
+		expectedDepth: 1,
+		root,
+	});
+
+	assert.equal(outcome.removed, false);
+	assert.match(outcome.error ?? '', /resolves outside/);
+	assert.equal(existsSync(outside), true);
+});
+
+test('removeManagedDirectory removes a child at the expected depth', async (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), 'ensemblr-managed-root-'));
+	t.after(() => rmSync(root, { force: true, recursive: true }));
+	const child = path.join(root, 'repo-slug');
+	mkdirSync(child, { recursive: true });
+
+	const outcome = await removeManagedDirectory({
+		candidatePath: child,
+		expectedDepth: 1,
+		root,
+	});
+
+	assert.equal(outcome.removed, true);
+	assert.equal(existsSync(child), false);
 });

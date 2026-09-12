@@ -236,6 +236,11 @@ function createEnvironmentVariablesService(): EnvironmentVariablesService {
 		addEnvFile: () => {
 			throw new Error('addEnvFile is not used by setup diagnostics tests.');
 		},
+		rememberPickedEnvFile: () => {
+			throw new Error(
+				'rememberPickedEnvFile is not used by setup diagnostics tests.',
+			);
+		},
 		assembleEnvironment: async () => ({
 			diagnostics: [],
 			env: {},

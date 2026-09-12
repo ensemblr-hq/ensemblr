@@ -5,23 +5,18 @@
  * does not parse is left untouched rather than clobbered, and the replacement
  * is atomic so a crash mid-write cannot leave a half-written config behind.
  */
-import {
-	existsSync,
-	mkdirSync,
-	readFileSync,
-	renameSync,
-	writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { dump } from 'js-toml';
 
+import { writeFileAtomicExclusive } from '../safe-fs/index.ts';
 import { formatErrorMessage } from './json-utils.ts';
-import {
-	ENSEMBLR_DIRECTORY,
-	ENSEMBLR_SETTINGS_FILENAME,
-} from './repository-config.ts';
 import { readTomlFile } from './repository-config-loaders.ts';
+import {
+	assertSafeSettingsPath,
+	settingsFilePath,
+} from './settings-file-access.ts';
 
 /** Taplo's schema directive, which must be the first line of the document. */
 const SCHEMA_DIRECTIVE_PATTERN = /^#:schema[ \t]+\S+$/;
@@ -30,19 +25,6 @@ const SCHEMA_DIRECTIVE_PATTERN = /^#:schema[ \t]+\S+$/;
 export type WriteRepositorySettingsResult =
 	| { message: string; ok: false }
 	| { ok: true; path: string };
-
-/**
- * Resolves the committed settings path for a repository.
- * @param repositoryPath - Absolute path of the repository.
- * @returns Absolute path of its `.ensemblr/settings.toml`.
- */
-function repositorySettingsPath(repositoryPath: string): string {
-	return path.join(
-		repositoryPath,
-		ENSEMBLR_DIRECTORY,
-		ENSEMBLR_SETTINGS_FILENAME,
-	);
-}
 
 /**
  * Reports whether a repository has a committed settings file at all, without
@@ -54,7 +36,7 @@ function repositorySettingsPath(repositoryPath: string): string {
  * @returns True when `.ensemblr/settings.toml` exists.
  */
 export function hasRepositorySettingsFile(repositoryPath: string): boolean {
-	return existsSync(repositorySettingsPath(repositoryPath));
+	return existsSync(settingsFilePath(repositoryPath));
 }
 
 /**
@@ -66,7 +48,7 @@ export function readRepositorySettings(
 	repositoryPath: string,
 ): Record<string, unknown> | null {
 	const parsed = readTomlFile({
-		sourcePath: repositorySettingsPath(repositoryPath),
+		sourcePath: settingsFilePath(repositoryPath),
 	});
 
 	return parsed.status === 'loaded' ? parsed.record : null;
@@ -87,7 +69,7 @@ export function rewriteRepositorySettings({
 	repositoryPath: string;
 	rewrite: (record: Record<string, unknown>) => Record<string, unknown>;
 }): WriteRepositorySettingsResult {
-	const configPath = repositorySettingsPath(repositoryPath);
+	const configPath = settingsFilePath(repositoryPath);
 	const existing = readTomlFile({ sourcePath: configPath });
 
 	if (existing.status === 'invalid') {
@@ -143,6 +125,12 @@ function readSchemaDirective(configPath: string): string | null {
 /**
  * Serialises a config record and replaces the file atomically, so a crash
  * mid-write cannot leave a half-written config the loader would reject.
+ *
+ * The destination is inside the repository checkout, so a repository can commit
+ * a symlink at any level of it. Each level is refused before the write, and the
+ * staging file carries a random name opened exclusively — the fixed
+ * `settings.toml.tmp` this used to write was itself plantable, and following it
+ * left the repository permanently aliased to the link's target.
  * @param configPath - Absolute path of the config file.
  * @param record - The full config record to serialise.
  * @param schemaDirective - The `#:schema` line to restore above the document.
@@ -152,13 +140,14 @@ function writeTomlFile(
 	record: Record<string, unknown>,
 	schemaDirective: string | null,
 ): void {
-	const temporaryPath = `${configPath}.tmp`;
 	const document = dump(record);
 	const serialized = schemaDirective
 		? `${schemaDirective}\n\n${document}`
 		: document;
+	const repositoryPath = path.dirname(path.dirname(configPath));
 
-	mkdirSync(path.dirname(configPath), { recursive: true });
-	writeFileSync(temporaryPath, serialized, 'utf8');
-	renameSync(temporaryPath, configPath);
+	assertSafeSettingsPath(repositoryPath);
+	mkdirSync(path.dirname(configPath), { mode: 0o700, recursive: true });
+	assertSafeSettingsPath(repositoryPath);
+	writeFileAtomicExclusive(configPath, serialized);
 }

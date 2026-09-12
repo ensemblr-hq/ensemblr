@@ -159,11 +159,11 @@ interface AgentSessionServiceOptions {
 	/** Renders the per-turn upkeep block for runtimes whose system prompt is fixed at open. */
 	resolveTurnPreamble?: TurnPreambleResolver;
 	/**
-	 * Reads the workspace's permission mode at open time. Omitted, sessions open
-	 * under {@link DEFAULT_PERMISSION_MODE} — the same full-workspace control a
-	 * workspace with no explicit setting already grants.
+	 * Reads the permission mode the workspace's repository owns, at open time.
+	 * Omitted, sessions open under {@link DEFAULT_PERMISSION_MODE} — the same
+	 * full-workspace control a workspace with no explicit setting already grants.
 	 */
-	resolvePermissionMode?: () => PermissionMode;
+	resolvePermissionMode?: (workspaceId?: string) => PermissionMode;
 	/**
 	 * Resolves the binary a non-Pi runtime should launch, so a user's executable
 	 * override reaches the session rather than only the settings readout.

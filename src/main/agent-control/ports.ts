@@ -717,11 +717,13 @@ export interface LinearPort {
 export type LinearPortInput<T> = T & { workspaceId: string };
 
 /**
- * Resolves the active permission mode. The mode is a global app setting (the
- * same value the IPC permission gate reads), so it takes no workspace argument.
+ * Resolves the permission mode an op runs under. The mode is owned by the
+ * repository the workspace belongs to, with the app scope as the fallback, so
+ * the workspace has to be named for the repository's choice to be the one
+ * enforced. Naming none resolves at app scope.
  */
 export interface PermissionPort {
-	getMode: () => PermissionMode;
+	getMode: (workspaceId?: string) => PermissionMode;
 }
 
 /**
