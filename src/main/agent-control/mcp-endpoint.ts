@@ -719,6 +719,7 @@ async function instructionsFor(
 		playbook,
 		service.readLanguageDirective(),
 		await service.readIssueDirective(token),
+		service.readDelegationDirective(audience),
 		service.readCoAuthorDirective(),
 	].filter((block) => block !== null);
 	return blocks.join('\n\n');

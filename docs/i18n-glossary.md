@@ -100,6 +100,7 @@ Rules of thumb:
 | Board | Доска | Πίνακας εργασιών | The kanban dashboard. |
 | Setting | Настройка | Ρύθμιση | |
 | Model | Модель | Μοντέλο | |
+| Delegation | Делегирование | Ανάθεση | One agent handing a bounded unit of work to another. The bare noun, already fixed by the Models-settings copy; the compound below narrows it to crossing a runtime. Greek keeps `ανάθεση` rather than `εκχώρηση`, which reads as assigning a right rather than handing over work. |
 | Cross-runtime delegation | Делегирование между средами выполнения | Ανάθεση μεταξύ περιβαλλόντων εκτέλεσης | Explicitly opening a delegated Ensemblr chat on another native runtime. Keep the full `Среда выполнения`/`Περιβάλλον εκτέλεσης` term rather than borrowing `runtime`; the switch is about where instructions and context go, not about a model vendor. |
 | Sage *(model role)* | Советник | Σύμβουλος | Advisory role for reasoning, architecture, and difficult tradeoffs. Not an authority role and never a permission label. |
 | Coder *(model role)* | Инженер | Μηχανικός | Advisory role for novel or design-adjacent code where the implementation path is unresolved. Distinct from **Builder** by uncertainty, never by task size. |

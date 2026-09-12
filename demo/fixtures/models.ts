@@ -41,6 +41,7 @@ export const DEMO_MODEL_ROLE_SETTINGS = {
 	...DEFAULT_APP_SETTINGS.models,
 	allowCrossRuntimeDelegation: true,
 	defaultModel: 'claude-opus-5',
+	delegationInitiative: 'on-request' as const,
 	defaultThinkingLevel: 'medium',
 	reviewModel: 'openai/gpt-5.4',
 	reviewThinkingLevel: 'high',

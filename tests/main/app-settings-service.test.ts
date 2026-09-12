@@ -98,6 +98,7 @@ describe('createAppSettingsService', () => {
 		expect(onDisk.schemaVersion).toBe(1);
 		expect(onDisk.app.general.sendShortcut).toBe('enter');
 		expect(onDisk.app.models.hiddenModels).toEqual([]);
+		expect(onDisk.app.models.delegationInitiative).toBe('automatic');
 		expect(onDisk.app.experimental.autoRunAfterSetup).toBe(false);
 	});
 
@@ -110,6 +111,7 @@ describe('createAppSettingsService', () => {
 			general: { sendShortcut: 'mod+enter' },
 			models: {
 				allowCrossRuntimeDelegation: true,
+				delegationInitiative: 'on-request',
 				hiddenModels: ['lmstudio/x'],
 				roleAssignments: [
 					{
@@ -123,6 +125,7 @@ describe('createAppSettingsService', () => {
 		expect(next.general.sendShortcut).toBe('mod+enter');
 		expect(next.models.hiddenModels).toEqual(['lmstudio/x']);
 		expect(next.models.allowCrossRuntimeDelegation).toBe(true);
+		expect(next.models.delegationInitiative).toBe('on-request');
 		expect(next.models.roleAssignments).toEqual([
 			{
 				modelId: 'shared',
@@ -144,6 +147,9 @@ describe('createAppSettingsService', () => {
 				runtime: 'claude',
 			},
 		]);
+		expect(readJson(configPath).app.models.delegationInitiative).toBe(
+			'on-request',
+		);
 		expect(readJson(configPath).app.experimental.autoRunAfterSetup).toBe(true);
 	});
 

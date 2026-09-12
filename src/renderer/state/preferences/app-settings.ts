@@ -152,6 +152,17 @@ export const allowCrossRuntimeDelegationAtom = settingAtom(
 	'allowCrossRuntimeDelegation',
 	modelOrchestrationWriteErrorAtom,
 );
+/**
+ * Whether an orchestrator may decide to delegate on its own, or holds the work
+ * in the conversation until the user asks for a hand-off. Steers the prose an
+ * agent receives rather than its tool list, and never applies to an unattended
+ * turn or to the Concierge.
+ */
+export const delegationInitiativeAtom = settingAtom(
+	'models',
+	'delegationInitiative',
+	modelOrchestrationWriteErrorAtom,
+);
 /** Advisory strengths saved for runtime-and-model pairs, including unavailable models. */
 export const modelRoleAssignmentsAtom = settingAtom(
 	'models',

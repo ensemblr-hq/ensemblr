@@ -61,6 +61,15 @@ export {
 } from './agent-control/context-pressure.ts';
 export * from './agent-control/contracts.ts';
 export { buildConversationTranscript } from './agent-control/conversation-transcript.ts';
+export type { DelegationInitiative } from './agent-control/delegation-initiative.ts';
+export {
+	DELEGATION_INITIATIVES,
+	isDelegationInitiative,
+} from './agent-control/delegation-initiative.ts';
+export {
+	buildDelegationInitiativeDirective,
+	DELEGATION_ON_REQUEST_HEADER,
+} from './agent-control/delegation-initiative-directive.ts';
 export { buildLanguageDirective } from './agent-control/language-directive.ts';
 export type { AgentSessionLineage } from './agent-control/lineage.ts';
 export {

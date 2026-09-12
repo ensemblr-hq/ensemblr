@@ -25,6 +25,7 @@ import type {
 	ControlAudience,
 	ConversationRef,
 	CreateWorkspaceArgs,
+	DelegationInitiative,
 	ExitPlanModeArgs,
 	FocusDockTabArgs,
 	FocusPanelArgs,
@@ -85,6 +86,7 @@ import {
 	buildAfkWorkflowDirective,
 	buildCoAuthorDirective,
 	buildConciergeMessage,
+	buildDelegationInitiativeDirective,
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
 	buildPeerBriefDirective,
@@ -216,6 +218,15 @@ export interface AgentControlService {
 	 */
 	readCoAuthorDirective: () => string | null;
 	/**
+	 * Renders the delegate-when-asked directive for one caller, for the same
+	 * inject-once surfaces {@link readLanguageDirective} serves. Takes the
+	 * audience rather than a session id because those surfaces are built from the
+	 * tool-list request, which carries no turn of its own.
+	 * @param audience - Whether the caller has a chat tab, its role, and its pinned delegation mechanism.
+	 * @returns The directive to append, or null when it does not apply.
+	 */
+	readDelegationDirective: (audience: ControlAudience) => string | null;
+	/**
 	 * Renders the linked-issue directive for one caller, for the MCP server's
 	 * `instructions` field — the only per-workspace channel a caller whose whole
 	 * surface is MCP has. Takes a token rather than a session id because that is
@@ -274,6 +285,13 @@ interface AgentControlServiceOptions {
 	 * Defaults to off, so a build that never wires it keeps the feature absent.
 	 */
 	readTuiHarnessesEnabled?: () => boolean;
+	/**
+	 * Whether the user lets an orchestrator decide to delegate on its own, read
+	 * live because it is a setting they can flip while sessions are open.
+	 * Defaults to `automatic`, which is the shipped default and the behaviour
+	 * every playbook already describes.
+	 */
+	readDelegationInitiative?: () => DelegationInitiative;
 	/**
 	 * Overrides the service clock and sleep; defaults to the real scheduler. Its
 	 * `now` drives both the wait-loop deadline and the review-focus coalescing
@@ -808,6 +826,7 @@ export function createAgentControlService({
 	startedTerminals = createStartedTerminalRegistry(),
 	readArchitectureDiagramEnabled = () => false,
 	readTuiHarnessesEnabled = () => false,
+	readDelegationInitiative = () => 'automatic',
 	scheduler = REAL_SCHEDULER,
 	dispatchTimeoutMs = DISPATCH_TIMEOUT_MS,
 }: AgentControlServiceOptions): AgentControlService {
@@ -963,6 +982,38 @@ export function createAgentControlService({
 	 */
 	const readCoAuthorDirective = (): string | null =>
 		buildCoAuthorDirective(ports.commitCredit.isCoAuthorEnabled());
+
+	/**
+	 * This turn's delegate-when-asked block, read from the setting rather than
+	 * captured so a preference toggled mid-session reaches the next turn.
+	 * @param origin - Resolved caller identity, for its pinned delegation mechanism and AFK state.
+	 * @param role - The caller's control-layer role.
+	 * @returns The directive to append, or null when it does not apply.
+	 */
+	const delegationDirectiveFor = (
+		origin: AgentControlOrigin,
+		role: AgentControlRole,
+	): string | null =>
+		buildDelegationInitiativeDirective({
+			delegation: origin.delegation,
+			initiative: readDelegationInitiative(),
+			role,
+			unattended: isUnattended(origin),
+		});
+
+	/**
+	 * The delegate-when-asked block for an inject-once surface, which is built
+	 * from a tool-list request rather than a turn and so has no AFK state to read.
+	 * @param audience - Whether the caller has a chat tab, its role, and its pinned delegation mechanism.
+	 * @returns The directive to append, or null when it does not apply.
+	 */
+	const readDelegationDirective = (audience: ControlAudience): string | null =>
+		buildDelegationInitiativeDirective({
+			delegation: audience.delegation,
+			initiative: readDelegationInitiative(),
+			role: audience.role,
+			unattended: false,
+		});
 
 	/**
 	 * The caller's control-layer role. Validated durable depth is authoritative;
@@ -2270,6 +2321,7 @@ export function createAgentControlService({
 				role,
 				unattended: afkMode,
 			}),
+			delegationDirective: delegationDirectiveFor(origin, role),
 			issueDirective: issueDirectiveFor(origin, role),
 			languageDirective: readLanguageDirective(),
 			naming,
@@ -3762,6 +3814,7 @@ export function createAgentControlService({
 				role,
 				unattended: isUnattended(origin),
 			}),
+			delegationDirectiveFor(origin, role),
 			readLanguageDirective(),
 			issueDirectiveFor(origin, role),
 			readCoAuthorDirective(),
@@ -3801,6 +3854,7 @@ export function createAgentControlService({
 		describeAudience,
 		invoke,
 		readCoAuthorDirective,
+		readDelegationDirective,
 		readIssueDirective,
 		readLanguageDirective,
 		readTurnPreamble,

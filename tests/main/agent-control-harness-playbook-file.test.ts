@@ -16,9 +16,11 @@ import {
 } from '../../src/main/agent-control/index.ts';
 import {
 	buildCoAuthorDirective,
+	buildDelegationInitiativeDirective,
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
 	CO_AUTHOR_DIRECTIVE_HEADER,
+	DELEGATION_ON_REQUEST_HEADER,
 	harnessAwareness,
 	LINKED_ISSUE_DIRECTIVE_HEADER,
 	type WorkspaceLinkedIssue,
@@ -29,6 +31,14 @@ import type { AppLanguage } from '../../src/shared/i18n.ts';
 const HARNESS_AWARENESS = harnessAwareness({
 	architectureDiagram: true,
 	tuiHarnesses: true,
+});
+
+/** The delegate-when-asked block a harness gets: an attended Ensemblr-delegating root. */
+const DELEGATION_BLOCK = buildDelegationInitiativeDirective({
+	delegation: 'ensemblr',
+	initiative: 'on-request',
+	role: 'orchestrator',
+	unattended: false,
 });
 
 const WORKSPACE = 'ws-1';
@@ -192,6 +202,31 @@ describe('the harness playbook file', () => {
 		expect(playbook).toBe(
 			`${HARNESS_AWARENESS}\n\n${buildCoAuthorDirective(true)}\n`,
 		);
+	});
+
+	// A harness is a delegating root of its own, and this file is the only channel
+	// it reliably reads, so the setting reaching the chat tabs alone would leave
+	// the one surface the user cannot see it missing from.
+	it('holds delegation back while the user asks to be consulted', () => {
+		const { playbook } = launchWith({
+			readCoAuthorEnabled: () => false,
+			readDelegationInitiative: () => 'on-request',
+		});
+
+		expect(playbook).toBe(`${HARNESS_AWARENESS}\n\n${DELEGATION_BLOCK}\n`);
+		expect(playbook).toContain(DELEGATION_ON_REQUEST_HEADER);
+	});
+
+	it('leaves the block out while the judgement is the agent’s', () => {
+		expect(
+			launchWith({ readDelegationInitiative: () => 'automatic' }).playbook,
+		).not.toContain(DELEGATION_ON_REQUEST_HEADER);
+	});
+
+	// Proactive delegation ships on, so a caller that never wires the reader must
+	// fall back to it rather than to the restriction.
+	it('leaves the block out when no reader is wired', () => {
+		expect(launchWith({}).playbook).not.toContain(DELEGATION_ON_REQUEST_HEADER);
 	});
 
 	// A GitHub-linked workspace has no control op that could move its issue, so a

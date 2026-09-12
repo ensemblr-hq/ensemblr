@@ -29,7 +29,19 @@ describe('parseAppSettings', () => {
 		expect(parsed.models.defaultModel).toBe('anthropic/claude-opus-4-8');
 		expect(parsed.models.hiddenModels).toEqual([]); // default
 		expect(parsed.models.allowCrossRuntimeDelegation).toBe(false);
+		expect(parsed.models.delegationInitiative).toBe('automatic');
 		expect(parsed.models.roleAssignments).toEqual([]);
+	});
+
+	test('keeps a delegation initiative the user chose and defaults a bad one', () => {
+		expect(
+			parseAppSettings({ models: { delegationInitiative: 'on-request' } })
+				.models.delegationInitiative,
+		).toBe('on-request');
+		expect(
+			parseAppSettings({ models: { delegationInitiative: 'sometimes' } }).models
+				.delegationInitiative,
+		).toBe('automatic');
 	});
 
 	test('keeps independent runtime-and-model role assignments', () => {
@@ -254,6 +266,7 @@ describe('mergeAppSettings', () => {
 			general: { caffeinateWhileRunning: true },
 			models: {
 				allowCrossRuntimeDelegation: true,
+				delegationInitiative: 'on-request',
 				hiddenModels: ['x/y'],
 				roleAssignments,
 			},
@@ -262,6 +275,7 @@ describe('mergeAppSettings', () => {
 		expect(next.general.sendShortcut).toBe('enter'); // untouched
 		expect(next.models.hiddenModels).toEqual(['x/y']);
 		expect(next.models.allowCrossRuntimeDelegation).toBe(true);
+		expect(next.models.delegationInitiative).toBe('on-request');
 		expect(next.models.roleAssignments).toEqual(roleAssignments);
 		// original is not mutated
 		expect(DEFAULT_APP_SETTINGS.general.caffeinateWhileRunning).toBe(false);
