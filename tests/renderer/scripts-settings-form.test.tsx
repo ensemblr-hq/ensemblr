@@ -56,13 +56,17 @@ function createWrapper() {
 	};
 }
 
+const WORKSPACE_ID = 'workspace-1';
+
 function renderForm(
 	repoProject: Project = project,
 	seed: ScriptsForm = initial,
+	workspaceId: string | undefined = WORKSPACE_ID,
 ) {
-	return renderHook(() => useScriptsSettingsForm('repo-1', repoProject, seed), {
-		wrapper: createWrapper(),
-	});
+	return renderHook(
+		() => useScriptsSettingsForm('repo-1', repoProject, seed, workspaceId),
+		{ wrapper: createWrapper() },
+	);
 }
 
 describe('useScriptsSettingsForm', () => {
@@ -106,6 +110,7 @@ describe('useScriptsSettingsForm', () => {
 			runScripts: [],
 			runScriptMode: 'concurrent',
 			setup: 'bun install',
+			workspaceId: WORKSPACE_ID,
 		});
 	});
 
@@ -188,7 +193,28 @@ describe('useScriptsSettingsForm', () => {
 					'repo-1',
 					undefined as unknown as Project,
 					initial,
+					WORKSPACE_ID,
 				),
+			{ wrapper: createWrapper() },
+		);
+
+		act(() => {
+			result.current.updateForm({ setup: 'x' });
+		});
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(500);
+		});
+
+		expect(result.current.form.setup).toBe('x');
+		expect(updateRepositoryScriptsMock).not.toHaveBeenCalled();
+	});
+
+	test('keeps edits local and does not persist when no workspace is available', async () => {
+		vi.useFakeTimers();
+		// Call renderHook directly: passing `undefined` to renderForm's defaulted
+		// param would resolve to the default workspace id and defeat the guard.
+		const { result } = renderHook(
+			() => useScriptsSettingsForm('repo-1', project, initial, undefined),
 			{ wrapper: createWrapper() },
 		);
 

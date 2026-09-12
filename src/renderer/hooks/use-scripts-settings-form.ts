@@ -14,20 +14,23 @@ const SAVE_DEBOUNCE_MS = 500;
 
 /**
  * Owns the Scripts settings form: local edit state seeded once at mount,
- * debounced writes to the repository's committed `.ensemblr/settings.toml`
- * (ADR 0041), a flush on unmount so an in-flight edit is never dropped, and
- * error surfacing via a toast. When `project` is `undefined` (unknown repo)
- * edits stay local and are not persisted.
+ * debounced writes to a chosen live workspace's committed
+ * `.ensemblr/settings.toml`, a flush on unmount so an in-flight edit is never
+ * dropped, and error surfacing via a toast. When `project` or `workspaceId` is
+ * missing (unknown repo, or no live workspace to write to) edits stay local
+ * and are not persisted.
  *
  * @param repoId - Repository whose scripts are being edited.
  * @param project - Resolved repo project, or `undefined` for an unknown repo.
  * @param initial - Seed values captured from the resolved snapshot at mount.
+ * @param workspaceId - Live workspace whose branch receives the write, or `undefined` when the repo has none.
  * @returns The current form and a debounced field updater.
  */
 export function useScriptsSettingsForm(
 	repoId: string,
 	project: RepoProject,
 	initial: ScriptsForm,
+	workspaceId: string | undefined,
 ): { form: ScriptsForm; updateForm: (patch: Partial<ScriptsForm>) => void } {
 	const queryClient = useQueryClient();
 	const { t } = useTranslation();
@@ -36,7 +39,7 @@ export function useScriptsSettingsForm(
 	const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const persist = useCallback(async (): Promise<void> => {
-		if (!project) {
+		if (!project || !workspaceId) {
 			return;
 		}
 
@@ -49,6 +52,7 @@ export function useScriptsSettingsForm(
 				runScripts: next.runScripts,
 				runScriptMode: next.runMode,
 				setup: next.setup.trim() ? next.setup : null,
+				workspaceId,
 			});
 			if (!result.ok) {
 				toast.error(
@@ -70,7 +74,7 @@ export function useScriptsSettingsForm(
 				),
 			);
 		}
-	}, [project, queryClient, repoId, t]);
+	}, [project, queryClient, repoId, t, workspaceId]);
 
 	// Keep the latest persist closure reachable from the unmount-only cleanup.
 	const persistRef = useRef(persist);
@@ -97,7 +101,7 @@ export function useScriptsSettingsForm(
 			formRef.current = next;
 			setForm(next);
 
-			if (!project) {
+			if (!project || !workspaceId) {
 				return;
 			}
 
@@ -109,7 +113,7 @@ export function useScriptsSettingsForm(
 				void persist();
 			}, SAVE_DEBOUNCE_MS);
 		},
-		[persist, project],
+		[persist, project, workspaceId],
 	);
 
 	return { form, updateForm };

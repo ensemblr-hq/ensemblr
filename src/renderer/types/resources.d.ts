@@ -654,10 +654,12 @@ export default interface Resources {
 			'archived-context-restore-failed': 'The archived context could not be restored.';
 			'archived-contexts-directory-missing': 'The managed root has no archived-contexts directory. Configure the root directory first.';
 			auth: 'GitHub authentication failed. Sign in again, then retry.';
+			'base-branch-diverged': 'The local base and its remote have diverged. Choose which branch to create from.';
 			'base-branch-invalid': 'That base branch name is not valid.';
 			'base-branch-missing': 'The base branch was not preserved, so the worktree cannot be recreated.';
 			'base-branch-unresolvable': 'That base branch could not be resolved in this repository, even after fetching.';
 			'base-branch-unsynced': 'The base branch is out of sync with its remote.';
+			'base-refresh-failed': 'The remote base could not be refreshed. This workspace uses cached code and may not be current.';
 			'branch-adopted': 'This workspace took over an existing branch, which may already back a pull request, so the branch cannot be renamed here.';
 			'branch-already-checked-out': 'That branch is already checked out in another worktree.';
 			'branch-already-exists': 'That branch already exists.';
@@ -670,12 +672,14 @@ export default interface Resources {
 			'branch-unresolved': 'Could not determine which branch this workspace is on.';
 			'callback-failed': 'Ensemblr could not open the local port Linear sends you back to. Close other Ensemblr windows, then retry.';
 			'callback-timeout': 'Linear did not answer in time. Try signing in again.';
+			'cleanup-unsafe': 'The repository’s settings are staged or conflicted, so the old copy could not be safely removed.';
 			'command-failed': 'The command failed.';
 			'configured-base-invalid': 'The branch new workspaces fork from is not a usable branch name, so this workspace took the repository default as its base instead.';
 			'configured-base-unresolvable': 'The branch new workspaces fork from could not be resolved, so this workspace took the repository default as its base instead.';
 			'copy-failed': 'The files could not be copied.';
 			'database-error': 'The local database is unavailable, so the Linear account was not saved.';
 			'database-unavailable': 'The local database is unavailable, so nothing was changed.';
+			'destination-changed': 'The workspace’s settings changed since this was captured.';
 			'destination-exists': 'Something already exists at the destination. Remove it or pick another location.';
 			'destination-not-writable': 'Ensemblr cannot write to that location. Pick a writable one.';
 			'destination-path-relative': 'The destination path must be absolute.';
@@ -705,9 +709,11 @@ export default interface Resources {
 			'git-failed': 'The git command failed.';
 			'git-init-failed': 'The repository could not be initialized.';
 			'git-not-installed': 'git was not found in PATH. Install git, then retry.';
+			'git-unavailable': 'Git could not read the settings file.';
 			'git-worktree-failed': 'The worktree could not be created.';
 			'infisical-account-exists': 'That Client ID is already configured for this Infisical instance.';
 			'infisical-account-not-found': 'That Infisical account is no longer configured.';
+			'infisical-clear-workspace-required': 'The link is cleared on this machine, but its [infisical] block is still committed in .ensemblr/settings.toml. Open a workspace for this repository, then clear it again.';
 			'infisical-config-write-failed': 'The link works on this machine, but .ensemblr/settings.toml could not be updated, so nobody who clones this repository will inherit it.';
 			'infisical-invalid-credentials': 'Infisical rejected these credentials. Check the Client ID and Client Secret, then retry.';
 			'infisical-invalid-request': 'Infisical rejected the request. Check the instance URL and the selected project.';
@@ -719,12 +725,14 @@ export default interface Resources {
 			'infisical-secret-store-unavailable': 'The macOS Keychain is unavailable, so the Infisical client secret could not be read.';
 			'infisical-server-error': 'Infisical returned an unexpected error. Try again shortly.';
 			'infisical-unknown': 'The Infisical operation failed.';
+			'infisical-workspace-required': 'The link is saved on this machine, but .ensemblr/settings.toml is written on a live workspace’s branch. Open a workspace for this repository, then save again.';
 			'invalid-attachment': 'That attachment could not be read.';
 			'invalid-cwd': 'The workspace path must be an absolute directory.';
 			'invalid-image': 'That attachment is not a valid image.';
 			'invalid-path': 'That path must stay inside the workspace.';
 			'invalid-pattern': 'That pattern is not valid.';
 			'invalid-repository': 'That is not a usable repository.';
+			'invalid-request': 'That request was malformed.';
 			'invalid-worktree': 'The worktree does not belong to this repository.';
 			'issues-disabled': 'Issues are turned off for this repository on GitHub.';
 			'job-unknown': 'The clone job has expired or was never prepared. Start a new clone.';
@@ -740,6 +748,7 @@ export default interface Resources {
 			'managed-path-not-directory': 'A managed path exists but is not a directory.';
 			'managed-repositories-path-missing': 'The managed root has no repositories directory. Configure the root directory first.';
 			'merge-blocked': 'GitHub refused the merge for this pull request.';
+			'merge-failed': 'The settings merge could not be completed automatically.';
 			'mkdir-failed': 'The directory could not be created.';
 			'name-already-in-use': 'That name is already taken.';
 			'name-invalid': 'That name is not valid.';
@@ -761,18 +770,24 @@ export default interface Resources {
 			'owner-invalid': 'That GitHub owner is not a valid login.';
 			'parse-failed': 'The command output could not be parsed.';
 			'path-not-a-git-repository': 'That path is not a git repository.';
+			'path-unsafe': 'That settings path is not safe to use.';
 			'pattern-listing-failed': 'The files matching that pattern could not be listed.';
 			permission: 'Permission was denied for that location.';
 			'permission-denied': 'Permission was denied.';
+			'preview-not-found': 'That settings preview has expired. Preview it again.';
+			'preview-stale': 'The settings or Git state changed since this preview was prepared. Preview it again.';
 			'pruned-branch-missing': 'The branch this workspace was archived on no longer exists, so its files could not be restored.';
 			'pruned-snapshot-missing': 'The commit this workspace was archived at is no longer in the repository, so its files could not be restored.';
 			'pruned-snapshot-restore-failed': 'The branch was checked out, but the uncommitted changes saved when the workspace was archived could not be restored.';
+			'publication-unexpected': 'That settings operation failed unexpectedly. Check the workspace’s file before trying again.';
 			'publish-failed': 'The project was created locally, but publishing it to GitHub failed.';
 			'read-failed': 'That file could not be read.';
 			'reconcile-child-not-directory': 'An entry under the root is not a directory and was skipped.';
 			'reconcile-directory-read-failed': 'A directory under the root could not be read during the scan.';
 			'reconcile-path-stat-failed': 'A path under the root could not be inspected during the scan.';
 			'reconcile-workspace-repository-not-directory': "A workspace's repository folder is not a directory.";
+			'recovery-failed': 'That settings recovery could not be completed.';
+			'recovery-not-found': 'That settings recovery is no longer available.';
 			'refresh-failed': 'The Linear token expired and could not be refreshed. Reconnect the account.';
 			'register-failed': 'The repository could not be registered.';
 			'remote-already-registered': 'This repository is already registered with Ensemblr.';
@@ -809,9 +824,16 @@ export default interface Resources {
 			'root-unwritable': 'The root directory is not writable.';
 			'secret-store-error': 'The macOS Keychain is unavailable, so the Linear token could not be read.';
 			'shared-root-content': 'The root directory holds files Ensemblr does not manage.';
+			'source-changed': 'The repository’s settings changed after cleanup.';
+			'source-invalid': 'The repository’s settings are not valid TOML.';
+			'source-missing': 'The repository has no unpublished settings changes.';
 			'source-path-missing': 'A source path no longer exists, so it was skipped.';
+			'source-unreadable': 'The repository’s settings could not be read.';
 			'spawn-error': 'The process could not be started.';
 			'state-mismatch': 'The Linear sign-in reply did not match this attempt, so it was rejected.';
+			'target-invalid': 'The workspace’s settings are not valid TOML.';
+			'target-not-found': 'The selected workspace is unavailable or belongs to another repository.';
+			'target-unreadable': 'The workspace’s settings could not be read.';
 			'too-large': 'That file is too large.';
 			'tracked-skipped': 'That path is tracked by git, so it was skipped.';
 			'unarchive-aborted-by-hook': 'An unarchive hook stopped the operation.';
@@ -2278,6 +2300,8 @@ export default interface Resources {
 				'no-accounts-action': 'Open Integrations';
 				'no-accounts-description': 'Ensemblr reads secrets through a Machine Identity. Add one to link this repository to an Infisical project.';
 				'no-accounts-title': 'No Infisical account yet';
+				'no-workspace-description': 'The project half of this link is committed to .ensemblr/settings.toml on a live workspace’s branch. Open a workspace for this repository first.';
+				'no-workspace-title': 'No live workspace yet';
 				path: 'Secret path';
 				'path-description': 'Folder inside the environment to read. Use / for the root.';
 				project: 'Project';
@@ -2307,6 +2331,10 @@ export default interface Resources {
 				'unreachable-project': 'This repository points at project {{projectId}}, which none of your accounts can see. Add your Machine Identity to it in Infisical, or pick a different project.';
 				unsaved: 'Unsaved changes to this link.';
 				'unsaved-incomplete': 'Pick a project and an environment to save this link.';
+				'workspace-target': {
+					description: 'The project half of this link is committed on the chosen workspace’s branch, the same as any other change.';
+					label: 'Save to workspace';
+				};
 			};
 			misc: {
 				description: 'Repository paths, preview URLs, files-to-copy patterns, and lifecycle.';
@@ -2322,6 +2350,71 @@ export default interface Resources {
 				'name-placeholder': 'Name';
 				'template-aria-label': 'Preview URL template';
 			};
+			publication: {
+				applied: 'Published. The workspace’s branch now carries the settings, and the root clone still holds its own copy.';
+				apply: {
+					action: 'Publish to workspace';
+					description: 'Writes the merged file on the workspace’s branch. The root clone keeps its own copy until you remove it.';
+					label: 'Publish';
+					retry: 'Nothing was written. One of the two files changed while the preview was open, so it has been read again — check it and publish once more.';
+					'write-unverified': 'The workspace file was replaced, but the write could not be verified. Use the recovery snapshot below to put it back, then publish again.';
+				};
+				applying: 'Publishing…';
+				cleanup: {
+					action: 'Remove root copy';
+					armed: 'Remove it';
+					description: 'Restores the root clone’s file to its committed HEAD state. A recovery snapshot is kept either way, so this can be put back.';
+					done: 'The root clone’s file is back to its committed state.';
+					label: 'Remove the root copy';
+					'unsafe-hint': 'The root clone’s file is staged or conflicted. Settle it in git first — retrying will not clear this.';
+				};
+				conflict: {
+					description: 'Nothing has been changed and both files are still intact. Edit either the root clone’s file or the workspace’s file by hand to settle the difference, then check again.';
+					label: 'Publishing is unavailable';
+				};
+				description: 'Shared repository settings that were written into the root clone sit on no branch and in no diff. Publishing merges them into a live workspace’s committed .ensemblr/settings.toml, where they can be reviewed and committed like any other change.';
+				empty: 'The root clone holds no unpublished settings.';
+				'legacy-scripts': {
+					description: 'Retained script settings from an older Ensemblr version are folded into the merged file.';
+					label: 'Older script settings included';
+				};
+				loading: 'Reading the root clone…';
+				merged: {
+					'clean-description': 'This is what the workspace’s .ensemblr/settings.toml becomes.';
+					'conflict-description': 'Git could not merge the two copies, so the block below carries its conflict markers.';
+					label: 'Merged file';
+				};
+				'no-workspace': 'Settings are published onto a live workspace’s branch. Open a workspace for this repository first.';
+				recovery: {
+					'applied-at': 'Published {{when}}';
+					'cleaned-at': 'Root copy removed {{when}}';
+					description: 'Copies captured before each publication and before each root cleanup, so either side can be put back.';
+					label: 'Recovery snapshots';
+					loading: 'Reading recovery snapshots…';
+					'not-applied': 'Not published';
+					'not-cleaned': 'Root copy still present';
+					'restore-armed': 'Restore it';
+					'restore-destination': 'Restore workspace file';
+					'restore-source': 'Restore root file';
+					'unknown-workspace': 'Archived workspace';
+				};
+				source: {
+					description: 'The state of .ensemblr/settings.toml in the repository’s root clone, which is where these edits were stranded.';
+					label: 'Root clone';
+				};
+				'source-status': {
+					deleted: 'Deleted since the last commit';
+					missing: 'Not present';
+					modified: 'Edited since the last commit';
+					untracked: 'Never committed';
+				};
+				title: 'Settings file';
+				unexpected: 'Ensemblr could not complete the request. Nothing was changed — try again.';
+				'workspace-target': {
+					description: 'The merged file is written on this workspace’s branch, as an uncommitted change you can review and commit.';
+					label: 'Publish to workspace';
+				};
+			};
 			'root-path': {
 				description: 'Do not move or delete this directory. Instead, delete the repository in Ensemblr.';
 				label: 'Root path';
@@ -2336,9 +2429,13 @@ export default interface Resources {
 			};
 			scripts: {
 				description: 'Commands that run when workspaces are set up, run, or archived. Saved to the repository’s committed .ensemblr/settings.toml.';
-				diverges: 'The workspace you have open commits different scripts on its branch, and runs those. Merge this file to change what it runs.';
 				loading: 'Reading scripts…';
+				'no-workspace': 'Scripts are saved to a live workspace’s branch. Open a workspace for this repository first.';
 				title: 'Scripts';
+				'workspace-target': {
+					description: 'This file is saved on the chosen workspace’s branch, as an uncommitted change you can review and commit.';
+					label: 'Save to workspace';
+				};
 			};
 			secrets: {
 				description: 'Link this repository to an Infisical project so its secrets resolve into every workspace, terminal, and agent. Values are read at launch and never written into the repository.';
@@ -2363,6 +2460,9 @@ export default interface Resources {
 				label: 'Setup script';
 				placeholder: 'e.g. npm ci';
 			};
+			'workspace-target': {
+				placeholder: 'Choose a workspace';
+			};
 			'workspaces-path': {
 				description: 'Do not move or delete the workspace subdirectories. Instead, archive workspaces in Ensemblr.';
 				label: 'Workspaces path';
@@ -2375,6 +2475,7 @@ export default interface Resources {
 			git: 'Git';
 			group: 'Repository';
 			misc: 'Misc';
+			publication: 'Settings file';
 			scripts: 'Scripts';
 			secrets: 'Secrets';
 			security: 'Security';

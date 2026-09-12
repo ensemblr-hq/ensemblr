@@ -5,6 +5,7 @@ import {
 	BoxIcon,
 	BrushIcon,
 	CableIcon,
+	FileCogIcon,
 	FlaskConicalIcon,
 	GitBranchIcon,
 	HeartPulseIcon,
@@ -148,6 +149,12 @@ function repoNav(t: TFunction): RepoNavItem[] {
 			section: 'scripts',
 		},
 		{
+			icon: FileCogIcon,
+			kind: 'repo',
+			label: t('settings:repo-nav.publication', 'Settings file'),
+			section: 'publication',
+		},
+		{
 			icon: CableIcon,
 			kind: 'repo',
 			label: t('settings:repo-nav.actions', 'Actions'),
@@ -173,6 +180,7 @@ const REPO_SECTION_TARGETS = {
 	environment: '/settings/repo/$repoId/environment',
 	git: '/settings/repo/$repoId/git',
 	misc: '/settings/repo/$repoId/misc',
+	publication: '/settings/repo/$repoId/publication',
 	scripts: '/settings/repo/$repoId/scripts',
 	secrets: '/settings/repo/$repoId/secrets',
 	security: '/settings/repo/$repoId/security',

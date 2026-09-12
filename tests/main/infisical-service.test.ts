@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-
+import { resolveWorkspaceSettingsTarget } from '../../src/main/config/workspace-settings-target';
 import { createInfisicalAccountStore } from '../../src/main/infisical/infisical-account-store';
 import type { InfisicalApiClient } from '../../src/main/infisical/infisical-api';
 import { createInfisicalCache } from '../../src/main/infisical/infisical-cache';
@@ -22,9 +22,14 @@ import {
 } from '../../src/main/infisical/infisical-service';
 import { createMockSecretStore } from '../../src/main/secrets/mock-backend';
 import { openEnsemblrDatabase } from '../../src/main/storage/database';
+import { insertWorkspaceRow } from '../../src/main/storage/repositories/workspace-repository';
+
+const WORKSPACE_ID = 'workspace-1';
 
 let database: DatabaseSync;
+let fixtureRoot: string;
 let repositoryPath: string;
+let workspacePath: string;
 let service: InfisicalService;
 let accountId: string;
 let sharedSecretStore: ReturnType<typeof createMockSecretStore>;
@@ -70,6 +75,9 @@ async function buildService(
 		cache: createInfisicalCache({ secretStore }),
 		client: createInfisicalClient({ accountStore, api }),
 		linkStore: createInfisicalLinkStore({ database }),
+		resolveWorkspaceCheckout: ({ repositoryId, workspaceId }) =>
+			resolveWorkspaceSettingsTarget({ database, repositoryId, workspaceId })
+				?.workspacePath ?? null,
 	});
 	accountCounter += 1;
 	const added = await built.addAccount({
@@ -82,23 +90,48 @@ async function buildService(
 	return { accountId: added.account?.id ?? '', secretStore, service: built };
 }
 
-/** Writes the `.infisical.json` the Infisical CLI leaves at a repository root. */
-function writeCliConfig(config: Record<string, unknown>): void {
-	writeFileSync(
-		path.join(repositoryPath, '.infisical.json'),
-		JSON.stringify(config),
-		'utf8',
-	);
+/**
+ * Writes the `.infisical.json` the Infisical CLI leaves in a checkout. Written
+ * to both checkouts by default because the two read paths differ on purpose:
+ * the settings screen reads the named workspace, the environment layer reads
+ * the root clone. Tests that care which one is read pass a checkout explicitly.
+ */
+function writeCliConfig(
+	config: Record<string, unknown>,
+	checkoutPaths: string[] = [repositoryPath, workspacePath],
+): void {
+	for (const checkoutPath of checkoutPaths) {
+		writeFileSync(
+			path.join(checkoutPath, '.infisical.json'),
+			JSON.stringify(config),
+			'utf8',
+		);
+	}
 }
 
-/** Inserts the repository row the link's committed half is written next to. */
-function seedRepository(repoPath: string): string {
+/**
+ * Inserts the repository row plus the live workspace whose checkout carries the
+ * committed half of every repository link.
+ */
+function seedRepository(repoPath: string, workPath: string): string {
 	database
 		.prepare(
 			`INSERT INTO repositories (id, slug, name, path)
 			 VALUES ('repo-1', 'repo-1', 'Repo One', ?)`,
 		)
 		.run(repoPath);
+	insertWorkspaceRow({
+		baseBranch: 'main',
+		branchName: 'feature',
+		database,
+		id: WORKSPACE_ID,
+		metadataJson: '{}',
+		name: 'Workspace',
+		path: workPath,
+		repositoryId: 'repo-1',
+		slug: 'workspace',
+		timestamp: new Date().toISOString(),
+	});
 
 	return 'repo-1';
 }
@@ -106,8 +139,12 @@ function seedRepository(repoPath: string): string {
 beforeEach(async () => {
 	accountCounter = 0;
 	database = openEnsemblrDatabase({ databasePath: ':memory:' }).database;
-	repositoryPath = mkdtempSync(path.join(tmpdir(), 'ensemblr-infisical-'));
-	seedRepository(repositoryPath);
+	fixtureRoot = mkdtempSync(path.join(tmpdir(), 'ensemblr-infisical-'));
+	repositoryPath = path.join(fixtureRoot, 'root');
+	workspacePath = path.join(fixtureRoot, 'workspace');
+	mkdirSync(repositoryPath, { recursive: true });
+	mkdirSync(workspacePath, { recursive: true });
+	seedRepository(repositoryPath, workspacePath);
 
 	const built = await buildService();
 	service = built.service;
@@ -117,7 +154,7 @@ beforeEach(async () => {
 
 afterEach(() => {
 	database.close();
-	rmSync(repositoryPath, { force: true, recursive: true });
+	rmSync(fixtureRoot, { force: true, recursive: true });
 });
 
 describe('createInfisicalService.setLink', () => {
@@ -129,6 +166,7 @@ describe('createInfisicalService.setLink', () => {
 			projectName: 'Backend',
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		expect(result.failure).toBeNull();
@@ -147,10 +185,11 @@ describe('createInfisicalService.setLink', () => {
 			projectName: 'Backend',
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		const committed = readFileSync(
-			path.join(repositoryPath, '.ensemblr', 'settings.toml'),
+			path.join(workspacePath, '.ensemblr', 'settings.toml'),
 			'utf8',
 		);
 
@@ -165,12 +204,14 @@ describe('createInfisicalService.setLink', () => {
 			projectId: 'proj_1',
 			scope: 'repository' as const,
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		};
 
 		await service.setLink(request);
 		const second = await service.setLink({
 			...request,
 			environmentSlug: 'prod',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		expect(second.failure).toBeNull();
@@ -184,6 +225,7 @@ describe('createInfisicalService.setLink', () => {
 			projectId: 'proj_1',
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		expect(result.failure?.code).toBe('infisical-account-not-found');
@@ -198,6 +240,7 @@ describe('createInfisicalService.setLink', () => {
 			scope: 'repository',
 			scopeId: 'repo-1',
 			secretPath: '/backend',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		expect(result.link).toMatchObject({
@@ -207,9 +250,9 @@ describe('createInfisicalService.setLink', () => {
 	});
 
 	test('reports a committed config that could not be written, keeping the local half', async () => {
-		mkdirSync(path.join(repositoryPath, '.ensemblr'), { recursive: true });
+		mkdirSync(path.join(workspacePath, '.ensemblr'), { recursive: true });
 		writeFileSync(
-			path.join(repositoryPath, '.ensemblr', 'settings.toml'),
+			path.join(workspacePath, '.ensemblr', 'settings.toml'),
 			'this is not = = valid toml',
 			'utf8',
 		);
@@ -220,12 +263,17 @@ describe('createInfisicalService.setLink', () => {
 			projectId: 'proj_1',
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		expect(result.failure?.code).toBe('infisical-config-write-failed');
 		expect(result.link?.projectId).toBe('proj_1');
 		expect(
-			service.getLink({ scope: 'repository', scopeId: 'repo-1' }).link,
+			service.getLink({
+				scope: 'repository',
+				scopeId: 'repo-1',
+				workspaceId: WORKSPACE_ID,
+			}).link,
 		).not.toBeNull();
 	});
 
@@ -236,9 +284,10 @@ describe('createInfisicalService.setLink', () => {
 			projectId: 'proj_1',
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 		writeFileSync(
-			path.join(repositoryPath, '.ensemblr', 'settings.toml'),
+			path.join(workspacePath, '.ensemblr', 'settings.toml'),
 			'this is not = = valid toml',
 			'utf8',
 		);
@@ -246,6 +295,7 @@ describe('createInfisicalService.setLink', () => {
 		const result = await service.clearLink({
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		expect(result.failure?.code).toBe('infisical-config-write-failed');
@@ -300,6 +350,9 @@ describe('createInfisicalService.listProjects', () => {
 			cache: createInfisicalCache({ secretStore }),
 			client: createInfisicalClient({ accountStore, api }),
 			linkStore: createInfisicalLinkStore({ database }),
+			resolveWorkspaceCheckout: ({ repositoryId, workspaceId }) =>
+				resolveWorkspaceSettingsTarget({ database, repositoryId, workspaceId })
+					?.workspacePath ?? null,
 		});
 
 		for (const [index, label] of labels.entries()) {
@@ -395,6 +448,7 @@ describe('createInfisicalService.resolveForScope', () => {
 			projectId: 'proj_1',
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		const resolution = await service.resolveForScope({
@@ -413,6 +467,7 @@ describe('createInfisicalService.resolveForScope', () => {
 			projectId: 'proj_1',
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 		await service.resolveForScope({ scope: 'repository', scopeId: 'repo-1' });
 
@@ -447,6 +502,7 @@ describe('createInfisicalService.resolveForScope', () => {
 			projectId: 'proj_1',
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		await built.service.resolveForScope({
@@ -478,6 +534,7 @@ describe('createInfisicalService.resolveForScope', () => {
 			projectId: 'proj_1',
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		await built.service.resolveForScope({
@@ -503,6 +560,7 @@ describe('createInfisicalService.resolveForScope', () => {
 			projectId: 'proj_1',
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		await Promise.all([
@@ -532,17 +590,19 @@ describe('createInfisicalService.clearLink', () => {
 			projectId: 'proj_1',
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		const cleared = await service.clearLink({
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		expect(cleared.failure).toBeNull();
 		expect(
 			readFileSync(
-				path.join(repositoryPath, '.ensemblr', 'settings.toml'),
+				path.join(workspacePath, '.ensemblr', 'settings.toml'),
 				'utf8',
 			),
 		).not.toContain('proj_1');
@@ -556,6 +616,7 @@ describe('createInfisicalService discovery from .infisical.json', () => {
 		const { link } = service.getLink({
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		expect(link).toMatchObject({
@@ -585,6 +646,7 @@ describe('createInfisicalService discovery from .infisical.json', () => {
 		const { link } = service.getLink({
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 		const resolution = await service.resolveForScope({
 			scope: 'repository',
@@ -601,7 +663,7 @@ describe('createInfisicalService discovery from .infisical.json', () => {
 		await service.resolveForScope({ scope: 'repository', scopeId: 'repo-1' });
 
 		expect(
-			existsSync(path.join(repositoryPath, '.ensemblr', 'settings.toml')),
+			existsSync(path.join(workspacePath, '.ensemblr', 'settings.toml')),
 		).toBe(false);
 	});
 
@@ -694,10 +756,15 @@ describe('createInfisicalService discovery from .infisical.json', () => {
 			projectId: 'proj_1',
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		expect(
-			service.getLink({ scope: 'repository', scopeId: 'repo-1' }).link,
+			service.getLink({
+				scope: 'repository',
+				scopeId: 'repo-1',
+				workspaceId: WORKSPACE_ID,
+			}).link,
 		).toMatchObject({
 			environmentSlug: 'dev',
 			origin: 'local',
@@ -710,15 +777,19 @@ describe('createInfisicalService discovery from .infisical.json', () => {
 			defaultEnvironment: 'staging',
 			workspaceId: 'proj_other',
 		});
-		mkdirSync(path.join(repositoryPath, '.ensemblr'), { recursive: true });
+		mkdirSync(path.join(workspacePath, '.ensemblr'), { recursive: true });
 		writeFileSync(
-			path.join(repositoryPath, '.ensemblr', 'settings.toml'),
+			path.join(workspacePath, '.ensemblr', 'settings.toml'),
 			'[infisical]\nproject_id = "proj_1"\nenvironment = "dev"\n',
 			'utf8',
 		);
 
 		expect(
-			service.getLink({ scope: 'repository', scopeId: 'repo-1' }).link,
+			service.getLink({
+				scope: 'repository',
+				scopeId: 'repo-1',
+				workspaceId: WORKSPACE_ID,
+			}).link,
 		).toMatchObject({
 			environmentSlug: 'dev',
 			origin: 'repository-config',
@@ -730,7 +801,11 @@ describe('createInfisicalService discovery from .infisical.json', () => {
 		writeCliConfig({ defaultEnvironment: 'dev', workspaceId: 'proj_1' });
 
 		expect(
-			service.getLink({ scope: 'workspace', scopeId: 'repo-1' }).link,
+			service.getLink({
+				scope: 'workspace',
+				scopeId: 'repo-1',
+				workspaceId: WORKSPACE_ID,
+			}).link,
 		).toBeNull();
 	});
 });
@@ -744,19 +819,32 @@ describe('createInfisicalService unlinking a discoverable repository', () => {
 			projectId: 'proj_1',
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 
-		await service.clearLink({ scope: 'repository', scopeId: 'repo-1' });
+		await service.clearLink({
+			scope: 'repository',
+			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
+		});
 
 		expect(
-			service.getLink({ scope: 'repository', scopeId: 'repo-1' }).link,
+			service.getLink({
+				scope: 'repository',
+				scopeId: 'repo-1',
+				workspaceId: WORKSPACE_ID,
+			}).link,
 		).toBeNull();
 	});
 
 	test('stops resolving secrets once the discovered link is unlinked', async () => {
 		writeCliConfig({ defaultEnvironment: 'dev', workspaceId: 'proj_1' });
 
-		await service.clearLink({ scope: 'repository', scopeId: 'repo-1' });
+		await service.clearLink({
+			scope: 'repository',
+			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
+		});
 		const resolution = await service.resolveForScope({
 			scope: 'repository',
 			scopeId: 'repo-1',
@@ -771,17 +859,22 @@ describe('createInfisicalService unlinking a discoverable repository', () => {
 		const result = await service.clearLink({
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
 
 		expect(result.failure).toBeNull();
 		expect(
-			existsSync(path.join(repositoryPath, '.ensemblr', 'settings.toml')),
+			existsSync(path.join(workspacePath, '.ensemblr', 'settings.toml')),
 		).toBe(false);
 	});
 
 	test('linking again after an unlink restores discovery for a later unlink', async () => {
 		writeCliConfig({ defaultEnvironment: 'dev', workspaceId: 'proj_1' });
-		await service.clearLink({ scope: 'repository', scopeId: 'repo-1' });
+		await service.clearLink({
+			scope: 'repository',
+			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
+		});
 
 		await service.setLink({
 			accountId,
@@ -789,11 +882,20 @@ describe('createInfisicalService unlinking a discoverable repository', () => {
 			projectId: 'proj_1',
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
 		});
-		await service.clearLink({ scope: 'repository', scopeId: 'repo-1' });
+		await service.clearLink({
+			scope: 'repository',
+			scopeId: 'repo-1',
+			workspaceId: WORKSPACE_ID,
+		});
 
 		expect(
-			service.getLink({ scope: 'repository', scopeId: 'repo-1' }).link,
+			service.getLink({
+				scope: 'repository',
+				scopeId: 'repo-1',
+				workspaceId: WORKSPACE_ID,
+			}).link,
 		).toBeNull();
 	});
 });

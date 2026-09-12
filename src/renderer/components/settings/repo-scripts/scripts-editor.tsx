@@ -4,6 +4,7 @@ import { ScriptRow } from '@/renderer/components/settings/repo-scripts/script-ro
 import { RunScriptsSection } from '@/renderer/components/settings/run-scripts/run-scripts-section';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
+import { SettingsWorkspaceTargetRow } from '@/renderer/components/settings/settings-workspace-target-row';
 import {
 	RadioGroup,
 	RadioGroupItem,
@@ -15,22 +16,34 @@ import type {
 	RunMode,
 	ScriptsForm,
 } from '@/renderer/types/settings';
+import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 /** The live Scripts form once settings have loaded; remounted per repo via `key`. */
 export function ScriptsEditor({
 	initial,
+	onWorkspaceChange,
 	project,
 	repoId,
-	workspaceDiverges,
+	selectedWorkspaceId,
+	workspaces,
 }: {
 	initial: ScriptsForm;
+	/** Switches which live workspace's branch receives the write. */
+	onWorkspaceChange: (workspaceId: string) => void;
 	project: RepoProject;
 	repoId: string;
-	/** True when the open workspace's branch commits different scripts. */
-	workspaceDiverges: boolean;
+	/** Live workspace whose branch currently receives the write. */
+	selectedWorkspaceId: string;
+	/** Live workspaces of this repository the user can choose to write to. */
+	workspaces: WorkspaceShellModel[];
 }) {
 	const { t } = useTranslation();
-	const { form, updateForm } = useScriptsSettingsForm(repoId, project, initial);
+	const { form, updateForm } = useScriptsSettingsForm(
+		repoId,
+		project,
+		initial,
+		selectedWorkspaceId,
+	);
 
 	return (
 		<SettingsSection
@@ -40,14 +53,19 @@ export function ScriptsEditor({
 			)}
 			title={t('settings:repo.scripts.title', 'Scripts')}
 		>
-			{workspaceDiverges ? (
-				<p className='py-4 text-muted-foreground text-xs'>
-					{t(
-						'settings:repo.scripts.diverges',
-						'The workspace you have open commits different scripts on its branch, and runs those. Merge this file to change what it runs.',
-					)}
-				</p>
-			) : null}
+			<SettingsWorkspaceTargetRow
+				description={t(
+					'settings:repo.scripts.workspace-target.description',
+					'This file is saved on the chosen workspace’s branch, as an uncommitted change you can review and commit.',
+				)}
+				label={t(
+					'settings:repo.scripts.workspace-target.label',
+					'Save to workspace',
+				)}
+				onChange={onWorkspaceChange}
+				value={selectedWorkspaceId}
+				workspaces={workspaces}
+			/>
 
 			<ScriptRow
 				description={t(

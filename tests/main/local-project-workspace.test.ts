@@ -6,6 +6,7 @@ import {
 	mkdtempSync,
 	readFileSync,
 	realpathSync,
+	renameSync,
 	rmSync,
 	writeFileSync,
 } from 'node:fs';
@@ -15,12 +16,14 @@ import test, { type TestContext } from 'node:test';
 
 import { createLocalCommandService } from '../../src/main/commands/local-command.ts';
 import { createWorkspaceService } from '../../src/main/repository/create-workspace.ts';
+import { resolveFreshForkRef } from '../../src/main/repository/git-ops.ts';
 import { createLocalRepositoryRegistrationService } from '../../src/main/repository/register-repository.ts';
 import {
 	type EnsemblrDatabaseConnection,
 	type EnsemblrDatabaseService,
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
+import { createWorkspaceGitService } from '../../src/main/workspace-git/workspace-git-status.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
@@ -128,13 +131,17 @@ async function createProjectWorkspace(
 	}).create({ name, repositoryId });
 }
 
-function attachOrigin(harness: Harness): string {
-	const remotePath = path.join(harness.rootPath, 'origin.git');
+function attachRemote(harness: Harness, remote = 'origin'): string {
+	const remotePath = path.join(harness.rootPath, `${remote}.git`);
 	runGit(harness.rootPath, ['init', '--bare', remotePath]);
 	runGit(remotePath, ['symbolic-ref', 'HEAD', 'refs/heads/master']);
-	runGit(harness.externalPath, ['remote', 'add', 'origin', remotePath]);
-	runGit(harness.externalPath, ['push', '-u', 'origin', 'master']);
+	runGit(harness.externalPath, ['remote', 'add', remote, remotePath]);
+	runGit(harness.externalPath, ['push', '-u', remote, 'master']);
 	return remotePath;
+}
+
+function attachOrigin(harness: Harness): string {
+	return attachRemote(harness);
 }
 
 function publishRemoteCommit(harness: Harness, remotePath: string): string {
@@ -209,10 +216,28 @@ test('uses commits added to the local master checkout after registration', async
 	);
 });
 
-test('fast-forwards a local master checkout from its remote before creating a workspace', async (t) => {
+test('fresh fork resolution pins the fetched upstream to a commit', async (t) => {
+	const harness = createHarness(t);
+	const remotePath = attachOrigin(harness);
+	const localTip = runGit(harness.externalPath, ['rev-parse', 'master']);
+	const remoteTip = publishRemoteCommit(harness, remotePath);
+
+	const resolution = await resolveFreshForkRef({
+		baseBranch: 'master',
+		localCommandService: createLocalCommandService(),
+		repositoryPath: harness.externalPath,
+	});
+
+	assert.equal(resolution.status, 'fresh');
+	assert.equal(resolution.ref, remoteTip);
+	assert.equal(runGit(harness.externalPath, ['rev-parse', 'master']), localTip);
+});
+
+test('forks from a newer remote without moving the clean root checkout', async (t) => {
 	const harness = createHarness(t);
 	const remotePath = attachOrigin(harness);
 	const repository = await registerProject(harness);
+	const localTip = runGit(harness.externalPath, ['rev-parse', 'master']);
 	const remoteTip = publishRemoteCommit(harness, remotePath);
 
 	const workspace = await createProjectWorkspace(
@@ -222,26 +247,33 @@ test('fast-forwards a local master checkout from its remote before creating a wo
 	);
 
 	assert.equal(workspace.status, 'success');
-	assert.equal(
-		runGit(harness.externalPath, ['rev-parse', 'master']),
-		remoteTip,
-	);
+	assert.equal(runGit(harness.externalPath, ['rev-parse', 'master']), localTip);
 	assert.equal(
 		runGit(String(workspace.workspace?.path), ['rev-parse', 'HEAD']),
 		remoteTip,
 	);
 });
 
-test('does not overwrite a dirty local master checkout while syncing its remote', async (t) => {
+test('forks from the fetched upstream without touching a dirty root checkout', async (t) => {
 	const harness = createHarness(t);
+	mkdirSync(path.join(harness.externalPath, '.ensemblr'));
+	const settingsPath = path.join(
+		harness.externalPath,
+		'.ensemblr',
+		'settings.toml',
+	);
+	writeFileSync(settingsPath, '[git]\nbranch_prefix = "local/"\n');
+	runGit(harness.externalPath, ['add', '.ensemblr/settings.toml']);
+	runGit(harness.externalPath, ['commit', '-m', 'configure project']);
 	const remotePath = attachOrigin(harness);
 	const repository = await registerProject(harness);
 	const localTip = runGit(harness.externalPath, ['rev-parse', 'master']);
-	publishRemoteCommit(harness, remotePath);
-	writeFileSync(
-		path.join(harness.externalPath, 'README.md'),
-		'# dirty local project\n',
-	);
+	writeFileSync(path.join(harness.externalPath, 'staged.txt'), 'staged root\n');
+	runGit(harness.externalPath, ['add', 'staged.txt']);
+	const indexBefore = runGit(harness.externalPath, ['diff', '--cached']);
+	const remoteTip = publishRemoteCommit(harness, remotePath);
+	const dirtySettings = '[git]\nbranch_prefix = "dirty/"\n';
+	writeFileSync(settingsPath, dirtySettings);
 
 	const workspace = await createProjectWorkspace(
 		harness,
@@ -250,18 +282,34 @@ test('does not overwrite a dirty local master checkout while syncing its remote'
 	);
 
 	assert.equal(workspace.status, 'success');
-	assert.equal(runGit(harness.externalPath, ['rev-parse', 'master']), localTip);
-	assert.equal(
-		readFileSync(path.join(harness.externalPath, 'README.md'), 'utf8'),
-		'# dirty local project\n',
-	);
+	assert.match(indexBefore, /staged\.txt/);
+	assert.equal(runGit(harness.externalPath, ['rev-parse', 'HEAD']), localTip);
+	assert.equal(runGit(harness.externalPath, ['diff', '--cached']), indexBefore);
+	assert.equal(readFileSync(settingsPath, 'utf8'), dirtySettings);
 	assert.equal(
 		runGit(String(workspace.workspace?.path), ['rev-parse', 'HEAD']),
-		localTip,
+		remoteTip,
 	);
+	assert.equal(
+		runGit(String(workspace.workspace?.path), [
+			'for-each-ref',
+			'--format=%(upstream)',
+			`refs/heads/${workspace.workspace?.branchName}`,
+		]),
+		'',
+	);
+
+	const comparison = await createWorkspaceGitService({
+		localCommandService: createLocalCommandService(),
+	}).getStatus({
+		scope: { baseRef: 'master', kind: 'branch' },
+		workspaceCwd: String(workspace.workspace?.path),
+	});
+	assert.equal(comparison.error, undefined);
+	assert.deepEqual(comparison.files, []);
 });
 
-test('does not overwrite a diverged local master checkout while syncing its remote', async (t) => {
+test('requires an explicit source when the local base and upstream diverge', async (t) => {
 	const harness = createHarness(t);
 	const remotePath = attachOrigin(harness);
 	const repository = await registerProject(harness);
@@ -280,10 +328,130 @@ test('does not overwrite a diverged local master checkout while syncing its remo
 		'diverged',
 	);
 
-	assert.equal(workspace.status, 'success');
+	assert.equal(workspace.status, 'failure');
+	assert.equal(workspace.diagnostics[0]?.code, 'base-branch-diverged');
+	assert.match(String(workspace.diagnostics[0]?.message), /origin\/master/);
 	assert.equal(runGit(harness.externalPath, ['rev-parse', 'master']), localTip);
+	assert.equal(workspace.workspace, null);
+});
+
+test('preserves a locally-ahead base and compares against that local source', async (t) => {
+	const harness = createHarness(t);
+	attachOrigin(harness);
+	const repository = await registerProject(harness);
+	writeFileSync(path.join(harness.externalPath, 'local.md'), 'local ahead\n');
+	runGit(harness.externalPath, ['add', 'local.md']);
+	runGit(harness.externalPath, ['commit', '-m', 'local ahead']);
+	const localTip = runGit(harness.externalPath, ['rev-parse', 'master']);
+
+	const workspace = await createProjectWorkspace(
+		harness,
+		repository.id,
+		'ahead',
+	);
+
+	assert.equal(workspace.status, 'success');
 	assert.equal(
 		runGit(String(workspace.workspace?.path), ['rev-parse', 'HEAD']),
 		localTip,
+	);
+	const comparison = await createWorkspaceGitService({
+		localCommandService: createLocalCommandService(),
+	}).getStatus({
+		scope: { baseRef: 'master', kind: 'branch' },
+		workspaceCwd: String(workspace.workspace?.path),
+	});
+	assert.deepEqual(comparison.files, []);
+});
+
+test('explicit fork refs resolve divergence without changing the merge target', async (t) => {
+	const harness = createHarness(t);
+	const remotePath = attachOrigin(harness);
+	const repository = await registerProject(harness);
+	writeFileSync(path.join(harness.externalPath, 'local.md'), 'local\n');
+	runGit(harness.externalPath, ['add', 'local.md']);
+	runGit(harness.externalPath, ['commit', '-m', 'local']);
+	const localTip = runGit(harness.externalPath, ['rev-parse', 'master']);
+	const remoteTip = publishRemoteCommit(harness, remotePath);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: buildRootDirectoryStub({
+			rootPath: harness.rootPath,
+			workspacesPath: harness.workspacesPath,
+		}),
+	});
+
+	const localWorkspace = await service.create({
+		branchPlan: { forkRef: 'master', kind: 'create' },
+		name: 'choose local',
+		repositoryId: repository.id,
+	});
+	const remoteWorkspace = await service.create({
+		branchPlan: { forkRef: 'origin/master', kind: 'create' },
+		name: 'choose remote',
+		repositoryId: repository.id,
+	});
+
+	assert.equal(localWorkspace.status, 'success');
+	assert.equal(remoteWorkspace.status, 'success');
+	assert.equal(localWorkspace.workspace?.baseBranch, 'master');
+	assert.equal(remoteWorkspace.workspace?.baseBranch, 'master');
+	assert.equal(
+		runGit(String(localWorkspace.workspace?.path), ['rev-parse', 'HEAD']),
+		localTip,
+	);
+	assert.equal(
+		runGit(String(remoteWorkspace.workspace?.path), ['rev-parse', 'HEAD']),
+		remoteTip,
+	);
+});
+
+test('uses the configured custom upstream remote for a fresh default fork', async (t) => {
+	const harness = createHarness(t);
+	const remotePath = attachRemote(harness, 'upstream');
+	const repository = await registerProject(harness);
+	const remoteTip = publishRemoteCommit(harness, remotePath);
+
+	const workspace = await createProjectWorkspace(
+		harness,
+		repository.id,
+		'custom',
+	);
+
+	assert.equal(workspace.status, 'success');
+	assert.equal(
+		runGit(String(workspace.workspace?.path), ['rev-parse', 'HEAD']),
+		remoteTip,
+	);
+	const comparison = await createWorkspaceGitService({
+		localCommandService: createLocalCommandService(),
+	}).getStatus({
+		scope: { baseRef: 'master', kind: 'branch' },
+		workspaceCwd: String(workspace.workspace?.path),
+	});
+	assert.deepEqual(comparison.files, []);
+});
+
+test('creates from the cached base with a warning when its upstream is offline', async (t) => {
+	const harness = createHarness(t);
+	const remotePath = attachOrigin(harness);
+	const repository = await registerProject(harness);
+	const cachedTip = runGit(harness.externalPath, ['rev-parse', 'master']);
+	renameSync(remotePath, `${remotePath}.offline`);
+
+	const workspace = await createProjectWorkspace(
+		harness,
+		repository.id,
+		'offline',
+	);
+
+	assert.equal(workspace.status, 'success');
+	assert.equal(workspace.diagnostics[0]?.code, 'base-refresh-failed');
+	assert.equal(workspace.diagnostics[0]?.severity, 'warning');
+	assert.equal(
+		runGit(String(workspace.workspace?.path), ['rev-parse', 'HEAD']),
+		cachedTip,
 	);
 });

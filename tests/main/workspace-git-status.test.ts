@@ -758,6 +758,79 @@ test('getStatus (real git) branch scope spans commits + uncommitted', async (t) 
 	]);
 });
 
+test('branch status and commits keep using the workspace fork point after the remote advances again', async (t) => {
+	const root = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-moving-base-'));
+	t.after(() => rm(root, { force: true, recursive: true }));
+	const repositoryPath = path.join(root, 'repository');
+	const remotePath = path.join(root, 'remote.git');
+	const collaboratorPath = path.join(root, 'collaborator');
+	const workspacePath = path.join(root, 'workspace');
+	const git = (cwd: string, ...args: string[]) =>
+		execFileAsync('git', args, { cwd });
+
+	await git(root, 'init', '--bare', remotePath);
+	await git(remotePath, 'symbolic-ref', 'HEAD', 'refs/heads/main');
+	await git(root, 'init', '-b', 'main', repositoryPath);
+	await git(repositoryPath, 'config', 'user.email', 'test@example.com');
+	await git(repositoryPath, 'config', 'user.name', 'Test');
+	await writeFile(path.join(repositoryPath, 'initial.md'), 'initial\n');
+	await git(repositoryPath, 'add', '.');
+	await git(repositoryPath, 'commit', '-m', 'initial');
+	await git(repositoryPath, 'remote', 'add', 'origin', remotePath);
+	await git(repositoryPath, 'push', '-u', 'origin', 'main');
+	await git(root, 'clone', remotePath, collaboratorPath);
+	await git(collaboratorPath, 'config', 'user.email', 'test@example.com');
+	await git(collaboratorPath, 'config', 'user.name', 'Test');
+
+	await writeFile(path.join(collaboratorPath, 'upstream-b.md'), 'upstream B\n');
+	await git(collaboratorPath, 'add', '.');
+	await git(collaboratorPath, 'commit', '-m', 'upstream B');
+	await git(collaboratorPath, 'push', 'origin', 'main');
+	await git(repositoryPath, 'fetch', 'origin');
+	await git(
+		repositoryPath,
+		'worktree',
+		'add',
+		'--no-track',
+		'-b',
+		'workspace',
+		workspacePath,
+		'origin/main',
+	);
+	await writeFile(path.join(workspacePath, 'workspace.md'), 'workspace\n');
+	await git(workspacePath, 'add', '.');
+	await git(workspacePath, 'commit', '-m', 'workspace work');
+
+	await writeFile(path.join(collaboratorPath, 'upstream-c.md'), 'upstream C\n');
+	await git(collaboratorPath, 'add', '.');
+	await git(collaboratorPath, 'commit', '-m', 'upstream C');
+	await git(collaboratorPath, 'push', 'origin', 'main');
+	await git(workspacePath, 'fetch', 'origin');
+
+	const service = createWorkspaceGitService({
+		localCommandService: realCommandService(),
+	});
+	const status = await service.getStatus({
+		scope: { baseRef: 'main', kind: 'branch' },
+		workspaceCwd: workspacePath,
+	});
+	const commits = await service.getCommits({
+		baseRef: 'main',
+		workspaceCwd: workspacePath,
+	});
+
+	assert.equal(status.error, undefined);
+	assert.deepEqual(
+		status.files.map((file) => file.path),
+		['workspace.md'],
+	);
+	assert.equal(commits.error, undefined);
+	assert.deepEqual(
+		commits.commits.map((commit) => commit.subject),
+		['workspace work'],
+	);
+});
+
 test('getCommits (real git) scopes to branch commits when given a base ref', async (t) => {
 	const dir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-log-'));
 	t.after(() => rm(dir, { force: true, recursive: true }));

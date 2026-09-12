@@ -11,9 +11,9 @@ import {
 	GIT_WORKTREE_TIMEOUT_MS,
 	readOriginTrackingRef,
 	refResolvesToCommit,
+	resolveFreshForkRef,
 	runWorktreeAdd as runWorktreeAddShared,
 	runWorktreePrune,
-	syncBaseRef,
 	type WorktreeBranchPlacement,
 } from './git-ops.ts';
 import { removeDirectoryTree } from './remove-directory.ts';
@@ -44,6 +44,7 @@ export interface WorktreePlacementRequest {
  */
 export interface WorktreeCreated {
 	createdBranch: boolean;
+	diagnostics: CreateWorkspaceDiagnostic[];
 }
 
 /**
@@ -82,7 +83,10 @@ export async function createWorktree({
 		workspacePath: request.workspacePath,
 	});
 	if (!worktreeDiagnostic) {
-		return { createdBranch: planned.placement.kind !== 'checkout' };
+		return {
+			createdBranch: planned.placement.kind !== 'checkout',
+			diagnostics: planned.diagnostics,
+		};
 	}
 
 	// A destination that was already there lost a TOCTOU race against another
@@ -181,28 +185,32 @@ function refsRequiredBy(request: WorktreePlacementRequest): string[] {
 }
 
 /**
- * Refreshes each ref from its remote, one at a time so concurrent fetches never
- * contend for the repository's git lock. Entirely best-effort.
+ * Ensures each ref is available, optionally refreshing explicit/adopted refs
+ * one at a time so concurrent fetches never contend for the git lock.
  * @param options - Refs to refresh plus git command dependencies.
  */
 async function prepareGitRefs({
 	localCommandService,
+	refresh,
 	refs,
 	repositoryPath,
 }: {
 	localCommandService: LocalCommandService;
+	refresh: boolean;
 	refs: readonly string[];
 	repositoryPath: string;
 }): Promise<void> {
 	for (const ref of refs) {
 		// Parallelizing these fetches would make them contend for the repository's
 		// single git index lock and fail intermittently.
-		// oxlint-disable-next-line react-doctor/async-await-in-loop
-		await syncBaseRef({
-			baseBranch: ref,
-			localCommandService,
-			repositoryPath,
-		});
+		if (refresh) {
+			// oxlint-disable-next-line react-doctor/async-await-in-loop
+			await resolveFreshForkRef({
+				baseBranch: ref,
+				localCommandService,
+				repositoryPath,
+			});
+		}
 		await ensureBaseRefAvailable({
 			baseBranch: ref,
 			localCommandService,
@@ -377,8 +385,9 @@ function occupiedDiagnostic({
  * checked out in another worktree, which git would reject anyway but only after
  * three retries and with a far less actionable message.
  *
- * The ref refresh is best-effort: offline, divergence, or a dirty tree degrades
- * to the local refs rather than blocking creation.
+ * An implicit fork resolves independently of every checkout: fetched upstream
+ * code wins when the local base is behind, local commits win when it is ahead,
+ * offline fetches warn, and divergence requires an explicit fork ref.
  * @param options - Placement request plus git command dependencies.
  * @returns The placement to hand `git worktree add`, or the diagnostic that
  * blocks creation.
@@ -393,20 +402,58 @@ async function planBranchPlacement({
 	request: WorktreePlacementRequest;
 }): Promise<
 	| { diagnostic: CreateWorkspaceDiagnostic }
-	| { placement: WorktreeBranchPlacement }
+	| {
+			diagnostics: CreateWorkspaceDiagnostic[];
+			placement: WorktreeBranchPlacement;
+	  }
 > {
 	const refDiagnostic = validatePlacementRefs(request);
 	if (refDiagnostic) {
 		return { diagnostic: refDiagnostic };
 	}
 
+	const forkResolution =
+		request.plan.kind === 'create' && !request.plan.forkRef
+			? await resolveFreshForkRef({
+					baseBranch: request.baseBranch,
+					localCommandService,
+					repositoryPath,
+				})
+			: null;
+	if (forkResolution?.status === 'diverged') {
+		return {
+			diagnostic: {
+				code: 'base-branch-diverged',
+				message: `Branch "${request.baseBranch}" and its upstream "${forkResolution.upstreamRef}" have diverged. Choose an explicit source branch to create the workspace.`,
+				severity: 'error',
+			},
+		};
+	}
+	const effectiveRequest = forkResolution
+		? {
+				...request,
+				plan: { forkRef: forkResolution.ref, kind: 'create' as const },
+			}
+		: request;
+	const diagnostics: CreateWorkspaceDiagnostic[] =
+		forkResolution?.status === 'offline'
+			? [
+					{
+						code: 'base-refresh-failed',
+						message: `Could not refresh "${forkResolution.upstreamRef}"; the workspace was created from cached "${request.baseBranch}" and may not include the latest remote commits.`,
+						severity: 'warning',
+					},
+				]
+			: [];
+
 	await prepareGitRefs({
 		localCommandService,
-		refs: refsRequiredBy(request),
+		refresh: forkResolution === null,
+		refs: refsRequiredBy(effectiveRequest),
 		repositoryPath,
 	});
 
-	const occupiedBy = adoptedBranchOf(request.plan)
+	const occupiedBy = adoptedBranchOf(effectiveRequest.plan)
 		? await findWorktreeHoldingBranch({
 				branchName: request.branchName,
 				localCommandService,
@@ -426,10 +473,10 @@ async function planBranchPlacement({
 	const placement = await resolveBranchPlacement({
 		localCommandService,
 		repositoryPath,
-		request,
+		request: effectiveRequest,
 	});
 	return placement
-		? { placement }
+		? { diagnostics, placement }
 		: {
 				diagnostic: {
 					code: 'branch-not-found',

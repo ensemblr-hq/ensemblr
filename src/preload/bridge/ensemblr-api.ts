@@ -494,6 +494,16 @@ export function createEnsemblrApi(): EnsemblrApi {
 		updateAppSettings: (patch) => invoke('updateAppSettings', patch),
 		openRepositoryConfigFile: (request) =>
 			invoke('openRepositoryConfigFile', request),
+		previewSettingsPublication: (request) =>
+			invoke('previewSettingsPublication', request),
+		applySettingsPublication: (request) =>
+			invoke('applySettingsPublication', request),
+		cleanupSettingsPublication: (request) =>
+			invoke('cleanupSettingsPublication', request),
+		restoreSettingsPublication: (request) =>
+			invoke('restoreSettingsPublication', request),
+		settingsPublicationRecoveryStatus: (request) =>
+			invoke('settingsPublicationRecoveryStatus', request),
 		updateRepositoryScripts: (request) =>
 			invoke('updateRepositoryScripts', request),
 		updateRepositorySettings: (request) =>

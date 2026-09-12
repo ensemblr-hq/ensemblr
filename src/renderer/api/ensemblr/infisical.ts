@@ -61,7 +61,14 @@ export const infisicalProjectsQuery = queryOptions({
 	staleTime: 30_000,
 });
 
-/** Query options for the Infisical link attached to one scope. */
+/**
+ * Query options for the Infisical link attached to one scope. The named
+ * workspace is part of the key because it decides which checkout's committed
+ * `[infisical]` block the answer merges in — two workspaces of one repository
+ * can be on branches that disagree. It extends the shared key rather than
+ * replacing it, so an invalidation by scope still reaches every workspace's
+ * entry.
+ */
 export function infisicalLinkQuery(request: InfisicalLinkScopeRequest) {
 	return queryOptions({
 		queryFn: (): Promise<InfisicalLinkResult> =>
@@ -69,7 +76,10 @@ export function infisicalLinkQuery(request: InfisicalLinkScopeRequest) {
 				{ channel: 'ensemblr:infisical-link', usesDatabase: true },
 				() => getEnsemblrApi().infisicalLink(request),
 			),
-		queryKey: ensemblrQueryKeys.infisicalLink(request.scope, request.scopeId),
+		queryKey: [
+			...ensemblrQueryKeys.infisicalLink(request.scope, request.scopeId),
+			request.workspaceId,
+		],
 		staleTime: 2000,
 	});
 }

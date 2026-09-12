@@ -4,7 +4,11 @@ Date: 2026-08-05
 
 ## Status
 
-Accepted
+Accepted, with its root-write clauses superseded by
+[0070](0070-publish-shared-repository-settings-onto-a-workspace-branch.md):
+the Scripts screen writes a live workspace the user names rather than the
+repository root clone, and the launch-time migration that wrote the root is
+gone. Everything else below still holds.
 
 Supersedes the read-only clauses of
 [0030](0030-use-ensemblr-settings-toml-as-sole-repository-config.md) for script

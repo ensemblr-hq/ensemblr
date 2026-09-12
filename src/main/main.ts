@@ -129,8 +129,9 @@ import {
 	createEnsemblrConfigResolutionService,
 	createEnsemblrConfigService,
 	createRepositoryConfigService,
-	migrateAllRepositoryScriptSettings,
+	createSettingsPublicationService,
 	resolveEnsemblrConfigPath,
+	resolveWritableWorkspaceCheckout,
 } from './config';
 import { createDictationService } from './dictation';
 import {
@@ -377,6 +378,13 @@ let onAppSettingsUpdated: ((settings: AppSettings) => void) | undefined;
 const databaseService = createEnsemblrDatabaseService(
 	isDev ? { databasePath: devDatabasePath } : {},
 );
+const settingsPublicationService = createSettingsPublicationService({
+	databaseService,
+	recoveryDirectory: path.join(
+		app.getPath('userData'),
+		'settings-publication-recovery',
+	),
+});
 
 /**
  * Whether the experimental architecture diagram feature is on. Read live rather
@@ -486,6 +494,14 @@ const getInfisicalService = (): InfisicalService | null => {
 		cache: createInfisicalCache({ secretStore }),
 		client: createInfisicalClient({ accountStore, api: createInfisicalApi() }),
 		linkStore: createInfisicalLinkStore({ database }),
+		/**
+		 * Resolves the live workspace checkout a repository's committed
+		 * `[infisical]` block is read from and written to, so the link never
+		 * edits the root clone (ADR 0070) and never a stale directory that is no
+		 * longer this repository's worktree.
+		 */
+		resolveWorkspaceCheckout: ({ repositoryId, workspaceId }) =>
+			resolveWritableWorkspaceCheckout({ database, repositoryId, workspaceId }),
 	});
 
 	infisicalRuntime = { database, service };
@@ -1715,37 +1731,6 @@ async function reclaimSweptWorkspaceDisk(): Promise<void> {
 }
 
 /**
- * Moves personal script settings into each repository's committed
- * `.ensemblr/settings.toml` (ADR 0041). Runs before any window opens so the
- * Scripts screen never reads a half-migrated repository. Fails open: the pass
- * is retried on the next launch, so nothing here is worth a windowless start.
- */
-function moveRepositoryScriptsIntoCommittedConfig(): void {
-	const database = databaseService.getConnection()?.database;
-
-	if (!database) {
-		return;
-	}
-
-	try {
-		const migrated = migrateAllRepositoryScriptSettings(database);
-
-		if (migrated.length > 0) {
-			console.info(
-				'[repository-scripts] moved personal script settings into .ensemblr/settings.toml for',
-				migrated.length,
-				'repositories',
-			);
-		}
-	} catch (error) {
-		console.error(
-			'[repository-scripts] migration pass failed; retrying on next launch',
-			error,
-		);
-	}
-}
-
-/**
  * Lets `safeStorage` fall back to its hardcoded key when no keyring daemon
  * answers, which is what makes ADR 0056's "a missing keyring is a warning, not
  * a crash" true rather than aspirational.
@@ -1776,7 +1761,6 @@ app.whenReady().then(() => {
 	configService.load();
 	databaseService.open();
 	registerLinearAssetProtocol(linearAssetProxy);
-	moveRepositoryScriptsIntoCommittedConfig();
 	ensureConciergeHome(rootDirectoryService.ensure().conciergePath);
 	conciergeMemoryService.reconcile();
 	void sharedRootAdoptionService.reconcile();
@@ -1898,6 +1882,7 @@ app.whenReady().then(() => {
 		scriptLifecycleService,
 		setWorkspaceBaseBranchService,
 		setupDiagnosticsService,
+		settingsPublicationService,
 		settingsResolutionService,
 		sharedRootAdoptionService,
 		terminalService,

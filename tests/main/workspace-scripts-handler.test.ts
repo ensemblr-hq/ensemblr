@@ -1,4 +1,12 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
@@ -21,10 +29,17 @@ const { openEnsemblrDatabase } = await import(
 );
 
 const REPOSITORY_ID = 'repo-1';
+const WORKSPACE_ID = 'workspace-1';
 
 let database: DatabaseSync;
-let databaseDirectory: string;
+let parentDirectory: string;
 let repositoryPath: string;
+let workspacePath: string;
+
+/** Runs one bounded Git command inside a disposable test repository. */
+function git(cwd: string, ...args: string[]): string {
+	return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+}
 
 /** Invokes the registered `update-repository-scripts` handler with a payload. */
 function invokeUpdate(request: unknown): { ok: boolean } {
@@ -54,7 +69,7 @@ function updateRequest(overrides: Record<string, unknown> = {}) {
 
 /** Reads the written config back as a plain record. */
 function readConfig(): Record<string, unknown> {
-	const configPath = path.join(repositoryPath, '.ensemblr', 'settings.toml');
+	const configPath = path.join(workspacePath, '.ensemblr', 'settings.toml');
 
 	return structuredClone(load(readFileSync(configPath, 'utf8'))) as Record<
 		string,
@@ -64,10 +79,19 @@ function readConfig(): Record<string, unknown> {
 
 beforeEach(() => {
 	handle.mockClear();
-	repositoryPath = mkdtempSync(path.join(tmpdir(), 'ensemblr-handler-'));
-	databaseDirectory = mkdtempSync(path.join(tmpdir(), 'ensemblr-handler-db-'));
+	parentDirectory = mkdtempSync(path.join(tmpdir(), 'ensemblr-handler-'));
+	repositoryPath = path.join(parentDirectory, 'root');
+	workspacePath = path.join(parentDirectory, 'workspace');
+	mkdirSync(repositoryPath, { recursive: true });
+	git(parentDirectory, 'init', '-b', 'main', repositoryPath);
+	git(repositoryPath, 'config', 'user.email', 'test@example.com');
+	git(repositoryPath, 'config', 'user.name', 'Test');
+	writeFileSync(path.join(repositoryPath, 'README.md'), '# repo\n', 'utf8');
+	git(repositoryPath, 'add', 'README.md');
+	git(repositoryPath, 'commit', '-m', 'base');
+	git(repositoryPath, 'worktree', 'add', '-b', 'feature', workspacePath);
 	database = openEnsemblrDatabase({
-		databasePath: path.join(databaseDirectory, 'ensemblr-test.db'),
+		databasePath: path.join(parentDirectory, 'ensemblr-test.db'),
 	}).database;
 	insertRepositoryRow({
 		database,
@@ -80,6 +104,21 @@ beforeEach(() => {
 		slug: 'repo',
 		timestamp: new Date().toISOString(),
 	});
+	database
+		.prepare(
+			`INSERT INTO workspaces
+				(id, repository_id, slug, name, path, created_at, updated_at, metadata_json)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, '{}')`,
+		)
+		.run(
+			WORKSPACE_ID,
+			REPOSITORY_ID,
+			'workspace',
+			'Workspace',
+			workspacePath,
+			new Date().toISOString(),
+			new Date().toISOString(),
+		);
 
 	registerWorkspaceScriptHandlers({
 		databaseService: { getConnection: () => ({ database }) },
@@ -89,11 +128,10 @@ beforeEach(() => {
 
 afterEach(() => {
 	database.close();
-	rmSync(databaseDirectory, { force: true, recursive: true });
-	rmSync(repositoryPath, { force: true, recursive: true });
+	rmSync(parentDirectory, { force: true, recursive: true });
 });
 
-test('writes the repository root committed config', () => {
+test('writes the chosen workspace config without touching the repository root', () => {
 	const result = invokeUpdate(
 		updateRequest({
 			runScripts: [
@@ -105,10 +143,14 @@ test('writes the repository root committed config', () => {
 					name: 'dev',
 				},
 			],
+			workspaceId: WORKSPACE_ID,
 		}),
 	);
 
 	expect(result).toEqual({ ok: true });
+	expect(
+		existsSync(path.join(repositoryPath, '.ensemblr', 'settings.toml')),
+	).toBe(false);
 	expect(readConfig()).toEqual({
 		scripts: {
 			auto_run_after_setup: false,
@@ -125,8 +167,19 @@ test('writes the repository root committed config', () => {
 	});
 });
 
-test('refuses a repository id the app does not track', () => {
-	const result = invokeUpdate(updateRequest({ repositoryId: 'unknown-repo' }));
+test('refuses a payload with no workspaceId', () => {
+	const result = invokeUpdate(updateRequest());
+
+	expect(result).toEqual({ ok: false });
+	expect(
+		existsSync(path.join(workspacePath, '.ensemblr', 'settings.toml')),
+	).toBe(false);
+});
+
+test('refuses a workspace outside the requested repository', () => {
+	const result = invokeUpdate(
+		updateRequest({ repositoryId: 'unknown-repo', workspaceId: WORKSPACE_ID }),
+	);
 
 	expect(result).toEqual({ ok: false });
 	expect(
@@ -135,7 +188,9 @@ test('refuses a repository id the app does not track', () => {
 });
 
 test('refuses a malformed payload without touching the config', () => {
-	const result = invokeUpdate(updateRequest({ runScriptMode: 'sideways' }));
+	const result = invokeUpdate(
+		updateRequest({ runScriptMode: 'sideways', workspaceId: WORKSPACE_ID }),
+	);
 
 	expect(result).toEqual({ ok: false });
 	expect(
@@ -155,11 +210,24 @@ test('refuses duplicate run script names rather than dropping one', () => {
 	const result = invokeUpdate(
 		updateRequest({
 			runScripts: [duplicate('npm run dev'), duplicate('npm run dev:alt')],
+			workspaceId: WORKSPACE_ID,
 		}),
 	);
 
 	expect(result).toEqual({ ok: false });
 	expect(
 		existsSync(path.join(repositoryPath, '.ensemblr', 'settings.toml')),
+	).toBe(false);
+});
+
+test('refuses a workspace row whose path is no longer a worktree', () => {
+	rmSync(workspacePath, { force: true, recursive: true });
+	mkdirSync(workspacePath, { recursive: true });
+
+	const result = invokeUpdate(updateRequest({ workspaceId: WORKSPACE_ID }));
+
+	expect(result).toEqual({ ok: false });
+	expect(
+		existsSync(path.join(workspacePath, '.ensemblr', 'settings.toml')),
 	).toBe(false);
 });

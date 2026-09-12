@@ -40,6 +40,7 @@ Rules of thumb:
 | Destroyed *(a worktree)* | Worktree удалён | Το worktree διαγράφηκε | The state of an archived workspace whose folder **and** branch were both dropped, so its commits are gone. Kept plainly distinct from *pruned*: the two look identical in the archive list and only this wording tells the user which one comes back intact. |
 | Residue *(after a prune)* | Файлы записаны обратно | Αρχεία γράφτηκαν ξανά | Files a straggling writer put back at a worktree path git had already emptied — a build that outlived the teardown, most often. Said as *what happened* rather than as a noun: `остаток`/`υπόλειμμα` read as debris the user must clean up, when the launch-time sweep clears it unasked. Never worded as a failure — the worktree **was** removed, and *pruned* above still holds. |
 | Branch | Ветка | Κλάδος | |
+| Diverged branches | Ветки разошлись | Οι κλάδοι έχουν αποκλίνει | Git branches whose tips contain different commits after their common ancestor. Use the ordinary verb rather than transliterating `diverged`. |
 | Commit | Коммит | Commit | |
 | Uncommitted change | Изменение без коммита | Αλλαγή χωρίς commit | The working-tree change set. Russian says *without a commit* rather than a participle; Greek keeps the porcelain `commit`. Already the shape every `git:` catalogue row uses — reuse it rather than coining `незакоммиченный`/`μη υποβεβλημένη`. |
 | Commit co-author | Соавтор коммита | Συν-συντάκτης commit | The credit a `Co-authored-by:` trailer earns on GitHub. Russian `соавтор` is the ordinary word for it; Greek takes `συν-συντάκτης` rather than `συν-συγγραφέας`, which reads as co-authorship of a *book*. |
@@ -202,6 +203,10 @@ Rules of thumb:
 | Title bar | Заголовок окна | Γραμμή τίτλου | The strip at the top of the window carrying its controls, and the Appearance setting choosing who draws it. Russian says `заголовок окна` rather than the calque `титульная строка`, which nobody uses; Greek keeps the standard `γραμμή τίτλου`. |
 | Window controls | Элементы управления окном | Στοιχεία ελέγχου παραθύρου | The minimize / maximize / close cluster as a *group*, used only for the group's accessible label — the three buttons keep their own entries below. Both languages take the descriptive phrase over a calque of `controls`, which reads as media playback in Russian and as an audit in Greek. |
 | Desktop entry | Desktop-запись | Εγγραφή desktop | The freedesktop `.desktop` file a Linux app installs so launchers can find it. `Desktop` stays English in both because it names the file extension and the spec, not a screen; only the noun around it is translated. The launcher binaries `gio` and `gtk-launch`, and the packages `glib` and `gtk3`, stay English — they are what the user types to install one. |
+| Root clone | Корневой клон | Κλώνος ρίζας | The repository checkout Ensemblr manages under its root directory, as distinct from a workspace's worktree. Built on `Root directory` above — Russian keeps `корневой`, Greek keeps `ρίζα` — so the two read as the same place. Never `основной`/`κύριος` ("main"), which collides with the `main` branch on a screen that talks about branches throughout. **Flag for native review.** |
+| Publish *(settings onto a workspace branch)* | Опубликовать | Δημοσίευση | Merging the root clone's pending `.ensemblr/settings.toml` into a live workspace's committed copy, where it sits on a branch and in a diff. Deliberately the npm-publish sense in both languages — the file moves from somewhere nothing can see it to somewhere the repository tracks it — rather than a literal `Перенести`/`Μεταφορά` ("transfer"), which says the file moved but not that it became visible. Not `Сохранить`/`Αποθήκευση`: Scripts already uses "save" for the ordinary write to a workspace. **Flag for native review:** `Опубликовать` can read as publishing to the public. |
+| Unpublished settings | Неопубликованные настройки | Μη δημοσιευμένες ρυθμίσεις | Repository settings an older Ensemblr wrote straight into the root clone, which therefore sit on no branch. Built on `Publish` above rather than coining a second word; the empty state is the same negation in both languages. |
+| Recovery snapshot | Снимок для восстановления | Στιγμιότυπο επαναφοράς | The copy Ensemblr captures before a publication and before a root cleanup, so either file can be put back. Distinct from `Checkpoint` above (`Контрольная точка`/`Σημείο ελέγχου`), which rolls back an agent turn — this one is a stored copy of one file. Greek takes `επαναφορά` (restore) over `ανάκτηση`, which `Reclaim disk` above already uses for space. **Flag for native review.** |
 
 ## Core verbs
 
@@ -284,6 +289,7 @@ from **Core nouns** — the width budget there is generous.
 | Security | Безопасность | Ασφάλεια |
 | Actions | Действия | Ενέργειες |
 | Scripts | Скрипты | Σενάρια |
+| Settings file | Файл настроек | Αρχείο ρυθμίσεων |
 | Misc | Разное | Διάφορα |
 
 "Advanced" was a section until the settings restructure split it into

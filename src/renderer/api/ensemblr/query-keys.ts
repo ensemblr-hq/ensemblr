@@ -198,6 +198,29 @@ export const ensemblrQueryKeys = {
 	/** Query key for the setup-diagnostics snapshot. */
 	setupDiagnostics: () =>
 		[...ensemblrQueryKeys.all, 'setup-diagnostics'] as const,
+	/** Query key for a bounded backend-owned settings-publication preview. */
+	settingsPublicationPreview: (
+		repositoryId: string,
+		workspaceId: string | undefined,
+	) =>
+		[
+			...ensemblrQueryKeys.settingsPublicationPreviews(repositoryId),
+			workspaceId,
+		] as const,
+	/** Query key prefix covering every workspace's preview for one repository. */
+	settingsPublicationPreviews: (repositoryId: string) =>
+		[
+			...ensemblrQueryKeys.all,
+			'settings-publication-preview',
+			repositoryId,
+		] as const,
+	/** Query key for a repository's durable settings-publication recovery records. */
+	settingsPublicationRecoveryStatus: (repositoryId: string) =>
+		[
+			...ensemblrQueryKeys.all,
+			'settings-publication-recovery-status',
+			repositoryId,
+		] as const,
 	/** Query key for a resolved settings snapshot, optionally scoped by repository path. */
 	settingsResolution: (repositoryId: string | null, repositoryPath?: string) =>
 		repositoryPath

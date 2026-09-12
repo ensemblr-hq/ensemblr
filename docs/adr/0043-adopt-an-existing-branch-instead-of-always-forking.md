@@ -199,6 +199,25 @@ The charset lives in `src/shared/` so the rewrite, the service-side validator,
 and the rename dialog's inline check cannot drift apart. Only the display name is
 rewritten — an adopted branch keeps its real name.
 
+### 9. Default forks resolve freshness without moving an existing checkout
+
+A default `create` plan fetches the base branch's configured upstream and chooses
+its fork ref by ancestry. When the local base is behind or equal, the new branch
+starts directly at the fetched remote-tracking ref. When the local base is ahead,
+it starts at the local ref so committed local work is preserved. Divergence is
+rejected until the caller supplies an explicit `forkRef`; an offline fetch uses
+the cached local ref and returns a warning.
+
+This resolution never merges, resets, stashes, or moves the local base branch, so
+the repository folder's HEAD, index, and working files are untouched. The new
+feature branch still uses `--no-track`.
+
+Review comparison considers the stored merge target, its common alternate shape,
+and the local target's configured upstream. It selects the nearest candidate
+already contained in the workspace HEAD. This keeps upstream commits out of a
+workspace cut from the fetched remote while preserving locally-ahead commits for
+a workspace explicitly cut from the local base.
+
 ## Consequences
 
 - **Adoption is a metadata flag, not a column.** `adoptedBranch` is written into

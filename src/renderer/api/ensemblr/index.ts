@@ -35,6 +35,7 @@ export {
 export * from './repo-settings';
 export * from './repository-sources';
 export * from './settings';
+export * from './settings-publication';
 export * from './setup';
 export * from './updates';
 export * from './window-controls';

@@ -7,6 +7,7 @@ import type {
 	InfisicalLinkOrigin,
 	InfisicalLinkResult,
 	InfisicalLinkScope,
+	InfisicalLinkScopeRequest,
 	InfisicalLinkSnapshot,
 	InfisicalProjectSnapshot,
 	InfisicalProjectsResult,
@@ -33,6 +34,30 @@ import {
 	writeInfisicalRepositoryConfig,
 } from './infisical-repository-config.ts';
 
+/**
+ * Refusal returned when a repository's committed `[infisical]` block has
+ * nowhere to land: ADR 0070 puts shared repository config on a live workspace's
+ * branch, and the root clone is never the fallback.
+ */
+const WORKSPACE_REQUIRED_FAILURE: InfisicalFailure = {
+	code: 'infisical-workspace-required',
+	message:
+		'The link is saved on this machine, but .ensemblr/settings.toml needs a live workspace to be written to.',
+	retryAfterSeconds: null,
+};
+
+/**
+ * The same refusal for an unlink, which has already cleared the local half by
+ * the time it runs: the committed block is what survives, so the sentence has
+ * to say the repository still carries it rather than that the link was saved.
+ */
+const CLEAR_WORKSPACE_REQUIRED_FAILURE: InfisicalFailure = {
+	code: 'infisical-clear-workspace-required',
+	message:
+		'The link is cleared on this machine, but .ensemblr/settings.toml needs a live workspace for its [infisical] block to be removed.',
+	retryAfterSeconds: null,
+};
+
 /** Resolved values for one scope, plus why they may be stale or missing. */
 export interface InfisicalResolution {
 	/** Locale-neutral reason the resolution is degraded, or null when it is clean. */
@@ -45,14 +70,10 @@ export interface InfisicalService {
 	addAccount: (
 		request: AddInfisicalAccountRequest,
 	) => Promise<InfisicalAccountMutationResult>;
-	clearLink: (request: {
-		scope: InfisicalLinkScope;
-		scopeId: string;
-	}) => Promise<InfisicalLinkResult>;
-	getLink: (request: {
-		scope: InfisicalLinkScope;
-		scopeId: string;
-	}) => InfisicalLinkResult;
+	clearLink: (
+		request: InfisicalLinkScopeRequest,
+	) => Promise<InfisicalLinkResult>;
+	getLink: (request: InfisicalLinkScopeRequest) => InfisicalLinkResult;
 	listAccounts: () => Promise<InfisicalAccountsResult>;
 	/**
 	 * Lists every project reachable across every configured account at once, so
@@ -72,10 +93,7 @@ export interface InfisicalService {
 		scopeId: string;
 	}) => Promise<InfisicalResolution>;
 	setLink: (request: SetInfisicalLinkRequest) => Promise<InfisicalLinkResult>;
-	syncNow: (request: {
-		scope: InfisicalLinkScope;
-		scopeId: string;
-	}) => Promise<InfisicalSyncResult>;
+	syncNow: (request: InfisicalLinkScopeRequest) => Promise<InfisicalSyncResult>;
 	testAccount: (request: {
 		accountId: string;
 	}) => Promise<InfisicalAccountMutationResult>;
@@ -88,6 +106,16 @@ export interface CreateInfisicalServiceOptions {
 	client: InfisicalClient;
 	linkStore: InfisicalLinkStore;
 	now?: () => Date;
+	/**
+	 * Resolves the live workspace checkout a repository's committed
+	 * `[infisical]` block is read from and written to, or null when the named
+	 * workspace is unknown, archived, or belongs to another repository. The root
+	 * clone is never a valid answer (ADR 0070).
+	 */
+	resolveWorkspaceCheckout: (input: {
+		repositoryId: string;
+		workspaceId: string;
+	}) => string | null;
 }
 
 /**
@@ -104,6 +132,7 @@ export function createInfisicalService({
 	client,
 	linkStore,
 	now = () => new Date(),
+	resolveWorkspaceCheckout,
 }: CreateInfisicalServiceOptions): InfisicalService {
 	const inFlightResolutions = new Map<string, Promise<InfisicalResolution>>();
 	const accountMatcher = createInfisicalAccountMatcher({
@@ -127,26 +156,61 @@ export function createInfisicalService({
 	}
 
 	/**
-	 * Reads the two repository-side sources of a link: the `[infisical]` block
-	 * Ensemblr commits, and the `.infisical.json` the Infisical CLI writes.
-	 * Only a repository has either; a workspace link is an explicit per-machine
-	 * override with nothing on disk behind it.
-	 * @param scope - Link scope.
-	 * @param scopeId - Repository or workspace id.
-	 * @returns Both sources, each null when the repository declares none.
+	 * Reads the two repository-side sources of a link out of one checkout: the
+	 * `[infisical]` block Ensemblr commits, and the `.infisical.json` the
+	 * Infisical CLI writes. Both come from the same checkout so the screen never
+	 * shows one tree's project while writing another's. Only a repository has
+	 * either; a workspace link is an explicit per-machine override with nothing
+	 * on disk behind it.
+	 * @param checkoutPath - Checkout to read, or null when the scope has none.
+	 * @returns Both sources, each null when the checkout declares none.
 	 */
-	function readRepositorySources(scope: InfisicalLinkScope, scopeId: string) {
-		const repositoryPath =
-			scope === 'repository' ? linkStore.readRepositoryPath(scopeId) : null;
-
-		if (!repositoryPath) {
+	function readRepositorySources(checkoutPath: string | null) {
+		if (!checkoutPath) {
 			return { committed: null, discovered: null };
 		}
 
 		return {
-			committed: readInfisicalRepositoryConfig(repositoryPath),
-			discovered: readInfisicalCliConfig(repositoryPath),
+			committed: readInfisicalRepositoryConfig(checkoutPath),
+			discovered: readInfisicalCliConfig(checkoutPath),
 		};
+	}
+
+	/**
+	 * Resolves the checkout whose committed `[infisical]` block backs one
+	 * renderer request. Shared repository config lives on a live workspace's
+	 * branch rather than in the root clone, so an unknown, archived, or
+	 * mismatched workspace resolves to nothing instead of falling back to the
+	 * root.
+	 * @param request - Scope, scope id, and the live workspace the user named.
+	 * @returns The workspace checkout path, or null when the scope has none.
+	 */
+	function resolveRequestCheckout({
+		scope,
+		scopeId,
+		workspaceId,
+	}: InfisicalLinkScopeRequest): string | null {
+		return scope === 'repository'
+			? resolveWorkspaceCheckout({ repositoryId: scopeId, workspaceId })
+			: null;
+	}
+
+	/**
+	 * Names the checkout the environment layer reads a repository's committed
+	 * block from. A terminal or agent launch names no workspace, so the root
+	 * clone stands in: it holds the merged, team-visible config rather than one
+	 * branch's pending edit. Reading it is safe — ADR 0070 forbids *writing* it.
+	 * @param scope - Link scope being resolved.
+	 * @param scopeId - Repository or workspace id.
+	 * @returns The checkout to read, or null when the scope has none.
+	 */
+	function resolveEnvironmentCheckout(
+		scope: InfisicalLinkScope,
+		scopeId: string,
+	): string | null {
+		return scope === 'repository'
+			? linkStore.readRepositoryPath(scopeId)
+			: null;
 	}
 
 	/**
@@ -154,14 +218,16 @@ export function createInfisicalService({
 	 * link every caller reads.
 	 * @param scope - Link scope.
 	 * @param scopeId - Repository or workspace id.
+	 * @param checkoutPath - Checkout the committed half is read from, or null.
 	 * @returns The effective link, or null when the scope is not linked.
 	 */
 	function resolveLink(
 		scope: InfisicalLinkScope,
 		scopeId: string,
+		checkoutPath: string | null,
 	): InfisicalLinkSnapshot | null {
 		const row = linkStore.rows({ scope, scopeId });
-		const { committed, discovered } = readRepositorySources(scope, scopeId);
+		const { committed, discovered } = readRepositorySources(checkoutPath);
 		const ensemblrProjectId = row?.projectId || committed?.projectId || '';
 		const fallback = ensemblrProjectId
 			? null
@@ -317,32 +383,39 @@ export function createInfisicalService({
 	}
 
 	/**
-	 * Rewrites the repository's committed `[infisical]` block, reporting a
-	 * failure rather than swallowing it: a config that could not be written is a
-	 * link nobody who clones the repository will inherit, and the local half has
-	 * already saved by the time this runs. Clearing is skipped only when the
-	 * repository has no settings file at all — unlinking a project discovered in
-	 * a `.infisical.json` must not create one. A file that exists but does not
-	 * parse still goes through the writer, so the failure is reported.
-	 * @param repositoryId - Repository whose committed config is rewritten.
+	 * Rewrites the committed `[infisical]` block on the named workspace's
+	 * branch, reporting a failure rather than swallowing it: a config that could
+	 * not be written is a link nobody who clones the repository will inherit,
+	 * and the local half has already saved by the time this runs. A repository
+	 * with no live workspace is refused outright — the root clone is never the
+	 * fallback — and the refusal is worded for the half that already committed,
+	 * since a clear has dropped the local link by the time this runs while a
+	 * save has stored it. Clearing is skipped only when the workspace has no settings file
+	 * at all, so unlinking a project discovered in a `.infisical.json` never
+	 * creates one. A file that exists but does not parse still goes through the
+	 * writer, so the failure is reported.
+	 * @param checkoutPath - Workspace checkout receiving the write, or null when none resolved.
 	 * @param block - The block to commit, or null to clear it.
 	 * @returns The failure that stopped the write, or null.
 	 */
 	function commitRepositoryBlock(
-		repositoryId: string,
+		checkoutPath: string | null,
 		block: InfisicalRepositoryConfigBlock | null,
 	): InfisicalFailure | null {
-		const repositoryPath = linkStore.readRepositoryPath(repositoryId);
+		if (!checkoutPath) {
+			return block
+				? WORKSPACE_REQUIRED_FAILURE
+				: CLEAR_WORKSPACE_REQUIRED_FAILURE;
+		}
 
-		if (!repositoryPath) {
+		if (!block && !hasRepositorySettingsFile(checkoutPath)) {
 			return null;
 		}
 
-		if (!block && !hasRepositorySettingsFile(repositoryPath)) {
-			return null;
-		}
-
-		const result = writeInfisicalRepositoryConfig({ block, repositoryPath });
+		const result = writeInfisicalRepositoryConfig({
+			block,
+			repositoryPath: checkoutPath,
+		});
 
 		return result.ok
 			? null
@@ -430,7 +503,9 @@ export function createInfisicalService({
 			}
 		},
 
-		clearLink: async ({ scope, scopeId }) => {
+		clearLink: async (request) => {
+			const { scope, scopeId } = request;
+
 			try {
 				linkStore.clear({ scope, scopeId });
 				linkStore.dismissDiscovery({ scope, scopeId });
@@ -439,7 +514,7 @@ export function createInfisicalService({
 				return {
 					failure:
 						scope === 'repository'
-							? commitRepositoryBlock(scopeId, null)
+							? commitRepositoryBlock(resolveRequestCheckout(request), null)
 							: null,
 					link: null,
 				};
@@ -448,9 +523,16 @@ export function createInfisicalService({
 			}
 		},
 
-		getLink: ({ scope, scopeId }) => {
+		getLink: (request) => {
 			try {
-				return { failure: null, link: resolveLink(scope, scopeId) };
+				return {
+					failure: null,
+					link: resolveLink(
+						request.scope,
+						request.scopeId,
+						resolveRequestCheckout(request),
+					),
+				};
 			} catch (error) {
 				return { failure: toFailure(error), link: null };
 			}
@@ -514,7 +596,11 @@ export function createInfisicalService({
 			let link: InfisicalLinkSnapshot | null;
 
 			try {
-				link = resolveLink(scope, scopeId);
+				link = resolveLink(
+					scope,
+					scopeId,
+					resolveEnvironmentCheckout(scope, scopeId),
+				);
 			} catch {
 				return empty;
 			}
@@ -561,6 +647,7 @@ export function createInfisicalService({
 
 				const secretPath = request.secretPath?.trim() || '/';
 				const recursive = request.recursive ?? false;
+				const checkoutPath = resolveRequestCheckout(request);
 
 				linkStore.restoreDiscovery({
 					scope: request.scope,
@@ -584,7 +671,7 @@ export function createInfisicalService({
 				return {
 					failure:
 						request.scope === 'repository'
-							? commitRepositoryBlock(request.scopeId, {
+							? commitRepositoryBlock(checkoutPath, {
 									environmentSlug: request.environmentSlug.trim(),
 									projectId: request.projectId.trim(),
 									projectName: request.projectName?.trim() || null,
@@ -593,15 +680,16 @@ export function createInfisicalService({
 									siteUrl: account.siteUrl,
 								})
 							: null,
-					link: resolveLink(request.scope, request.scopeId),
+					link: resolveLink(request.scope, request.scopeId, checkoutPath),
 				};
 			} catch (error) {
 				return { failure: toFailure(error), link: null };
 			}
 		},
 
-		syncNow: async ({ scope, scopeId }) => {
-			const link = resolveLink(scope, scopeId);
+		syncNow: async (request) => {
+			const { scope, scopeId } = request;
+			const link = resolveLink(scope, scopeId, resolveRequestCheckout(request));
 
 			if (!link) {
 				return {

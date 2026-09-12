@@ -177,12 +177,14 @@ Three consequences are worth knowing before you save:
   keeps its file untouched.
 - **A file that does not parse is never overwritten.** The save fails with an
   error and your file is left byte-for-byte intact.
-- **Edits land on the repository root clone, not the open workspace.** That is
-  the checkout whose branch you commit and merge, so the change is one your team
-  can actually receive — commit `.ensemblr/settings.toml` to share it. A
-  workspace picks it up once its own branch has the change, and if the open
-  workspace's branch resolves different script settings, the Scripts pane says
-  so.
+- **Edits land on a live workspace you name, never on the repository root
+  clone.** The pane shows which workspace receives the write and lets you change
+  it, and it reads that same workspace, so what is on screen is what that
+  workspace runs. The save produces an ordinary uncommitted change on that
+  workspace's branch: commit `.ensemblr/settings.toml` there and merge it to
+  share it with the team. A repository with no live workspace cannot edit its
+  scripts in the app — open one first
+  ([ADR 0070](../adr/0070-publish-shared-repository-settings-onto-a-workspace-branch.md)).
 
 ## Running a coding-agent CLI in a terminal
 
