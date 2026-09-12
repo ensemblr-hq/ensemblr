@@ -7,6 +7,15 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
+      # React and react-dom ship from one repository on one version, and
+      # @types/react-dom peer-depends on @types/react, so a bump landing one
+      # without the other fails the install. All four only ever move together.
+      react:
+        patterns:
+          - react
+          - react-dom
+          - "@types/react"
+          - "@types/react-dom"
       # Electron carries the Chromium and Node the app runs on, so a patch
       # release is a security update. Grouped alone so it is never buried in a
       # batched dev-dependency pull request nobody reads line by line.
@@ -24,10 +33,10 @@ updates:
           - lexical
           - "@lexical/*"
       # A group without `applies-to` covers version updates only, so an advisory
-      # on either family would still arrive as one pull request per package —
-      # which for lexical is the split this file exists to prevent. Each family
-      # gets a security twin; neither bundles anything outside itself, so no
-      # advisory waits on an unrelated package.
+      # on one of these families would still arrive as one pull request per
+      # package — which for lexical and react is the split this file exists to
+      # prevent. Each family gets a security twin; none bundles anything outside
+      # itself, so no advisory waits on an unrelated package.
       electron-security:
         applies-to: security-updates
         patterns:
@@ -39,12 +48,26 @@ updates:
         patterns:
           - lexical
           - "@lexical/*"
+      react-security:
+        applies-to: security-updates
+        patterns:
+          - react
+          - react-dom
+          - "@types/react"
+          - "@types/react-dom"
+      # The two @types packages are development dependencies, so this group
+      # would claim them back out of `react` and split the family across two
+      # pull requests again. Dependabot resolves that overlap by pattern
+      # specificity, but the electron entries below have always declared it
+      # rather than leaning on the tiebreak.
       dev-dependencies:
         dependency-type: development
         exclude-patterns:
           - electron
           - "@electron/*"
           - "@electron-forge/*"
+          - "@types/react"
+          - "@types/react-dom"
     ignore:
       # @types/node mirrors the Node major that Electron embeds (24), not the
       # latest release; a newer major type-checks green and fails at runtime.
