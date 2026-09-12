@@ -1,4 +1,5 @@
 import path from 'node:path';
+import type { DatabaseSync } from 'node:sqlite';
 
 import type { EnsemblrRootDirectoryService } from '../../../src/main/root';
 import type { RootDirectorySnapshot } from '../../../src/shared/ipc';
@@ -71,4 +72,33 @@ export function buildRootDirectoryStub(
 			oldRootPreserved: true,
 		}),
 	};
+}
+
+/**
+ * Writes the `root_directories` row the managed-roots reader consults, so a
+ * service that has no root service injected still resolves the same roots the
+ * stub reports.
+ */
+export function persistManagedRootsRow(
+	database: DatabaseSync,
+	roots: { archivedContextsPath: string; workspacesPath: string },
+): void {
+	database
+		.prepare(
+			`INSERT INTO root_directories (
+				id, path, source, status,
+				repositories_path, workspaces_path, archived_contexts_path,
+				concierge_path, last_seen_at, metadata_json
+			)
+			VALUES ('current', ?, 'built-in-default', 'ok', '', ?, ?, '', ?, '{}')
+			ON CONFLICT(id) DO UPDATE SET
+				workspaces_path = excluded.workspaces_path,
+				archived_contexts_path = excluded.archived_contexts_path`,
+		)
+		.run(
+			path.dirname(roots.workspacesPath),
+			roots.workspacesPath,
+			roots.archivedContextsPath,
+			new Date().toISOString(),
+		);
 }

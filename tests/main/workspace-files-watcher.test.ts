@@ -105,6 +105,38 @@ describe('createWorkspaceFilesWatcher', () => {
 		expect(changes).toEqual([]);
 	});
 
+	test('ignores .git and node_modules churn at any depth', async () => {
+		const changes: string[] = [];
+		const { startWatch, watches } = fakeWatchFactory();
+		const watcher = createWorkspaceFilesWatcher({
+			onChange: (cwd) => changes.push(cwd),
+			startWatch,
+		});
+
+		watcher.watch('/abs/workspace');
+		watches[0].changed('packages/web/node_modules/react/index.js');
+		watches[0].changed('packages/web/.git/index');
+		watches[0].changed('vendor\\pkg\\node_modules\\lib.js');
+
+		await sleep(AFTER_DEBOUNCE_MS);
+		expect(changes).toEqual([]);
+	});
+
+	test('still emits for a path whose segment merely contains an ignored name', async () => {
+		const changes: string[] = [];
+		const { startWatch, watches } = fakeWatchFactory();
+		const watcher = createWorkspaceFilesWatcher({
+			onChange: (cwd) => changes.push(cwd),
+			startWatch,
+		});
+
+		watcher.watch('/abs/workspace');
+		watches[0].changed('docs/node_modules-guide/index.md');
+
+		await sleep(AFTER_DEBOUNCE_MS);
+		expect(changes).toEqual(['/abs/workspace']);
+	});
+
 	test('ignores .DS_Store and AppleDouble churn at any depth', async () => {
 		const changes: string[] = [];
 		const { startWatch, watches } = fakeWatchFactory();

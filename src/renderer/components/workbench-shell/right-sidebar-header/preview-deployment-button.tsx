@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
+import { externalHref } from '@/renderer/lib/external-url';
 import {
 	getPullRequestLinkButtonClassName,
 	resolvePreviewPillTone,
@@ -86,7 +87,7 @@ export function PreviewDeploymentButton({
 			variant='outline'
 		>
 			<a
-				href={deployment.url}
+				href={externalHref(deployment.url)}
 				rel='noreferrer'
 				target='_blank'
 				title={canCollapseTextLabel ? deployment.label : undefined}

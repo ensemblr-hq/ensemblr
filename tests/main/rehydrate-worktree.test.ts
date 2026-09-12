@@ -28,6 +28,7 @@ interface Harness {
 	archivedContextPath: string;
 	repositoryPath: string;
 	workspacePath: string;
+	workspacesPath: string;
 }
 
 function runGit(cwd: string, args: string[]): string {
@@ -37,7 +38,8 @@ function runGit(cwd: string, args: string[]): string {
 function createHarness(t: TestContext): Harness {
 	const rootPath = mkdtempSync(path.join(tmpdir(), 'ensemblr-rehydrate-'));
 	const repositoryPath = path.join(rootPath, 'repo');
-	const workspacePath = path.join(rootPath, 'workspaces', 'eng-1');
+	const workspacesPath = path.join(rootPath, 'workspaces');
+	const workspacePath = path.join(workspacesPath, 'octocat-demo', 'eng-1');
 	const archivedContextPath = path.join(rootPath, 'archived', 'eng-1');
 	mkdirSync(repositoryPath, { recursive: true });
 	mkdirSync(archivedContextPath, { recursive: true });
@@ -62,7 +64,7 @@ function createHarness(t: TestContext): Harness {
 		rmSync(rootPath, { force: true, recursive: true });
 	});
 
-	return { archivedContextPath, repositoryPath, workspacePath };
+	return { archivedContextPath, repositoryPath, workspacePath, workspacesPath };
 }
 
 function prune(harness: Harness): Promise<PruneWorktreeOutcome> {
@@ -73,6 +75,7 @@ function prune(harness: Harness): Promise<PruneWorktreeOutcome> {
 		repositoryPath: harness.repositoryPath,
 		workspaceId: 'ws-1',
 		workspacePath: harness.workspacePath,
+		workspacesRoot: harness.workspacesPath,
 	});
 }
 
@@ -85,6 +88,7 @@ function rehydrate(harness: Harness, pruned: PruneWorktreeOutcome) {
 		prunedWipCommit: pruned.wipCommit,
 		repositoryPath: harness.repositoryPath,
 		workspacePath: harness.workspacePath,
+		workspacesRoot: harness.workspacesPath,
 	});
 }
 
@@ -209,6 +213,7 @@ test('an unrecoverable branch reports which recovery is missing', async (t) => {
 		prunedWipCommit: pruned.wipCommit,
 		repositoryPath: harness.repositoryPath,
 		workspacePath: harness.workspacePath,
+		workspacesRoot: harness.workspacesPath,
 	});
 
 	assert.equal(outcome.status, 'failure');
@@ -231,6 +236,7 @@ test('a recorded commit that no longer resolves is reported as a missing snapsho
 		prunedWipCommit: null,
 		repositoryPath: harness.repositoryPath,
 		workspacePath: harness.workspacePath,
+		workspacesRoot: harness.workspacesPath,
 	});
 
 	assert.equal(outcome.status, 'failure');
@@ -287,5 +293,29 @@ test('rehydrating clears residue a straggler left at the worktree path', async (
 	assert.equal(
 		readFileSync(path.join(harness.workspacePath, 'feature.txt'), 'utf8'),
 		'shipped\n',
+	);
+});
+
+test('leaves residue alone when it sits outside the managed workspaces root', async (t) => {
+	const harness = createHarness(t);
+	const pruned = await prune(harness);
+	mkdirSync(harness.workspacePath, { recursive: true });
+	writeFileSync(path.join(harness.workspacePath, 'residue.txt'), 'stay\n');
+
+	const outcome = await rehydrateWorktree({
+		archivedContextPath: harness.archivedContextPath,
+		branchName: BRANCH,
+		localCommandService: createLocalCommandService(),
+		prunedHeadCommit: pruned.headCommit,
+		prunedWipCommit: pruned.wipCommit,
+		repositoryPath: harness.repositoryPath,
+		workspacePath: harness.workspacePath,
+		workspacesRoot: path.join(harness.workspacesPath, 'somewhere-else'),
+	});
+
+	assert.equal(outcome.status, 'failure');
+	assert.equal(
+		readFileSync(path.join(harness.workspacePath, 'residue.txt'), 'utf8'),
+		'stay\n',
 	);
 });

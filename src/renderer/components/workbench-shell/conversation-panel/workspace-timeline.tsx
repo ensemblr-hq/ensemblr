@@ -110,6 +110,11 @@ export function WorkspaceTimeline({
 					activeAgentSessionId={composer.activeAgentSessionId}
 					activeSession={activeSession}
 					hasParentButton={hasParentButton}
+					// A different chat tab is a different transcript, so its window
+					// back through history starts closed again. Keyed rather than
+					// reset in an effect, which ran a render behind and briefly
+					// showed the previous tab's window over the new tab's messages.
+					key={activeSession.chatTabId}
 					workspace={workspace}
 				/>
 			</div>

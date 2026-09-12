@@ -6,7 +6,11 @@ import type {
 } from '../commands/local-command';
 import { firstLine } from './first-line.ts';
 import { canonicalPath } from './managed-path.ts';
-import { removeDirectoryTree } from './remove-directory.ts';
+import {
+	type RemoveDirectoryOutcome,
+	removeManagedDirectory,
+	WORKTREE_DEPTH,
+} from './remove-directory.ts';
 
 /** Outcome of a git operation that the caller maps to its own diagnostic code. */
 type GitOpOutcome =
@@ -862,12 +866,19 @@ export async function runWorktreeRemove({
 	localCommandService,
 	repositoryPath,
 	workspacePath,
+	workspacesRoot,
 }: {
 	/** True when the workspace itself is going, so git's refusal preserves nothing. */
 	deletingWorkspace?: boolean;
 	localCommandService: LocalCommandService;
 	repositoryPath: string;
 	workspacePath: string;
+	/**
+	 * Managed workspaces root the directory removal must resolve inside. Null
+	 * when no root has been resolved yet, which refuses the removal rather than
+	 * falling back to a shape check.
+	 */
+	workspacesRoot: string | null;
 }): Promise<WorktreeRemoveOutcome> {
 	const attempt = await removeWorktreeUntilUnregistered({
 		deletingWorkspace,
@@ -882,7 +893,7 @@ export async function runWorktreeRemove({
 		return { status: 'failure', message: attempt.message };
 	}
 
-	const removal = await removeDirectoryTree(workspacePath);
+	const removal = await removeWorktreeDirectory(workspacePath, workspacesRoot);
 	if (!removal.removed) {
 		const message = removal.error ?? attempt.message;
 
@@ -1220,4 +1231,29 @@ export async function runBranchDelete({
 					: 'git branch -D threw unexpectedly.',
 		};
 	}
+}
+
+/**
+ * Removes a worktree directory only when it resolves to exactly one worktree
+ * slot inside the managed workspaces root.
+ * @param workspacePath - Directory git left behind.
+ * @param workspacesRoot - Managed workspaces root, or null when unresolved.
+ * @returns Whether the path is gone afterwards, and the refusal when it is not.
+ */
+async function removeWorktreeDirectory(
+	workspacePath: string,
+	workspacesRoot: string | null,
+): Promise<RemoveDirectoryOutcome> {
+	if (!workspacesRoot) {
+		return {
+			error: `Refused to remove ${workspacePath}: the managed workspaces root is unknown.`,
+			removed: false,
+		};
+	}
+
+	return await removeManagedDirectory({
+		candidatePath: workspacePath,
+		expectedDepth: WORKTREE_DEPTH,
+		root: workspacesRoot,
+	});
 }

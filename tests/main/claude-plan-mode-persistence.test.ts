@@ -180,7 +180,20 @@ describe('resolvePermissionSettings falls back to the workspace mode, not a fixe
 });
 
 describe('Plan Mode survives Claude s own ExitPlanMode', () => {
-	it('re-asserts plan mode on the turn after a plan was submitted', async () => {
+	// The window this closes is the rest of the submitting turn. The CLI drops
+	// plan mode as it runs the tool and tells nobody, so on a trusted workspace
+	// everything after the `ExitPlanMode` call used to run at
+	// `bypassPermissions` with no gate anywhere in the path.
+	it('re-asserts plan mode the moment ExitPlanMode is observed', async () => {
+		const { permissionModes } = await openSession({
+			messages: [EXIT_PLAN_MESSAGE],
+			planMode: true,
+		});
+
+		expect(permissionModes).toEqual(['plan']);
+	});
+
+	it('re-asserts plan mode again on the turn after a plan was submitted', async () => {
 		const { permissionModes, session } = await openSession({
 			messages: [EXIT_PLAN_MESSAGE],
 			planMode: true,
@@ -188,7 +201,7 @@ describe('Plan Mode survives Claude s own ExitPlanMode', () => {
 
 		await session.submit({ planMode: true, prompt: 'refine it' });
 
-		expect(permissionModes).toEqual(['plan']);
+		expect(permissionModes).toEqual(['plan', 'plan']);
 	});
 
 	it('sees the plan submission it is reacting to', async () => {
@@ -209,7 +222,7 @@ describe('Plan Mode survives Claude s own ExitPlanMode', () => {
 
 		await session.submit({ planMode: false, prompt: 'implement it' });
 
-		expect(permissionModes).toEqual(['bypassPermissions']);
+		expect(permissionModes).toEqual(['plan', 'bypassPermissions']);
 	});
 
 	it('returns a read-only workspace to its own gate, never to default', async () => {
@@ -221,7 +234,7 @@ describe('Plan Mode survives Claude s own ExitPlanMode', () => {
 
 		await session.submit({ planMode: false, prompt: 'implement it' });
 
-		expect(permissionModes).toEqual(['plan']);
+		expect(permissionModes).toEqual(['plan', 'plan']);
 	});
 
 	it('leaves an unchanged mode alone, so an ordinary turn costs nothing', async () => {
@@ -246,7 +259,7 @@ describe('Plan Mode survives Claude s own ExitPlanMode', () => {
 	});
 
 	it('skips the switch for a mid-turn steer, which is already committed', async () => {
-		const { setPermissionMode, session } = await openSession({
+		const { permissionModes, session } = await openSession({
 			messages: [EXIT_PLAN_MESSAGE],
 			planMode: true,
 		});
@@ -257,7 +270,7 @@ describe('Plan Mode survives Claude s own ExitPlanMode', () => {
 			streamingBehavior: 'steer',
 		});
 
-		expect(setPermissionMode).not.toHaveBeenCalled();
+		expect(permissionModes).toEqual(['plan']);
 	});
 
 	// Forgetting the applied mode is this session's own bookkeeping, so it cannot
@@ -271,7 +284,7 @@ describe('Plan Mode survives Claude s own ExitPlanMode', () => {
 
 		await session.submit({ planMode: true, prompt: 'refine it' });
 
-		expect(permissionModes).toEqual(['plan']);
+		expect(permissionModes).toEqual(['plan', 'plan']);
 	});
 
 	it('re-asserts once per plan, not once per turn after it', async () => {
@@ -283,6 +296,6 @@ describe('Plan Mode survives Claude s own ExitPlanMode', () => {
 		await session.submit({ planMode: true, prompt: 'refine it' });
 		await session.submit({ planMode: true, prompt: 'refine it again' });
 
-		expect(permissionModes).toEqual(['plan']);
+		expect(permissionModes).toEqual(['plan', 'plan']);
 	});
 });

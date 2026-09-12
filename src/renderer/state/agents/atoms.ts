@@ -1,4 +1,6 @@
 import { atom } from 'jotai';
+import { selectAtom } from 'jotai/utils';
+import { atomFamily } from 'jotai-family';
 
 import {
 	type AgentActivityState,
@@ -27,6 +29,29 @@ export interface AgentConversationLiveState {
 export const agentConversationLiveStateAtom = atom<
 	Readonly<Record<string, Readonly<Record<string, AgentConversationLiveState>>>>
 >({});
+
+/** Live state of every session in one workspace, keyed by Ensemblr session id. */
+export type AgentWorkspaceLiveState = Readonly<
+	Record<string, AgentConversationLiveState>
+>;
+
+const EMPTY_WORKSPACE_LIVE_STATE: AgentWorkspaceLiveState = {};
+
+/**
+ * One workspace's slice of {@link agentConversationLiveStateAtom}.
+ *
+ * The full map is written on every applied agent session event of every open
+ * workspace, and a busy turn with parallel tool calls produces tens per second.
+ * Reading the slice means a write for another workspace — or for a session in
+ * this one that changed nothing — never reaches the subscriber.
+ */
+export const agentWorkspaceLiveStateAtomFamily = atomFamily(
+	(workspaceId: string) =>
+		selectAtom(
+			agentConversationLiveStateAtom,
+			(byWorkspace) => byWorkspace[workspaceId] ?? EMPTY_WORKSPACE_LIVE_STATE,
+		),
+);
 
 /** Builds the identity whose change retires activity from a replaced runtime. */
 function runtimeIdentityOf(session: AgentSessionSnapshotWire): string {
@@ -115,6 +140,18 @@ export const applyAgentConversationEventAtom = atom(
 				? input.envelope.status
 				: previous.status;
 		const activity = reduceAgentActivity(previous.activity, input.envelope);
+		// `reduceAgentActivity` hands back the same object when an event moves
+		// nothing, so an event that only advances the ordinal — a prose-only
+		// message, a status the projection ignores — writes nothing and re-renders
+		// nobody. Leaving the ordinal behind costs only the replay guard for an
+		// event that is by definition a no-op.
+		if (
+			activity === previous.activity &&
+			contextUsage === previous.contextUsage &&
+			status === previous.status
+		) {
+			return;
+		}
 		set(agentConversationLiveStateAtom, {
 			...current,
 			[input.workspaceId]: {

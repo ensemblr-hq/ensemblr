@@ -96,10 +96,11 @@ export function parseDeepLink(rawUrl: string): DeepLink {
 
 	// `new URL("ensemblr://foo/bar")` puts `foo` in hostname and `/bar` in pathname.
 	const head = url.hostname.toLowerCase();
-	const segments = url.pathname.split('/').flatMap((s) => {
-		const trimmed = decodeURIComponent(s).trim();
-		return trimmed ? [trimmed] : [];
-	});
+	const segments = decodePathSegments(url.pathname);
+
+	if (!segments) {
+		return { kind: 'invalid', reason: 'malformed-escape' };
+	}
 
 	switch (head) {
 		case 'workbench':
@@ -119,6 +120,33 @@ export function parseDeepLink(rawUrl: string): DeepLink {
 		default:
 			return { kind: 'invalid', reason: 'unknown-target' };
 	}
+}
+
+/**
+ * Percent-decode a deep link's path into its non-empty segments.
+ *
+ * `decodeURIComponent` throws on an invalid escape, and the caller's whole
+ * contract is that an unsafe URL comes back as `{ kind: 'invalid' }` rather
+ * than as an exception in whatever process opened the link.
+ * @param pathname - The URL pathname to split and decode
+ * @returns The decoded segments, or `null` when any segment is a malformed escape
+ */
+function decodePathSegments(pathname: string): string[] | null {
+	const segments: string[] = [];
+
+	for (const segment of pathname.split('/')) {
+		let decoded: string;
+		try {
+			decoded = decodeURIComponent(segment).trim();
+		} catch {
+			return null;
+		}
+		if (decoded) {
+			segments.push(decoded);
+		}
+	}
+
+	return segments;
 }
 
 /**

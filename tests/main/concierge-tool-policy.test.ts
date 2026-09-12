@@ -175,9 +175,9 @@ describe('the Concierge tool policy', () => {
 		expect(verdict('bash', { command }).blocked).toBe(false);
 	});
 
-	test('leaves every other tool untouched', () => {
-		for (const tool of ['read', 'Read', 'Grep', 'glob', 'WebFetch']) {
-			expect(verdict(tool).blocked).toBe(false);
+	test('leaves the read-only built-ins of both runtimes untouched', () => {
+		for (const tool of ['read', 'Read', 'grep', 'Grep', 'Glob', 'WebFetch']) {
+			expect(verdict(tool).blocked, tool).toBe(false);
 		}
 	});
 });
@@ -371,10 +371,16 @@ describe('the Claude runtime’s Concierge gate', () => {
 		).toBe('deny');
 	});
 
-	test('leaves every other tool untouched', async () => {
+	test('leaves every known read-only tool untouched', async () => {
 		for (const tool of ['Read', 'Grep', 'WebFetch']) {
 			expect((await ask(tool, {})).behavior).toBe('allow');
 		}
+	});
+
+	test('denies a tool it cannot vouch for', async () => {
+		expect(
+			(await ask('mcp__fs__write_file', { path: '/etc/hosts' })).behavior,
+		).toBe('deny');
 	});
 
 	// The hook resolves before permissions are consulted at all, so it still
@@ -391,5 +397,73 @@ describe('the Claude runtime’s Concierge gate', () => {
 			permissionDecision: 'deny',
 		});
 		expect(allowed.hookSpecificOutput).toBeUndefined();
+	});
+});
+
+// The classifier used to return `{ blocked: false }` for every name it did not
+// recognize. Wave 1 made the Pi extension forward by default rather than
+// intercepting eight literal names, so those calls now arrive here — `powershell`
+// runs a shell the bash classifier cannot read, and an MCP server's write tool
+// writes anywhere on disk. Both were cleared.
+describe('the Concierge guard denies a tool it cannot vouch for', () => {
+	test.each([
+		['powershell', {}],
+		['mcp__fs__write_file', { path: '/etc/hosts' }],
+		['mcp__github__create_pull_request', {}],
+		['ShellCommand', { command: 'ls' }],
+		['', {}],
+	])('blocks %s', (tool, extra) => {
+		const result = verdict(tool, extra);
+		expect(result.blocked).toBe(true);
+		expect(result.reason).toContain('refused rather than guessed at');
+	});
+
+	// The reads are what a supervising agent does all day, so a deny-by-default
+	// posture that took them would be a worse bug than the one it closes. Both
+	// runtimes' spellings, because one classifier answers for both.
+	test.each([
+		'find',
+		'grep',
+		'ls',
+		'read',
+		'Glob',
+		'Grep',
+		'Read',
+		'NotebookRead',
+		'Task',
+		'TodoWrite',
+		'WebFetch',
+		'WebSearch',
+		'BashOutput',
+		'Skill',
+		'SlashCommand',
+		'AskUserQuestion',
+		'ExitPlanMode',
+	])('clears the read-only built-in %s', (tool) => {
+		expect(verdict(tool)).toEqual({ blocked: false });
+	});
+
+	// Gated per op and per role by the control server instead, and a blanket
+	// denial here would take away the supervision the Concierge exists for.
+	test.each([
+		'ensemblr_start_conversation',
+		'ensemblr_list_workspaces',
+		'ensemblr_update_app_settings',
+	])('clears the control tool %s', (tool) => {
+		expect(verdict(tool)).toEqual({ blocked: false });
+	});
+
+	// The write and shell policies still answer first, with their own reasons.
+	test('keeps the write and shell verdicts ahead of the default', () => {
+		expect(verdict('write', { path: `${HOME}/notes.md` })).toEqual({
+			blocked: false,
+		});
+		expect(verdict('write', { path: '/etc/hosts' }).reason).toContain(
+			'outside your own folder',
+		);
+		expect(verdict('bash', { command: 'ls -la' })).toEqual({ blocked: false });
+		expect(verdict('bash', { command: 'rm -rf /' }).reason).toContain(
+			'not read-only',
+		);
 	});
 });

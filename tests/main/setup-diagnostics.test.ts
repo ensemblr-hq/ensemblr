@@ -133,6 +133,7 @@ function createDatabaseService(
 		close: () => undefined,
 		getConnection: () => null,
 		getHealth: () => snapshot,
+		vacuum: () => undefined,
 		open: () => snapshot,
 	};
 }
@@ -235,6 +236,11 @@ function createEnvironmentVariablesService(): EnvironmentVariablesService {
 	return {
 		addEnvFile: () => {
 			throw new Error('addEnvFile is not used by setup diagnostics tests.');
+		},
+		rememberPickedEnvFile: () => {
+			throw new Error(
+				'rememberPickedEnvFile is not used by setup diagnostics tests.',
+			);
 		},
 		assembleEnvironment: async () => ({
 			diagnostics: [],

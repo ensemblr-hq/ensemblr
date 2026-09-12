@@ -1,7 +1,21 @@
 import { describe, expect, test } from 'vitest';
 
-import { I18N_NAMESPACES, resources } from '@/renderer/lib/i18n';
+import {
+	I18N_NAMESPACES,
+	type LanguageCatalogue,
+	loadCatalogue,
+} from '@/renderer/lib/i18n';
 import { APP_LANGUAGES, FALLBACK_LANGUAGE } from '@/shared/i18n';
+
+// The catalogues are lazy chunks in the app; the suite wants all three at once.
+const resources = Object.fromEntries(
+	await Promise.all(
+		APP_LANGUAGES.map(async (language) => [
+			language,
+			await loadCatalogue(language),
+		]),
+	),
+) as Record<(typeof APP_LANGUAGES)[number], LanguageCatalogue>;
 
 const PLURAL_SUFFIXES = new Set(['zero', 'one', 'two', 'few', 'many', 'other']);
 

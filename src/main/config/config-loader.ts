@@ -13,7 +13,10 @@ import {
 	isPlainRecord,
 	isSensitiveKeyName,
 } from './json-utils.ts';
-import { watchConfigFile } from './watch-config-file.ts';
+import {
+	type ConfigFileWatcher,
+	watchConfigFile,
+} from './watch-config-file.ts';
 
 export type { ConfigDiagnostic, ConfigStatusSnapshot };
 
@@ -70,6 +73,16 @@ export interface LoadEnsemblrConfigOptions {
 	homeDirectory?: string;
 	now?: () => Date;
 	requireTrustedManagedConfig?: boolean;
+	/**
+	 * Override how the file is watched. Defaults to {@link watchConfigFile}.
+	 *
+	 * Injectable for the same reason the app-settings service takes one: the
+	 * reload-and-notify behaviour is this module's, while `fs.watch` delivery is
+	 * the OS's, and a test that drives the former through the latter fails on the
+	 * half it does not own — under a saturated parallel suite the event does not
+	 * arrive at all.
+	 */
+	watchFile?: ConfigFileWatcher;
 }
 
 /** Combined result of validating the on-disk config file. */
@@ -291,7 +304,7 @@ export function createEnsemblrConfigService(
 	const startWatching = (
 		onChange: (snapshot: ConfigStatusSnapshot) => void,
 	): void => {
-		watcherHandle = watchConfigFile({
+		watcherHandle = (options.watchFile ?? watchConfigFile)({
 			debounceMs: CONFIG_WATCH_DEBOUNCE_MS,
 			filePath: configPath,
 			onChange: () => {

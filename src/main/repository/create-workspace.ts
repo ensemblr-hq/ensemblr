@@ -519,6 +519,7 @@ export function createWorkspaceService({
 				branchName: prepared.branchName,
 				plan: prepared.plan,
 				workspacePath: prepared.path,
+				workspacesRoot: rootSnapshot.workspacesPath,
 			},
 		});
 		if ('diagnostic' in worktree) {
@@ -538,10 +539,12 @@ export function createWorkspaceService({
 				: failure(worktree.diagnostic);
 		}
 
-		// Best-effort: ensure `.context/` is git-ignored before anything can
-		// write to it. Failure is non-fatal (the directory is still usable;
-		// it just may show up in `git status`), so we do not roll back.
-		await addContextDirToGitExclude({
+		// Strictly before `runFilesToCopy`, which asks git which *gitignored*
+		// files match its patterns — the answer changes the moment this write
+		// lands, so running the two concurrently would race git's ignore state.
+		// Failure is non-fatal (the directory is still usable; it just may show
+		// up in `git status`), so we do not roll back.
+		const contextExcludeDiagnostic = await addContextDirToGitExclude({
 			localCommandService,
 			workspacePath: prepared.path,
 		});
@@ -583,7 +586,10 @@ export function createWorkspaceService({
 				repositoryPath: repository.path,
 				workspacePath: prepared.path,
 			});
-			await cleanupWorkspaceDirectory(prepared.path);
+			await cleanupWorkspaceDirectory({
+				workspacePath: prepared.path,
+				workspacesRoot: rootSnapshot.workspacesPath,
+			});
 			const message = error instanceof Error ? error.message : '';
 			// SQLite's UNIQUE(repository_id, slug) is the authoritative
 			// guard against concurrent same-slug workspace creation.
@@ -621,6 +627,7 @@ export function createWorkspaceService({
 			diagnostics: [
 				...(branchPoint.diagnostic ? [branchPoint.diagnostic] : []),
 				...worktree.diagnostics,
+				...(contextExcludeDiagnostic ? [contextExcludeDiagnostic] : []),
 			],
 			filesToCopy: filesToCopySnapshot,
 			reusedExisting: false,
@@ -1193,7 +1200,12 @@ async function rollbackWorktree({
  * `create-next-app`. Writes to `<git-common-dir>/info/exclude`, which lives
  * outside the working tree and is the only exclude file git honors for
  * worktrees. Idempotent across workspaces that share a repo. Best-effort: a
- * failure leaves `.context/` un-ignored but never fails workspace creation.
+ * failure leaves `.context/` un-ignored but never fails workspace creation — it
+ * surfaces as a creation warning instead, because an un-ignored `.context/`
+ * puts unredacted terminal scrollback in front of `git add -A`.
+ * @param localCommandService - Runs the `git rev-parse` that locates the exclude file.
+ * @param workspacePath - Worktree whose shared exclude file to append to.
+ * @returns A warning diagnostic when the exclude could not be written, else null.
  */
 async function addContextDirToGitExclude({
 	localCommandService,
@@ -1201,7 +1213,7 @@ async function addContextDirToGitExclude({
 }: {
 	localCommandService: LocalCommandService;
 	workspacePath: string;
-}): Promise<void> {
+}): Promise<CreateWorkspaceDiagnostic | null> {
 	try {
 		const result = await localCommandService.run({
 			args: ['rev-parse', '--git-common-dir'],
@@ -1212,7 +1224,7 @@ async function addContextDirToGitExclude({
 		});
 		const rawCommonDir = result.stdout.trim();
 		if (result.status !== 'success' || !rawCommonDir) {
-			return;
+			return null;
 		}
 
 		// `--git-common-dir` may be absolute or relative to the worktree;
@@ -1232,7 +1244,7 @@ async function addContextDirToGitExclude({
 			);
 		});
 		if (alreadyIgnored) {
-			return;
+			return null;
 		}
 
 		mkdirSync(path.dirname(excludePath), { recursive: true });
@@ -1243,11 +1255,16 @@ async function addContextDirToGitExclude({
 			`${leadingNewline}${CONTEXT_DIRECTORY}/\n`,
 			'utf8',
 		);
+		return null;
 	} catch (error) {
-		console.warn('[create-workspace] Failed to add .context/ to git exclude.', {
-			cause: error instanceof Error ? error.message : String(error),
-			workspacePath,
-		});
+		return {
+			code: 'context-exclude-failed',
+			message:
+				error instanceof Error
+					? error.message
+					: 'Could not add .context/ to the repository git exclude file.',
+			severity: 'warning',
+		};
 	}
 }
 

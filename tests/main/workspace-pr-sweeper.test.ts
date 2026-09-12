@@ -227,6 +227,123 @@ describe('createWorkspacePrStatusSweeper', () => {
 		}
 	});
 
+	test('a classified failure backs the workspace off past its ordinary cadence', async () => {
+		const scheduleInterval = vi.fn((_callback: () => void) => () => undefined);
+		let nowMs = 0;
+		const refreshSnapshot = vi.fn(async () => ({
+			error: { code: 'command-failed' as const },
+		}));
+		createWorkspacePrStatusSweeper({
+			idleIntervalMs: 120_000,
+			listActiveWorkspaces: () => [
+				{ hasPendingChecks: true, id: 'flaky', path: '/repo/flaky' },
+			],
+			now: () => nowMs,
+			pendingIntervalMs: 20_000,
+			refreshSnapshot,
+			scheduleInterval,
+		}).start();
+		await vi.waitFor(() => expect(refreshSnapshot).toHaveBeenCalledTimes(1));
+
+		// The pending cadence alone would already make this due; a second
+		// consecutive failure doubles the backoff past that cadence.
+		nowMs = 20_000;
+		tick(scheduleInterval);
+		await vi.waitFor(() => expect(refreshSnapshot).toHaveBeenCalledTimes(2));
+
+		nowMs = 40_000;
+		tick(scheduleInterval);
+		await flushSweep();
+		expect(refreshSnapshot).toHaveBeenCalledTimes(2);
+	});
+
+	test('a code that will not recover on a timer is held back for a long, flat window', async () => {
+		const scheduleInterval = vi.fn((_callback: () => void) => () => undefined);
+		let nowMs = 0;
+		const refreshSnapshot = vi.fn(async () => ({
+			error: { code: 'gh-not-authenticated' as const },
+		}));
+		createWorkspacePrStatusSweeper({
+			idleIntervalMs: 120_000,
+			listActiveWorkspaces: () => [
+				{ hasPendingChecks: false, id: 'unauthed', path: '/repo/unauthed' },
+			],
+			now: () => nowMs,
+			pendingIntervalMs: 20_000,
+			refreshSnapshot,
+			scheduleInterval,
+		}).start();
+		await vi.waitFor(() => expect(refreshSnapshot).toHaveBeenCalledTimes(1));
+
+		nowMs = 130_000;
+		tick(scheduleInterval);
+		await flushSweep();
+		expect(refreshSnapshot).toHaveBeenCalledTimes(1);
+
+		nowMs = 30 * 60_000 + 1;
+		tick(scheduleInterval);
+		await vi.waitFor(() => expect(refreshSnapshot).toHaveBeenCalledTimes(2));
+	});
+
+	test('a success clears a prior backoff so the ordinary cadence resumes', async () => {
+		const scheduleInterval = vi.fn((_callback: () => void) => () => undefined);
+		let nowMs = 0;
+		let fail = true;
+		const refreshSnapshot = vi.fn(async () =>
+			fail ? { error: { code: 'command-failed' as const } } : undefined,
+		);
+		createWorkspacePrStatusSweeper({
+			idleIntervalMs: 120_000,
+			listActiveWorkspaces: () => [
+				{ hasPendingChecks: true, id: 'recovers', path: '/repo/recovers' },
+			],
+			now: () => nowMs,
+			pendingIntervalMs: 20_000,
+			refreshSnapshot,
+			scheduleInterval,
+		}).start();
+		await vi.waitFor(() => expect(refreshSnapshot).toHaveBeenCalledTimes(1));
+
+		// The pending cadence alone would already make this due; the point is
+		// that the failure's backoff no longer holds it back past that.
+		fail = false;
+		nowMs = 20_000;
+		tick(scheduleInterval);
+		await vi.waitFor(() => expect(refreshSnapshot).toHaveBeenCalledTimes(2));
+
+		nowMs = 40_000;
+		tick(scheduleInterval);
+		await vi.waitFor(() => expect(refreshSnapshot).toHaveBeenCalledTimes(3));
+	});
+
+	test('a thrown refresh error backs off the same as a classified failure', async () => {
+		const scheduleInterval = vi.fn((_callback: () => void) => () => undefined);
+		let nowMs = 0;
+		const refreshSnapshot = vi.fn(async () => {
+			throw new Error('gh exploded');
+		});
+		createWorkspacePrStatusSweeper({
+			idleIntervalMs: 120_000,
+			listActiveWorkspaces: () => [
+				{ hasPendingChecks: true, id: 'throws', path: '/repo/throws' },
+			],
+			now: () => nowMs,
+			pendingIntervalMs: 20_000,
+			refreshSnapshot,
+			scheduleInterval,
+		}).start();
+		await vi.waitFor(() => expect(refreshSnapshot).toHaveBeenCalledTimes(1));
+
+		nowMs = 20_000;
+		tick(scheduleInterval);
+		await vi.waitFor(() => expect(refreshSnapshot).toHaveBeenCalledTimes(2));
+
+		nowMs = 40_000;
+		tick(scheduleInterval);
+		await flushSweep();
+		expect(refreshSnapshot).toHaveBeenCalledTimes(2);
+	});
+
 	test('an unlisted workspace is swept again when it comes back', async () => {
 		const scheduleInterval = vi.fn((_callback: () => void) => () => undefined);
 		let nowMs = 0;

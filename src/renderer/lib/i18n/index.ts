@@ -7,10 +7,16 @@
  * language changes.
  */
 
-export { INITIAL_LANGUAGE, i18n } from './instance';
+export {
+	changeAppLanguage,
+	ensureLanguageCatalogue,
+	INITIAL_LANGUAGE,
+	i18n,
+} from './instance';
 export {
 	DEFAULT_NAMESPACE,
 	I18N_NAMESPACES,
 	type I18nNamespace,
-	resources,
+	type LanguageCatalogue,
+	loadCatalogue,
 } from './resources';

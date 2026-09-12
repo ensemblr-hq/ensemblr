@@ -6,6 +6,7 @@ import {
 	mkdtempSync,
 	readFileSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -317,4 +318,36 @@ test('reports a failure when the config cannot be written', (t) => {
 
 	assert.equal(result.ok, false);
 	assert.equal(existsSync(fixture.configPath), false);
+});
+
+test('refuses to write through a committed settings.toml.tmp symlink', (t) => {
+	const fixture = createRepositoryFixture(t);
+	const victimDirectory = mkdtempSync(path.join(tmpdir(), 'ensemblr-victim-'));
+	t.after(() => rmSync(victimDirectory, { force: true, recursive: true }));
+	const victim = path.join(victimDirectory, 'authorized_keys');
+	writeFileSync(victim, 'untouched');
+	mkdirSync(path.dirname(fixture.configPath), { recursive: true });
+	symlinkSync(victim, `${fixture.configPath}.tmp`);
+
+	const result = writeRepositoryScripts(
+		writeInput(fixture.repositoryPath, { setup: 'echo hello' }),
+	);
+
+	assert.equal(result.ok, true);
+	assert.equal(readFileSync(victim, 'utf8'), 'untouched');
+	assert.match(fixture.read(), /setup = "echo hello"/);
+});
+
+test('refuses to write when .ensemblr is a committed symlink', (t) => {
+	const fixture = createRepositoryFixture(t);
+	const victimDirectory = mkdtempSync(path.join(tmpdir(), 'ensemblr-victim-'));
+	t.after(() => rmSync(victimDirectory, { force: true, recursive: true }));
+	symlinkSync(victimDirectory, path.join(fixture.repositoryPath, '.ensemblr'));
+
+	const result = writeRepositoryScripts(
+		writeInput(fixture.repositoryPath, { setup: 'echo hello' }),
+	);
+
+	assert.equal(result.ok, false);
+	assert.equal(existsSync(path.join(victimDirectory, 'settings.toml')), false);
 });

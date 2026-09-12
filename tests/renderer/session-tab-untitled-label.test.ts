@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'vitest';
-import { i18n } from '../../src/renderer/lib/i18n';
+import { changeAppLanguage } from '../../src/renderer/lib/i18n';
 import {
 	toClosedSessionTabModel,
 	toSessionTabModel,
@@ -44,43 +44,43 @@ function untitledClosedEntry(): ChatTabSummaryEntryWire {
 }
 
 afterEach(async () => {
-	await i18n.changeLanguage('en');
+	await changeAppLanguage('en');
 });
 
 test('an untitled open tab is labelled in the active language', async () => {
-	await i18n.changeLanguage('en');
+	await changeAppLanguage('en');
 	expect(toSessionTabModel(untitledTab(), undefined).label).toBe('New chat');
 
-	await i18n.changeLanguage('ru');
+	await changeAppLanguage('ru');
 	expect(toSessionTabModel(untitledTab(), undefined).label).toBe('Новый чат');
 
-	await i18n.changeLanguage('el');
+	await changeAppLanguage('el');
 	expect(toSessionTabModel(untitledTab(), undefined).label).toBe(
 		'Νέα συνομιλία',
 	);
 });
 
 test('an untitled open tab localizes its tooltip label too', async () => {
-	await i18n.changeLanguage('ru');
+	await changeAppLanguage('ru');
 	expect(toSessionTabModel(untitledTab(), undefined).fullLabel).toBe(
 		'Новый чат',
 	);
 });
 
 test('an untitled closed tab reads as untitled, not as new', async () => {
-	await i18n.changeLanguage('en');
+	await changeAppLanguage('en');
 	expect(toClosedSessionTabModel(untitledClosedEntry()).label).toBe(
 		'Untitled chat',
 	);
 
-	await i18n.changeLanguage('ru');
+	await changeAppLanguage('ru');
 	expect(toClosedSessionTabModel(untitledClosedEntry()).label).toBe(
 		'Диалог без названия',
 	);
 });
 
 test('an untitled file tab is named after the file it opens', async () => {
-	await i18n.changeLanguage('ru');
+	await changeAppLanguage('ru');
 	const fileTab: ChatTabWire = {
 		...untitledTab(),
 		kind: 'file',
@@ -103,15 +103,15 @@ test('an untitled diff tab is named after the file it diffs', async () => {
 test('an untitled non-chat tab with no path reads as untitled, not as new', async () => {
 	const documentTab: ChatTabWire = { ...untitledTab(), kind: 'document' };
 
-	await i18n.changeLanguage('en');
+	await changeAppLanguage('en');
 	expect(toSessionTabModel(documentTab, undefined).label).toBe('Untitled');
 
-	await i18n.changeLanguage('ru');
+	await changeAppLanguage('ru');
 	expect(toSessionTabModel(documentTab, undefined).label).toBe('Без названия');
 });
 
 test('a titled tab keeps its own title', async () => {
-	await i18n.changeLanguage('ru');
+	await changeAppLanguage('ru');
 	const titled: ChatTabWire = { ...untitledTab(), title: 'Fix the parser' };
 	expect(toSessionTabModel(titled, undefined).label).toBe('Fix the parser');
 });

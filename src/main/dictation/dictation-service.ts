@@ -18,6 +18,7 @@ import {
 	DICTATION_SECRET_KEY,
 	DictationError,
 	type DictationService,
+	isLoopbackEndpointHost,
 } from './dictation-types.ts';
 
 /** Longest slice of a provider's error body kept in a failure message. */
@@ -59,6 +60,10 @@ function uploadFileName(mimeType: string): string {
  * user's provider key in an `Authorization` header, so a value that is not an
  * absolute `http(s)` URL is refused here instead of reaching `fetch` and being
  * reported as an unreachable network.
+ *
+ * Plain `http:` is narrowed to loopback for the same reason it is allowed at
+ * all: the allowance exists for a locally-run `whisper-server`, and a remote
+ * `http:` host would receive the stored key and the recorded clip in cleartext.
  * @param baseUrl - OpenAI-compatible API root, e.g. `https://api.openai.com/v1`
  * @returns The absolute transcription endpoint
  */
@@ -70,6 +75,13 @@ function transcriptionEndpoint(baseUrl: string): string {
 		throw new DictationError(
 			'dictation-invalid-endpoint',
 			'The transcription endpoint must be an absolute http:// or https:// URL.',
+		);
+	}
+
+	if (parsed.protocol === 'http:' && !isLoopbackEndpointHost(parsed.hostname)) {
+		throw new DictationError(
+			'dictation-invalid-endpoint',
+			'A plain http:// transcription endpoint must be on the loopback interface; use https:// for a remote provider.',
 		);
 	}
 

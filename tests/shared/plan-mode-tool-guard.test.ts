@@ -36,6 +36,40 @@ describe('evaluatePlanModeTool', () => {
 		},
 	);
 
+	// The set a Pi session holds is open — the user can install another extension
+	// or point Pi at an MCP server — so a filter listing the mutating tools
+	// somebody thought of is a filter every other write walks past. Deny by
+	// default, exactly as the bash classifier is an allowlist.
+	it.each([
+		'mcp__filesystem__write_file',
+		'apply_patch',
+		'str_replace_editor',
+		'powershell',
+		'multiedit',
+		'Write',
+	])('blocks %s, which nothing here vouches for', (tool) => {
+		const verdict = evaluatePlanModeTool({ tool });
+		expect(verdict.blocked).toBe(true);
+		expect(verdict.reason).toContain(tool);
+	});
+
+	it('names the tool it refused, so the agent can say what it reached for', () => {
+		expect(
+			evaluatePlanModeTool({ tool: 'mcp__filesystem__write_file' }).reason,
+		).toContain('mcp__filesystem__write_file');
+	});
+
+	// The control tools have a better gate one layer up: `planModeControlOpDenial`
+	// answers per op and per role, and a blanket denial here would take away the
+	// reads and the spawn route planning is for.
+	it.each([
+		'ensemblr_get_workspace_diff',
+		'ensemblr_start_conversation',
+		'ensemblr_exit_plan_mode',
+	])('leaves the control tool %s to its own op gate', (tool) => {
+		expect(evaluatePlanModeTool({ tool })).toEqual({ blocked: false });
+	});
+
 	it('always points the agent at the way out of plan mode', () => {
 		expect(evaluatePlanModeTool({ tool: 'write' }).reason).toContain(
 			'ensemblr_exit_plan_mode',

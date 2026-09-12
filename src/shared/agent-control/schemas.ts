@@ -34,6 +34,12 @@ const nonEmpty = z.string().trim().min(1);
  * traversal attempt comes back as `invalid-args` the agent can correct instead
  * of as a git failure. Both separators are rejected: a Windows-style path
  * reaches a POSIX git as one opaque segment, which hides a `..` from the check.
+ *
+ * A leading `~` is refused too, because it is not the relative path it looks
+ * like: `resolvePreviewPath` expands it, so `~/.ssh/id_rsa` would resolve to the
+ * user's home rather than to a file under the workspace. No path the check
+ * admits may depend on an expansion it cannot see, which is the rule the
+ * Concierge guard applies to the same shape.
  * @param value - The agent-supplied path.
  * @returns True when the path is relative and never climbs out.
  */
@@ -44,7 +50,11 @@ const staysInsideWorkspace = (value: string): boolean => {
 	if (/^[A-Za-z]:[\\/]/.test(value)) {
 		return false;
 	}
-	return !value.split(/[\\/]/).includes('..');
+	const segments = value.split(/[\\/]/);
+	if (segments[0]?.startsWith('~')) {
+		return false;
+	}
+	return !segments.includes('..');
 };
 
 const workspaceRelativePath = nonEmpty.refine(staysInsideWorkspace, {
@@ -179,10 +189,18 @@ const writeTerminalSchema = z.strictObject({
 	input: z.string().min(1),
 });
 
+// `filePath` is validated exactly as the neighbouring diff ops validate theirs.
+// The preview resolver behind this op is deliberately permissive — it expands
+// `~`, accepts an absolute path, and reports anything outside the workspace as
+// `external` rather than refusing it — and its argument that "the agent already
+// reads the whole disk through its own tools" covers the agent reading a file.
+// It does not cover the agent choosing what the *user's* viewer displays: the
+// tab is titled with the basename alone, so `~/.ssh/id_rsa` opens as `id_rsa`
+// inside the workspace's own tab strip.
 const openTabSchema = z
 	.strictObject({
 		variant: z.enum(['file', 'diff', 'comment']),
-		filePath: nonEmpty.optional(),
+		filePath: workspaceRelativePath.optional(),
 		turnId: nonEmpty.optional(),
 		commentBody: nonEmpty.optional(),
 		prNumber: z.number().int().positive().optional(),

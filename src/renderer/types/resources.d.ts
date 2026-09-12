@@ -674,6 +674,7 @@ export default interface Resources {
 			'command-failed': 'The command failed.';
 			'configured-base-invalid': 'The branch new workspaces fork from is not a usable branch name, so this workspace took the repository default as its base instead.';
 			'configured-base-unresolvable': 'The branch new workspaces fork from could not be resolved, so this workspace took the repository default as its base instead.';
+			'context-exclude-failed': 'Ensemblr could not add .context/ to this repository’s git exclude file, so the workspace handoff directory may show up in git status. Terminal logs are written there, so check it before committing.';
 			'copy-failed': 'The files could not be copied.';
 			'database-error': 'The local database is unavailable, so the Linear account was not saved.';
 			'database-unavailable': 'The local database is unavailable, so nothing was changed.';
@@ -686,7 +687,7 @@ export default interface Resources {
 			'diagram-unreadable': 'The stored architecture diagram cannot be read. Repair or delete the file, then ask an agent to draw a new one.';
 			'dictation-disabled': 'Dictation is turned off in Settings.';
 			'dictation-empty-transcript': 'No speech was detected in the recording.';
-			'dictation-invalid-endpoint': 'The transcription endpoint must be a full http:// or https:// address.';
+			'dictation-invalid-endpoint': 'The transcription endpoint must be a full https:// address. http:// is accepted only for a server on this machine.';
 			'dictation-key-store-unavailable': 'The stored transcription API key could not be read from the Keychain.';
 			'dictation-microphone-denied': 'Ensemblr needs microphone access. Grant it in System Settings › Privacy & Security › Microphone.';
 			'dictation-microphone-missing': 'No microphone was found.';
@@ -763,6 +764,7 @@ export default interface Resources {
 			'not-file': 'That path is not a file.';
 			'not-found': 'That path was not found.';
 			'nothing-to-commit': 'Nothing to commit — the working tree is clean.';
+			'obfuscated-storage-unacknowledged': 'No keyring daemon answered, so this secret would only be obfuscated rather than encrypted. Accept the weaker protection in Settings › Diagnostics, or start gnome-keyring or KWallet.';
 			'open-target-app-not-installed': 'That app is not installed on this machine.';
 			'open-target-no-desktop-launcher': 'That app is only installed as a desktop entry, and neither gio nor gtk-launch is available to start it. Install glib or gtk3.';
 			'owner-invalid': 'That GitHub owner is not a valid login.';
@@ -1578,6 +1580,8 @@ export default interface Resources {
 			'add-comment': 'Add comment';
 			'hidden-line-count_one': '{{count}} unchanged line';
 			'hidden-line-count_other': '{{count}} unchanged lines';
+			'show-remaining-rows_one': 'Show the remaining {{count}} line';
+			'show-remaining-rows_other': 'Show the remaining {{count}} lines';
 			'unchanged-lines': 'Unchanged lines';
 		};
 		'discard-changes': {
@@ -1709,7 +1713,24 @@ export default interface Resources {
 		};
 		diagnostics: {
 			'copy-bundle': 'Copy diagnostics bundle';
+			database: {
+				compact: 'Compact database';
+				'compact-confirm': 'Click again to confirm';
+				compacting: 'Compacting…';
+				description: 'Ensemblr prunes old agent history automatically, but SQLite does not shrink the file on disk by itself. Compacting rewrites the whole file to reclaim that space, and blocks other database activity while it runs.';
+				failed: 'Could not compact the database: {{error}}.';
+				label: 'Database';
+				result: 'Reclaimed {{size}}.';
+				size: '{{size}} on disk';
+			};
 			description: 'Setup gate checks for Pi, git, GitHub, Linear, and the Ensemblr runtime. The diagnostics bundle redacts secrets, account ids, and full paths before going to the clipboard.';
+			'obfuscated-storage': {
+				acknowledge: 'Accept and store secrets anyway';
+				'acknowledge-failed': 'Could not record the acknowledgement: {{error}}.';
+				acknowledged: 'You accepted that the {{backend}} backend only obfuscates stored secrets on this machine, not encrypts them.';
+				description: 'No keyring daemon answered, so Ensemblr falls back to the {{backend}} backend, which obfuscates stored secrets with a key published in its own source rather than encrypting them. Anyone who can read the local database file can recover them. Start gnome-keyring or KWallet for real encryption, or accept the weaker protection to keep using secrets on this machine.';
+				title: 'Secrets are only obfuscated, not encrypted';
+			};
 			'rerun-onboarding': {
 				action: 'Re-run wizard';
 				description: 'Reopen the first-run setup wizard. Nothing already configured is undone — the wizard re-probes every check and walks you through whatever is still unresolved.';
@@ -2451,7 +2472,6 @@ export default interface Resources {
 				title: 'Secrets';
 			};
 			security: {
-				'committed-note': 'A committed <file>.ensemblr/settings.toml</file> value shared with the team still wins over this personal override — a repository can raise its own floor and you cannot lower it locally.';
 				description: 'How much an agent may do on its own in this repository. Applies to every workspace of the repo, and to the tools agents reach over the control server.';
 				'permission-mode': {
 					'approval-required': 'Approval required';
@@ -2462,6 +2482,7 @@ export default interface Resources {
 					'workspace-trusted': 'Workspace trusted';
 					'workspace-trusted-description': 'Agents act freely inside the workspace; anything outside it still asks.';
 				};
+				'scope-note': 'This repository’s mode is the one Ensemblr enforces. Reset it and workspaces of this repo fall back to the app-wide default.';
 				title: 'Security';
 			};
 			'setup-script': {
@@ -3926,8 +3947,12 @@ export default interface Resources {
 				'open-settings': 'Open settings';
 				retry: 'Send again';
 			};
+			'load-earlier': 'Load earlier messages';
 			'load-failed': 'Could not load timeline events.';
+			'payload-truncated': '[output truncated — {{size}} not shown]';
 			'runtime-error': 'Runtime error';
+			'show-earlier_one': 'Show {{count}} earlier message';
+			'show-earlier_other': 'Show {{count}} earlier messages';
 			starting: {
 				agent: 'Starting agent';
 				loading: 'Loading conversation';

@@ -4,7 +4,7 @@
  * errors as diagnostics. Normalization, snapshot wrapping, and orchestration
  * live in `repository-config.ts`.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 import { load } from 'js-toml';
@@ -13,6 +13,10 @@ import type { ConfigDiagnostic } from '../../shared/ipc/contracts/health';
 import type { RepositoryConfigSourceStatus } from '../../shared/ipc/contracts/repository-config';
 import type { SettingsResolutionSource } from '../../shared/ipc/contracts/settings-resolution';
 import { formatErrorMessage } from './json-utils.ts';
+import {
+	MAX_SETTINGS_BYTES,
+	readBoundedSettingsFile,
+} from './settings-file-access.ts';
 
 /** Filename of the `.worktreeinclude` legacy include list. */
 export const WORKTREE_INCLUDE_FILENAME = '.worktreeinclude';
@@ -44,22 +48,36 @@ export function formatSourceName(source: SettingsResolutionSource): string {
 type ReadSourceFileOutcome =
 	| { kind: 'missing'; rawSource?: undefined }
 	| { kind: 'read-error'; rawSource?: undefined; readError: unknown }
+	| { kind: 'too-large'; rawSource?: undefined }
 	| { kind: 'loaded'; rawSource: string };
 
 /**
  * Reads a source file from disk and reports IO-level outcomes (missing vs
- * read-error vs loaded). Parsing is left to the caller.
+ * read-error vs too-large vs loaded). Parsing is left to the caller.
+ *
+ * The file is committed by the repository, so its size is attacker-chosen: the
+ * read is bounded rather than allowed to allocate whatever is on disk, since
+ * every `resolve({repository})` — the Scripts pane, the review-brief fallback,
+ * `resolveScriptConfig` — lands here on the main thread.
+ * @param sourcePath - Absolute path of the config file to read.
+ * @returns What the read produced.
  */
 function readSourceFile(sourcePath: string): ReadSourceFileOutcome {
 	if (!existsSync(sourcePath)) {
 		return { kind: 'missing' };
 	}
 
-	try {
-		return { kind: 'loaded', rawSource: readFileSync(sourcePath, 'utf8') };
-	} catch (error) {
-		return { kind: 'read-error', readError: error };
+	const result = readBoundedSettingsFile(sourcePath);
+	if (result.ok) {
+		return { kind: 'loaded', rawSource: result.bytes.toString('utf8') };
 	}
+
+	return result.reason === 'too-large'
+		? { kind: 'too-large' }
+		: {
+				kind: 'read-error',
+				readError: new Error(`Failed to read ${sourcePath}.`),
+			};
 }
 
 /**
@@ -78,6 +96,21 @@ export function readTomlFile({
 			path: sourcePath,
 			record: null,
 			status: 'missing',
+		};
+	}
+
+	if (outcome.kind === 'too-large') {
+		return {
+			diagnostics: [
+				{
+					code: 'invalid-repository-toml',
+					message: `${sourcePath} exceeds the ${MAX_SETTINGS_BYTES} byte configuration limit.`,
+					severity: 'error',
+				},
+			],
+			path: sourcePath,
+			record: null,
+			status: 'invalid',
 		};
 	}
 
@@ -140,19 +173,17 @@ export function loadWorktreeincludeSource(repositoryPath: string): {
 		return { diagnostics: [], settings: {}, status: 'missing' };
 	}
 
-	let source: string;
+	const read = readBoundedSettingsFile(sourcePath);
 
-	try {
-		source = readFileSync(sourcePath, 'utf8');
-	} catch (error) {
+	if (!read.ok) {
 		return {
 			diagnostics: [
 				{
 					code: 'repository-config-read-error',
-					message: formatErrorMessage(
-						error,
-						'Failed to read .worktreeinclude.',
-					),
+					message:
+						read.reason === 'too-large'
+							? `.worktreeinclude exceeds the ${MAX_SETTINGS_BYTES} byte configuration limit.`
+							: 'Failed to read .worktreeinclude.',
 					severity: 'error',
 				},
 			],
@@ -161,7 +192,8 @@ export function loadWorktreeincludeSource(repositoryPath: string): {
 		};
 	}
 
-	const filesToCopy = source
+	const filesToCopy = read.bytes
+		.toString('utf8')
 		.split(/\r?\n/)
 		.map((line) => line.trim())
 		.flatMap((line) => {

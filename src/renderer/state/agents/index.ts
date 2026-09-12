@@ -1,6 +1,8 @@
 export {
 	type AgentConversationLiveState,
+	type AgentWorkspaceLiveState,
 	agentConversationLiveStateAtom,
+	agentWorkspaceLiveStateAtomFamily,
 	applyAgentConversationEventAtom,
 	seedAgentConversationSnapshotsAtom,
 } from './atoms';

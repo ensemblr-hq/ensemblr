@@ -1,5 +1,5 @@
 import type { DynamicToolUIPart } from 'ai';
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChatAttachmentChip } from '@/renderer/components/chat-attachment-chip';
 import {
@@ -136,8 +136,20 @@ export function ChatSkillInvocation({ name }: { name: string }) {
  * of kind `pending` disables it for the same reason: the call has produced no
  * result yet, so the only thing behind the control is a placeholder repeating
  * what the row's own pulse already says.
+ *
+ * Memoized because the live turn re-renders on every streamed delta while the
+ * rows above it are settled: each caller `useMemo`s its presentation on the part
+ * identity the projector preserves, so this boundary is what keeps a turn's cost
+ * flat in the number of tool calls it has already made rather than linear in it.
+ * The rows between here and the turn carry no memo of their own —
+ * `groupSubagentActivity` and `foldTaskPlanRuns` allocate a fresh node per part
+ * per fold, so nothing above this point has a stable prop to compare.
  */
-function ToolRow({ presentation }: { presentation: ToolPresentation }) {
+const ToolRow = memo(function ToolRow({
+	presentation,
+}: {
+	presentation: ToolPresentation;
+}) {
 	const {
 		badge,
 		body,
@@ -172,7 +184,7 @@ function ToolRow({ presentation }: { presentation: ToolPresentation }) {
 			{extensionOwned && rawIO ? <ToolRawIODisclosure rawIO={rawIO} /> : null}
 		</ToolCollapsible>
 	);
-}
+});
 
 /** Host-owned disclosure that keeps the actual execution visible beside custom UI. */
 function ToolRawIODisclosure({ rawIO }: { rawIO: ToolRawIODescriptor }) {

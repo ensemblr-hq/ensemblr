@@ -16,7 +16,7 @@
 
 import {
 	interpolatePromptFields,
-	USER_PREF_ADDON,
+	preferenceAddonFor,
 } from '../prompt-scaffolding.ts';
 import { clampReviewContext } from './review-context.ts';
 
@@ -181,6 +181,6 @@ export function composeReviewBrief(input: ReviewBriefInput): string {
 	const bounded = clampReviewContext(sections.join('\n\n'));
 	const preferences = input.preferences.trim();
 	return preferences
-		? `${bounded}\n\n${USER_PREF_ADDON}\n\n${preferences}`
+		? `${bounded}\n\n${preferenceAddonFor(preferences)}\n\n${preferences}`
 		: bounded;
 }

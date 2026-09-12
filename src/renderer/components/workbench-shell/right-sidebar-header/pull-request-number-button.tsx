@@ -2,6 +2,7 @@ import { ArrowUpRightIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
+import { externalHref } from '@/renderer/lib/external-url';
 import { getPullRequestLinkButtonClassName } from '@/renderer/lib/workbench/pull-request-link-button';
 import type { PullRequestHeaderTone } from '@/renderer/types/workbench';
 
@@ -38,7 +39,7 @@ export function PullRequestNumberButton({
 				size='sm'
 				variant='outline'
 			>
-				<a href={url} rel='noreferrer' target='_blank'>
+				<a href={externalHref(url)} rel='noreferrer' target='_blank'>
 					{content}
 				</a>
 			</Button>

@@ -16,7 +16,7 @@ import {
 	runWorktreePrune,
 	type WorktreeBranchPlacement,
 } from './git-ops.ts';
-import { removeDirectoryTree } from './remove-directory.ts';
+import { removeManagedDirectory, WORKTREE_DEPTH } from './remove-directory.ts';
 import { validateGitRef } from './validate-git-ref.ts';
 
 const ORIGIN_REMOTE = 'origin';
@@ -34,6 +34,8 @@ export interface WorktreePlacementRequest {
 	branchName: string;
 	plan: WorkspaceBranchPlan;
 	workspacePath: string;
+	/** Managed workspaces root a rollback removal must resolve inside. */
+	workspacesRoot: string;
 }
 
 /**
@@ -106,15 +108,34 @@ export async function createWorktree({
 			},
 		};
 	}
-	await cleanupWorkspaceDirectory(request.workspacePath);
+	await cleanupWorkspaceDirectory({
+		workspacePath: request.workspacePath,
+		workspacesRoot: request.workspacesRoot,
+	});
 	return { diagnostic: worktreeDiagnostic };
 }
 
-/** Removes a half-created workspace directory; failures are swallowed. */
-export async function cleanupWorkspaceDirectory(
-	workspacePath: string,
-): Promise<void> {
-	await removeDirectoryTree(workspacePath);
+/**
+ * Removes a half-created workspace directory; failures are swallowed.
+ *
+ * Root-anchored rather than shape-checked alone: the path is composed from a
+ * slug and a managed root, so a rollback that resolves anywhere but exactly one
+ * worktree slot inside `workspacesRoot` is a bug worth refusing rather than a
+ * tree worth deleting.
+ * @param options - The half-created worktree path and the managed workspaces root.
+ */
+export async function cleanupWorkspaceDirectory({
+	workspacePath,
+	workspacesRoot,
+}: {
+	workspacePath: string;
+	workspacesRoot: string;
+}): Promise<void> {
+	await removeManagedDirectory({
+		candidatePath: workspacePath,
+		expectedDepth: WORKTREE_DEPTH,
+		root: workspacesRoot,
+	});
 }
 
 /**

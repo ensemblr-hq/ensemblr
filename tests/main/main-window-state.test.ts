@@ -47,6 +47,7 @@ function createDatabaseService(t: TestContext): EnsemblrDatabaseService {
 		close,
 		getConnection: () => (closed ? null : connection),
 		getHealth: () => health,
+		vacuum: () => undefined,
 		open: () => health,
 	};
 }

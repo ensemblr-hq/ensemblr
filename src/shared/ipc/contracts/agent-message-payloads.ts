@@ -48,16 +48,27 @@ export interface AgentWireMetadata {
  * main-process agent-runtime boundary as `AgentMessagePart`. Keeping one
  * definition means a new variant added here is enforced everywhere by the type
  * system — no silent drift between main and renderer.
+ *
+ * `truncatedBytes` is set only when the persisted payload exceeded the event
+ * byte budget and the writer kept the head of the field; it counts the bytes
+ * that were dropped, so a surface can say how much it is not showing.
  */
 export type AgentWireMessagePart =
-	| { kind: 'text'; text: string }
-	| { kind: 'reasoning'; text: string }
-	| { kind: 'tool-call'; input: unknown; name: string; toolCallId: string }
+	| { kind: 'text'; text: string; truncatedBytes?: number }
+	| { kind: 'reasoning'; text: string; truncatedBytes?: number }
+	| {
+			kind: 'tool-call';
+			input: unknown;
+			name: string;
+			toolCallId: string;
+			truncatedBytes?: number;
+	  }
 	| {
 			kind: 'tool-result';
 			isError: boolean;
 			output: unknown;
 			toolCallId: string;
+			truncatedBytes?: number;
 	  };
 
 /**
@@ -76,9 +87,13 @@ export type AgentWireMessagePart =
  * `custom` carries a message an extension injected into the conversation. It is
  * context the agent reads, not prose it wrote, so it is kept apart from `text`
  * rather than folded into it.
+ *
+ * `truncatedBytes` is set only when the persisted payload exceeded the event
+ * byte budget (see `MAX_PERSISTED_PAYLOAD_BYTES`) and the writer kept the head
+ * of the bulk-carrying field; it counts the bytes that were dropped.
  */
 export type AgentWireMessagePayload =
-	| { kind: 'text'; text: string }
+	| { kind: 'text'; text: string; truncatedBytes?: number }
 	| {
 			/** Extension-chosen tag, e.g. `context7_docs`; identifies the injector. */
 			customType: string;
@@ -86,16 +101,24 @@ export type AgentWireMessagePayload =
 			display: boolean;
 			kind: 'custom';
 			text: string;
+			truncatedBytes?: number;
 	  }
-	| { kind: 'reasoning'; text: string }
-	| { kind: 'text-delta'; text: string }
-	| { kind: 'reasoning-delta'; text: string }
-	| { input: unknown; kind: 'tool-call'; name: string; toolCallId: string }
+	| { kind: 'reasoning'; text: string; truncatedBytes?: number }
+	| { kind: 'text-delta'; text: string; truncatedBytes?: number }
+	| { kind: 'reasoning-delta'; text: string; truncatedBytes?: number }
+	| {
+			input: unknown;
+			kind: 'tool-call';
+			name: string;
+			toolCallId: string;
+			truncatedBytes?: number;
+	  }
 	| {
 			isError: boolean;
 			kind: 'tool-result';
 			output: unknown;
 			toolCallId: string;
+			truncatedBytes?: number;
 	  }
 	| {
 			/** Complete replacement of the extension-owned running presentation. */
@@ -104,6 +127,7 @@ export type AgentWireMessagePayload =
 			name: string;
 			presentation: ToolPresentationV1 | null;
 			toolCallId: string;
+			truncatedBytes?: number;
 	  }
 	| {
 			/** Completed assistant response; later continuation must not fold it into activity. Not session idle. */
@@ -112,7 +136,7 @@ export type AgentWireMessagePayload =
 			parts: readonly AgentWireMessagePart[];
 			role: 'assistant' | 'user';
 	  }
-	| { kind: 'prompt'; prompt: string }
+	| { kind: 'prompt'; prompt: string; truncatedBytes?: number }
 	| { kind: 'unknown'; frameType: string; raw: unknown };
 
 /** Context-window usage snapshot for a session. */

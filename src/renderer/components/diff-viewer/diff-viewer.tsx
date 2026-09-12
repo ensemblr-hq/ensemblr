@@ -1,7 +1,7 @@
 import { useAtomValue } from 'jotai';
 import { PlusIcon } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
-import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
 	type ChangeData,
 	Decoration,
@@ -36,6 +36,7 @@ import {
 	type RevealedRow,
 	useDiffViewerModel,
 } from './diff-viewer-model';
+import { boundHunksToRowBudget } from './hunk-budget';
 import { renderDiffToken, useDiffTokens } from './shiki-tokenize';
 
 /**
@@ -154,6 +155,12 @@ export function DiffViewer({
 				commentingEnabled={commentingEnabled}
 				diffType={file.type}
 				hunks={displayHunks}
+				// Resets the row budget when the pane moves to another file, which
+				// is what the lifted budget was scoped to. Keyed rather than reset
+				// in an effect on the hunks: `displayHunks` is also rebuilt when the
+				// split/unified toggle flips, so an effect re-trimmed a diff the
+				// user had just asked to see in full.
+				key={filePath}
 				language={resolvedLanguage}
 				layout={layout}
 				onRequestComment={openComposer}
@@ -208,7 +215,7 @@ function highestLineNumber(
 function DiffBody({
 	commentingEnabled,
 	diffType,
-	hunks,
+	hunks: allHunks,
 	language,
 	layout,
 	onRequestComment,
@@ -230,6 +237,13 @@ function DiffBody({
 	const { t } = useTranslation();
 	const paneRef = useRef<HTMLDivElement>(null);
 	const showWhitespace = useAtomValue(diffShowWhitespaceAtom);
+	const [budgetLifted, setBudgetLifted] = useState(false);
+	const bounded = useMemo(() => boundHunksToRowBudget(allHunks), [allHunks]);
+	// A reveal is an explicit jump to a line, so it outranks the budget: the row
+	// it names may sit in a hunk the trim withheld, and scrolling to a row that
+	// was never rendered is worse than the layout cost of rendering the rest.
+	const showEveryHunk = budgetLifted || revealed !== null;
+	const hunks = showEveryHunk ? allHunks : bounded.hunks;
 	const tokens = useDiffTokens(hunks, language, showWhitespace);
 	// The gutter column is border-box, so it carries the shared 1ch of padding on
 	// either side of the digits the app's other code surfaces add outside theirs.
@@ -359,6 +373,19 @@ function DiffBody({
 					})
 				}
 			</Diff>
+			{!showEveryHunk && bounded.hiddenHunks > 0 ? (
+				<button
+					className='w-full border-border/60 border-t px-3 py-2 text-left text-muted-foreground text-xs hover:text-foreground'
+					onClick={() => setBudgetLifted(true)}
+					type='button'
+				>
+					{t('review:diff-viewer.show-remaining-rows', {
+						count: bounded.hiddenRows,
+						defaultValue_one: 'Show the remaining {{count}} line',
+						defaultValue_other: 'Show the remaining {{count}} lines',
+					})}
+				</button>
+			) : null}
 		</div>
 	);
 }

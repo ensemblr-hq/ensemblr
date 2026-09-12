@@ -1,6 +1,18 @@
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { expect, test } from 'vitest';
 
-import { readWorktreeHolderForBranch } from '../../src/main/repository/worktree-placement';
+import {
+	cleanupWorkspaceDirectory,
+	readWorktreeHolderForBranch,
+} from '../../src/main/repository/worktree-placement';
 
 const PORCELAIN = [
 	'worktree /repos/app',
@@ -114,4 +126,42 @@ test('treats a locked worktree as a live holder', () => {
 		path: '/repos/app-workspaces/app/bach',
 		prunable: false,
 	});
+});
+
+test('a rollback refuses a directory outside the managed workspaces root', async () => {
+	const rootPath = mkdtempSync(path.join(tmpdir(), 'ensemblr-cleanup-'));
+	const workspacesPath = path.join(rootPath, 'workspaces');
+	const outsidePath = path.join(rootPath, 'elsewhere', 'repo', 'ws');
+	mkdirSync(workspacesPath, { recursive: true });
+	mkdirSync(outsidePath, { recursive: true });
+	writeFileSync(path.join(outsidePath, 'keep.txt'), 'keep\n');
+
+	try {
+		await cleanupWorkspaceDirectory({
+			workspacePath: outsidePath,
+			workspacesRoot: workspacesPath,
+		});
+
+		expect(existsSync(path.join(outsidePath, 'keep.txt'))).toBe(true);
+	} finally {
+		rmSync(rootPath, { force: true, recursive: true });
+	}
+});
+
+test('a rollback removes a directory in its managed worktree slot', async () => {
+	const rootPath = mkdtempSync(path.join(tmpdir(), 'ensemblr-cleanup-'));
+	const workspacesPath = path.join(rootPath, 'workspaces');
+	const workspacePath = path.join(workspacesPath, 'octocat-demo', 'eng-1');
+	mkdirSync(workspacePath, { recursive: true });
+
+	try {
+		await cleanupWorkspaceDirectory({
+			workspacePath,
+			workspacesRoot: workspacesPath,
+		});
+
+		expect(existsSync(workspacePath)).toBe(false);
+	} finally {
+		rmSync(rootPath, { force: true, recursive: true });
+	}
 });

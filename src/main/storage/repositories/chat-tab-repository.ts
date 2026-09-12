@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
+import { rollbackQuietly } from '../tx.ts';
 import { parseMetadata, serializeMetadata } from './metadata-json.ts';
 
 /** Kind of content a chat tab hosts: a chat, diagram, diff, document, file, or preview. */
@@ -128,7 +129,7 @@ export function openChatTab({
 
 		database.exec('COMMIT');
 	} catch (error) {
-		database.exec('ROLLBACK');
+		rollbackQuietly(database);
 		throw error;
 	}
 
@@ -206,7 +207,7 @@ export function restoreChatTab({
 
 		database.exec('COMMIT');
 	} catch (error) {
-		database.exec('ROLLBACK');
+		rollbackQuietly(database);
 		throw error;
 	}
 
@@ -462,7 +463,7 @@ export function bindAgentSession({
 			.run(agentSessionId, id);
 		database.exec('COMMIT');
 	} catch (error) {
-		database.exec('ROLLBACK');
+		rollbackQuietly(database);
 		throw error;
 	}
 	return getChatTabById({ database, id });
@@ -488,7 +489,7 @@ export function reorderChatTabs({
 		});
 		database.exec('COMMIT');
 	} catch (error) {
-		database.exec('ROLLBACK');
+		rollbackQuietly(database);
 		throw error;
 	}
 

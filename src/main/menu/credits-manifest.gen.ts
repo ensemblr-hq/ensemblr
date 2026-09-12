@@ -30,18 +30,6 @@ export const CREDITS_PACKAGES = [
 		kind: 'runtime',
 	},
 	{
-		name: '@iconify-json/logos',
-		license: 'CC0-1.0',
-		url: 'https://icon-sets.iconify.design/logos/',
-		kind: 'runtime',
-	},
-	{
-		name: '@iconify-json/vscode-icons',
-		license: 'MIT',
-		url: 'https://icon-sets.iconify.design/vscode-icons/',
-		kind: 'runtime',
-	},
-	{
 		name: '@iconify/react',
 		license: 'MIT',
 		url: 'https://iconify.design/',
@@ -61,12 +49,6 @@ export const CREDITS_PACKAGES = [
 	},
 	{
 		name: '@streamdown/cjk',
-		license: 'Apache-2.0',
-		url: 'https://github.com/vercel/streamdown',
-		kind: 'runtime',
-	},
-	{
-		name: '@streamdown/code',
 		license: 'Apache-2.0',
 		url: 'https://github.com/vercel/streamdown',
 		kind: 'runtime',
@@ -335,6 +317,18 @@ export const CREDITS_PACKAGES = [
 		name: '@electron/fuses',
 		license: 'MIT',
 		url: 'https://github.com/electron/fuses#readme',
+		kind: 'development',
+	},
+	{
+		name: '@iconify-json/logos',
+		license: 'CC0-1.0',
+		url: 'https://icon-sets.iconify.design/logos/',
+		kind: 'development',
+	},
+	{
+		name: '@iconify-json/vscode-icons',
+		license: 'MIT',
+		url: 'https://icon-sets.iconify.design/vscode-icons/',
 		kind: 'development',
 	},
 	{

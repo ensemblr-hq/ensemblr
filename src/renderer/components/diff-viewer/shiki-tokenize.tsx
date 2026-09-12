@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
 	type HunkData,
 	markEdits,
@@ -7,11 +7,10 @@ import {
 	pickRanges,
 	tokenize,
 } from 'react-diff-view';
-import type { BundledLanguage, BundledTheme, ThemedToken } from 'shiki';
+import type { BundledLanguage, ThemedToken } from 'shiki';
 
-import { highlightCode } from '@/renderer/lib/code';
+import { useHighlightedCode } from '@/renderer/hooks/code-surface/use-highlighted-code';
 import { reconstructSideSources } from '@/renderer/lib/diff/parse';
-import { useResolvedCodeTheme } from '@/renderer/state/preferences';
 import type { TokenizedCode } from '@/renderer/types/code';
 
 // Shiki font-style bitflags: 1=italic, 2=bold, 4=underline.
@@ -95,60 +94,15 @@ function toSyntaxRanges(tokenized: TokenizedCode): SyntaxRange[] {
 }
 
 /**
- * Highlight a source text with the shared Shiki highlighter, returning cached
- * tokens synchronously and swapping in async results once highlighting resolves.
- * @param text - Source text to highlight
- * @param language - Shiki language id
- * @param theme - Shiki theme id
- * @returns The tokenized code, or null until highlighting is available
- */
-function useSideTokens(
-	text: string,
-	language: BundledLanguage,
-	theme: BundledTheme,
-): TokenizedCode | null {
-	const [asyncTokens, setAsyncTokens] = useState<TokenizedCode | null>(null);
-	const [key, setKey] = useState({ language, text, theme });
-
-	// Drop the previous side's async tokens synchronously when the input changes,
-	// so stale syntax colors never render against different text for a frame.
-	if (key.text !== text || key.language !== language || key.theme !== theme) {
-		setKey({ language, text, theme });
-		setAsyncTokens(null);
-	}
-
-	const syncTokens = useMemo(
-		() => highlightCode(text, language, theme),
-		[text, language, theme],
-	);
-
-	useEffect(() => {
-		let cancelled = false;
-		// highlightCode fires the callback only for a fresh async highlight; on a
-		// warm-highlighter cache hit it returns the tokens synchronously and never
-		// calls back. Capture that return so the tokens are never dropped — without
-		// it the diff stays un-highlighted whenever the language is already loaded.
-		const immediate = highlightCode(text, language, theme, (result) => {
-			if (!cancelled) {
-				setAsyncTokens(result);
-			}
-		});
-		if (immediate) {
-			setAsyncTokens(immediate);
-		}
-		return () => {
-			cancelled = true;
-		};
-	}, [text, language, theme]);
-
-	return syncTokens ?? asyncTokens;
-}
-
-/**
  * Build react-diff-view token trees for a diff, bridging the app's Shiki
  * highlighter into react-diff-view via `pickRanges`, with optional whitespace
  * markers and word-level edit marks. Returns null until both sides finish
  * highlighting so the caller can render un-tokenized text first.
+ *
+ * Each side goes through `useHighlightedCode`, so a side over the highlight
+ * budget — a committed bundle, a minified asset, a file with one enormous line —
+ * comes back null and the diff renders un-tokenized rather than freezing the
+ * window for the length of the tokenizer pass.
  * @param hunks - The file's parsed hunks
  * @param language - Shiki language id for the file
  * @param showWhitespace - Whether to reveal tabs and carriage returns as glyphs
@@ -159,13 +113,12 @@ export function useDiffTokens(
 	language: BundledLanguage,
 	showWhitespace: boolean,
 ): ReturnType<typeof tokenize> | null {
-	const theme = useResolvedCodeTheme();
 	const { oldText, newText } = useMemo(
 		() => reconstructSideSources(hunks),
 		[hunks],
 	);
-	const oldTokens = useSideTokens(oldText, language, theme);
-	const newTokens = useSideTokens(newText, language, theme);
+	const oldTokens = useHighlightedCode(oldText, language);
+	const newTokens = useHighlightedCode(newText, language);
 
 	return useMemo(() => {
 		if (!oldTokens || !newTokens) {

@@ -46,19 +46,23 @@ export function useTimelineMessages({
 	);
 
 	const optimistic = useOptimisticPrompts(chatTabId);
+	const { prompts: optimisticPrompts, removeMany } = optimistic;
 
+	// Depends on the two members it reads rather than on the hook's return value,
+	// which is a fresh object literal every render: watching that made the effect
+	// fire on every streamed delta, and each firing walks the whole transcript.
 	useEffect(() => {
-		if (optimistic.prompts.length === 0) {
+		if (optimisticPrompts.length === 0) {
 			return;
 		}
 		const matchedIds = matchOptimisticAgainstMessages(
-			optimistic.prompts,
+			optimisticPrompts,
 			persistedMessages,
 		);
 		if (matchedIds.length > 0) {
-			optimistic.removeMany(matchedIds);
+			removeMany(matchedIds);
 		}
-	}, [optimistic, persistedMessages]);
+	}, [optimisticPrompts, removeMany, persistedMessages]);
 
 	const optimisticUnmatched = useMemo(
 		() => filterUnmatchedOptimistic(optimistic.prompts, persistedMessages),

@@ -4,6 +4,7 @@ import type {
 	EnvironmentVariableScope,
 	EnvironmentVariableValueKind,
 } from '../../shared/ipc/contracts/environment';
+import { CONTROL_ENV_KEYS } from '../agent-control/control-env-keys.ts';
 import { isSensitiveKeyName } from '../config/json-utils.ts';
 
 /** Built-in catalog of environment variables Ensemblr understands out-of-the-box. */
@@ -109,6 +110,18 @@ export const BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG: readonly EnvironmentVariable
 				category: 'runtime',
 				description:
 					'Reserved workspace runtime variable populated by later workspace environment injection.',
+				key,
+				reserved: true,
+				scope: 'workspace',
+				title: formatEnvironmentVariableTitle(key),
+				valueKind: 'runtime',
+			}),
+		),
+		...CONTROL_ENV_KEYS.map((key) =>
+			createCatalogEntry({
+				category: 'runtime',
+				description:
+					'Reserved agent-control variable populated by the app at agent launch. A repository, env file, or secret layer cannot set it: the URL decides where a shipped extension posts its bearer token, and the token itself is a capability into the control channel.',
 				key,
 				reserved: true,
 				scope: 'workspace',

@@ -37,10 +37,11 @@ import { NotificationFocusBridge } from '../../src/renderer/components/workbench
 import { WorkbenchLayoutModelProvider } from '../../src/renderer/components/workbench-shell/shell-contexts';
 import { shellFixtureProjects } from '../../src/renderer/fixtures/workbench';
 import { useAskUserQuestionToast } from '../../src/renderer/hooks/ask-user-question/use-ask-user-question-toast';
-import { i18n } from '../../src/renderer/lib/i18n';
+import { changeAppLanguage } from '../../src/renderer/lib/i18n';
 import { pendingAskUserQuestionsAtom } from '../../src/renderer/state/ask-user-question';
 import { pendingNotificationFocusAtom } from '../../src/renderer/state/unread';
 import type { WorkbenchLayoutModel } from '../../src/renderer/types/workbench-shell';
+import type { AppLanguage } from '../../src/shared/i18n';
 import type { FocusChatBroadcast } from '../../src/shared/ipc/contracts/notifications';
 import { createTestQueryClient } from './support/dom';
 
@@ -174,16 +175,21 @@ test('a question toast stays translated and focuses its chat only after the acti
 		});
 	});
 	await screen.findByRole('button', { name: 'Focus chat' });
-	for (const { language, title, label } of [
+	const localizedNotices: readonly {
+		label: string;
+		language: AppLanguage;
+		title: string;
+	}[] = [
 		{ language: 'ru', title: 'Агенту нужен ваш ответ', label: 'Открыть чат' },
 		{
 			language: 'el',
 			title: 'Ο πράκτορας χρειάζεται την απάντησή σας',
 			label: 'Άνοιξε τη συνομιλία',
 		},
-	]) {
+	];
+	for (const { language, title, label } of localizedNotices) {
 		await act(async () => {
-			await i18n.changeLanguage(language);
+			await changeAppLanguage(language);
 		});
 		await screen.findByRole('button', { name: label });
 		expect(screen.getByText(title)).toBeInTheDocument();

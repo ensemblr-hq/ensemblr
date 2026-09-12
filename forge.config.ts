@@ -345,11 +345,13 @@ const config: ForgeConfig = {
 					desktopName: APP_LINUX_APP_IDS[buildChannel],
 					genericName: 'Multi-agent coding workbench',
 					icon: linuxIconSet(),
-					// Writes `x-scheme-handler/ensemblr` into the generated `.desktop`
-					// file, registering the app as the scheme's handler with the
-					// desktop environment. `src/shared/deep-link.ts` has no consumer
-					// yet; this only prepares the ground.
-					mimeType: ['x-scheme-handler/ensemblr'],
+					// No `mimeType`, and therefore no `x-scheme-handler/ensemblr` in the
+					// generated `.desktop` file. `src/shared/deep-link.ts` still has no
+					// consumer, so registering the scheme only gave any web page a
+					// drive-by way to raise the window — and macOS registers nothing
+					// (no `CFBundleURLTypes`), so this is also what keeps the two
+					// platforms agreeing about whether the scheme exists. Restore it in
+					// the same change that wires a handler.
 					name: APP_LINUX_APP_IDS[buildChannel],
 					productName: APP_NAMES[buildChannel],
 				},
@@ -387,6 +389,17 @@ const config: ForgeConfig = {
 			[FuseV1Options.EnableNodeCliInspectArguments]: false,
 			[FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
 			[FuseV1Options.OnlyLoadAppFromAsar]: true,
+			// Left granted, and that is measured rather than assumed. The production
+			// renderer is a `file:` document whose entry is an ES module, and a
+			// module script is always fetched in CORS mode: with this off the `file:`
+			// origin turns opaque and Chromium refuses every `<script type="module">`
+			// in the bundle ("Cross origin requests are only supported for protocol
+			// schemes: … http, https"), so the window comes up blank. Closing it for
+			// real means serving the renderer from a custom `app://` scheme first —
+			// which also moves the origin, orphaning the localStorage the renderer
+			// keeps its preferences and per-chat overrides in. Declared rather than
+			// defaulted so the next reader finds this note instead of re-deriving it.
+			[FuseV1Options.GrantFileProtocolExtraPrivileges]: true,
 		}),
 	],
 };

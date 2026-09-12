@@ -259,17 +259,22 @@ function defaultStartWatch(
 	return { close: () => watcher.close() };
 }
 
-/** True when a change is confined to a directory `git ls-files` never lists. */
+/**
+ * True when a change is confined to a directory `git ls-files` never lists.
+ * Every segment is tested, not just the first, so a monorepo package's nested
+ * `node_modules` is filtered the same way a root one is — and the same way the
+ * Linux walk already skips those names at any depth.
+ */
 function isIgnoredChange(changed: string | null): boolean {
 	if (!changed) {
 		return false;
 	}
 
-	const topSegment = changed.split(/[/\\]/, 1)[0];
-	if (IGNORED_DIRECTORY_NAMES.has(topSegment)) {
+	const segments = changed.split(/[/\\]/);
+	if (segments.some((segment) => IGNORED_DIRECTORY_NAMES.has(segment))) {
 		return true;
 	}
 
-	const basename = changed.split(/[/\\]/).pop() ?? changed;
+	const basename = segments.at(-1) ?? changed;
 	return IGNORED_BASENAMES.has(basename) || basename.startsWith('._');
 }

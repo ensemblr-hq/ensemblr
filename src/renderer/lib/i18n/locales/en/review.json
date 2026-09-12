@@ -94,6 +94,8 @@
 		"add-comment": "Add comment",
 		"hidden-line-count_one": "{{count}} unchanged line",
 		"hidden-line-count_other": "{{count}} unchanged lines",
+		"show-remaining-rows_one": "Show the remaining {{count}} line",
+		"show-remaining-rows_other": "Show the remaining {{count}} lines",
 		"unchanged-lines": "Unchanged lines"
 	},
 	"discard-changes": {

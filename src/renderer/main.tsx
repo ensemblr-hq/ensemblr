@@ -9,6 +9,7 @@ import { WindowChromeSync } from './components/workbench-shell/window-controls/w
 import { WindowTitleBar } from './components/workbench-shell/window-controls/window-title-bar';
 import { applyWindowChrome, readWindowChrome } from './lib/window-chrome';
 import { registerIconCollections } from './lib/workbench/icon-collections';
+import { syncQueryFocusWithWindow } from './lib/workbench/query-focus';
 import { router } from './routing/router';
 import './styles/index.css';
 
@@ -29,6 +30,11 @@ if (import.meta.env.DEV) {
 }
 
 registerIconCollections();
+
+// A desktop window the user has clicked away from is still `document.visible`,
+// so every polling query kept firing against it until this taught TanStack
+// Query what focus means here.
+syncQueryFocusWithWindow();
 
 // Applied before the first render so no toolbar paints at the wrong offset and
 // then jumps once the chrome is known.

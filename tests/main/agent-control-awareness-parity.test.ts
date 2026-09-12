@@ -7,7 +7,10 @@ import {
 	CONTROL_TUI_HARNESSES_ENV_KEY,
 	TOOL_DEFS,
 } from '../../src/main/agent-control/index.ts';
-import type { AwarenessFeatures } from '../../src/shared/agent-control.ts';
+import type {
+	AgentControlOp,
+	AwarenessFeatures,
+} from '../../src/shared/agent-control.ts';
 import {
 	ARCHITECTURE_DIAGRAM_OPS,
 	ASK_USER_QUESTION_LIMITS,
@@ -35,7 +38,10 @@ import {
 	withheldControlOps,
 } from '../../src/shared/agent-control.ts';
 import { formatConciergeReferenceHref } from '../../src/shared/concierge-references.ts';
-import { DEFAULT_APP_SETTINGS } from '../../src/shared/config.ts';
+import {
+	appSettingsControlPatchSchema,
+	DEFAULT_APP_SETTINGS,
+} from '../../src/shared/config.ts';
 import {
 	CONCIERGE_GUARDED_TOOLS,
 	PLAN_MODE_GUARDED_TOOLS,
@@ -840,6 +846,9 @@ describe('agent-control AWARENESS parity', () => {
 			'ensemblr_launch_harness',
 			'ensemblr_start_terminal',
 			'ensemblr_write_terminal',
+			// Renaming the git branch is what `git branch -m` does, which the bash
+			// guard denies by name. Labelling the tab and the summary stay available.
+			'ensemblr_set_branch_name',
 		]) {
 			for (const playbook of PLAN_MODE_PLAYBOOKS) {
 				expect(playbook).toContain(toolName);
@@ -935,7 +944,7 @@ describe('agent-control AWARENESS parity', () => {
 			/const GUARDED_TOOLS = new Set\(\[\s*\.\.\.PLAN_MODE_GUARDED_TOOLS,\s*\.\.\.CONCIERGE_GUARDED_TOOLS,\s*\]\)/,
 		);
 		expect(readExtensionSource()).toMatch(
-			/if \(!GUARDED_TOOLS\.has\(event\.toolName\)\)/,
+			/!GUARDED_TOOLS\.has\(event\.toolName\) &&\s*answersWithoutTheApp\(event\.toolName\)/,
 		);
 	});
 
@@ -1029,11 +1038,7 @@ describe('agent-control AWARENESS parity', () => {
 	});
 
 	it('leaves the naming ops available while planning and says so', () => {
-		for (const toolName of [
-			'ensemblr_set_name',
-			'ensemblr_set_branch_name',
-			'ensemblr_set_summary',
-		]) {
+		for (const toolName of ['ensemblr_set_name', 'ensemblr_set_summary']) {
 			for (const playbook of PLAN_MODE_PLAYBOOKS) {
 				expect(playbook).toContain(toolName);
 			}
@@ -1153,12 +1158,21 @@ describe('agent-control AWARENESS parity', () => {
 		}
 	});
 
-	it('defers branch naming to the upkeep block in both orchestrator playbooks', () => {
+	it('defers branch naming to the upkeep block outside Plan Mode', () => {
 		expect(ORCHESTRATOR_AWARENESS).toContain(
 			'it is what asks for the workspace and branch',
 		);
+	});
+
+	// While planning the answer is the opposite: the upkeep block may still ask
+	// for the branch, and the op is refused, so the playbook has to say where the
+	// name goes instead rather than leaving the agent to retry the call.
+	it('sends a planning root’s branch name into the plan instead', () => {
 		expect(PLAN_MODE_ORCHESTRATOR_AWARENESS).toContain(
-			'If the upkeep block also asks for the workspace and branch',
+			'Put the name in the plan and apply it once the plan is approved',
+		);
+		expect(PLAN_MODE_ORCHESTRATOR_AWARENESS).toContain(
+			'is refused while planning, so put the name in the plan instead of calling it',
 		);
 	});
 
@@ -1287,17 +1301,44 @@ describe('sub-agent role policy', () => {
 
 	// The role and depth gates make the leaf promise survive a restart rather
 	// than relying on the current process's in-memory ancestry.
+	//
+	// Every clause of the refusal sentence, rather than a sample of it: the
+	// architecture clause was the one nothing cross-checked, and both diagram ops
+	// were in a leaf's tool list and dispatched successfully while its own
+	// playbook told it they belonged to its parent.
 	it('backs the sub-agent playbook’s promises with a real denial', () => {
 		expect(SUBAGENT_AWARENESS).toContain('delegation is blocked at leaf depth');
 		expect(SUBAGENT_AWARENESS).toContain('refused here');
-		for (const op of [
-			'startConversation',
-			'launchHarness',
-			'writeTerminal',
-			'setWorkspaceStatus',
-			'askUserQuestion',
-		] as const) {
-			expect(subAgentControlOpDenial(op)).not.toBeNull();
+		const clauses: ReadonlyArray<readonly [string, readonly AgentControlOp[]]> =
+			[
+				[
+					'starting or steering another conversation',
+					['startConversation', 'sendFollowUp', 'spawnChatTab'],
+				],
+				['launching a harness', ['launchHarness']],
+				[
+					'starting/stopping/typing into a terminal',
+					['startTerminal', 'stopTerminal', 'writeTerminal'],
+				],
+				['opening or closing tabs', ['openTab', 'closeTab']],
+				['moving the kanban board', ['setWorkspaceStatus']],
+				['naming the workspace and branch', ['setBranchName']],
+				[
+					'reading or redrawing the architecture diagram',
+					['getArchitectureDiagram', 'updateArchitectureDiagram'],
+				],
+				[
+					'commenting on or moving a Linear issue',
+					['linearCreateComment', 'linearUpdateIssue'],
+				],
+				['putting a question to the user', ['askUserQuestion']],
+			];
+		for (const [clause, ops] of clauses) {
+			expect(SUBAGENT_AWARENESS, clause).toContain(clause);
+			for (const op of ops) {
+				expect(subAgentControlOpDenial(op), `${clause} → ${op}`).not.toBeNull();
+				expect(SUBAGENT_WITHHELD_OPS.has(op), `${clause} → ${op}`).toBe(true);
+			}
 		}
 	});
 
@@ -1341,15 +1382,50 @@ describe('Concierge role policy', () => {
 	});
 
 	it('describes every editable preference even when features are disabled', () => {
-		const { onboarding: _onboarding, ...preferences } = DEFAULT_APP_SETTINGS;
+		const {
+			dictation: _dictation,
+			onboarding: _onboarding,
+			...preferences
+		} = DEFAULT_APP_SETTINGS;
 		for (const features of FEATURE_CORNERS) {
 			const guidance = conciergeAwareness(features);
 			for (const [section, settings] of Object.entries(preferences)) {
 				expect(guidance).toContain(`\`${section}\``);
 				for (const field of Object.keys(settings)) {
+					if (field === 'automaticUpdates') {
+						continue;
+					}
 					expect(guidance).toContain(`\`${field}\``);
 				}
 			}
+		}
+	});
+
+	// Both are settable app preferences that the control schema refuses, so the
+	// playbook has to place them among the controls the Concierge explains rather
+	// than among the ones it applies. `dictation.baseUrl` is where the user's
+	// stored transcription key is posted with every clip, and `automaticUpdates`
+	// decides whether a patched release installs.
+	it('places the two refused preferences among the awareness-only controls', () => {
+		for (const features of FEATURE_CORNERS) {
+			const guidance = conciergeAwareness(features);
+			const editable = guidance.slice(
+				guidance.indexOf('### Editable preferences and where they live'),
+				guidance.indexOf('### Awareness only'),
+			);
+			expect(editable).not.toContain('`dictation`');
+			expect(editable).not.toContain('`baseUrl`');
+			expect(editable).not.toContain('`automaticUpdates`');
+			expect(
+				appSettingsControlPatchSchema.safeParse({
+					dictation: { baseUrl: 'http://elsewhere.example/v1' },
+				}).success,
+			).toBe(false);
+			expect(
+				appSettingsControlPatchSchema.safeParse({
+					general: { automaticUpdates: false },
+				}).success,
+			).toBe(false);
 		}
 	});
 

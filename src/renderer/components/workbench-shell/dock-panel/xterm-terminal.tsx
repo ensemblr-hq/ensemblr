@@ -8,6 +8,7 @@ import {
 } from '@/renderer/components/ui/context-menu';
 import { useTerminalSelectionMenu } from '@/renderer/hooks/workbench-shell/dock-panel/use-terminal-selection-menu';
 import { emitTerminalInput } from '@/renderer/lib/terminal';
+import { subscribeTerminalOutput } from '@/renderer/lib/terminal/terminal-output-bus';
 import {
 	createXtermAdapter,
 	DEFAULT_FONT_FAMILY,
@@ -22,6 +23,47 @@ import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
 import { scrollbackMbToLines } from '@/shared/terminal';
 
 import { TerminalContextMenuContent } from './terminal-context-menu';
+
+/**
+ * Largest slice of pasted input forwarded to the PTY in one IPC message.
+ *
+ * xterm hands a paste to `onData` whole, so without this a 100 MB clipboard
+ * would be structured-cloned across the bridge and materialized in the main
+ * process before the service's own 64 KiB cap could refuse it — the memory
+ * spike and serialization stall that cap exists to prevent. Half the cap, so a
+ * chunk is never the thing that trips it.
+ */
+const MAX_INPUT_CHUNK_LENGTH = 32_768;
+
+/**
+ * How long a tab stays GPU-accelerated after it is hidden.
+ *
+ * Cycling through tabs would otherwise tear down and rebuild a WebGL context
+ * per keystroke of the tab shortcut; a few seconds covers a round trip without
+ * holding a context for a tab the user has actually left.
+ */
+const RENDERER_HIDE_GRACE_MS = 5_000;
+
+/**
+ * Forwards terminal input to the main process in bounded, ordered slices.
+ *
+ * Each slice is awaited before the next is sent: a shell reads its input as a
+ * stream, so a reordered pair of chunks is corrupted input rather than slow
+ * input.
+ * @param terminalId - Session the input belongs to.
+ * @param data - Raw input as xterm produced it.
+ */
+async function writeTerminalInput(
+	terminalId: string,
+	data: string,
+): Promise<void> {
+	for (let offset = 0; offset < data.length; offset += MAX_INPUT_CHUNK_LENGTH) {
+		await window.ensemblr?.writeTerminalSession({
+			data: data.slice(offset, offset + MAX_INPUT_CHUNK_LENGTH),
+			terminalId,
+		});
+	}
+}
 
 /** Builds the terminal CSS font stack, prepending the user's chosen font. */
 function buildTerminalFontFamily(font: string): string {
@@ -40,12 +82,19 @@ function buildTerminalFontFamily(font: string): string {
  * Right-clicking hands the current selection to the chat as an attachment chip.
  */
 export function XtermTerminal({
+	isVisible = true,
 	readOnly = false,
 	sessionStatus,
 	terminalId,
 	terminalLabel,
 	workspaceCwd,
 }: {
+	/**
+	 * Whether the pane is on screen. Defaults to true for a surface that is
+	 * conditionally rendered, and so is visible whenever it is mounted; the dock
+	 * force-mounts every tab and passes the real state.
+	 */
+	isVisible?: boolean;
 	readOnly?: boolean;
 	sessionStatus: TerminalSessionStatus | null;
 	terminalId: string;
@@ -77,6 +126,17 @@ export function XtermTerminal({
 	// values so the live-apply effect skips its redundant first run (and any
 	// remount that rebuilds the adapter with the same font).
 	const appliedFontRef = useRef({ fontFamily, fontSize: terminalFontSize });
+	// Geometry the PTY was last told about, so a fit that lands on the same cell
+	// grid costs neither an IPC round trip nor a SIGWINCH. Shared by the mount,
+	// resize and typography paths, all of which fit the same surface.
+	const sentDimensionsRef = useRef({ cols: 0, rows: 0 });
+	// Visibility read at construction, so a surface that mounts already on screen
+	// takes its GPU context with the rest of its setup rather than waiting for the
+	// effect below to see a change that never comes.
+	const isVisibleRef = useRef(isVisible);
+	useEffect(() => {
+		isVisibleRef.current = isVisible;
+	});
 	// The exit banner is for interactive terminals only. Setup/Run script panels
 	// (read-only) surface lifecycle controls and status in their panel chrome, so
 	// the footer would be redundant noise there.
@@ -98,6 +158,7 @@ export function XtermTerminal({
 		});
 		adapterRef.current = adapter;
 		adapter.attach(container);
+		adapter.setRendererVisible(isVisibleRef.current);
 
 		let disposed = false;
 		let replayed = false;
@@ -105,12 +166,11 @@ export function XtermTerminal({
 		// its sequence number so chunks already folded into the snapshot's
 		// scrollback are dropped instead of replayed twice.
 		const bufferedChunks: Array<{ data: string; seq: number }> = [];
+		// Serializes input writes across events as well as within one, so a fast
+		// typist's keystroke cannot overtake the tail of a large paste.
+		let writeChain: Promise<void> = Promise.resolve();
 
-		const unsubscribeOutput = ensemblr.onTerminalOutput((event) => {
-			if (event.terminalId !== terminalId) {
-				return;
-			}
-
+		const unsubscribeOutput = subscribeTerminalOutput(terminalId, (event) => {
 			if (replayed) {
 				adapter.write(event.data);
 			} else {
@@ -123,7 +183,9 @@ export function XtermTerminal({
 			? null
 			: adapter.onData((data) => {
 					emitTerminalInput({ data, terminalId });
-					void ensemblr.writeTerminalSession({ data, terminalId });
+					writeChain = writeChain.then(() =>
+						writeTerminalInput(terminalId, data),
+					);
 				});
 
 		ensemblr
@@ -150,8 +212,24 @@ export function XtermTerminal({
 				replayed = true;
 			});
 
-		const syncDimensions = () =>
-			syncTerminalDimensions(adapter, container, terminalId);
+		const sentDimensions = sentDimensionsRef.current;
+		sentDimensions.cols = 0;
+		sentDimensions.rows = 0;
+		let pendingFrame: number | null = null;
+
+		const syncDimensions = () => {
+			syncTerminalDimensions(adapter, container, terminalId, sentDimensions);
+		};
+
+		// Dragging the dock splitter fires the observer every frame, and each call
+		// measures the DOM through `fit()`. Coalescing onto the next frame makes
+		// that one measurement per painted frame rather than one per observation.
+		const scheduleSync = () => {
+			pendingFrame ??= requestAnimationFrame(() => {
+				pendingFrame = null;
+				syncDimensions();
+			});
+		};
 
 		syncDimensions();
 
@@ -166,11 +244,14 @@ export function XtermTerminal({
 			adapter.focus();
 		}
 
-		const resizeObserver = new ResizeObserver(() => syncDimensions());
+		const resizeObserver = new ResizeObserver(scheduleSync);
 		resizeObserver.observe(container);
 
 		return () => {
 			disposed = true;
+			if (pendingFrame !== null) {
+				cancelAnimationFrame(pendingFrame);
+			}
 			resizeObserver.disconnect();
 			unsubscribeOutput();
 			unsubscribeInput?.();
@@ -178,6 +259,30 @@ export function XtermTerminal({
 			adapterRef.current = null;
 		};
 	}, [readOnly, terminalId]);
+
+	// Hand the GPU context back while this tab is hidden, after a grace period so
+	// tab-cycling does not thrash it. The surface stays mounted either way: that
+	// is what keeps its scrollback and its PTY binding.
+	useEffect(() => {
+		const adapter = adapterRef.current;
+
+		if (!adapter) {
+			return;
+		}
+
+		if (isVisible) {
+			adapter.setRendererVisible(true);
+			return;
+		}
+
+		const timer = setTimeout(() => {
+			if (adapterRef.current === adapter) {
+				adapter.setRendererVisible(false);
+			}
+		}, RENDERER_HIDE_GRACE_MS);
+
+		return () => clearTimeout(timer);
+	}, [isVisible]);
 
 	// Live-apply terminal font/size changes to the already-mounted surface so the
 	// Appearance settings take effect without recreating the PTY binding. Each
@@ -202,13 +307,23 @@ export function XtermTerminal({
 		appliedFontRef.current = { fontFamily, fontSize: terminalFontSize };
 
 		adapter.setFont({ fontFamily, fontSize: terminalFontSize });
-		syncTerminalDimensions(adapter, container, terminalId);
+		syncTerminalDimensions(
+			adapter,
+			container,
+			terminalId,
+			sentDimensionsRef.current,
+		);
 
 		// Not redundant: the fit above measured whatever faces were rasterizable
 		// then, and a face landing later moves the cell box and the column count.
 		void adapter.whenFontReady().then(() => {
 			if (adapterRef.current === adapter) {
-				syncTerminalDimensions(adapter, container, terminalId);
+				syncTerminalDimensions(
+					adapter,
+					container,
+					terminalId,
+					sentDimensionsRef.current,
+				);
 			}
 		});
 	}, [fontFamily, terminalFontSize, terminalId]);
@@ -258,11 +373,14 @@ export function XtermTerminal({
  * @param adapter - The live terminal surface to fit.
  * @param container - The element the surface fills.
  * @param terminalId - Session whose PTY geometry follows the fit.
+ * @param sent - Geometry last sent for this session, updated in place, so a fit
+ *   that lands on the same cell grid sends nothing.
  */
 function syncTerminalDimensions(
 	adapter: TerminalRendererAdapter,
 	container: HTMLElement,
 	terminalId: string,
+	sent: { cols: number; rows: number },
 ): void {
 	if (container.clientHeight === 0 || container.clientWidth === 0) {
 		return;
@@ -273,6 +391,13 @@ function syncTerminalDimensions(
 	if (!dimensions) {
 		return;
 	}
+
+	if (dimensions.cols === sent.cols && dimensions.rows === sent.rows) {
+		return;
+	}
+
+	sent.cols = dimensions.cols;
+	sent.rows = dimensions.rows;
 
 	void window.ensemblr?.resizeTerminalSession({
 		cols: dimensions.cols,

@@ -105,7 +105,7 @@ export function createArchiveWorkspaceService({
 			if ('diagnostic' in target) {
 				return failure(target.diagnostic);
 			}
-			const { archivedContextsRoot, database, source } = target;
+			const { archivedContextsRoot, database, source, workspacesRoot } = target;
 
 			const branchCleanup = request.branchCleanup === true;
 			// Deleting the branch already removes the worktree, and it deliberately
@@ -217,6 +217,7 @@ export function createArchiveWorkspaceService({
 					localCommandService,
 					repositoryPath: source.repositoryPath,
 					workspacePath: source.path,
+					workspacesRoot,
 				});
 				if (worktreeOutcome.status !== 'success') {
 					const residue = worktreeOutcome.status === 'residue';
@@ -245,6 +246,7 @@ export function createArchiveWorkspaceService({
 						localCommandService,
 						recordId,
 						source,
+						workspacesRoot,
 					})
 				: { bytesFreed: null, worktreePruned: false };
 
@@ -304,6 +306,8 @@ type ArchiveTarget =
 			archivedContextsRoot: string;
 			database: DatabaseSync;
 			source: SourceWorkspace;
+			/** Managed workspaces root a worktree removal must resolve inside. */
+			workspacesRoot: string | null;
 	  }
 	| { diagnostic: ArchiveWorkspaceDiagnostic };
 
@@ -385,6 +389,7 @@ function resolveArchiveTarget({
 		archivedContextsRoot: rootSnapshot.archivedContextsPath,
 		database,
 		source,
+		workspacesRoot: rootSnapshot.workspacesPath || null,
 	};
 }
 
@@ -473,6 +478,7 @@ async function reclaimWorktreeDisk({
 	localCommandService,
 	recordId,
 	source,
+	workspacesRoot,
 }: {
 	archivedContextPath: string | null;
 	database: DatabaseSync;
@@ -480,6 +486,8 @@ async function reclaimWorktreeDisk({
 	localCommandService: LocalCommandService;
 	recordId: string;
 	source: SourceWorkspace;
+	/** Managed workspaces root the prune's removal must resolve inside. */
+	workspacesRoot: string | null;
 }): Promise<{ bytesFreed: number | null; worktreePruned: boolean }> {
 	const pruned = await pruneWorktree({
 		archivedContextPath,
@@ -488,6 +496,7 @@ async function reclaimWorktreeDisk({
 		repositoryPath: source.repositoryPath,
 		workspaceId: source.id,
 		workspacePath: source.path,
+		workspacesRoot,
 	});
 
 	if (pruned.status === 'failure') {

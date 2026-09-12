@@ -1,32 +1,57 @@
 import { ipcMain } from 'electron';
-
+import type { AppLanguage } from '../../../shared/i18n.ts';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type {
 	OpenRepositoryConfigFileRequest,
 	OpenRepositoryConfigFileResult,
 	UpdateRepositorySettingsResult,
 } from '../../../shared/ipc/contracts/repository-settings';
+import {
+	classifyPermissionAction,
+	type PermissionMode,
+} from '../../../shared/permissions.ts';
 import { isRepositoryConfigPathAllowed } from '../../config';
 import { openInEditor } from '../../config/open-in-editor.ts';
 import { ensureRepositoryConfigFile } from '../../config/repository-config-file.ts';
 import { upsertRepositorySettings } from '../../environment/repository-settings.ts';
 import type { EnsemblrDatabaseService } from '../../storage';
+import { confirmPermissionAction } from '../permission-gate.ts';
+import type { PermissionModeContext } from '../permission-mode.ts';
 import { parseUpdateRepositorySettingsRequest } from '../request-schemas.ts';
 
 /**
  * Registers the IPC handler that persists personal repository settings (Git and
  * Misc screens) to repository-scoped SQLite rows the settings resolver reads.
+ *
+ * This channel is deliberately absent from the central permission table: the
+ * patch it carries can hold `security.permissionMode`, so a mode-derived gate
+ * would let a `read-only` repository lock the user out of the very screen that
+ * relaxes it. It enforces its own rule instead — a mode change always asks the
+ * user, and every other field is gated as an app-settings change.
  * @param options - Required services.
  */
 export function registerRepositorySettingsHandlers({
 	databaseService,
+	getLanguage,
+	resolvePermissionMode,
 }: {
 	databaseService: EnsemblrDatabaseService;
+	getLanguage: () => AppLanguage;
+	resolvePermissionMode: (context: PermissionModeContext) => PermissionMode;
 }): void {
 	ipcMain.handle(
 		IPC_CHANNELS.updateRepositorySettings,
-		(_event, request: unknown): UpdateRepositorySettingsResult =>
-			persistRepositorySettings(databaseService, request),
+		async (
+			_event,
+			request: unknown,
+		): Promise<UpdateRepositorySettingsResult> =>
+			(await approveRepositorySettingsWrite({
+				getLanguage,
+				request,
+				resolvePermissionMode,
+			}))
+				? persistRepositorySettings(databaseService, request)
+				: { ok: false },
 	);
 
 	ipcMain.handle(
@@ -37,6 +62,55 @@ export function registerRepositorySettingsHandlers({
 		): Promise<OpenRepositoryConfigFileResult> =>
 			openRepositoryConfig(databaseService, request),
 	);
+}
+
+/**
+ * Decides whether a repository-settings patch may be written. A patch touching
+ * the permission mode always needs a native approval, because that field is the
+ * one an attacker would widen to unlock everything else; any other patch is
+ * classified as an app-settings change against the repository's current mode.
+ * @param options - Language reader, the raw patch, and the mode resolver.
+ * @returns True when the write may proceed.
+ */
+async function approveRepositorySettingsWrite({
+	getLanguage,
+	request,
+	resolvePermissionMode,
+}: {
+	getLanguage: () => AppLanguage;
+	request: unknown;
+	resolvePermissionMode: (context: PermissionModeContext) => PermissionMode;
+}): Promise<boolean> {
+	const parsed = parseUpdateRepositorySettingsRequest(request);
+
+	if (!parsed) {
+		return false;
+	}
+
+	const mode = resolvePermissionMode({ repositoryId: parsed.repositoryId });
+
+	if (parsed.settings.permissionMode !== undefined) {
+		return confirmPermissionAction({
+			action: 'app-settings-change',
+			language: getLanguage(),
+		});
+	}
+
+	const boundary = classifyPermissionAction({
+		action: 'app-settings-change',
+		mode,
+	}).boundary;
+
+	if (boundary === 'blocked') {
+		return false;
+	}
+
+	return boundary === 'allowed' || mode === 'workspace-trusted'
+		? true
+		: confirmPermissionAction({
+				action: 'app-settings-change',
+				language: getLanguage(),
+			});
 }
 
 /**

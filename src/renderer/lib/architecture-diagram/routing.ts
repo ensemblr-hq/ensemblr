@@ -725,6 +725,16 @@ export function segmentIntersectsRect(
 	const y1 = rect.y - gap;
 	const x2 = rect.x + rect.width + gap;
 	const y2 = rect.y + rect.height + gap;
+	// Four comparisons in front of sixteen cross products. The router tests every
+	// candidate segment against the boxes near it, and most of those miss.
+	if (
+		Math.max(start[0], end[0]) < x1 ||
+		Math.min(start[0], end[0]) > x2 ||
+		Math.max(start[1], end[1]) < y1 ||
+		Math.min(start[1], end[1]) > y2
+	) {
+		return false;
+	}
 	const inBox = (point: DiagramPoint) =>
 		point[0] >= x1 && point[0] <= x2 && point[1] >= y1 && point[1] <= y2;
 	if (inBox(start) || inBox(end)) {

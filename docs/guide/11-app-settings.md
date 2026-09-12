@@ -530,6 +530,20 @@ Developer-only controls and early automation defaults.
 | Auto-run after setup | Start a repository's run script automatically after setup, when no repository-specific setting overrides it. | Off |
 | Developer Mode | Show developer-only diagnostics and Pi debug controls. | Off |
 
+### Spellchecking in the composer, on Linux
+
+The composer runs Chromium's spellchecker. On macOS that is the OS one, which
+downloads nothing. **On Linux, Chromium has no OS spellchecker to borrow, so the
+first time it checks a word it fetches a Hunspell dictionary for your app
+language from Google's CDN** (`redirector.gstatic.com`) and caches it under the
+app's user-data directory.
+
+That is one outbound request to Google, on first use, carrying your language
+code — Ensemblr sends nothing else with it and has no telemetry of its own.
+There is no setting for it yet; the fix is to ship the dictionaries inside the
+AppImage, which is tracked rather than done. If that request is unacceptable on
+your machine, run with `--disable-features=SpellcheckService` until it is.
+
 ---
 
 ## Repository panes

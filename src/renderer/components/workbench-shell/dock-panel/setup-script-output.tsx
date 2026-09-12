@@ -10,6 +10,8 @@ import { XtermTerminal } from './xterm-terminal';
 
 /** Props for {@link SetupScriptOutputPanel}. */
 interface SetupScriptOutputPanelProps {
+	/** Whether this pane is the dock's active tab and the dock is expanded. */
+	isVisible?: boolean;
 	onAskAgentSetupScript: () => void;
 	onOpenSetupScripts: () => void;
 	onRunSetupScript: () => void;
@@ -22,6 +24,7 @@ interface SetupScriptOutputPanelProps {
 
 /** Renders the Setup script output or the appropriate empty state. */
 export function SetupScriptOutputPanel({
+	isVisible = true,
 	onAskAgentSetupScript,
 	onOpenSetupScripts,
 	onRunSetupScript,
@@ -46,6 +49,7 @@ export function SetupScriptOutputPanel({
 	return (
 		<div className='relative h-full min-h-0'>
 			<XtermTerminal
+				isVisible={isVisible}
 				readOnly
 				sessionStatus={script.sessionStatus ?? null}
 				terminalId={script.terminalId}

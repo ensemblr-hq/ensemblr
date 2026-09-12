@@ -6,6 +6,7 @@ import {
 	normalizeAgentProviderId,
 } from '../../../shared/agent-provider.ts';
 import type { AgentSessionStatusWire } from '../../../shared/ipc/contracts/agent-message-payloads';
+import { rollbackQuietly } from '../tx.ts';
 import { parseMetadata, serializeMetadata } from './metadata-json.ts';
 
 /** Lifecycle status of a persisted agent session, mirrored from the IPC wire type. */
@@ -226,7 +227,7 @@ export function createAgentSession({
 
 		database.exec('COMMIT');
 	} catch (error) {
-		database.exec('ROLLBACK');
+		rollbackQuietly(database);
 		throw error;
 	}
 
@@ -492,7 +493,7 @@ export function createTurn({
 
 		database.exec('COMMIT');
 	} catch (error) {
-		database.exec('ROLLBACK');
+		rollbackQuietly(database);
 		throw error;
 	}
 

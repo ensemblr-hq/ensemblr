@@ -385,6 +385,40 @@ function handleUnknown(typed: FrameObject, deps: ProtocolDispatchDeps): void {
 }
 
 /**
+ * Methods of `extension_ui_request` that repaint the harness's own chrome and
+ * carry nothing the timeline can show. Pi emits one per spinner tick, which made
+ * them the bulk of the persisted event table on this machine.
+ */
+const COSMETIC_EXTENSION_UI_METHODS = new Set([
+	'notify',
+	'setStatus',
+	'setWidget',
+]);
+
+/**
+ * Drops an extension UI frame unless it is a blocking dialog.
+ *
+ * The renderer projects an `unknown` payload to no UI parts, so every one of
+ * these was a SQLite transaction plus a broadcast to every window for something
+ * nothing rendered. A `confirm` still reaches the timeline: it is rare, and it
+ * is the one extension UI frame worth finding after the fact.
+ * @param typed - The `extension_ui_request` frame.
+ * @param deps - Session callbacks.
+ */
+function handleExtensionUiRequest(
+	typed: FrameObject,
+	deps: ProtocolDispatchDeps,
+): void {
+	if (
+		typeof typed.method === 'string' &&
+		COSMETIC_EXTENSION_UI_METHODS.has(typed.method)
+	) {
+		return;
+	}
+	handleUnknown(typed, deps);
+}
+
+/**
  * Handles retry and definitive settlement frames that share pending-error state.
  * @param typed - The parsed Pi frame.
  * @param deps - Session callbacks.
@@ -485,6 +519,9 @@ export function createProtocolDispatcher(
 				return;
 			case 'error':
 				handleError(typed, deps);
+				return;
+			case 'extension_ui_request':
+				handleExtensionUiRequest(typed, deps);
 				return;
 			default:
 				handleUnknown(typed, deps);

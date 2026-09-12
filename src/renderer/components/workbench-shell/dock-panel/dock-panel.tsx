@@ -63,6 +63,15 @@ export function DockPanel({
 	const setupTabLabel = fixedDockTabLabel(workspace.dockTabs, 'setup');
 	const runTabLabel = fixedDockTabLabel(workspace.dockTabs, 'run');
 	const activeRunScript = useActiveRunScript(workspace);
+	/**
+	 * Whether a force-mounted pane is actually on screen. Every tab stays mounted
+	 * to keep its scrollback and PTY binding, so this is what tells each surface
+	 * it may hold a WebGL context.
+	 * @param tabId - The dock tab the pane belongs to
+	 * @returns True when that tab is selected and the dock is expanded
+	 */
+	const isPaneVisible = (tabId: DockTabId): boolean =>
+		!isCollapsed && activeDockTab === tabId;
 
 	return (
 		<Tabs
@@ -118,13 +127,17 @@ export function DockPanel({
 												// primary underline sits flush on the header's bottom border
 												// (the default line-variant indicator renders below the list
 												// and gets clipped here).
-												'h-full flex-none rounded-none px-2 text-xs after:bg-primary group-data-horizontal/tabs:after:bottom-0 [&_svg]:size-3.5',
+												'h-full max-w-64 flex-none rounded-none px-2 text-xs after:bg-primary group-data-horizontal/tabs:after:bottom-0 [&_svg]:size-3.5',
 											)}
 											data-dock-tab-kind={tab.kind}
 											value={tab.id}
 										>
 											<DockTabGlyph tab={tab} />
-											{tab.label}
+											{/* A label can be an OSC window title the PTY chose, so an
+											    uncapped tab would push the strip off screen. */}
+											<span className='truncate' title={tab.label}>
+												{tab.label}
+											</span>
 										</TabsTrigger>
 										{closableTerminalId ? <DockTabCloseOverlay /> : null}
 										{closableTerminalId ? (
@@ -171,6 +184,7 @@ export function DockPanel({
 				value='setup'
 			>
 				<SetupScriptOutputPanel
+					isVisible={isPaneVisible('setup')}
 					onAskAgentSetupScript={actions.onAskAgentSetupScript}
 					onOpenSetupScripts={actions.onOpenSetupScripts}
 					onRunSetupScript={actions.onRunSetupScript}
@@ -187,6 +201,7 @@ export function DockPanel({
 			>
 				<RunScriptOutputPanel
 					activeRunScriptName={activeRunScript?.name ?? null}
+					isVisible={isPaneVisible('run')}
 					onOpenSetupScripts={actions.onOpenSetupScripts}
 					onRunScript={actions.onRunScript}
 					script={workspace.scripts.run}
@@ -202,6 +217,7 @@ export function DockPanel({
 					value={tab.id}
 				>
 					<XtermTerminal
+						isVisible={isPaneVisible(tab.id)}
 						sessionStatus={tab.sessionStatus}
 						terminalId={tab.terminalId}
 						terminalLabel={tab.label}

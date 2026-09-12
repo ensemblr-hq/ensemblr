@@ -97,6 +97,16 @@ const MAX_READ_BYTES = 512 * 1024;
 // Content-addressed attachments each add a hash folder under `.context/`, so
 // this is the budget that decides how deep that tree stays browsable.
 const IGNORED_ROOT_MAX_ENTRIES = 2000;
+/**
+ * How long a cached listing stands without an explicit invalidation.
+ *
+ * The file watcher is the real invalidation — it fires within 250 ms of a write
+ * and already broadcasts the same change to the renderer — so this only bounds
+ * the case where the watcher never armed or errored out. Long enough that the
+ * renderer's 30 s poll is a cache hit, short enough that a dead watcher costs a
+ * stale tree for a minute rather than for the run.
+ */
+const LISTING_CACHE_TTL_MS = 60_000;
 
 /** Service surface for listing and safely reading files within a workspace. */
 export interface ListWorkspaceFilesService {
@@ -120,6 +130,12 @@ export interface ListWorkspaceFilesService {
 	readDirectory: (
 		request: ReadWorkspaceDirectoryRequest,
 	) => Promise<ReadWorkspaceDirectoryResult>;
+	/**
+	 * Drops a workspace's cached listing so the next {@link list} re-reads the
+	 * tree. Called by whatever observes the worktree changing — in production the
+	 * file watcher, which already broadcasts the same event to the renderer.
+	 */
+	invalidate: (workspaceCwd: string) => void;
 }
 
 /** Options for constructing a {@link ListWorkspaceFilesService}. */
@@ -143,7 +159,108 @@ export function createListWorkspaceFilesService({
 	ignoredRootMaxEntries = IGNORED_ROOT_MAX_ENTRIES,
 	localCommandService,
 }: CreateListWorkspaceFilesServiceOptions): ListWorkspaceFilesService {
+	/**
+	 * Successful listings by resolved cwd. One listing is four `git ls-files`
+	 * spawns plus a depth-first walk of every ignored root, and it was repeated
+	 * in full for every watcher broadcast and every 30 s poll even when nothing
+	 * had moved. Invalidated by {@link ListWorkspaceFilesService.invalidate}, and
+	 * by {@link LISTING_CACHE_TTL_MS} so a watcher that died does not freeze the
+	 * tree for the rest of the run.
+	 */
+	const listings = new Map<
+		string,
+		{ at: number; result: ListWorkspaceFilesResult }
+	>();
+	/** Listings currently being built, so concurrent callers share one. */
+	const listingsInFlight = new Map<string, Promise<ListWorkspaceFilesResult>>();
+	/**
+	 * Ignored roots last seen to exceed the per-root enumeration cap, keyed by
+	 * workspace-relative path and holding the root's mtime at the time.
+	 *
+	 * The walk that produces that verdict is thrown away — the point is to keep
+	 * the directory collapsed — and it measured 5-14.5 ms across 66 `readdir`
+	 * calls for a `node_modules`, repeated identically on every listing. A root
+	 * that later drops below the cap without its own mtime moving stays
+	 * collapsed until it does, which is the same thing the user was already
+	 * looking at.
+	 */
+	const oversizedIgnoredRoots = new Map<string, number>();
+
+	/**
+	 * Builds one workspace's listing from git and the ignored-root walk.
+	 * @param cwd - Resolved absolute workspace root.
+	 * @returns The listing, or the failure that stopped it.
+	 */
+	async function buildListing(cwd: string): Promise<ListWorkspaceFilesResult> {
+		const runGit = (args: readonly string[]) =>
+			localCommandService.run({
+				args,
+				command: 'git',
+				cwd,
+				maxOutputBytes: MAX_OUTPUT_BYTES,
+				timeoutMs: TIMEOUT_MS,
+			});
+
+		const [tracked, ignored, deleted, typechanged] = await Promise.all([
+			runGit(GIT_ARGS),
+			runGit(GIT_IGNORED_ARGS),
+			runGit(GIT_DELETED_ARGS),
+			runGit(GIT_TYPECHANGED_ARGS),
+		]);
+
+		if (tracked.status !== 'success') {
+			const message =
+				tracked.failure?.message ?? 'git ls-files failed in workspace.';
+			const stderr = tracked.stderr?.toLowerCase() ?? '';
+			if (
+				stderr.includes('not a git repository') ||
+				stderr.includes('does not have any git working tree')
+			) {
+				return {
+					error: { code: 'not-a-git-repo', message },
+					files: [],
+				};
+			}
+			return {
+				error: { code: 'command-failed', message },
+				files: [],
+			};
+		}
+
+		const trackedListing = parseGitLsFiles(
+			tracked.stdout,
+			bestEffortPaths(deleted),
+			bestEffortPaths(typechanged),
+		);
+		// Ignored listing is best-effort: a failure there must never drop the
+		// primary file list, so fall back to no ignored entries.
+		const ignoredListing =
+			ignored.status === 'success'
+				? await expandIgnoredEntries({
+						budget: MAX_ENTRIES - trackedListing.entries.length,
+						oversizedRoots: oversizedIgnoredRoots,
+						rootMaxEntries: ignoredRootMaxEntries,
+						stdout: ignored.stdout,
+						trackedPaths: new Set(
+							trackedListing.entries.map((entry) => entry.path),
+						),
+						workspaceCwd: cwd,
+					})
+				: { entries: [], probePaths: new Set<string>() };
+		return {
+			files: await annotateSymlinkTargets(
+				cwd,
+				[...trackedListing.entries, ...ignoredListing.entries],
+				new Set([...trackedListing.probePaths, ...ignoredListing.probePaths]),
+			),
+		};
+	}
+
 	return {
+		invalidate(workspaceCwd) {
+			const cwdResult = resolveWorkspaceCwd(workspaceCwd);
+			listings.delete(cwdResult.ok ? cwdResult.cwd : workspaceCwd);
+		},
 		async list(request) {
 			const cwdResult = resolveWorkspaceCwd(request.workspaceCwd);
 			if (!cwdResult.ok) {
@@ -156,67 +273,32 @@ export function createListWorkspaceFilesService({
 				};
 			}
 
-			const runGit = (args: readonly string[]) =>
-				localCommandService.run({
-					args,
-					command: 'git',
-					cwd: cwdResult.cwd,
-					maxOutputBytes: MAX_OUTPUT_BYTES,
-					timeoutMs: TIMEOUT_MS,
-				});
-
-			const [tracked, ignored, deleted, typechanged] = await Promise.all([
-				runGit(GIT_ARGS),
-				runGit(GIT_IGNORED_ARGS),
-				runGit(GIT_DELETED_ARGS),
-				runGit(GIT_TYPECHANGED_ARGS),
-			]);
-
-			if (tracked.status !== 'success') {
-				const message =
-					tracked.failure?.message ?? 'git ls-files failed in workspace.';
-				const stderr = tracked.stderr?.toLowerCase() ?? '';
-				if (
-					stderr.includes('not a git repository') ||
-					stderr.includes('does not have any git working tree')
-				) {
-					return {
-						error: { code: 'not-a-git-repo', message },
-						files: [],
-					};
-				}
-				return {
-					error: { code: 'command-failed', message },
-					files: [],
-				};
+			const { cwd } = cwdResult;
+			const cached = listings.get(cwd);
+			if (cached && Date.now() - cached.at < LISTING_CACHE_TTL_MS) {
+				return cached.result;
 			}
 
-			const trackedListing = parseGitLsFiles(
-				tracked.stdout,
-				bestEffortPaths(deleted),
-				bestEffortPaths(typechanged),
-			);
-			// Ignored listing is best-effort: a failure there must never drop the
-			// primary file list, so fall back to no ignored entries.
-			const ignoredListing =
-				ignored.status === 'success'
-					? await expandIgnoredEntries({
-							budget: MAX_ENTRIES - trackedListing.entries.length,
-							rootMaxEntries: ignoredRootMaxEntries,
-							stdout: ignored.stdout,
-							trackedPaths: new Set(
-								trackedListing.entries.map((entry) => entry.path),
-							),
-							workspaceCwd: cwdResult.cwd,
-						})
-					: { entries: [], probePaths: new Set<string>() };
-			return {
-				files: await annotateSymlinkTargets(
-					cwdResult.cwd,
-					[...trackedListing.entries, ...ignoredListing.entries],
-					new Set([...trackedListing.probePaths, ...ignoredListing.probePaths]),
-				),
-			};
+			const pending = listingsInFlight.get(cwd);
+			if (pending) {
+				return pending;
+			}
+
+			const flight = buildListing(cwd)
+				.then((result) => {
+					// A failure is a transient state of the workspace — mid-clone, a
+					// worktree being replaced — not a fact about its tree, so it is
+					// never what the next caller is served.
+					if (!result.error) {
+						listings.set(cwd, { at: Date.now(), result });
+					}
+					return result;
+				})
+				.finally(() => {
+					listingsInFlight.delete(cwd);
+				});
+			listingsInFlight.set(cwd, flight);
+			return flight;
 		},
 		async read(request) {
 			const cwdResult = resolveWorkspaceCwd(request.workspaceCwd);
@@ -586,12 +668,14 @@ function parseIgnoredRoots(stdout: string): {
  */
 async function expandIgnoredEntries({
 	budget,
+	oversizedRoots,
 	rootMaxEntries,
 	stdout,
 	trackedPaths,
 	workspaceCwd,
 }: {
 	budget: number;
+	oversizedRoots: Map<string, number>;
 	rootMaxEntries: number;
 	stdout: string;
 	trackedPaths: ReadonlySet<string>;
@@ -623,22 +707,48 @@ async function expandIgnoredEntries({
 		if (trackedPaths.has(root)) {
 			continue;
 		}
+		const rootMtimeMs = await directoryMtimeMs(workspaceCwd, root);
+		if (rootMtimeMs !== null && oversizedRoots.get(root) === rootMtimeMs) {
+			entries.push(ignoredEntry(root, 'directory'));
+			remaining -= 1;
+			continue;
+		}
 		const walked = await walkIgnoredRoot(
 			workspaceCwd,
 			root,
 			Math.min(rootMaxEntries, remaining),
 		);
 		if (walked) {
+			oversizedRoots.delete(root);
 			entries.push(...walked);
 			remaining -= walked.length;
 		} else {
 			// Too big to enumerate cheaply — leave it collapsed.
+			if (rootMtimeMs !== null) {
+				oversizedRoots.set(root, rootMtimeMs);
+			}
 			entries.push(ignoredEntry(root, 'directory'));
 			remaining -= 1;
 		}
 	}
 
 	return { entries, probePaths };
+}
+
+/**
+ * Modification time of an ignored root, used to decide whether a remembered
+ * over-the-cap verdict still holds.
+ * @param workspaceCwd - Absolute workspace root.
+ * @param root - Workspace-relative ignored directory.
+ * @returns The directory's mtime in milliseconds, or null when it cannot be read.
+ */
+async function directoryMtimeMs(
+	workspaceCwd: string,
+	root: string,
+): Promise<number | null> {
+	return stat(path.join(workspaceCwd, root))
+		.then((stats) => stats.mtimeMs)
+		.catch(() => null);
 }
 
 /**

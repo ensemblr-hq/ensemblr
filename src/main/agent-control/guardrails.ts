@@ -136,6 +136,7 @@ export function createGuardrails(
 				maxTotal: limits.maxSpawnsPerSession,
 				rootSessionId,
 				windowStart: reservedAt - RATE_WINDOW_MS,
+				workspaceId: origin.workspaceId,
 			});
 			if (durable.status !== 'reserved') {
 				return {

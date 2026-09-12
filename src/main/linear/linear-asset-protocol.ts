@@ -4,8 +4,8 @@ import { LINEAR_ASSET_SCHEME } from '../../shared/linear-assets.ts';
 import type { LinearAssetProxy } from './linear-asset-proxy.ts';
 
 /**
- * Declare the Linear asset scheme to Chromium. Must run before the app's
- * `ready` event, which is why it is separate from the handler below.
+ * Declare every privileged scheme the app serves to Chromium. Must run before
+ * the app's `ready` event, which is why it is separate from the handler below.
  *
  * `standard` and `secure` make a served image an ordinary subresource rather
  * than a `file:`-like opaque one, so it is not treated as cross-origin from the
@@ -13,8 +13,14 @@ import type { LinearAssetProxy } from './linear-asset-proxy.ts';
  * `supportFetchAPI` is what lets an `<img>` load it at all. The scheme is
  * deliberately not `bypassCSP` and not `allowServiceWorkers`: it serves image
  * bytes and nothing else.
+ *
+ * Electron honours only the **first** `registerSchemesAsPrivileged` call — a
+ * second call's scheme fails to load as a document with `ERR_FAILED` — so a
+ * further privileged scheme joins this one array rather than adding a call of
+ * its own. That is why the name is not `registerLinearAssetScheme`: whenever
+ * the renderer moves off `file:` onto an `app:` scheme, it lands here.
  */
-export function registerLinearAssetScheme(): void {
+export function registerPrivilegedSchemes(): void {
 	protocol.registerSchemesAsPrivileged([
 		{
 			privileges: { secure: true, standard: true, supportFetchAPI: true },

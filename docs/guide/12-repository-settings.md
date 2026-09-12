@@ -85,15 +85,15 @@ your file byte-for-byte intact.
 
 | Key | Type | What it does |
 | --- | --- | --- |
-| `environment_variables` | table | Repository-scoped environment variables, passed to agent sessions, scripts, and terminals. |
 | `file_include_globs` | array of strings | Gitignore-style patterns for files copied into every new workspace. Defaults to `[".env*"]`. |
-| `claude_executable_path` | string | Executable override for the Claude Code harness. |
-| `codex_executable_path` | string | Executable override for the OpenAI Codex harness. |
-| `gemini_executable_path` | string | Executable override for the Gemini harness. |
-| `opencode_executable_path` | string | Executable override for the opencode harness. Also accepted as `open_code_executable_path`. |
-| `amp_executable_path` | string | Executable override for the Amp harness. |
-| `copilot_executable_path` | string | Executable override for the Copilot harness. |
-| `pi_executable_path` | string | Executable override for Pi. |
+| `environment_variables` | table | Accepted and validated; see below. |
+| `claude_executable_path` | string | Accepted and validated; see below. |
+| `codex_executable_path` | string | Accepted and validated; see below. |
+| `gemini_executable_path` | string | Accepted and validated; see below. |
+| `opencode_executable_path` | string | Accepted and validated; see below. Also accepted as `open_code_executable_path`. |
+| `amp_executable_path` | string | Accepted and validated; see below. |
+| `copilot_executable_path` | string | Accepted and validated; see below. |
+| `pi_executable_path` | string | Accepted and validated; see below. |
 | `enterprise_data_privacy` | boolean | Accepted and validated; see below. |
 | `spotlight_testing` | table | Accepted and validated; see below. |
 
@@ -109,6 +109,7 @@ them so a file carrying one still loads cleanly, but **nothing reads the value**
 | --- | --- | --- |
 | `enterprise_data_privacy` | boolean | Accepted, validated, inert |
 | `spotlight_testing` | table | Accepted, validated, inert |
+| `environment_variables` | table | Accepted, validated, inert |
 | `claude_executable_path` | string | Accepted, validated, inert |
 | `codex_executable_path` | string | Accepted, validated, inert |
 | `gemini_executable_path` | string | Accepted, validated, inert |
@@ -121,9 +122,18 @@ If you find one of these in a real repository, it is not doing what its name
 suggests. A wrong type still produces a diagnostic, so the file will tell you
 you got the type wrong for a key that has no effect either way.
 
-To actually pin the executable a runtime uses, set it in **Settings → Providers**
-— see [11. App settings](./11-app-settings.md). That override applies app-wide,
-not per repository.
+`environment_variables` is the one most likely to mislead, because it fails
+silently in both directions: the key normalises into the repository scope and
+stops there. The environment a terminal or a script launches with is assembled
+from env files, Infisical, the plain values in Ensemblr's own database, and the
+platform secret store — never from a repository's committed settings. A team
+that commits `environment_variables` for the whole repo gets a file that
+validates, a settings screen that raises no diagnostic, and terminals that
+launch without any of it.
+
+To actually set a variable, use **Settings → Environment** or an env file — see
+[11. App settings](./11-app-settings.md). To pin the executable a runtime uses,
+use **Settings → Providers**. Both apply app-wide, not per repository.
 
 ---
 

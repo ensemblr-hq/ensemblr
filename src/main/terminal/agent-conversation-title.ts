@@ -93,10 +93,14 @@ interface NormalizedTitle {
 /**
  * Collapses a raw title to a single trimmed line, returning it both capped at
  * {@link MAX_TITLE_LENGTH} for tab display and at full length for tooltips.
+ *
+ * Exported because the OSC window title a PTY sets is the same kind of value
+ * from a less trustworthy source — it arrives inside a terminal chunk, so it is
+ * bounded only by the chunk size — and must not reach a tab uncapped.
  * @param raw - The raw title text pulled from a session log.
  * @returns Both title forms, or null when nothing meaningful remains.
  */
-function normalizeTitle(raw: string): NormalizedTitle | null {
+export function normalizeTitle(raw: string): NormalizedTitle | null {
 	const firstLine = raw.split('\n', 1)[0]?.trim() ?? '';
 	if (!firstLine) {
 		return null;
@@ -517,6 +521,46 @@ async function readJsonlPaths(directory: string): Promise<string[]> {
 }
 
 /**
+ * Recency orderings keyed by candidate-directory set, held against the exact
+ * `.jsonl` paths that produced them.
+ *
+ * The poll that drives this runs every 1.5 s per agent terminal and its job is
+ * to notice a *newly written* session, which always arrives as a new filename —
+ * so an unchanged path set means an unchanged answer. Without this, each tick
+ * `stat`ed every transcript in the candidate directories to sort them, which
+ * grows with the user's transcript history and never prunes.
+ */
+const orderedCandidates = new Map<
+	string,
+	{ fingerprint: string; files: string[] }
+>();
+
+/** Most candidate-directory sets remembered before the oldest is dropped. */
+const MAX_REMEMBERED_CANDIDATE_SETS = 64;
+
+/**
+ * Records one directory set's ordering, evicting the oldest entry once the map
+ * is full so a long run does not accumulate one entry per workspace ever opened.
+ * @param cacheKey - The candidate directory set the ordering belongs to.
+ * @param fingerprint - The `.jsonl` paths the ordering was computed from.
+ * @param files - The ordering itself, newest first.
+ */
+function rememberOrderedCandidates(
+	cacheKey: string,
+	fingerprint: string,
+	files: string[],
+): void {
+	orderedCandidates.delete(cacheKey);
+	orderedCandidates.set(cacheKey, { fingerprint, files });
+	if (orderedCandidates.size > MAX_REMEMBERED_CANDIDATE_SETS) {
+		const oldest = orderedCandidates.keys().next().value;
+		if (oldest !== undefined) {
+			orderedCandidates.delete(oldest);
+		}
+	}
+}
+
+/**
  * Lists `.jsonl` files across one or more directories newest-first by modified
  * time, capped to a bounded probe window. Claude names transcripts by UUID (no
  * timestamp to sort on), so recency comes from `stat` rather than the name.
@@ -527,6 +571,13 @@ async function readJsonlPaths(directory: string): Promise<string[]> {
 async function listJsonlByMtime(directories: string[]): Promise<string[]> {
 	const listed = await Promise.all(directories.map(readJsonlPaths));
 	const jsonlPaths = listed.flat();
+	const fingerprint = jsonlPaths.join('\u0000');
+	const cacheKey = directories.join('\u0000');
+	const cached = orderedCandidates.get(cacheKey);
+	if (cached && cached.fingerprint === fingerprint) {
+		return cached.files;
+	}
+
 	const stated = await Promise.all(
 		jsonlPaths.map(async (full) => {
 			try {
@@ -541,7 +592,11 @@ async function listJsonlByMtime(directories: string[]): Promise<string[]> {
 		(entry): entry is { mtimeMs: number; path: string } => entry !== null,
 	);
 	files.sort((a, b) => b.mtimeMs - a.mtimeMs);
-	return files.slice(0, MAX_SESSION_CANDIDATES).map((file) => file.path);
+	const ordered = files
+		.slice(0, MAX_SESSION_CANDIDATES)
+		.map((file) => file.path);
+	rememberOrderedCandidates(cacheKey, fingerprint, ordered);
+	return ordered;
 }
 
 /** The identifying fields {@link readClaudeTranscriptHead} gleans from a head. */

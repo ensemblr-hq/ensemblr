@@ -3,19 +3,33 @@ export {
 	refundAgentControlSpawn,
 	reserveAgentControlSpawn,
 } from './agent-control-spawn-repository.ts';
+export {
+	capPersistedPayload,
+	MAX_PERSISTED_PAYLOAD_BYTES,
+} from './agent-event-payload-cap.ts';
 export type {
 	AgentEventRow,
 	AgentEventStream,
 	AppendAgentEventInput,
+	BranchEventTail,
 } from './agent-event-repository.ts';
 export {
 	appendAgentEvent,
 	appendAgentEvents,
-	getEventById,
 	getMaxOrdinalForBranch,
+	listBranchEventTail,
 	listEventsByBranch,
 	listEventsByTurn,
 } from './agent-event-repository.ts';
+export type {
+	EventRetentionResult,
+	PruneEventHistoryOptions,
+} from './agent-event-retention.ts';
+export {
+	EVENT_RETENTION_DAYS,
+	MAX_EVENTS_PER_BRANCH,
+	pruneAgentEventHistory,
+} from './agent-event-retention.ts';
 export type {
 	AgentSessionBranchKind,
 	AgentSessionBranchRow,

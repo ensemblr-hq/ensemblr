@@ -6,6 +6,7 @@ import type {
 	SetupDiagnosticsSnapshot,
 	SetupMessageParams,
 } from '../../shared/ipc/contracts/setup';
+import { redactSecrets } from '../../shared/redaction.ts';
 import {
 	AGENT_RUNTIME_CHECK_GROUPS,
 	isPassingSetupStatus,
@@ -101,13 +102,6 @@ const PLATFORM_ONLY_CHECK_IDS: Partial<Record<SetupCheckId, NodeJS.Platform>> =
 	{
 		'secret-storage': 'linux',
 	};
-
-const SENSITIVE_ASSIGNMENT_PATTERN =
-	/\b([A-Z0-9_.-]*(?:ACCESS[_-]?TOKEN|API[_-]?KEY|CREDENTIAL|PASSWORD|PRIVATE[_-]?KEY|SECRET|TOKEN)[A-Z0-9_.-]*)(\s*[=:]\s*)(["']?)([^\s"',;]+)/gi;
-const GITHUB_TOKEN_PATTERN =
-	/\b(?:gh[opsru]_[A-Za-z0-9_]{16,}|github_pat_[A-Za-z0-9_]{16,})\b/g;
-const TOKEN_LINE_PATTERN =
-	/\b(Token:\s*)(?:gh[opsru]_|github_pat_)?[A-Za-z0-9_*]+/gi;
 
 /**
  * Builds the diagnostics service that orchestrates every setup check, allowing
@@ -330,7 +324,7 @@ function sanitizeMessageParams(
 
 /**
  * Renders text safely for diagnostic display by collapsing the user's home
- * directory to `~` and redacting GitHub tokens and secret-shaped assignments.
+ * directory to `~` and running the shared redaction corpus over what remains.
  * @param text - Raw text to sanitise.
  * @param homeDirectory - Home directory to collapse.
  * @returns Safe text suitable for surfacing in the UI.
@@ -340,12 +334,5 @@ function formatSafeText(text: string, homeDirectory: string): string {
 		? text.replaceAll(homeDirectory, '~')
 		: text;
 
-	return collapsedHome
-		.replace(
-			SENSITIVE_ASSIGNMENT_PATTERN,
-			(_match, key: string, separator: string, quote: string) =>
-				`${key}${separator}${quote}[REDACTED]`,
-		)
-		.replace(GITHUB_TOKEN_PATTERN, '[REDACTED]')
-		.replace(TOKEN_LINE_PATTERN, '$1[REDACTED]');
+	return redactSecrets(collapsedHome);
 }

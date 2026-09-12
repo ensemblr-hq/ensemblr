@@ -11,6 +11,7 @@ import type {
 	AgentWireMessagePayload,
 } from '@/shared/ipc/contracts/agent-session';
 import { parseToolPresentation } from '@/shared/tool-presentation';
+import { withTruncationNotice } from './payload-truncation.ts';
 import { parentToolCallIdOf } from './subagent-parts.ts';
 
 /**
@@ -60,7 +61,10 @@ export function buildToolResultPart(
 	event: AgentSessionEventWire,
 	parentToolCallId: string | null = null,
 ): ParentedDynamicToolUIPart {
-	const normalizedOutput = normalizeToolOutput(source.output);
+	const normalizedOutput = withOutputTruncationNotice(
+		normalizeToolOutput(source.output),
+		source.truncatedBytes,
+	);
 	const link = parentToolCallId ? { parentToolCallId } : {};
 	const toolPresentation = presentationFromDetails(normalizedOutput.details);
 	const presentationField = toolPresentation ? { toolPresentation } : {};
@@ -86,6 +90,21 @@ export function buildToolResultPart(
 		toolName: 'tool',
 		type: 'dynamic-tool',
 	};
+}
+
+/**
+ * Marks a tool result the event log had to cut short, so a truncated payload
+ * reads as one rather than as the whole thing the tool produced.
+ * @param output - The normalized tool output
+ * @param truncatedBytes - Bytes dropped, as the wire payload reported them
+ * @returns The output, with the notice appended to its text when one applies
+ */
+function withOutputTruncationNotice(
+	output: AgentToolOutput,
+	truncatedBytes: number | undefined,
+): AgentToolOutput {
+	const text = withTruncationNotice(output.text, truncatedBytes);
+	return text === output.text ? output : { ...output, text };
 }
 
 /**

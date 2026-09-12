@@ -963,23 +963,38 @@ function collectSqliteSettings(
 }
 
 /**
+ * Deepest nesting {@link flattenRecord} will descend. Every key either loader
+ * recognises sits at depth two or less, so anything past this is a repository
+ * shaping a document to cost the resolver rather than to configure anything.
+ */
+const MAX_FLATTEN_DEPTH = 8;
+
+/**
  * Flattens a nested object into a dotted-key map; arrays and primitives become
- * leaves at their containing path.
+ * leaves at their containing path. Nesting past {@link MAX_FLATTEN_DEPTH} is
+ * kept as one leaf rather than walked, so a committed config cannot turn a
+ * settings read into an unbounded recursion.
  * @param record - Source record.
  * @param prefix - Key prefix used during recursion.
+ * @param depth - Current recursion depth, counted from the root call.
  * @returns Flat map of dotted-keys to leaf values.
  */
 function flattenRecord(
 	record: Record<string, unknown>,
 	prefix = '',
+	depth = 0,
 ): Map<string, unknown> {
 	const flattened = new Map<string, unknown>();
 
 	for (const [key, value] of Object.entries(record)) {
 		const fieldPath = prefix ? `${prefix}.${key}` : key;
 
-		if (isPlainRecord(value)) {
-			for (const [nestedKey, nestedValue] of flattenRecord(value, fieldPath)) {
+		if (isPlainRecord(value) && depth < MAX_FLATTEN_DEPTH) {
+			for (const [nestedKey, nestedValue] of flattenRecord(
+				value,
+				fieldPath,
+				depth + 1,
+			)) {
 				flattened.set(nestedKey, nestedValue);
 			}
 			continue;

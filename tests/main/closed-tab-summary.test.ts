@@ -40,6 +40,7 @@ function databaseServiceFor(database: DatabaseSync): EnsemblrDatabaseService {
 		close: () => undefined,
 		getConnection: () => connection,
 		getHealth: () => ({ path: ':memory:', schemaVersion: 5, status: 'ok' }),
+		vacuum: () => undefined,
 		open: () => ({ path: ':memory:', schemaVersion: 5, status: 'ok' }),
 	};
 }

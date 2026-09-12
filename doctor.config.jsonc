@@ -79,10 +79,16 @@
 				// browse-archive-dialog.tsx locks its whole dialog for — and all three
 				// steps append to one shared `diagnostics` array, so Promise.all would
 				// both break the removals and interleave the report.
+				//
+				// xterm-terminal chunks composer input at 32 KiB and awaits each slice
+				// because a shell reads its input as a stream: a reordered pair of
+				// chunks is corrupted input, not slow input. Promise.all there is a
+				// correctness bug rather than a speedup.
 				"files": [
 					"src/main/agent-runtime/session/summary-queue.ts",
 					"src/main/repository/delete-repository.ts",
 					"src/main/terminal/agent-conversation-title.ts",
+					"src/renderer/components/workbench-shell/dock-panel/xterm-terminal.tsx",
 					"src/renderer/lib/workbench/composer-attachments.ts"
 				],
 				"rules": ["react-doctor/async-await-in-loop"]
@@ -99,7 +105,15 @@
 				// the worktree, and racing it would let a subscriber read a half-restored
 				// tree. Both pairs also append to one shared `diagnostics` array, so
 				// Promise.all would interleave the reported order nondeterministically.
+				//
+				// create-workspace writes `.context/` into the worktree's git exclude
+				// before `runFilesToCopy`, which runs `git ls-files --others --ignored`
+				// — it asks git which files are *gitignored*, and that answer changes
+				// the moment the exclude write lands. Running the two together races
+				// git's own ignore state, which is a nondeterministic coupling rather
+				// than a slow one.
 				"files": [
+					"src/main/repository/create-workspace.ts",
 					"src/main/repository/unarchive-workspace.ts",
 					"src/main/repository/workspace-teardown.ts"
 				],
@@ -155,7 +169,18 @@
 				// and preserves chips — writing the draft atom directly (as
 				// `useComposerInsertToChat` does for a non-mounted tab) would clobber
 				// the live editor state.
-				"files": ["src/renderer/state/composer/composer-insert.ts"],
+				//
+				// use-timeline-messages retires an optimistic prompt once the persisted
+				// transcript carries its twin. That is a Jotai store write from an
+				// effect, which the rule matches on shape — there is no parent component
+				// being handed data, and no prop callback. The store write is also
+				// load-bearing rather than bookkeeping: `hasPendingPromptsAtomFamily`
+				// drives the conversation panel's timeline-vs-empty-state choice, so a
+				// prompt that is never retired leaves that flag stuck true.
+				"files": [
+					"src/renderer/hooks/workbench-shell/timeline/use-timeline-messages.ts",
+					"src/renderer/state/composer/composer-insert.ts"
+				],
 				"rules": ["react-doctor/no-pass-data-to-parent"]
 			},
 			{

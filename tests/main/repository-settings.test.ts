@@ -11,6 +11,7 @@ import {
 } from '../../src/main/config/config-loader.ts';
 import { resolveSettings } from '../../src/main/config/config-resolution.ts';
 import { upsertRepositorySettings } from '../../src/main/environment/repository-settings.ts';
+import { readPermissionModeFromSnapshot } from '../../src/main/ipc/permission-mode.ts';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import { DEFAULT_PERMISSION_MODE } from '../../src/shared/permissions.ts';
 
@@ -187,4 +188,83 @@ test('omitted patch fields leave existing rows untouched', (t) => {
 
 	assert.equal(resolved('branchFrom')?.value, 'develop');
 	assert.equal(resolved('remoteOrigin')?.value, 'fork');
+});
+
+test('the permission mode the Security screen writes is the mode the gate reads', (t) => {
+	const database = createDatabaseFixture(t);
+	const resolveForRepository = () =>
+		resolveSettings({
+			config: createConfig(),
+			database,
+			repository: { repositoryId: REPO_ID },
+		});
+
+	assert.equal(
+		readPermissionModeFromSnapshot(resolveForRepository()),
+		DEFAULT_PERMISSION_MODE,
+	);
+
+	upsertRepositorySettings({
+		database,
+		repositoryId: REPO_ID,
+		settings: { permissionMode: 'read-only' },
+	});
+
+	assert.equal(
+		readPermissionModeFromSnapshot(resolveForRepository()),
+		'read-only',
+	);
+
+	upsertRepositorySettings({
+		database,
+		repositoryId: REPO_ID,
+		settings: { permissionMode: 'approval-required' },
+	});
+
+	assert.equal(
+		readPermissionModeFromSnapshot(resolveForRepository()),
+		'approval-required',
+	);
+});
+
+test('a repository that sets no mode inherits the app-scope value', (t) => {
+	const database = createDatabaseFixture(t);
+	const config = createConfig();
+	config.security = { permissionMode: 'read-only' };
+
+	const snapshot = resolveSettings({
+		config,
+		database,
+		repository: { repositoryId: REPO_ID },
+	});
+
+	assert.equal(readPermissionModeFromSnapshot(snapshot), 'read-only');
+
+	upsertRepositorySettings({
+		database,
+		repositoryId: REPO_ID,
+		settings: { permissionMode: 'workspace-trusted' },
+	});
+
+	assert.equal(
+		readPermissionModeFromSnapshot(
+			resolveSettings({
+				config,
+				database,
+				repository: { repositoryId: REPO_ID },
+			}),
+		),
+		'workspace-trusted',
+	);
+});
+
+test('a snapshot resolved without a repository falls back to the app scope', (t) => {
+	const database = createDatabaseFixture(t);
+	const config = createConfig();
+	config.security = { permissionMode: 'approval-required' };
+
+	assert.equal(
+		readPermissionModeFromSnapshot(resolveSettings({ config, database })),
+		'approval-required',
+	);
 });

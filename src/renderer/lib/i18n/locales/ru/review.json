@@ -102,6 +102,10 @@
 		"hidden-line-count_few": "{{count}} неизменённые строки",
 		"hidden-line-count_many": "{{count}} неизменённых строк",
 		"hidden-line-count_other": "{{count}} неизменённой строки",
+		"show-remaining-rows_one": "Показать оставшуюся {{count}} строку",
+		"show-remaining-rows_few": "Показать оставшиеся {{count}} строки",
+		"show-remaining-rows_many": "Показать оставшиеся {{count}} строк",
+		"show-remaining-rows_other": "Показать оставшиеся {{count}} строки",
 		"unchanged-lines": "Неизменённые строки"
 	},
 	"discard-changes": {

@@ -233,17 +233,34 @@ export function retainLastRunScripts(
  * @returns Every workspace id carried by a `last_run_script_*` storage key
  */
 function storedLastRunScriptWorkspaceIds(): string[] {
-	const workspaceIds: string[] = [];
+	return storedIdsForKeyPrefix(LAST_RUN_SCRIPT_KEY_PREFIX);
+}
+
+/**
+ * Reads the ids carried by every stored key under one prefix.
+ *
+ * `atomWithStorage` writes a key per family member and never collects one, so
+ * a family keyed by workspace or repository id needs the stored keys themselves
+ * as its only enumeration — the family holds no key list of its own.
+ * @param keyPrefix - Storage-key prefix the family writes under
+ * @returns The id segment of every key currently stored under that prefix
+ */
+function storedIdsForKeyPrefix(keyPrefix: string): string[] {
+	if (typeof globalThis.localStorage === 'undefined') {
+		return [];
+	}
+
+	const ids: string[] = [];
 
 	for (let index = 0; index < globalThis.localStorage.length; index += 1) {
 		const storageKey = globalThis.localStorage.key(index);
 
-		if (storageKey?.startsWith(LAST_RUN_SCRIPT_KEY_PREFIX)) {
-			workspaceIds.push(storageKey.slice(LAST_RUN_SCRIPT_KEY_PREFIX.length));
+		if (storageKey?.startsWith(keyPrefix)) {
+			ids.push(storageKey.slice(keyPrefix.length));
 		}
 	}
 
-	return workspaceIds;
+	return ids;
 }
 
 // ─── Git (user defaults) ──────────────────────────────────────────────────────
@@ -436,3 +453,81 @@ export interface PrDetailsLiveDraft {
 export const prDetailsLiveDraftAtomFamily = atomFamily((_workspaceId: string) =>
 	atom<PrDetailsLiveDraft | null>(null),
 );
+
+/** Shared prefix of every per-workspace saved-PR-draft storage key. */
+const PR_DETAILS_KEY_PREFIX = KEY('pr_details_');
+
+/** Shared prefix of every per-repository settings-override storage key. */
+const REPO_OVERRIDE_KEY_PREFIX = KEY('repo_override_');
+
+/**
+ * Drops a workspace's PR drafts — the saved one and its backing storage key,
+ * plus the in-memory live mirror. Call when a workspace is deleted, for the
+ * reason {@link forgetLastRunScript} gives: the family keeps a derived atom and
+ * `atomWithStorage` keeps a key for every workspace the install has opened.
+ * @param workspaceId - The workspace whose drafts to drop
+ */
+export function forgetPrDetailsDrafts(workspaceId: string): void {
+	prDetailsDraftAtomFamily.remove(workspaceId);
+	prDetailsLiveDraftAtomFamily.remove(workspaceId);
+
+	if (typeof globalThis.localStorage !== 'undefined') {
+		globalThis.localStorage.removeItem(
+			`${PR_DETAILS_KEY_PREFIX}${workspaceId}`,
+		);
+	}
+}
+
+/**
+ * Drops the PR drafts of every workspace outside `existingWorkspaceIds`, the
+ * counterpart to {@link retainLastRunScripts} for drafts stranded by a removal
+ * this renderer never saw. The set must name archived workspaces too.
+ * @param existingWorkspaceIds - Every workspace still on record
+ */
+export function retainPrDetailsDrafts(
+	existingWorkspaceIds: ReadonlySet<string>,
+): void {
+	if (existingWorkspaceIds.size === 0) {
+		return;
+	}
+
+	for (const workspaceId of storedIdsForKeyPrefix(PR_DETAILS_KEY_PREFIX)) {
+		if (!existingWorkspaceIds.has(workspaceId)) {
+			forgetPrDetailsDrafts(workspaceId);
+		}
+	}
+}
+
+/**
+ * Drops a repository's personal setting overrides and their storage key. Call
+ * when a repository is removed — overrides are per repo rather than per
+ * workspace, so they outlive every workspace of that repo.
+ * @param repoId - The repository whose overrides to drop
+ */
+export function forgetRepoSettingsOverride(repoId: string): void {
+	repoSettingsOverrideAtomFamily.remove(repoId);
+
+	if (typeof globalThis.localStorage !== 'undefined') {
+		globalThis.localStorage.removeItem(`${REPO_OVERRIDE_KEY_PREFIX}${repoId}`);
+	}
+}
+
+/**
+ * Drops the overrides of every repository outside `existingRepoIds`. An empty
+ * set is ignored for the same reason the workspace passes ignore one: "nothing
+ * loaded yet" and "everything was removed" are indistinguishable here.
+ * @param existingRepoIds - Every repository still on record
+ */
+export function retainRepoSettingsOverrides(
+	existingRepoIds: ReadonlySet<string>,
+): void {
+	if (existingRepoIds.size === 0) {
+		return;
+	}
+
+	for (const repoId of storedIdsForKeyPrefix(REPO_OVERRIDE_KEY_PREFIX)) {
+		if (!existingRepoIds.has(repoId)) {
+			forgetRepoSettingsOverride(repoId);
+		}
+	}
+}

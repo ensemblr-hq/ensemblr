@@ -30,6 +30,7 @@ import {
 	runRefDelete,
 	runWorktreeAdd as runWorktreeAddShared,
 } from './git-ops.ts';
+import { readManagedRoots } from './managed-roots.ts';
 import { archivedWorktreeRefFor } from './prune-worktree.ts';
 import {
 	invalidateSetupMarker,
@@ -168,6 +169,7 @@ export function createUnarchiveWorkspaceService({
 				diagnostics,
 				localCommandService,
 				source,
+				workspacesRoot: readManagedRoots(database)?.workspacesPath ?? null,
 			});
 			if ('diagnostic' in materialized) {
 				return {
@@ -319,16 +321,20 @@ async function materializeWorktree({
 	diagnostics,
 	localCommandService,
 	source,
+	workspacesRoot,
 }: {
 	diagnostics: UnarchiveWorkspaceDiagnostic[];
 	localCommandService: LocalCommandService;
 	source: ArchivedWorkspace;
+	/** Managed workspaces root a residue removal must resolve inside. */
+	workspacesRoot: string | null;
 }): Promise<MaterializeOutcome> {
 	if (source.worktreePruned) {
 		return await rehydratePrunedWorktree({
 			diagnostics,
 			localCommandService,
 			source,
+			workspacesRoot,
 		});
 	}
 
@@ -341,6 +347,7 @@ async function materializeWorktree({
 			diagnostics,
 			localCommandService,
 			source,
+			workspacesRoot,
 		});
 	}
 
@@ -368,10 +375,13 @@ async function recoverMissingWorktree({
 	diagnostics,
 	localCommandService,
 	source,
+	workspacesRoot,
 }: {
 	diagnostics: UnarchiveWorkspaceDiagnostic[];
 	localCommandService: LocalCommandService;
 	source: ArchivedWorkspace;
+	/** Managed workspaces root a residue removal must resolve inside. */
+	workspacesRoot: string | null;
 }): Promise<MaterializeOutcome> {
 	const orphaned: MaterializeOutcome = {
 		diagnostic: {
@@ -403,6 +413,7 @@ async function recoverMissingWorktree({
 		prunedWipCommit: archivedWorktreeRefFor(source.id),
 		repositoryPath: source.repositoryPath,
 		workspacePath: source.path,
+		workspacesRoot,
 	});
 	if (outcome.status === 'failure') {
 		return orphaned;
@@ -428,10 +439,13 @@ async function rehydratePrunedWorktree({
 	diagnostics,
 	localCommandService,
 	source,
+	workspacesRoot,
 }: {
 	diagnostics: UnarchiveWorkspaceDiagnostic[];
 	localCommandService: LocalCommandService;
 	source: ArchivedWorkspace;
+	/** Managed workspaces root a residue removal must resolve inside. */
+	workspacesRoot: string | null;
 }): Promise<MaterializeOutcome> {
 	if (!source.branchName) {
 		return {
@@ -452,6 +466,7 @@ async function rehydratePrunedWorktree({
 		prunedWipCommit: source.prunedWipCommit,
 		repositoryPath: source.repositoryPath,
 		workspacePath: source.path,
+		workspacesRoot,
 	});
 
 	if (outcome.status === 'failure') {

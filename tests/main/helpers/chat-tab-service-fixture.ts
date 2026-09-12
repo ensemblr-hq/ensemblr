@@ -70,6 +70,7 @@ VALUES ('${WORKSPACE_ID}', 'repo-tab-svc', 'tab-svc', 'TabSvc', '${CHAT_TAB_FIXT
 			schemaVersion: connection.schemaVersion,
 			status: 'ok',
 		}),
+		vacuum: () => undefined,
 		open: () => ({
 			path: connection.path,
 			schemaVersion: connection.schemaVersion,

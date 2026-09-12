@@ -37,10 +37,18 @@ function tokensFor(code: string): TokenizedCode {
 	};
 }
 
-function resolveHunk(code: string) {
+/**
+ * Delivers one hunk's tokens the way the highlighter does, then drains the
+ * microtask queue: the hook accumulates arrivals and commits them once per
+ * burst rather than once per hunk, so the colours land a microtask after the
+ * callback rather than inside it.
+ */
+async function resolveHunk(code: string) {
 	const callback = waiting.get(code);
 	waiting.delete(code);
-	act(() => callback?.(tokensFor(code)));
+	await act(async () => {
+		callback?.(tokensFor(code));
+	});
 }
 
 function renderHunks(sources: readonly string[]) {
@@ -65,21 +73,43 @@ describe('per-hunk diff highlighting', () => {
 		expect(result.current).toEqual([null, null]);
 	});
 
-	test('colours only the hunk whose tokens arrived', () => {
+	test('colours only the hunk whose tokens arrived', async () => {
 		const { result } = renderHunks(['const a = 1;', 'const b = 2;']);
 
-		resolveHunk('const b = 2;');
+		await resolveHunk('const b = 2;');
 
 		expect(result.current).toEqual([null, tokensFor('const b = 2;')]);
 	});
 
-	test('keeps resolved tokens with their source when hunks change position', () => {
+	test('keeps resolved tokens with their source when hunks change position', async () => {
 		const { rerender, result } = renderHunks(['const a = 1;', 'const b = 2;']);
-		resolveHunk('const b = 2;');
+		await resolveHunk('const b = 2;');
 
 		rerender({ hunks: ['const b = 2;', 'const a = 1;'] });
 
 		expect(result.current).toEqual([tokensFor('const b = 2;'), null]);
+	});
+
+	test('commits a burst of arrivals once, not once per hunk', async () => {
+		const sources = Array.from({ length: 8 }, (_, index) => `const v${index};`);
+		let renders = 0;
+		const { result } = renderHook(
+			({ hunks }: { hunks: readonly string[] }) => {
+				renders += 1;
+				return useHighlightedHunks(hunks, 'typescript');
+			},
+			{ initialProps: { hunks: sources } },
+		);
+		const mountRenders = renders;
+
+		await act(async () => {
+			for (const source of sources) {
+				waiting.get(source)?.(tokensFor(source));
+			}
+		});
+
+		expect(renders - mountRenders).toBe(1);
+		expect(result.current.filter(Boolean)).toHaveLength(sources.length);
 	});
 
 	test('derives a warm cache hit without waiting for an async round trip', () => {

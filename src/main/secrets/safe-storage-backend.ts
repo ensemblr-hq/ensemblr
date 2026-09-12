@@ -12,6 +12,7 @@ import {
 	normalizeLookup,
 	normalizeWriteInput,
 } from './normalize.ts';
+import { readObfuscatedStorageAcknowledgement as readAcknowledgementRow } from './obfuscated-storage-acknowledgement.ts';
 import {
 	type NormalizedWriteInput,
 	type SafeStorageApi,
@@ -42,6 +43,9 @@ export function createSafeStorageSecretStore({
 	database,
 	idFactory = randomUUID,
 	now = () => new Date(),
+	platform = process.platform,
+	readObfuscatedStorageAcknowledgement = (keyringBackend) =>
+		readAcknowledgementRow(database, keyringBackend),
 	safeStorage,
 	serviceName = DEFAULT_SAFE_STORAGE_SERVICE_NAME,
 }: SafeStorageSecretStoreOptions): SecretStore {
@@ -49,6 +53,8 @@ export function createSafeStorageSecretStore({
 		idFactory,
 		metadataStore: createSqliteSecretMetadataStore(database),
 		now,
+		platform,
+		readObfuscatedStorageAcknowledgement,
 		resolveSafeStorage: safeStorage
 			? () => safeStorage
 			: resolveElectronSafeStorage,
@@ -61,6 +67,10 @@ export interface SafeStorageBackendDependencies {
 	idFactory: () => string;
 	metadataStore: MetadataStore;
 	now: () => Date;
+	/** Platform whose keyring semantics apply. */
+	platform: NodeJS.Platform;
+	/** Whether the user accepted storing secrets under an obfuscating keyring backend. */
+	readObfuscatedStorageAcknowledgement: (keyringBackend: string) => boolean;
 	resolveSafeStorage: () => SafeStorageApi | undefined;
 	serviceName: string;
 }
@@ -76,6 +86,8 @@ export function buildSafeStorageSecretStore({
 	idFactory,
 	metadataStore,
 	now,
+	platform,
+	readObfuscatedStorageAcknowledgement,
 	resolveSafeStorage,
 	serviceName,
 }: SafeStorageBackendDependencies): SecretStore {
@@ -86,11 +98,16 @@ export function buildSafeStorageSecretStore({
 	 */
 	function toPersistPayload(input: NormalizedWriteInput) {
 		const safeStorage = requireSafeStorage(resolveSafeStorage, 'store');
+		const keyringBackend = readKeyringBackend(safeStorage, platform);
+		refuseUnacknowledgedObfuscation(
+			keyringBackend,
+			readObfuscatedStorageAcknowledgement,
+		);
 
 		return {
 			...input,
 			backend: 'safe-storage' as const,
-			keyringBackend: readKeyringBackend(safeStorage),
+			keyringBackend,
 			maskedDisplay: maskSecret(input.value),
 			now: now().toISOString(),
 			secretValue: encryptSecret(safeStorage, input.value),
@@ -137,7 +154,7 @@ export function buildSafeStorageSecretStore({
 
 			const safeStorage = requireSafeStorage(resolveSafeStorage, 'read');
 
-			return decryptSecret(safeStorage, stored, normalized.key);
+			return decryptSecret(safeStorage, stored, normalized.key, platform);
 		},
 		async update(input) {
 			const normalized = normalizeWriteInput(input);
@@ -196,13 +213,56 @@ function requireSafeStorage(
 }
 
 /**
+ * Electron's backend id for the fallback that "encrypts" with a key published
+ * in its own source rather than one the OS holds.
+ */
+export const OBFUSCATING_KEYRING_BACKEND = 'basic_text';
+
+/**
+ * Refuses a write when the session's keyring only obfuscates and the user has
+ * not accepted that.
+ *
+ * `isEncryptionAvailable()` is true for `basic_text`, so on a host with no
+ * keyring daemon the ciphertext in `secret_metadata.secret_value` is reversible
+ * by anyone who can read the database file. Reporting that afterwards in a
+ * setup check is not the same as declining to create the exposure.
+ *
+ * Only `basic_text` is refused. `unknown` is what a non-Linux platform reports
+ * because `getSelectedStorageBackend()` is a Linux API, and on Linux it means
+ * Electron did not recognise a keyring that may well be working — refusing
+ * either would lock a user out of their own secret store.
+ * @param keyringBackend - Backend id the session selected.
+ * @param readAcknowledgement - Whether the user accepted the weaker protection.
+ */
+function refuseUnacknowledgedObfuscation(
+	keyringBackend: string,
+	readAcknowledgement: (keyringBackend: string) => boolean,
+): void {
+	if (
+		keyringBackend !== OBFUSCATING_KEYRING_BACKEND ||
+		readAcknowledgement(keyringBackend)
+	) {
+		return;
+	}
+
+	throw new SecretStoreError(
+		'obfuscated-storage-unacknowledged',
+		'No keyring daemon answered, so this secret would only be obfuscated rather than encrypted. Start gnome-keyring or KWallet, or accept the weaker protection, before storing secrets.',
+	);
+}
+
+/**
  * Names the keyring that is about to encrypt a value, so a later decrypt
  * failure can say whether the session's backend changed.
  * @param safeStorage - Resolved keyring API.
+ * @param platform - Platform whose keyring semantics apply.
  * @returns The backend id, or `unknown` off Linux where Electron reports none.
  */
-function readKeyringBackend(safeStorage: SafeStorageApi): string {
-	return process.platform === 'linux'
+function readKeyringBackend(
+	safeStorage: SafeStorageApi,
+	platform: NodeJS.Platform,
+): string {
+	return platform === 'linux'
 		? safeStorage.getSelectedStorageBackend()
 		: 'unknown';
 }
@@ -230,19 +290,21 @@ function encryptSecret(safeStorage: SafeStorageApi, value: string): Uint8Array {
  * @param safeStorage - Resolved keyring API.
  * @param stored - Ciphertext plus the keyring backend that produced it.
  * @param key - Secret key, named in the error so a failure is traceable.
+ * @param platform - Platform whose keyring semantics apply.
  * @returns The plaintext secret value.
  */
 function decryptSecret(
 	safeStorage: SafeStorageApi,
 	stored: StoredCiphertext,
 	key: string,
+	platform: NodeJS.Platform,
 ): string {
 	try {
 		return safeStorage.decryptString(Buffer.from(stored.ciphertext));
 	} catch (error) {
 		throw new SecretStoreError(
 			'encryption-error',
-			describeDecryptFailure(safeStorage, stored, key),
+			describeDecryptFailure(safeStorage, stored, key, platform),
 			{ cause: error },
 		);
 	}
@@ -254,14 +316,16 @@ function decryptSecret(
  * @param safeStorage - Resolved keyring API.
  * @param stored - Ciphertext plus the keyring backend that produced it.
  * @param key - Secret key, named so a failure is traceable.
+ * @param platform - Platform whose keyring semantics apply.
  * @returns The message to surface.
  */
 function describeDecryptFailure(
 	safeStorage: SafeStorageApi,
 	stored: StoredCiphertext,
 	key: string,
+	platform: NodeJS.Platform,
 ): string {
-	const current = readKeyringBackend(safeStorage);
+	const current = readKeyringBackend(safeStorage, platform);
 
 	if (stored.keyringBackend && stored.keyringBackend !== current) {
 		return `The stored value for ${key} was encrypted by the ${stored.keyringBackend} keyring, but this session uses ${current}. Re-enter the secret to store it under the current keyring.`;

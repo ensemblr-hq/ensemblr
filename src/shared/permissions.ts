@@ -15,6 +15,7 @@ export type PermissionActionKind =
 	| 'app-settings-change'
 	| 'outside-workspace-write'
 	| 'pi-global-config-change'
+	| 'plan-submission'
 	| 'pull-request-merge'
 	| 'repository-removal'
 	| 'root-directory-change'
@@ -149,13 +150,18 @@ export function classifyPermissionAction({
 		});
 	}
 
-	if (SENSITIVE_ACTIONS.has(action)) {
+	// Submitting a plan writes one file into `.context/plans/`, and it is the only
+	// exit from Plan Mode — so it is never blocked, because blocking it strands a
+	// planning agent with every editing tool denied and no way out. It is not a
+	// read either: classifying it as one made a `read-only` workspace gain a file
+	// with nothing shown to the user. Under `read-only` the user is asked.
+	if (action === 'plan-submission') {
 		return createBoundary({
 			action,
-			boundary: 'confirmation-required',
+			boundary: mode === 'read-only' ? 'confirmation-required' : 'allowed',
 			mode,
 			reason:
-				'This action can affect files outside the current workspace, app state, Pi global configuration, or externally visible project state.',
+				'Submitting a plan writes one file under .context/plans/ and is the only exit from Plan Mode, so it is confirmed rather than blocked.',
 		});
 	}
 
@@ -166,6 +172,16 @@ export function classifyPermissionAction({
 			mode,
 			reason:
 				'Read-only mode restricts workspace write, shell, script, terminal, and tool execution where enforcement is available.',
+		});
+	}
+
+	if (SENSITIVE_ACTIONS.has(action)) {
+		return createBoundary({
+			action,
+			boundary: 'confirmation-required',
+			mode,
+			reason:
+				'This action can affect files outside the current workspace, app state, Pi global configuration, or externally visible project state.',
 		});
 	}
 

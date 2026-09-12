@@ -9,6 +9,7 @@ import { XtermTerminal } from './xterm-terminal';
 /** Renders the Run script output or the appropriate empty state. */
 export function RunScriptOutputPanel({
 	activeRunScriptName,
+	isVisible = true,
 	onOpenSetupScripts,
 	onRunScript,
 	script,
@@ -17,6 +18,8 @@ export function RunScriptOutputPanel({
 }: {
 	/** Script the stopped empty state starts, or null when none is configured. */
 	activeRunScriptName: string | null;
+	/** Whether this pane is the dock's active tab and the dock is expanded. */
+	isVisible?: boolean;
 	onOpenSetupScripts: () => void;
 	onRunScript: (scriptName?: string) => void;
 	script: WorkspaceScriptSummary;
@@ -57,6 +60,7 @@ export function RunScriptOutputPanel({
 
 	return (
 		<XtermTerminal
+			isVisible={isVisible}
 			readOnly
 			sessionStatus={script.sessionStatus ?? null}
 			terminalId={script.terminalId}

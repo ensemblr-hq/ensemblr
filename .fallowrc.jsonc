@@ -119,8 +119,16 @@
 	// Node-built one. Fallow reads `scripts/**` as production and wants it in
 	// `dependencies`, but nothing under `scripts/` is packaged — it runs from the
 	// repo checkout, before `electron-forge` does.
+	// The two @iconify-json collections are the *input* to
+	// scripts/generate-icon-subset.mjs, not a runtime dependency: it reads their
+	// icons.json and emits the 77 glyphs the renderer actually draws into
+	// src/renderer/lib/workbench/icon-subset.gen.ts, which is what ships. The
+	// generator resolves them with `import.meta.resolve` on a computed package
+	// name, so there is no static import edge for fallow to follow.
 	"ignoreDependencies": [
 		"@electron-forge/shared-types",
+		"@iconify-json/logos",
+		"@iconify-json/vscode-icons",
 		"node-abi",
 		"@tailwindcss/typography",
 		"i18next-cli",

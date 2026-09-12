@@ -12,6 +12,7 @@ import {
 	polylinePath,
 	roundedPath,
 	routeHonorsEndpointSides,
+	segmentIntersectsRect,
 } from '../../src/renderer/lib/architecture-diagram/routing';
 import type {
 	ArchitectureConnection,
@@ -271,5 +272,42 @@ describe('routeHonorsEndpointSides', () => {
 				'left',
 			),
 		).toBe(false);
+	});
+});
+
+describe('segmentIntersectsRect', () => {
+	const box: MeasuredRect = {
+		cx: 60,
+		cy: 25,
+		height: 50,
+		id: 'box',
+		width: 120,
+		x: 0,
+		y: 0,
+	};
+
+	it('reports a segment that crosses the box', () => {
+		expect(segmentIntersectsRect([-20, 25], [200, 25], box)).toBe(true);
+	});
+
+	it('reports a segment that ends inside the box', () => {
+		expect(segmentIntersectsRect([-20, 25], [60, 25], box)).toBe(true);
+	});
+
+	// The AABB pre-reject in front of the cross products has to agree with them
+	// exactly: a false negative routes an edge straight through a component.
+	it('clears a segment whose bounding box misses the expanded rect', () => {
+		expect(segmentIntersectsRect([200, 200], [400, 400], box)).toBe(false);
+		expect(segmentIntersectsRect([-200, 25], [-130, 25], box)).toBe(false);
+		expect(segmentIntersectsRect([60, -200], [60, -60], box)).toBe(false);
+	});
+
+	it('still reports a segment the gap brings into range', () => {
+		expect(segmentIntersectsRect([-20, -6], [200, -6], box)).toBe(false);
+		expect(segmentIntersectsRect([-20, -6], [200, -6], box, 8)).toBe(true);
+	});
+
+	it('clears a segment that passes diagonally outside a corner', () => {
+		expect(segmentIntersectsRect([130, -10], [200, -80], box)).toBe(false);
 	});
 });

@@ -30,6 +30,7 @@ const stubService: AgentControlService = {
 		}
 		return { ok: true, data: { echoed: command.op } };
 	},
+	isKnownToken: (token) => token === 'good',
 	readIssueDirective: async () => null,
 	readCoAuthorDirective: () => null,
 	readDelegationDirective: () => null,
@@ -56,12 +57,28 @@ afterEach(async () => {
 });
 
 describe('control server', () => {
-	it('answers a health check', async () => {
+	it('answers a health check for a token that resolves', async () => {
 		server = await startControlServer(stubService);
-		const response = await fetch(`${server.url}/health`);
+		const response = await fetch(`${server.url}/health`, {
+			headers: { authorization: 'Bearer good' },
+		});
 		expect(response.status).toBe(200);
 		await expect(response.json()).resolves.toEqual({ ok: true });
 	});
+
+	// An unauthenticated 200 here confirms to any local process that a given
+	// ephemeral port is Ensemblr's control server, which is the port-scan half of
+	// reaching the MCP endpoint at all.
+	it.each([null, 'bogus'])(
+		'refuses a health check with token %s',
+		async (token) => {
+			server = await startControlServer(stubService);
+			const response = await fetch(`${server.url}/health`, {
+				headers: token ? { authorization: `Bearer ${token}` } : {},
+			});
+			expect(response.status).toBe(401);
+		},
+	);
 
 	it('rejects a request with no token', async () => {
 		server = await startControlServer(stubService);
@@ -191,6 +208,7 @@ describe('control server', () => {
 				hasChatTab: false,
 				role: 'orchestrator',
 			}),
+			isKnownToken: (token) => token === 'good',
 			readIssueDirective: async () => null,
 			readCoAuthorDirective: () => null,
 			readDelegationDirective: () => null,
@@ -264,6 +282,7 @@ describe('control server', () => {
 				hasChatTab: false,
 				role: 'orchestrator',
 			}),
+			isKnownToken: (token) => token === 'good',
 			readIssueDirective: async () => null,
 			readCoAuthorDirective: () => null,
 			readDelegationDirective: () => null,
@@ -290,4 +309,46 @@ describe('control server', () => {
 		await expect(inFlight).rejects.toThrow();
 		await vi.waitFor(() => expect(seen?.aborted).toBe(true));
 	});
+});
+
+// The endpoint used to require only that an `Authorization` header be *present*:
+// a bogus token was answered with the full 37-tool inventory and the root
+// playbook, because `describeAudience` read an unresolvable token as the widest
+// audience it serves. And the route matched on the URL alone, so a GET was
+// answered as an SSE stream the server then held open forever.
+describe('the MCP route refuses what it cannot resolve', () => {
+	it.each([null, 'bogus'])(
+		'401s a POST bearing token %s, before building a server',
+		async (token) => {
+			server = await startControlServer(stubService);
+			const response = await fetch(`${server.url}/mcp`, {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json',
+					accept: 'application/json, text/event-stream',
+					...(token ? { authorization: `Bearer ${token}` } : {}),
+				},
+				body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+			});
+			expect(response.status).toBe(401);
+			const text = await response.text();
+			expect(text).not.toContain('ensemblr_start_conversation');
+			expect(calls).toHaveLength(0);
+		},
+	);
+
+	it.each(['GET', 'DELETE'])(
+		'405s a %s rather than holding a stream open',
+		async (method) => {
+			server = await startControlServer(stubService);
+			const response = await fetch(`${server.url}/mcp`, {
+				method,
+				headers: { authorization: 'Bearer good' },
+			});
+			expect(response.status).toBe(405);
+			expect(response.headers.get('content-type')).toContain(
+				'application/json',
+			);
+		},
+	);
 });

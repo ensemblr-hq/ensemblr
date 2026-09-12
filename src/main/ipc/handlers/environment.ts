@@ -180,9 +180,12 @@ export function registerEnvironmentHandlers({
 				title: 'Select env file',
 			});
 
-			return result.canceled
-				? { canceled: true }
-				: { canceled: false, path: result.path };
+			if (result.canceled) {
+				return { canceled: true };
+			}
+
+			environmentVariablesService.rememberPickedEnvFile(result.path);
+			return { canceled: false, path: result.path };
 		},
 	);
 }

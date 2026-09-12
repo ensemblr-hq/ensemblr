@@ -34,6 +34,7 @@ import {
 } from '../storage/repositories/terminal-session-repository.ts';
 import {
 	type AgentConversationInfo,
+	normalizeTitle,
 	type ReadAgentConversationTitleOptions,
 	readAgentConversationInfo,
 } from './agent-conversation-title.ts';
@@ -46,6 +47,7 @@ import {
 } from './pty-backend.ts';
 import type { TerminalScrollbackCapture } from './terminal-output-file.ts';
 import {
+	appendTerminalOutput,
 	deleteTerminalOutput,
 	readTerminalOutput,
 	writeTerminalOutput,
@@ -69,7 +71,13 @@ const DEFAULT_KILL_GRACE_MS = 5_000;
  * bounded quit window.
  */
 const DEFAULT_SHUTDOWN_GRACE_MS = 1_000;
-// Defense-in-depth against a compromised renderer flooding the PTY buffer.
+/**
+ * Ceiling on one renderer-supplied PTY write. Defense-in-depth against a
+ * compromised renderer flooding the PTY buffer: the honest renderer slices a
+ * paste well below this before it crosses IPC, so reaching it means the caller
+ * is not the shipped one and the excess is refused rather than truncated
+ * silently.
+ */
 const MAX_WRITE_BYTES = 65_536;
 
 /**
@@ -80,11 +88,54 @@ const MAX_WRITE_BYTES = 65_536;
 const OUTPUT_FLUSH_DEBOUNCE_MS = 1_000;
 
 /**
+ * How far the persisted log may run ahead of the retained scrollback window
+ * before a flush rewrites it whole.
+ *
+ * Appending the delta keeps the per-second flush proportional to the output
+ * rather than to `appearance.terminalScrollbackMb` (10 MB by default, 200 at the
+ * ceiling), but the file would then grow forever. Rewriting once the file holds
+ * twice the window bounds it, costs one whole-buffer write per window's worth of
+ * output, and is harmless to the restore path: seeding the ring trims the excess
+ * back to the limit.
+ */
+const OUTPUT_FILE_OVERSHOOT_FACTOR = 2;
+
+/**
+ * How long a session's PTY output is accumulated before one broadcast carries
+ * it. node-pty delivers hundreds to thousands of chunks a second under a build
+ * or a `cat`, and each one was its own structured-clone IPC message to every
+ * window; one frame's worth of coalescing collapses a burst into a single
+ * message without the renderer noticing, since it only appends into xterm.
+ *
+ * `outputSeq` counts these batches rather than PTY chunks, which is what keeps
+ * the snapshot handshake sound: a batch is broadcast whole, so a reattaching
+ * renderer's `seq > lastSeq` test can never split one.
+ */
+const OUTPUT_BROADCAST_COALESCE_MS = 16;
+
+/**
  * Dim separator appended after a restored session's seeded scrollback, marking
  * where the previous run's replayed output ends and the fresh shell begins. Built
  * without literal control characters, matching the OSC helpers below.
  */
 const RESTORE_BANNER = `\r\n${String.fromCharCode(27)}[2m── restored session — output above is from the previous run ──${String.fromCharCode(27)}[0m\r\n`;
+
+/**
+ * Session kinds that receive the agent-control overlay — the live control-server
+ * URL and the workspace's harness bearer token.
+ *
+ * The script kinds are deliberately absent. `setup`, `run`, and `archive` run a
+ * command the *repository* wrote, and handing that command a capability into the
+ * control channel widens the blast radius of the one actor the permission model
+ * cannot gate; `env` in one of those also prints the token into scrollback that
+ * is persisted under `.context/terminals/`. An agent tab and a dock terminal
+ * keep it: the harness launcher turns it into an MCP client, and a user who
+ * starts a CLI agent by hand in a plain terminal has the same claim on it.
+ */
+const CONTROL_TOKEN_TERMINAL_KINDS: ReadonlySet<TerminalSessionKind> = new Set([
+	'agent',
+	'terminal',
+]);
 
 /**
  * Reports whether a session kind is persisted to disk and offered for dock
@@ -297,10 +348,20 @@ export interface CreateTerminalServiceOptions {
 	resolveBaseEnv?: TerminalBaseEnvResolver;
 	/**
 	 * Injects the agent-control env (control-server URL + a workspace-scoped
-	 * harness token) into every terminal/harness process so a launched harness can
-	 * call back into the app. Absent when the control layer is disabled.
+	 * harness token) into the terminal and harness processes that can use it, so a
+	 * launched harness can call back into the app. Absent when the control layer
+	 * is disabled.
 	 */
 	resolveAgentControlEnv?: AgentControlEnvResolver;
+	/**
+	 * Invalidates the workspace's shared harness control token once its last
+	 * terminal is gone. That origin is registered on the first terminal of any
+	 * kind and has no session of its own to be released with, so without this the
+	 * token minted for a workspace stays valid — along with the worktree path
+	 * captured at registration — for the whole run of the app, outliving the
+	 * workspace itself. Absent when the control layer is disabled.
+	 */
+	releaseAgentControlOrigins?: (workspaceId: string) => void;
 	/**
 	 * Resolves the pty scrollback byte limit from the user's
 	 * `appearance.terminalScrollbackMb` setting. Read per new session so an edited
@@ -367,7 +428,39 @@ interface TrackedSession {
 	 * kinds, or null when no flush is pending. Unset for agent sessions.
 	 */
 	outputFlushTimer: NodeJS.Timeout | null;
+	/**
+	 * Whether a delta append is awaiting its filesystem write. A second flush
+	 * cannot start meanwhile, or the two would race for the file's tail.
+	 */
+	outputAppendInFlight: boolean;
+	/**
+	 * PTY output accumulated since the last broadcast, or an empty string when
+	 * nothing is pending.
+	 */
+	pendingOutput: string;
+	/**
+	 * Timer that will broadcast {@link TrackedSession.pendingOutput}, or null
+	 * when no output is waiting.
+	 */
+	outputBroadcastTimer: NodeJS.Timeout | null;
+	/**
+	 * Scrollback offset of the first character the log file holds. The file is
+	 * allowed to run ahead of the in-memory ring by up to
+	 * {@link OUTPUT_FILE_OVERSHOOT_FACTOR}, which is what lets a flush append a
+	 * delta instead of rewriting the buffer.
+	 */
+	outputFileStart: number;
+	/**
+	 * Bumped on every whole-buffer rewrite, so a delta append that was already
+	 * in flight when the rewrite landed discards its result instead of
+	 * duplicating a tail the rewrite already wrote.
+	 */
+	outputFileGeneration: number;
+	/** Scrollback offset written to the log so far, or null when it has no file. */
+	outputFlushedAt: number | null;
 	outputSeq: number;
+	/** Retained scrollback ceiling for this session, in UTF-16 code units. */
+	scrollbackLimit: number;
 	/** Poll timer re-reading the harness conversation title, or null when idle. */
 	titlePollTimer: NodeJS.Timeout | null;
 	/**
@@ -577,6 +670,7 @@ export function createTerminalService({
 	onLifecycle,
 	onOutput,
 	readConversationInfo = readAgentConversationInfo,
+	releaseAgentControlOrigins,
 	resolveAgentControlEnv,
 	resolveBaseEnv = () => process.env,
 	resolveScrollbackLimit = () => DEFAULT_SCROLLBACK_LIMIT,
@@ -649,12 +743,14 @@ export function createTerminalService({
 	 * replayed history reads before the fresh shell. Fresh spawns get an empty
 	 * buffer.
 	 * @param seedOutput - Prior scrollback to replay, or undefined for a fresh spawn.
+	 * @param limit - Retained scrollback ceiling, in UTF-16 code units.
 	 * @returns A scrollback buffer at the user's configured limit.
 	 */
 	function buildSessionScrollback(
 		seedOutput: string | undefined,
+		limit: number,
 	): ScrollbackBuffer {
-		const scrollback = createScrollbackBuffer(resolveScrollbackLimit());
+		const scrollback = createScrollbackBuffer(limit);
 
 		if (seedOutput) {
 			scrollback.append(seedOutput);
@@ -680,6 +776,57 @@ export function createTerminalService({
 		}
 	}
 
+	/**
+	 * Broadcasts a session's accumulated PTY output as one event and clears the
+	 * pending batch. No-op when nothing is waiting.
+	 *
+	 * Called from the coalescing timer, and synchronously by anything that has to
+	 * observe a consistent `(scrollback, outputSeq)` pair — a snapshot read or a
+	 * session winding down — so the renderer's replay test never sees a sequence
+	 * number whose output has not been sent.
+	 * @param session - Tracked session whose pending output to broadcast.
+	 */
+	function flushPendingOutput(session: TrackedSession): void {
+		if (session.outputBroadcastTimer) {
+			clearTimeout(session.outputBroadcastTimer);
+			session.outputBroadcastTimer = null;
+		}
+		if (!session.pendingOutput) {
+			return;
+		}
+
+		const data = session.pendingOutput;
+		session.pendingOutput = '';
+		session.outputSeq += 1;
+		onOutput({
+			data,
+			seq: session.outputSeq,
+			terminalId: session.snapshot.id,
+			workspaceId: session.snapshot.workspaceId,
+		});
+	}
+
+	/**
+	 * Queues a PTY chunk for the next coalesced broadcast, arming the timer when
+	 * this is the first chunk of a batch. The timer is unref'd so a pending
+	 * broadcast never keeps the app alive.
+	 * @param session - Tracked session the output belongs to.
+	 * @param data - Raw PTY output to broadcast.
+	 */
+	function queueOutputBroadcast(session: TrackedSession, data: string): void {
+		session.pendingOutput += data;
+
+		if (session.outputBroadcastTimer) {
+			return;
+		}
+
+		session.outputBroadcastTimer = setTimeout(() => {
+			session.outputBroadcastTimer = null;
+			flushPendingOutput(session);
+		}, OUTPUT_BROADCAST_COALESCE_MS);
+		session.outputBroadcastTimer.unref?.();
+	}
+
 	/** Clears a session's pending debounced flush timer, if one is armed. */
 	function clearOutputFlushTimer(session: TrackedSession): void {
 		if (session.outputFlushTimer) {
@@ -689,9 +836,14 @@ export function createTerminalService({
 	}
 
 	/**
-	 * Writes a restorable session's current scrollback to its `.context` output
+	 * Rewrites a restorable session's whole scrollback into its `.context` output
 	 * log so a later app run can replay it. No-op for non-restorable kinds.
 	 * Best-effort — the writer swallows errors.
+	 *
+	 * This is the synchronous leg, and it stays synchronous because quit depends
+	 * on it: {@link beginSessionShutdown} flushes here and the app may be gone
+	 * before an asynchronous write settled. The per-second steady-state flush
+	 * goes through {@link flushSessionOutput} instead.
 	 *
 	 * A closed session never writes: {@link close} deletes the log while the PTY
 	 * is still dying, so anything the child prints inside the kill grace would
@@ -705,11 +857,71 @@ export function createTerminalService({
 			return;
 		}
 
+		const { appended, dropped } = session.scrollback.offsets();
 		writeTerminalOutput(
 			session.cwd,
 			session.snapshot.id,
 			session.scrollback.read(),
 		);
+		session.outputFileGeneration += 1;
+		session.outputFileStart = dropped;
+		session.outputFlushedAt = appended;
+	}
+
+	/**
+	 * Persists the scrollback a session produced since its last flush, appending
+	 * it to the existing log rather than rewriting the whole ring.
+	 *
+	 * Falls back to {@link persistSessionOutput} in the three cases an append
+	 * cannot represent: no log has been written yet, the ring has trimmed past
+	 * what the file already holds (so the file is no longer a prefix of it), and
+	 * the file has grown past {@link OUTPUT_FILE_OVERSHOOT_FACTOR} times the
+	 * retained window, which is what keeps the log bounded. A whole-buffer
+	 * rewrite therefore costs one write per `limit` characters of output rather
+	 * than one per second.
+	 * @param session - Tracked session whose scrollback to flush.
+	 */
+	async function flushSessionOutput(session: TrackedSession): Promise<void> {
+		if (session.closed || !isRestorableTerminalKind(session.snapshot.kind)) {
+			return;
+		}
+
+		const flushedAt = session.outputFlushedAt;
+		const { appended } = session.scrollback.offsets();
+		const delta =
+			flushedAt === null ? null : session.scrollback.readSince(flushedAt);
+
+		if (
+			flushedAt === null ||
+			delta === null ||
+			appended - session.outputFileStart >
+				session.scrollbackLimit * OUTPUT_FILE_OVERSHOOT_FACTOR
+		) {
+			persistSessionOutput(session);
+			return;
+		}
+
+		if (delta.length === 0 || session.outputAppendInFlight) {
+			return;
+		}
+
+		const generation = session.outputFileGeneration;
+		session.outputAppendInFlight = true;
+		const landed = await appendTerminalOutput(
+			session.cwd,
+			session.snapshot.id,
+			delta,
+		);
+		session.outputAppendInFlight = false;
+
+		if (generation !== session.outputFileGeneration || session.closed) {
+			return;
+		}
+		if (landed) {
+			session.outputFlushedAt = flushedAt + delta.length;
+			return;
+		}
+		persistSessionOutput(session);
 	}
 
 	/**
@@ -729,7 +941,9 @@ export function createTerminalService({
 	/**
 	 * Schedules a debounced scrollback flush for a restorable session, coalescing
 	 * bursty output into one write. No-op for non-restorable kinds. The timer is
-	 * unref'd so a pending flush never keeps the app alive.
+	 * unref'd so a pending flush never keeps the app alive. The flush itself is
+	 * asynchronous and usually appends only the new output, so this no longer
+	 * blocks the event loop for the size of the retained buffer.
 	 * @param session - Tracked session whose output changed.
 	 */
 	function scheduleOutputFlush(session: TrackedSession): void {
@@ -742,7 +956,7 @@ export function createTerminalService({
 
 		session.outputFlushTimer = setTimeout(() => {
 			session.outputFlushTimer = null;
-			persistSessionOutput(session);
+			void flushSessionOutput(session);
 		}, OUTPUT_FLUSH_DEBOUNCE_MS);
 		session.outputFlushTimer.unref?.();
 	}
@@ -776,6 +990,13 @@ export function createTerminalService({
 	 * Captures the window title an agent harness sets via an OSC escape and, when
 	 * it changes, stamps it on the session and broadcasts so the harness's own
 	 * conversation title surfaces on its tab. No-op for non-agent sessions.
+	 *
+	 * The captured text is repository-controlled — any toolchain the agent runs
+	 * can emit an OSC title — and {@link TITLE_SCAN_WINDOW} bounds only the
+	 * unterminated tail, so a terminated title inside one PTY chunk arrives at up
+	 * to the chunk's size. It goes through the same {@link normalizeTitle} the
+	 * session-log titles use, which collapses it to one line and caps it, rather
+	 * than reaching a dock tab at whatever length it was sent.
 	 */
 	function maybeCaptureOscTitle(session: TrackedSession, data: string): void {
 		if (session.snapshot.kind !== 'agent') {
@@ -802,7 +1023,7 @@ export function createTerminalService({
 		if (latestTitle === null) {
 			return;
 		}
-		const nextTitle = latestTitle.trim();
+		const nextTitle = normalizeTitle(latestTitle)?.display ?? '';
 		if (nextTitle && nextTitle !== session.snapshot.title) {
 			session.snapshot = {
 				...session.snapshot,
@@ -1007,6 +1228,7 @@ export function createTerminalService({
 			session.agentBusyIdleTimer = null;
 		}
 		clearOutputFlushTimer(session);
+		flushPendingOutput(session);
 	}
 
 	/**
@@ -1096,6 +1318,32 @@ export function createTerminalService({
 	}
 
 	/**
+	 * Invalidates a workspace's shared harness control token once nothing is left
+	 * in that workspace to use it.
+	 *
+	 * The origin behind that token belongs to no session, so no `releaseSession`
+	 * call reaches it; this is the one moment the terminal service can observe
+	 * that the workspace has no live PTY left. A workspace whose terminals all
+	 * exited keeps its worktree path and its token otherwise, and archiving or
+	 * deleting the workspace does not invalidate either.
+	 * @param workspaceId - Workspace whose last terminal has just finished
+	 */
+	function releaseHarnessOriginWhenIdle(workspaceId: string): void {
+		if (!releaseAgentControlOrigins) {
+			return;
+		}
+		for (const session of sessions.values()) {
+			if (
+				session.snapshot.workspaceId === workspaceId &&
+				!isSessionOver(session)
+			) {
+				return;
+			}
+		}
+		releaseAgentControlOrigins(workspaceId);
+	}
+
+	/**
 	 * Tears down a session's PTY subscriptions, records its terminal status and
 	 * exit code, persists the outcome when a database is available, and wakes any
 	 * exit waiters and lifecycle listeners.
@@ -1163,17 +1411,20 @@ export function createTerminalService({
 		}
 
 		broadcastLifecycle(session);
+		releaseHarnessOriginWhenIdle(session.snapshot.workspaceId);
 	}
 
 	/**
 	 * Assembles the workspace environment a session launches in and layers the
-	 * agent-control variables on top, turning a known environment failure into a
-	 * diagnostic rather than letting it throw.
+	 * agent-control variables on top for the kinds that can use them, turning a
+	 * known environment failure into a diagnostic rather than letting it throw.
 	 * @param workspaceId - Workspace whose environment to assemble
+	 * @param kind - What the session hosts, which decides whether it receives the control overlay
 	 * @returns The assembled environment, or the diagnostic explaining why it is unavailable
 	 */
 	async function assembleSessionEnvironment(
 		workspaceId: string,
+		kind: TerminalSessionKind,
 	): Promise<SessionStep<'environment', AssembledWorkspaceEnvironment>> {
 		let assembled: AssembledWorkspaceEnvironment;
 
@@ -1193,11 +1444,13 @@ export function createTerminalService({
 			throw error;
 		}
 
-		const controlEnv = resolveAgentControlEnv?.({
-			workspaceId,
-			sessionId: `ws:${workspaceId}`,
-			species: 'harness',
-		});
+		const controlEnv = CONTROL_TOKEN_TERMINAL_KINDS.has(kind)
+			? resolveAgentControlEnv?.({
+					workspaceId,
+					sessionId: `ws:${workspaceId}`,
+					species: 'harness',
+				})
+			: undefined;
 
 		return {
 			environment: controlEnv
@@ -1269,6 +1522,8 @@ export function createTerminalService({
 		title: string | undefined;
 		workspaceId: string;
 	}): TrackedSession {
+		const scrollbackLimit = resolveScrollbackLimit();
+
 		return {
 			agentBusyIdleTimer: null,
 			busyFromPtySpinner:
@@ -1283,14 +1538,21 @@ export function createTerminalService({
 			exitWaiters: [],
 			foregroundPollTimer: null,
 			killTimer: null,
+			outputAppendInFlight: false,
+			outputBroadcastTimer: null,
+			outputFileGeneration: 0,
+			outputFileStart: 0,
 			outputFlushTimer: null,
+			outputFlushedAt: null,
 			outputSeq: 0,
+			pendingOutput: '',
 			previewScanBuffer: '',
 			titlePollTimer: null,
 			titleScanBuffer: '',
 			pty,
 			ptyExited: false,
-			scrollback: buildSessionScrollback(seedOutput),
+			scrollback: buildSessionScrollback(seedOutput, scrollbackLimit),
+			scrollbackLimit,
 			shutdownStarted: false,
 			snapshot: {
 				agentBusy: false,
@@ -1329,13 +1591,10 @@ export function createTerminalService({
 		session: TrackedSession,
 		pty: PtyProcess,
 	): void {
-		const { id, workspaceId } = session.snapshot;
-
 		session.dataSubscription = pty.onData((data) => {
-			session.outputSeq += 1;
 			session.scrollback.append(data);
 			scheduleOutputFlush(session);
-			onOutput({ data, seq: session.outputSeq, terminalId: id, workspaceId });
+			queueOutputBroadcast(session, data);
 			maybeDetectPreviewUrl(session, data);
 			maybeCaptureOscTitle(session, data);
 			if (session.busyFromPtySpinner && containsBrailleSpinner(data)) {
@@ -1421,7 +1680,7 @@ export function createTerminalService({
 		title,
 		workspaceId,
 	}: CreateTerminalSessionOptions): Promise<CreateTerminalSessionResult> {
-		const assembly = await assembleSessionEnvironment(workspaceId);
+		const assembly = await assembleSessionEnvironment(workspaceId, kind);
 
 		if (assembly.failure) {
 			return { diagnostics: [assembly.failure], session: null };
@@ -1634,6 +1893,7 @@ export function createTerminalService({
 	 */
 	function beginSessionShutdown(session: TrackedSession): Promise<void> {
 		clearOutputFlushTimer(session);
+		flushPendingOutput(session);
 		session.dataSubscription?.dispose();
 		session.dataSubscription = null;
 		session.exitSubscription?.dispose();
@@ -1733,6 +1993,8 @@ export function createTerminalService({
 			if (!session || session.closed) {
 				return { lastSeq: 0, scrollback: '', session: null };
 			}
+
+			flushPendingOutput(session);
 
 			return {
 				lastSeq: session.outputSeq,
@@ -1859,6 +2121,11 @@ export function createTerminalService({
 		},
 		write: (terminalId, data) => {
 			const session = requireSession(terminalId);
+			if (data.length > MAX_WRITE_BYTES) {
+				console.warn(
+					`[terminal] refused ${data.length - MAX_WRITE_BYTES} characters over the ${MAX_WRITE_BYTES} write cap`,
+				);
+			}
 			session.pty?.write(data.slice(0, MAX_WRITE_BYTES));
 		},
 	};

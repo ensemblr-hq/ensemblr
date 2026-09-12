@@ -1329,8 +1329,12 @@
 			"open-settings": "Open settings",
 			"retry": "Send again"
 		},
+		"load-earlier": "Load earlier messages",
 		"load-failed": "Could not load timeline events.",
+		"payload-truncated": "[output truncated — {{size}} not shown]",
 		"runtime-error": "Runtime error",
+		"show-earlier_one": "Show {{count}} earlier message",
+		"show-earlier_other": "Show {{count}} earlier messages",
 		"starting": {
 			"agent": "Starting agent",
 			"loading": "Loading conversation"

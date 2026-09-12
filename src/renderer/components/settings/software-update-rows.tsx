@@ -9,6 +9,7 @@ import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
 import { Spinner } from '@/renderer/components/ui/spinner';
 import { Switch } from '@/renderer/components/ui/switch';
+import { externalHref } from '@/renderer/lib/external-url';
 import { failureText } from '@/renderer/lib/failure-text';
 import { automaticUpdatesAtom } from '@/renderer/state/preferences';
 import { useUpdateActions, useUpdateStatus } from '@/renderer/state/updates';
@@ -134,7 +135,11 @@ export function SoftwareUpdateRows() {
 				control={
 					downloadUrl ? (
 						<Button asChild size='sm' variant='default'>
-							<a href={downloadUrl} rel='noreferrer' target='_blank'>
+							<a
+								href={externalHref(downloadUrl)}
+								rel='noreferrer'
+								target='_blank'
+							>
 								{t(
 									'settings:general.updates.open-release',
 									'Open the release page',

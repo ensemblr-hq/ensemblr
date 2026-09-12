@@ -86,6 +86,8 @@ export {
 	filePreviewWordWrapAtom,
 	forgetChatOverrides,
 	forgetLastRunScript,
+	forgetPrDetailsDrafts,
+	forgetRepoSettingsOverride,
 	hasAcknowledgedAfkModeWarningAtom,
 	lastQuickStartOwnerAtom,
 	lastRunScriptAtomFamily,
@@ -94,6 +96,8 @@ export {
 	REPO_ACTION_KEYS,
 	repoSettingsOverrideAtomFamily,
 	retainLastRunScripts,
+	retainPrDetailsDrafts,
+	retainRepoSettingsOverrides,
 } from './atoms';
 export { useAppearanceEffect } from './use-appearance-effect';
 export {

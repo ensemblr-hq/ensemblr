@@ -1,6 +1,7 @@
-import { icons as vscodeIcons } from '@iconify-json/vscode-icons';
-
+import type { IconifyJSON } from '@iconify/react';
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
+
+import { ICON_SUBSET } from './icon-subset.gen';
 
 const iconPrefix = 'vscode-icons';
 
@@ -109,6 +110,32 @@ const fileIconByExtension: Record<string, string> = {
 	zsh: 'file-type-shell',
 };
 
+/** Icon this file falls back to when no name or extension rule matches. */
+const DEFAULT_FILE_ICON = 'default-file';
+
+/** Icon a directory falls back to when its name matches no rule. */
+const DEFAULT_FOLDER_ICON = 'default-folder';
+
+/** Icon for `.env` and its per-environment variants, matched by prefix. */
+const DOTENV_ICON = 'file-type-dotenv';
+
+/**
+ * Every bare vscode-icons name this module can produce, including the derived
+ * open-folder variants. `tests/renderer/icon-collections.test.ts` asserts each
+ * one resolves in the trimmed collection, so a table entry the icon-subset
+ * generator failed to pick up is a red test rather than a blank glyph.
+ */
+export const WORKSPACE_FILE_ICON_NAMES: readonly string[] = [
+	...new Set([
+		DEFAULT_FILE_ICON,
+		DEFAULT_FOLDER_ICON,
+		DOTENV_ICON,
+		...Object.values(fileIconByName),
+		...Object.values(fileIconByExtension),
+		...Object.values(folderIconByName),
+	]),
+];
+
 /** File identity and optional symlink target needed to choose an icon. */
 type WorkspaceFileIconTarget = Pick<
 	WorkspaceFileSummary,
@@ -134,7 +161,7 @@ export function getWorkspaceFileIconName(
 	}
 
 	if (file.kind === 'directory') {
-		const baseIcon = folderIconByName[file.name] ?? 'default-folder';
+		const baseIcon = folderIconByName[file.name] ?? DEFAULT_FOLDER_ICON;
 		const openIcon = `${baseIcon}-opened`;
 		const iconName =
 			options?.isExpanded && folderIconExists(openIcon) ? openIcon : baseIcon;
@@ -143,13 +170,13 @@ export function getWorkspaceFileIconName(
 	}
 
 	if (file.name === '.env' || file.name.startsWith('.env.')) {
-		return `${iconPrefix}:file-type-dotenv`;
+		return `${iconPrefix}:${DOTENV_ICON}`;
 	}
 
 	const iconName =
 		fileIconByName[file.name] ??
 		fileIconByExtension[getFileExtension(file.name)] ??
-		'default-file';
+		DEFAULT_FILE_ICON;
 
 	return `${iconPrefix}:${iconName}`;
 }
@@ -168,7 +195,8 @@ export function getWorkspaceFileIconNameForPath(filePath: string): string {
 
 /** Reports whether a (non-prefixed) folder icon name exists in the VSCode set. */
 function folderIconExists(name: string): boolean {
-	return Boolean(vscodeIcons.icons[name] ?? vscodeIcons.aliases?.[name]);
+	const collection: IconifyJSON = ICON_SUBSET['vscode-icons'];
+	return Boolean(collection.icons[name] ?? collection.aliases?.[name]);
 }
 
 /**

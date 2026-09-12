@@ -14,7 +14,7 @@ import {
 	runWorktreeAdd,
 } from './git-ops.ts';
 import { ARCHIVED_FILES_TO_COPY_DIRECTORY } from './prune-worktree.ts';
-import { removeDirectoryTree } from './remove-directory.ts';
+import { removeManagedDirectory, WORKTREE_DEPTH } from './remove-directory.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -57,6 +57,7 @@ export async function rehydrateWorktree({
 	prunedWipCommit,
 	repositoryPath,
 	workspacePath,
+	workspacesRoot,
 }: {
 	archivedContextPath: string | null;
 	branchName: string;
@@ -65,6 +66,11 @@ export async function rehydrateWorktree({
 	prunedWipCommit: string | null;
 	repositoryPath: string;
 	workspacePath: string;
+	/**
+	 * Managed workspaces root the residue removal must resolve inside. Null
+	 * leaves the residue in place, which `git worktree add` then reports.
+	 */
+	workspacesRoot: string | null;
 }): Promise<RehydrateWorktreeOutcome> {
 	// A prune removes the admin entry with the directory, but an interrupted one
 	// can leave it behind and `git worktree add` refuses a registered path.
@@ -75,7 +81,13 @@ export async function rehydrateWorktree({
 	// background write into `.context`, puts one back. This path only runs for a
 	// worktree the prune already removed, so whatever is there is residue the
 	// checkout below would have overwritten anyway.
-	await removeDirectoryTree(workspacePath);
+	if (workspacesRoot) {
+		await removeManagedDirectory({
+			candidatePath: workspacePath,
+			expectedDepth: WORKTREE_DEPTH,
+			root: workspacesRoot,
+		});
+	}
 
 	const placement = await resolvePlacement({
 		branchName,

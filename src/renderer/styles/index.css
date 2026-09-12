@@ -15,12 +15,21 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * WOFF2 rather than the release archive's TrueType: the four faces are 9.43 MB
+ * of raw `.ttf` against 4.00 MB compressed, and the container is decoded to the
+ * same SFNT before any consumer sees it. Measured in Electron 44 against
+ * `Mg@%#\u2502\u2588`, the WOFF2 and TTF faces ink an identical 5,811 canvas
+ * pixels at an identical 230px advance (the fallback monospace inks 4,563 at
+ * 279), so the xterm texture atlas rasterizes from one exactly as from the
+ * other — see the font section of `.claude/rules/stack.md`.
+ */
 @font-face {
 	font-display: swap;
 	font-family: "JetBrainsMono Nerd Font Mono";
 	font-style: normal;
 	font-weight: 400;
-	src: url("./fonts/JetBrainsMonoNerdFontMono-Regular.ttf") format("truetype");
+	src: url("./fonts/JetBrainsMonoNerdFontMono-Regular.woff2") format("woff2");
 }
 
 @font-face {
@@ -28,7 +37,7 @@
 	font-family: "JetBrainsMono Nerd Font Mono";
 	font-style: italic;
 	font-weight: 400;
-	src: url("./fonts/JetBrainsMonoNerdFontMono-Italic.ttf") format("truetype");
+	src: url("./fonts/JetBrainsMonoNerdFontMono-Italic.woff2") format("woff2");
 }
 
 @font-face {
@@ -36,7 +45,7 @@
 	font-family: "JetBrainsMono Nerd Font Mono";
 	font-style: normal;
 	font-weight: 700;
-	src: url("./fonts/JetBrainsMonoNerdFontMono-Bold.ttf") format("truetype");
+	src: url("./fonts/JetBrainsMonoNerdFontMono-Bold.woff2") format("woff2");
 }
 
 @font-face {
@@ -44,8 +53,7 @@
 	font-family: "JetBrainsMono Nerd Font Mono";
 	font-style: italic;
 	font-weight: 700;
-	src: url("./fonts/JetBrainsMonoNerdFontMono-BoldItalic.ttf")
-		format("truetype");
+	src: url("./fonts/JetBrainsMonoNerdFontMono-BoldItalic.woff2") format("woff2");
 }
 
 :root {

@@ -40,7 +40,6 @@ import type {
 	SharedRootAdoptionService,
 	UnarchiveWorkspaceService,
 } from '../../repository';
-import type { WithPermissionGate } from '../permission-gate.ts';
 import {
 	parseArchiveWorkspaceRequest,
 	parseContinueWorkspaceBranchRequest,
@@ -77,7 +76,6 @@ interface RepositoryHandlersOptions {
 	setWorkspaceBaseBranchService: SetWorkspaceBaseBranchService;
 	sharedRootAdoptionService: SharedRootAdoptionService;
 	unarchiveWorkspaceService: UnarchiveWorkspaceService;
-	withPermissionGate: WithPermissionGate;
 }
 
 /**
@@ -101,7 +99,6 @@ export function registerRepositoryHandlers({
 	setWorkspaceBaseBranchService,
 	sharedRootAdoptionService,
 	unarchiveWorkspaceService,
-	withPermissionGate,
 }: RepositoryHandlersOptions): void {
 	ipcMain.handle(
 		IPC_CHANNELS.selectLocalRepository,
@@ -171,16 +168,14 @@ export function registerRepositoryHandlers({
 			),
 	);
 
-	withPermissionGate(
+	ipcMain.handle(
 		IPC_CHANNELS.deleteWorkspace,
-		'workspace-archive-delete',
 		(_event, raw: unknown): Promise<DeleteWorkspaceResult> =>
 			deleteWorkspaceService.delete(parseDeleteWorkspaceRequest(raw)),
 	);
 
-	withPermissionGate(
+	ipcMain.handle(
 		IPC_CHANNELS.deleteRepository,
-		'repository-removal',
 		(_event, raw: unknown): Promise<DeleteRepositoryResult> =>
 			deleteRepositoryService.delete(parseDeleteRepositoryRequest(raw)),
 	);
@@ -204,9 +199,8 @@ export function registerRepositoryHandlers({
 			unarchiveWorkspaceService.unarchive(parseUnarchiveWorkspaceRequest(raw)),
 	);
 
-	withPermissionGate(
+	ipcMain.handle(
 		IPC_CHANNELS.deleteArchivedWorkspace,
-		'workspace-archive-delete',
 		(_event, raw: unknown): Promise<DeleteArchivedWorkspaceResult> =>
 			deleteArchivedWorkspaceService.delete(
 				parseDeleteArchivedWorkspaceRequest(raw),

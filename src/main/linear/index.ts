@@ -14,7 +14,7 @@ export {
 } from './linear-asset-cache.ts';
 export {
 	registerLinearAssetProtocol,
-	registerLinearAssetScheme,
+	registerPrivilegedSchemes,
 } from './linear-asset-protocol.ts';
 export {
 	type CreateLinearAssetProxyOptions,

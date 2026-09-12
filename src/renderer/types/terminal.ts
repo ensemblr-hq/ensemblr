@@ -26,6 +26,15 @@ export interface TerminalRendererAdapter {
 	onData: (listener: (data: string) => void) => () => void;
 	/** Live-updates the terminal typography; caller re-fits afterwards. */
 	setFont: (options: { fontFamily?: string; fontSize?: number }) => void;
+	/**
+	 * Declares whether the surface is on screen, which decides whether it holds a
+	 * GPU-accelerated renderer. Dock tabs stay mounted while hidden so their
+	 * scrollback and PTY binding survive, and Chromium evicts the oldest of a
+	 * page's ~16 WebGL contexts — so a hidden surface gives its context back and
+	 * falls to the DOM renderer, which costs nothing while it is not painting.
+	 * Idempotent, and a no-op before {@link TerminalRendererAdapter.attach}.
+	 */
+	setRendererVisible: (visible: boolean) => void;
 	/** Live-updates the scrollback buffer line limit without recreating the surface. */
 	setScrollback: (lines: number) => void;
 	/**

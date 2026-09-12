@@ -9,7 +9,6 @@ import {
 	ipcMain,
 	nativeTheme,
 	safeStorage,
-	shell,
 } from 'electron';
 import type { DelegationInitiative } from '../shared/agent-control.ts';
 import {
@@ -42,6 +41,7 @@ import type {
 } from '../shared/ipc/contracts/terminal';
 import type { UpdateStatusChangedBroadcast } from '../shared/ipc/contracts/update';
 import type { WorkspaceFilesChangedBroadcast } from '../shared/ipc/contracts/workspace-files';
+import type { PermissionMode } from '../shared/permissions.ts';
 import { scrollbackMbToBytes } from '../shared/terminal.ts';
 import { resolveWindowChrome } from '../shared/window-chrome.ts';
 import { createAfkModeRegistry } from './afk-mode';
@@ -97,8 +97,9 @@ import { resolveNotificationTarget } from './agent-runtime/notification-target';
 import { createSessionSummaryWriter } from './agent-runtime/session-summary-writer';
 import { resolveAgentSkillBundle } from './agent-skills';
 import { createHarnessDetectionService } from './agents';
+import { guardEveryWebContents, openExternalUrl } from './app/external-links';
 import { applyLinuxDesktopIdentity } from './app/linux-desktop-identity';
-import { createMainWindow } from './app/main-window';
+import { createMainWindow, rendererDocument } from './app/main-window';
 import type { QuitExit } from './app/quit-coordinator';
 import { createQuitCoordinator } from './app/quit-coordinator';
 import { createQuitGuard } from './app/quit-guard';
@@ -151,14 +152,14 @@ import {
 } from './infisical';
 import { type IpcHandlersHandle, registerIpcHandlers } from './ipc';
 import { trackWindowMaximizedState } from './ipc/handlers/window.ts';
-import { readPermissionModeFromSnapshot } from './ipc/permission-gate.ts';
+import { createPermissionModeResolver } from './ipc/permission-mode-resolver.ts';
 import {
 	createLinearAssetProxy,
 	createLinearAuthService,
 	createLinearClient,
 	createLinearService,
 	registerLinearAssetProtocol,
-	registerLinearAssetScheme,
+	registerPrivilegedSchemes,
 } from './linear';
 import { installApplicationMenu, MenuBarStore, MenuContextStore } from './menu';
 import { createOpenTargetService } from './open-target';
@@ -244,6 +245,12 @@ const isDev = !app.isPackaged;
 // live in different namespaces (dotfile path segment, reverse-DNS service id)
 // and carry their own dev markers below.
 const DEV_SUFFIX = ' (DEV)';
+/**
+ * How long deferred boot work waits for the first window's `ready-to-show`
+ * before running anyway. A window that never reports readiness should delay
+ * adoption, not cancel it.
+ */
+const DEFERRED_BOOT_WORK_FALLBACK_MS = 5_000;
 // The unpackaged dev build (`electron-forge start`) gets the explicit (DEV)
 // suffix so it reads its isolated userData below. A *packaged* build keeps the
 // product name forge baked in from its build channel (Ensemblr / Ensemblr
@@ -408,6 +415,20 @@ const readArchitectureDiagramEnabled = (): boolean =>
 const readTuiHarnessesEnabled = (): boolean =>
 	appSettingsService.read().experimental.tuiHarnesses;
 /**
+ * Whether anything could be listening to the Pi raw-frame debug tap.
+ *
+ * `usePiRawFrameCapture` is the tap's only subscriber and it subscribes only
+ * under developer mode, so with the switch off — the normal case — every frame
+ * was serialized, sent across the process boundary and dropped on arrival. A
+ * window has to exist as well, since the broadcast has nowhere to go otherwise.
+ * Read per frame rather than captured: the settings file is watched, so flipping
+ * the switch arms the tap without a restart, and the read is cached.
+ * @returns True when a live window could be showing the raw-frame panel.
+ */
+const isRawFrameTapActive = (): boolean =>
+	appSettingsService.read().experimental.developerMode &&
+	BrowserWindow.getAllWindows().some((window) => !window.isDestroyed());
+/**
  * Reads the model ids currently hidden from delegated spawn choices.
  * @returns The latest hidden-model ids from app settings.
  */
@@ -556,6 +577,21 @@ const settingsResolutionService = createEnsemblrConfigResolutionService({
 	rootDirectory: isDev ? devRootDirectory : undefined,
 });
 /**
+ * Resolves the permission mode a workspace runs under. Repository scope is
+ * authoritative and the app scope is the fallback, so the mode the Security
+ * screen writes is the mode every gate reads. Naming no workspace resolves at
+ * app scope, which is what a surface with no workspace in hand gets.
+ * @param workspaceId - Workspace whose repository owns the mode, when known.
+ * @returns The mode to enforce.
+ */
+const resolvePermissionMode = createPermissionModeResolver({
+	databaseService,
+	resolveSettings: (request) => settingsResolutionService.resolve(request),
+});
+const resolvePermissionModeForWorkspace = (
+	workspaceId?: string,
+): PermissionMode => resolvePermissionMode({ workspaceId });
+/**
  * Resolves the language the app is rendering in, the same way the native menu
  * and the shell snapshot do. Read per call rather than captured so a language
  * the user switches mid-session reaches the next agent turn, and defensive
@@ -686,6 +722,7 @@ const {
 	augmentHarnessCommand,
 	confirmAgentControlAction,
 	piControlExtensionPath,
+	releaseWorkspaceHarnessOrigins,
 } = createAgentControlIntegration({
 	app,
 	originRegistry: agentControlOriginRegistry,
@@ -740,6 +777,7 @@ const piAgentAdapter = createPiCliRpcAdapter({
 			directory,
 		]),
 	],
+	isRawFrameTapActive,
 	onRawFrame: broadcastRawFrame,
 	resolveBaseEnv: resolveAgentSpawnEnv,
 });
@@ -958,8 +996,7 @@ const agentSessionService = createAgentSessionService({
 	readTuiHarnessesEnabled,
 	resolveAgentControlEnv,
 	/** Reads the workspace permission mode each new agent session must honour. */
-	resolvePermissionMode: () =>
-		readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
+	resolvePermissionMode: resolvePermissionModeForWorkspace,
 	resolveProviderExecutable,
 	/** Renders this turn's naming upkeep for runtimes the app prompts directly. */
 	resolveTurnPreamble: async (sessionId) =>
@@ -1248,11 +1285,17 @@ const conciergeSessionService = createConciergeSessionService({
 });
 let ipcHandlersHandle: IpcHandlersHandle | null = null;
 const workspaceFilesWatcher = createWorkspaceFilesWatcher({
-	/** Broadcasts a workspace-files-changed event when the watcher fires. */
-	onChange: (workspaceCwd) =>
+	/**
+	 * Drops the workspace's cached listing, then tells the renderer to refetch.
+	 * Order matters: the broadcast is what triggers the refetch, so invalidating
+	 * afterwards would serve the stale tree the change just invalidated.
+	 */
+	onChange: (workspaceCwd) => {
+		listWorkspaceFilesService.invalidate(workspaceCwd);
 		broadcastToAllWindows(IPC_CHANNELS.workspaceFilesChanged, {
 			workspaceCwd,
-		} satisfies WorkspaceFilesChangedBroadcast),
+		} satisfies WorkspaceFilesChangedBroadcast);
+	},
 });
 const terminalService = createTerminalService({
 	databaseService,
@@ -1270,6 +1313,7 @@ const terminalService = createTerminalService({
 	/** Broadcasts terminal output to all windows. */
 	onOutput: (event: TerminalOutputBroadcast) =>
 		broadcastToAllWindows(IPC_CHANNELS.terminalOutput, event),
+	releaseAgentControlOrigins: releaseWorkspaceHarnessOrigins,
 	resolveAgentControlEnv,
 	/** Resolves the shell-derived base environment for terminal and script PTYs. */
 	resolveBaseEnv: async () => (await localCommandService.getEnvironment()).env,
@@ -1392,15 +1436,22 @@ const planSubmission = createPlanSubmission({
 });
 // Declaring the scheme has to happen before `ready`, which module scope is; the
 // handler that serves it is registered inside `whenReady` below.
-registerLinearAssetScheme();
+registerPrivilegedSchemes();
+// Module scope so no WebContents can be created ahead of the policy — the main
+// window's own handlers are installed in `createMainWindow`, and this is what
+// carries the same rules onto anything else Electron ever constructs.
+guardEveryWebContents(rendererDocument());
 const linearAuthService = createLinearAuthService({
 	configService,
 	databaseService,
 	getLanguage: resolveAppLanguage,
 	/** Releases the asset bytes cached under an account the user just disconnected. */
 	onDisconnect: (accountId) => linearAssetProxy.forgetAccount(accountId),
-	/** Opens an external URL in the user's default browser. */
-	openExternal: (url) => shell.openExternal(url),
+	// Routed through the vetted opener rather than `shell.openExternal`: the
+	// authorize base URL is hardcoded today, but a self-hosted Linear option
+	// would make it configuration, and a custom scheme there launches whatever
+	// app registered it.
+	openExternal: openExternalUrl,
 	secretStoreFactory: createSecretStore,
 });
 // Built at module scope so the auth service above can reach it on disconnect;
@@ -1541,8 +1592,7 @@ agentControlService = createAgentControlService({
 		databaseService,
 		renameWorkspace: renameWorkspaceService.rename,
 		/** Reads the currently resolved permission mode that gates control ops. */
-		getPermissionMode: () =>
-			readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
+		getPermissionMode: resolvePermissionModeForWorkspace,
 		getLanguage: resolveAppLanguage,
 		harnessDetectionService,
 		linearService,
@@ -1677,6 +1727,43 @@ function refreshWindowBackgrounds(): void {
  * confirmation runs here rather than downstream: by the time `window-all-closed`
  * fires the window is destroyed, and the dialog has nothing left to attach to.
  */
+/** Boot work deferred until the first window has something to paint. */
+const deferredUntilFirstPaint: Array<() => void> = [];
+let firstWindowPainted = false;
+
+/**
+ * Releases the boot work the first paint was gating. Idempotent, and armed both
+ * by the window's `ready-to-show` and by a timeout, so a window that never
+ * reports readiness delays this work rather than dropping it.
+ */
+function releaseDeferredBootWork(): void {
+	if (firstWindowPainted) {
+		return;
+	}
+	firstWindowPainted = true;
+	for (const task of deferredUntilFirstPaint.splice(0)) {
+		task();
+	}
+}
+
+/**
+ * Runs `task` once the first window is ready to show, or immediately when one
+ * already is.
+ *
+ * For launch work that competes with the renderer's first paint without
+ * anything about the paint depending on it — a `git` probe fan-out across every
+ * registered repository, for instance, which measured 48 concurrent spawns in
+ * the same window as `BrowserWindow` construction.
+ * @param task - Work to defer past the first paint.
+ */
+function whenFirstWindowPainted(task: () => void): void {
+	if (firstWindowPainted) {
+		task();
+		return;
+	}
+	deferredUntilFirstPaint.push(task);
+}
+
 function openMainWindow(): void {
 	activeWindowChrome = resolveWindowChrome(
 		process.platform,
@@ -1687,6 +1774,8 @@ function openMainWindow(): void {
 		titleBar: activeWindowChrome.titleBar,
 		windowStateStore: mainWindowStateStore,
 	});
+	window.once('ready-to-show', releaseDeferredBootWork);
+	setTimeout(releaseDeferredBootWork, DEFERRED_BOOT_WORK_FALLBACK_MS).unref?.();
 	trackWindowMaximizedState(window);
 	trackWindowChrome({
 		onResolved: (chrome) => {
@@ -1772,9 +1861,20 @@ app.whenReady().then(() => {
 	configService.load();
 	databaseService.open();
 	registerLinearAssetProtocol(linearAssetProxy);
+	// Everything the first paint depends on is now in place, and the renderer is
+	// a separate process: asking it to start here lets its own boot overlap with
+	// the handler graph below instead of queueing behind it. The IPC it sends
+	// back cannot arrive before this synchronous body finishes, so the handlers
+	// are registered by the time any of it is answered.
+	openMainWindow();
 	ensureConciergeHome(rootDirectoryService.ensure().conciergePath);
 	conciergeMemoryService.reconcile();
-	void sharedRootAdoptionService.reconcile();
+	// Nothing about painting the workbench depends on adoption: the renderer's
+	// navigation query is what surfaces its result, and that query runs after the
+	// window is up.
+	whenFirstWindowPainted(() => {
+		void sharedRootAdoptionService.reconcile();
+	});
 	void reclaimSweptWorkspaceDisk();
 	const readAppSettings = () => appSettingsService.read();
 	const menuContextStore = new MenuContextStore();
@@ -1907,7 +2007,6 @@ app.whenReady().then(() => {
 	// listeners and the check timer there would be a side effect the
 	// construction-only rule above exists to keep out.
 	updateService.start();
-	openMainWindow();
 });
 
 const quitGuard = createQuitGuard({
@@ -2043,16 +2142,33 @@ app.on('activate', () => {
 	}
 });
 
+/** How much of one externally supplied argument ever reaches the log. */
+const MAX_LOGGED_ARGUMENT_CHARS = 256;
+
+/**
+ * Caps one externally supplied string before it is logged, marking the cut so a
+ * truncated value is never mistaken for the whole of one.
+ * @param value - The argument exactly as the OS handed it over
+ * @returns The value, or its first {@link MAX_LOGGED_ARGUMENT_CHARS} characters followed by an ellipsis
+ */
+function truncateForLog(value: string): string {
+	return value.length <= MAX_LOGGED_ARGUMENT_CHARS
+		? value
+		: `${value.slice(0, MAX_LOGGED_ARGUMENT_CHARS)}…`;
+}
+
 // A blocked second launch (see the single-instance lock above) fires this in the
 // already-running instance. Surface the existing window instead of letting a new
 // instance spawn; recreate only if every window was closed (on macOS the app
 // stays alive with no windows).
 app.on('second-instance', (_event, argv, workingDirectory) => {
 	// Forensics for the Dock-flash bug: record who exec'd the blocked instance
-	// so a surviving relaunch trigger can be identified from Console.app.
+	// so a surviving relaunch trigger can be identified from Console.app. Bounded
+	// because argv is attacker-supplied wherever a URL scheme is registered with
+	// the desktop, and an unbounded one is an unbounded write to the log.
 	console.warn('[single-instance] blocked a second launch', {
-		argv,
-		workingDirectory,
+		argv: argv.map(truncateForLog),
+		workingDirectory: truncateForLog(workingDirectory),
 	});
 	const [existing] = BrowserWindow.getAllWindows();
 	if (existing) {

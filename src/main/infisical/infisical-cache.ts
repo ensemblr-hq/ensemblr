@@ -47,6 +47,14 @@ export interface CreateInfisicalCacheOptions {
 /**
  * Builds the fallback store. Every operation degrades to a miss rather than
  * throwing — a cache failure must never be the reason a workspace cannot open.
+ *
+ * A write whose values match what this process last stored for the same scope
+ * is skipped. Every resolution fetches live, so the unchanged case is the
+ * common one, and on macOS each write puts a whole project's secrets on
+ * `/usr/bin/security`'s argv for the life of that spawn (SEC-04). The stored
+ * `fetchedAt` then dates the last *change* rather than the last fetch, bounded
+ * to one app session because the map starts empty; the entry this returns —
+ * which is what `recordSync` reads — always carries the live timestamp.
  * @param options - Secret store and injectable clock.
  * @returns A fresh {@link InfisicalCache}.
  */
@@ -54,8 +62,12 @@ export function createInfisicalCache({
 	now = () => new Date(),
 	secretStore,
 }: CreateInfisicalCacheOptions): InfisicalCache {
+	const lastWrittenValues = new Map<string, string>();
+
 	return {
 		clear: async ({ scope, scopeId }) => {
+			lastWrittenValues.delete(cacheIdentity(scope, scopeId));
+
 			if (!secretStore) {
 				return;
 			}
@@ -95,6 +107,13 @@ export function createInfisicalCache({
 				return entry;
 			}
 
+			const identity = cacheIdentity(scope, scopeId);
+			const serializedValues = JSON.stringify(values);
+
+			if (lastWrittenValues.get(identity) === serializedValues) {
+				return entry;
+			}
+
 			const payload = JSON.stringify(entry);
 
 			try {
@@ -119,8 +138,11 @@ export function createInfisicalCache({
 				} catch {
 					// Losing the cache costs freshness on the next cold start, not
 					// correctness; the live fetch already produced these values.
+					return entry;
 				}
 			}
+
+			lastWrittenValues.set(identity, serializedValues);
 
 			return entry;
 		},
@@ -167,4 +189,14 @@ function parseCacheEntry(raw: string): InfisicalCacheEntry | null {
 				: '',
 		values,
 	};
+}
+
+/**
+ * Keys one scope's last-written values within a process.
+ * @param scope - Link scope the values belong to.
+ * @param scopeId - Identifier within that scope.
+ * @returns The map key.
+ */
+function cacheIdentity(scope: InfisicalLinkScope, scopeId: string): string {
+	return `${scope}:${scopeId}`;
 }

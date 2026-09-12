@@ -19,6 +19,7 @@ export type CreateWorkspaceDiagnosticCode =
 	| 'branch-not-found'
 	| 'configured-base-invalid'
 	| 'configured-base-unresolvable'
+	| 'context-exclude-failed'
 	| 'database-unavailable'
 	| 'destination-exists'
 	| 'destination-not-writable'

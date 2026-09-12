@@ -95,12 +95,54 @@ describe('terminal WebGL renderer', () => {
 		});
 	});
 
+	// Every dock tab is force-mounted so its scrollback and PTY binding survive a
+	// tab switch. One context per mounted tab would exhaust Chromium's ~16-context
+	// page budget and silently evict the surfaces the user is looking at.
+	it('holds no WebGL context until the surface is declared visible', () => {
+		const adapter = createXtermAdapter();
+
+		adapter.attach(document.createElement('div'));
+
+		expect(calls).toEqual(['terminal:open']);
+	});
+
 	// The addon takes over a canvas the terminal only creates once it has a
 	// container, so loading it before open() leaves the DOM renderer in place.
 	it('loads the WebGL renderer only after the terminal is opened', () => {
 		const adapter = createXtermAdapter();
 
+		adapter.setRendererVisible(true);
+		expect(calls).toEqual([]);
+
 		adapter.attach(document.createElement('div'));
+		adapter.setRendererVisible(true);
+
+		expect(calls).toEqual(['terminal:open', 'webgl:construct']);
+	});
+
+	it('gives the context back when the surface is hidden and takes it again', () => {
+		const adapter = createXtermAdapter();
+		adapter.attach(document.createElement('div'));
+
+		adapter.setRendererVisible(true);
+		adapter.setRendererVisible(false);
+		adapter.setRendererVisible(true);
+
+		expect(calls).toEqual([
+			'terminal:open',
+			'webgl:construct',
+			'webgl:dispose',
+			'webgl:construct',
+		]);
+	});
+
+	it('ignores a visibility declaration that changes nothing', () => {
+		const adapter = createXtermAdapter();
+		adapter.attach(document.createElement('div'));
+
+		adapter.setRendererVisible(false);
+		adapter.setRendererVisible(true);
+		adapter.setRendererVisible(true);
 
 		expect(calls).toEqual(['terminal:open', 'webgl:construct']);
 	});
@@ -108,8 +150,9 @@ describe('terminal WebGL renderer', () => {
 	it('keeps the DOM renderer when the GPU cannot serve a context', () => {
 		webglState.throwOnLoad = true;
 		const adapter = createXtermAdapter();
+		adapter.attach(document.createElement('div'));
 
-		expect(() => adapter.attach(document.createElement('div'))).not.toThrow();
+		expect(() => adapter.setRendererVisible(true)).not.toThrow();
 
 		adapter.dispose();
 		expect(calls).toContain('terminal:dispose');
@@ -119,17 +162,20 @@ describe('terminal WebGL renderer', () => {
 	it('keeps the DOM renderer when the addon cannot be constructed', () => {
 		webglState.throwOnConstruct = true;
 		const adapter = createXtermAdapter();
+		adapter.attach(document.createElement('div'));
 
-		expect(() => adapter.attach(document.createElement('div'))).not.toThrow();
+		expect(() => adapter.setRendererVisible(true)).not.toThrow();
 	});
 
 	it('disposes the addon on context loss and does not dispose it twice', () => {
 		const adapter = createXtermAdapter();
 		adapter.attach(document.createElement('div'));
+		adapter.setRendererVisible(true);
 
 		for (const handler of webglState.contextLossHandlers) {
 			handler();
 		}
+		adapter.setRendererVisible(false);
 		adapter.dispose();
 
 		expect(webglState.disposeCount).toBe(1);
@@ -141,6 +187,7 @@ describe('terminal WebGL renderer', () => {
 	it('leaves addon disposal to the terminal', () => {
 		const adapter = createXtermAdapter();
 		adapter.attach(document.createElement('div'));
+		adapter.setRendererVisible(true);
 
 		adapter.dispose();
 

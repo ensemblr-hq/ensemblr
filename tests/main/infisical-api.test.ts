@@ -38,6 +38,20 @@ describe('normalizeSiteUrl', () => {
 		);
 	});
 
+	test('rejects cleartext http against a remote host', () => {
+		expect(() => normalizeSiteUrl('http://infisical.internal')).toThrow(
+			InfisicalApiError,
+		);
+	});
+
+	test.each([
+		'http://localhost:8080',
+		'http://127.0.0.1:8080',
+		'http://[::1]:8080',
+	])('allows cleartext http against loopback %s', (siteUrl) => {
+		expect(normalizeSiteUrl(siteUrl)).toBe(siteUrl);
+	});
+
 	test('rejects an unparseable URL', () => {
 		expect(() => normalizeSiteUrl('not a url')).toThrow(InfisicalApiError);
 	});

@@ -16,13 +16,14 @@ vi.mock('sonner', () => ({
 }));
 
 import { useAskUserQuestionToast } from '@/renderer/hooks/ask-user-question/use-ask-user-question-toast';
-import { i18n } from '@/renderer/lib/i18n';
+import { changeAppLanguage } from '@/renderer/lib/i18n';
 import { pendingAskUserQuestionsAtom } from '@/renderer/state/ask-user-question';
 import {
 	activeChatIdentityAtom,
 	pendingNotificationFocusAtom,
 } from '@/renderer/state/unread';
 import type { AskUserQuestionBroadcast } from '@/shared/agent-control';
+import type { AppLanguage } from '@/shared/i18n';
 
 /** Creates a pending agent question for toast behavior tests. */
 function question({
@@ -74,7 +75,7 @@ test('shows a persistent warning for a question from an offscreen chat', () => {
 	);
 });
 
-test.each([
+test.each<{ label: string; language: AppLanguage; title: string }>([
 	{
 		language: 'ru',
 		title: 'Агенту нужен ваш ответ',
@@ -94,7 +95,7 @@ test.each([
 		);
 
 		await act(async () => {
-			await i18n.changeLanguage(language);
+			await changeAppLanguage(language);
 		});
 
 		expect(toastWarning).toHaveBeenCalledTimes(2);
@@ -178,7 +179,7 @@ test('focus action parks navigation and stays dismissed across language changes'
 	});
 
 	await act(async () => {
-		await i18n.changeLanguage('ru');
+		await changeAppLanguage('ru');
 	});
 
 	expect(toastWarning).toHaveBeenCalledTimes(1);
@@ -193,7 +194,7 @@ test('does not revive a manually dismissed toast when the language changes', asy
 
 	act(() => options.onDismiss?.({ id: 'ask-user-question:request-1' }));
 	await act(async () => {
-		await i18n.changeLanguage('el');
+		await changeAppLanguage('el');
 	});
 
 	expect(toastWarning).toHaveBeenCalledTimes(1);

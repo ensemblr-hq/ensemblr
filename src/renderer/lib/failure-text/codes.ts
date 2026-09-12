@@ -14,6 +14,7 @@ import type {
 	RegisterLocalRepositoryDiagnosticCode,
 } from '@/shared/ipc/contracts/repository';
 import type { RootDirectoryDiagnosticCode } from '@/shared/ipc/contracts/root-directory';
+import type { ObfuscatedStorageFailureCode } from '@/shared/ipc/contracts/secrets';
 import type { SettingsPublicationFailureCode } from '@/shared/ipc/contracts/settings-publication';
 import type { SharedRootAdoptionDiagnosticCode } from '@/shared/ipc/contracts/shared-root-adoption';
 import type { UpdateFailureCode } from '@/shared/ipc/contracts/update';
@@ -59,6 +60,7 @@ export type AppFailureCode =
 	| InfisicalFailureCode
 	| LinearAuthFailureCode
 	| ListWorkspaceFilesFailureCode
+	| ObfuscatedStorageFailureCode
 	| OpenTargetFailureCode
 	| QuickStartProjectDiagnosticCode
 	| ReadWorkspaceDirectoryFailureCode
@@ -357,6 +359,11 @@ export const APP_FAILURE_TEXT: Record<
 			'errors:failure.configured-base-unresolvable',
 			'The branch new workspaces fork from could not be resolved, so this workspace took the repository default as its base instead.',
 		),
+	'context-exclude-failed': (t) =>
+		t(
+			'errors:failure.context-exclude-failed',
+			'Ensemblr could not add .context/ to this repository\u2019s git exclude file, so the workspace handoff directory may show up in git status. Terminal logs are written there, so check it before committing.',
+		),
 	'copy-failed': (t) =>
 		t('errors:failure.copy-failed', 'The files could not be copied.'),
 	'database-unavailable': (t) =>
@@ -407,7 +414,7 @@ export const APP_FAILURE_TEXT: Record<
 	'dictation-invalid-endpoint': (t) =>
 		t(
 			'errors:failure.dictation-invalid-endpoint',
-			'The transcription endpoint must be a full http:// or https:// address.',
+			'The transcription endpoint must be a full https:// address. http:// is accepted only for a server on this machine.',
 		),
 	'dictation-key-store-unavailable': (t) =>
 		t(
@@ -694,6 +701,11 @@ export const APP_FAILURE_TEXT: Record<
 		t(
 			'errors:failure.nothing-to-commit',
 			'Nothing to commit — the working tree is clean.',
+		),
+	'obfuscated-storage-unacknowledged': (t) =>
+		t(
+			'errors:failure.obfuscated-storage-unacknowledged',
+			'No keyring daemon answered, so this secret would only be obfuscated rather than encrypted. Accept the weaker protection in Settings › Diagnostics, or start gnome-keyring or KWallet.',
 		),
 	'parse-failed': (t) =>
 		t('errors:failure.parse-failed', 'The command output could not be parsed.'),

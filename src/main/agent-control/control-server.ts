@@ -4,7 +4,13 @@
  * `/invoke`, and the harness MCP bridge forwards tool calls to the same
  * endpoint. It binds to 127.0.0.1 on an ephemeral port and authenticates each
  * request by the per-session token minted in the origin registry — the server
- * never resolves identity itself, it hands the token to the service.
+ * never resolves identity itself, it asks the service whether the token names a
+ * live origin and hands the token on.
+ *
+ * Every route is authenticated, `/health` included, and a token has to *resolve*
+ * rather than merely be present: the MCP endpoint builds a tool list and a
+ * playbook shaped to its caller before the first op is dispatched, so a bogus
+ * bearer token that got that far would be answered with the widest of both.
  *
  * A response may be held open for hours: `askUserQuestion` blocks until the
  * human answers. So the socket closing before a reply was written is the only
@@ -43,6 +49,16 @@ const OP_SET: ReadonlySet<string> = new Set(AGENT_CONTROL_OPS);
  * hold has no limit of its own.
  */
 const REQUEST_TIMEOUT_MS = 300_000;
+
+/**
+ * Ceiling on concurrently open sockets. `requestTimeout` bounds *receiving* a
+ * request rather than answering one, and `askUserQuestion` deliberately holds
+ * its response until the human answers, so nothing else puts a number on how
+ * many sockets the main process can be made to retain. Far above what the app
+ * itself opens — one keep-alive socket per live agent, terminal, and harness —
+ * so it is reached only by something accumulating connections on purpose.
+ */
+const MAX_CONNECTIONS = 512;
 
 /** Host names that may address the loopback control server. */
 const LOOPBACK_HOSTS: ReadonlySet<string> = new Set([
@@ -229,8 +245,44 @@ async function handleInvoke(
 }
 
 /**
+ * Rejects a request whose bearer token is missing or names no live origin.
+ *
+ * Presence was not enough: the MCP endpoint shapes a whole tool list and
+ * playbook to its caller before any op is dispatched, so a token that resolves
+ * to nothing has to be refused here rather than at the first `tools/call`.
+ * @param req - Incoming request.
+ * @param res - Server response the refusal is written to.
+ * @param service - Agent-control service that owns identity resolution.
+ * @returns The resolved token, or null once a 401 has been written.
+ */
+function authenticate(
+	req: IncomingMessage,
+	res: ServerResponse,
+	service: AgentControlService,
+): string | null {
+	const token = readToken(req);
+	if (!token) {
+		sendJson(res, 401, {
+			ok: false,
+			code: 'denied-permission',
+			error: 'Missing token.',
+		});
+		return null;
+	}
+	if (!service.isKnownToken(token)) {
+		sendJson(res, 401, {
+			ok: false,
+			code: 'denied-permission',
+			error: 'Unknown or expired control token.',
+		});
+		return null;
+	}
+	return token;
+}
+
+/**
  * Handles an MCP streamable-HTTP request: authenticates the bearer token, parses
- * the JSON-RPC body for POSTs, and delegates to the MCP endpoint.
+ * the JSON-RPC body, and delegates to the MCP endpoint.
  * @param req - Incoming request.
  * @param res - Server response.
  * @param service - Agent-control service the MCP tools delegate to.
@@ -242,24 +294,17 @@ async function handleMcp(
 	service: AgentControlService,
 	progressIntervalMs: number | undefined,
 ): Promise<void> {
-	const token = readToken(req);
+	const token = authenticate(req, res, service);
 	if (!token) {
-		sendJson(res, 401, {
-			ok: false,
-			code: 'denied-permission',
-			error: 'Missing token.',
-		});
 		return;
 	}
 	let body: unknown;
-	if (req.method === 'POST') {
-		try {
-			body = await readJsonBody(req);
-		} catch (error) {
-			const detail = error instanceof Error ? error.message : String(error);
-			sendJson(res, 400, { ok: false, code: 'invalid-args', error: detail });
-			return;
-		}
+	try {
+		body = await readJsonBody(req);
+	} catch (error) {
+		const detail = error instanceof Error ? error.message : String(error);
+		sendJson(res, 400, { ok: false, code: 'invalid-args', error: detail });
+		return;
 	}
 	await handleMcpRequest(req, res, body, service, token, progressIntervalMs);
 }
@@ -303,7 +348,9 @@ export function startControlServer(
 				return;
 			}
 			if (req.method === 'GET' && req.url === '/health') {
-				sendJson(res, 200, { ok: true });
+				if (authenticate(req, res, service)) {
+					sendJson(res, 200, { ok: true });
+				}
 				return;
 			}
 			if (req.method === 'POST' && req.url === '/invoke') {
@@ -312,6 +359,14 @@ export function startControlServer(
 					if (!res.headersSent && !res.destroyed) {
 						sendJson(res, 500, { ok: false, code: 'internal', error: detail });
 					}
+				});
+				return;
+			}
+			if (req.url === '/mcp' && req.method !== 'POST') {
+				sendJson(res, 405, {
+					ok: false,
+					code: 'invalid-args',
+					error: 'The MCP endpoint is stateless; POST a JSON-RPC request.',
 				});
 				return;
 			}
@@ -338,6 +393,8 @@ export function startControlServer(
 			});
 		},
 	);
+
+	server.maxConnections = MAX_CONNECTIONS;
 
 	return new Promise<ControlServer>((resolve, reject) => {
 		server.once('error', reject);

@@ -24,6 +24,7 @@ import type { NavigationApi, ShellApi } from './repository-navigation';
 import type { RepositorySettingsApi } from './repository-settings';
 import type { ReviewCommentsApi } from './review-comments';
 import type { RootDirectoryApi } from './root-directory';
+import type { SecretsApi } from './secrets';
 import type { SettingsPublicationApi } from './settings-publication';
 import type { SettingsApi } from './settings-resolution';
 import type { SetupApi } from './setup';
@@ -83,5 +84,6 @@ export interface EnsemblrApi
 		LinkedDirectoriesApi,
 		DictationApi,
 		OpenTargetApi,
+		SecretsApi,
 		TextEditingApi,
 		UpdateApi {}

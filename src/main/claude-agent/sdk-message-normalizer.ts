@@ -451,7 +451,7 @@ function normalizeAssistant(
 	const parts = readBlocks(message.message?.content).flatMap((block, index) =>
 		toMessagePart(block, reasoning.take(index)),
 	);
-	reasoning.reset();
+	reasoningByThread.release(parentToolCallId);
 
 	return [
 		messageEvent(

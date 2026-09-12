@@ -160,12 +160,18 @@ export {
 	settingsPublicationRecoveryStatusRequestSchema,
 } from './request-schemas/settings-publication.ts';
 export {
+	sanitizeCreateTerminalSessionRequest,
+	terminalSessionIdSchema,
+} from './request-schemas/terminal.ts';
+export {
 	addWordToDictionaryRequestSchema,
 	replaceMisspellingRequestSchema,
 	textEditCommandSchema,
 } from './request-schemas/text-editing.ts';
 export {
+	readWorkspaceDirectoryRequestSchema,
 	readWorkspaceFileRequestSchema,
+	workspaceCwdRequestSchema,
 	writeWorkspaceActionPromptRequestSchema,
 	writeWorkspaceFileAttachmentRequestSchema,
 	writeWorkspaceImageAttachmentRequestSchema,

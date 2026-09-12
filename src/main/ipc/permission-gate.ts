@@ -1,21 +1,21 @@
-import { ipcMain } from 'electron';
+import {
+	BrowserWindow,
+	dialog,
+	type IpcMainInvokeEvent,
+	ipcMain,
+} from 'electron';
 
-import type { SettingsResolutionSnapshot } from '../../shared/ipc/contracts/settings-resolution';
+import { type AppLanguage, FALLBACK_LANGUAGE } from '../../shared/i18n.ts';
 import {
 	classifyPermissionAction,
-	DEFAULT_PERMISSION_MODE,
-	normalizePermissionMode,
 	type PermissionActionKind,
 	type PermissionMode,
-} from '../../shared/permissions';
-
-/**
- * Mode the permission gate operates under. `'allow-all'` is a transport-level
- * bypass that short-circuits classification entirely; remaining values delegate
- * to {@link classifyPermissionAction}. Bypass mode is reserved for the test
- * harness so handler tests don't have to wire a settings service.
- */
-type PermissionGateMode = PermissionMode | 'allow-all';
+} from '../../shared/permissions.ts';
+import type { EnsemblrDatabaseService } from '../storage/index.ts';
+import { isTrackedRepositoryPath } from '../storage/repositories/repository-path-repository.ts';
+import { permissionActionForChannel } from './permission-actions.ts';
+import { permissionConfirmStrings } from './permission-confirm-strings.ts';
+import type { PermissionModeContext } from './permission-mode.ts';
 
 /**
  * Error raised when the gate denies an invocation. Crosses the IPC boundary as
@@ -46,71 +46,226 @@ export class PermissionGateDeniedError extends Error {
 /** Listener signature accepted by `ipcMain.handle`. */
 type IpcHandleListener = Parameters<typeof ipcMain.handle>[1];
 
-/**
- * Function shape returned by {@link createPermissionGate} — wraps an
- * `ipcMain.handle` registration with a permission classification check.
- */
-export type WithPermissionGate = (
-	channel: string,
-	action: PermissionActionKind,
-	handler: IpcHandleListener,
-) => void;
-
-/** Inputs for {@link createPermissionGate}. */
-interface CreatePermissionGateOptions {
+/** Inputs for {@link installPermissionGate}. */
+interface InstallPermissionGateOptions {
+	/** Membership source for the `workspaceCwd` a request names. */
+	databaseService: EnsemblrDatabaseService;
+	/** Reads the app's resolved UI language for the confirmation dialog. */
+	getLanguage: () => AppLanguage;
 	/**
-	 * Resolves the currently-active permission mode every time a gated channel
-	 * is invoked. Called per-invocation so the gate picks up settings changes
-	 * without restarting Electron.
+	 * Resolves the permission mode that applies to one request. Called per
+	 * invocation so a mode the user just changed applies without a restart.
 	 */
-	getMode: () => PermissionGateMode;
+	resolveMode: (context: PermissionModeContext) => PermissionMode;
 }
 
 /**
- * Builds a {@link WithPermissionGate} that uses `getMode` to look up the
- * active mode on every call. Under `'allow-all'` the wrapper is a pass-through;
- * under any classifying mode a `'blocked'` boundary throws
- * {@link PermissionGateDeniedError} before the inner handler runs.
+ * Wraps `ipcMain.handle` for the duration of handler registration so every
+ * channel is classified against the central action table without each
+ * handler group having to opt in.
+ *
+ * Interception rather than a threaded wrapper is what closes the gap the audit
+ * found: opt-in reached six handler groups out of thirty, and the ones running
+ * shell commands were not among them. The patch is confined to the composition
+ * root and restored by the returned function before it returns.
+ * @param options - Database service, language reader, and the mode resolver.
+ * @returns A function restoring the original `ipcMain.handle`.
  */
-export function createPermissionGate({
-	getMode,
-}: CreatePermissionGateOptions): WithPermissionGate {
-	return (channel, action, handler) => {
-		const gated: IpcHandleListener = (event, ...args) => {
-			const mode = getMode();
+export function installPermissionGate({
+	databaseService,
+	getLanguage,
+	resolveMode,
+}: InstallPermissionGateOptions): () => void {
+	const originalHandle = ipcMain.handle.bind(ipcMain);
 
-			if (mode !== 'allow-all') {
-				const snapshot = classifyPermissionAction({ action, mode });
+	ipcMain.handle = (channel: string, listener: IpcHandleListener): void => {
+		originalHandle(
+			channel,
+			gateListener({
+				action: permissionActionForChannel(channel),
+				channel,
+				databaseService,
+				getLanguage,
+				listener,
+				resolveMode,
+			}),
+		);
+	};
 
-				if (snapshot.boundary === 'blocked') {
-					throw new PermissionGateDeniedError({
-						action,
-						channel,
-						reason: snapshot.reason,
-					});
-				}
-			}
-
-			return handler(event, ...args);
-		};
-
-		ipcMain.handle(channel, gated);
+	return () => {
+		ipcMain.handle = originalHandle;
 	};
 }
 
 /**
- * Reads `security.permissionMode` out of a resolved-settings snapshot,
- * normalising the value back to a valid {@link PermissionMode} and falling
- * back to {@link DEFAULT_PERMISSION_MODE} when the setting is absent.
+ * Builds the gated listener for one channel: it rejects a sub-frame sender,
+ * classifies the action against the request's repository mode, denies a blocked
+ * boundary, and asks the user before a boundary that needs approval.
+ * @param options - Channel identity, its action, the collaborators, and the inner listener.
+ * @returns A listener suitable for `ipcMain.handle`.
  */
-export function readPermissionModeFromSnapshot(
-	snapshot: SettingsResolutionSnapshot,
-): PermissionMode {
-	const setting = snapshot.app.settings.find(
-		(entry) => entry.key === 'security.permissionMode',
-	);
-	if (!setting) {
-		return DEFAULT_PERMISSION_MODE;
+function gateListener({
+	action,
+	channel,
+	databaseService,
+	getLanguage,
+	listener,
+	resolveMode,
+}: InstallPermissionGateOptions & {
+	action: PermissionActionKind | null;
+	channel: string;
+	listener: IpcHandleListener;
+}): IpcHandleListener {
+	return async (event, ...args) => {
+		assertTopLevelSender(event, channel);
+
+		const context = readPermissionModeContext(args[0]);
+		assertKnownWorkspaceCwd({ channel, context, databaseService });
+
+		if (!action) {
+			return listener(event, ...args);
+		}
+
+		const mode = resolveMode(context);
+		const snapshot = classifyPermissionAction({ action, mode });
+
+		if (snapshot.boundary === 'blocked') {
+			throw new PermissionGateDeniedError({
+				action,
+				channel,
+				reason: snapshot.reason,
+			});
+		}
+
+		if (
+			snapshot.boundary === 'confirmation-required' &&
+			mode !== 'workspace-trusted'
+		) {
+			const approved = await confirmPermissionAction({
+				action,
+				language: getLanguage(),
+			});
+
+			if (!approved) {
+				throw new PermissionGateDeniedError({
+					action,
+					channel,
+					reason: 'The user declined this action.',
+				});
+			}
+		}
+
+		return listener(event, ...args);
+	};
+}
+
+/**
+ * Refuses a request naming a `workspaceCwd` that matches no tracked repository
+ * or workspace row. Every downstream containment check — `resolveWorkspacePath`,
+ * `isWithinWorkspaceReal`, `validateRelativePath` — is relative to this root, so
+ * without the membership test the caller picks the root those checks defend.
+ * @param options - Channel name, the identifiers read off the payload, and the database.
+ */
+function assertKnownWorkspaceCwd({
+	channel,
+	context,
+	databaseService,
+}: {
+	channel: string;
+	context: PermissionModeContext;
+	databaseService: EnsemblrDatabaseService;
+}): void {
+	const workspaceCwd = context.workspaceCwd?.trim();
+
+	if (!workspaceCwd) {
+		return;
 	}
-	return normalizePermissionMode(setting.value);
+
+	const database = databaseService.getConnection()?.database ?? null;
+
+	if (!isTrackedRepositoryPath({ database, repositoryPath: workspaceCwd })) {
+		throw new Error(
+			`Permission denied for ${channel}: workspace path is not a tracked workspace.`,
+		);
+	}
+}
+
+/**
+ * Refuses an invocation that did not come from a window's top-level frame. The
+ * app hosts no `<webview>` and blocks cross-origin navigation, so this is a
+ * standing assertion rather than a live defence — it is what keeps the day a
+ * remote-content frame is introduced from silently inheriting the whole bridge.
+ * @param event - The invoke event whose sender is being checked.
+ * @param channel - Channel name, for the raised error.
+ */
+function assertTopLevelSender(
+	event: IpcMainInvokeEvent,
+	channel: string,
+): void {
+	const senderFrame = event.senderFrame;
+
+	if (senderFrame && senderFrame !== event.sender.mainFrame) {
+		throw new Error(
+			`Permission denied for ${channel}: sender is not the main frame.`,
+		);
+	}
+}
+
+/**
+ * Reads the workspace or repository a request names, so its repository's mode
+ * is the one enforced. A payload naming none resolves at app scope.
+ * @param payload - First argument the renderer passed to the channel.
+ * @returns The identifiers found on the payload.
+ */
+function readPermissionModeContext(payload: unknown): PermissionModeContext {
+	if (!payload || typeof payload !== 'object') {
+		return {};
+	}
+
+	const candidate = payload as Record<string, unknown>;
+	return {
+		repositoryId: readString(candidate.repositoryId),
+		workspaceCwd: readString(candidate.workspaceCwd),
+		workspaceId: readString(candidate.workspaceId),
+	};
+}
+
+/**
+ * Narrows an unknown payload field to a string.
+ * @param value - Field read off the request payload.
+ * @returns The string, or `null` when the field is absent or another type.
+ */
+function readString(value: unknown): string | null {
+	return typeof value === 'string' ? value : null;
+}
+
+/**
+ * Puts a native approval dialog to the user for an action the mode does not
+ * allow outright, parented to the focused window when there is one.
+ * @param input - The action being approved and the language to draw it in.
+ * @returns True when the user approves.
+ */
+export async function confirmPermissionAction({
+	action,
+	language,
+}: {
+	action: PermissionActionKind;
+	language: AppLanguage;
+}): Promise<boolean> {
+	const strings = permissionConfirmStrings(language ?? FALLBACK_LANGUAGE);
+	const options = {
+		buttons: [strings.deny, strings.allow],
+		cancelId: 0,
+		defaultId: 0,
+		detail: strings.detail.replace('{{action}}', action),
+		message: strings.message,
+		title: strings.title,
+		type: 'question' as const,
+	};
+	const parentWindow = BrowserWindow.getFocusedWindow();
+	const answered = await (parentWindow
+		? dialog.showMessageBox(parentWindow, options)
+		: dialog.showMessageBox(options));
+
+	return answered.response === 1;
 }

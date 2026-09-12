@@ -18,6 +18,7 @@ import type {
 	AgentSessionStatus,
 	AgentShutdownReason,
 } from '../agent-types.ts';
+import { isTimelineAgentEvent } from '../event-admission.ts';
 import type { SessionNamingInput } from '../naming/session-naming.ts';
 import {
 	type ActiveSession,
@@ -60,6 +61,10 @@ interface RuntimeEventHandler {
 
 /**
  * Persists one normalized runtime event and schedules summary refreshes.
+ *
+ * Two events never reach persistence: a streaming delta, which is broadcast
+ * ephemerally and superseded by the authoritative `message_end`, and an event
+ * the timeline cannot render at all (see {@link isTimelineAgentEvent}).
  *
  * Side-effect ordering is load-bearing: persistence write → snapshot/broadcast
  * → agent-end fan-out (sets `agentResponsePendingSummary`) → status/shutdown
@@ -263,6 +268,10 @@ export function createRuntimeEventHandler({
 		const active = activeCandidate;
 
 		if (tryBroadcastDelta({ active, branchId, event, sessionId })) {
+			return;
+		}
+
+		if (!isTimelineAgentEvent(event)) {
 			return;
 		}
 

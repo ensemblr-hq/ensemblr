@@ -55,11 +55,13 @@ export {
 } from './follow-up-queue';
 export type { OptimisticPrompt } from './optimistic-prompts';
 export {
+	forgetPendingPromptsFlag,
 	useHasPendingPrompts,
 	useOptimisticPrompts,
 } from './optimistic-prompts';
 export type { PrimedAction } from './primed-action';
 export {
+	forgetPrimedAction,
 	primedActionAtomFamily,
 	useComposerPrimedActionConsumer,
 } from './primed-action';

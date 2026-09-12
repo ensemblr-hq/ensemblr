@@ -26,6 +26,7 @@ interface Harness {
 	archivedContextPath: string;
 	repositoryPath: string;
 	workspacePath: string;
+	workspacesPath: string;
 }
 
 function runGit(cwd: string, args: string[]): string {
@@ -35,7 +36,8 @@ function runGit(cwd: string, args: string[]): string {
 function createHarness(t: TestContext): Harness {
 	const rootPath = mkdtempSync(path.join(tmpdir(), 'ensemblr-prune-'));
 	const repositoryPath = path.join(rootPath, 'repo');
-	const workspacePath = path.join(rootPath, 'workspaces', 'eng-1');
+	const workspacesPath = path.join(rootPath, 'workspaces');
+	const workspacePath = path.join(workspacesPath, 'octocat-demo', 'eng-1');
 	const archivedContextPath = path.join(rootPath, 'archived', 'eng-1');
 	mkdirSync(repositoryPath, { recursive: true });
 	mkdirSync(archivedContextPath, { recursive: true });
@@ -60,7 +62,7 @@ function createHarness(t: TestContext): Harness {
 		rmSync(rootPath, { force: true, recursive: true });
 	});
 
-	return { archivedContextPath, repositoryPath, workspacePath };
+	return { archivedContextPath, repositoryPath, workspacePath, workspacesPath };
 }
 
 function prune(harness: Harness) {
@@ -71,6 +73,7 @@ function prune(harness: Harness) {
 		repositoryPath: harness.repositoryPath,
 		workspaceId: 'ws-1',
 		workspacePath: harness.workspacePath,
+		workspacesRoot: harness.workspacesPath,
 	});
 }
 
@@ -175,6 +178,7 @@ test('a files-to-copy match with nowhere to go keeps the worktree', async (t) =>
 		repositoryPath: harness.repositoryPath,
 		workspaceId: 'ws-1',
 		workspacePath: harness.workspacePath,
+		workspacesRoot: harness.workspacesPath,
 	});
 
 	assert.equal(outcome.status, 'failure');
@@ -198,6 +202,7 @@ test('no files-to-copy match means an absent archive directory is harmless', asy
 		repositoryPath: harness.repositoryPath,
 		workspaceId: 'ws-1',
 		workspacePath: harness.workspacePath,
+		workspacesRoot: harness.workspacesPath,
 	});
 
 	assert.equal(outcome.status, 'pruned');
@@ -234,6 +239,7 @@ test('a worktree that cannot be snapshotted is kept rather than reclaimed', asyn
 		repositoryPath: harness.repositoryPath,
 		workspaceId: 'ws-detached',
 		workspacePath: detached,
+		workspacesRoot: harness.workspacesPath,
 	});
 
 	assert.equal(outcome.status, 'failure');
@@ -309,6 +315,7 @@ test('a worktree on an unborn branch is not treated as unreadable', async (t) =>
 		repositoryPath: emptyRepository,
 		workspaceId: 'ws-1',
 		workspacePath: emptyRepository,
+		workspacesRoot: harness.workspacesPath,
 	});
 
 	assert.equal(outcome.status, 'failure');
@@ -367,6 +374,7 @@ test('a straggling build that recreates the worktree is swept before the prune r
 		repositoryPath: harness.repositoryPath,
 		workspaceId: 'ws-1',
 		workspacePath: harness.workspacePath,
+		workspacesRoot: harness.workspacesPath,
 	});
 
 	assert.equal(outcome.status, 'pruned');
@@ -392,6 +400,7 @@ test('residue that cannot be cleared is reported without failing the prune', asy
 			repositoryPath: harness.repositoryPath,
 			workspaceId: 'ws-1',
 			workspacePath: harness.workspacePath,
+			workspacesRoot: harness.workspacesPath,
 		});
 
 		assert.equal(outcome.status, 'pruned');

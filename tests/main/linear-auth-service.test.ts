@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
@@ -76,6 +77,7 @@ function createDatabaseServiceFixture(t: TestContext): EnsemblrDatabaseService {
 			schemaVersion: connection.schemaVersion,
 			status: 'ok',
 		}),
+		vacuum: () => undefined,
 		open: () => ({
 			path: connection.path,
 			schemaVersion: connection.schemaVersion,
@@ -210,8 +212,24 @@ async function approveLoginInBrowser(
 		callback.searchParams.set(key, value);
 	}
 
-	const response = await fetch(callback);
-	assert.strictEqual(response.status, 200);
+	// A real OAuth redirect is a top-level browser navigation, which is what
+	// earns it `sec-fetch-mode: navigate`. Built on `http.request` rather than
+	// the global `fetch`, whose undici implementation silently forces
+	// `sec-fetch-mode: cors` on every outgoing request regardless of what a
+	// caller sets.
+	const status = await new Promise<number>((resolve, reject) => {
+		const req = httpRequest(
+			callback,
+			{ headers: { 'sec-fetch-mode': 'navigate' }, method: 'GET' },
+			(res) => {
+				res.resume();
+				res.on('end', () => resolve(res.statusCode ?? 0));
+			},
+		);
+		req.on('error', reject);
+		req.end();
+	});
+	assert.strictEqual(status, 200);
 }
 
 test('startLogin: completes the PKCE flow and stores tokens outside SQLite', async (t) => {
@@ -360,6 +378,44 @@ test('startLogin: surfaces token-exchange failures', async (t) => {
 
 	assert.ok(result.status === 'error');
 	assert.strictEqual(result.failure.code, 'exchange-failed');
+});
+
+test('startLogin: redacts a client secret the token endpoint echoes back in its error body', async (t) => {
+	const secretStore = createMockSecretStore({ now: () => NOW });
+	await secretStore.create({
+		key: 'linear-client-secret',
+		scope: 'app',
+		value: 'shhh-secret',
+	});
+	const calls: FetchCall[] = [];
+	const fetchImpl = (async (
+		input: string | URL | Request,
+		init?: RequestInit,
+	) => {
+		const url = String(input);
+		calls.push({
+			body: typeof init?.body === 'string' ? init.body : null,
+			url,
+		});
+		if (url.includes('/oauth/token')) {
+			return new Response(
+				'client_secret=shhh-secret was rejected for this client',
+				{ status: 400 },
+			);
+		}
+		throw new Error(`unexpected fetch: ${url}`);
+	}) as unknown as typeof fetch;
+	const { service } = createServiceFixture(t, {
+		fetchStub: { calls, fetchImpl },
+		secretStore,
+	});
+
+	const result = await service.startLogin();
+
+	assert.ok(result.status === 'error');
+	assert.strictEqual(result.failure.code, 'exchange-failed');
+	assert.ok(!result.failure.message.includes('shhh-secret'));
+	assert.ok(result.failure.message.includes('[redacted]'));
 });
 
 test('getConnectionSummary: reports not-configured, disconnected, and connected', async (t) => {

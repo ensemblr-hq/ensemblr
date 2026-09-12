@@ -1,4 +1,4 @@
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
 import {
@@ -9,7 +9,8 @@ import {
 	ensureContextPath,
 	resolveContextPath,
 } from '../config/context-directory.ts';
-import { ENSEMBLR_DIRECTORY } from '../config/repository-config.ts';
+import { ENSEMBLR_DIRECTORY } from '../config/repository-paths.ts';
+import { writeFileAtomicExclusive } from '../safe-fs/index.ts';
 
 /**
  * Filename of the machine-local per-worktree setup marker, written inside the
@@ -19,8 +20,11 @@ import { ENSEMBLR_DIRECTORY } from '../config/repository-config.ts';
  */
 export const SETUP_STATE_FILENAME = 'setup.local.json';
 
-/** Absolute path to a worktree's current setup marker under `.context`. */
-function setupStatePath(worktreePath: string): string {
+/**
+ * Absolute path to a worktree's current setup marker under `.context`, or null
+ * when the path cannot be composed safely.
+ */
+function setupStatePath(worktreePath: string): string | null {
 	return resolveContextPath(worktreePath, SETUP_STATE_FILENAME);
 }
 
@@ -34,7 +38,11 @@ function legacySetupStatePath(worktreePath: string): string {
 }
 
 /** Parses a setup marker at `markerPath`, or null when absent/unreadable/malformed. */
-function readMarker(markerPath: string): WorkspaceSetupState | null {
+function readMarker(markerPath: string | null): WorkspaceSetupState | null {
+	if (markerPath === null) {
+		return null;
+	}
+
 	try {
 		return parseSetupState(JSON.parse(readFileSync(markerPath, 'utf8')));
 	} catch {
@@ -74,7 +82,7 @@ export function writeSetupStateFile(
 		if (markerPath === null) {
 			return;
 		}
-		writeFileSync(markerPath, `${JSON.stringify(state, null, 2)}\n`);
+		writeFileAtomicExclusive(markerPath, `${JSON.stringify(state, null, 2)}\n`);
 	} catch {}
 }
 
@@ -95,6 +103,10 @@ export function clearSetupStateFile(worktreePath: string): void {
 		setupStatePath(worktreePath),
 		legacySetupStatePath(worktreePath),
 	]) {
+		if (markerPath === null) {
+			continue;
+		}
+
 		try {
 			rmSync(markerPath, { force: true });
 		} catch {}

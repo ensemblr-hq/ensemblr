@@ -1,9 +1,10 @@
-import { mkdirSync } from 'node:fs';
+import { chmodSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import type { DatabaseHealthSnapshot } from '../../shared/ipc/contracts/health';
+import { pruneAgentEventHistory } from './repositories/agent-event-retention.ts';
 
 /** Options for {@link openEnsemblrDatabase} / {@link createEnsemblrDatabaseService}. */
 export interface OpenDatabaseOptions {
@@ -23,6 +24,13 @@ export interface EnsemblrDatabaseService {
 	getConnection: () => EnsemblrDatabaseConnection | null;
 	getHealth: () => DatabaseHealthSnapshot;
 	open: () => DatabaseHealthSnapshot;
+	/**
+	 * Runs `VACUUM` against the open database, rewriting the whole file to
+	 * reclaim pages retention has already freed onto SQLite's freelist. Blocks
+	 * the calling thread for the duration and cannot run inside a transaction.
+	 * @throws When the database is not open.
+	 */
+	vacuum: () => void;
 }
 
 /**
@@ -1212,6 +1220,72 @@ CREATE INDEX idx_agent_control_spawn_root_time
 ON agent_control_spawn_reservations(root_session_id, reserved_at);
 `,
 	},
+	{
+		id: '029_agent_event_index_hygiene',
+		version: 29,
+		// `idx_agent_session_events_branch_ordinal` duplicated the
+		// UNIQUE(branch_id, ordinal) autoindex exactly — same columns, same order,
+		// and `dbstat` reported the same 47,722,496 bytes over the same 890,305
+		// cells. `idx_agent_session_events_type` had no reader at all: no query in
+		// src/main filters, groups, or orders by `event_type`. Together they cost
+		// two of the four b-tree writes on every append, on a table taking ~99,000
+		// appends a day. `idx_agent_session_events_turn_id` stays — `turn_id
+		// REFERENCES agent_turns(id) ON DELETE SET NULL` needs it so settling a
+		// turn does not scan the table.
+		sql: `
+DROP INDEX IF EXISTS idx_agent_session_events_branch_ordinal;
+DROP INDEX IF EXISTS idx_agent_session_events_type;
+`,
+	},
+	{
+		id: '030_chat_tab_closed_at_index',
+		version: 30,
+		// `listAllChatTabs` orders every closed tab by `closed_at` with no
+		// workspace predicate, so `idx_chat_tabs_open(workspace_id, closed_at)`
+		// cannot serve it: the plan was SCAN plus USE TEMP B-TREE FOR ORDER BY over
+		// the wide row. Closed tabs are never pruned, so that scan grows with the
+		// user's lifetime tab count. The partial index is exactly the rows the
+		// query reads, in the order it wants them.
+		sql: `
+CREATE INDEX idx_chat_tabs_closed_at
+ON chat_tabs(closed_at DESC)
+WHERE closed_at IS NOT NULL;
+`,
+	},
+	{
+		id: '031_spawn_reservation_workspace',
+		version: 31,
+		// Reservations had no foreign key at all, so deleting a workspace cascaded
+		// the sessions away and left the quota rows behind forever. The key is on
+		// `workspace_id` rather than `root_session_id`: a root may be a Concierge
+		// or harness origin that has no `agent_sessions` row, and a key onto that
+		// table would refuse the insert and fail the spawn. Deleting the workspace
+		// is the one event that genuinely ends a delegation tree; age is not, since
+		// sweeping by age would refund lifetime spawn quota and defeat the
+		// fork-bomb guard. Legacy rows carry NULL and are left to expire with the
+		// table.
+		sql: `
+CREATE TABLE agent_control_spawn_reservations_new (
+	id TEXT PRIMARY KEY,
+	root_session_id TEXT NOT NULL,
+	workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
+	reserved_at INTEGER NOT NULL
+) STRICT;
+
+INSERT INTO agent_control_spawn_reservations_new (id, root_session_id, workspace_id, reserved_at)
+SELECT id, root_session_id, NULL, reserved_at FROM agent_control_spawn_reservations;
+
+DROP TABLE agent_control_spawn_reservations;
+
+ALTER TABLE agent_control_spawn_reservations_new RENAME TO agent_control_spawn_reservations;
+
+CREATE INDEX idx_agent_control_spawn_root_time
+ON agent_control_spawn_reservations(root_session_id, reserved_at);
+
+CREATE INDEX idx_agent_control_spawn_workspace
+ON agent_control_spawn_reservations(workspace_id);
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */
@@ -1238,8 +1312,63 @@ export function resolveDefaultDatabasePath(homeDirectory = homedir()): string {
 }
 
 /**
+ * Owner-only directory mode for the database's parent. On Linux the path is
+ * `~/.config/ensemblr`, whose parent is not reliably `0700` across
+ * distributions, and on Linux this file holds `safeStorage` ciphertext for
+ * every secret rather than a Keychain reference (ADR 0056).
+ */
+const DATABASE_DIRECTORY_MODE = 0o700;
+
+/** Owner-only file mode for the database and its write-ahead log siblings. */
+const DATABASE_FILE_MODE = 0o600;
+
+/**
+ * Suffixes SQLite creates alongside the database file in WAL mode. Each is
+ * readable on its own and the `-wal` carries pages not yet checkpointed, so
+ * tightening only the `.db` would leave recent writes world-readable.
+ */
+const DATABASE_SIDECAR_SUFFIXES = ['-wal', '-shm'] as const;
+
+/**
+ * Narrows an existing path's permissions, ignoring a path that is absent or
+ * whose mode the platform will not take.
+ *
+ * Best-effort by design: an install already sitting on a correctly restricted
+ * directory needs nothing, and a filesystem that does not carry POSIX modes
+ * (a mounted share, Windows) must not stop the app from opening its database.
+ * @param target - Path whose mode to narrow.
+ * @param mode - Mode to apply.
+ */
+function restrictMode(target: string, mode: number): void {
+	try {
+		chmodSync(target, mode);
+	} catch {}
+}
+
+/**
+ * Restricts the database file and its WAL sidecars to owner-only.
+ * @param databasePath - Path the connection was opened against.
+ */
+function restrictDatabaseFileModes(databasePath: string): void {
+	restrictMode(databasePath, DATABASE_FILE_MODE);
+
+	for (const suffix of DATABASE_SIDECAR_SUFFIXES) {
+		restrictMode(`${databasePath}${suffix}`, DATABASE_FILE_MODE);
+	}
+}
+
+/**
  * Opens the SQLite database, ensures its parent directory exists, configures
  * pragmas, and applies any pending migrations.
+ *
+ * The directory is created `0700` and the file plus its WAL sidecars narrowed
+ * to `0600` once the connection exists, because SQLite creates them under the
+ * process umask — `0644` on a typical Linux host, where this file is where
+ * secrets actually live.
+ *
+ * Transcript retention runs on the way in, and only against a database this
+ * build fully migrated: a test fixture staged at an older schema has tables the
+ * sweep's statements do not know.
  * @param options - Optional path override; `:memory:` is honored for tests.
  * @returns An open {@link EnsemblrDatabaseConnection}.
  */
@@ -1249,7 +1378,11 @@ export function openEnsemblrDatabase(
 	const databasePath = options.databasePath ?? resolveDefaultDatabasePath();
 
 	if (databasePath !== SQLITE_MEMORY_PATH) {
-		mkdirSync(path.dirname(databasePath), { recursive: true });
+		mkdirSync(path.dirname(databasePath), {
+			mode: DATABASE_DIRECTORY_MODE,
+			recursive: true,
+		});
+		restrictMode(path.dirname(databasePath), DATABASE_DIRECTORY_MODE);
 	}
 
 	const database = new DatabaseSync(databasePath, {
@@ -1261,7 +1394,12 @@ export function openEnsemblrDatabase(
 
 	try {
 		configureDatabase(database);
+		restrictDatabaseFileModes(databasePath);
+		assertSchemaIsNotNewer(database);
 		const schemaVersion = runMigrations(database);
+		if (schemaVersion === LATEST_SCHEMA_VERSION) {
+			pruneAgentEventHistory({ database });
+		}
 
 		return {
 			database,
@@ -1275,6 +1413,27 @@ export function openEnsemblrDatabase(
 }
 
 /**
+ * Refuses a database a newer build already migrated.
+ *
+ * The migration runner skips ids it has seen and never compares `user_version`
+ * against what this build knows, so an older binary would report `ok` and then
+ * write against tables, columns, and CHECK constraints it has never heard of.
+ * Release and Canary share one file by design (`user-data-location.ts`), and
+ * Canary is by construction ahead, so running Canary once and then Release is
+ * the ordinary way to reach this.
+ * @param database - Open SQLite connection.
+ */
+function assertSchemaIsNotNewer(database: DatabaseSync): void {
+	const version = getCurrentSchemaVersion(database);
+	if (version <= LATEST_SCHEMA_VERSION) {
+		return;
+	}
+	throw new Error(
+		`Database schema version ${version} is newer than this build supports (${LATEST_SCHEMA_VERSION}). Open the newer version of Ensemblr instead.`,
+	);
+}
+
+/**
  * Builds a lazily-opening database service whose lifecycle is owned by the
  * Electron main process.
  * @param options - Forwarded to {@link openEnsemblrDatabase} on first open.
@@ -1284,7 +1443,7 @@ export function createEnsemblrDatabaseService(
 	options: OpenDatabaseOptions = {},
 ): EnsemblrDatabaseService {
 	let connection: EnsemblrDatabaseConnection | null = null;
-	let health: DatabaseHealthSnapshot = {
+	let health: Omit<DatabaseHealthSnapshot, 'sizeBytes'> = {
 		path: options.databasePath ?? resolveDefaultDatabasePath(),
 		schemaVersion: 0,
 		status: 'error',
@@ -1293,7 +1452,7 @@ export function createEnsemblrDatabaseService(
 	/** Opens the database if not already open; returns the current health snapshot. */
 	function open(): DatabaseHealthSnapshot {
 		if (connection) {
-			return health;
+			return getHealth();
 		}
 
 		try {
@@ -1312,25 +1471,117 @@ export function createEnsemblrDatabaseService(
 			};
 		}
 
-		return health;
+		return getHealth();
 	}
 
-	/** Closes the database, if open. Safe to call when no connection exists. */
+	/**
+	 * Closes the database, if open, running `PRAGMA optimize` first so the
+	 * planner statistics the next launch reads are current. Safe to call when no
+	 * connection exists.
+	 */
 	function close(): void {
 		if (!connection) {
 			return;
 		}
 
+		optimizeQuietly(connection.database);
 		connection.database.close();
 		connection = null;
+	}
+
+	/**
+	 * Reads the current health snapshot, computing the on-disk size live off
+	 * the open connection so it reflects growth and compaction between opens
+	 * rather than the size at the last `open()` call.
+	 */
+	function getHealth(): DatabaseHealthSnapshot {
+		return { ...health, sizeBytes: readDatabaseSizeBytes(connection) };
+	}
+
+	/** Runs `VACUUM` against the open database, rewriting the whole file to reclaim freed pages. */
+	function vacuum(): void {
+		const database = requireDatabase(
+			connection?.database,
+			() => new Error('Database is not open.'),
+		);
+		database.exec('VACUUM;');
 	}
 
 	return {
 		close,
 		getConnection: () => connection,
-		getHealth: () => health,
+		getHealth,
 		open,
+		vacuum,
 	};
+}
+
+/**
+ * Reads the main database file's size as `PRAGMA page_count * PRAGMA
+ * page_size`. Deliberately excludes the `-wal` and `-shm` companion files, per
+ * {@link DatabaseHealthSnapshot.sizeBytes}.
+ * @param connection - The live connection, or `null` when the database is not open.
+ * @returns The size in bytes, or `null` when there is no open connection or the pragmas fail.
+ */
+function readDatabaseSizeBytes(
+	connection: EnsemblrDatabaseConnection | null,
+): number | null {
+	if (!connection) {
+		return null;
+	}
+
+	try {
+		const pageCountRow = connection.database.prepare('PRAGMA page_count').get();
+		const pageSizeRow = connection.database.prepare('PRAGMA page_size').get();
+
+		if (!isPageCountRow(pageCountRow) || !isPageSizeRow(pageSizeRow)) {
+			return null;
+		}
+
+		return pageCountRow.page_count * pageSizeRow.page_size;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Type guard for the row shape of `PRAGMA page_count`.
+ * @param row - Candidate row.
+ * @returns True when the row has a numeric `page_count` column.
+ */
+function isPageCountRow(row: unknown): row is { page_count: number } {
+	return (
+		typeof row === 'object' &&
+		row !== null &&
+		'page_count' in row &&
+		typeof row.page_count === 'number'
+	);
+}
+
+/**
+ * Type guard for the row shape of `PRAGMA page_size`.
+ * @param row - Candidate row.
+ * @returns True when the row has a numeric `page_size` column.
+ */
+function isPageSizeRow(row: unknown): row is { page_size: number } {
+	return (
+		typeof row === 'object' &&
+		row !== null &&
+		'page_size' in row &&
+		typeof row.page_size === 'number'
+	);
+}
+
+/**
+ * Refreshes the query planner's statistics on the way out, ignoring a failure:
+ * this runs during shutdown, where a maintenance pragma must never be the
+ * reason the app cannot quit.
+ * @param database - Open SQLite connection.
+ */
+function optimizeQuietly(database: DatabaseSync): void {
+	try {
+		database.exec('PRAGMA optimize;');
+	} catch {}
 }
 
 /**
@@ -1364,7 +1615,15 @@ export function listAppliedMigrationIds(database: DatabaseSync): string[] {
 }
 
 /**
- * Applies connection-wide pragmas (foreign keys, busy timeout, WAL journal).
+ * Applies connection-wide pragmas (foreign keys, busy timeout, WAL journal,
+ * commit durability, temp storage, page cache).
+ *
+ * `synchronous` is left at SQLite's compile-time `FULL` otherwise, which fsyncs
+ * the WAL on every commit; `NORMAL` is the documented recommendation under WAL
+ * and gives up only the last few transactions on a power loss — not integrity,
+ * and not a process crash. `temp_store = MEMORY` keeps the ORDER BY temp
+ * b-trees off disk, and the cache is raised from the 2 MB default because this
+ * file reaches hundreds of megabytes.
  * @param database - Open SQLite connection.
  */
 function configureDatabase(database: DatabaseSync): void {
@@ -1372,6 +1631,9 @@ function configureDatabase(database: DatabaseSync): void {
 PRAGMA foreign_keys = ON;
 PRAGMA busy_timeout = 5000;
 PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
+PRAGMA temp_store = MEMORY;
+PRAGMA cache_size = -32768;
 `);
 }
 
@@ -1418,6 +1680,12 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
  * @param migration - Migration to apply.
  */
 function runMigration(database: DatabaseSync, migration: Migration): void {
+	if (!Number.isInteger(migration.version)) {
+		throw new Error(
+			`Migration ${migration.id} declares a non-integer version; PRAGMA user_version takes no bound parameter, so the value is interpolated and must be an integer.`,
+		);
+	}
+
 	database.exec('BEGIN IMMEDIATE;');
 
 	try {

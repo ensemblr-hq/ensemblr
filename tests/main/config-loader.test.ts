@@ -231,6 +231,11 @@ test('config service caches the startup load result', (t) => {
 	assert.deepEqual(service.getConfig().ui, { theme: 'dark' });
 });
 
+// The watcher is injected rather than real: what is under test is that a change
+// notification reloads the cache and forwards a snapshot, which is this module's
+// logic. `fs.watch` delivery is the OS's, and driving this through it made the
+// test hang outright — not merely run late — whenever the machine was saturated
+// by the rest of the suite.
 test('startWatching reloads the cache and fires onChange on external edits', async (t) => {
 	const fixture = createConfigFixture();
 	t.after(fixture.cleanup);
@@ -241,9 +246,14 @@ test('startWatching reloads the cache and fires onChange on external edits', asy
 		}),
 	);
 
+	let fileMoved: (() => void) | undefined;
 	const service = createEnsemblrConfigService({
 		homeDirectory: fixture.homeDirectory,
 		now: fixedClock,
+		watchFile: ({ onChange }) => {
+			fileMoved = onChange;
+			return { stop: () => undefined };
+		},
 	});
 	t.after(() => service.stop());
 	service.load();
@@ -251,6 +261,7 @@ test('startWatching reloads the cache and fires onChange on external edits', asy
 	const changed = new Promise<void>((resolve) => {
 		service.startWatching(() => resolve());
 	});
+	assert.ok(fileMoved, 'startWatching registers a watch');
 
 	fixture.writeConfig(
 		JSON.stringify({
@@ -258,6 +269,7 @@ test('startWatching reloads the cache and fires onChange on external edits', asy
 			schemaVersion: 1,
 		}),
 	);
+	fileMoved?.();
 
 	await changed;
 	assert.deepEqual(service.getConfig().repositoryDefaults, {

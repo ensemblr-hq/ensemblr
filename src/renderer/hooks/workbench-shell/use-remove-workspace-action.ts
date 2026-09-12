@@ -7,7 +7,10 @@ import {
 	forgetWorkspaceInListViews,
 	invalidateWorkspaceListViews,
 } from '@/renderer/api/ensemblr';
-import { forgetLastRunScript } from '@/renderer/state/preferences';
+import {
+	forgetLastRunScript,
+	forgetPrDetailsDrafts,
+} from '@/renderer/state/preferences';
 import {
 	forgetWorkspaceStateAtom,
 	lastWorkspaceNavigationRenderStateAtom,
@@ -98,6 +101,7 @@ export function useRemoveWorkspaceAction(options: {
 			deleted: async (deletedWorkspaceId: string) => {
 				deleteLastUsedOpenTarget(deletedWorkspaceId);
 				forgetLastRunScript(deletedWorkspaceId);
+				forgetPrDetailsDrafts(deletedWorkspaceId);
 				forgetWorkspaceState(deletedWorkspaceId);
 				await dropFromNavigation(deletedWorkspaceId);
 			},

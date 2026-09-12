@@ -81,6 +81,7 @@ describe('useWorkbenchQueries projects identity', () => {
 					summary: { additions: 5, deletions: 2, files: 1 },
 				}),
 			health: () => Promise.resolve({ status: 'ok' }),
+			onWorkspaceFilesChanged: () => () => {},
 			repositoryWorkspaceNavigation: () =>
 				Promise.resolve(snapshot(['ws-a', 'ws-b'])),
 			setupDiagnostics: () => Promise.resolve({ checks: [], status: 'ok' }),

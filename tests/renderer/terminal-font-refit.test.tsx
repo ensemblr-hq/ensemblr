@@ -35,6 +35,7 @@ const { adapter, pendingFontLoads } = vi.hoisted(() => ({
 		getSelection: vi.fn(() => ''),
 		onData: vi.fn(() => () => undefined),
 		setFont: vi.fn(),
+		setRendererVisible: vi.fn(),
 		setScrollback: vi.fn(),
 		whenFontReady: vi.fn(() => Promise.resolve()),
 		write: vi.fn(),
@@ -138,11 +139,11 @@ test('re-fits the surface once the mount-time font faces land', async () => {
 
 	await landFontFaces();
 
+	// The surface is re-measured, but the PTY hears about it only when the cell
+	// grid actually moved: dragging the dock splitter fires the observer every
+	// frame, and an unchanged grid is an IPC round trip and a SIGWINCH for nothing.
 	expect(adapter.fit).toHaveBeenCalledTimes(2);
-	expect(resizes).toEqual([
-		{ cols: 80, rows: 24 },
-		{ cols: 80, rows: 24 },
-	]);
+	expect(resizes).toEqual([{ cols: 80, rows: 24 }]);
 });
 
 // Without this the pane keeps the geometry it measured against the fallback
@@ -167,10 +168,7 @@ test('re-fits again once a live font change has loaded its faces', async () => {
 	await landFontFaces();
 
 	expect(adapter.fit).toHaveBeenCalledTimes(2);
-	expect(resizes).toEqual([
-		{ cols: 96, rows: 24 },
-		{ cols: 96, rows: 24 },
-	]);
+	expect(resizes).toEqual([{ cols: 96, rows: 24 }]);
 });
 
 // A pane torn down between the font change and the face landing would otherwise

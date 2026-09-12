@@ -1,6 +1,11 @@
 import { atom, type Getter, type Setter, type WritableAtom } from 'jotai';
 
 import {
+	agentConversationLiveStateAtom,
+	agentWorkspaceLiveStateAtomFamily,
+} from '@/renderer/state/agents';
+
+import {
 	activeDockTabByWorkspaceAtom,
 	activeReviewTabByWorkspaceAtom,
 	changesSourceByWorkspaceAtom,
@@ -86,6 +91,33 @@ function idListStore(target: WorkspaceIdListAtom): WorkspaceKeyedStore {
 }
 
 /**
+ * Registers the agent live-state map, which is a `workspaceId → sessions` map
+ * behind a readonly type plus a `selectAtom` family keyed by the same id.
+ * Evicting the map alone would leave the family holding a derived atom per
+ * workspace the install has ever opened.
+ * @returns The store entry for {@link WORKSPACE_KEYED_STORES}
+ */
+function agentLiveStateStore(): WorkspaceKeyedStore {
+	return {
+		evict: (get, set, keepWorkspace) => {
+			const current = get(agentConversationLiveStateAtom);
+
+			for (const workspaceId of Object.keys(current)) {
+				if (!keepWorkspace(workspaceId)) {
+					agentWorkspaceLiveStateAtomFamily.remove(workspaceId);
+				}
+			}
+
+			const retained = retainInRecord(current, keepWorkspace);
+
+			if (retained !== current) {
+				set(agentConversationLiveStateAtom, retained);
+			}
+		},
+	};
+}
+
+/**
  * Every renderer store keyed by workspace id. Most are persisted, so a
  * workspace that no longer exists would otherwise keep its entry for the
  * lifetime of the install — a fresh install reaches hundreds of dead keys well
@@ -106,6 +138,7 @@ const WORKSPACE_KEYED_STORES: readonly WorkspaceKeyedStore[] = [
 	idListStore(pinnedWorkspaceIdsAtom),
 	idListStore(unreadWorkspaceIdsAtom),
 	idListStore(workspaceBoardOrderAtom),
+	agentLiveStateStore(),
 ];
 
 /**

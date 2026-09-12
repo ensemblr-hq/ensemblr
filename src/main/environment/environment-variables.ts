@@ -1,3 +1,4 @@
+import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type {
@@ -10,6 +11,10 @@ import type { EnsemblrConfigService } from '../config';
 import type { SecretMetadata, SecretStore } from '../secrets/secret-store';
 import type { EnsemblrDatabaseService } from '../storage';
 import { requireDatabase } from '../storage/database.ts';
+import {
+	getWorkspacePathById,
+	selectRepositoryPathById,
+} from '../storage/repositories/index.ts';
 import {
 	loadScopeEnvFiles,
 	readEnvFilePaths,
@@ -54,6 +59,7 @@ export { isEnvironmentVariableKey } from './environment-variable-keys.ts';
 export type EnvironmentVariablesErrorCode =
 	| 'database-unavailable'
 	| 'env-file-not-found'
+	| 'env-file-outside-scope'
 	| 'invalid-key'
 	| 'invalid-scope'
 	| 'reserved-key'
@@ -120,6 +126,11 @@ export interface EnvironmentVariablesAssembly {
 /** Public surface of the environment-variables service. */
 export interface EnvironmentVariablesService {
 	addEnvFile: (input: EnvironmentFileInput) => Promise<string[]>;
+	/**
+	 * Records a path the user chose in the native picker this session, which is
+	 * the one way a file outside the scope's checkout becomes registrable.
+	 */
+	rememberPickedEnvFile: (filePath: string) => void;
 	assembleEnvironment: (
 		options?: EnvironmentVariablesAssemblyOptions,
 	) => Promise<EnvironmentVariablesAssembly>;
@@ -190,6 +201,7 @@ export function createEnvironmentVariablesService({
 	secretStore,
 	secretStoreFactory = createDefaultSecretStore,
 }: CreateEnvironmentVariablesServiceOptions): EnvironmentVariablesService {
+	const pickedEnvFilePaths = new Set<string>();
 	/** Resolves the active SQLite handle from the injected database or service. */
 	function getDatabase(): DatabaseSync | null {
 		if (database !== undefined) {
@@ -579,6 +591,14 @@ export function createEnvironmentVariablesService({
 		}
 
 		const databaseConnection = requireEnvironmentDatabase(getDatabase());
+
+		if (!isRegistrableEnvFile(databaseConnection, scope, filePath)) {
+			throw new EnvironmentVariablesError(
+				'env-file-outside-scope',
+				'An env file must live inside the scope it is registered for, or be chosen in the file picker.',
+			);
+		}
+
 		const current = readEnvFilePaths(databaseConnection, scope);
 
 		if (current.includes(filePath)) {
@@ -609,8 +629,48 @@ export function createEnvironmentVariablesService({
 		return next;
 	}
 
+	/**
+	 * Records a path the user just chose in the native picker, so the otherwise
+	 * scope-contained {@link addEnvFile} accepts it. The set lives for this app
+	 * run only: a compromised renderer cannot name a path the user never picked,
+	 * and a restart forgets the grant.
+	 * @param filePath - Absolute path the picker returned.
+	 */
+	function rememberPickedEnvFile(filePath: string): void {
+		const trimmedPath = filePath.trim();
+
+		if (trimmedPath) {
+			pickedEnvFilePaths.add(path.resolve(trimmedPath));
+		}
+	}
+
+	/**
+	 * Decides whether an env file may be registered for a scope: it must sit
+	 * inside that scope's checkout, or be a path the user picked this session.
+	 * App-scope files have no checkout to sit inside, so they must be picked.
+	 * @param database - Open database handle for the scope-root lookup.
+	 * @param scope - Scope the file is being registered for.
+	 * @param filePath - Candidate env-file path.
+	 * @returns True when the registration is allowed.
+	 */
+	function isRegistrableEnvFile(
+		database: DatabaseSync,
+		scope: NormalizedScope,
+		filePath: string,
+	): boolean {
+		const resolved = path.resolve(filePath);
+
+		if (pickedEnvFilePaths.has(resolved)) {
+			return true;
+		}
+
+		const root = resolveScopeRoot(database, scope);
+		return root ? isInsideDirectory(root, resolved) : false;
+	}
+
 	return {
 		addEnvFile,
+		rememberPickedEnvFile,
 		assembleEnvironment,
 		getSnapshot,
 		listEnvFiles,
@@ -732,5 +792,42 @@ function isSecretStoreAlreadyExistsError(
 		error !== null &&
 		'code' in error &&
 		error.code === 'already-exists'
+	);
+}
+
+/**
+ * Reads the on-disk root an env-file scope is contained by.
+ * @param database - Open database handle.
+ * @param scope - Normalized scope the file is registered for.
+ * @returns The absolute checkout path, or `null` for a scope that has none.
+ */
+function resolveScopeRoot(
+	database: DatabaseSync,
+	scope: NormalizedScope,
+): string | null {
+	if (scope.scope === 'workspace') {
+		return getWorkspacePathById({ database, workspaceId: scope.scopeId });
+	}
+
+	if (scope.scope === 'repository') {
+		return selectRepositoryPathById({ database, id: scope.scopeId });
+	}
+
+	return null;
+}
+
+/**
+ * Tests containment of a resolved path inside a directory, rejecting the
+ * sibling-prefix case (`/a/b` against root `/a/bc`) a bare `startsWith` accepts.
+ * @param directory - Absolute directory that must contain the path.
+ * @param candidate - Absolute path being tested.
+ * @returns True when the candidate sits inside the directory.
+ */
+function isInsideDirectory(directory: string, candidate: string): boolean {
+	const relative = path.relative(path.resolve(directory), candidate);
+	return (
+		relative.length > 0 &&
+		!relative.startsWith('..') &&
+		!path.isAbsolute(relative)
 	);
 }

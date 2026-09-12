@@ -94,6 +94,8 @@
 		"add-comment": "Προσθήκη σχολίου",
 		"hidden-line-count_one": "{{count}} αμετάβλητη γραμμή",
 		"hidden-line-count_other": "{{count}} αμετάβλητες γραμμές",
+		"show-remaining-rows_one": "Εμφάνιση της υπόλοιπης {{count}} γραμμής",
+		"show-remaining-rows_other": "Εμφάνιση των υπόλοιπων {{count}} γραμμών",
 		"unchanged-lines": "Αμετάβλητες γραμμές"
 	},
 	"discard-changes": {

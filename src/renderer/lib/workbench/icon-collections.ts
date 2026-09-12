@@ -1,6 +1,6 @@
 import { addCollection } from '@iconify/react';
-import { icons as logosIcons } from '@iconify-json/logos';
-import { icons as vscodeIcons } from '@iconify-json/vscode-icons';
+
+import { ICON_SUBSET } from './icon-subset.gen';
 
 /** Shortcut arrow badge shared by the file and folder symlink glyphs. */
 const symlinkBadge =
@@ -14,20 +14,31 @@ const symlinkBadge =
  * `api.iconify.design`, which in a desktop app means a blank icon until the
  * network answers, so registration belongs to the entry rather than to each
  * module that happens to draw a glyph.
+ *
+ * The two bundled collections are registered from `icon-subset.gen.ts` rather
+ * than from `@iconify-json/*`: the full sets are 11.24 MB of SVG for 3,699
+ * icons against the ~77 the app draws, and `addCollection` needs the object, so
+ * importing them puts every byte in the entry chunk and pays its parse before
+ * React mounts. `node scripts/generate-icon-subset.mjs` rebuilds the subset and
+ * `tests/renderer/icon-collections.test.ts` fails when a new reference is
+ * missing from it.
  */
 export function registerIconCollections(): void {
-	addCollection(vscodeIcons);
-	addCollection(logosIcons);
+	addCollection(ICON_SUBSET['vscode-icons']);
+	addCollection(ICON_SUBSET.logos);
 	addCollection({
 		prefix: 'ensemblr',
 		width: 32,
 		height: 32,
 		icons: {
 			'file-symlink': {
-				body: vscodeIcons.icons['default-file'].body + symlinkBadge,
+				body:
+					ICON_SUBSET['vscode-icons'].icons['default-file'].body + symlinkBadge,
 			},
 			'folder-symlink': {
-				body: vscodeIcons.icons['default-folder'].body + symlinkBadge,
+				body:
+					ICON_SUBSET['vscode-icons'].icons['default-folder'].body +
+					symlinkBadge,
 			},
 		},
 	});

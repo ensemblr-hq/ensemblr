@@ -1,12 +1,5 @@
-import {
-	existsSync,
-	mkdirSync,
-	readFileSync,
-	renameSync,
-	writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-
 import {
 	type AppSettings,
 	type AppSettingsPatch,
@@ -14,11 +7,15 @@ import {
 	mergeAppSettings,
 	parseAppSettings,
 } from '../../shared/config.ts';
+import { writeFileAtomicExclusive } from '../safe-fs/index.ts';
 import {
 	ENSEMBLR_CONFIG_SCHEMA_URL,
 	resolveEnsemblrConfigPath,
 } from './config-loader.ts';
-import { watchConfigFile } from './watch-config-file.ts';
+import {
+	type ConfigFileWatcher,
+	watchConfigFile,
+} from './watch-config-file.ts';
 
 /** Coalesces the burst of fs events an editor emits for a single save. */
 const WATCH_DEBOUNCE_MS = 120;
@@ -73,6 +70,17 @@ export interface AppSettingsService {
 export interface CreateAppSettingsServiceOptions {
 	/** Override the config path (tests). Defaults to the real `~/.config` path. */
 	configPath?: string;
+	/**
+	 * Override how the file is watched. Defaults to {@link watchConfigFile}.
+	 *
+	 * Injectable because the caching contract — a parse held only while the
+	 * watcher runs, dropped the moment the file moves underneath — is the
+	 * service's own logic, while `fs.watch` delivery is the OS's. A test that
+	 * asserts the former through the latter is asserting two things, and the one
+	 * it does not own is the one that fails: under a saturated parallel suite the
+	 * event does not arrive at all, not late.
+	 */
+	watchFile?: ConfigFileWatcher;
 }
 
 /**
@@ -96,10 +104,14 @@ export function createAppSettingsService(
 	options: CreateAppSettingsServiceOptions = {},
 ): AppSettingsService {
 	const configPath = options.configPath ?? resolveEnsemblrConfigPath();
+	const watchFile = options.watchFile ?? watchConfigFile;
 	// Exact bytes of our last write — the watcher compares against this to ignore
 	// the fs event our own atomic write triggers.
 	let lastWritten: string | null = null;
 	let watcherHandle: { stop: () => void } | null = null;
+	// Held only while the watcher runs, because the watcher is what makes a live
+	// edit observable — without it a cached parse would never see one.
+	let cached: AppSettings | null = null;
 
 	const readRaw = (): Record<string, unknown> => {
 		try {
@@ -127,10 +139,9 @@ export function createAppSettingsService(
 	const writeRaw = (config: Record<string, unknown>): void => {
 		const serialized = `${JSON.stringify(config, null, 2)}\n`;
 		mkdirSync(path.dirname(configPath), { recursive: true });
-		const tempPath = `${configPath}.tmp`;
-		writeFileSync(tempPath, serialized, 'utf8');
-		renameSync(tempPath, configPath);
+		writeFileAtomicExclusive(configPath, serialized);
 		lastWritten = serialized;
+		cached = null;
 	};
 
 	const settingsFrom = (config: Record<string, unknown>): AppSettings =>
@@ -148,8 +159,16 @@ export function createAppSettingsService(
 	};
 
 	const read = (): AppSettings => {
+		if (cached) {
+			return cached;
+		}
+
 		ensureExists();
-		return settingsFrom(readRaw());
+		const settings = settingsFrom(readRaw());
+		if (watcherHandle) {
+			cached = settings;
+		}
+		return settings;
 	};
 
 	const update = (patch: AppSettingsPatch): AppSettings => {
@@ -173,7 +192,7 @@ export function createAppSettingsService(
 		} catch {
 			lastWritten = null;
 		}
-		watcherHandle = watchConfigFile({
+		watcherHandle = watchFile({
 			debounceMs: WATCH_DEBOUNCE_MS,
 			filePath: configPath,
 			onChange: () => {
@@ -187,7 +206,9 @@ export function createAppSettingsService(
 					return; // our own write — ignore the echo
 				}
 				lastWritten = current;
-				onChange(settingsFrom(asRecord(safeParse(current))));
+				const settings = settingsFrom(asRecord(safeParse(current)));
+				cached = settings;
+				onChange(settings);
 			},
 		});
 	};
@@ -195,6 +216,7 @@ export function createAppSettingsService(
 	const stop = (): void => {
 		watcherHandle?.stop();
 		watcherHandle = null;
+		cached = null;
 	};
 
 	return {

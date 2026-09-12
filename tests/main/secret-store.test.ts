@@ -10,7 +10,9 @@ import {
 	createMockSecretStore,
 	createSafeStorageSecretStore,
 	maskSecret,
+	readObfuscatedStorageAcknowledgement,
 	SecretStoreError,
+	writeObfuscatedStorageAcknowledgement,
 } from '../../src/main/secrets/index.ts';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 
@@ -458,4 +460,115 @@ test('safe storage scopes its listing the same way the Keychain backend does', a
 		),
 		['B'],
 	);
+});
+
+test('safe storage refuses a write under an obfuscating keyring until it is acknowledged', async (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	const store = createSafeStorageSecretStore({
+		database: connection.database,
+		...createFixedClock(),
+		platform: 'linux',
+		safeStorage: createFakeSafeStorage({ backend: 'basic_text' }),
+	});
+
+	assert.equal(
+		readObfuscatedStorageAcknowledgement(connection.database, 'basic_text'),
+		false,
+	);
+	await assert.rejects(
+		store.create({ key: 'LINEAR_TOKEN', scope: 'app', value: 'lin_api_1' }),
+		(error: unknown) =>
+			error instanceof SecretStoreError &&
+			error.code === 'obfuscated-storage-unacknowledged',
+	);
+	assert.deepEqual(await store.listMetadata(), []);
+
+	writeObfuscatedStorageAcknowledgement(connection.database, 'basic_text');
+
+	const metadata = await store.create({
+		key: 'LINEAR_TOKEN',
+		scope: 'app',
+		value: 'lin_api_1',
+	});
+
+	assert.equal(metadata.backend, 'safe-storage');
+	assert.equal(
+		await store.read({ key: 'LINEAR_TOKEN', scope: 'app' }),
+		'lin_api_1',
+	);
+});
+
+test('an acknowledgement is keyed on the backend id, not just recorded once', async (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	writeObfuscatedStorageAcknowledgement(connection.database, 'basic_text');
+
+	assert.equal(
+		readObfuscatedStorageAcknowledgement(connection.database, 'basic_text'),
+		true,
+	);
+	assert.equal(
+		readObfuscatedStorageAcknowledgement(connection.database, 'unknown'),
+		false,
+	);
+});
+
+test('safe storage stores without an acknowledgement under a real keyring', async (t) => {
+	const { store } = openSafeStorageFixture(
+		t,
+		createFakeSafeStorage({ backend: 'gnome_libsecret' }),
+	);
+
+	const metadata = await store.create({
+		key: 'LINEAR_TOKEN',
+		scope: 'app',
+		value: 'lin_api_1',
+	});
+
+	assert.equal(metadata.backend, 'safe-storage');
+});
+
+test('an update is refused under an obfuscating keyring too', async (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	const encrypted = createSafeStorageSecretStore({
+		database: connection.database,
+		...createFixedClock(),
+		safeStorage: createFakeSafeStorage({ backend: 'kwallet6' }),
+	});
+	await encrypted.create({ key: 'K', scope: 'app', value: 'first' });
+
+	const obfuscated = createSafeStorageSecretStore({
+		database: connection.database,
+		...createFixedClock(),
+		platform: 'linux',
+		safeStorage: createFakeSafeStorage({ backend: 'basic_text' }),
+	});
+
+	await assert.rejects(
+		obfuscated.update({ key: 'K', scope: 'app', value: 'second' }),
+		(error: unknown) =>
+			error instanceof SecretStoreError &&
+			error.code === 'obfuscated-storage-unacknowledged',
+	);
+	assert.equal(await encrypted.read({ key: 'K', scope: 'app' }), 'first');
 });

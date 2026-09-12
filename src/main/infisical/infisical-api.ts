@@ -1,4 +1,5 @@
 import type { InfisicalFailureCode } from '../../shared/ipc/contracts/infisical';
+import { isLoopbackHost } from '../../shared/loopback-host.ts';
 
 const LOGIN_PATH = '/api/v1/auth/universal-auth/login';
 const PROJECTS_PATH = '/api/v1/projects';
@@ -125,6 +126,13 @@ export function normalizeSiteUrl(siteUrl: string): string {
 		throw new InfisicalApiError(
 			'infisical-invalid-request',
 			'An Infisical instance URL must use http or https.',
+		);
+	}
+
+	if (parsed.protocol === 'http:' && !isLoopbackHost(parsed.hostname)) {
+		throw new InfisicalApiError(
+			'infisical-invalid-request',
+			`"${trimmed}" would send the Machine Identity client secret in cleartext. Use https, or http only against localhost.`,
 		);
 	}
 

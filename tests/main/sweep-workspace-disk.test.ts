@@ -87,6 +87,7 @@ function createHarness(): Harness {
 			schemaVersion: 0,
 			status: 'ok',
 		}),
+		vacuum: () => undefined,
 		open: () => ({ path: connection.path, schemaVersion: 0, status: 'ok' }),
 	} as unknown as EnsemblrDatabaseService;
 

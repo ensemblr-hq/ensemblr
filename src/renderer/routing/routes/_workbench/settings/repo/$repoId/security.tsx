@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { Trans, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 
 import { PermissionModeRow } from '@/renderer/components/settings/permission-mode-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
@@ -45,11 +45,10 @@ function RepoSecuritySettings() {
 			/>
 
 			<p className='py-3 text-muted-foreground text-xs'>
-				<Trans
-					components={{ file: <code className='font-mono' /> }}
-					defaults='A committed <file>.ensemblr/settings.toml</file> value shared with the team still wins over this personal override — a repository can raise its own floor and you cannot lower it locally.'
-					i18nKey='settings:repo.security.committed-note'
-				/>
+				{t(
+					'settings:repo.security.scope-note',
+					'This repository’s mode is the one Ensemblr enforces. Reset it and workspaces of this repo fall back to the app-wide default.',
+				)}
 			</p>
 		</SettingsSection>
 	);

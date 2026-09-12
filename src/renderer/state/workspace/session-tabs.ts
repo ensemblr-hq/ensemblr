@@ -13,6 +13,8 @@ import {
 import { useWorkspaceAgentBusy } from '@/renderer/hooks/workspace/use-workspace-agent-busy';
 import {
 	forgetComposerDraft,
+	forgetPendingPromptsFlag,
+	forgetPrimedAction,
 	useDropComposerSubmits,
 	useDropFollowUpQueue,
 } from '@/renderer/state/composer';
@@ -214,6 +216,8 @@ export function useSessionTabState({
 			if (result.deleted) {
 				forgetChatOverrides(chatTabId);
 				forgetComposerDraft(chatTabId);
+				forgetPrimedAction(chatTabId);
+				forgetPendingPromptsFlag(chatTabId);
 				scrollOffsets.forget(chatTabId);
 			}
 			// Queued follow-ups and queued auto-submits are not restorable the way a

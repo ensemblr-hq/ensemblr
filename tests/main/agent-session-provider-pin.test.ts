@@ -189,7 +189,6 @@ function registerHandlers({
 		},
 		afkModeRegistry: createAfkModeRegistry(),
 		provisionalNamingQueue: () => undefined,
-		withPermissionGate: () => undefined,
 	});
 
 	const channels = new Map<

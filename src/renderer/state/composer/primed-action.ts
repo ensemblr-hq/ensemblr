@@ -1,5 +1,5 @@
 import { atom, useAtom } from 'jotai';
-import { atomFamily } from 'jotai/utils';
+import { atomFamily } from 'jotai-family';
 import { useEffect } from 'react';
 import { buildActionAttachmentBlock } from '@/renderer/lib/workbench/action-prompts';
 
@@ -26,6 +26,17 @@ export interface PrimedAction {
 export const primedActionAtomFamily = atomFamily((_chatTabId: string) =>
 	atom<PrimedAction | null>(null),
 );
+
+/**
+ * Evicts a chat tab's primed action from the family. The family grows for the
+ * lifetime of the window otherwise, one atom per chat tab the session has seen.
+ * Call only when a tab is permanently deleted: a primed action drains through a
+ * mounted composer, which a restorable closed tab gets back.
+ * @param chatTabId - Chat-tab id whose primed action should be dropped
+ */
+export function forgetPrimedAction(chatTabId: string): void {
+	primedActionAtomFamily.remove(chatTabId);
+}
 
 /**
  * Drains a per-tab {@link PrimedAction} into the mounted composer. When one is

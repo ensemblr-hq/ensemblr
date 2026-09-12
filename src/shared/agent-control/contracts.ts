@@ -150,8 +150,12 @@ export type AgentControlOp = (typeof AGENT_CONTROL_OPS)[number];
  * allowed and may span workspaces.
  *
  * `exitPlanMode` writes a plan file yet is deliberately absent: it is the only
- * exit from Plan Mode, so gating it would strand a planning agent with every
- * editing tool denied and no way out. It is gated on active Plan Mode instead.
+ * exit from Plan Mode, so blocking it would strand a planning agent with every
+ * editing tool denied and no way out. Absence from this set no longer makes it a
+ * *read*, which is what let a `read-only` workspace gain a file with nothing
+ * shown to the user: the service maps it to the `plan-submission` action, which
+ * `classifyPermissionAction` confirms rather than blocks under `read-only`. It is
+ * still additionally gated on active Plan Mode.
  */
 const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'spawnChatTab',

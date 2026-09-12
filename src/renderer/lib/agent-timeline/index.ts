@@ -32,6 +32,7 @@ export {
 	parsePromptAttachments,
 } from './prompt-attachment-parser.ts';
 export { parseStackTrace } from './stack-trace.ts';
+export { splitSettledMarkdown } from './streaming-markdown-split.ts';
 export {
 	countNestedToolCalls,
 	dropEchoedSubagentReports,

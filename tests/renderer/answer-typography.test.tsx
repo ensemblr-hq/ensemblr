@@ -36,6 +36,22 @@ describe('answer typography', () => {
 		expect(markup).not.toContain('ensemblr-answer-default');
 	});
 
+	test('draws every block of an answer split at a closed fence', () => {
+		// A long answer is handed to Streamdown in two pieces, cut after the last
+		// fence that closed, so a streamed token re-lexes only the tail. Both pieces
+		// have to land on the surface, and both have to carry the answer chrome.
+		const markup = renderWithMarkdownStyle(
+			'default',
+			<ChatMessageText
+				text={'Do this:\n\n```ts\nconst a = 1;\n```\n\nThen read it back.'}
+			/>,
+		);
+
+		expect(markup).toContain('const a = 1;');
+		expect(markup).toContain('Then read it back.');
+		expect(markup).toContain('Do this:');
+	});
+
 	test.each([
 		['compact', 'ensemblr-answer-compact'],
 		['prose', 'ensemblr-answer-prose'],

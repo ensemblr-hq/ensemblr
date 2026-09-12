@@ -128,6 +128,13 @@ export interface AgentControlWiring {
 	 * the control tools being reachable.
 	 */
 	delegation: SubagentMechanism;
+	/**
+	 * How far down the delegation tree this session sits, taken from persisted
+	 * lineage. The runtime adapter needs it to withhold the tools a descendant
+	 * may not reach: a depth-2 leaf cannot delegate at all, so a mode resolved
+	 * without it hands every descendant the root's tool set.
+	 */
+	depth: 0 | 1 | 2;
 	env: Record<string, string> | undefined;
 	resolveTurnPreamble: (() => Promise<string | null>) | null;
 	systemPromptAppend: string | null;
@@ -242,6 +249,7 @@ export function resolveAgentControlWiring({
 		readClaudeSubagentMode,
 		sessionId,
 	});
+	const depth = lineage?.depth ?? 0;
 	const env = resolveAgentControlEnv?.({
 		delegation,
 		lineage,
@@ -258,6 +266,7 @@ export function resolveAgentControlWiring({
 		return {
 			controlMcp: null,
 			delegation,
+			depth,
 			env,
 			resolveTurnPreamble: null,
 			systemPromptAppend: null,
@@ -268,6 +277,7 @@ export function resolveAgentControlWiring({
 	return {
 		controlMcp,
 		delegation,
+		depth,
 		env,
 		resolveTurnPreamble: resolveTurnPreamble
 			? () => resolveTurnPreamble(sessionId)

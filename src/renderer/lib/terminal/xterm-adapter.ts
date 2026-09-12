@@ -5,6 +5,7 @@ import { Terminal } from '@xterm/xterm';
 
 import '@xterm/xterm/css/xterm.css';
 
+import { parseExternalUrl } from '@/renderer/lib/external-url';
 import type { TerminalRendererAdapter } from '@/renderer/types/terminal';
 
 /** Options for {@link createXtermAdapter}. */
@@ -77,6 +78,8 @@ export function createXtermAdapter({
 		terminal.options.theme = readThemeFromDocument();
 	});
 	let disposed = false;
+	let attached = false;
+	let webglAddon: WebglAddon | null = null;
 	let activeFont = { family: fontFamily, size: fontSize };
 	let fontReady: Promise<void> = Promise.resolve();
 
@@ -101,7 +104,7 @@ export function createXtermAdapter({
 	return {
 		attach: (element) => {
 			terminal.open(element);
-			loadWebglRenderer(terminal);
+			attached = true;
 			requestFontFaces();
 		},
 		clear: () => terminal.clear(),
@@ -138,6 +141,21 @@ export function createXtermAdapter({
 				size: nextSize ?? activeFont.size,
 			};
 			requestFontFaces();
+		},
+		setRendererVisible: (visible) => {
+			if (disposed || !attached || visible === (webglAddon !== null)) {
+				return;
+			}
+
+			if (!visible) {
+				webglAddon?.dispose();
+				webglAddon = null;
+				return;
+			}
+
+			webglAddon = loadWebglRenderer(terminal, () => {
+				webglAddon = null;
+			});
 		},
 		setScrollback: (lines) => {
 			terminal.options.scrollback = lines;
@@ -224,29 +242,44 @@ function redrawWithLoadedFont(terminal: Terminal, fontFamily: string): void {
  * where the rest of the UI also lives. WebGL draws the same cells from a glyph
  * atlas and leaves that thread free.
  *
+ * Loaded when the surface becomes visible rather than at `attach`, because
+ * every dock tab is force-mounted to keep its scrollback and PTY binding: with
+ * one context per mounted tab, Chromium's ~16-context page budget evicts the
+ * oldest and silently drops those surfaces to the slow path. A hidden
+ * `display: none` pane paints nothing, so the DOM renderer costs it nothing.
+ *
  * Must run after `terminal.open`: the addon takes over a canvas the terminal
  * only creates once it has a container. Losing the GL context (a driver reset,
  * a suspend, an out-of-memory GPU) disposes the addon, which is how xterm
  * documents dropping back to the DOM renderer mid-session.
  *
- * Teardown is left to `terminal.dispose`, which disposes every addon it loaded.
- * Disposing this one first instead would make it hand the render service a
- * freshly built DOM renderer — rows and an injected stylesheet — microseconds
- * before the terminal tears that renderer down again; the addon skips that
- * restore only once the terminal's core is already disposed.
+ * Teardown when the terminal itself goes is left to `terminal.dispose`, which
+ * disposes every addon it loaded. Disposing this one first instead would make
+ * it hand the render service a freshly built DOM renderer — rows and an
+ * injected stylesheet — microseconds before the terminal tears that renderer
+ * down again; the addon skips that restore only once the terminal's core is
+ * already disposed. Disposing it for a hidden tab is that restore on purpose.
  * @param terminal - An xterm terminal that has already been opened.
+ * @param onContextLoss - Called once the GPU has dropped the addon's context.
+ * @returns The loaded addon, or null when the GPU could not serve a context.
  */
-function loadWebglRenderer(terminal: Terminal): void {
+function loadWebglRenderer(
+	terminal: Terminal,
+	onContextLoss: () => void,
+): WebglAddon | null {
 	try {
 		const addon = new WebglAddon();
 		addon.onContextLoss(() => {
 			addon.dispose();
+			onContextLoss();
 		});
 		terminal.loadAddon(addon);
+		return addon;
 	} catch {
 		// A GPU that cannot serve a context throws out of the addon's activate;
 		// xterm is left on the DOM renderer it already had, so there is no
 		// teardown to do here.
+		return null;
 	}
 }
 
@@ -257,10 +290,22 @@ function loadWebglRenderer(terminal: Terminal): void {
  * (the OSC 8 one behind a `confirm()` prompt): the app's window-open guard sees
  * `about:blank`, refuses to open it externally, and the click silently does
  * nothing.
+ *
+ * The URI is checked against the same http(s) allowlist the main process
+ * enforces before it is sent. `WebLinksAddon` only ever matches http(s), but
+ * the OSC 8 path carries whatever wrote to the PTY — any command, any agent
+ * harness, any build script in an untrusted repository — and the display text
+ * is chosen independently of the target, so the renderer must not treat it as a
+ * URL it may hand onward.
  * @param _event - The originating click, unused — the URI carries everything.
  * @param uri - The link target under the cursor.
  */
 function openTerminalLink(_event: MouseEvent, uri: string): void {
+	if (!parseExternalUrl(uri)) {
+		console.warn('[terminal] refused link with disallowed scheme', uri);
+		return;
+	}
+
 	window.ensemblr?.openExternal(uri).catch((error: unknown) => {
 		console.error('[terminal] failed to open link', uri, error);
 	});

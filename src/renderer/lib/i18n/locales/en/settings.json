@@ -64,7 +64,24 @@
 	},
 	"diagnostics": {
 		"copy-bundle": "Copy diagnostics bundle",
+		"database": {
+			"compact": "Compact database",
+			"compact-confirm": "Click again to confirm",
+			"compacting": "Compacting…",
+			"description": "Ensemblr prunes old agent history automatically, but SQLite does not shrink the file on disk by itself. Compacting rewrites the whole file to reclaim that space, and blocks other database activity while it runs.",
+			"failed": "Could not compact the database: {{error}}.",
+			"label": "Database",
+			"result": "Reclaimed {{size}}.",
+			"size": "{{size}} on disk"
+		},
 		"description": "Setup gate checks for Pi, git, GitHub, Linear, and the Ensemblr runtime. The diagnostics bundle redacts secrets, account ids, and full paths before going to the clipboard.",
+		"obfuscated-storage": {
+			"acknowledge": "Accept and store secrets anyway",
+			"acknowledge-failed": "Could not record the acknowledgement: {{error}}.",
+			"acknowledged": "You accepted that the {{backend}} backend only obfuscates stored secrets on this machine, not encrypts them.",
+			"description": "No keyring daemon answered, so Ensemblr falls back to the {{backend}} backend, which obfuscates stored secrets with a key published in its own source rather than encrypting them. Anyone who can read the local database file can recover them. Start gnome-keyring or KWallet for real encryption, or accept the weaker protection to keep using secrets on this machine.",
+			"title": "Secrets are only obfuscated, not encrypted"
+		},
 		"rerun-onboarding": {
 			"action": "Re-run wizard",
 			"description": "Reopen the first-run setup wizard. Nothing already configured is undone — the wizard re-probes every check and walks you through whatever is still unresolved.",
@@ -806,7 +823,6 @@
 			"title": "Secrets"
 		},
 		"security": {
-			"committed-note": "A committed <file>.ensemblr/settings.toml</file> value shared with the team still wins over this personal override — a repository can raise its own floor and you cannot lower it locally.",
 			"description": "How much an agent may do on its own in this repository. Applies to every workspace of the repo, and to the tools agents reach over the control server.",
 			"permission-mode": {
 				"approval-required": "Approval required",
@@ -817,6 +833,7 @@
 				"workspace-trusted": "Workspace trusted",
 				"workspace-trusted-description": "Agents act freely inside the workspace; anything outside it still asks."
 			},
+			"scope-note": "This repository’s mode is the one Ensemblr enforces. Reset it and workspaces of this repo fall back to the app-wide default.",
 			"title": "Security"
 		},
 		"setup-script": {

@@ -108,6 +108,7 @@ function wrapConnection(
 			schemaVersion: connection.schemaVersion,
 			status: 'ok',
 		}),
+		vacuum: () => undefined,
 		open: () => ({
 			path: connection.path,
 			schemaVersion: connection.schemaVersion,

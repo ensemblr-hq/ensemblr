@@ -65,6 +65,7 @@ const makeStubService = (
 	issueDirective: string | null = null,
 ): AgentControlService => ({
 	describeAudience: async () => audience,
+	isKnownToken: (token) => token !== 'bogus',
 	invoke: async (command) => {
 		calls.push(command);
 		return { ok: true, data: { echoed: command.op, args: command.rawArgs } };
@@ -289,6 +290,15 @@ describe('agent-control MCP endpoint', () => {
 			new URL(`${server.url}/mcp`),
 		);
 		await expect(client.connect(transport)).rejects.toThrow();
+		expect(calls).toHaveLength(0);
+	});
+
+	// The stub used to ignore the token it was handed, so no test here could tell
+	// a valid one from a bogus one — and the endpoint answered both with the tool
+	// list and the playbook.
+	it('rejects an MCP connection whose token resolves to nothing', async () => {
+		server = await startControlServer(stubService);
+		await expect(connect('bogus')).rejects.toThrow();
 		expect(calls).toHaveLength(0);
 	});
 
@@ -648,6 +658,7 @@ const makeBlockingService = (audience: ControlAudience = HARNESS_ROOT) => {
 	});
 	const service: AgentControlService = {
 		describeAudience: async () => audience,
+		isKnownToken: () => true,
 		invoke: async (command) => {
 			announceStart(command);
 			await held;

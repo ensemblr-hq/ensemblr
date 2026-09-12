@@ -51,6 +51,7 @@ function wrapConnection(
 			schemaVersion: connection.schemaVersion,
 			status: 'ok',
 		}),
+		vacuum: () => undefined,
 		open: () => ({
 			path: connection.path,
 			schemaVersion: connection.schemaVersion,
@@ -234,6 +235,7 @@ test('listAllWorkspaces returns an empty list when the database is unavailable',
 			close: () => undefined,
 			getConnection: () => undefined,
 			getHealth: () => ({ path: null, schemaVersion: 0, status: 'closed' }),
+			vacuum: () => undefined,
 			open: () => ({ path: null, schemaVersion: 0, status: 'closed' }),
 		} as unknown as EnsemblrDatabaseService,
 	});

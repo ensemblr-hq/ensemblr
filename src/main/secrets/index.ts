@@ -1,7 +1,16 @@
 export { createMacosKeychainSecretStore } from './keychain-backend.ts';
 export { createMockSecretStore } from './mock-backend.ts';
 export { maskSecret } from './normalize.ts';
-export { createSafeStorageSecretStore } from './safe-storage-backend.ts';
+export {
+	clearObfuscatedStorageAcknowledgement,
+	OBFUSCATED_STORAGE_ACKNOWLEDGEMENT_KEY,
+	readObfuscatedStorageAcknowledgement,
+	writeObfuscatedStorageAcknowledgement,
+} from './obfuscated-storage-acknowledgement.ts';
+export {
+	createSafeStorageSecretStore,
+	OBFUSCATING_KEYRING_BACKEND,
+} from './safe-storage-backend.ts';
 export {
 	readSafeStorageStatus,
 	type SafeStorageProtection,

@@ -18,6 +18,7 @@ const databaseService: EnsemblrDatabaseService = {
 	getHealth: () => {
 		throw new Error('getHealth is not used by the linked-directory service.');
 	},
+	vacuum: () => undefined,
 	open: () => {
 		throw new Error('open is not used by the linked-directory service.');
 	},

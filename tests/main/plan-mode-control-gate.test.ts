@@ -410,18 +410,31 @@ describe('plan mode: getSessionBrief', () => {
 		expect(result).toMatchObject({ data: { planMode: false }, ok: true });
 	});
 
-	it('leaves the naming ops available while planning', async () => {
+	it('leaves the tab-labelling ops available while planning', async () => {
 		const { service } = setup({ planning: true });
 
-		expect(
-			await invoke(service, 'setBranchName', { name: 'add-dark-mode' }),
-		).toMatchObject({ ok: true });
 		expect(
 			await invoke(service, 'setSummary', { summary: 'Body.', title: 'Topic' }),
 		).toMatchObject({ ok: true });
 		expect(await invoke(service, 'setName', { title: 'Topic' })).toMatchObject({
 			ok: true,
 		});
+	});
+
+	// The branch rename is not one of them: it moves the git branch, which is what
+	// `git branch -m` does and the bash guard denies by name, and a branch moved
+	// under the user mid-plan breaks upstream tracking on the old name.
+	it('refuses the branch rename while planning', async () => {
+		const { service } = setup({ planning: true });
+
+		const result = await invoke(service, 'setBranchName', {
+			name: 'add-dark-mode',
+		});
+
+		expect(result).toMatchObject({ ok: false, code: 'denied-scope' });
+		if (!result.ok) {
+			expect(result.error).toContain('git branch -m');
+		}
 	});
 });
 

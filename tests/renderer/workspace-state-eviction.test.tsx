@@ -9,6 +9,10 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { ensemblrQueryKeys } from '@/renderer/api/ensemblr-queries';
 import { useReconcileWorkspaceState } from '@/renderer/hooks/workspace/use-reconcile-workspace-state';
 import {
+	agentConversationLiveStateAtom,
+	agentWorkspaceLiveStateAtomFamily,
+} from '@/renderer/state/agents';
+import {
 	lastRunScriptAtomFamily,
 	retainLastRunScripts,
 } from '@/renderer/state/preferences';
@@ -84,6 +88,13 @@ function seedBothWorkspaces(store: ReturnType<typeof createStore>): void {
 	store.set(pinnedWorkspaceIdsAtom, [GONE, LIVE]);
 	store.set(unreadWorkspaceIdsAtom, [GONE, LIVE]);
 	store.set(workspaceBoardOrderAtom, [GONE, LIVE]);
+	store.set(agentConversationLiveStateAtom, {
+		[GONE]: {},
+		[LIVE]: {},
+	});
+	// Touching the family is what creates the derived atom eviction has to drop.
+	store.get(agentWorkspaceLiveStateAtomFamily(GONE));
+	store.get(agentWorkspaceLiveStateAtomFamily(LIVE));
 
 	writeLastUsedOpenTarget(GONE, 'vscode');
 	writeLastUsedOpenTarget(LIVE, 'vscode');
@@ -95,6 +106,7 @@ function seedBothWorkspaces(store: ReturnType<typeof createStore>): void {
 function survivingWorkspaceIds(store: ReturnType<typeof createStore>) {
 	return {
 		activeChatTab: Object.keys(store.get(activeChatTabByWorkspaceAtom)),
+		agentLiveState: Object.keys(store.get(agentConversationLiveStateAtom)),
 		activeDockTab: Object.keys(store.get(activeDockTabByWorkspaceAtom)),
 		activeReviewTab: Object.keys(store.get(activeReviewTabByWorkspaceAtom)),
 		boardOrder: store.get(workspaceBoardOrderAtom),
@@ -114,6 +126,7 @@ function survivingWorkspaceIds(store: ReturnType<typeof createStore>) {
 /** The expected read-back once only {@link LIVE} survives. */
 const ONLY_LIVE = {
 	activeChatTab: [LIVE],
+	agentLiveState: [LIVE],
 	activeDockTab: [LIVE],
 	activeReviewTab: [LIVE],
 	boardOrder: [LIVE],

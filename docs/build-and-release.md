@@ -718,6 +718,43 @@ A build only ever reads the releases for **its own channel** — the rolling
 channels carry different bundle ids, so an update can never cross between them.
 See [ADR 0055](./adr/0055-resolve-updates-in-app-against-the-github-releases-api.md).
 
+### The Linux update trust model is GitHub-only, and that is a deliberate gap
+
+On macOS, an update is verified twice: `asset.digest` (below) proves the download
+matches what GitHub stored, and Squirrel.Mac separately validates the downloaded
+bundle's code signature against the running app's designated requirement, rooted
+in a Developer ID key GitHub never holds. That second check is what stops a
+compromised release-publishing credential — or a compromised GitHub — from
+shipping a malicious update: Squirrel refuses a bundle GitHub could re-sign but
+not re-key.
+
+**Linux has no equivalent second check, and there is no plan to add one.** There
+is no AppImage signing key (minisign, GPG, or otherwise), so
+`src/main/updates/appimage-installer.ts` verifies only that the downloaded bytes
+hash to the `sha256:<hex>` digest the GitHub Releases API reports for that asset
+— the same API response that supplied the download URL. If the asset is
+replaced, GitHub recomputes the digest to match, so both halves move together:
+this is *transport* integrity (the bytes are what GitHub currently serves), not
+*provenance* (that a legitimate maintainer built them). A Linux user is trusting
+GitHub Releases and the accounts that can publish to them, full stop — the same
+trust every `apt`/`brew`/`npm install` already asks for, but stated here because
+macOS visibly asks for more.
+
+What the app *does* verify, inside that trust model: `release-feed.ts` requires
+every asset and feed URL to be `https:` on `github.com`,
+`objects.githubusercontent.com`, or `release-assets.githubusercontent.com` before
+it is fetched or handed to the installer, so an API-level response that pointed
+at another host would be rejected before a single byte downloaded. And
+`appimage-installer.ts` re-hashes the staged file against the digest it was
+verified with at download time immediately before the rename-over-running-binary
+swap, since the staged file can sit on disk for days before the user restarts —
+narrowing, not closing, the local-write-access scenario `SECURITY.md` already
+places out of scope.
+
+If that changes — a signing key gets provisioned, or `actions/attest-build-provenance`
+gets wired into `release.yml` — this section is the place to update, alongside
+`SECURITY.md`'s build-integrity bullet.
+
 ### The Homebrew tap
 
 `brew install --cask ensemblr-hq/tap/ensemblr` is served by a second repository,
@@ -775,6 +812,33 @@ first step naming the ones it lacked:
 | `APPLE_CERT_P12` | base64 of the Developer ID Application `.p12` |
 | `APPLE_CERT_PASSWORD` | password the `.p12` was exported with |
 | `KEYCHAIN_PASSWORD` | any throwaway string |
+
+`verify:signing` additionally needs one repository **variable** — not a secret:
+
+| Variable | Value |
+| --- | --- |
+| `APPLE_TEAM_ID` | the 10-character Apple Developer Team ID the Developer ID certificate belongs to |
+
+`codesign -dv` reports `Authority=Developer ID Application: <Name> (<TEAMID>)`
+for *any* Developer ID certificate from *any* Apple developer account —
+matching only that authority string, which is what `verify:signing` did before,
+accepts a build signed by the wrong account. `ENSEMBLR_TEAM_ID`
+(`scripts/verify-signed-artifacts.mjs`) pins the parenthesized Team ID against
+it, and **fails when it is unset** — a pin that silently does nothing is the
+defect it was added to fix.
+
+A variable rather than a secret because a Team ID is not one: it is embedded in
+every binary the account signs and printed by `codesign -dv` on any machine that
+has a copy. Masking it would only make a mismatch read as `***` in the log that
+has to explain the failure. Set it with:
+
+```sh
+gh variable set APPLE_TEAM_ID --body <TEAMID>
+```
+
+To run `npm run verify:signing` locally, export the same value as
+`ENSEMBLR_TEAM_ID`; `security find-identity -v -p codesigning` prints it in
+parentheses after your name.
 
 One further secret is read by the release workflow alone, and is not signing
 material:

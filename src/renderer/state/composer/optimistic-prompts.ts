@@ -32,6 +32,15 @@ const hasPendingPromptsAtomFamily = atomFamily((chatTabId: string) =>
 );
 
 /**
+ * Evicts a chat tab's pending-prompt flag from the family. The derived atom is
+ * cheap but the family keeps one per chat tab the window has ever rendered.
+ * @param chatTabId - Chat-tab id whose flag should be dropped
+ */
+export function forgetPendingPromptsFlag(chatTabId: string): void {
+	hasPendingPromptsAtomFamily.remove(chatTabId);
+}
+
+/**
  * Reads whether a chat tab has a prompt in flight, without subscribing the
  * caller to the prompts themselves.
  * @param chatTabId - Chat tab to check

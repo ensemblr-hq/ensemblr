@@ -16,12 +16,19 @@ import type { SecretStore } from '../secrets/secret-store';
  */
 export const DICTATION_SECRET_KEY = 'dictation:api-key';
 
-/** URL schemes a transcription endpoint may use. Plain `http:` stays allowed
- * because a locally-run `whisper-server` is a supported target. */
+/**
+ * URL schemes a transcription endpoint may use. Plain `http:` stays allowed
+ * because a locally-run `whisper-server` is a supported target — but only on
+ * loopback, per {@link isLoopbackEndpointHost}: the request carries the user's
+ * stored transcription key in an `Authorization` header, and cleartext to a
+ * remote host puts that credential and the recorded audio on the wire.
+ */
 export const ALLOWED_ENDPOINT_PROTOCOLS: readonly string[] = [
 	'http:',
 	'https:',
 ];
+
+export { isLoopbackHost as isLoopbackEndpointHost } from '../../shared/loopback-host.ts';
 
 /** Thrown inside the service and converted to a typed failure at its edge. */
 export class DictationError extends Error {

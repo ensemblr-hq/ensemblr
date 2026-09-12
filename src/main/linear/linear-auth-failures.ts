@@ -63,3 +63,22 @@ export function formatError(error: unknown): string {
 export function truncate(text: string, maxLength: number): string {
 	return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
 }
+
+/**
+ * Strips every given secret out of text bound for a failure message. Some
+ * OAuth servers echo a submitted parameter back in their error body, and that
+ * message reaches the renderer and the support bundle.
+ * @param text - Text about to be surfaced
+ * @param secrets - Values that must not appear in it; falsy entries are skipped
+ * @returns The text with every occurrence of each secret replaced
+ */
+export function redactSecrets(
+	text: string,
+	secrets: readonly (string | undefined)[],
+): string {
+	return secrets.reduce<string>(
+		(redacted, secret) =>
+			secret ? redacted.split(secret).join('[redacted]') : redacted,
+		text,
+	);
+}

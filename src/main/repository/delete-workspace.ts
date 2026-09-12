@@ -11,6 +11,7 @@ import type { LocalCommandService } from '../commands/local-command';
 import type { EnsemblrDatabaseService } from '../storage';
 import { selectDeleteWorkspaceWithRepositoryById } from '../storage/repositories/workspace-repository.ts';
 import { runBranchDelete, runRefDelete, runWorktreeRemove } from './git-ops.ts';
+import { readManagedRoots } from './managed-roots.ts';
 import { archivedWorktreeRefFor } from './prune-worktree.ts';
 import { deleteWorkspaceRow } from './workspace-row-ops.ts';
 import type { WorkspaceTeardownService } from './workspace-teardown.ts';
@@ -106,6 +107,7 @@ export function createDeleteWorkspaceService({
 				deletingWorkspace: true,
 				repositoryPath: source.repositoryPath,
 				workspacePath: source.path,
+				workspacesRoot: readManagedRoots(database)?.workspacesPath ?? null,
 			});
 			if (worktreeOutcome.status !== 'success') {
 				diagnostics.push({

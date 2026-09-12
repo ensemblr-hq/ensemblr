@@ -363,7 +363,9 @@ test('env files round-trip and seed assembled environment below explicit vars', 
 		rmSync(directory, { force: true, recursive: true });
 	});
 
+	service.rememberPickedEnvFile(envFilePath);
 	const afterAdd = await service.addEnvFile({ path: envFilePath });
+	await service.addEnvFile({ path: envFilePath });
 	assert.deepEqual(afterAdd, [envFilePath]);
 	assert.deepEqual(await service.listEnvFiles(), [envFilePath]);
 
@@ -405,6 +407,7 @@ test('assembleEnvironment warns when a configured env file disappears', async (t
 		rmSync(directory, { force: true, recursive: true });
 	});
 
+	service.rememberPickedEnvFile(envFilePath);
 	await service.addEnvFile({ path: envFilePath });
 	// The file is removed after it was registered.
 	rmSync(envFilePath, { force: true });
@@ -436,6 +439,7 @@ test('assembleEnvironment redacts secret-shaped env-file values', async (t) => {
 		rmSync(directory, { force: true, recursive: true });
 	});
 
+	service.rememberPickedEnvFile(envFilePath);
 	await service.addEnvFile({ path: envFilePath });
 	const assembly = await service.assembleEnvironment();
 
@@ -463,9 +467,27 @@ test('getSnapshot counts an env-file value as satisfying a required key', async 
 	});
 	assert.equal(before.missingRequiredCount, 1);
 
+	service.rememberPickedEnvFile(envFilePath);
 	await service.addEnvFile({ path: envFilePath });
 	const after = await service.getSnapshot({
 		requiredKeys: ['REQUIRED_FROM_FILE'],
 	});
 	assert.equal(after.missingRequiredCount, 0);
+});
+
+test('addEnvFile refuses a path the user never picked', async (t) => {
+	const database = createDatabaseFixture(t);
+	const service = createService({ database });
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-envfile-'));
+	const envFilePath = path.join(directory, 'outside.env');
+
+	t.after(() => rmSync(directory, { force: true, recursive: true }));
+	writeFileSync(envFilePath, 'SECRET_FROM_ELSEWHERE=1\n', 'utf8');
+
+	await assert.rejects(
+		() => service.addEnvFile({ path: envFilePath }),
+		(error: unknown) =>
+			error instanceof EnvironmentVariablesError &&
+			error.code === 'env-file-outside-scope',
+	);
 });

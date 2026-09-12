@@ -11,8 +11,12 @@ import type { LocalCommandService } from '../commands/local-command';
 import type { EnsemblrDatabaseService } from '../storage';
 import { selectDeleteArchivedWorkspaceJoinById } from '../storage/repositories/workspace-repository.ts';
 import { runBranchDelete, runRefDelete, runWorktreeRemove } from './git-ops.ts';
+import { readManagedRoots } from './managed-roots.ts';
 import { archivedWorktreeRefFor } from './prune-worktree.ts';
-import { removeDirectoryTree } from './remove-directory.ts';
+import {
+	ARCHIVED_CONTEXT_DEPTH,
+	removeManagedDirectory,
+} from './remove-directory.ts';
 import { deleteWorkspaceRow } from './workspace-row-ops.ts';
 import type { WorkspaceTeardownService } from './workspace-teardown.ts';
 
@@ -95,6 +99,7 @@ export function createDeleteArchivedWorkspaceService({
 			}
 
 			const diagnostics: DeleteArchivedWorkspaceDiagnostic[] = [];
+			const managedRoots = readManagedRoots(database);
 
 			const teardown = await workspaceTeardownService.teardown({
 				workspaceId: source.id,
@@ -117,6 +122,7 @@ export function createDeleteArchivedWorkspaceService({
 					deletingWorkspace: true,
 					repositoryPath: source.repositoryPath,
 					workspacePath: source.path,
+					workspacesRoot: managedRoots?.workspacesPath ?? null,
 				});
 				if (worktreeOutcome.status !== 'success') {
 					diagnostics.push({
@@ -156,6 +162,7 @@ export function createDeleteArchivedWorkspaceService({
 			});
 
 			const contextRemoved = await removeArchivedContextDirectory({
+				archivedContextsRoot: managedRoots?.archivedContextsPath ?? null,
 				diagnostics,
 				preservedPath: source.archivedContextPath,
 			});
@@ -239,14 +246,19 @@ function readArchivedWorkspace(
 /**
  * Removes the preserved archived-contexts directory when present, recording a
  * diagnostic on failure.
- * @param diagnostics - Diagnostics sink appended to on failure
- * @param preservedPath - Path of the preserved directory, or null when none was kept
+ *
+ * The path comes off an archive record, so it is removed only when it resolves
+ * to exactly one preserved-archive slot inside the managed root; an unknown
+ * root leaves the directory alone rather than falling back to a shape check.
+ * @param options - Managed root, diagnostics sink, and the preserved path
  * @returns True when the directory is absent afterwards
  */
 async function removeArchivedContextDirectory({
+	archivedContextsRoot,
 	diagnostics,
 	preservedPath,
 }: {
+	archivedContextsRoot: string | null;
 	diagnostics: DeleteArchivedWorkspaceDiagnostic[];
 	preservedPath: string | null;
 }): Promise<boolean> {
@@ -256,8 +268,22 @@ async function removeArchivedContextDirectory({
 	if (!existsSync(preservedPath)) {
 		return true;
 	}
+	if (!archivedContextsRoot) {
+		diagnostics.push({
+			code: 'archived-context-cleanup-failed',
+			message:
+				'The managed archived-contexts root is unknown, so the preserved directory was left in place.',
+			path: preservedPath,
+			severity: 'warning',
+		});
+		return false;
+	}
 
-	const outcome = await removeDirectoryTree(preservedPath);
+	const outcome = await removeManagedDirectory({
+		candidatePath: preservedPath,
+		expectedDepth: ARCHIVED_CONTEXT_DEPTH,
+		root: archivedContextsRoot,
+	});
 
 	if (outcome.error !== null || !outcome.removed) {
 		diagnostics.push({

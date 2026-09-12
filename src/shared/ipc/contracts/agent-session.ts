@@ -251,12 +251,29 @@ export interface ListAgentSessionsResult {
 
 /** Read persisted events for a branch (rehydrating the timeline on reopen). */
 export interface ListAgentSessionEventsRequest {
+	/**
+	 * Exclusive upper ordinal bound, for paging further back. Omit for the
+	 * newest window.
+	 */
+	beforeOrdinal?: number;
 	branchId: string;
+	/**
+	 * How many of the branch's newest events to return. The handler applies its
+	 * own default and ceiling when this is omitted or larger, because an
+	 * unbounded read of a long branch blocks the main process for hundreds of
+	 * milliseconds and ships megabytes through one reply.
+	 */
+	limit?: number;
 }
 
-/** Result of reading persisted events for a branch. */
+/**
+ * Result of reading persisted events for a branch. `events` is always in
+ * ascending ordinal order; `hasOlder` says whether the window stopped short of
+ * the start of the branch, so a caller can page back with `beforeOrdinal`.
+ */
 export interface ListAgentSessionEventsResult {
 	events: readonly AgentSessionEventWire[];
+	hasOlder?: boolean;
 }
 
 /**

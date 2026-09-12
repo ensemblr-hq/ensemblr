@@ -1,9 +1,11 @@
-import { describe, expect, test } from 'vitest';
+import { beforeAll, describe, expect, test } from 'vitest';
 
 import { toAgentConversations } from '../../src/renderer/lib/agents/conversation-model';
+import { ensureLanguageCatalogue } from '../../src/renderer/lib/i18n';
 import type { AgentConversationLiveState } from '../../src/renderer/state/agents';
 import { createAgentActivityState } from '../../src/shared/agent-activity';
 import type { AgentSessionLineage } from '../../src/shared/agent-control';
+import { APP_LANGUAGES } from '../../src/shared/i18n';
 import type { AgentSessionSnapshotWire } from '../../src/shared/ipc/contracts/agent-session';
 import type { ChatTabWire } from '../../src/shared/ipc/contracts/chat-tab';
 
@@ -62,6 +64,12 @@ function session(
 }
 
 describe('toAgentConversations', () => {
+	// Only the launch language's catalogue is bundled eagerly, so a fixed-language
+	// lookup for the other two resolves to its English fallback until they load.
+	beforeAll(async () => {
+		await Promise.all(APP_LANGUAGES.map(ensureLanguageCatalogue));
+	});
+
 	test.each([
 		['en', 'New chat', 'Untitled chat'],
 		['ru', 'Новый чат', 'Диалог без названия'],

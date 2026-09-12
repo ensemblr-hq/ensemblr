@@ -232,6 +232,85 @@ describe('createAppSettingsService', () => {
 		expect(settings.general.toolCallCollapse).toBe('collapsed');
 	});
 
+	// Every gated agent-control op resolves a permission mode, and 35 call sites
+	// across main re-read for the same reason: the answer is live. The watcher is
+	// what makes it live, so once it is running the parse is cached and only the
+	// three places that know the file moved invalidate it.
+	// The watcher is injected rather than real: what is under test is the caching
+	// contract — held while watching, dropped when the file moves — and `fs.watch`
+	// delivery belongs to the OS. Through a real watcher this asserts both, and
+	// the half it does not own is the half that fails: in a saturated parallel
+	// suite the event never arrives rather than arriving late.
+	test('serves a cached parse while the watcher is running', () => {
+		const configPath = tmpConfigPath();
+		let fileMoved: (() => void) | undefined;
+		const service = createAppSettingsService({
+			configPath,
+			watchFile: ({ onChange }) => {
+				fileMoved = onChange;
+				return { stop: () => undefined };
+			},
+		});
+		service.startWatching(() => undefined);
+		expect(fileMoved).toBeDefined();
+
+		// Reference equality, not "the value has not changed yet": the same parse
+		// is served until something says the file moved.
+		const first = service.read();
+		expect(first.general.sendShortcut).toBe('enter');
+		expect(service.read()).toBe(first);
+
+		const raw = readJson(configPath);
+		writeFileSync(
+			configPath,
+			JSON.stringify({
+				...raw,
+				app: {
+					...raw.app,
+					general: { ...raw.app.general, sendShortcut: 'mod+enter' },
+				},
+			}),
+		);
+		expect(service.read()).toBe(first);
+
+		fileMoved?.();
+
+		expect(service.read().general.sendShortcut).toBe('mod+enter');
+		service.stop();
+	});
+
+	test('re-reads on every call when no watcher is running', () => {
+		const configPath = tmpConfigPath();
+		const service = createAppSettingsService({ configPath });
+
+		expect(service.read().general.sendShortcut).toBe('enter');
+		const raw = readJson(configPath);
+		writeFileSync(
+			configPath,
+			JSON.stringify({
+				...raw,
+				app: {
+					...raw.app,
+					general: { ...raw.app.general, sendShortcut: 'mod+enter' },
+				},
+			}),
+		);
+
+		expect(service.read().general.sendShortcut).toBe('mod+enter');
+	});
+
+	test('invalidates the cache when it writes the file itself', () => {
+		const configPath = tmpConfigPath();
+		const service = createAppSettingsService({ configPath });
+		service.startWatching(() => undefined);
+
+		expect(service.read().general.sendShortcut).toBe('enter');
+		service.update({ general: { sendShortcut: 'mod+enter' } });
+
+		expect(service.read().general.sendShortcut).toBe('mod+enter');
+		service.stop();
+	});
+
 	test('fails closed when an existing config is malformed on update', () => {
 		const configPath = tmpConfigPath();
 		const malformed = '{"app":';

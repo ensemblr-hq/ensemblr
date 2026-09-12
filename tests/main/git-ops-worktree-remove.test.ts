@@ -23,6 +23,7 @@ const BRANCH_NAME = 'octocat/eng-1';
 interface Harness {
 	repositoryPath: string;
 	workspacePath: string;
+	workspacesPath: string;
 }
 
 function runGit(cwd: string, args: string[]): string {
@@ -32,7 +33,8 @@ function runGit(cwd: string, args: string[]): string {
 function createHarness(t: TestContext): Harness {
 	const rootPath = mkdtempSync(path.join(tmpdir(), 'ensemblr-wt-remove-'));
 	const repositoryPath = path.join(rootPath, 'repo');
-	const workspacePath = path.join(rootPath, 'workspaces', 'eng-1');
+	const workspacesPath = path.join(rootPath, 'workspaces');
+	const workspacePath = path.join(workspacesPath, 'octocat-demo', 'eng-1');
 	mkdirSync(repositoryPath, { recursive: true });
 
 	runGit(repositoryPath, ['init', '-b', 'main']);
@@ -54,7 +56,7 @@ function createHarness(t: TestContext): Harness {
 		rmSync(rootPath, { force: true, recursive: true });
 	});
 
-	return { repositoryPath, workspacePath };
+	return { repositoryPath, workspacePath, workspacesPath };
 }
 
 function remove(harness: Harness, deletingWorkspace?: boolean) {
@@ -63,6 +65,7 @@ function remove(harness: Harness, deletingWorkspace?: boolean) {
 		localCommandService: createLocalCommandService(),
 		repositoryPath: harness.repositoryPath,
 		workspacePath: harness.workspacePath,
+		workspacesRoot: harness.workspacesPath,
 	});
 }
 
@@ -143,6 +146,7 @@ test('a repository git cannot read leaves the directory alone', async (t) => {
 		localCommandService: createLocalCommandService(),
 		repositoryPath: strayRepository,
 		workspacePath: harness.workspacePath,
+		workspacesRoot: harness.workspacesPath,
 	});
 
 	assert.equal(outcome.status, 'failure');
@@ -162,6 +166,7 @@ test('a workspace being deleted is removed even when git cannot answer', async (
 		localCommandService: createLocalCommandService(),
 		repositoryPath: strayRepository,
 		workspacePath: harness.workspacePath,
+		workspacesRoot: harness.workspacesPath,
 	});
 
 	assert.equal(outcome.status, 'success');
@@ -214,6 +219,7 @@ test('a registration that outlives its directory is pruned', async (t) => {
 		localCommandService: refuseWorktreeRemove(createLocalCommandService()),
 		repositoryPath: harness.repositoryPath,
 		workspacePath: harness.workspacePath,
+		workspacesRoot: harness.workspacesPath,
 	});
 
 	assert.equal(outcome.status, 'success');
@@ -229,4 +235,58 @@ test('removing an already-absent worktree directory reports success', async (t) 
 	const outcome = await remove(harness);
 
 	assert.equal(outcome.status, 'success');
+});
+
+test('refuses a worktree directory outside the managed workspaces root', async (t) => {
+	const harness = createHarness(t);
+	runGit(harness.repositoryPath, [
+		'worktree',
+		'remove',
+		'--force',
+		harness.workspacePath,
+	]);
+	mkdirSync(harness.workspacePath, { recursive: true });
+	writeFileSync(path.join(harness.workspacePath, 'keep.txt'), 'keep\n');
+
+	const outcome = await runWorktreeRemove({
+		deletingWorkspace: true,
+		localCommandService: createLocalCommandService(),
+		repositoryPath: harness.repositoryPath,
+		workspacePath: harness.workspacePath,
+		workspacesRoot: path.join(harness.workspacesPath, 'somewhere-else'),
+	});
+
+	assert.equal(outcome.status, 'residue');
+	assert.match(
+		String(outcome.status === 'residue' && outcome.message),
+		/resolves outside/,
+	);
+	assert.equal(existsSync(path.join(harness.workspacePath, 'keep.txt')), true);
+});
+
+test('refuses a worktree removal when no managed root is known', async (t) => {
+	const harness = createHarness(t);
+	runGit(harness.repositoryPath, [
+		'worktree',
+		'remove',
+		'--force',
+		harness.workspacePath,
+	]);
+	mkdirSync(harness.workspacePath, { recursive: true });
+	writeFileSync(path.join(harness.workspacePath, 'keep.txt'), 'keep\n');
+
+	const outcome = await runWorktreeRemove({
+		deletingWorkspace: true,
+		localCommandService: createLocalCommandService(),
+		repositoryPath: harness.repositoryPath,
+		workspacePath: harness.workspacePath,
+		workspacesRoot: null,
+	});
+
+	assert.equal(outcome.status, 'residue');
+	assert.match(
+		String(outcome.status === 'residue' && outcome.message),
+		/managed workspaces root is unknown/,
+	);
+	assert.equal(existsSync(path.join(harness.workspacePath, 'keep.txt')), true);
 });

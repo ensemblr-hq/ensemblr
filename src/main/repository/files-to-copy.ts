@@ -18,6 +18,28 @@ import type {
 } from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
 import type { LoadedRepositoryConfig } from '../config';
+import { isSymbolicLinkPath } from '../safe-fs/index.ts';
+
+/**
+ * Explains why one candidate was skipped rather than copied.
+ * @param status - The non-copying, non-failing outcome the attempt produced.
+ * @param relativePath - Workspace-relative path of the candidate.
+ * @returns The skip diagnostic's message.
+ */
+function skipReason(
+	status: 'missing' | 'not-a-file' | 'unsafe-destination',
+	relativePath: string,
+): string {
+	if (status === 'missing') {
+		return `Source path ${relativePath} no longer exists; skipped.`;
+	}
+
+	if (status === 'unsafe-destination') {
+		return `Destination path ${relativePath} is a symlink in the new worktree; skipped.`;
+	}
+
+	return `Source path ${relativePath} is not a regular file; skipped.`;
+}
 
 /** Public surface of the files-to-copy service. */
 export interface FilesToCopyService {
@@ -107,10 +129,7 @@ export function createFilesToCopyService({
 				} else {
 					skipped.push({
 						code: 'source-path-missing',
-						message:
-							outcome.status === 'missing'
-								? `Source path ${relativePath} no longer exists; skipped.`
-								: `Source path ${relativePath} is not a regular file; skipped.`,
+						message: skipReason(outcome.status, relativePath),
 						path: relativePath,
 						severity: 'info',
 					});
@@ -209,10 +228,16 @@ export type CopyOneOutcome =
 	| { status: 'copied' }
 	| { status: 'missing' }
 	| { status: 'not-a-file' }
+	| { status: 'unsafe-destination' }
 	| { message: string; status: 'failed' };
 
 /**
  * Copies one files-to-copy candidate, creating parent directories as needed.
+ *
+ * The destination is checked the same way the source is, because the fresh
+ * worktree is a checkout of the branch being created: a branch tracking `.env`
+ * as a symlink would have `copyFileSync` write the base checkout's real `.env`
+ * through the link, out of the worktree entirely.
  * @param from - Absolute source path.
  * @param to - Absolute destination path.
  * @returns Whether the copy happened, and what stopped it when it did not.
@@ -224,6 +249,10 @@ export function copyOneFile(from: string, to: string): CopyOneOutcome {
 
 	if (!lstatSync(from).isFile()) {
 		return { status: 'not-a-file' };
+	}
+
+	if (isSymbolicLinkPath(to)) {
+		return { status: 'unsafe-destination' };
 	}
 
 	try {

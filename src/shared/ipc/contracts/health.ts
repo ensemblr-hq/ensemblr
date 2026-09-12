@@ -36,12 +36,34 @@ export interface ConfigChangedBroadcast {
 /** Health status of the local database. */
 export type DatabaseStatus = 'ok' | 'error';
 
-/** Snapshot of the local database's health, path, and schema version. */
+/**
+ * Snapshot of the local database's health, path, and schema version.
+ *
+ * `sizeBytes` covers only the main database file (`PRAGMA page_count *
+ * PRAGMA page_size`); it does not include the `-wal` or `-shm` companion
+ * files SQLite keeps alongside it under WAL journaling. It is `null` when the
+ * database is open but could not be measured, and absent altogether from a
+ * snapshot taken without a connection to measure — a size is a readout of a
+ * live database rather than a property every snapshot has.
+ */
 export interface DatabaseHealthSnapshot {
 	error?: string;
 	path: string;
 	schemaVersion: number;
+	sizeBytes?: number | null;
 	status: DatabaseStatus;
+}
+
+/**
+ * Result of running `VACUUM` against the local database to reclaim the disk
+ * space retention frees onto SQLite's internal freelist. `sizeBytesBefore` and
+ * `sizeBytesAfter` follow the same main-file-only scope as
+ * {@link DatabaseHealthSnapshot.sizeBytes}.
+ */
+export interface CompactDatabaseResult {
+	durationMs: number;
+	sizeBytesAfter: number | null;
+	sizeBytesBefore: number | null;
 }
 
 /** Overall process and database health snapshot returned by the health IPC channel. */
@@ -61,6 +83,8 @@ export interface HealthSnapshot {
 
 /** Process / database health IPC surface. */
 export interface HealthApi {
+	/** Runs `VACUUM` against the local database, blocking until it completes. */
+	compactDatabase: () => Promise<CompactDatabaseResult>;
 	health: () => Promise<HealthSnapshot>;
 	/** Subscribes to `config.json` reloads after external edits; returns an unsubscribe fn. */
 	onConfigChanged: (

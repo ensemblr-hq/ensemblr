@@ -9,6 +9,7 @@ import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import {
 	appendAgentEvent,
 	appendAgentEvents,
+	listBranchEventTail,
 	listEventsByBranch,
 	listEventsByTurn,
 } from '../../src/main/storage/repositories/agent-event-repository.ts';
@@ -313,4 +314,152 @@ test('a row written without a subagent link reads back without the key', (t) => 
 			Object.hasOwn(stored.payload ?? {}, 'parentToolCallId'),
 		false,
 	);
+});
+
+/**
+ * Counts the SQL a call issues by handing the repository a proxy that forwards
+ * to the real connection. Statement caching is per connection, so the proxy has
+ * to be the same object across the calls being measured.
+ */
+function countingDatabase(database: DatabaseSync): {
+	exec: string[];
+	prepare: string[];
+	proxy: DatabaseSync;
+} {
+	const exec: string[] = [];
+	const prepare: string[] = [];
+	const proxy = new Proxy(database, {
+		get(target, property, receiver) {
+			if (property === 'prepare') {
+				return (sql: string) => {
+					prepare.push(sql);
+					return target.prepare(sql);
+				};
+			}
+			if (property === 'exec') {
+				return (sql: string) => {
+					exec.push(sql);
+					return target.exec(sql);
+				};
+			}
+			return Reflect.get(target, property, receiver);
+		},
+	}) as DatabaseSync;
+
+	return { exec, prepare, proxy };
+}
+
+test('appendAgentEvent issues one statement per event and compiles it once', (t) => {
+	const fixture = openFixture(t);
+	const counted = countingDatabase(fixture.database);
+
+	for (let index = 0; index < 3; index += 1) {
+		appendAgentEvent({
+			database: counted.proxy,
+			input: {
+				branchId: fixture.branchId,
+				eventType: 'message',
+				payload: {
+					kind: 'message',
+					payload: { kind: 'text', text: `msg-${index}` },
+					role: 'agent',
+				},
+			},
+		});
+	}
+
+	assert.deepEqual(counted.exec, []);
+	assert.equal(counted.prepare.length, 1);
+	assert.match(counted.prepare[0] ?? '', /^INSERT INTO agent_session_events/);
+	assert.deepEqual(
+		listEventsByBranch({
+			branchId: fixture.branchId,
+			database: fixture.database,
+		}).map((event) => event.ordinal),
+		[0, 1, 2],
+	);
+});
+
+test('appendAgentEvent caps an oversized payload and reports the loss', (t) => {
+	const fixture = openFixture(t);
+
+	const row = appendAgentEvent({
+		database: fixture.database,
+		input: {
+			branchId: fixture.branchId,
+			eventType: 'message',
+			payload: {
+				kind: 'message',
+				payload: {
+					isError: false,
+					kind: 'tool-result',
+					output: 'x'.repeat(2_000_000),
+					toolCallId: 'call-1',
+				},
+				role: 'tool',
+			},
+		},
+	});
+
+	const stored = fixture.database
+		.prepare('SELECT LENGTH(payload_json) AS length FROM agent_session_events')
+		.get() as { length: number };
+
+	assert.equal(stored.length < 300_000, true);
+	if (row.payload?.kind !== 'message') {
+		throw new Error('expected a message envelope');
+	}
+	if (row.payload.payload.kind !== 'tool-result') {
+		throw new Error('expected a tool-result payload');
+	}
+	assert.equal(
+		(row.payload.payload.truncatedBytes ?? 0) > 1_000_000,
+		true,
+		'the broadcast row carries what was persisted, truncation included',
+	);
+});
+
+test('listBranchEventTail returns the newest window, not the oldest', (t) => {
+	const fixture = openFixture(t);
+	appendAgentEvents({
+		branchId: fixture.branchId,
+		database: fixture.database,
+		events: Array.from({ length: 10 }, (_, index) => ({
+			eventType: 'message',
+			payload: {
+				kind: 'message' as const,
+				payload: { kind: 'text' as const, text: `msg-${index}` },
+				role: 'agent' as const,
+			},
+		})),
+	});
+
+	const tail = listBranchEventTail({
+		branchId: fixture.branchId,
+		database: fixture.database,
+		limit: 3,
+	});
+	const older = listBranchEventTail({
+		beforeOrdinal: tail.events[0]?.ordinal,
+		branchId: fixture.branchId,
+		database: fixture.database,
+		limit: 3,
+	});
+	const whole = listBranchEventTail({
+		branchId: fixture.branchId,
+		database: fixture.database,
+		limit: 50,
+	});
+
+	assert.deepEqual(
+		tail.events.map((event) => event.ordinal),
+		[7, 8, 9],
+	);
+	assert.equal(tail.hasOlder, true);
+	assert.deepEqual(
+		older.events.map((event) => event.ordinal),
+		[4, 5, 6],
+	);
+	assert.equal(whole.events.length, 10);
+	assert.equal(whole.hasOlder, false);
 });

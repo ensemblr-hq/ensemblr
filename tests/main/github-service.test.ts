@@ -12,6 +12,7 @@ import {
 	type GithubService,
 } from '../../src/main/github/github-service.ts';
 import {
+	PR_VIEW_JSON_FIELDS,
 	parseDeployments,
 	parsePullRequestView,
 	parseReviewThreads,
@@ -104,6 +105,7 @@ function stubDatabaseService(database: DatabaseSync): EnsemblrDatabaseService {
 		close: () => undefined,
 		getConnection: () => ({ database }) as never,
 		getHealth: () => ({}) as never,
+		vacuum: () => undefined,
 		open: () => ({}) as never,
 	};
 }
@@ -607,6 +609,70 @@ test('getPullRequestSnapshot queries gh by the remote head branch, not the local
 	]);
 });
 
+test('getPullRequestSnapshot refuses an upstream ref read from git config that starts with a dash', async () => {
+	const { calls, service } = createService((request) => {
+		if (request.command === 'git') {
+			if (request.args?.[0] === 'rev-parse') {
+				return buildResult({ stdout: 'local/worktree-name\n' });
+			}
+			if (request.args?.[0] === 'config') {
+				return buildResult({ stdout: 'refs/heads/--repo=other/repo\n' });
+			}
+			return buildResult({ stdout: '0\t0\n' });
+		}
+		if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+			return buildResult({ stdout: PR_VIEW_JSON });
+		}
+		return buildResult({ exitCode: 1, status: 'failure', stderr: 'HTTP 404' });
+	});
+
+	await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	const viewCall = calls.find(
+		(call) => call.command === 'gh' && call.args?.[1] === 'view',
+	);
+	// Falls back to no explicit head ref rather than handing `gh` a flag-shaped
+	// positional — the same no-arg form an upstream-less branch already takes.
+	assert.deepEqual(viewCall?.args, [
+		'pr',
+		'view',
+		'--json',
+		PR_VIEW_JSON_FIELDS,
+	]);
+});
+
+test('mergePullRequest refuses an upstream ref read from git config that starts with a dash', async () => {
+	const { calls, service } = createService((request) => {
+		if (request.command === 'git') {
+			if (request.args?.[0] === 'rev-parse') {
+				return buildResult({ stdout: 'local/worktree-name\n' });
+			}
+			if (request.args?.[0] === 'config') {
+				return buildResult({ stdout: 'refs/heads/--repo=other/repo\n' });
+			}
+			return buildResult({ stdout: '0\t0\n' });
+		}
+		if (request.args?.[0] === 'pr' && request.args?.[1] === 'merge') {
+			return buildResult({ stdout: '' });
+		}
+		return buildResult({ exitCode: 1, status: 'failure', stderr: 'HTTP 404' });
+	});
+
+	await service.mergePullRequest({
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	const mergeCall = calls.find(
+		(call) => call.command === 'gh' && call.args?.[1] === 'merge',
+	);
+	assert.deepEqual(mergeCall?.args, ['pr', 'merge', '--squash']);
+});
+
 test('getPullRequestSnapshot ignores an upstream that names the workspace base branch', async () => {
 	const { calls, service } = createService(
 		(request) => {
@@ -902,6 +968,75 @@ test('getPullRequestSnapshot does not re-query deployments when the head sha has
 		calls.flatMap((call) => readDeploymentsRef(call) ?? []),
 		['feature-tip-oid'],
 	);
+});
+
+// Bounded, not serialized: an unbounded fan-out spawned a `gh` per deployment
+// at once, which is what the PR sweeper's pacing exists to prevent, while a
+// strictly sequential loop paid a full round trip each on a timer-driven
+// refresh. The assertion is the ceiling, so raising the bound is a deliberate
+// edit here rather than a silent drift.
+test('deployment statuses are fetched at a bounded concurrency', async () => {
+	const database = createTestDatabase();
+	let activeStatusCalls = 0;
+	let maxConcurrentStatusCalls = 0;
+	const localCommandService: LocalCommandService = {
+		getEnvironment: async () => ({
+			diagnostics: [],
+			env: {},
+			path: '',
+			resolvedAt: fixedNow().toISOString(),
+			shell: '/bin/zsh',
+			source: 'fallback',
+		}),
+		run: async (request) => {
+			const prelude = respondToSnapshotPrelude(request);
+			if (prelude) {
+				return prelude;
+			}
+			if (readDeploymentsRef(request)) {
+				return buildResult({
+					stdout: JSON.stringify([
+						{ id: 1 },
+						{ id: 2 },
+						{ id: 3 },
+						{ id: 4 },
+						{ id: 5 },
+					]),
+				});
+			}
+			if (isDeploymentStatusesCall(request)) {
+				activeStatusCalls += 1;
+				maxConcurrentStatusCalls = Math.max(
+					maxConcurrentStatusCalls,
+					activeStatusCalls,
+				);
+				await new Promise((resolve) => setTimeout(resolve, 0));
+				activeStatusCalls -= 1;
+				return buildResult({ stdout: DEPLOYMENT_STATUSES_JSON });
+			}
+			return buildResult({
+				exitCode: 1,
+				status: 'failure',
+				stderr: 'HTTP 404',
+			});
+		},
+	};
+	const service = createGithubService({
+		databaseService: stubDatabaseService(database),
+		localCommandService,
+		now: fixedNow,
+		readCoAuthorEnabled: () => false,
+	});
+
+	await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	// Five deployments, so a ceiling of 2 is a real bound rather than an artefact
+	// of there being too few to overlap.
+	assert.equal(maxConcurrentStatusCalls, 2);
 });
 
 test('getPullRequestSnapshot caches and serves fresh snapshots', async () => {

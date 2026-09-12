@@ -2,7 +2,7 @@ import { useAtomValue } from 'jotai';
 import { useEffect } from 'react';
 
 import { getSystemLanguages } from '@/renderer/api/ensemblr';
-import { i18n } from '@/renderer/lib/i18n';
+import { changeAppLanguage, i18n } from '@/renderer/lib/i18n';
 import { type AppLanguage, resolveLanguage } from '@/shared/i18n';
 
 import { appSettingsAtom } from './app-settings';
@@ -25,13 +25,19 @@ function loadSystemLanguages(): Promise<readonly string[]> {
 }
 
 /**
- * Switches i18next and the `<html lang>` attribute to the given language.
+ * Switches i18next and the `<html lang>` attribute to the given language,
+ * fetching that language's catalogue chunk first — only the launch language is
+ * bundled eagerly, so switching without the await renders keys until it lands.
  * @param language - The language the app should render in
+ * @returns Resolves once the catalogue is registered and the switch has applied
  */
-function applyLanguage(language: AppLanguage): void {
-	if (i18n.language !== language) {
-		void i18n.changeLanguage(language);
+async function applyLanguage(language: AppLanguage): Promise<void> {
+	if (i18n.language === language) {
+		document.documentElement.lang = language;
+		return;
 	}
+
+	await changeAppLanguage(language);
 	document.documentElement.lang = language;
 }
 
@@ -48,7 +54,7 @@ export function useLanguageEffect(): void {
 		let active = true;
 		void loadSystemLanguages().then((tags) => {
 			if (active) {
-				applyLanguage(resolveLanguage(preference, tags));
+				void applyLanguage(resolveLanguage(preference, tags));
 			}
 		});
 		return () => {
