@@ -68,6 +68,24 @@ function stubScrollMetrics(
 	});
 }
 
+function countTransformWrites(element: HTMLElement) {
+	const declaration = element.style;
+	const counter = { writes: 0 };
+	const counting = new Proxy(declaration, {
+		set(target, property, value) {
+			if (property === 'transform') {
+				counter.writes += 1;
+			}
+			return Reflect.set(target, property, value);
+		},
+	});
+	Object.defineProperty(element, 'style', {
+		configurable: true,
+		get: () => counting,
+	});
+	return counter;
+}
+
 function Strip({
 	activeKey,
 	tabKeys,
@@ -216,7 +234,7 @@ describe('TabScroller', () => {
 	test('coalesces a burst of scroll events into one thumb sync', () => {
 		const { thumb, viewport } = renderStrip('a');
 		stubScrollMetrics(viewport, { clientWidth: 300, scrollWidth: 600 });
-		const syncs = vi.spyOn(thumb.style, 'transform', 'set');
+		const syncs = countTransformWrites(thumb);
 
 		act(() => {
 			fireEvent.scroll(viewport);
@@ -225,7 +243,7 @@ describe('TabScroller', () => {
 			vi.advanceTimersByTime(20);
 		});
 
-		expect(syncs).toHaveBeenCalledTimes(1);
+		expect(syncs.writes).toBe(1);
 	});
 
 	test('keeps the thumb visible while the strip is hovered', () => {
