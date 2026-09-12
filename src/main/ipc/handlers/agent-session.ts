@@ -314,8 +314,11 @@ export function registerAgentSessionHandlers({
 		IPC_CHANNELS.listAgentSessionEvents,
 		(_event, raw: unknown): Promise<ListAgentSessionEventsResult> => {
 			const request = listAgentSessionEventsRequestSchema.parse(raw);
-			const rows = agentSessionService.listEvents(request.branchId);
-			const events: AgentSessionEventWire[] = rows.map((row) => ({
+			const tail = agentSessionService.listEventTail(request.branchId, {
+				beforeOrdinal: request.beforeOrdinal,
+				limit: request.limit,
+			});
+			const events: AgentSessionEventWire[] = tail.events.map((row) => ({
 				branchId: row.branchId,
 				createdAt: row.createdAt,
 				eventType: row.eventType,
@@ -325,7 +328,7 @@ export function registerAgentSessionHandlers({
 				stream: row.stream,
 				turnId: row.turnId,
 			}));
-			return Promise.resolve({ events });
+			return Promise.resolve({ events, hasOlder: tail.hasOlder });
 		},
 	);
 

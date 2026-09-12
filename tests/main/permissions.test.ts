@@ -159,6 +159,7 @@ test('the channels that execute or mutate are gated', () => {
 		['applySettingsPublication', 'workspace-write'],
 		['updateAppSettings', 'app-settings-change'],
 		['setAgentProviderExecutablePath', 'app-settings-change'],
+		['acknowledgeObfuscatedStorage', 'app-settings-change'],
 	] as const) {
 		assert.equal(
 			permissionActionForChannel(IPC_CHANNELS[channel]),

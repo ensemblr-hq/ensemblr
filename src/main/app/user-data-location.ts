@@ -32,6 +32,12 @@ const ELECTRON_STATE_DIRECTORY = 'electron';
  * lock, which is the correct reading given they already share one database file
  * (this amends ADR 0032, whose bundle-id split stands).
  *
+ * Sharing that file is safe forwards and unsafe backwards — Canary migrates the
+ * schema, and Release, launched afterwards, would write against tables it has
+ * never seen. The lock only stops them running at once, so the guard that
+ * matters is in `openEnsemblrDatabase`, which refuses a `user_version` above
+ * what the build declares rather than opening it read-anyway.
+ *
  * The Linux path needs no such pin: it is derived from the config directory,
  * which is channel-independent already, so the sharing falls out for free. The
  * unpackaged dev build gets its isolation from the dev config directory for the

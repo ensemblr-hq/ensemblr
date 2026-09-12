@@ -46,6 +46,14 @@ export interface StreamedReasoningByThread {
 	 * @returns That thread's reasoning buffer.
 	 */
 	forThread: (parentToolCallId: string | null) => StreamedReasoning;
+	/**
+	 * Drops a thread's buffer once its sealing `assistant` message has consumed
+	 * the banked text. Without it the registry keeps one entry per distinct
+	 * `parent_tool_use_id` the session ever produced, so the entry count grows
+	 * with the number of sub-agent tool calls for the life of the session.
+	 * @param parentToolCallId - Tool call whose subagent owned the thread, or null on the main thread.
+	 */
+	release: (parentToolCallId: string | null) => void;
 }
 
 /**
@@ -65,6 +73,9 @@ export function createStreamedReasoningByThread(): StreamedReasoningByThread {
 			const created = createStreamedReasoning();
 			buffersByThread.set(threadKey, created);
 			return created;
+		},
+		release: (parentToolCallId) => {
+			buffersByThread.delete(parentToolCallId ?? '');
 		},
 	};
 }

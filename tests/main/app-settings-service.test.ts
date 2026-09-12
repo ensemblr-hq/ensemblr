@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { createAppSettingsService } from '../../src/main/config/app-settings-service';
 import { DEFAULT_APP_SETTINGS } from '../../src/shared/config';
@@ -230,6 +230,68 @@ describe('createAppSettingsService', () => {
 		const settings = service.read();
 		expect(settings.general.sendShortcut).toBe('mod+enter');
 		expect(settings.general.toolCallCollapse).toBe('collapsed');
+	});
+
+	// Every gated agent-control op resolves a permission mode, and 35 call sites
+	// across main re-read for the same reason: the answer is live. The watcher is
+	// what makes it live, so once it is running the parse is cached and only the
+	// three places that know the file moved invalidate it.
+	test('serves a cached parse while the watcher is running', async () => {
+		const configPath = tmpConfigPath();
+		const service = createAppSettingsService({ configPath });
+		service.startWatching(() => undefined);
+
+		expect(service.read().general.sendShortcut).toBe('enter');
+		const raw = readJson(configPath);
+		writeFileSync(
+			configPath,
+			JSON.stringify({
+				...raw,
+				app: {
+					...raw.app,
+					general: { ...raw.app.general, sendShortcut: 'mod+enter' },
+				},
+			}),
+		);
+
+		expect(service.read().general.sendShortcut).toBe('enter');
+
+		await vi.waitFor(() =>
+			expect(service.read().general.sendShortcut).toBe('mod+enter'),
+		);
+		service.stop();
+	});
+
+	test('re-reads on every call when no watcher is running', () => {
+		const configPath = tmpConfigPath();
+		const service = createAppSettingsService({ configPath });
+
+		expect(service.read().general.sendShortcut).toBe('enter');
+		const raw = readJson(configPath);
+		writeFileSync(
+			configPath,
+			JSON.stringify({
+				...raw,
+				app: {
+					...raw.app,
+					general: { ...raw.app.general, sendShortcut: 'mod+enter' },
+				},
+			}),
+		);
+
+		expect(service.read().general.sendShortcut).toBe('mod+enter');
+	});
+
+	test('invalidates the cache when it writes the file itself', () => {
+		const configPath = tmpConfigPath();
+		const service = createAppSettingsService({ configPath });
+		service.startWatching(() => undefined);
+
+		expect(service.read().general.sendShortcut).toBe('enter');
+		service.update({ general: { sendShortcut: 'mod+enter' } });
+
+		expect(service.read().general.sendShortcut).toBe('mod+enter');
+		service.stop();
 	});
 
 	test('fails closed when an existing config is malformed on update', () => {

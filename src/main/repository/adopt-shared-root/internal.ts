@@ -19,6 +19,19 @@ import { parseMetadata } from '../metadata.ts';
 /** Sentinel string written into adoption metadata to tag discovered rows. */
 export const ADOPTION_MODE = 'adopted-from-shared-root';
 
+/**
+ * Most `git` probes adoption keeps in flight at once.
+ *
+ * Reconcile runs at launch, alongside window creation and the renderer's first
+ * paint. Every repository candidate is 3 `git` spawns and every workspace
+ * candidate ~6, and mapping them through one unbounded `Promise.all` measured
+ * 48 concurrent spawns and 269-288 ms on a 16-repository root — all of it
+ * competing with the paint. The same rationale is already written down in
+ * `sweep-workspace-disk.ts`: running them together only contends for the same
+ * disk while the app is still opening its window.
+ */
+export const MAX_CONCURRENT_ADOPTION_PROBES = 4;
+
 /** Lightweight view of a repository row needed by adoption helpers. */
 export interface RepositoryAdoptionInfo {
 	defaultBranch: string | null;

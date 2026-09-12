@@ -44,7 +44,8 @@ export function createSafeStorageSecretStore({
 	idFactory = randomUUID,
 	now = () => new Date(),
 	platform = process.platform,
-	readObfuscatedStorageAcknowledgement = () => readAcknowledgementRow(database),
+	readObfuscatedStorageAcknowledgement = (keyringBackend) =>
+		readAcknowledgementRow(database, keyringBackend),
 	safeStorage,
 	serviceName = DEFAULT_SAFE_STORAGE_SERVICE_NAME,
 }: SafeStorageSecretStoreOptions): SecretStore {
@@ -68,8 +69,8 @@ export interface SafeStorageBackendDependencies {
 	now: () => Date;
 	/** Platform whose keyring semantics apply. */
 	platform: NodeJS.Platform;
-	/** Whether the user accepted storing secrets under an obfuscating keyring. */
-	readObfuscatedStorageAcknowledgement: () => boolean;
+	/** Whether the user accepted storing secrets under an obfuscating keyring backend. */
+	readObfuscatedStorageAcknowledgement: (keyringBackend: string) => boolean;
 	resolveSafeStorage: () => SafeStorageApi | undefined;
 	serviceName: string;
 }
@@ -215,7 +216,7 @@ function requireSafeStorage(
  * Electron's backend id for the fallback that "encrypts" with a key published
  * in its own source rather than one the OS holds.
  */
-const OBFUSCATING_KEYRING_BACKEND = 'basic_text';
+export const OBFUSCATING_KEYRING_BACKEND = 'basic_text';
 
 /**
  * Refuses a write when the session's keyring only obfuscates and the user has
@@ -235,9 +236,12 @@ const OBFUSCATING_KEYRING_BACKEND = 'basic_text';
  */
 function refuseUnacknowledgedObfuscation(
 	keyringBackend: string,
-	readAcknowledgement: () => boolean,
+	readAcknowledgement: (keyringBackend: string) => boolean,
 ): void {
-	if (keyringBackend !== OBFUSCATING_KEYRING_BACKEND || readAcknowledgement()) {
+	if (
+		keyringBackend !== OBFUSCATING_KEYRING_BACKEND ||
+		readAcknowledgement(keyringBackend)
+	) {
 		return;
 	}
 

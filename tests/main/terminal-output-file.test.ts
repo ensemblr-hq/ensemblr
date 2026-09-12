@@ -7,12 +7,15 @@ import {
 	readFileSync,
 	rmSync,
 	statSync,
+	symlinkSync,
+	writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test, { type TestContext } from 'node:test';
 import { sanitizeCreateTerminalSessionRequest } from '../../src/main/ipc/request-schemas/terminal.ts';
 import {
+	appendTerminalOutput,
 	deleteTerminalOutput,
 	readTerminalOutput,
 	writeArchivedTerminalOutput,
@@ -57,6 +60,59 @@ test('a later write replaces the prior output for the same session', (t) => {
 	writeTerminalOutput(worktreePath, 'term-1', 'second');
 
 	assert.equal(readTerminalOutput(worktreePath, 'term-1'), 'second');
+});
+
+test('appendTerminalOutput extends an existing log', async (t) => {
+	const worktreePath = createWorktree(t);
+
+	writeTerminalOutput(worktreePath, 'term-1', OUTPUT);
+	assert.equal(
+		await appendTerminalOutput(worktreePath, 'term-1', 'tail\r\n'),
+		true,
+	);
+
+	assert.equal(readTerminalOutput(worktreePath, 'term-1'), `${OUTPUT}tail\r\n`);
+});
+
+test('appendTerminalOutput refuses when no log exists yet', async (t) => {
+	const worktreePath = createWorktree(t);
+
+	assert.equal(
+		await appendTerminalOutput(worktreePath, 'term-1', 'tail'),
+		false,
+	);
+	assert.equal(readTerminalOutput(worktreePath, 'term-1'), null);
+});
+
+test('appendTerminalOutput refuses a session id that is not a single filename', async (t) => {
+	const worktreePath = createWorktree(t);
+
+	assert.equal(
+		await appendTerminalOutput(worktreePath, '../escape', 'tail'),
+		false,
+	);
+});
+
+test('appendTerminalOutput refuses to write through a symlinked log', async (t) => {
+	const worktreePath = createWorktree(t);
+	const outsidePath = path.join(worktreePath, 'outside.log');
+	writeFileSync(outsidePath, 'untouched');
+
+	writeTerminalOutput(worktreePath, 'term-1', OUTPUT);
+	const logPath = path.join(
+		worktreePath,
+		'.context',
+		'terminals',
+		'term-1.log',
+	);
+	rmSync(logPath);
+	symlinkSync(outsidePath, logPath);
+
+	assert.equal(
+		await appendTerminalOutput(worktreePath, 'term-1', 'tail'),
+		false,
+	);
+	assert.equal(readFileSync(outsidePath, 'utf8'), 'untouched');
 });
 
 test('deleteTerminalOutput removes the log and is a no-op when absent', (t) => {

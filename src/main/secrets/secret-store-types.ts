@@ -104,9 +104,10 @@ export interface SafeStorageSecretStoreOptions {
 	platform?: NodeJS.Platform;
 	/**
 	 * Overrides how the store learns whether the user accepted an obfuscating
-	 * keyring. Defaults to the app-scope settings row.
+	 * keyring backend. Defaults to the app-scope settings row, keyed on the
+	 * backend id passed in.
 	 */
-	readObfuscatedStorageAcknowledgement?: () => boolean;
+	readObfuscatedStorageAcknowledgement?: (keyringBackend: string) => boolean;
 	safeStorage?: SafeStorageApi;
 	serviceName?: string;
 }

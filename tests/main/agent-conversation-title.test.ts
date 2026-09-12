@@ -8,11 +8,30 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
+const { statCalls } = vi.hoisted(() => ({ statCalls: { count: 0 } }));
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('node:fs/promises')>();
+	return {
+		...actual,
+		stat: (...args: Parameters<typeof actual.stat>) => {
+			statCalls.count += 1;
+			return actual.stat(...args);
+		},
+	};
+});
+
 import {
 	readAgentConversationInfo,
 	readAgentConversationTitle,
 } from '../../src/main/terminal/agent-conversation-title.ts';
+
+/** Number of `stat` calls the module has made so far in this file's run. */
+function statCallCount(): number {
+	return statCalls.count;
+}
 
 const CWD = '/Users/dev/workspaces/example/satie';
 const LAUNCH = '2026-07-20T10:00:00.000Z';
@@ -356,6 +375,38 @@ describe('readAgentConversationInfo — session id', () => {
 				since: LAUNCH,
 			}),
 		).toEqual({ fullTitle: null, sessionId: 'claude-abc', title: null });
+	});
+
+	// Each poll tick used to `stat` every transcript in the candidate directories
+	// to sort by mtime — ~40 per tick per agent terminal on a machine with 234
+	// project directories, every 1.5 s, growing with transcript history. A new
+	// session id arrives as a new filename, so an unchanged entry set means the
+	// answer cannot have moved.
+	test('claude re-stats only when a directory gains or loses a transcript', async () => {
+		writeClaudeTranscript('claude-abc', CWD, AFTER_LAUNCH);
+		const before = statCallCount();
+
+		await readAgentConversationInfo('claude-transcript', CWD, {
+			home,
+			since: LAUNCH,
+		});
+		const afterFirst = statCallCount();
+		await readAgentConversationInfo('claude-transcript', CWD, {
+			home,
+			since: LAUNCH,
+		});
+		const afterSecond = statCallCount();
+
+		expect(afterFirst).toBeGreaterThan(before);
+		expect(afterSecond).toBe(afterFirst);
+
+		writeClaudeTranscript('claude-def', CWD, AFTER_LAUNCH);
+		await readAgentConversationInfo('claude-transcript', CWD, {
+			home,
+			since: LAUNCH,
+		});
+
+		expect(statCallCount()).toBeGreaterThan(afterSecond);
 	});
 
 	test('claude ignores a transcript from before the tab launched', async () => {

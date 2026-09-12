@@ -23,6 +23,38 @@ import { scrollbackMbToLines } from '@/shared/terminal';
 
 import { TerminalContextMenuContent } from './terminal-context-menu';
 
+/**
+ * Largest slice of pasted input forwarded to the PTY in one IPC message.
+ *
+ * xterm hands a paste to `onData` whole, so without this a 100 MB clipboard
+ * would be structured-cloned across the bridge and materialized in the main
+ * process before the service's own 64 KiB cap could refuse it — the memory
+ * spike and serialization stall that cap exists to prevent. Half the cap, so a
+ * chunk is never the thing that trips it.
+ */
+const MAX_INPUT_CHUNK_LENGTH = 32_768;
+
+/**
+ * Forwards terminal input to the main process in bounded, ordered slices.
+ *
+ * Each slice is awaited before the next is sent: a shell reads its input as a
+ * stream, so a reordered pair of chunks is corrupted input rather than slow
+ * input.
+ * @param terminalId - Session the input belongs to.
+ * @param data - Raw input as xterm produced it.
+ */
+async function writeTerminalInput(
+	terminalId: string,
+	data: string,
+): Promise<void> {
+	for (let offset = 0; offset < data.length; offset += MAX_INPUT_CHUNK_LENGTH) {
+		await window.ensemblr?.writeTerminalSession({
+			data: data.slice(offset, offset + MAX_INPUT_CHUNK_LENGTH),
+			terminalId,
+		});
+	}
+}
+
 /** Builds the terminal CSS font stack, prepending the user's chosen font. */
 function buildTerminalFontFamily(font: string): string {
 	const trimmed = font.trim();
@@ -105,6 +137,9 @@ export function XtermTerminal({
 		// its sequence number so chunks already folded into the snapshot's
 		// scrollback are dropped instead of replayed twice.
 		const bufferedChunks: Array<{ data: string; seq: number }> = [];
+		// Serializes input writes across events as well as within one, so a fast
+		// typist's keystroke cannot overtake the tail of a large paste.
+		let writeChain: Promise<void> = Promise.resolve();
 
 		const unsubscribeOutput = ensemblr.onTerminalOutput((event) => {
 			if (event.terminalId !== terminalId) {
@@ -123,7 +158,9 @@ export function XtermTerminal({
 			? null
 			: adapter.onData((data) => {
 					emitTerminalInput({ data, terminalId });
-					void ensemblr.writeTerminalSession({ data, terminalId });
+					writeChain = writeChain.then(() =>
+						writeTerminalInput(terminalId, data),
+					);
 				});
 
 		ensemblr

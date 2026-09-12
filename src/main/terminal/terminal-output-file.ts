@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { constants, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { open } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
@@ -81,6 +82,52 @@ export function writeTerminalOutput(
 		}
 		writeFileAtomicExclusive(outputPath, text);
 	} catch {}
+}
+
+/**
+ * Open flags for a delta append: write-only, positioned at end, never creating
+ * and never traversing a final symlink. `O_NOFOLLOW` is what keeps this as safe
+ * as the staged-rename write it complements — a repository that committed a
+ * link at the log's path gets `ELOOP` rather than a write through it.
+ */
+const APPEND_OPEN_FLAGS =
+	constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW;
+
+/**
+ * Appends newly produced scrollback to a session's existing output log without
+ * rewriting the whole buffer, and without blocking the event loop.
+ *
+ * This is the steady-state flush: a busy terminal produces a few kilobytes a
+ * second against a buffer that may hold 200 MB, so rewriting the buffer every
+ * second is what made the flush cost scale with the user's scrollback setting
+ * rather than with the output. The caller keeps the log honest by rewriting it
+ * whole through {@link writeTerminalOutput} whenever the in-memory ring has
+ * trimmed past what the file already holds.
+ * @param worktreePath - Absolute path to the workspace worktree root.
+ * @param terminalId - Id of the terminal session whose log to extend.
+ * @param text - Scrollback produced since the last flush.
+ * @returns True when the append landed; false when the caller must rewrite.
+ */
+export async function appendTerminalOutput(
+	worktreePath: string,
+	terminalId: string,
+	text: string,
+): Promise<boolean> {
+	const outputPath = terminalOutputPath(worktreePath, terminalId);
+	if (outputPath === null) {
+		return false;
+	}
+
+	let handle: Awaited<ReturnType<typeof open>> | null = null;
+	try {
+		handle = await open(outputPath, APPEND_OPEN_FLAGS);
+		await handle.writeFile(text, 'utf8');
+		return true;
+	} catch {
+		return false;
+	} finally {
+		await handle?.close().catch(() => {});
+	}
 }
 
 /**

@@ -129,6 +129,17 @@ export interface CreatePiCliRpcAdapterOptions {
 	 */
 	onRawFrame?: (frame: PiRawFrameSample) => void;
 	/**
+	 * Asked once per frame, before anything is sampled or timestamped, whether a
+	 * renderer is actually showing the debug panel. Defaults to always-on.
+	 *
+	 * The tap is wired unconditionally in production, so without this every JSONL
+	 * line Pi writes or reads — token deltas included — was sampled, wrapped and
+	 * structured-cloned to every window for a panel that only exists in developer
+	 * mode, roughly doubling a streaming turn's IPC volume for a payload the
+	 * renderer dropped on arrival.
+	 */
+	isRawFrameTapActive?: () => boolean;
+	/**
 	 * Argv every session starts from, before the per-session selection flags.
 	 * Production appends `-e <control-extension>` and one `--skill` per shipped
 	 * skill here; the default is the bare RPC mode switch. Resolved per session
@@ -163,6 +174,7 @@ export function createPiCliRpcAdapter(
 	const stderrRingBytes = options.stderrRingBytes ?? DEFAULT_STDERR_RING_BYTES;
 	const killGraceMs = options.killGraceMs ?? DEFAULT_KILL_GRACE_MS;
 	const onRawFrame = options.onRawFrame;
+	const isRawFrameTapActive = options.isRawFrameTapActive ?? (() => true);
 	const resolveBaseEnv = options.resolveBaseEnv ?? (() => process.env);
 	const readBaseArgs = options.baseArgs ?? (() => DEFAULT_PI_RPC_ARGS);
 
@@ -190,6 +202,7 @@ export function createPiCliRpcAdapter(
 				killGraceMs,
 				maxLineBytes,
 				now,
+				isRawFrameTapActive,
 				onClosed: (s) => openSessions.delete(s),
 				onRawFrame,
 				spawnFn,
@@ -296,6 +309,7 @@ interface CliRpcSession {
 function createCliRpcSession({
 	baseEnv,
 	input,
+	isRawFrameTapActive,
 	killGraceMs,
 	maxLineBytes,
 	now,
@@ -307,6 +321,7 @@ function createCliRpcSession({
 }: {
 	baseEnv: NodeJS.ProcessEnv;
 	input: AgentAdapterCreateSessionInput;
+	isRawFrameTapActive: () => boolean;
 	killGraceMs: number;
 	maxLineBytes: number;
 	now: () => Date;
@@ -344,7 +359,7 @@ function createCliRpcSession({
 	let appliedThinking: string | undefined = spawnFlagValue('--thinking');
 
 	const emitRawFrame = (direction: 'rx' | 'tx', line: string): void => {
-		if (!onRawFrame) {
+		if (!onRawFrame || !isRawFrameTapActive()) {
 			return;
 		}
 		try {
@@ -587,14 +602,12 @@ function createCliRpcSession({
 
 	bindChildStreams({
 		child,
-		emit,
 		emitError,
 		finalizeShutdown,
 		getPendingShutdownReason: () => pendingShutdownReason,
 		rejectPendingCommands: acknowledgements.rejectAll,
 		killTimer,
 		lineStream,
-		now,
 		stderrRing,
 	});
 

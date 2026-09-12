@@ -9,6 +9,7 @@ import {
 	setupDiagnosticsQuery,
 	updateAppSettings,
 } from '@/renderer/api/ensemblr';
+import { ObfuscatedStorageNotice } from '@/renderer/components/settings/obfuscated-storage-notice';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { SetupDiagnosticsPanel } from '@/renderer/components/setup-diagnostics';
@@ -119,6 +120,8 @@ function DiagnosticsRoute() {
 				onRetry={onRetry}
 				snapshot={snapshot ?? null}
 			/>
+
+			<ObfuscatedStorageNotice />
 
 			<SettingRow
 				control={

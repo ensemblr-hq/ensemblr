@@ -656,6 +656,70 @@ test('raw frames name the agent_sessions.id the debug panel scopes by', async ()
 	await adapter.shutdown();
 });
 
+// Pi's extension UI frames were 79% of the persisted event table: a spinner
+// repaint became a `setStatus` frame, which fell through to the unknown-frame
+// arm, which persisted an event and broadcast it to every window — and the
+// renderer projects an `unknown` payload to no UI parts at all.
+test('drops cosmetic extension UI frames instead of eventing them', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createPiCliRpcAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession(buildInput());
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	child.emitStdout(
+		'{"type":"extension_ui_request","id":"1","method":"setStatus","statusKey":"pi","statusText":"thinking"}\n',
+	);
+	child.emitStdout(
+		'{"type":"extension_ui_request","id":"2","method":"notify","message":"done"}\n',
+	);
+	child.emitStdout(
+		'{"type":"extension_ui_request","id":"3","method":"setWidget"}\n',
+	);
+
+	const messages = () => events.filter((event) => event.type === 'message');
+	assert.deepEqual(messages(), []);
+
+	// A blocking dialog still reaches the timeline: it is rare, and it is the one
+	// extension UI frame a reader would want to find after the fact.
+	child.emitStdout(
+		'{"type":"extension_ui_request","id":"4","method":"confirm","title":"Allow?"}\n',
+	);
+	assert.equal(messages().length, 1);
+	await adapter.shutdown();
+});
+
+// The tap is wired unconditionally in production but its only subscriber lives
+// behind developer mode, so every frame used to be sampled, wrapped and posted
+// to every window for a panel nobody had open.
+test('skips the raw-frame tap entirely when nothing is listening', async () => {
+	const recorder = createSpawnRecorder();
+	const frames: Array<{ line: string }> = [];
+	let listening = false;
+	const adapter = createPiCliRpcAdapter({
+		isRawFrameTapActive: () => listening,
+		onRawFrame: (frame) => frames.push(frame),
+		spawn: recorder.spawn,
+	});
+	await adapter.createSession(buildInput());
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	child.emitStdout(
+		'{"type":"message","role":"agent","payload":{"text":"dropped"}}\n',
+	);
+	assert.equal(frames.length, 0);
+
+	listening = true;
+	child.emitStdout(
+		'{"type":"message","role":"agent","payload":{"text":"captured"}}\n',
+	);
+	assert.ok(frames.some((frame) => frame.line.includes('captured')));
+	await adapter.shutdown();
+});
+
 test('raw frames sample a megabyte line instead of broadcasting it whole', async () => {
 	const recorder = createSpawnRecorder();
 	const frames: Array<{ line: string }> = [];
@@ -700,7 +764,11 @@ test('invalid JSON lines surface as recoverable error events', async () => {
 	await adapter.shutdown();
 });
 
-test('stderr chunks emit recoverable error events tagged "Pi RPC stderr"', async () => {
+// A chunk used to become an `error` event, which is a SQLite transaction plus a
+// broadcast to every window — for content the renderer discards on arrival,
+// since it routes `stream === 'stderr'` nowhere. The ring buffer keeps it, and
+// the crash diagnostic is where it surfaces.
+test('keeps stderr for the crash diagnostic instead of eventing every chunk', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createPiCliRpcAdapter({ spawn: recorder.spawn });
 	const session = await adapter.createSession(buildInput());
@@ -711,13 +779,20 @@ test('stderr chunks emit recoverable error events tagged "Pi RPC stderr"', async
 
 	child.emitStderr('warning: deprecated flag\n');
 
-	const stderrEvent = events.find(
-		(event): event is Extract<AgentEvent, { type: 'error' }> =>
-			event.type === 'error' && event.error.message === 'Pi RPC stderr',
+	assert.equal(
+		events.some((event) => event.type === 'error'),
+		false,
 	);
-	assert.ok(stderrEvent);
-	assert.equal(stderrEvent.error.recoverable, true);
-	assert.equal(stderrEvent.error.detail, 'warning: deprecated flag\n');
+
+	child.emitExit(137, 'SIGKILL');
+	await waitForMicrotasks();
+
+	const crash = events.find(
+		(event): event is Extract<AgentEvent, { type: 'error' }> =>
+			event.type === 'error',
+	);
+	assert.ok(crash);
+	assert.match(crash.error.detail ?? '', /warning: deprecated flag/);
 	await adapter.shutdown();
 });
 

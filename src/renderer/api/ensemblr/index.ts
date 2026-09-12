@@ -34,6 +34,7 @@ export {
 } from './query-keys';
 export * from './repo-settings';
 export * from './repository-sources';
+export * from './secrets';
 export * from './settings';
 export * from './settings-publication';
 export * from './setup';

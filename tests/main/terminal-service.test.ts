@@ -291,6 +291,52 @@ test('create spawns a PTY in the workspace cwd with the assembled env', async (t
 	assert.equal(spawnOptions.env.ENSEMBLR_PORT, '41000');
 });
 
+// One structured-clone IPC message per node-pty chunk meant a build or a `cat`
+// of a large file posted thousands of messages a second to every window. The
+// batch is what carries the sequence number now, so a reattaching renderer's
+// `seq > lastSeq` test can never split one.
+test('coalesces a burst of PTY chunks into one broadcast', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { outputEvents, service } = createServiceFixture(t, { backend });
+
+	const created = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = created.session?.id ?? '';
+	outputEvents.length = 0;
+
+	for (let index = 0; index < 50; index += 1) {
+		fake.emitData(`chunk-${index} `);
+	}
+
+	assert.equal(outputEvents.length, 0);
+	await waitFor(() => outputEvents.length > 0);
+
+	assert.equal(outputEvents.length, 1);
+	assert.equal(outputEvents[0]?.terminalId, terminalId);
+	assert.match(outputEvents[0]?.data ?? '', /^chunk-0 .*chunk-49 $/);
+	assert.equal(outputEvents[0]?.seq, 1);
+});
+
+// A snapshot pairs the scrollback with the last sequence number broadcast. If a
+// batch were still pending the renderer would replay it on top of a scrollback
+// that already contained it, so reading a snapshot flushes first.
+test('flushes pending output before answering a snapshot', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { outputEvents, service } = createServiceFixture(t, { backend });
+
+	const created = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = created.session?.id ?? '';
+	outputEvents.length = 0;
+	fake.emitData('pending output');
+
+	const snapshot = service.getSnapshot(terminalId);
+
+	assert.equal(outputEvents.length, 1);
+	assert.equal(outputEvents[0]?.seq, snapshot.lastSeq);
+	assert.match(snapshot.scrollback, /pending output/);
+});
+
 // Closing a tab used to only signal the PTY, leaving the session listed as
 // stopped — so navigating away and back reseeded the dock from `list` and the
 // tab came back, dead, for the rest of the run.
@@ -521,9 +567,10 @@ test('output streams broadcast and accumulate as scrollback', async (t) => {
 	fake.emitData('hello ');
 	fake.emitData('world');
 
-	assert.equal(outputEvents.length, 2);
-	assert.equal(outputEvents[1]?.data, 'world');
+	// Both chunks land in one coalesced broadcast, which the snapshot flushes.
 	assert.equal(service.getSnapshot(terminalId).scrollback, 'hello world');
+	assert.equal(outputEvents.length, 1);
+	assert.equal(outputEvents[0]?.data, 'hello world');
 });
 
 test('getSnapshot strips answer-eliciting query sequences from replay scrollback', async (t) => {
@@ -786,12 +833,15 @@ test('output broadcasts carry monotonic seq mirrored by snapshot lastSeq', async
 
 	fake.emitData('a');
 	fake.emitData('b');
+	assert.equal(service.getSnapshot(terminalId).lastSeq, 1);
+
+	fake.emitData('c');
+	assert.equal(service.getSnapshot(terminalId).lastSeq, 2);
 
 	assert.deepEqual(
 		outputEvents.map((event) => event.seq),
 		[1, 2],
 	);
-	assert.equal(service.getSnapshot(terminalId).lastSeq, 2);
 	assert.equal(service.getSnapshot('missing').lastSeq, 0);
 });
 

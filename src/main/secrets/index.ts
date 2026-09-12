@@ -7,7 +7,10 @@ export {
 	readObfuscatedStorageAcknowledgement,
 	writeObfuscatedStorageAcknowledgement,
 } from './obfuscated-storage-acknowledgement.ts';
-export { createSafeStorageSecretStore } from './safe-storage-backend.ts';
+export {
+	createSafeStorageSecretStore,
+	OBFUSCATING_KEYRING_BACKEND,
+} from './safe-storage-backend.ts';
 export {
 	readSafeStorageStatus,
 	type SafeStorageProtection,

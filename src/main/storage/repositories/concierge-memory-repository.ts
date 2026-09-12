@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
+import { rollbackQuietly } from '../tx.ts';
 
 /**
  * What a memory is about. The vocabulary is deliberately small: a Concierge
@@ -215,7 +216,7 @@ export function upsertConciergeMemory({
 
 		database.exec('COMMIT');
 	} catch (error) {
-		database.exec('ROLLBACK');
+		rollbackQuietly(database);
 		throw error;
 	}
 
@@ -286,7 +287,7 @@ export function deleteConciergeMemory({
 		database.exec('COMMIT');
 		return Number(result.changes) > 0;
 	} catch (error) {
-		database.exec('ROLLBACK');
+		rollbackQuietly(database);
 		throw error;
 	}
 }
@@ -381,7 +382,7 @@ export function rebuildConciergeMemoryIndex({
 		insert.run();
 		database.exec('COMMIT');
 	} catch (error) {
-		database.exec('ROLLBACK');
+		rollbackQuietly(database);
 		throw error;
 	}
 }

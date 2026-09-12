@@ -28,8 +28,10 @@ import type {
 } from '../storage/repositories';
 import {
 	type AgentEventRow,
+	type BranchEventTail,
 	getMaxOrdinalForBranch,
 	iterateBranchPayloadsDescending,
+	listBranchEventTail,
 	listEventsByBranch,
 } from '../storage/repositories/agent-event-repository.ts';
 import {
@@ -226,6 +228,19 @@ export interface AgentSessionService {
 		workspaceId: string,
 	) => readonly AgentSessionSnapshot[];
 	listEvents: (branchId: string) => readonly AgentEventRow[];
+	/**
+	 * Reads a window of a branch's newest events, honoring checkpoint hidden
+	 * ranges just like {@link AgentSessionService.listEvents}, and reports
+	 * whether older events remain so the caller can page back.
+	 *
+	 * Replay uses this rather than `listEvents`: the whole branch is what
+	 * measured ~460 ms of blocked main thread and 13.5 MB over one IPC reply on
+	 * the largest real chat.
+	 */
+	listEventTail: (
+		branchId: string,
+		options: { beforeOrdinal?: number; limit: number },
+	) => BranchEventTail;
 	/**
 	 * Scans a branch's persisted events newest-first, honoring checkpoint hidden
 	 * ranges just like {@link AgentSessionService.listEvents}, and yields each
@@ -478,6 +493,26 @@ export function createAgentSessionService({
 			return events.filter(
 				(event) => !isOrdinalHidden(event.ordinal, hiddenRanges),
 			);
+		},
+		listEventTail: (branchId, options) => {
+			const database = requireSessionDatabase();
+			const tail = listBranchEventTail({
+				beforeOrdinal: options.beforeOrdinal,
+				branchId,
+				database,
+				limit: options.limit,
+			});
+			const branch = getAgentSessionBranchById({ database, id: branchId });
+			const hiddenRanges = branch ? readHiddenEventRanges(branch.metadata) : [];
+			if (hiddenRanges.length === 0) {
+				return tail;
+			}
+			return {
+				events: tail.events.filter(
+					(event) => !isOrdinalHidden(event.ordinal, hiddenRanges),
+				),
+				hasOlder: tail.hasOlder,
+			};
 		},
 		iterateEventPayloadsDescending: function* (branchId) {
 			const database = requireSessionDatabase();

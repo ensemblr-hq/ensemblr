@@ -28,6 +28,20 @@ import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contrac
 // workspace's live detail (which keeps the 10s poll in workspaceGitStatusQuery).
 // A slower fan-out interval keeps N per-workspace git-status calls cheap.
 const OVERVIEW_GIT_STATUS_REFETCH_INTERVAL_MS = 30_000;
+/**
+ * Spread between one workspace's overview poll and the next.
+ *
+ * Every target shares one interval, so they were armed in the same render and
+ * fired in the same tick: N workspaces meant N `git status
+ * --untracked-files=all` fan-outs landing on the main process at once. Main
+ * caps its own git concurrency, so this is about the request burst rather than
+ * the spawn burst — it costs nothing and keeps the queue from arriving in one
+ * lump. Capped so a long workspace list still refreshes on a predictable
+ * cadence rather than drifting minutes apart.
+ */
+const OVERVIEW_GIT_STATUS_STAGGER_MS = 750;
+/** How many staggered slots the workspace list is spread across. */
+const OVERVIEW_GIT_STATUS_STAGGER_SLOTS = 8;
 
 /**
  * Owns the three workbench-shell live queries (health, repository workspace
@@ -105,10 +119,13 @@ export function useWorkbenchQueries({
 	);
 	const projects = useQueries({
 		combine: combineWorkspaceChangeSummaries,
-		queries: workspaceChangeSummaryTargets.map((target) => ({
+		queries: workspaceChangeSummaryTargets.map((target, index) => ({
 			...workspaceGitStatusQuery(target.workspaceCwd, target.scope),
 			enabled: hasPreloadBridge && target.workspaceCwd.length > 0,
-			refetchInterval: OVERVIEW_GIT_STATUS_REFETCH_INTERVAL_MS,
+			refetchInterval:
+				OVERVIEW_GIT_STATUS_REFETCH_INTERVAL_MS +
+				(index % OVERVIEW_GIT_STATUS_STAGGER_SLOTS) *
+					OVERVIEW_GIT_STATUS_STAGGER_MS,
 		})),
 	});
 

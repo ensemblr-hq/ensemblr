@@ -64,6 +64,9 @@ export const ensemblrQueryKeys = {
 	/** Query key for the Infisical link attached to one scope. */
 	infisicalLink: (scope: string, scopeId: string) =>
 		[...ensemblrQueryKeys.all, 'infisical-link', scope, scopeId] as const,
+	/** Query key for the keyring backend behind the secret store and its acknowledgement state. */
+	obfuscatedStorageStatus: () =>
+		[...ensemblrQueryKeys.all, 'obfuscated-storage-status'] as const,
 	/** Query key for the projects reachable across every Infisical account. */
 	infisicalProjects: () =>
 		[...ensemblrQueryKeys.all, 'infisical-projects'] as const,

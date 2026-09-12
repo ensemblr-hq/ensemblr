@@ -94,6 +94,9 @@ export function createAppSettingsService(
 	// the fs event our own atomic write triggers.
 	let lastWritten: string | null = null;
 	let watcherHandle: { stop: () => void } | null = null;
+	// Held only while the watcher runs, because the watcher is what makes a live
+	// edit observable — without it a cached parse would never see one.
+	let cached: AppSettings | null = null;
 
 	const readRaw = (): Record<string, unknown> => {
 		try {
@@ -123,6 +126,7 @@ export function createAppSettingsService(
 		mkdirSync(path.dirname(configPath), { recursive: true });
 		writeFileAtomicExclusive(configPath, serialized);
 		lastWritten = serialized;
+		cached = null;
 	};
 
 	const settingsFrom = (config: Record<string, unknown>): AppSettings =>
@@ -140,8 +144,16 @@ export function createAppSettingsService(
 	};
 
 	const read = (): AppSettings => {
+		if (cached) {
+			return cached;
+		}
+
 		ensureExists();
-		return settingsFrom(readRaw());
+		const settings = settingsFrom(readRaw());
+		if (watcherHandle) {
+			cached = settings;
+		}
+		return settings;
 	};
 
 	const update = (patch: AppSettingsPatch): AppSettings => {
@@ -179,7 +191,9 @@ export function createAppSettingsService(
 					return; // our own write — ignore the echo
 				}
 				lastWritten = current;
-				onChange(settingsFrom(asRecord(safeParse(current))));
+				const settings = settingsFrom(asRecord(safeParse(current)));
+				cached = settings;
+				onChange(settings);
 			},
 		});
 	};
@@ -187,6 +201,7 @@ export function createAppSettingsService(
 	const stop = (): void => {
 		watcherHandle?.stop();
 		watcherHandle = null;
+		cached = null;
 	};
 
 	return {

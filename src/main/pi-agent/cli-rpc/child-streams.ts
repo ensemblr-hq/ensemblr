@@ -1,7 +1,6 @@
 import { isGracefulTermination } from '../../../shared/process-exit.ts';
 import type {
 	AgentErrorCode,
-	AgentEvent,
 	AgentShutdownReason,
 } from '../../agent-runtime/agent-types.ts';
 import type { JsonlLineStream } from '../../pi-ipc';
@@ -32,10 +31,8 @@ export function bindChildStreams({
 	lineStream,
 	stderrRing,
 	killTimer,
-	emit,
 	emitError,
 	getPendingShutdownReason,
-	now,
 	finalizeShutdown,
 	rejectPendingCommands,
 }: {
@@ -43,7 +40,6 @@ export function bindChildStreams({
 	lineStream: JsonlLineStream;
 	stderrRing: RingBuffer;
 	killTimer: KillTimer;
-	emit: (event: AgentEvent) => void;
 	emitError: (
 		code: AgentErrorCode,
 		message: string,
@@ -51,7 +47,6 @@ export function bindChildStreams({
 		recoverable?: boolean,
 	) => void;
 	getPendingShutdownReason: () => AgentShutdownReason | null;
-	now: () => Date;
 	finalizeShutdown: (reason: AgentShutdownReason) => void;
 	rejectPendingCommands: (cause: Error) => void;
 }): void {
@@ -62,18 +57,10 @@ export function bindChildStreams({
 	child.stdout.on('end', () => {
 		lineStream.flush();
 	});
+	// Retained for the crash post-mortem only: the renderer discards a `stderr`
+	// event on arrival, and `crashDetail` is what surfaces this tail.
 	child.stderr.on('data', (chunk: Buffer) => {
 		stderrRing.write(chunk);
-		emit({
-			at: now().toISOString(),
-			error: {
-				code: 'adapter-failure',
-				detail: chunk.toString('utf8'),
-				message: 'Pi RPC stderr',
-				recoverable: true,
-			},
-			type: 'error',
-		});
 	});
 
 	// The child's stdin is a pipe socket. If the Pi process exits mid-turn the

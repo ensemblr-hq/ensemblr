@@ -82,6 +82,8 @@ export const IPC_CHANNELS = {
 	dictationKeyStatus: 'ensemblr:dictation-key-status',
 	setDictationApiKey: 'ensemblr:set-dictation-api-key',
 	transcribeAudio: 'ensemblr:transcribe-audio',
+	acknowledgeObfuscatedStorage: 'ensemblr:acknowledge-obfuscated-storage',
+	getObfuscatedStorageStatus: 'ensemblr:get-obfuscated-storage-status',
 	addEnvFile: 'ensemblr:add-env-file',
 	environmentVariables: 'ensemblr:environment-variables',
 	listEnvFiles: 'ensemblr:list-env-files',

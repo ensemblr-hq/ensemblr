@@ -245,6 +245,12 @@ const isDev = !app.isPackaged;
 // live in different namespaces (dotfile path segment, reverse-DNS service id)
 // and carry their own dev markers below.
 const DEV_SUFFIX = ' (DEV)';
+/**
+ * How long deferred boot work waits for the first window's `ready-to-show`
+ * before running anyway. A window that never reports readiness should delay
+ * adoption, not cancel it.
+ */
+const DEFERRED_BOOT_WORK_FALLBACK_MS = 5_000;
 // The unpackaged dev build (`electron-forge start`) gets the explicit (DEV)
 // suffix so it reads its isolated userData below. A *packaged* build keeps the
 // product name forge baked in from its build channel (Ensemblr / Ensemblr
@@ -408,6 +414,20 @@ const readArchitectureDiagramEnabled = (): boolean =>
  */
 const readTuiHarnessesEnabled = (): boolean =>
 	appSettingsService.read().experimental.tuiHarnesses;
+/**
+ * Whether anything could be listening to the Pi raw-frame debug tap.
+ *
+ * `usePiRawFrameCapture` is the tap's only subscriber and it subscribes only
+ * under developer mode, so with the switch off — the normal case — every frame
+ * was serialized, sent across the process boundary and dropped on arrival. A
+ * window has to exist as well, since the broadcast has nowhere to go otherwise.
+ * Read per frame rather than captured: the settings file is watched, so flipping
+ * the switch arms the tap without a restart, and the read is cached.
+ * @returns True when a live window could be showing the raw-frame panel.
+ */
+const isRawFrameTapActive = (): boolean =>
+	appSettingsService.read().experimental.developerMode &&
+	BrowserWindow.getAllWindows().some((window) => !window.isDestroyed());
 /**
  * Reads the model ids currently hidden from delegated spawn choices.
  * @returns The latest hidden-model ids from app settings.
@@ -757,6 +777,7 @@ const piAgentAdapter = createPiCliRpcAdapter({
 			directory,
 		]),
 	],
+	isRawFrameTapActive,
 	onRawFrame: broadcastRawFrame,
 	resolveBaseEnv: resolveAgentSpawnEnv,
 });
@@ -1264,11 +1285,17 @@ const conciergeSessionService = createConciergeSessionService({
 });
 let ipcHandlersHandle: IpcHandlersHandle | null = null;
 const workspaceFilesWatcher = createWorkspaceFilesWatcher({
-	/** Broadcasts a workspace-files-changed event when the watcher fires. */
-	onChange: (workspaceCwd) =>
+	/**
+	 * Drops the workspace's cached listing, then tells the renderer to refetch.
+	 * Order matters: the broadcast is what triggers the refetch, so invalidating
+	 * afterwards would serve the stale tree the change just invalidated.
+	 */
+	onChange: (workspaceCwd) => {
+		listWorkspaceFilesService.invalidate(workspaceCwd);
 		broadcastToAllWindows(IPC_CHANNELS.workspaceFilesChanged, {
 			workspaceCwd,
-		} satisfies WorkspaceFilesChangedBroadcast),
+		} satisfies WorkspaceFilesChangedBroadcast);
+	},
 });
 const terminalService = createTerminalService({
 	databaseService,
@@ -1700,6 +1727,43 @@ function refreshWindowBackgrounds(): void {
  * confirmation runs here rather than downstream: by the time `window-all-closed`
  * fires the window is destroyed, and the dialog has nothing left to attach to.
  */
+/** Boot work deferred until the first window has something to paint. */
+const deferredUntilFirstPaint: Array<() => void> = [];
+let firstWindowPainted = false;
+
+/**
+ * Releases the boot work the first paint was gating. Idempotent, and armed both
+ * by the window's `ready-to-show` and by a timeout, so a window that never
+ * reports readiness delays this work rather than dropping it.
+ */
+function releaseDeferredBootWork(): void {
+	if (firstWindowPainted) {
+		return;
+	}
+	firstWindowPainted = true;
+	for (const task of deferredUntilFirstPaint.splice(0)) {
+		task();
+	}
+}
+
+/**
+ * Runs `task` once the first window is ready to show, or immediately when one
+ * already is.
+ *
+ * For launch work that competes with the renderer's first paint without
+ * anything about the paint depending on it — a `git` probe fan-out across every
+ * registered repository, for instance, which measured 48 concurrent spawns in
+ * the same window as `BrowserWindow` construction.
+ * @param task - Work to defer past the first paint.
+ */
+function whenFirstWindowPainted(task: () => void): void {
+	if (firstWindowPainted) {
+		task();
+		return;
+	}
+	deferredUntilFirstPaint.push(task);
+}
+
 function openMainWindow(): void {
 	activeWindowChrome = resolveWindowChrome(
 		process.platform,
@@ -1710,6 +1774,8 @@ function openMainWindow(): void {
 		titleBar: activeWindowChrome.titleBar,
 		windowStateStore: mainWindowStateStore,
 	});
+	window.once('ready-to-show', releaseDeferredBootWork);
+	setTimeout(releaseDeferredBootWork, DEFERRED_BOOT_WORK_FALLBACK_MS).unref?.();
 	trackWindowMaximizedState(window);
 	trackWindowChrome({
 		onResolved: (chrome) => {
@@ -1803,7 +1869,12 @@ app.whenReady().then(() => {
 	openMainWindow();
 	ensureConciergeHome(rootDirectoryService.ensure().conciergePath);
 	conciergeMemoryService.reconcile();
-	void sharedRootAdoptionService.reconcile();
+	// Nothing about painting the workbench depends on adoption: the renderer's
+	// navigation query is what surfaces its result, and that query runs after the
+	// window is up.
+	whenFirstWindowPainted(() => {
+		void sharedRootAdoptionService.reconcile();
+	});
 	void reclaimSweptWorkspaceDisk();
 	const readAppSettings = () => appSettingsService.read();
 	const menuContextStore = new MenuContextStore();

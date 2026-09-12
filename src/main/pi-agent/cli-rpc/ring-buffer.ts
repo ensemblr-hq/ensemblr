@@ -10,23 +10,44 @@ export interface RingBuffer {
 }
 
 /**
+ * How far the retained chunks may exceed `maxBytes` before they are joined and
+ * trimmed. Concatenating on every write made a chunk cost a copy of the whole
+ * buffer, so a child that logs progress to stderr paid `maxBytes` per line;
+ * letting the excess build first makes each write amortized O(chunk).
+ */
+const COMPACTION_FACTOR = 2;
+
+/**
  * Create a fixed-byte ring buffer that retains only the most recent bytes.
  * @param maxBytes - Maximum number of bytes to retain.
  * @returns A ring buffer exposing `write` and `snapshot`.
  */
 export function createRingBuffer(maxBytes: number): RingBuffer {
-	let stored = Buffer.alloc(0);
+	let parts: Buffer[] = [];
+	let retained = 0;
+
+	const compact = (): Buffer => {
+		const combined = Buffer.concat(parts, retained);
+		const trimmed =
+			combined.length > maxBytes
+				? combined.subarray(combined.length - maxBytes)
+				: combined;
+		parts = [trimmed];
+		retained = trimmed.length;
+		return trimmed;
+	};
+
 	return {
-		snapshot: () => stored.toString('utf8'),
+		snapshot: () => compact().toString('utf8'),
 		write: (chunk: Buffer) => {
 			if (chunk.length === 0) {
 				return;
 			}
-			const combined = Buffer.concat([stored, chunk]);
-			stored =
-				combined.length > maxBytes
-					? combined.subarray(combined.length - maxBytes)
-					: combined;
+			parts.push(chunk);
+			retained += chunk.length;
+			if (retained > maxBytes * COMPACTION_FACTOR) {
+				compact();
+			}
 		},
 	};
 }

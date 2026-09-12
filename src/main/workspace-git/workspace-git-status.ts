@@ -20,6 +20,8 @@ import type {
 import { summarizeWorkspaceGitFiles } from '../../shared/ipc/contracts/workspace-git.ts';
 import type { LocalCommandService } from '../commands/local-command';
 // react-doctor-disable-next-line -- Cross-concern imports use the stable public entrypoint.
+import { mapWithConcurrency } from '../concurrency/index.ts';
+// react-doctor-disable-next-line -- Cross-concern imports use the stable public entrypoint.
 import { resolveWorkspaceCwd } from '../workspace-files/index.ts';
 import {
 	classifyGitFailure,
@@ -38,6 +40,28 @@ const TIMEOUT_MS = 15_000;
 const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
 const MAX_DIFF_BYTES = 2 * 1024 * 1024;
 const MAX_UNTRACKED_COUNT_BYTES = 512 * 1024;
+/**
+ * Most `git` invocations this service keeps in flight at once.
+ *
+ * The dashboard asks for one branch-scope status per workspace on one tick, and
+ * each of those is ~4 spawns plus a read per untracked file. At 15 workspaces
+ * that measured 60 concurrent `git` processes and 666 ms of churn every 30 s,
+ * all on the thread that answers IPC. The work still gets done; it stops
+ * arriving as one burst.
+ */
+const MAX_CONCURRENT_GIT = 4;
+/**
+ * Most untracked files whose lines are actually counted.
+ *
+ * Counting opens a descriptor and allocates up to
+ * {@link MAX_UNTRACKED_COUNT_BYTES} per file, so a working tree with an
+ * unpacked tarball or a build output in it would hold hundreds of megabytes
+ * live at once. Past this many rows a `null` count is the honest answer — the
+ * reviewer is looking at the file list, not at per-file line totals.
+ */
+export const MAX_COUNTED_UNTRACKED_FILES = 200;
+/** Most untracked files read concurrently, bounding open descriptors. */
+const MAX_CONCURRENT_UNTRACKED_READS = 16;
 const BINARY_SNIFF_BYTES = 8 * 1024;
 const DEFAULT_COMMIT_LIMIT = 20;
 const MAX_COMMIT_LIMIT = 100;
@@ -103,7 +127,44 @@ export function createWorkspaceGitService({
 	localCommandService: LocalCommandService;
 }): WorkspaceGitService {
 	/**
-	 * Runs a git subcommand in a workspace via the local command service.
+	 * Statuses currently being computed, keyed by workspace and scope. Concurrent
+	 * identical requests — the dashboard tick and an open Changes view, or two
+	 * windows — share one answer instead of racing two identical fan-outs. The
+	 * entry is dropped the moment the flight settles, so nothing is ever served
+	 * from a stale read.
+	 */
+	const statusesInFlight = new Map<
+		string,
+		Promise<GetWorkspaceGitStatusResult>
+	>();
+	let gitSlotsFree = MAX_CONCURRENT_GIT;
+	const gitSlotWaiters: Array<() => void> = [];
+
+	/** Releases one git slot, handing it straight to the longest waiter. */
+	function releaseGitSlot(): void {
+		const waiter = gitSlotWaiters.shift();
+		if (waiter) {
+			waiter();
+			return;
+		}
+		gitSlotsFree += 1;
+	}
+
+	/** Waits for a free git slot, resolving immediately when one is available. */
+	function acquireGitSlot(): Promise<void> {
+		if (gitSlotsFree > 0) {
+			gitSlotsFree -= 1;
+			return Promise.resolve();
+		}
+		return new Promise((resolve) => {
+			gitSlotWaiters.push(resolve);
+		});
+	}
+
+	/**
+	 * Runs a git subcommand in a workspace via the local command service, behind
+	 * a {@link MAX_CONCURRENT_GIT} semaphore so a multi-workspace refresh queues
+	 * rather than spawning every process at once.
 	 * @param cwd - Absolute working directory to run git in
 	 * @param args - Git arguments, excluding the `git` executable itself
 	 * @param maxOutputBytes - Cap on captured stdout; defaults to the service limit
@@ -114,13 +175,41 @@ export function createWorkspaceGitService({
 		args: readonly string[],
 		maxOutputBytes = MAX_OUTPUT_BYTES,
 	) {
-		return localCommandService.run({
-			args: [...args],
-			command: 'git',
-			cwd,
-			maxOutputBytes,
-			timeoutMs: TIMEOUT_MS,
+		await acquireGitSlot();
+		try {
+			return await localCommandService.run({
+				args: [...args],
+				command: 'git',
+				cwd,
+				maxOutputBytes,
+				timeoutMs: TIMEOUT_MS,
+			});
+		} finally {
+			releaseGitSlot();
+		}
+	}
+
+	/**
+	 * Runs `compute` unless an identical request is already in flight, in which
+	 * case both callers await the same promise.
+	 * @param key - Identity of the request: workspace plus scope.
+	 * @param compute - Produces the status when no flight is under way.
+	 * @returns The shared result.
+	 */
+	function shareStatusInFlight(
+		key: string,
+		compute: () => Promise<GetWorkspaceGitStatusResult>,
+	): Promise<GetWorkspaceGitStatusResult> {
+		const existing = statusesInFlight.get(key);
+		if (existing) {
+			return existing;
+		}
+
+		const flight = compute().finally(() => {
+			statusesInFlight.delete(key);
 		});
+		statusesInFlight.set(key, flight);
+		return flight;
 	}
 
 	return {
@@ -175,12 +264,20 @@ export function createWorkspaceGitService({
 				kind: 'working-tree',
 			};
 			if (scope.kind === 'commit') {
-				return getCommitStatus(cwd.cwd, scope.commitHash);
+				return shareStatusInFlight(
+					`${cwd.cwd}\u0000commit\u0000${scope.commitHash}`,
+					() => getCommitStatus(cwd.cwd, scope.commitHash),
+				);
 			}
 			if (scope.kind === 'branch') {
-				return getBranchStatus(cwd.cwd, scope.baseRef);
+				return shareStatusInFlight(
+					`${cwd.cwd}\u0000branch\u0000${scope.baseRef}`,
+					() => getBranchStatus(cwd.cwd, scope.baseRef),
+				);
 			}
-			return getWorkingTreeStatus(cwd.cwd);
+			return shareStatusInFlight(`${cwd.cwd}\u0000working-tree`, () =>
+				getWorkingTreeStatus(cwd.cwd),
+			);
 		},
 
 		async getMergeConflicts(request) {
@@ -306,18 +403,23 @@ export function createWorkspaceGitService({
 		const entries = parsePorcelainStatus(statusResult.stdout);
 		const numstat = await readNumstatAgainstHead(cwd);
 
-		const files: WorkspaceGitFileWire[] = await Promise.all(
-			entries.map(async (entry) => {
+		const countable = countableUntrackedPaths(entries);
+		const files: WorkspaceGitFileWire[] = await mapWithConcurrency(
+			entries,
+			MAX_CONCURRENT_UNTRACKED_READS,
+			async (entry) => {
 				if (entry.status === 'untracked') {
-					const counts = await countUntrackedLines(cwd, entry.path);
-					return { ...entry, ...counts };
+					return {
+						...entry,
+						...(await untrackedCounts(cwd, entry.path, countable)),
+					};
 				}
 				const counts = numstat.get(entry.path) ?? {
 					additions: 0,
 					deletions: 0,
 				};
 				return { ...entry, ...counts };
-			}),
+			},
 		);
 
 		return summarizeWorkspaceGitFiles(await withContentIds(cwd, files));
@@ -406,11 +508,13 @@ export function createWorkspaceGitService({
 		cwd: string,
 		files: readonly WorkspaceGitFileWire[],
 	): Promise<WorkspaceGitFileWire[]> {
-		return Promise.all(
-			files.map(async (file) => ({
+		return mapWithConcurrency(
+			files,
+			MAX_CONCURRENT_UNTRACKED_READS,
+			async (file) => ({
 				...file,
 				contentId: await readContentId(cwd, file.path),
-			})),
+			}),
 		);
 	}
 
@@ -430,10 +534,13 @@ export function createWorkspaceGitService({
 		const untracked = parsePorcelainStatus(statusResult.stdout).filter(
 			(entry) => entry.status === 'untracked',
 		);
-		return Promise.all(
-			untracked.map(async (entry) => {
-				const counts = await countUntrackedLines(cwd, entry.path);
-				return { ...entry, ...counts };
+		const countable = countableUntrackedPaths(untracked);
+		return mapWithConcurrency(
+			untracked,
+			MAX_CONCURRENT_UNTRACKED_READS,
+			async (entry) => ({
+				...entry,
+				...(await untrackedCounts(cwd, entry.path, countable)),
 			}),
 		);
 	}
@@ -733,6 +840,50 @@ export function createWorkspaceGitService({
 	}
 
 	/** Counts lines in an untracked file so new files still show +N in review. */
+	/**
+	 * The untracked paths whose lines are worth counting: the first
+	 * {@link MAX_COUNTED_UNTRACKED_FILES} in the order git reported them.
+	 * @param entries - Status rows for the change set, untracked or not.
+	 * @returns The set of untracked paths that get a real line count.
+	 */
+	function countableUntrackedPaths(
+		entries: readonly { path: string; status: string }[],
+	): ReadonlySet<string> {
+		return new Set(
+			entries
+				.filter((entry) => entry.status === 'untracked')
+				.slice(0, MAX_COUNTED_UNTRACKED_FILES)
+				.map((entry) => entry.path),
+		);
+	}
+
+	/**
+	 * Line counts for one untracked file, or a null pair when the change set has
+	 * more untracked files than {@link MAX_COUNTED_UNTRACKED_FILES}.
+	 * @param cwd - Absolute workspace directory the path is relative to.
+	 * @param relativePath - Untracked path to count.
+	 * @param countable - Paths admitted by {@link countableUntrackedPaths}.
+	 * @returns The row's addition and deletion counts.
+	 */
+	async function untrackedCounts(
+		cwd: string,
+		relativePath: string,
+		countable: ReadonlySet<string>,
+	): Promise<{ additions: number | null; deletions: number | null }> {
+		if (!countable.has(relativePath)) {
+			return { additions: null, deletions: null };
+		}
+		return countUntrackedLines(cwd, relativePath);
+	}
+
+	/**
+	 * Counts the lines in one untracked file, reading at most
+	 * {@link MAX_UNTRACKED_COUNT_BYTES}. A file whose head contains a NUL byte is
+	 * binary and reports null counts, as a tracked binary row does.
+	 * @param cwd - Absolute workspace directory the path is relative to.
+	 * @param relativePath - Untracked path to read.
+	 * @returns The row's addition and deletion counts.
+	 */
 	async function countUntrackedLines(
 		cwd: string,
 		relativePath: string,
@@ -758,10 +909,12 @@ export function createWorkspaceGitService({
 					return { additions: null, deletions: null };
 				}
 				let lines = 0;
-				for (const byte of buffer) {
-					if (byte === 0x0a) {
-						lines += 1;
-					}
+				for (
+					let at = buffer.indexOf(0x0a);
+					at !== -1;
+					at = buffer.indexOf(0x0a, at + 1)
+				) {
+					lines += 1;
 				}
 				if (buffer[readBytes - 1] !== 0x0a) {
 					lines += 1;

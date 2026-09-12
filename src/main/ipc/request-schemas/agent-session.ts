@@ -85,9 +85,27 @@ export const listAgentSessionsRequestSchema = z.object({
 	workspaceId: z.string().min(1),
 });
 
+/**
+ * Events returned when a caller names no window. Replay wants the newest
+ * events, and the largest real branch held 26,922 — read whole, that measured
+ * ~460 ms of blocked main thread and 13.5 MB in one IPC reply. A caller that
+ * needs more pages back with `beforeOrdinal`.
+ */
+export const DEFAULT_AGENT_EVENT_TAIL = 1000;
+
+/** Ceiling on a caller-supplied window, so one request cannot ask for the whole log. */
+export const MAX_AGENT_EVENT_TAIL = 5000;
+
 /** {@link import('../../../shared/ipc').ListAgentSessionEventsRequest}. */
 export const listAgentSessionEventsRequestSchema = z.object({
+	beforeOrdinal: z.number().int().nonnegative().optional(),
 	branchId: z.string().min(1),
+	limit: z
+		.number()
+		.int()
+		.positive()
+		.max(MAX_AGENT_EVENT_TAIL)
+		.default(DEFAULT_AGENT_EVENT_TAIL),
 });
 
 /** {@link import('../../../shared/ipc').WriteForkSummaryRequest}. */

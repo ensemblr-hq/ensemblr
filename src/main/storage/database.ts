@@ -4,6 +4,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import type { DatabaseHealthSnapshot } from '../../shared/ipc/contracts/health';
+import { pruneAgentEventHistory } from './repositories/agent-event-retention.ts';
 
 /** Options for {@link openEnsemblrDatabase} / {@link createEnsemblrDatabaseService}. */
 export interface OpenDatabaseOptions {
@@ -1212,6 +1213,72 @@ CREATE INDEX idx_agent_control_spawn_root_time
 ON agent_control_spawn_reservations(root_session_id, reserved_at);
 `,
 	},
+	{
+		id: '029_agent_event_index_hygiene',
+		version: 29,
+		// `idx_agent_session_events_branch_ordinal` duplicated the
+		// UNIQUE(branch_id, ordinal) autoindex exactly — same columns, same order,
+		// and `dbstat` reported the same 47,722,496 bytes over the same 890,305
+		// cells. `idx_agent_session_events_type` had no reader at all: no query in
+		// src/main filters, groups, or orders by `event_type`. Together they cost
+		// two of the four b-tree writes on every append, on a table taking ~99,000
+		// appends a day. `idx_agent_session_events_turn_id` stays — `turn_id
+		// REFERENCES agent_turns(id) ON DELETE SET NULL` needs it so settling a
+		// turn does not scan the table.
+		sql: `
+DROP INDEX IF EXISTS idx_agent_session_events_branch_ordinal;
+DROP INDEX IF EXISTS idx_agent_session_events_type;
+`,
+	},
+	{
+		id: '030_chat_tab_closed_at_index',
+		version: 30,
+		// `listAllChatTabs` orders every closed tab by `closed_at` with no
+		// workspace predicate, so `idx_chat_tabs_open(workspace_id, closed_at)`
+		// cannot serve it: the plan was SCAN plus USE TEMP B-TREE FOR ORDER BY over
+		// the wide row. Closed tabs are never pruned, so that scan grows with the
+		// user's lifetime tab count. The partial index is exactly the rows the
+		// query reads, in the order it wants them.
+		sql: `
+CREATE INDEX idx_chat_tabs_closed_at
+ON chat_tabs(closed_at DESC)
+WHERE closed_at IS NOT NULL;
+`,
+	},
+	{
+		id: '031_spawn_reservation_workspace',
+		version: 31,
+		// Reservations had no foreign key at all, so deleting a workspace cascaded
+		// the sessions away and left the quota rows behind forever. The key is on
+		// `workspace_id` rather than `root_session_id`: a root may be a Concierge
+		// or harness origin that has no `agent_sessions` row, and a key onto that
+		// table would refuse the insert and fail the spawn. Deleting the workspace
+		// is the one event that genuinely ends a delegation tree; age is not, since
+		// sweeping by age would refund lifetime spawn quota and defeat the
+		// fork-bomb guard. Legacy rows carry NULL and are left to expire with the
+		// table.
+		sql: `
+CREATE TABLE agent_control_spawn_reservations_new (
+	id TEXT PRIMARY KEY,
+	root_session_id TEXT NOT NULL,
+	workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
+	reserved_at INTEGER NOT NULL
+) STRICT;
+
+INSERT INTO agent_control_spawn_reservations_new (id, root_session_id, workspace_id, reserved_at)
+SELECT id, root_session_id, NULL, reserved_at FROM agent_control_spawn_reservations;
+
+DROP TABLE agent_control_spawn_reservations;
+
+ALTER TABLE agent_control_spawn_reservations_new RENAME TO agent_control_spawn_reservations;
+
+CREATE INDEX idx_agent_control_spawn_root_time
+ON agent_control_spawn_reservations(root_session_id, reserved_at);
+
+CREATE INDEX idx_agent_control_spawn_workspace
+ON agent_control_spawn_reservations(workspace_id);
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */
@@ -1291,6 +1358,10 @@ function restrictDatabaseFileModes(databasePath: string): void {
  * to `0600` once the connection exists, because SQLite creates them under the
  * process umask — `0644` on a typical Linux host, where this file is where
  * secrets actually live.
+ *
+ * Transcript retention runs on the way in, and only against a database this
+ * build fully migrated: a test fixture staged at an older schema has tables the
+ * sweep's statements do not know.
  * @param options - Optional path override; `:memory:` is honored for tests.
  * @returns An open {@link EnsemblrDatabaseConnection}.
  */
@@ -1317,7 +1388,11 @@ export function openEnsemblrDatabase(
 	try {
 		configureDatabase(database);
 		restrictDatabaseFileModes(databasePath);
+		assertSchemaIsNotNewer(database);
 		const schemaVersion = runMigrations(database);
+		if (schemaVersion === LATEST_SCHEMA_VERSION) {
+			pruneAgentEventHistory({ database });
+		}
 
 		return {
 			database,
@@ -1328,6 +1403,27 @@ export function openEnsemblrDatabase(
 		database.close();
 		throw error;
 	}
+}
+
+/**
+ * Refuses a database a newer build already migrated.
+ *
+ * The migration runner skips ids it has seen and never compares `user_version`
+ * against what this build knows, so an older binary would report `ok` and then
+ * write against tables, columns, and CHECK constraints it has never heard of.
+ * Release and Canary share one file by design (`user-data-location.ts`), and
+ * Canary is by construction ahead, so running Canary once and then Release is
+ * the ordinary way to reach this.
+ * @param database - Open SQLite connection.
+ */
+function assertSchemaIsNotNewer(database: DatabaseSync): void {
+	const version = getCurrentSchemaVersion(database);
+	if (version <= LATEST_SCHEMA_VERSION) {
+		return;
+	}
+	throw new Error(
+		`Database schema version ${version} is newer than this build supports (${LATEST_SCHEMA_VERSION}). Open the newer version of Ensemblr instead.`,
+	);
 }
 
 /**
@@ -1371,12 +1467,17 @@ export function createEnsemblrDatabaseService(
 		return health;
 	}
 
-	/** Closes the database, if open. Safe to call when no connection exists. */
+	/**
+	 * Closes the database, if open, running `PRAGMA optimize` first so the
+	 * planner statistics the next launch reads are current. Safe to call when no
+	 * connection exists.
+	 */
 	function close(): void {
 		if (!connection) {
 			return;
 		}
 
+		optimizeQuietly(connection.database);
 		connection.database.close();
 		connection = null;
 	}
@@ -1387,6 +1488,18 @@ export function createEnsemblrDatabaseService(
 		getHealth: () => health,
 		open,
 	};
+}
+
+/**
+ * Refreshes the query planner's statistics on the way out, ignoring a failure:
+ * this runs during shutdown, where a maintenance pragma must never be the
+ * reason the app cannot quit.
+ * @param database - Open SQLite connection.
+ */
+function optimizeQuietly(database: DatabaseSync): void {
+	try {
+		database.exec('PRAGMA optimize;');
+	} catch {}
 }
 
 /**
@@ -1420,7 +1533,15 @@ export function listAppliedMigrationIds(database: DatabaseSync): string[] {
 }
 
 /**
- * Applies connection-wide pragmas (foreign keys, busy timeout, WAL journal).
+ * Applies connection-wide pragmas (foreign keys, busy timeout, WAL journal,
+ * commit durability, temp storage, page cache).
+ *
+ * `synchronous` is left at SQLite's compile-time `FULL` otherwise, which fsyncs
+ * the WAL on every commit; `NORMAL` is the documented recommendation under WAL
+ * and gives up only the last few transactions on a power loss — not integrity,
+ * and not a process crash. `temp_store = MEMORY` keeps the ORDER BY temp
+ * b-trees off disk, and the cache is raised from the 2 MB default because this
+ * file reaches hundreds of megabytes.
  * @param database - Open SQLite connection.
  */
 function configureDatabase(database: DatabaseSync): void {
@@ -1428,6 +1549,9 @@ function configureDatabase(database: DatabaseSync): void {
 PRAGMA foreign_keys = ON;
 PRAGMA busy_timeout = 5000;
 PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
+PRAGMA temp_store = MEMORY;
+PRAGMA cache_size = -32768;
 `);
 }
 
@@ -1474,6 +1598,12 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
  * @param migration - Migration to apply.
  */
 function runMigration(database: DatabaseSync, migration: Migration): void {
+	if (!Number.isInteger(migration.version)) {
+		throw new Error(
+			`Migration ${migration.id} declares a non-integer version; PRAGMA user_version takes no bound parameter, so the value is interpolated and must be an integer.`,
+		);
+	}
+
 	database.exec('BEGIN IMMEDIATE;');
 
 	try {

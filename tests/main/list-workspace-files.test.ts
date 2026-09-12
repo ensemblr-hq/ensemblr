@@ -353,6 +353,97 @@ describe('createListWorkspaceFilesService.list', () => {
 	});
 });
 
+describe('createListWorkspaceFilesService.list caching', () => {
+	// Every broadcast from the file watcher costs a full listing, and the
+	// renderer polls on top of that. One listing is four `git ls-files` spawns
+	// plus a depth-first walk of each ignored root that usually ends in a
+	// discarded result, and none of it was memoised between invalidations.
+	test('serves a repeat listing from cache without re-spawning git', async () => {
+		const cwd = seedRepo();
+		const spawned: string[] = [];
+		const real = createLocalCommandService();
+		const service = createListWorkspaceFilesService({
+			localCommandService: {
+				...real,
+				run: async (request) => {
+					spawned.push(request.command);
+					return real.run(request);
+				},
+			},
+		});
+
+		const first = await service.list({ workspaceCwd: cwd });
+		const spawnsForFirst = spawned.length;
+		const second = await service.list({ workspaceCwd: cwd });
+
+		expect(spawnsForFirst).toBeGreaterThan(0);
+		expect(spawned.length).toBe(spawnsForFirst);
+		expect(second.files).toEqual(first.files);
+	});
+
+	test('re-lists after the watcher reports the workspace changed', async () => {
+		const cwd = seedRepo();
+		const spawned: string[] = [];
+		const real = createLocalCommandService();
+		const service = createListWorkspaceFilesService({
+			localCommandService: {
+				...real,
+				run: async (request) => {
+					spawned.push(request.command);
+					return real.run(request);
+				},
+			},
+		});
+
+		await service.list({ workspaceCwd: cwd });
+		const spawnsForFirst = spawned.length;
+		writeFileSync(path.join(cwd, 'fresh.ts'), 'export {};\n');
+		service.invalidate(cwd);
+		const second = await service.list({ workspaceCwd: cwd });
+
+		expect(spawned.length).toBeGreaterThan(spawnsForFirst);
+		expect(second.files.map((entry) => entry.path)).toContain('fresh.ts');
+	});
+
+	test('shares one listing between concurrent callers', async () => {
+		const cwd = seedRepo();
+		const spawned: string[] = [];
+		const real = createLocalCommandService();
+		const service = createListWorkspaceFilesService({
+			localCommandService: {
+				...real,
+				run: async (request) => {
+					spawned.push(request.command);
+					return real.run(request);
+				},
+			},
+		});
+
+		const [a, b] = await Promise.all([
+			service.list({ workspaceCwd: cwd }),
+			service.list({ workspaceCwd: cwd }),
+		]);
+
+		expect(a.files).toEqual(b.files);
+		expect(spawned.length).toBe(4);
+	});
+
+	test('never caches a failed listing', async () => {
+		const cwd = mkdtempSync(path.join(tmpdir(), 'ensemblr-not-a-repo-'));
+		tempDirs.push(cwd);
+		const service = createListWorkspaceFilesService({
+			localCommandService: createLocalCommandService(),
+		});
+
+		const first = await service.list({ workspaceCwd: cwd });
+		expect(first.error).toBeDefined();
+
+		git(cwd, ['init', '-b', 'main']);
+		const second = await service.list({ workspaceCwd: cwd });
+		expect(second.error).toBeUndefined();
+	});
+});
+
 describe('createListWorkspaceFilesService.read', () => {
 	test('reads text files as utf8 preview content', async () => {
 		const result = await readWorkspaceFile(seedRepo(), 'README.md');

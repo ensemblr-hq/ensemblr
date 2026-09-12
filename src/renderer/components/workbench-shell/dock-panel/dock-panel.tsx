@@ -118,13 +118,17 @@ export function DockPanel({
 												// primary underline sits flush on the header's bottom border
 												// (the default line-variant indicator renders below the list
 												// and gets clipped here).
-												'h-full flex-none rounded-none px-2 text-xs after:bg-primary group-data-horizontal/tabs:after:bottom-0 [&_svg]:size-3.5',
+												'h-full max-w-64 flex-none rounded-none px-2 text-xs after:bg-primary group-data-horizontal/tabs:after:bottom-0 [&_svg]:size-3.5',
 											)}
 											data-dock-tab-kind={tab.kind}
 											value={tab.id}
 										>
 											<DockTabGlyph tab={tab} />
-											{tab.label}
+											{/* A label can be an OSC window title the PTY chose, so an
+											    uncapped tab would push the strip off screen. */}
+											<span className='truncate' title={tab.label}>
+												{tab.label}
+											</span>
 										</TabsTrigger>
 										{closableTerminalId ? <DockTabCloseOverlay /> : null}
 										{closableTerminalId ? (

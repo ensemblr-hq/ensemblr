@@ -4,6 +4,8 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import type { AdoptedRepositorySnapshot } from '../../../shared/ipc/contracts/repository';
 import type { SharedRootAdoptionDiagnostic } from '../../../shared/ipc/contracts/shared-root-adoption';
+// react-doctor-disable-next-line -- Cross-concern imports use the stable public entrypoint.
+import { mapWithConcurrency } from '../../concurrency/index.ts';
 import {
 	insertRepositoryRow,
 	refreshRepositoryAdoptionRow,
@@ -19,6 +21,7 @@ import { toSlug } from '../slug.ts';
 import {
 	ADOPTION_MODE,
 	type LoadConfigFn,
+	MAX_CONCURRENT_ADOPTION_PROBES,
 	patchAdoptionMetadata,
 	type RepositoryAdoptionInfo,
 } from './internal.ts';
@@ -69,8 +72,10 @@ export async function reconcileRepositories({
 	repositoriesPath: string;
 	timestamp: string;
 }): Promise<RepositoryReconciliation> {
-	const probes = await Promise.all(
-		children.map(async (child) => {
+	const probes = await mapWithConcurrency(
+		children,
+		MAX_CONCURRENT_ADOPTION_PROBES,
+		async (child) => {
 			const candidatePath = path.join(repositoriesPath, child);
 			if (hasArchivedRepositoryMarker(candidatePath)) {
 				return { archived: true as const, candidatePath };
@@ -80,7 +85,7 @@ export async function reconcileRepositories({
 				candidatePath,
 				probe: await gitProbe(candidatePath),
 			};
-		}),
+		},
 	);
 
 	const outcome: RepositoryReconciliation = {

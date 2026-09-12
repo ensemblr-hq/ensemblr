@@ -4,6 +4,8 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import type { SharedRootAdoptionDiagnostic } from '../../../shared/ipc/contracts/shared-root-adoption';
 import type { AdoptedWorkspaceSnapshot } from '../../../shared/ipc/contracts/workspace';
+// react-doctor-disable-next-line -- Cross-concern imports use the stable public entrypoint.
+import { mapWithConcurrency } from '../../concurrency/index.ts';
 import {
 	insertWorkspaceRow,
 	refreshWorkspaceAdoptionRow,
@@ -15,6 +17,7 @@ import type { GitWorktreeMetadata, GitWorktreeProbeFn } from '../git-probe.ts';
 import { trackBranchCollision } from './branch-collisions.ts';
 import {
 	ADOPTION_MODE,
+	MAX_CONCURRENT_ADOPTION_PROBES,
 	patchAdoptionMetadata,
 	type RepositoryAdoptionInfo,
 } from './internal.ts';
@@ -92,15 +95,17 @@ export async function reconcileWorkspaces({
 		// Probes stay per-repository so a slug that resolves to nothing costs no
 		// filesystem work at all.
 		// oxlint-disable-next-line react-doctor/async-await-in-loop
-		const probes = await Promise.all(
-			(childrenByRepository.get(repoSlug) ?? []).map(async (workspaceSlug) => {
+		const probes = await mapWithConcurrency(
+			childrenByRepository.get(repoSlug) ?? [],
+			MAX_CONCURRENT_ADOPTION_PROBES,
+			async (workspaceSlug) => {
 				const candidatePath = path.join(repoWorkspacesPath, workspaceSlug);
 				return {
 					candidatePath,
 					probe: await worktreeProbe(candidatePath),
 					workspaceSlug,
 				};
-			}),
+			},
 		);
 
 		for (const { candidatePath, probe, workspaceSlug } of probes) {

@@ -20,7 +20,10 @@ import {
 	parseNumstat,
 	parsePorcelainStatus,
 } from '../../src/main/workspace-git/workspace-git-parsers.ts';
-import { createWorkspaceGitService } from '../../src/main/workspace-git/workspace-git-status.ts';
+import {
+	createWorkspaceGitService,
+	MAX_COUNTED_UNTRACKED_FILES,
+} from '../../src/main/workspace-git/workspace-git-status.ts';
 import type { WorkspaceGitDiffScope } from '../../src/shared/ipc/contracts/workspace-git';
 
 const fixedNow = () => new Date('2026-06-11T12:00:00.000Z');
@@ -256,6 +259,120 @@ test('getStatus expands untracked directories with --untracked-files=all', async
 		result.files.map((file) => file.path),
 		['.DS_Store', 'src/models/user.ts'],
 	);
+});
+
+// The dashboard fires one branch-scope status per workspace on a 30s timer, and
+// a Changes view or a second window fires the same one again. Without a dedupe
+// each of those was its own ~4-spawn fan-out over the same repository.
+test('shares one in-flight status between concurrent identical requests', async (t) => {
+	let releaseStatus: () => void = () => undefined;
+	const gate = new Promise<void>((resolve) => {
+		releaseStatus = resolve;
+	});
+	const { calls, service: commandService } = stubCommandService(() =>
+		buildResult({ stdout: '' }),
+	);
+	const gated: LocalCommandService = {
+		...commandService,
+		run: async (request) => {
+			if (request.args?.[0] === 'status') {
+				await gate;
+			}
+			return commandService.run(request);
+		},
+	};
+	const service = createWorkspaceGitService({ localCommandService: gated });
+
+	const first = service.getStatus({ workspaceCwd: '/repo' });
+	const second = service.getStatus({ workspaceCwd: '/repo' });
+	releaseStatus();
+	const [a, b] = await Promise.all([first, second]);
+
+	assert.deepEqual(a, b);
+	assert.equal(calls.filter((call) => call.args?.[0] === 'status').length, 1);
+
+	// The share lasts only as long as the flight: a later read is fresh.
+	await service.getStatus({ workspaceCwd: '/repo' });
+	assert.equal(calls.filter((call) => call.args?.[0] === 'status').length, 2);
+	t.diagnostic(`git invocations: ${calls.length}`);
+});
+
+test('does not share a status between different workspaces or scopes', async () => {
+	const { calls, service: commandService } = stubCommandService(() =>
+		buildResult({ stdout: '' }),
+	);
+	const service = createWorkspaceGitService({
+		localCommandService: commandService,
+	});
+
+	await Promise.all([
+		service.getStatus({ workspaceCwd: '/repo-a' }),
+		service.getStatus({ workspaceCwd: '/repo-b' }),
+		service.getStatus({
+			scope: { kind: 'branch', baseRef: 'main' },
+			workspaceCwd: '/repo-a',
+		}),
+	]);
+
+	assert.equal(new Set(calls.map((call) => call.cwd)).size, 2);
+	assert.ok(calls.filter((call) => call.args?.[0] === 'status').length >= 2);
+});
+
+// Each untracked row opens a descriptor and allocates up to 512 KB, and they
+// used to be read through one unbounded `Promise.all`. Past a few hundred rows
+// the line counts are not worth the descriptors, so they come back null.
+test('counts untracked lines up to a cap, then reports null counts', async (t) => {
+	const workspace = await mkdtemp(
+		path.join(tmpdir(), 'ensemblr-git-untracked-'),
+	);
+	t.after(() => rm(workspace, { force: true, recursive: true }));
+	await execFileAsync('git', ['init', '-b', 'main'], { cwd: workspace });
+
+	const total = MAX_COUNTED_UNTRACKED_FILES + 20;
+	await Promise.all(
+		Array.from({ length: total }, (_unused, index) =>
+			writeFile(
+				path.join(workspace, `file-${String(index).padStart(4, '0')}.txt`),
+				'a\nb\n',
+			),
+		),
+	);
+	const service = createWorkspaceGitService({
+		localCommandService: realCommandService(),
+	});
+
+	const status = await service.getStatus({ workspaceCwd: workspace });
+	const files = status.files ?? [];
+
+	assert.equal(files.length, total);
+	assert.equal(
+		files.filter((file) => file.additions === 2).length,
+		MAX_COUNTED_UNTRACKED_FILES,
+	);
+	assert.equal(files.filter((file) => file.additions === null).length, 20);
+});
+
+test('counts untracked lines the same way a small set is counted', async (t) => {
+	const workspace = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-lines-'));
+	t.after(() => rm(workspace, { force: true, recursive: true }));
+	await execFileAsync('git', ['init', '-b', 'main'], { cwd: workspace });
+	await writeFile(path.join(workspace, 'trailing.txt'), 'a\nb\nc\n');
+	await writeFile(path.join(workspace, 'no-trailing.txt'), 'a\nb\nc');
+	await writeFile(path.join(workspace, 'empty.txt'), '');
+	await writeFile(path.join(workspace, 'binary.bin'), Buffer.from([1, 0, 2]));
+
+	const service = createWorkspaceGitService({
+		localCommandService: realCommandService(),
+	});
+	const status = await service.getStatus({ workspaceCwd: workspace });
+	const byPath = new Map(
+		(status.files ?? []).map((file) => [file.path, file.additions]),
+	);
+
+	assert.equal(byPath.get('trailing.txt'), 3);
+	assert.equal(byPath.get('no-trailing.txt'), 3);
+	assert.equal(byPath.get('empty.txt'), 0);
+	assert.equal(byPath.get('binary.bin'), null);
 });
 
 test('discardChanges reverts a tracked file to HEAD', async (t) => {

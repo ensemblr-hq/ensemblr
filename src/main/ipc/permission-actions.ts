@@ -97,6 +97,8 @@ export const IPC_PERMISSION_ACTIONS = {
 	dictationKeyStatus: null,
 	setDictationApiKey: 'app-settings-change',
 	transcribeAudio: null,
+	acknowledgeObfuscatedStorage: 'app-settings-change',
+	getObfuscatedStorageStatus: null,
 	addEnvFile: 'app-settings-change',
 	environmentVariables: null,
 	listEnvFiles: null,

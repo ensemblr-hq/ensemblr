@@ -764,6 +764,7 @@ export default interface Resources {
 			'not-file': 'That path is not a file.';
 			'not-found': 'That path was not found.';
 			'nothing-to-commit': 'Nothing to commit — the working tree is clean.';
+			'obfuscated-storage-unacknowledged': 'No keyring daemon answered, so this secret would only be obfuscated rather than encrypted. Accept the weaker protection in Settings › Diagnostics, or start gnome-keyring or KWallet.';
 			'open-target-app-not-installed': 'That app is not installed on this machine.';
 			'open-target-no-desktop-launcher': 'That app is only installed as a desktop entry, and neither gio nor gtk-launch is available to start it. Install glib or gtk3.';
 			'owner-invalid': 'That GitHub owner is not a valid login.';
@@ -1711,6 +1712,13 @@ export default interface Resources {
 		diagnostics: {
 			'copy-bundle': 'Copy diagnostics bundle';
 			description: 'Setup gate checks for Pi, git, GitHub, Linear, and the Ensemblr runtime. The diagnostics bundle redacts secrets, account ids, and full paths before going to the clipboard.';
+			'obfuscated-storage': {
+				acknowledge: 'Accept and store secrets anyway';
+				'acknowledge-failed': 'Could not record the acknowledgement: {{error}}.';
+				acknowledged: 'You accepted that the {{backend}} backend only obfuscates stored secrets on this machine, not encrypts them.';
+				description: 'No keyring daemon answered, so Ensemblr falls back to the {{backend}} backend, which obfuscates stored secrets with a key published in its own source rather than encrypting them. Anyone who can read the local database file can recover them. Start gnome-keyring or KWallet for real encryption, or accept the weaker protection to keep using secrets on this machine.';
+				title: 'Secrets are only obfuscated, not encrypted';
+			};
 			'rerun-onboarding': {
 				action: 'Re-run wizard';
 				description: 'Reopen the first-run setup wizard. Nothing already configured is undone — the wizard re-probes every check and walks you through whatever is still unresolved.';

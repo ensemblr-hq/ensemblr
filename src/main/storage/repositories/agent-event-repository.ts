@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import type { DatabaseSync } from 'node:sqlite';
+import type { DatabaseSync, StatementSync } from 'node:sqlite';
 
 import type { AgentPersistedEnvelope } from '../../../shared/ipc/contracts/agent-session';
+import { rollbackQuietly } from '../tx.ts';
+import { capPersistedPayload } from './agent-event-payload-cap.ts';
 
 /** Source stream a persisted agent event came from: the protocol channel or stderr. */
 export type AgentEventStream = 'protocol' | 'stderr';
@@ -71,8 +73,91 @@ WHERE branch_id = ?
 ORDER BY ordinal DESC`;
 
 /**
- * Appends a single event to a branch with auto-incremented ordinal. Transaction
- * scoped so concurrent appenders don't allocate the same ordinal.
+ * One append is one statement: the ordinal is allocated by a subquery inside
+ * the `INSERT` — atomic on its own, and `UNIQUE(branch_id, ordinal)` is the
+ * backstop — and `RETURNING` hands back the two columns SQLite owns, so no
+ * `BEGIN`/`COMMIT` pair, no `MAX(ordinal)` probe, and no read-back `SELECT`.
+ * The write path runs ~99,000 times a day on one developer's machine, and the
+ * five statements it used to compile per event were all on the main thread.
+ */
+const INSERT_EVENT = `INSERT INTO agent_session_events
+	(id, branch_id, turn_id, ordinal, event_type, stream, payload_json, created_at)
+	VALUES (?, ?, ?, (SELECT COALESCE(MAX(ordinal), -1) + 1 FROM agent_session_events WHERE branch_id = ?), ?, ?, ?, ${CREATED_AT_VALUE})
+	RETURNING ordinal, created_at`;
+
+/**
+ * Prepared statements are cached per connection rather than compiled per
+ * append. Keyed weakly so the statements are released with the database.
+ */
+const insertStatementsByDatabase = new WeakMap<DatabaseSync, StatementSync>();
+
+/** Columns `RETURNING` hands back from an event insert. */
+interface InsertedEventShape {
+	created_at: string;
+	ordinal: number;
+}
+
+/**
+ * Returns this connection's cached event-insert statement, compiling it once.
+ * @param database - Open SQLite connection.
+ * @returns The prepared insert.
+ */
+function insertEventStatement(database: DatabaseSync): StatementSync {
+	const cached = insertStatementsByDatabase.get(database);
+	if (cached) {
+		return cached;
+	}
+	const prepared = database.prepare(INSERT_EVENT);
+	insertStatementsByDatabase.set(database, prepared);
+	return prepared;
+}
+
+/**
+ * Inserts one event and returns the row as persisted, capping an oversized
+ * payload first so the caller broadcasts exactly what landed on disk.
+ * @param database - Open SQLite connection.
+ * @param input - Event to append, with its branch resolved.
+ * @returns The persisted row.
+ */
+function insertAgentEvent(
+	database: DatabaseSync,
+	input: AppendAgentEventInput,
+): AgentEventRow {
+	const id = randomUUID();
+	const stream: AgentEventStream = input.stream ?? 'protocol';
+	const payload = capPersistedPayload(input.payload ?? null);
+
+	const inserted = insertEventStatement(database).get(
+		id,
+		input.branchId,
+		input.turnId ?? null,
+		input.branchId,
+		input.eventType,
+		stream,
+		serializePayload(payload),
+		input.createdAt ?? null,
+	) as unknown as InsertedEventShape | undefined;
+
+	if (!inserted) {
+		throw new Error('agent-event-repository: event insert did not round-trip');
+	}
+
+	return {
+		branchId: input.branchId,
+		createdAt: inserted.created_at,
+		eventType: input.eventType,
+		id,
+		ordinal: inserted.ordinal,
+		payload,
+		stream,
+		turnId: input.turnId ?? null,
+	};
+}
+
+/**
+ * Appends a single event to a branch with auto-incremented ordinal. The ordinal
+ * is allocated inside the insert, so the statement is atomic without an
+ * explicit transaction.
  */
 export function appendAgentEvent({
 	database,
@@ -81,51 +166,12 @@ export function appendAgentEvent({
 	database: DatabaseSync;
 	input: AppendAgentEventInput;
 }): AgentEventRow {
-	const id = randomUUID();
-	const stream: AgentEventStream = input.stream ?? 'protocol';
-	const payload = serializePayload(input.payload);
-
-	database.exec('BEGIN IMMEDIATE');
-	try {
-		const next = database
-			.prepare(
-				`SELECT COALESCE(MAX(ordinal), -1) + 1 AS next FROM agent_session_events WHERE branch_id = ?`,
-			)
-			.get(input.branchId) as { next: number };
-
-		database
-			.prepare(
-				`INSERT INTO agent_session_events
-					(id, branch_id, turn_id, ordinal, event_type, stream, payload_json, created_at)
-					VALUES (?, ?, ?, ?, ?, ?, ?, ${CREATED_AT_VALUE})`,
-			)
-			.run(
-				id,
-				input.branchId,
-				input.turnId ?? null,
-				next.next,
-				input.eventType,
-				stream,
-				payload,
-				input.createdAt ?? null,
-			);
-
-		database.exec('COMMIT');
-	} catch (error) {
-		database.exec('ROLLBACK');
-		throw error;
-	}
-
-	const row = getEventById({ database, id });
-	if (!row) {
-		throw new Error('agent-event-repository: event insert did not round-trip');
-	}
-	return row;
+	return insertAgentEvent(database, input);
 }
 
 /**
- * Appends many events in one transaction. Ordinal allocation reuses the same
- * `max + 1` seed and increments locally.
+ * Appends many events in one transaction, reusing the single cached insert so a
+ * burst costs one commit instead of one per event.
  */
 export function appendAgentEvents({
 	database,
@@ -140,66 +186,17 @@ export function appendAgentEvents({
 		return [];
 	}
 
-	const insertedIds: string[] = [];
 	database.exec('BEGIN IMMEDIATE');
 	try {
-		const next = database
-			.prepare(
-				`SELECT COALESCE(MAX(ordinal), -1) + 1 AS next FROM agent_session_events WHERE branch_id = ?`,
-			)
-			.get(branchId) as { next: number };
-
-		const insertStatement = database.prepare(
-			`INSERT INTO agent_session_events
-				(id, branch_id, turn_id, ordinal, event_type, stream, payload_json, created_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ${CREATED_AT_VALUE})`,
+		const rows = events.map((event) =>
+			insertAgentEvent(database, { ...event, branchId }),
 		);
-
-		events.forEach((event, index) => {
-			const id = randomUUID();
-			insertStatement.run(
-				id,
-				branchId,
-				event.turnId ?? null,
-				next.next + index,
-				event.eventType,
-				event.stream ?? 'protocol',
-				serializePayload(event.payload),
-				event.createdAt ?? null,
-			);
-			insertedIds.push(id);
-		});
-
 		database.exec('COMMIT');
+		return rows;
 	} catch (error) {
-		database.exec('ROLLBACK');
+		rollbackQuietly(database);
 		throw error;
 	}
-
-	return insertedIds.map((id) => {
-		const row = getEventById({ database, id });
-		if (!row) {
-			throw new Error(
-				'agent-event-repository: batch event insert did not round-trip',
-			);
-		}
-		return row;
-	});
-}
-
-/** Returns the event row, or `null` when no row matches. */
-export function getEventById({
-	database,
-	id,
-}: {
-	database: DatabaseSync;
-	id: string;
-}): AgentEventRow | null {
-	const row = database.prepare(`${SELECT_EVENT} WHERE id = ?`).get(id) as
-		| EventRowShape
-		| undefined;
-
-	return row ? mapEventRow(row) : null;
 }
 
 /** Returns the largest ordinal stored for a branch, or -1 when empty. */
@@ -250,6 +247,55 @@ export function listEventsByBranch({
 		.all(...values) as unknown as EventRowShape[];
 
 	return rows.map(mapEventRow);
+}
+
+/** A window of a branch's newest events, plus whether older ones remain. */
+export interface BranchEventTail {
+	events: readonly AgentEventRow[];
+	hasOlder: boolean;
+}
+
+/**
+ * Reads the newest events of a branch in ordinal order, ending before
+ * `beforeOrdinal` when paging back.
+ *
+ * Replay needs the *tail*, and the ordered read is ASC, so a bare `LIMIT n`
+ * would return the oldest `n` — the wrong end of a 26,922-event branch, whose
+ * unbounded read measured ~460 ms of blocked main thread and 13.5 MB across one
+ * IPC reply. The window is taken DESC against `UNIQUE(branch_id, ordinal)` and
+ * reversed in memory, and one extra row is read to answer `hasOlder` without a
+ * second query.
+ * @param params - Database, branch, exclusive upper ordinal bound, and window size.
+ * @returns The window in ascending ordinal order, and whether older events remain.
+ */
+export function listBranchEventTail({
+	database,
+	branchId,
+	beforeOrdinal,
+	limit,
+}: {
+	beforeOrdinal?: number;
+	branchId: string;
+	database: DatabaseSync;
+	limit: number;
+}): BranchEventTail {
+	const values: Array<number | string> = [branchId];
+	const bound = typeof beforeOrdinal === 'number' ? ' AND ordinal < ?' : '';
+	if (typeof beforeOrdinal === 'number') {
+		values.push(beforeOrdinal);
+	}
+	values.push(limit + 1);
+
+	const rows = database
+		.prepare(
+			`${SELECT_EVENT} WHERE branch_id = ?${bound} ORDER BY ordinal DESC LIMIT ?`,
+		)
+		.all(...values) as unknown as EventRowShape[];
+
+	const hasOlder = rows.length > limit;
+	const window = hasOlder ? rows.slice(0, limit) : rows;
+
+	return { events: window.reverse().map(mapEventRow), hasOlder };
 }
 
 /**
@@ -316,7 +362,7 @@ function mapEventRow(row: EventRowShape): AgentEventRow {
  * @returns The JSON string, or `'{}'` when absent or serialization fails
  */
 function serializePayload(payload: AgentEventPayload | undefined): string {
-	if (payload === undefined) {
+	if (payload === undefined || payload === null) {
 		return '{}';
 	}
 	try {

@@ -479,7 +479,7 @@ test('safe storage refuses a write under an obfuscating keyring until it is ackn
 	});
 
 	assert.equal(
-		readObfuscatedStorageAcknowledgement(connection.database),
+		readObfuscatedStorageAcknowledgement(connection.database, 'basic_text'),
 		false,
 	);
 	await assert.rejects(
@@ -490,7 +490,7 @@ test('safe storage refuses a write under an obfuscating keyring until it is ackn
 	);
 	assert.deepEqual(await store.listMetadata(), []);
 
-	writeObfuscatedStorageAcknowledgement(connection.database);
+	writeObfuscatedStorageAcknowledgement(connection.database, 'basic_text');
 
 	const metadata = await store.create({
 		key: 'LINEAR_TOKEN',
@@ -502,6 +502,27 @@ test('safe storage refuses a write under an obfuscating keyring until it is ackn
 	assert.equal(
 		await store.read({ key: 'LINEAR_TOKEN', scope: 'app' }),
 		'lin_api_1',
+	);
+});
+
+test('an acknowledgement is keyed on the backend id, not just recorded once', async (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	writeObfuscatedStorageAcknowledgement(connection.database, 'basic_text');
+
+	assert.equal(
+		readObfuscatedStorageAcknowledgement(connection.database, 'basic_text'),
+		true,
+	);
+	assert.equal(
+		readObfuscatedStorageAcknowledgement(connection.database, 'unknown'),
+		false,
 	);
 });
 

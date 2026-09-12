@@ -96,6 +96,7 @@ import { registerRepositorySettingsHandlers } from './handlers/repository-settin
 import { registerRepositorySourcesHandlers } from './handlers/repository-sources';
 import { registerReviewHandlers } from './handlers/review';
 import { registerRootHandlers } from './handlers/root';
+import { registerSecretsHandlers } from './handlers/secrets';
 import { registerSettingsHandlers } from './handlers/settings';
 import { registerSettingsPublicationHandlers } from './handlers/settings-publication';
 import { registerSetupHandlers } from './handlers/setup';
@@ -294,6 +295,7 @@ export function registerIpcHandlers({
 			registerActiveChatHandlers({ activeChatStore });
 			registerAppSettingsHandlers({ appSettingsService, onAppSettingsUpdated });
 			registerDictationHandlers({ dictationService });
+			registerSecretsHandlers({ databaseService });
 			registerEnvironmentHandlers({ environmentVariablesService });
 			registerInfisicalHandlers({ getInfisicalService });
 			registerHealthHandlers({ configService, databaseService });

@@ -226,6 +226,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 		dictationKeyStatus: () => invoke('dictationKeyStatus'),
 		setDictationApiKey: (request) => invoke('setDictationApiKey', request),
 		transcribeAudio: (request) => invoke('transcribeAudio', request),
+		acknowledgeObfuscatedStorage: () => invoke('acknowledgeObfuscatedStorage'),
+		getObfuscatedStorageStatus: () => invoke('getObfuscatedStorageStatus'),
 		linearCancelLogin: () => invoke('linearCancelLogin'),
 		linearConnectionStatus: () => invoke('linearConnectionStatus'),
 		linearCreateComment: (request) => invoke('linearCreateComment', request),

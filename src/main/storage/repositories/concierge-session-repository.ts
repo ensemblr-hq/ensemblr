@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import type { AgentProviderId } from '../../../shared/agent-provider.ts';
 import type { AgentPersistedEnvelope } from '../../../shared/ipc/contracts/agent-session';
+import { rollbackQuietly } from '../tx.ts';
 import { parseMetadata, serializeMetadata } from './metadata-json.ts';
 
 /** Lifecycle status of a Concierge session, mirroring the agent-session vocabulary. */
@@ -391,7 +392,7 @@ export function appendConciergeEvent({
 
 		database.exec('COMMIT');
 	} catch (error) {
-		database.exec('ROLLBACK');
+		rollbackQuietly(database);
 		throw error;
 	}
 

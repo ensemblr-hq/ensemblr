@@ -14,6 +14,7 @@ import {
 	openEnsemblrDatabase,
 	resolveDefaultDatabasePath,
 } from '../../src/main/storage/database.ts';
+import { reserveAgentControlSpawn } from '../../src/main/storage/repositories/agent-control-spawn-repository.ts';
 
 const EXPECTED_MIGRATIONS = [
 	'001_foundation_metadata',
@@ -44,6 +45,9 @@ const EXPECTED_MIGRATIONS = [
 	'026_infisical_discovery_dismissals',
 	'027_architecture_diagram',
 	'028_agent_control_spawn_reservations',
+	'029_agent_event_index_hygiene',
+	'030_chat_tab_closed_at_index',
+	'031_spawn_reservation_workspace',
 ];
 
 const AGENT_VOCABULARY_MIGRATION_VERSION = 14;
@@ -1925,5 +1929,209 @@ test('widens the chat-tab kinds to diagram without losing tabs or their runtime 
 			"SELECT id FROM chat_tabs WHERE kind = 'diagram'",
 		),
 		[{ id: 'tab-diagram' }],
+	);
+});
+
+test('refuses a database a newer build already migrated', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	connection.database.exec(
+		`PRAGMA user_version = ${LATEST_SCHEMA_VERSION + 2};`,
+	);
+	connection.database.close();
+
+	assert.throws(
+		() => openEnsemblrDatabase({ databasePath: fixture.databasePath }),
+		(error: unknown) => {
+			const message = error instanceof Error ? error.message : '';
+			return (
+				message.includes(String(LATEST_SCHEMA_VERSION + 2)) &&
+				message.includes(String(LATEST_SCHEMA_VERSION))
+			);
+		},
+	);
+
+	const health = createEnsemblrDatabaseService({
+		databasePath: fixture.databasePath,
+	}).open();
+	assert.equal(health.status, 'error');
+});
+
+test('configures WAL with NORMAL durability and in-memory temp storage', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	const readPragma = (name: string): unknown =>
+		Object.values(
+			(connection.database.prepare(`PRAGMA ${name}`).get() ?? {}) as Record<
+				string,
+				unknown
+			>,
+		)[0];
+
+	assert.equal(readPragma('journal_mode'), 'wal');
+	assert.equal(readPragma('synchronous'), 1);
+	assert.equal(readPragma('temp_store'), 2);
+});
+
+test('migration 029 drops the duplicate and unread event indexes', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	const indexNames = readRows(
+		connection.database,
+		`SELECT name FROM sqlite_master
+		 WHERE type = 'index' AND tbl_name = 'agent_session_events'
+		 ORDER BY name`,
+	).map((row) => row.name as string);
+
+	assert.equal(
+		indexNames.includes('idx_agent_session_events_branch_ordinal'),
+		false,
+	);
+	assert.equal(indexNames.includes('idx_agent_session_events_type'), false);
+	assert.equal(indexNames.includes('idx_agent_session_events_turn_id'), true);
+});
+
+test('migration 030 gives the closed-tab history a partial index', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	const plan = readRows(
+		connection.database,
+		`EXPLAIN QUERY PLAN
+		 SELECT id FROM chat_tabs WHERE closed_at IS NOT NULL ORDER BY closed_at DESC LIMIT 20`,
+	)
+		.map((row) => String(row.detail))
+		.join(' ');
+
+	assert.equal(plan.includes('idx_chat_tabs_closed_at'), true);
+	assert.equal(plan.includes('TEMP B-TREE'), false);
+});
+
+test('migration 031 cascades spawn reservations with their workspace', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	connection.database.exec(`
+INSERT INTO repositories (id, slug, name, path, default_branch)
+VALUES ('repo-spawn', 'spawn', 'Spawn', '/tmp/ensemblr/spawn', 'main');
+INSERT INTO workspaces (id, repository_id, slug, name, path)
+VALUES ('ws-spawn', 'repo-spawn', 'spawn', 'Spawn', '/tmp/ensemblr/spawn/ws');
+INSERT INTO agent_control_spawn_reservations (id, root_session_id, workspace_id, reserved_at)
+VALUES ('res-1', 'root-1', 'ws-spawn', 1);
+INSERT INTO agent_control_spawn_reservations (id, root_session_id, workspace_id, reserved_at)
+VALUES ('res-legacy', 'root-1', NULL, 2);
+`);
+
+	assert.deepEqual(
+		listForeignKeys(connection.database, 'agent_control_spawn_reservations'),
+		[
+			{
+				on_delete: 'CASCADE',
+				source_column: 'workspace_id',
+				target_table: 'workspaces',
+			},
+		],
+	);
+
+	connection.database
+		.prepare('DELETE FROM workspaces WHERE id = ?')
+		.run('ws-spawn');
+
+	assert.deepEqual(
+		readRows(
+			connection.database,
+			'SELECT id FROM agent_control_spawn_reservations ORDER BY id',
+		),
+		[{ id: 'res-legacy' }],
+	);
+});
+
+test('a spawn reservation is attributed to its workspace, or to none at all', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	connection.database.exec(`
+INSERT INTO repositories (id, slug, name, path, default_branch)
+VALUES ('repo-attr', 'attr', 'Attr', '/tmp/ensemblr/attr', 'main');
+INSERT INTO workspaces (id, repository_id, slug, name, path)
+VALUES ('ws-attr', 'repo-attr', 'attr', 'Attr', '/tmp/ensemblr/attr/ws');
+`);
+
+	const reserve = (rootSessionId: string, workspaceId?: string) =>
+		reserveAgentControlSpawn({
+			at: 1,
+			database: connection.database,
+			maxRecent: 10,
+			maxTotal: 10,
+			rootSessionId,
+			windowStart: 0,
+			workspaceId,
+		});
+
+	assert.equal(reserve('root-attr', 'ws-attr').status, 'reserved');
+	// The Concierge's origin carries an empty workspace id, and a harness can
+	// register before its workspace row is committed. Neither may fail the spawn.
+	assert.equal(reserve('root-concierge', '').status, 'reserved');
+	assert.equal(reserve('root-unknown', 'ws-missing').status, 'reserved');
+	assert.equal(reserve('root-none', undefined).status, 'reserved');
+
+	assert.deepEqual(
+		readRows(
+			connection.database,
+			'SELECT root_session_id, workspace_id FROM agent_control_spawn_reservations ORDER BY root_session_id',
+		),
+		[
+			{ root_session_id: 'root-attr', workspace_id: 'ws-attr' },
+			{ root_session_id: 'root-concierge', workspace_id: null },
+			{ root_session_id: 'root-none', workspace_id: null },
+			{ root_session_id: 'root-unknown', workspace_id: null },
+		],
+	);
+
+	connection.database
+		.prepare('DELETE FROM workspaces WHERE id = ?')
+		.run('ws-attr');
+
+	assert.deepEqual(
+		readRows(
+			connection.database,
+			'SELECT root_session_id FROM agent_control_spawn_reservations ORDER BY root_session_id',
+		),
+		[
+			{ root_session_id: 'root-concierge' },
+			{ root_session_id: 'root-none' },
+			{ root_session_id: 'root-unknown' },
+		],
 	);
 });
