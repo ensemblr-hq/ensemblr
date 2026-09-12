@@ -511,7 +511,9 @@ function failedApply(
 /**
  * Normalizes thrown values into a non-secret IPC failure. An unexpected throw
  * carries filesystem paths in its message, so the renderer gets an authored
- * sentence and the operator gets the original in the main-process log.
+ * sentence and the operator gets the original in the main-process log. It also
+ * gets its own code rather than a recovery-specific one: preview, apply, and
+ * cleanup all reach here, and each would otherwise name the wrong operation.
  * @param error - Value thrown by one guarded operation.
  * @returns The renderer-safe failure envelope.
  */
@@ -521,7 +523,7 @@ function toFailure(error: unknown): SettingsPublicationFailure {
 	}
 	console.error('[settings-publication] unexpected failure', error);
 	return {
-		code: 'recovery-failed',
+		code: 'publication-unexpected',
 		message: 'Settings publication failed unexpectedly.',
 	};
 }

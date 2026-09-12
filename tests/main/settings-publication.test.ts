@@ -260,6 +260,27 @@ test('rejects a symlinked workspace settings path', () => {
 	assert.equal(result.failure?.code, 'path-unsafe');
 });
 
+test('refuses a root settings file larger than the publication limit', () => {
+	const fixture = createFixture();
+	fixture.writeRoot(`# ${'x'.repeat(1024 * 1024)}\n`);
+
+	const result = preview(fixture);
+
+	assert.equal(result.preview, null);
+	assert.equal(result.failure?.code, 'source-unreadable');
+});
+
+test('refuses a workspace settings file larger than the publication limit', () => {
+	const fixture = createFixture();
+	fixture.writeRoot('[scripts]\nsetup = "root"\n');
+	fixture.writeWorkspace(`# ${'x'.repeat(1024 * 1024)}\n`);
+
+	const result = preview(fixture);
+
+	assert.equal(result.preview, null);
+	assert.equal(result.failure?.code, 'target-unreadable');
+});
+
 test('publishes and cleans an untracked root settings file', () => {
 	const fixture = createFixture('');
 	git(fixture.repositoryPath, 'rm', SETTINGS_PATH);

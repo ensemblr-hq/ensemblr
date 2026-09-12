@@ -11,7 +11,7 @@ import type {
 	UpdateRepositoryScriptsResult,
 } from '../../../shared/ipc/contracts/workspace-scripts';
 import {
-	resolveWorkspaceSettingsTarget,
+	resolveWritableWorkspaceCheckout,
 	writeRepositoryScripts,
 } from '../../config';
 import type { ScriptLifecycleService } from '../../scripts';
@@ -94,15 +94,15 @@ function saveRepositoryScripts(
 		return { ok: false };
 	}
 
-	const target = resolveWorkspaceSettingsTarget({
+	const checkoutPath = resolveWritableWorkspaceCheckout({
 		database,
 		repositoryId: parsed.repositoryId,
 		workspaceId: parsed.workspaceId,
 	});
 
-	if (!target) {
+	if (!checkoutPath) {
 		console.error(
-			'[workspace-scripts] no known repository for',
+			'[workspace-scripts] no writable workspace checkout for',
 			parsed.repositoryId,
 			parsed.workspaceId,
 		);
@@ -111,7 +111,7 @@ function saveRepositoryScripts(
 
 	const result = writeRepositoryScripts({
 		...parsed,
-		repositoryPath: target.workspacePath,
+		repositoryPath: checkoutPath,
 	});
 
 	if (!result.ok) {

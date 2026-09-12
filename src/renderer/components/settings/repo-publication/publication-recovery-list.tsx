@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
+	ensemblrQueryKeys,
 	restoreSettingsPublication,
 	settingsPublicationRecoveryStatusQuery,
 } from '@/renderer/api/ensemblr';
@@ -117,7 +118,9 @@ function RecoveryRow({
 /**
  * The durable snapshots taken around each publication, newest first. Each one
  * can put back the workspace file as it stood before the publication, or the
- * root file as it stood before its cleanup.
+ * root file as it stood before its cleanup. A restore rewrites one of the two
+ * files the open preview was merged from, so it invalidates that preview as
+ * well as this list — an apply against a stale token is refused by the backend.
  */
 export function PublicationRecoveryList({
 	repositoryId,
@@ -142,10 +145,18 @@ export function PublicationRecoveryList({
 		}) => restoreSettingsPublication(input),
 		onError: () => setRestoreFailure(unexpectedPublicationFailure(t)),
 		onSuccess: async (result) => {
-			setRestoreFailure(result.status === 'restored' ? null : result.failure);
+			const restored = result.status === 'restored';
+
+			setRestoreFailure(restored ? null : result.failure);
 			await queryClient.invalidateQueries({
 				queryKey: settingsPublicationRecoveryStatusQuery(repositoryId).queryKey,
 			});
+
+			if (restored) {
+				await queryClient.invalidateQueries({
+					queryKey: ensemblrQueryKeys.settingsPublicationPreviews(repositoryId),
+				});
+			}
 		},
 	});
 
@@ -156,6 +167,17 @@ export function PublicationRecoveryList({
 					'settings:repo.publication.recovery.loading',
 					'Reading recovery snapshots…',
 				)}
+			/>
+		);
+	}
+
+	if (recoveryQuery.isError) {
+		return (
+			<SettingsErrorState
+				message={unexpectedPublicationFailure(t).message}
+				onRetry={() => {
+					void recoveryQuery.refetch();
+				}}
 			/>
 		);
 	}

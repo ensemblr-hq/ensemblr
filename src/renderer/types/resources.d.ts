@@ -713,6 +713,7 @@ export default interface Resources {
 			'git-worktree-failed': 'The worktree could not be created.';
 			'infisical-account-exists': 'That Client ID is already configured for this Infisical instance.';
 			'infisical-account-not-found': 'That Infisical account is no longer configured.';
+			'infisical-clear-workspace-required': 'The link is cleared on this machine, but its [infisical] block is still committed in .ensemblr/settings.toml. Open a workspace for this repository, then clear it again.';
 			'infisical-config-write-failed': 'The link works on this machine, but .ensemblr/settings.toml could not be updated, so nobody who clones this repository will inherit it.';
 			'infisical-invalid-credentials': 'Infisical rejected these credentials. Check the Client ID and Client Secret, then retry.';
 			'infisical-invalid-request': 'Infisical rejected the request. Check the instance URL and the selected project.';
@@ -778,6 +779,7 @@ export default interface Resources {
 			'pruned-branch-missing': 'The branch this workspace was archived on no longer exists, so its files could not be restored.';
 			'pruned-snapshot-missing': 'The commit this workspace was archived at is no longer in the repository, so its files could not be restored.';
 			'pruned-snapshot-restore-failed': 'The branch was checked out, but the uncommitted changes saved when the workspace was archived could not be restored.';
+			'publication-unexpected': 'That settings operation failed unexpectedly. Check the workspace’s file before trying again.';
 			'publish-failed': 'The project was created locally, but publishing it to GitHub failed.';
 			'read-failed': 'That file could not be read.';
 			'reconcile-child-not-directory': 'An entry under the root is not a directory and was skipped.';
@@ -2409,7 +2411,7 @@ export default interface Resources {
 				title: 'Settings file';
 				unexpected: 'Ensemblr could not complete the request. Nothing was changed — try again.';
 				'workspace-target': {
-					description: 'The merged file is written on this workspace’s branch, the same as any other commit.';
+					description: 'The merged file is written on this workspace’s branch, as an uncommitted change you can review and commit.';
 					label: 'Publish to workspace';
 				};
 			};
@@ -2431,7 +2433,7 @@ export default interface Resources {
 				'no-workspace': 'Scripts are saved to a live workspace’s branch. Open a workspace for this repository first.';
 				title: 'Scripts';
 				'workspace-target': {
-					description: 'This file is saved on the chosen workspace’s branch, the same as any other commit.';
+					description: 'This file is saved on the chosen workspace’s branch, as an uncommitted change you can review and commit.';
 					label: 'Save to workspace';
 				};
 			};

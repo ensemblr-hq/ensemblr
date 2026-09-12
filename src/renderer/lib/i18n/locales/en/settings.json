@@ -764,7 +764,7 @@
 			"title": "Settings file",
 			"unexpected": "Ensemblr could not complete the request. Nothing was changed — try again.",
 			"workspace-target": {
-				"description": "The merged file is written on this workspace’s branch, the same as any other commit.",
+				"description": "The merged file is written on this workspace’s branch, as an uncommitted change you can review and commit.",
 				"label": "Publish to workspace"
 			}
 		},
@@ -786,7 +786,7 @@
 			"no-workspace": "Scripts are saved to a live workspace’s branch. Open a workspace for this repository first.",
 			"title": "Scripts",
 			"workspace-target": {
-				"description": "This file is saved on the chosen workspace’s branch, the same as any other commit.",
+				"description": "This file is saved on the chosen workspace’s branch, as an uncommitted change you can review and commit.",
 				"label": "Save to workspace"
 			}
 		},

@@ -163,6 +163,27 @@ describe('InfisicalLinkPanel', () => {
 		});
 	});
 
+	test('drops the synced key list once the link is saved again', async () => {
+		const user = userEvent.setup();
+		installApi();
+		api.syncInfisicalLink.mockResolvedValue({
+			failure: null,
+			keys: ['DATABASE_URL'],
+		});
+		renderPanel();
+
+		await user.click(await screen.findByRole('button', { name: /sync now/i }));
+		expect(await screen.findByText('DATABASE_URL')).toBeInTheDocument();
+
+		const [recursiveSwitch] = await screen.findAllByRole('switch');
+		await user.click(recursiveSwitch);
+		await user.click(await screen.findByRole('button', { name: /save link/i }));
+
+		await waitFor(() => {
+			expect(screen.queryByText('DATABASE_URL')).not.toBeInTheDocument();
+		});
+	});
+
 	test('renders the workspace-required failure', async () => {
 		const user = userEvent.setup();
 		installApi();

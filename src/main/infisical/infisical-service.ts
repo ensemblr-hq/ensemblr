@@ -46,6 +46,18 @@ const WORKSPACE_REQUIRED_FAILURE: InfisicalFailure = {
 	retryAfterSeconds: null,
 };
 
+/**
+ * The same refusal for an unlink, which has already cleared the local half by
+ * the time it runs: the committed block is what survives, so the sentence has
+ * to say the repository still carries it rather than that the link was saved.
+ */
+const CLEAR_WORKSPACE_REQUIRED_FAILURE: InfisicalFailure = {
+	code: 'infisical-clear-workspace-required',
+	message:
+		'The link is cleared on this machine, but .ensemblr/settings.toml needs a live workspace for its [infisical] block to be removed.',
+	retryAfterSeconds: null,
+};
+
 /** Resolved values for one scope, plus why they may be stale or missing. */
 export interface InfisicalResolution {
 	/** Locale-neutral reason the resolution is degraded, or null when it is clean. */
@@ -376,7 +388,9 @@ export function createInfisicalService({
 	 * not be written is a link nobody who clones the repository will inherit,
 	 * and the local half has already saved by the time this runs. A repository
 	 * with no live workspace is refused outright — the root clone is never the
-	 * fallback. Clearing is skipped only when the workspace has no settings file
+	 * fallback — and the refusal is worded for the half that already committed,
+	 * since a clear has dropped the local link by the time this runs while a
+	 * save has stored it. Clearing is skipped only when the workspace has no settings file
 	 * at all, so unlinking a project discovered in a `.infisical.json` never
 	 * creates one. A file that exists but does not parse still goes through the
 	 * writer, so the failure is reported.
@@ -389,7 +403,9 @@ export function createInfisicalService({
 		block: InfisicalRepositoryConfigBlock | null,
 	): InfisicalFailure | null {
 		if (!checkoutPath) {
-			return WORKSPACE_REQUIRED_FAILURE;
+			return block
+				? WORKSPACE_REQUIRED_FAILURE
+				: CLEAR_WORKSPACE_REQUIRED_FAILURE;
 		}
 
 		if (!block && !hasRepositorySettingsFile(checkoutPath)) {

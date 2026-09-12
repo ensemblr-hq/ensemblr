@@ -204,10 +204,15 @@ export const ensemblrQueryKeys = {
 		workspaceId: string | undefined,
 	) =>
 		[
+			...ensemblrQueryKeys.settingsPublicationPreviews(repositoryId),
+			workspaceId,
+		] as const,
+	/** Query key prefix covering every workspace's preview for one repository. */
+	settingsPublicationPreviews: (repositoryId: string) =>
+		[
 			...ensemblrQueryKeys.all,
 			'settings-publication-preview',
 			repositoryId,
-			workspaceId,
 		] as const,
 	/** Query key for a repository's durable settings-publication recovery records. */
 	settingsPublicationRecoveryStatus: (repositoryId: string) =>

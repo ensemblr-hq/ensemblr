@@ -3,11 +3,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import {
 	closeSync,
 	existsSync,
+	fstatSync,
 	lstatSync,
 	mkdirSync,
 	mkdtempSync,
 	openSync,
-	readFileSync,
+	readSync,
 	realpathSync,
 	renameSync,
 	rmSync,
@@ -89,6 +90,24 @@ export function validateRepositoryPair(target: WorkspaceSettingsTarget): void {
 	}
 }
 
+/**
+ * Reports whether a resolved target is still the live worktree pair it was
+ * recorded as, so a settings write never lands in a directory the workspace has
+ * since moved away from or that belongs to another repository.
+ * @param target - Target resolved from the stored workspace record.
+ * @returns True when both checkouts validate as worktrees of one repository.
+ */
+export function isWritableWorkspaceTarget(
+	target: WorkspaceSettingsTarget,
+): boolean {
+	try {
+		validateRepositoryPair(target);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 /** Captures a worktree settings file with a bounded content hash. */
 export function captureSettingsFile(
 	repositoryPath: string,
@@ -100,9 +119,7 @@ export function captureSettingsFile(
 		return captureBytes(null);
 	}
 	try {
-		const bytes = readFileSync(filePath);
-		ensureBounded(bytes);
-		return captureBytes(bytes);
+		return captureBytes(readBoundedSettings(filePath));
 	} catch {
 		throw new SettingsPublicationError(
 			role === 'source' ? 'source-unreadable' : 'target-unreadable',
@@ -359,11 +376,43 @@ export function sameCapturedFile(
 /** Rejects oversized settings before they cross IPC or enter recovery storage. */
 function ensureBounded(bytes: Buffer): void {
 	if (bytes.byteLength > MAX_SETTINGS_BYTES) {
-		throw new SettingsPublicationError(
-			'source-unreadable',
-			'Settings exceed the 1 MiB publication limit.',
-		);
+		throw settingsTooLarge();
 	}
+}
+
+/**
+ * Reads a settings file without ever allocating more than the publication
+ * limit, so an oversized file on disk is refused rather than pulled into the
+ * main process first. A file that grew past the size just measured is refused
+ * on the same path, since the bytes read would be a truncated prefix.
+ * @param filePath - Settings file to read.
+ * @returns The file's bytes, always within the publication limit.
+ */
+function readBoundedSettings(filePath: string): Buffer {
+	const descriptor = openSync(filePath, 'r');
+	try {
+		const size = fstatSync(descriptor).size;
+		if (size > MAX_SETTINGS_BYTES) {
+			throw settingsTooLarge();
+		}
+		const capacity = size + 1;
+		const buffer = Buffer.alloc(capacity);
+		const read = readSync(descriptor, buffer, 0, capacity, 0);
+		if (read >= capacity) {
+			throw settingsTooLarge();
+		}
+		return buffer.subarray(0, read);
+	} finally {
+		closeSync(descriptor);
+	}
+}
+
+/** Builds the shared oversized-settings failure. */
+function settingsTooLarge(): SettingsPublicationError {
+	return new SettingsPublicationError(
+		'source-unreadable',
+		'Settings exceed the 1 MiB publication limit.',
+	);
 }
 
 /** Rejects symlinked roots, config directories, and settings files. */

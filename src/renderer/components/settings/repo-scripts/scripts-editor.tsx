@@ -56,7 +56,7 @@ export function ScriptsEditor({
 			<SettingsWorkspaceTargetRow
 				description={t(
 					'settings:repo.scripts.workspace-target.description',
-					'This file is saved on the chosen workspace’s branch, the same as any other commit.',
+					'This file is saved on the chosen workspace’s branch, as an uncommitted change you can review and commit.',
 				)}
 				label={t(
 					'settings:repo.scripts.workspace-target.label',

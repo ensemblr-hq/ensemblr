@@ -9,6 +9,7 @@ export type SettingsPublicationFailureCode =
 	| 'path-unsafe'
 	| 'preview-not-found'
 	| 'preview-stale'
+	| 'publication-unexpected'
 	| 'recovery-failed'
 	| 'recovery-not-found'
 	| 'source-changed'

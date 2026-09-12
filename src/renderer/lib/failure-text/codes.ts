@@ -138,6 +138,11 @@ export const APP_FAILURE_TEXT: Record<
 			'errors:failure.infisical-account-not-found',
 			'That Infisical account is no longer configured.',
 		),
+	'infisical-clear-workspace-required': (t) =>
+		t(
+			'errors:failure.infisical-clear-workspace-required',
+			'The link is cleared on this machine, but its [infisical] block is still committed in .ensemblr/settings.toml. Open a workspace for this repository, then clear it again.',
+		),
 	'infisical-config-write-failed': (t) =>
 		t(
 			'errors:failure.infisical-config-write-failed',
@@ -1014,6 +1019,11 @@ export const APP_FAILURE_TEXT: Record<
 		t(
 			'errors:failure.preview-stale',
 			'The settings or Git state changed since this preview was prepared. Preview it again.',
+		),
+	'publication-unexpected': (t) =>
+		t(
+			'errors:failure.publication-unexpected',
+			'That settings operation failed unexpectedly. Check the workspace’s file before trying again.',
 		),
 	'recovery-failed': (t) =>
 		t(

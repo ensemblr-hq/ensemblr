@@ -52,6 +52,7 @@ export function useInfisicalLinkMutations(scopeRequest: {
 
 			if (!result.failure) {
 				setDraft(EMPTY_INFISICAL_DRAFT);
+				setSyncedKeys(null);
 			}
 
 			await invalidateLink();

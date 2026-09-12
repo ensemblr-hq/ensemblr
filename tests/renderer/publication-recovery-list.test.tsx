@@ -4,10 +4,11 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { ensemblrQueryKeys } from '@/renderer/api/ensemblr';
 import { PublicationRecoveryList } from '@/renderer/components/settings/repo-publication/publication-recovery-list';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { SettingsPublicationRecoverySnapshot } from '@/shared/ipc/contracts/settings-publication';
-import { renderWithProviders } from './support/dom';
+import { createTestQueryClient, renderWithProviders } from './support/dom';
 
 const api = vi.hoisted(() => ({
 	recoveryStatus: vi.fn(),
@@ -40,12 +41,16 @@ function recoveryRecord(
 	} as SettingsPublicationRecoverySnapshot;
 }
 
-function renderList(repositoryWorkspaces = workspaces) {
+function renderList(
+	repositoryWorkspaces = workspaces,
+	client?: ReturnType<typeof createTestQueryClient>,
+) {
 	return renderWithProviders(
 		<PublicationRecoveryList
 			repositoryId='repo-1'
 			workspaces={repositoryWorkspaces}
 		/>,
+		{ client },
 	);
 }
 
@@ -162,6 +167,50 @@ describe('PublicationRecoveryList', () => {
 				copy: 'destination',
 				recoveryId: 'recovery-1',
 			});
+		});
+	});
+
+	test('offers a retry when the recovery read rejects outright', async () => {
+		const user = userEvent.setup();
+		api.recoveryStatus.mockRejectedValueOnce(new Error('bridge is gone'));
+		renderList();
+
+		expect(
+			await screen.findByText(/could not complete the request/i),
+		).toBeInTheDocument();
+
+		api.recoveryStatus.mockResolvedValue({
+			failure: null,
+			recoveries: [recoveryRecord()],
+		});
+		await user.click(screen.getByRole('button', { name: /try again/i }));
+
+		expect(await screen.findByText(/feature work/i)).toBeInTheDocument();
+	});
+
+	test("invalidates the repository's publication previews after a restore", async () => {
+		const user = userEvent.setup();
+		api.recoveryStatus.mockResolvedValue({
+			failure: null,
+			recoveries: [recoveryRecord({ appliedAt: '2026-01-01T12:00:00.000Z' })],
+		});
+		const client = createTestQueryClient();
+		const previewKey = [
+			...ensemblrQueryKeys.settingsPublicationPreviews('repo-1'),
+			'ws-1',
+		];
+		client.setQueryData(previewKey, { failure: null, preview: null });
+		renderList(workspaces, client);
+
+		await user.click(
+			await screen.findByRole('button', { name: /restore workspace file/i }),
+		);
+		await user.click(
+			await screen.findByRole('button', { name: /restore it/i }),
+		);
+
+		await waitFor(() => {
+			expect(client.getQueryState(previewKey)?.isInvalidated).toBe(true);
 		});
 	});
 

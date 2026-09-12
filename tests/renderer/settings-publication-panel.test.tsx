@@ -97,6 +97,22 @@ describe('SettingsPublicationPanel', () => {
 		).toBeNull();
 	});
 
+	test('offers a retry when the preview call rejects outright', async () => {
+		const user = userEvent.setup();
+		api.preview.mockRejectedValueOnce(new Error('bridge is gone'));
+		renderPanel();
+
+		expect(
+			await screen.findByText(/could not complete the request/i),
+		).toBeInTheDocument();
+
+		await user.click(screen.getByRole('button', { name: /try again/i }));
+
+		expect(
+			await screen.findByRole('button', { name: /publish to workspace/i }),
+		).toBeInTheDocument();
+	});
+
 	test('publishes a clean preview with the token the backend issued', async () => {
 		const user = userEvent.setup();
 		renderPanel();

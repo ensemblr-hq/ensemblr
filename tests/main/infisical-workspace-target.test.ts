@@ -12,7 +12,7 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { expect, onTestFinished, test, vi } from 'vitest';
 
-import { resolveWorkspaceSettingsTarget } from '../../src/main/config/workspace-settings-target.ts';
+import { resolveWritableWorkspaceCheckout } from '../../src/main/config/index.ts';
 import { createInfisicalAccountStore } from '../../src/main/infisical/infisical-account-store.ts';
 import type { InfisicalApiClient } from '../../src/main/infisical/infisical-api.ts';
 import { createInfisicalCache } from '../../src/main/infisical/infisical-cache.ts';
@@ -137,8 +137,7 @@ async function createFixture({ archived = false } = {}): Promise<Fixture> {
 		client: createInfisicalClient({ accountStore, api: fakeApi() }),
 		linkStore: createInfisicalLinkStore({ database }),
 		resolveWorkspaceCheckout: ({ repositoryId, workspaceId }) =>
-			resolveWorkspaceSettingsTarget({ database, repositoryId, workspaceId })
-				?.workspacePath ?? null,
+			resolveWritableWorkspaceCheckout({ database, repositoryId, workspaceId }),
 	});
 	const added = await service.addAccount({
 		clientId: 'client-1',
@@ -308,7 +307,23 @@ test('unlinking with no resolvable workspace is refused rather than silently ski
 		workspaceId: 'workspace-missing',
 	});
 
-	expect(result.failure?.code).toBe('infisical-workspace-required');
+	expect(result.failure?.code).toBe('infisical-clear-workspace-required');
 	expect(fixture.readWorkspace()).toContain('project_id = "proj_1"');
 	expect(fixture.readRoot()).toBe(COMMITTED_BASE);
+});
+
+test('refuses a workspace row whose path is no longer a worktree', async () => {
+	const fixture = await createFixture();
+	rmSync(fixture.workspacePath, { force: true, recursive: true });
+	mkdirSync(fixture.workspacePath, { recursive: true });
+
+	const result = await fixture.service.setLink(
+		linkRequest(fixture.accountId, WORKSPACE_ID),
+	);
+
+	expect(result.failure?.code).toBe('infisical-workspace-required');
+	expect(fixture.readRoot()).toBe(COMMITTED_BASE);
+	expect(existsSync(path.join(fixture.workspacePath, SETTINGS_PATH))).toBe(
+		false,
+	);
 });

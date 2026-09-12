@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { previewSettingsPublication } from '@/renderer/api/ensemblr';
 import { ensemblrQueryKeys } from '@/renderer/api/ensemblr/query-keys';
 import { ConfirmDestructiveButton } from '@/renderer/components/settings/confirm-destructive-button';
+import { unexpectedPublicationFailure } from '@/renderer/components/settings/repo-publication/publication-failure';
 import { PublicationPreview } from '@/renderer/components/settings/repo-publication/publication-preview';
 import { PublicationRecoveryList } from '@/renderer/components/settings/repo-publication/publication-recovery-list';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
@@ -120,7 +121,9 @@ function RootCleanupRow({
  * The preview, apply-outcome, and root-cleanup states that follow choosing a
  * publication target. Split out from `SettingsPublicationPanel` purely to
  * keep that component's conditional-render chain readable; it owns no state
- * of its own beyond what its props hand it.
+ * of its own beyond what its props hand it. A rejected preview call carries no
+ * code from main, so it is reported with the panel's own authored sentence and
+ * the same retry every other read failure offers.
  */
 function PublicationResults({
 	previewQuery,
@@ -133,7 +136,9 @@ function PublicationResults({
 	const { apply, applyFailure, cleaned, cleanup, cleanupFailure, recoveryId } =
 		publication;
 	const preview = previewQuery.data?.preview ?? null;
-	const previewFailure = previewQuery.data?.failure ?? null;
+	const previewFailure = previewQuery.isError
+		? unexpectedPublicationFailure(t)
+		: (previewQuery.data?.failure ?? null);
 	const isEmptyRoot = previewFailure?.code === 'source-missing';
 	const previewMessage = isEmptyRoot ? null : failureText(t, previewFailure);
 	const applyMessage = failureText(t, applyFailure);
@@ -159,7 +164,14 @@ function PublicationResults({
 				</p>
 			) : null}
 
-			{previewMessage ? <SettingsErrorState message={previewMessage} /> : null}
+			{previewMessage ? (
+				<SettingsErrorState
+					message={previewMessage}
+					onRetry={() => {
+						void previewQuery.refetch();
+					}}
+				/>
+			) : null}
 
 			{preview ? (
 				<PublicationPreview
@@ -251,7 +263,7 @@ export function SettingsPublicationPanel({ repoId }: { repoId: string }) {
 			<SettingsWorkspaceTargetRow
 				description={t(
 					'settings:repo.publication.workspace-target.description',
-					'The merged file is written on this workspace’s branch, the same as any other commit.',
+					'The merged file is written on this workspace’s branch, as an uncommitted change you can review and commit.',
 				)}
 				label={t(
 					'settings:repo.publication.workspace-target.label',

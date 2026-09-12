@@ -131,7 +131,7 @@ import {
 	createRepositoryConfigService,
 	createSettingsPublicationService,
 	resolveEnsemblrConfigPath,
-	resolveWorkspaceSettingsTarget,
+	resolveWritableWorkspaceCheckout,
 } from './config';
 import { createDictationService } from './dictation';
 import {
@@ -497,11 +497,11 @@ const getInfisicalService = (): InfisicalService | null => {
 		/**
 		 * Resolves the live workspace checkout a repository's committed
 		 * `[infisical]` block is read from and written to, so the link never
-		 * edits the root clone (ADR 0070).
+		 * edits the root clone (ADR 0070) and never a stale directory that is no
+		 * longer this repository's worktree.
 		 */
 		resolveWorkspaceCheckout: ({ repositoryId, workspaceId }) =>
-			resolveWorkspaceSettingsTarget({ database, repositoryId, workspaceId })
-				?.workspacePath ?? null,
+			resolveWritableWorkspaceCheckout({ database, repositoryId, workspaceId }),
 	});
 
 	infisicalRuntime = { database, service };

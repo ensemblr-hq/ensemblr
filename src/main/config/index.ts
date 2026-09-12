@@ -1,8 +1,12 @@
+import type { DatabaseSync } from 'node:sqlite';
+
 import type { RepositoryConfigSnapshot } from '../../shared/ipc/contracts/repository-config';
 import {
 	loadRepositoryConfig,
 	normalizeRepositoryConfigRequest,
 } from './repository-config.ts';
+import { isWritableWorkspaceTarget } from './settings-publication-files.ts';
+import { resolveWorkspaceSettingsTarget } from './workspace-settings-target.ts';
 
 /**
  * Backward-compat alias — the implementation moved to the storage repository
@@ -70,6 +74,7 @@ export {
 	readRepositorySettings,
 	rewriteRepositorySettings,
 } from './repository-settings-writer.ts';
+export { isWritableWorkspaceTarget } from './settings-publication-files.ts';
 export type {
 	CreateSettingsPublicationServiceOptions,
 	SettingsPublicationService,
@@ -77,6 +82,37 @@ export type {
 export { createSettingsPublicationService } from './settings-publication-service.ts';
 export type { WorkspaceSettingsTarget } from './workspace-settings-target.ts';
 export { resolveWorkspaceSettingsTarget } from './workspace-settings-target.ts';
+
+/**
+ * Resolves the live workspace checkout an IPC settings write may target. The
+ * stored path is only a record of where a worktree was, so it is re-validated
+ * against Git before anything is written into it — a workspace that has been
+ * moved, deleted, or re-pointed at another repository resolves to nothing
+ * rather than to a stale directory. Root clones are never returned (ADR 0070).
+ * @param database - Active database connection.
+ * @param repositoryId - Repository the settings screen belongs to.
+ * @param workspaceId - Live workspace the user selected as the write target.
+ * @returns The workspace checkout path, or null when there is no writable one.
+ */
+export function resolveWritableWorkspaceCheckout({
+	database,
+	repositoryId,
+	workspaceId,
+}: {
+	database: DatabaseSync;
+	repositoryId: string;
+	workspaceId: string;
+}): string | null {
+	const target = resolveWorkspaceSettingsTarget({
+		database,
+		repositoryId,
+		workspaceId,
+	});
+
+	return target && isWritableWorkspaceTarget(target)
+		? target.workspacePath
+		: null;
+}
 
 /** Service exposed to IPC handlers for inspecting per-repository config. */
 export interface RepositoryConfigService {
