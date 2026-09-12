@@ -7,6 +7,10 @@ re-verified by the orchestrator by reading the cited lines. Nothing under `src/`
 
 Branch: `psoldunov/security-and-performance-audit`. Commit `64f8b0c2` audited.
 
+**Every finding here has since been dispositioned — see
+[REMEDIATION.md](./REMEDIATION.md)** for what was fixed, what was accepted and
+why, and what could not be verified from a macOS host.
+
 ## Posture in one paragraph
 
 The parts that were designed as security boundaries hold: the loopback control server never
