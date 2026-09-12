@@ -28,6 +28,8 @@ export interface DelegationBarrierState {
 	children: readonly DelegatedChild[];
 	operations: readonly DelegationOperation[];
 	recoveryRequired: boolean;
+	/** Consecutive auto-resumed turns that settled without running any tool. */
+	staleResumes: number;
 	waitFailed: boolean;
 }
 
@@ -67,12 +69,24 @@ const BATCH_BLOCK_REASON =
 const RACING_WAIT_REASON =
 	'Child spawn calls in this tool batch have not returned their session ids yet. Call ensemblr_wait_for_agents in the next turn so it can wait on every child.';
 
+/**
+ * How many consecutive turns may settle without a single *permitted* tool call
+ * before the barrier stops queueing another one. Two distinct loops end here,
+ * and neither is repaired by asking again while each attempt spends a provider
+ * call the user is billed for: a turn that produced nothing at all died in the
+ * runtime — a provider rate limit, a dropped connection — and a turn whose only
+ * calls this barrier refused came from a model that already read the refusal
+ * mid-turn and stopped anyway. Repeating the nudge only repeats the refusal.
+ */
+const MAX_STALE_DELEGATION_RESUMES = 2;
+
 /** Creates an empty delegation barrier. */
 export function createDelegationBarrierState(): DelegationBarrierState {
 	return {
 		children: [],
 		operations: [],
 		recoveryRequired: false,
+		staleResumes: 0,
 		waitFailed: false,
 	};
 }
@@ -95,12 +109,27 @@ export function shouldResumeDelegationWait(
 	return (
 		delegationBarrierActive(state) &&
 		!state.waitFailed &&
-		!state.recoveryRequired
+		!state.recoveryRequired &&
+		state.staleResumes < MAX_STALE_DELEGATION_RESUMES
 	);
+}
+
+/**
+ * Counts a turn that settled without a permitted tool call while children were
+ * outstanding, so neither a runtime failing every turn nor a model that only
+ * retries refused work keeps being asked to resume.
+ * @param state - The barrier as it stood when the turn settled.
+ * @returns The barrier with one more stale resume against the cap.
+ */
+export function noteStalledDelegationTurn(
+	state: DelegationBarrierState,
+): DelegationBarrierState {
+	return { ...state, staleResumes: state.staleResumes + 1 };
 }
 
 /** Removes assistant findings while preserving tool calls needed to open the barrier. */
 export function sanitizeDelegationMessageContent(
+	state: DelegationBarrierState,
 	content: readonly unknown[],
 ): readonly unknown[] {
 	const nonText = content.filter((block) => recordOf(block).type !== 'text');
@@ -110,7 +139,10 @@ export function sanitizeDelegationMessageContent(
 	return [
 		...nonText,
 		{
-			text: 'Delegated children are still working. Waiting for every child before continuing.',
+			text:
+				state.staleResumes > 0
+					? 'Delegated children are still working, but the last turns produced no permitted tool call, so automatic resuming has stopped. Continuing or re-sending this turn picks the wait back up.'
+					: 'Delegated children are still working. Waiting for every child before continuing.',
 			type: 'text',
 		},
 	];
@@ -125,8 +157,29 @@ export function outstandingDelegatedChildren(
 	);
 }
 
-/** Checks and records a Pi tool call before it executes. */
+/**
+ * Checks and records a Pi tool call before it executes, clearing the stale
+ * resume count whenever a call is allowed through. A permitted call is the
+ * evidence that the turn is doing the orchestration the barrier asked for — a
+ * refused one proves only that the model is reachable, which is why a blocked
+ * call leaves the count alone — so it is what re-arms automatic resuming.
+ * @param state - The barrier as it stood before this call.
+ * @param call - The Pi tool call about to execute.
+ * @returns The barrier decision for this call, over the updated barrier.
+ */
 export function beforeDelegationToolCall(
+	state: DelegationBarrierState,
+	call: DelegationToolCall,
+): DelegationToolCallDecision {
+	const decision = decideDelegationToolCall(state, call);
+	if (decision.blockReason || decision.state.staleResumes === 0) {
+		return decision;
+	}
+	return { ...decision, state: { ...decision.state, staleResumes: 0 } };
+}
+
+/** Applies the barrier's guard rules to one Pi tool call. */
+function decideDelegationToolCall(
 	state: DelegationBarrierState,
 	call: DelegationToolCall,
 ): DelegationToolCallDecision {
@@ -380,8 +433,21 @@ export function restoreDelegationBarrierState(
 		operations: [],
 		recoveryRequired:
 			record.recoveryRequired === true || record.operations.length > 0,
+		staleResumes: staleResumeCount(record.staleResumes),
 		waitFailed: record.waitFailed === true,
 	};
+}
+
+/**
+ * Reads a persisted stale-resume count, treating anything unusable as none so a
+ * corrupt snapshot cannot silently disable automatic resuming for the session.
+ * @param value - The count as it was read back from the session entry.
+ * @returns A whole count within the cap.
+ */
+function staleResumeCount(value: unknown): number {
+	return typeof value === 'number' && Number.isInteger(value) && value > 0
+		? Math.min(value, MAX_STALE_DELEGATION_RESUMES)
+		: 0;
 }
 
 /** Reads a record-shaped value without trusting its fields. */
