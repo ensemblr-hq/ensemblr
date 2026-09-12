@@ -1286,6 +1286,32 @@ CREATE INDEX idx_agent_control_spawn_workspace
 ON agent_control_spawn_reservations(workspace_id);
 `,
 	},
+	{
+		id: '032_renderer_storage_mirror',
+		version: 32,
+		// The renderer's mirrored `localStorage` (ADR 0071) cannot live in
+		// `settings`: `collectSqliteSettings` enumerates every app-scope row with
+		// no key allowlist, so the blob came back as a resolved setting on every
+		// `settings-resolution` call — a query the renderer refetches per
+		// repository on window focus. A 200 KB mirror grew that response from
+		// ~1.5 KB to 201 KB. Its own table keeps it where only its two readers
+		// look. `origin` is what the document was served from, so a seed can be
+		// offered per origin rather than once per install, and an origin is never
+		// re-seeded from a snapshot it took itself.
+		sql: `
+CREATE TABLE renderer_storage_mirror (
+	id TEXT PRIMARY KEY CHECK (id = 'mirror'),
+	entries_json TEXT NOT NULL,
+	origin TEXT NOT NULL,
+	updated_at TEXT NOT NULL
+) STRICT;
+
+CREATE TABLE renderer_storage_seeded_origins (
+	origin TEXT PRIMARY KEY,
+	seeded_at TEXT NOT NULL
+) STRICT;
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

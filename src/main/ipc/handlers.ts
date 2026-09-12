@@ -90,6 +90,7 @@ import { registerLinkedDirectoryHandlers } from './handlers/linked-directories';
 import { registerMenuHandlers } from './handlers/menu';
 import { registerNavigationHandlers } from './handlers/navigation';
 import { registerOpenTargetHandlers } from './handlers/open-target';
+import { registerRendererStorageHandlers } from './handlers/renderer-storage';
 import { registerRepositoryHandlers } from './handlers/repository';
 import { registerRepositoryConfigHandlers } from './handlers/repository-config';
 import { registerRepositorySettingsHandlers } from './handlers/repository-settings';
@@ -306,6 +307,7 @@ export function registerIpcHandlers({
 				openTargetService,
 				readWindowChrome,
 			});
+			registerRendererStorageHandlers({ databaseService });
 			registerNavigationHandlers({ databaseService });
 			registerSettingsHandlers({ settingsResolutionService });
 			registerRootHandlers({

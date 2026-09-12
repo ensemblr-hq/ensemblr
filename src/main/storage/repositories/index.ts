@@ -136,6 +136,13 @@ export {
 	writeLinkedDirectoryRecents,
 } from './linked-directory-repository.ts';
 export { parseMetadata, serializeMetadata } from './metadata-json.ts';
+export type { RendererStorageMirror } from './renderer-storage-repository.ts';
+export {
+	hasSeededOrigin,
+	markRendererStorageSeeded,
+	readRendererStorageMirror,
+	writeRendererStorageMirror,
+} from './renderer-storage-repository.ts';
 export type {
 	DeleteRepositoryRowByIdOptions,
 	InsertRepositoryRowOptions,

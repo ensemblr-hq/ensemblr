@@ -107,6 +107,10 @@ export {
 	menuContextSchema,
 } from './request-schemas/menu.ts';
 export {
+	MAX_RENDERER_STORAGE_MIRROR_BYTES,
+	rendererStorageSnapshotSchema,
+} from './request-schemas/renderer-storage.ts';
+export {
 	archiveWorkspaceRequestSchema,
 	continueWorkspaceBranchRequestSchema,
 	createWorkspaceRequestSchema,

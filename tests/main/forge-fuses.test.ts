@@ -56,6 +56,11 @@ describe('the packaged binary fuses', () => {
 	// opaque `file:` origin blocks the whole bundle. Asserted at `true` so
 	// flipping it is a deliberate edit made alongside an `app://` scheme, rather
 	// than a hardening change that ships a blank window.
+	//
+	// The preferences that move with the origin are already carried across by
+	// the localStorage mirror (ADR 0071), so what this still pins is the order:
+	// the mirror has to have shipped in an earlier release before the switch and
+	// this flip land together.
 	test('grant the extra file: protocol privileges, deliberately', () => {
 		expect(fuses()[FuseV1Options.GrantFileProtocolExtraPrivileges]).toBe(true);
 	});

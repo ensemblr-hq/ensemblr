@@ -18,6 +18,7 @@ import type { LinearApi } from './linear';
 import type { LinkedDirectoriesApi } from './linked-directories';
 import type { OpenTargetApi } from './open-target';
 import type { QuickStartApi } from './quick-start';
+import type { RendererStorageApi } from './renderer-storage';
 import type { RepositoryApi } from './repository';
 import type { RepositoryConfigApi } from './repository-config';
 import type { NavigationApi, ShellApi } from './repository-navigation';
@@ -66,6 +67,7 @@ export interface EnsemblrApi
 		ShellApi,
 		NavigationApi,
 		QuickStartApi,
+		RendererStorageApi,
 		RepositoryConfigApi,
 		RepositorySettingsApi,
 		SharedRootApi,

@@ -278,6 +278,11 @@ export type {
 	QuickStartProjectStatus,
 } from './contracts/quick-start';
 export type {
+	RendererStorageApi,
+	RendererStorageMirrorResult,
+	RendererStorageSnapshot,
+} from './contracts/renderer-storage';
+export type {
 	AdoptedRepositorySnapshot,
 	DeletedRepositorySnapshot,
 	DeleteRepositoryDiagnostic,

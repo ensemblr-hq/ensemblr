@@ -141,6 +141,11 @@ export const IPC_PERMISSION_ACTIONS = {
 	infisicalTestAccount: null,
 	initialShellSnapshot: null,
 	killTerminalSession: null,
+	// The renderer copying its own `localStorage` into main, and reading that
+	// copy back when its origin has moved. Neither touches the user's files or
+	// settings, and the storage they mirror is not gated on its own side either.
+	mirrorRendererStorage: null,
+	rendererStorageSeed: null,
 	linearCancelLogin: null,
 	linearConnectionStatus: null,
 	linearCreateComment: 'outside-workspace-write',

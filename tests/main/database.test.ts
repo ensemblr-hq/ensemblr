@@ -48,6 +48,7 @@ const EXPECTED_MIGRATIONS = [
 	'029_agent_event_index_hygiene',
 	'030_chat_tab_closed_at_index',
 	'031_spawn_reservation_workspace',
+	'032_renderer_storage_mirror',
 ];
 
 const AGENT_VOCABULARY_MIGRATION_VERSION = 14;
@@ -331,6 +332,8 @@ test('opens an isolated database and applies foundation migrations', (t) => {
 		'linear_resources',
 		'linear_sync_state',
 		'process_records',
+		'renderer_storage_mirror',
+		'renderer_storage_seeded_origins',
 		'repositories',
 		'root_directories',
 		'schema_migrations',
