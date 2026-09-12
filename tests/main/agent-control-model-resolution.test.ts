@@ -719,6 +719,24 @@ describe('an unreadable model catalog', () => {
 		expect(message).not.toContain('lists no Pi models');
 	});
 
+	// The way out is only a way out when the caller has something to pass down.
+	// A session holding no model of its own would be refused a second time for
+	// omitting exactly what the first refusal told it to omit, and no catalog
+	// default can rescue it — this branch is reached only when the runtime has no
+	// rows for `defaultModelFor` to draw from.
+	it('does not offer inheritance to a caller with no model of its own', async () => {
+		const message = await refusal({
+			caller: { model: null, thinkingLevel: null },
+			callerRuntime: 'pi',
+			model: 'openai-codex/gpt-5.6-sol',
+			models: [modelOption({ id: CLAUDE_MODEL, runtime: 'claude' })],
+		});
+
+		expect(message).toContain('lists no Pi models');
+		expect(message).toContain('no model of its own to pass down');
+		expect(message).not.toContain('Omit "model" to inherit');
+	});
+
 	it('still names the empty runtime when crossing would reach nothing either', async () => {
 		const message = await refusal({
 			caller: { model: PI_MODEL, thinkingLevel: null },
