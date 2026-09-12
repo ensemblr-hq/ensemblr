@@ -831,6 +831,7 @@ interface SessionBrief {
 	readonly coAuthorDirective: string | null;
 	readonly afkDirective: string | null;
 	readonly afkWorkflowDirective: string | null;
+	readonly delegationDirective: string | null;
 	readonly rolePlaybook: string | null;
 }
 
@@ -839,6 +840,7 @@ const EMPTY_SESSION_BRIEF: SessionBrief = {
 	afkDirective: null,
 	afkWorkflowDirective: null,
 	coAuthorDirective: null,
+	delegationDirective: null,
 	issueDirective: null,
 	languageDirective: null,
 	nudge: null,
@@ -880,6 +882,7 @@ function normalizeSessionBrief(value: unknown): SessionBrief {
 		afkDirective: sessionBriefString(brief.afkDirective),
 		afkWorkflowDirective: sessionBriefString(brief.afkWorkflowDirective),
 		coAuthorDirective: sessionBriefString(brief.coAuthorDirective),
+		delegationDirective: sessionBriefString(brief.delegationDirective),
 		issueDirective: sessionBriefString(brief.issueDirective),
 		languageDirective: sessionBriefString(brief.languageDirective),
 		nudge: sessionBriefString(brief.nudge),
@@ -1082,6 +1085,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			afkDirective,
 			afkWorkflowDirective,
 			coAuthorDirective,
+			delegationDirective,
 			issueDirective,
 			languageDirective,
 			nudge,
@@ -1099,6 +1103,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			planRefinement,
 			afkDirective,
 			afkWorkflowDirective,
+			delegationDirective,
 			languageDirective,
 			issueDirective,
 			coAuthorDirective,
@@ -1211,6 +1216,9 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 				),
 				hiddenModels: Type.Optional(Type.Array(Type.String())),
 				allowCrossRuntimeDelegation: Type.Optional(Type.Boolean()),
+				delegationInitiative: Type.Optional(
+					Type.Union([Type.Literal('automatic'), Type.Literal('on-request')]),
+				),
 				roleAssignments: Type.Optional(
 					Type.Array(
 						Type.Object({

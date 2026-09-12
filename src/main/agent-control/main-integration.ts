@@ -14,8 +14,10 @@ import {
 	type AgentSessionLineage,
 	type AwarenessFeatures,
 	buildCoAuthorDirective,
+	buildDelegationInitiativeDirective,
 	buildLanguageDirective,
 	buildLinkedIssueDirective,
+	type DelegationInitiative,
 	harnessAwareness,
 	resolveAgentRole,
 	type WorkspaceLinkedIssue,
@@ -74,6 +76,14 @@ interface AgentControlIntegrationDeps {
 	 * Omitted, the credit reads as on, which is also its shipped default.
 	 */
 	readCoAuthorEnabled?: () => boolean;
+	/**
+	 * Whether an orchestrator may decide to delegate on its own. `on-request`
+	 * puts the delegate-when-asked block into the harness playbook; a harness is
+	 * a delegating root, so the setting has to reach it or it silently applies to
+	 * chat tabs alone. Omitted, the judgement reads as the agent's, which is the
+	 * shipped default.
+	 */
+	readDelegationInitiative?: () => DelegationInitiative;
 	/**
 	 * Reads the issue a workspace was created from, for the linked-issue block in
 	 * the harness playbook. Omitted, a harness launches with no prose about the
@@ -256,6 +266,7 @@ export function createAgentControlIntegration({
 	originRegistry,
 	readArchitectureDiagramEnabled = () => false,
 	readCoAuthorEnabled = () => true,
+	readDelegationInitiative = () => 'automatic',
 	readLinkedIssue = () => null,
 	readSkillPluginDirectories = () => [],
 	readTuiHarnessesEnabled = () => false,
@@ -330,6 +341,12 @@ export function createAgentControlIntegration({
 				},
 				directives: [
 					buildLinkedIssueDirective(readLinkedIssue(workspaceId)),
+					buildDelegationInitiativeDirective({
+						delegation: 'ensemblr',
+						initiative: readDelegationInitiative(),
+						role: 'orchestrator',
+						unattended: false,
+					}),
 					buildCoAuthorDirective(readCoAuthorEnabled()),
 				],
 				language: getLanguage(),

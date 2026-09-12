@@ -97,7 +97,7 @@ describe('model orchestration settings', () => {
 		const user = userEvent.setup();
 		renderSettings();
 
-		expect(screen.getAllByRole('combobox')).toHaveLength(5);
+		expect(screen.getAllByRole('combobox')).toHaveLength(6);
 		expect(screen.queryByRole('definition')).not.toBeInTheDocument();
 		for (const [role, modelName] of [
 			['Coder', 'Pi Model'],
@@ -131,6 +131,34 @@ describe('model orchestration settings', () => {
 						},
 					],
 				},
+			}),
+		);
+	});
+
+	test('heads the delegation rows so they read apart from the model slots', () => {
+		renderSettings();
+
+		expect(
+			screen.getByRole('heading', { level: 2, name: 'Delegation' }),
+		).toBeVisible();
+	});
+
+	test('persists the delegation initiative the user picks', async () => {
+		const user = userEvent.setup();
+		renderSettings();
+		const picker = screen.getByRole('combobox', {
+			name: 'Delegation initiative',
+		});
+
+		expect(picker).toHaveTextContent('Delegate automatically');
+		await user.click(picker);
+		await user.click(
+			await screen.findByRole('option', { name: 'Only when I ask' }),
+		);
+
+		await waitFor(() =>
+			expect(settingsApi.updateAppSettings).toHaveBeenLastCalledWith({
+				models: { delegationInitiative: 'on-request' },
 			}),
 		);
 	});

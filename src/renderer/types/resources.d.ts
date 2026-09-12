@@ -2010,6 +2010,17 @@ export default interface Resources {
 					description: 'Configure a runtime or show a hidden model before assigning roles.';
 					title: 'No active delegation models';
 				};
+				group: {
+					description: 'How agents hand work to one another: when they may delegate, which runtimes they may reach, and which model suits which kind of task.';
+					title: 'Delegation';
+				};
+				initiative: {
+					'aria-label': 'Delegation initiative';
+					automatic: 'Delegate automatically';
+					description: '“Only when I ask” tells agents to do the work in the conversation and wait for you to ask for a hand-off. It steers what they are told rather than which tools they hold, so asking for one mid-conversation still works. AFK runs ignore it — nobody is there to ask.';
+					label: 'When to delegate';
+					'on-request': 'Only when I ask';
+				};
 				'no-matches': 'No matching models.';
 				'remove-model': 'Remove {{model}} ({{runtime}}) from {{role}}';
 				'role-models-aria-label': 'Models for {{role}}';

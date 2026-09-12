@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { DELEGATION_INITIATIVES } from './agent-control/delegation-initiative.ts';
 import { SUBAGENT_MECHANISMS } from './agent-control/subagent-mechanism.ts';
 import { MODEL_ROLES } from './model-role.ts';
 
@@ -46,6 +47,7 @@ const modelSettingsSchema = z.object({
 	reviewThinkingLevel: z.string().nullable().catch(null),
 	hiddenModels: z.array(z.string()).catch([]),
 	allowCrossRuntimeDelegation: z.boolean().catch(false),
+	delegationInitiative: z.enum(DELEGATION_INITIATIVES).catch('automatic'),
 	roleAssignments: z
 		.array(
 			z.object({
@@ -274,6 +276,8 @@ export const appSettingsControlPatchSchema = z.strictObject({
 			hiddenModels: modelSettingsSchema.shape.hiddenModels.removeCatch(),
 			allowCrossRuntimeDelegation:
 				modelSettingsSchema.shape.allowCrossRuntimeDelegation.removeCatch(),
+			delegationInitiative:
+				modelSettingsSchema.shape.delegationInitiative.removeCatch(),
 			roleAssignments: modelSettingsSchema.shape.roleAssignments
 				.removeCatch()
 				.element.strict()

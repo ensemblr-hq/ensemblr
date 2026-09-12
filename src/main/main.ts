@@ -11,6 +11,7 @@ import {
 	safeStorage,
 	shell,
 } from 'electron';
+import type { DelegationInitiative } from '../shared/agent-control.ts';
 import {
 	awarenessForAudience,
 	buildCoAuthorDirective,
@@ -419,6 +420,14 @@ const readHiddenModelIds = (): readonly string[] =>
 const readCrossRuntimeDelegationEnabled = (): boolean =>
 	appSettingsService.read().models.allowCrossRuntimeDelegation;
 /**
+ * Reads whether an orchestrator may decide to delegate on its own. Read per call
+ * for the same reason the co-author credit is: the settings file is watched, so
+ * a turn taken after the switch flips gets the directive the user just asked for.
+ * @returns The latest delegation initiative from model settings.
+ */
+const readDelegationInitiative = (): DelegationInitiative =>
+	appSettingsService.read().models.delegationInitiative;
+/**
  * Reads advisory roles for every saved runtime-and-model pair.
  * @returns The latest assignments, including unavailable models.
  */
@@ -682,6 +691,7 @@ const {
 	originRegistry: agentControlOriginRegistry,
 	readArchitectureDiagramEnabled,
 	readCoAuthorEnabled,
+	readDelegationInitiative,
 	readSkillPluginDirectories: () => readAgentSkillBundle().pluginDirectories,
 	readTuiHarnessesEnabled,
 	/** Resolves durable lineage before a native runtime receives control authority. */
@@ -1489,6 +1499,7 @@ agentControlService = createAgentControlService({
 	guardrails: agentControlGuardrails,
 	originRegistry: agentControlOriginRegistry,
 	readArchitectureDiagramEnabled,
+	readDelegationInitiative,
 	readTuiHarnessesEnabled,
 	ports: createAgentControlPorts({
 		architectureService,

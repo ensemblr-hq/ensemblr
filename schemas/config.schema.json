@@ -166,6 +166,12 @@
 							"default": false,
 							"description": "Allow an orchestrator using Ensemblr chat-tab delegation to explicitly spawn a child on another configured native runtime. Omitted-model inheritance stays on the caller's runtime."
 						},
+						"delegationInitiative": {
+							"type": "string",
+							"enum": ["automatic", "on-request"],
+							"default": "automatic",
+							"description": "Whether an orchestrator may decide to delegate on its own. `on-request` holds the work in the conversation until the user asks for a hand-off. Advisory prose rather than a tool gate, and never applied to an unattended turn or to the Concierge."
+						},
 						"roleAssignments": {
 							"type": "array",
 							"default": [],

@@ -91,6 +91,9 @@ describe('demo settings scenarios', () => {
 		expect(
 			settingsModels.appSettings?.models?.allowCrossRuntimeDelegation,
 		).toBe(true);
+		expect(settingsModels.appSettings?.models?.delegationInitiative).toBe(
+			'on-request',
+		);
 		expect(settingsModels.appSettings?.models?.roleAssignments).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({

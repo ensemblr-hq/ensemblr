@@ -31,6 +31,8 @@ export const CANONICAL_ARG_KEYS = {
 		'Whether setup completion starts the configured run script.',
 	automaticUpdates: 'Whether Ensemblr checks, downloads, and installs updates.',
 	allowCrossRuntimeDelegation: 'Whether delegation across runtimes is allowed.',
+	delegationInitiative:
+		'Whether an orchestrator may delegate on its own initiative, or waits to be asked.',
 	afkMode:
 		'Open a conversation unattended, because the user has said they are away.',
 	agentSessionId: 'Identifier of an agent conversation.',

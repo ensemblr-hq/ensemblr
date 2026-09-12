@@ -206,7 +206,10 @@ describe('demo handlers', () => {
 
 		expect(call(handlers, 'getAppSettings')).toMatchObject({
 			experimental: { architectureDiagram: true, tuiHarnesses: true },
-			models: { allowCrossRuntimeDelegation: true },
+			models: {
+				allowCrossRuntimeDelegation: true,
+				delegationInitiative: 'on-request',
+			},
 		});
 		expect(call(handlers, 'resolveSettings')).toMatchObject({
 			repository: {

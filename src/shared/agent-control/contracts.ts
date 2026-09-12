@@ -1105,6 +1105,13 @@ export interface GetSessionBriefResult {
 	 */
 	afkWorkflowDirective: string | null;
 	/**
+	 * Ready-to-append instruction to hold delegation back until the user asks for
+	 * it, or null when the user leaves the judgement to the agent. Advisory
+	 * rather than enforced, because no control call distinguishes a spawn the
+	 * user asked for from one the agent chose.
+	 */
+	delegationDirective: string | null;
+	/**
 	 * Ready-to-append instruction to keep the workspace's linked Linear issue
 	 * current, cut to what this caller's role and mode may actually do to a
 	 * tracker, or null when the workspace was not created from a Linear issue.

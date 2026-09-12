@@ -32,6 +32,7 @@ export {
 	conciergeThinkingLevelAtom,
 	defaultChatModelAtom,
 	defaultChatThinkingLevelAtom,
+	delegationInitiativeAtom,
 	deleteBranchOnArchiveAtom,
 	desktopNotificationsAtom,
 	developerModeAtom,
