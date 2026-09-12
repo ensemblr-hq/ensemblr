@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	AGENT_CONTROL_OPS,
 	ASK_USER_QUESTION_LIMITS,
+	argKeysForOp,
 	isSpawnOp,
 	isWriteOp,
 	validateArgs,
@@ -135,6 +136,35 @@ describe('validateArgs', () => {
 
 	it('defaults missing args to an empty object for no-arg ops', () => {
 		expect(validateArgs('listWorkspaces', undefined).ok).toBe(true);
+	});
+
+	// Observed in a Pi session: a refused spawn told the agent to call
+	// ensemblr_list_models, and the call it made carried that op's own answer
+	// shape as its arguments. A no-argument op has no vocabulary a stray key
+	// could have missed, so refusing one only stranded the caller mid-recovery.
+	it('ignores stray keys on an op that takes no arguments', () => {
+		expect(
+			validateArgs('listModels', {
+				allowedRuntimes: ['pi'],
+				callerRuntime: 'pi',
+				crossRuntimeDelegationEnabled: false,
+				defaultModelId: null,
+				models: [],
+			}),
+		).toEqual({ ok: true, value: {} });
+	});
+
+	it('ignores stray keys on every no-arg op, not just listModels', () => {
+		const noArgOps = [...AGENT_CONTROL_OPS].filter(
+			(op) => argKeysForOp(op).length === 0,
+		);
+		expect(noArgOps.length).toBeGreaterThan(0);
+		for (const op of noArgOps) {
+			expect(validateArgs(op, { unexpected: 'value' }), op).toEqual({
+				ok: true,
+				value: {},
+			});
+		}
 	});
 
 	it('requires exactly one of terminalId or kind for focusDockTab', () => {

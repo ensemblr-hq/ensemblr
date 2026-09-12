@@ -534,7 +534,16 @@ const exitPlanModeSchema = z.strictObject({
 	plan: nonEmpty.max(EXIT_PLAN_MODE_LIMITS.maxPlanLength),
 });
 
-const emptySchema = z.strictObject({});
+/**
+ * The schema every op that takes no arguments validates against. Deliberately
+ * stripping rather than strict: an op with no vocabulary has nothing a stray key
+ * could mean, so rejecting one buys no safety and costs the agent its turn —
+ * and these are the read-only ops a refusal message sends it to, so a bounced
+ * `listModels` strands a caller that was told to call it to correct itself.
+ * Models reach for these with the *response* shape as arguments; that payload is
+ * dropped and the op answers.
+ */
+const emptySchema = z.object({});
 
 /** Per-operation argument validators, keyed by {@link AgentControlOp}. */
 const AGENT_CONTROL_ARG_SCHEMAS = {
