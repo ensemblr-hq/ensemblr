@@ -1320,7 +1320,6 @@
 		"aria-label": "Agent session timeline",
 		"error": {
 			"continue": "Continue",
-			"copy-detail": "Copy the runtime detail",
 			"details": "Runtime detail",
 			"edit-prompt": "Edit the prompt",
 			"fork": "Fork chat",

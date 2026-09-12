@@ -7,12 +7,12 @@ import {
 	type LucideIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { TextSurface } from '@/renderer/components/code-surface';
 import { cn } from '@/renderer/lib/utils';
 import type {
 	ToolChecklistItem,
 	ToolChecklistStatus,
 } from '@/renderer/types/tool-presentation';
-import { ToolPanel } from './tool-panel';
 
 const STATUS_ICON: Record<ToolChecklistStatus, LucideIcon> = {
 	completed: CircleCheckIcon,
@@ -43,13 +43,13 @@ export function ToolChecklist({
 	items: readonly ToolChecklistItem[];
 }) {
 	return (
-		<ToolPanel>
+		<TextSurface>
 			<ul className='flex flex-col gap-2'>
 				{items.map((item) => (
 					<ToolChecklistRow item={item} key={item.id} />
 				))}
 			</ul>
-		</ToolPanel>
+		</TextSurface>
 	);
 }
 

@@ -3,8 +3,10 @@ import { render, waitFor } from '@testing-library/react';
 import { createStore, Provider } from 'jotai';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { CodePanel } from '../../src/renderer/components/code-surface';
-import { ToolPanel } from '../../src/renderer/components/tool-collapsible/tool-panel';
+import {
+	CodePanel,
+	TextSurface,
+} from '../../src/renderer/components/code-surface';
 import {
 	codeThemeAtom,
 	useResolvedCodeTheme,
@@ -71,7 +73,7 @@ describe('code surfaces under a picked syntax theme', () => {
 	});
 
 	test('puts plain tool payloads on the same app-owned surface', () => {
-		const { container } = render(<ToolPanel>payload</ToolPanel>);
+		const { container } = render(<TextSurface>payload</TextSurface>);
 		const panel = container.querySelector('.bg-code');
 
 		expect(panel).not.toBeNull();

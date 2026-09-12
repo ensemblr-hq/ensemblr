@@ -207,3 +207,24 @@ export interface AgentToolOutput {
 	details: Readonly<Record<string, unknown>> | null;
 	text: string;
 }
+
+/**
+ * One line of a parsed traceback. `raw` always holds the line as printed, so a
+ * frame whose shape the parser did not recognise still renders.
+ */
+export interface StackFrame {
+	columnNumber: number | null;
+	filePath: string | null;
+	functionName: string | null;
+	/** True for a frame inside the runtime or an installed package. */
+	isInternal: boolean;
+	lineNumber: number | null;
+	raw: string;
+}
+
+/** A traceback split into its error line and the frames beneath it. */
+export interface ParsedStackTrace {
+	errorMessage: string;
+	errorType: string | null;
+	frames: StackFrame[];
+}

@@ -1,7 +1,8 @@
 /**
  * Public surface for the app's code surfaces: the chat-density scroll shell and
- * panel, the line and gutter primitives every surface shares, the skipped-lines
- * band, the panel header, and the class recipes that keep all of them in step.
+ * panel, its wrapping twin for payloads that are not code, the line and gutter
+ * primitives every surface shares, the skipped-lines band, the panel header, and
+ * the class recipes that keep all of them in step.
  */
 export { CodeGutter, CodeLineTokens } from './code-lines';
 export { CodePanel } from './code-panel';
@@ -17,4 +18,5 @@ export {
 } from './code-style';
 export { CodeSurface } from './code-surface';
 export { CodeHunkGap } from './hunk-gap';
+export { TextSurface } from './text-surface';
 export { CodeViewerHeader } from './viewer-header';

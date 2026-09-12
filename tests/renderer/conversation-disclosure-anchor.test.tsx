@@ -11,7 +11,7 @@
  */
 
 import { fireEvent, screen } from '@testing-library/react';
-import { createRef, useState } from 'react';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { ChatTurnSummary } from '../../src/renderer/components/chat-turn-summary';
@@ -21,14 +21,6 @@ import {
 	ConversationScrollButton,
 } from '../../src/renderer/components/conversation';
 import { ConversationViewportProvider } from '../../src/renderer/components/conversation/viewport-context';
-import {
-	StackTrace,
-	StackTraceContent,
-	StackTraceError,
-	StackTraceErrorMessage,
-	StackTraceFrames,
-	StackTraceHeader,
-} from '../../src/renderer/components/stack-trace';
 import { ToolCollapsible } from '../../src/renderer/components/tool-collapsible';
 import { useScrollAnchor } from '../../src/renderer/hooks/conversation/use-anchored-disclosure';
 import { renderWithProviders } from './support/dom';
@@ -285,34 +277,5 @@ describe('anchor lifetime', () => {
 		expect(() =>
 			fireEvent.click(screen.getByRole('button', { name: 'capture' })),
 		).not.toThrow();
-	});
-});
-
-describe('stack trace anchoring alongside a caller ref', () => {
-	const TRACE = 'TypeError: boom\n    at run (/tmp/a.ts:1:1)';
-
-	test('hands the caller the node and still anchors the row', () => {
-		const holdRowStill = vi.fn();
-		const callerRef = createRef<HTMLDivElement>();
-		renderWithProviders(
-			<ConversationViewportProvider value={{ holdRowStill }}>
-				<StackTrace ref={callerRef} trace={TRACE}>
-					<StackTraceHeader>
-						<StackTraceError>
-							<StackTraceErrorMessage />
-						</StackTraceError>
-					</StackTraceHeader>
-					<StackTraceContent>
-						<StackTraceFrames />
-					</StackTraceContent>
-				</StackTrace>
-			</ConversationViewportProvider>,
-		);
-
-		expect(callerRef.current).toBeInstanceOf(HTMLDivElement);
-
-		fireEvent.click(screen.getByText('boom'));
-
-		expect(holdRowStill).toHaveBeenCalledTimes(1);
 	});
 });

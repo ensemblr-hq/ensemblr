@@ -26,7 +26,7 @@ function DockFrame({ children, tab }: { children: ReactNode; tab: string }) {
 
 /**
  * Every empty state the Setup and Run dock tabs can show, on the surface they
- * show it on. They stood on `.terminal-surface` — dark in both window modes —
+ * show it on. They once stood on a surface that was dark in both window modes
  * while the terminal they stand in for takes its colours from `--sidebar`, so
  * in light mode the panel went black the moment a script was missing or
  * stopped. Flip the canvas theme to check both cuts.

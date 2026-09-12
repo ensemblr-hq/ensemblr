@@ -6,6 +6,7 @@ import {
 	parsePromptAttachments,
 } from '@/renderer/lib/agent-timeline';
 import { conciergeReferenceChipKind } from '@/renderer/lib/concierge';
+import { withListKeys } from '@/renderer/lib/list-keys';
 import { cn } from '@/renderer/lib/utils';
 import type { ParsedPromptPart } from '@/renderer/types/agent-timeline';
 import { conciergeReferenceId } from '@/shared/concierge-references';
@@ -84,25 +85,6 @@ function chipHostClassName(
 }
 
 /**
- * Pairs each parsed part with a key drawn from what it holds. Content alone is
- * not unique — the same folder can be referenced twice in one message — so a
- * repeat is distinguished by how many identical parts came before it.
- * @param parts - The prompt's runs and attachments, in document order
- * @returns The same parts, each with a key unique among its siblings
- */
-function keyedParts(
-	parts: readonly ParsedPromptPart[],
-): readonly { key: string; part: ParsedPromptPart }[] {
-	const occurrences = new Map<string, number>();
-	return parts.map((part) => {
-		const identity = partIdentity(part);
-		const seen = occurrences.get(identity) ?? 0;
-		occurrences.set(identity, seen + 1);
-		return { key: `${identity}#${seen}`, part };
-	});
-}
-
-/**
  * What a part is, for keying: two identical parts differ only in how many came
  * before them.
  * @param part - The part being keyed
@@ -141,7 +123,7 @@ function PromptParts({ parts }: { parts: readonly ParsedPromptPart[] }) {
 	const referenceAccess = useConciergeReferenceAccess();
 	return (
 		<>
-			{keyedParts(parts).map(({ key, part }, index) => {
+			{withListKeys(parts, partIdentity).map(({ item: part, key }, index) => {
 				if (part.kind === 'text') {
 					return (
 						<span className='wrap-anywhere whitespace-pre-wrap' key={key}>
