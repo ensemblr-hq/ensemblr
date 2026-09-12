@@ -23,6 +23,22 @@ updates:
         patterns:
           - lexical
           - "@lexical/*"
+      # A group without `applies-to` covers version updates only, so an advisory
+      # on either family would still arrive as one pull request per package —
+      # which for lexical is the split this file exists to prevent. Each family
+      # gets a security twin; neither bundles anything outside itself, so no
+      # advisory waits on an unrelated package.
+      electron-security:
+        applies-to: security-updates
+        patterns:
+          - electron
+          - "@electron/*"
+          - "@electron-forge/*"
+      lexical-security:
+        applies-to: security-updates
+        patterns:
+          - lexical
+          - "@lexical/*"
       dev-dependencies:
         dependency-type: development
         exclude-patterns:
