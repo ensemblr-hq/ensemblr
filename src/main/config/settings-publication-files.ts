@@ -20,7 +20,7 @@ import { isPlainRecord } from './json-utils.ts';
 import {
 	ENSEMBLR_DIRECTORY,
 	ENSEMBLR_SETTINGS_FILENAME,
-} from './repository-config.ts';
+} from './repository-paths.ts';
 import {
 	MAX_SETTINGS_BYTES,
 	readBoundedSettingsFile,

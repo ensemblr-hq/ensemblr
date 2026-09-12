@@ -241,7 +241,13 @@ describe('createAppSettingsService', () => {
 		const service = createAppSettingsService({ configPath });
 		service.startWatching(() => undefined);
 
-		expect(service.read().general.sendShortcut).toBe('enter');
+		// Reference equality rather than "the value has not changed yet": asserting
+		// staleness right after the write races the watcher, which under load can
+		// fire before the next read.
+		const first = service.read();
+		expect(first.general.sendShortcut).toBe('enter');
+		expect(service.read()).toBe(first);
+
 		const raw = readJson(configPath);
 		writeFileSync(
 			configPath,
@@ -253,8 +259,6 @@ describe('createAppSettingsService', () => {
 				},
 			}),
 		);
-
-		expect(service.read().general.sendShortcut).toBe('enter');
 
 		await vi.waitFor(() =>
 			expect(service.read().general.sendShortcut).toBe('mod+enter'),

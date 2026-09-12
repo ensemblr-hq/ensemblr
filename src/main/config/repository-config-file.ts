@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 
 import { writeFileAtomicExclusive } from '../safe-fs/index.ts';
-import { ENSEMBLR_DIRECTORY } from './repository-config.ts';
+import { ENSEMBLR_DIRECTORY } from './repository-paths.ts';
 import {
 	assertSafeSettingsPath,
 	settingsFilePath,

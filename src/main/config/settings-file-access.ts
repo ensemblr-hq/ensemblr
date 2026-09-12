@@ -14,7 +14,7 @@ import path from 'node:path';
 import {
 	ENSEMBLR_DIRECTORY,
 	ENSEMBLR_SETTINGS_FILENAME,
-} from './repository-config.ts';
+} from './repository-paths.ts';
 
 /** Refusal surfaced when a repository has made its settings path unsafe. */
 const UNSAFE_SETTINGS_PATH_MESSAGE =

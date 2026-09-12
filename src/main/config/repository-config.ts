@@ -18,6 +18,10 @@ import {
 	readTomlFile,
 	WORKTREE_INCLUDE_FILENAME,
 } from './repository-config-loaders.ts';
+import {
+	ENSEMBLR_DIRECTORY,
+	ENSEMBLR_SETTINGS_FILENAME,
+} from './repository-paths.ts';
 
 /** Options for {@link loadRepositoryConfig}. */
 export interface LoadRepositoryConfigOptions {
@@ -37,11 +41,6 @@ interface NormalizedConfigSource {
 	diagnostics: ConfigDiagnostic[];
 	settings: Record<string, unknown>;
 }
-
-/** Directory that holds the committed repository config. */
-export const ENSEMBLR_DIRECTORY = '.ensemblr';
-/** Filename of the sole on-disk repository config, inside {@link ENSEMBLR_DIRECTORY}. */
-export const ENSEMBLR_SETTINGS_FILENAME = 'settings.toml';
 
 const SCRIPT_FIELD_MAP = new Map([
 	['archive', 'archive'],

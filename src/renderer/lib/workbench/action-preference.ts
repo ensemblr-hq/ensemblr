@@ -3,11 +3,6 @@ import type { SettingsResolutionSnapshot } from '@/shared/ipc/contracts/settings
 import { REPOSITORY_PROMPT_TAG } from '@/shared/prompt-scaffolding';
 import { clampReviewContext } from '@/shared/review-brief';
 
-export {
-	isRepositoryAuthoredPreference,
-	REPOSITORY_PROMPT_TAG,
-} from '@/shared/prompt-scaffolding';
-
 /**
  * Provenance line carried inside the block, so the statement survives even if
  * the surrounding prompt is reordered, quoted, or summarised downstream.

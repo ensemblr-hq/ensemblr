@@ -1,12 +1,12 @@
 import { expect, test } from 'vitest';
 
 import {
-	isRepositoryAuthoredPreference,
 	resolveActionPreference,
 	sharedActionPreference,
 	wrapRepositoryPreference,
 } from '@/renderer/lib/workbench/action-preference';
 import type { SettingsResolutionSnapshot } from '@/shared/ipc/contracts/settings-resolution';
+import { isRepositoryAuthoredPreference } from '@/shared/prompt-scaffolding';
 
 function snapshotWith(key: string, value: unknown): SettingsResolutionSnapshot {
 	return {
