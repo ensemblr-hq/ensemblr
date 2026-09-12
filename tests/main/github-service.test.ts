@@ -970,7 +970,12 @@ test('getPullRequestSnapshot does not re-query deployments when the head sha has
 	);
 });
 
-test('deployment statuses are fetched sequentially, not concurrently', async () => {
+// Bounded, not serialized: an unbounded fan-out spawned a `gh` per deployment
+// at once, which is what the PR sweeper's pacing exists to prevent, while a
+// strictly sequential loop paid a full round trip each on a timer-driven
+// refresh. The assertion is the ceiling, so raising the bound is a deliberate
+// edit here rather than a silent drift.
+test('deployment statuses are fetched at a bounded concurrency', async () => {
 	const database = createTestDatabase();
 	let activeStatusCalls = 0;
 	let maxConcurrentStatusCalls = 0;
@@ -990,7 +995,13 @@ test('deployment statuses are fetched sequentially, not concurrently', async () 
 			}
 			if (readDeploymentsRef(request)) {
 				return buildResult({
-					stdout: JSON.stringify([{ id: 1 }, { id: 2 }]),
+					stdout: JSON.stringify([
+						{ id: 1 },
+						{ id: 2 },
+						{ id: 3 },
+						{ id: 4 },
+						{ id: 5 },
+					]),
 				});
 			}
 			if (isDeploymentStatusesCall(request)) {
@@ -1023,7 +1034,9 @@ test('deployment statuses are fetched sequentially, not concurrently', async () 
 		workspaceId: 'ws-1',
 	});
 
-	assert.equal(maxConcurrentStatusCalls, 1);
+	// Five deployments, so a ceiling of 2 is a real bound rather than an artefact
+	// of there being too few to overlap.
+	assert.equal(maxConcurrentStatusCalls, 2);
 });
 
 test('getPullRequestSnapshot caches and serves fresh snapshots', async () => {

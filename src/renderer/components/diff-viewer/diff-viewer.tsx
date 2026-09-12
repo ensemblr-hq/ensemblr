@@ -1,14 +1,7 @@
 import { useAtomValue } from 'jotai';
 import { PlusIcon } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
-import {
-	useCallback,
-	useEffect,
-	useLayoutEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
 	type ChangeData,
 	Decoration,
@@ -162,6 +155,12 @@ export function DiffViewer({
 				commentingEnabled={commentingEnabled}
 				diffType={file.type}
 				hunks={displayHunks}
+				// Resets the row budget when the pane moves to another file, which
+				// is what the lifted budget was scoped to. Keyed rather than reset
+				// in an effect on the hunks: `displayHunks` is also rebuilt when the
+				// split/unified toggle flips, so an effect re-trimmed a diff the
+				// user had just asked to see in full.
+				key={filePath}
 				language={resolvedLanguage}
 				layout={layout}
 				onRequestComment={openComposer}
@@ -320,11 +319,6 @@ function DiffBody({
 		() => (revealed ? [revealed.changeKey] : EMPTY_SELECTION),
 		[revealed],
 	);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: the effect resets on a new file's hunks, not on anything it reads.
-	useEffect(() => {
-		setBudgetLifted(false);
-	}, [allHunks]);
 
 	return (
 		<div

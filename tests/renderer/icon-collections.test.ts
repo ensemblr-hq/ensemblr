@@ -73,7 +73,7 @@ describe('registerIconCollections', () => {
 
 describe('icon subset', () => {
 	it('matches what the generator produces from the bundled collections today', () => {
-		expect(JSON.parse(JSON.stringify(ICON_SUBSET))).toEqual(buildIconSubset());
+		expect(structuredClone(ICON_SUBSET)).toEqual(buildIconSubset());
 	});
 
 	it('ships a fraction of the bundled collections', () => {

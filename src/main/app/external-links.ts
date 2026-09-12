@@ -2,8 +2,10 @@ import { app, shell, type WebContents } from 'electron';
 
 import {
 	type AppDocument,
+	type NavigationDecision,
 	navigationDecision,
 	parseAllowedExternalUrl,
+	subframeNavigationDecision,
 } from './external-links-policy';
 
 /**
@@ -58,12 +60,10 @@ export function routeExternalLinksToBrowser(
 		return { action: 'deny' };
 	});
 
-	const applyNavigationPolicy = (
+	const applyDecision = (
 		event: { preventDefault: () => void },
-		url: string,
+		decision: NavigationDecision,
 	): void => {
-		const decision = navigationDecision(url, appDocument);
-
 		if (decision.action === 'allow') {
 			return;
 		}
@@ -78,15 +78,24 @@ export function routeExternalLinksToBrowser(
 		console.warn('[external-links] blocked navigation', decision.reason);
 	};
 
+	const applyNavigationPolicy = (
+		event: { preventDefault: () => void },
+		url: string,
+	): void => {
+		applyDecision(event, navigationDecision(url, appDocument));
+	};
+
 	webContents.on('will-navigate', applyNavigationPolicy);
 	webContents.on('will-redirect', applyNavigationPolicy);
 	// `will-frame-navigate` also fires for the main frame, which `will-navigate`
-	// has already handled — acting twice would open the browser twice.
+	// has already handled — acting twice would open the browser twice. A
+	// subframe is judged by `subframeNavigationDecision`, which additionally
+	// admits the app's own blob and Chromium's PDF viewer.
 	webContents.on('will-frame-navigate', (event) => {
 		if (event.isMainFrame) {
 			return;
 		}
-		applyNavigationPolicy(event, event.url);
+		applyDecision(event, subframeNavigationDecision(event.url, appDocument));
 	});
 }
 

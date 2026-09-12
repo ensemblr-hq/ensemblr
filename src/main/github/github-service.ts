@@ -25,6 +25,7 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
+import { mapWithConcurrency } from '../concurrency/index.ts';
 import { validateGitRef } from '../repository/validate-git-ref.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import { selectWorkspaceBaseBranchById } from '../storage/repositories/workspace-repository.ts';
@@ -57,6 +58,14 @@ const SNAPSHOT_TTL_MS = 5_000;
  * lookup before a preview URL can be surfaced.
  */
 const DEPLOYMENT_PAGE_SIZE = 5;
+
+/**
+ * `gh` processes the deployment-status fan-out may hold open at once. Two, not
+ * {@link DEPLOYMENT_PAGE_SIZE}: this runs on the PR sweeper's timer, whose whole
+ * design is to keep `gh` off the main process in bursts, and two halves the
+ * latency of a five-deployment refresh without approaching that burst.
+ */
+const DEPLOYMENT_STATUS_CONCURRENCY = 2;
 /**
  * Status rows read per deployment. A deployment reports `queued`/`pending`
  * before `success`, and only the successful row carries `environment_url`.
@@ -463,18 +472,27 @@ export function createGithubService({
 			return [];
 		}
 
+		// Bounded rather than either extreme: an unbounded `Promise.all` over
+		// DEPLOYMENT_PAGE_SIZE spawned a `gh` per deployment at once, which is
+		// what the sweeper's one-call-at-a-time pacing exists to prevent, and a
+		// plain sequential loop paid a full round trip per deployment on a
+		// timer-driven refresh.
+		const ids = deployments.map((deployment) =>
+			String((deployment as Record<string, unknown> | null)?.id ?? ''),
+		);
+		const rowsById = await mapWithConcurrency(
+			ids,
+			DEPLOYMENT_STATUS_CONCURRENCY,
+			async (id) => (id ? await fetchDeploymentStatuses(cwd, id) : []),
+		);
+
 		const statuses = new Map<string, readonly unknown[]>();
-		// Sequential to match the sweeper's own one-gh-call-at-a-time intent —
-		// up to DEPLOYMENT_PAGE_SIZE concurrent calls here previously undercut it.
-		for (const deployment of deployments) {
-			const id = String(
-				(deployment as Record<string, unknown> | null)?.id ?? '',
-			);
-			const rows = id ? await fetchDeploymentStatuses(cwd, id) : [];
+		ids.forEach((id, index) => {
+			const rows = rowsById[index] ?? [];
 			if (rows.length > 0) {
 				statuses.set(id, rows);
 			}
-		}
+		});
 		return parseDeployments(deployments, statuses);
 	}
 

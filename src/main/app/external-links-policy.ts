@@ -109,3 +109,77 @@ export function navigationDecision(
 
 	return { action: 'block', reason: parsed.protocol };
 }
+
+/**
+ * Chromium's built-in PDF viewer, which an `<embed type="application/pdf">`
+ * instantiates in a subframe of the embedding document. The id is Chromium's
+ * own (`extension_misc::kPdfExtensionId`), not something this app registers.
+ */
+const PDF_VIEWER_ORIGIN = 'chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai';
+
+/**
+ * Whether a `blob:` URL was minted by the app's own document.
+ *
+ * A blob URL carries the origin that created it after the `blob:` prefix, which
+ * `URL` exposes as the `pathname`. From the dev server that inner origin is the
+ * dev origin; from the packaged build the document is `file:`, whose origin is
+ * opaque, so the protocol is as tight a comparison as the platform offers.
+ * @param url - The navigation target, exactly as the renderer gave it.
+ * @param appDocument - Where the app's own renderer is being served from.
+ * @returns True when the blob belongs to the app's own document.
+ */
+function isAppOwnBlob(
+	url: string,
+	{ appDocumentUrl, appOrigin }: AppDocument,
+): boolean {
+	let parsed: URL;
+	let inner: URL;
+
+	try {
+		parsed = new URL(url);
+		if (parsed.protocol !== 'blob:') {
+			return false;
+		}
+		inner = new URL(parsed.pathname);
+	} catch {
+		return false;
+	}
+
+	return appOrigin
+		? inner.origin === appOrigin
+		: appDocumentUrl !== null && inner.protocol === 'file:';
+}
+
+/**
+ * Decides what to do with a navigation inside a **subframe**, which is allowed
+ * two destinations a top-level navigation is not.
+ *
+ * Both exist only to let the file preview show a PDF. `<embed>` loads the blob
+ * the app minted from the file's bytes, and Chromium then instantiates its own
+ * viewer in a nested frame; each step is a frame navigation, and the top-level
+ * policy refuses both — a `blob:` because nothing the app navigates *to* should
+ * be one, and `chrome-extension:` because the app registers no extension.
+ * Neither is a destination a document can reach on its own: the blob has to have
+ * been created by this renderer, and the viewer frame is opened by the browser
+ * rather than by script.
+ *
+ * A top-level navigation to either is still blocked — this is the subframe
+ * handler's decision, not a widening of {@link navigationDecision}.
+ * @param url - The navigation target, exactly as the renderer gave it.
+ * @param appDocument - Where the app's own renderer is being served from.
+ * @returns The decision the Electron handler should act on.
+ */
+export function subframeNavigationDecision(
+	url: string,
+	appDocument: AppDocument,
+): NavigationDecision {
+	if (isAppOwnBlob(url, appDocument)) {
+		return { action: 'allow' };
+	}
+
+	if (url.startsWith(`${PDF_VIEWER_ORIGIN}/`)) {
+		return { action: 'allow' };
+	}
+
+	return navigationDecision(url, appDocument);
+}

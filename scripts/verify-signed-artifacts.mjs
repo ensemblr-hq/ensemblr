@@ -14,9 +14,10 @@ const DEVELOPER_ID_AUTHORITY = 'Developer ID Application';
 // `Authority=Developer ID Application: <Name> (<TEAMID>)` — matching only the
 // authority string (above) accepts *any* Developer ID certificate from *any*
 // Apple developer account, not just this project's. `ENSEMBLR_TEAM_ID`, set by
-// the release job from the `APPLE_TEAM_ID` repository secret, pins it. Optional
-// rather than required: until that secret is provisioned, the check is skipped
-// with a warning rather than failing every release.
+// the release and nightly jobs from the `APPLE_TEAM_ID` repository secret, pins
+// it to this one. Required: this script only ever runs against artifacts that
+// were signed, so an unset Team ID means the pin is not being applied, and a
+// pin that silently does nothing is the defect it was added to fix.
 const AUTHORITY_LINE_PATTERN =
 	/^Authority=Developer ID Application:.*\(([A-Z0-9]{10})\)\s*$/m;
 
@@ -89,16 +90,18 @@ function verifyDeveloperIdSignature(artifactPath) {
 }
 
 /**
- * Assert the signing certificate's Team ID matches `ENSEMBLR_TEAM_ID`, when
- * set. Skipped, not failed, when unset: this is a defence-in-depth pin over
- * the authority check above, not the thing that makes a build trustworthy.
+ * Assert the signing certificate's Team ID matches `ENSEMBLR_TEAM_ID`.
  * @param codesignOutput - Combined stdout/stderr of `codesign -dv --verbose=4`
  * @param artifactPath - Absolute path to the artifact being checked, for the message
- * @returns One message when the Team ID does not match; empty otherwise
+ * @returns One message when the Team ID is unset or does not match; empty otherwise
  */
 function verifyTeamId(codesignOutput, artifactPath) {
 	const expected = process.env.ENSEMBLR_TEAM_ID;
-	if (!expected) return [];
+	if (!expected) {
+		return [
+			'ENSEMBLR_TEAM_ID is not set, so the signing certificate was accepted from any Apple developer account. CI supplies it from the APPLE_TEAM_ID secret; locally, export it to the Team ID in your Developer ID certificate.',
+		];
+	}
 	const match = codesignOutput.match(AUTHORITY_LINE_PATTERN);
 	if (!match) {
 		return [

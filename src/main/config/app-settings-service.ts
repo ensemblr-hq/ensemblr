@@ -12,7 +12,10 @@ import {
 	ENSEMBLR_CONFIG_SCHEMA_URL,
 	resolveEnsemblrConfigPath,
 } from './config-loader.ts';
-import { watchConfigFile } from './watch-config-file.ts';
+import {
+	type ConfigFileWatcher,
+	watchConfigFile,
+} from './watch-config-file.ts';
 
 /** Coalesces the burst of fs events an editor emits for a single save. */
 const WATCH_DEBOUNCE_MS = 120;
@@ -67,6 +70,17 @@ export interface AppSettingsService {
 export interface CreateAppSettingsServiceOptions {
 	/** Override the config path (tests). Defaults to the real `~/.config` path. */
 	configPath?: string;
+	/**
+	 * Override how the file is watched. Defaults to {@link watchConfigFile}.
+	 *
+	 * Injectable because the caching contract — a parse held only while the
+	 * watcher runs, dropped the moment the file moves underneath — is the
+	 * service's own logic, while `fs.watch` delivery is the OS's. A test that
+	 * asserts the former through the latter is asserting two things, and the one
+	 * it does not own is the one that fails: under a saturated parallel suite the
+	 * event does not arrive at all, not late.
+	 */
+	watchFile?: ConfigFileWatcher;
 }
 
 /**
@@ -90,6 +104,7 @@ export function createAppSettingsService(
 	options: CreateAppSettingsServiceOptions = {},
 ): AppSettingsService {
 	const configPath = options.configPath ?? resolveEnsemblrConfigPath();
+	const watchFile = options.watchFile ?? watchConfigFile;
 	// Exact bytes of our last write — the watcher compares against this to ignore
 	// the fs event our own atomic write triggers.
 	let lastWritten: string | null = null;
@@ -177,7 +192,7 @@ export function createAppSettingsService(
 		} catch {
 			lastWritten = null;
 		}
-		watcherHandle = watchConfigFile({
+		watcherHandle = watchFile({
 			debounceMs: WATCH_DEBOUNCE_MS,
 			filePath: configPath,
 			onChange: () => {

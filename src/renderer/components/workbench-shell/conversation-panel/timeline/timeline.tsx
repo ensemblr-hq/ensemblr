@@ -1,6 +1,6 @@
 import type { UIMessage } from 'ai';
 import type { TFunction } from 'i18next';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChatAssistantTurn } from '@/renderer/components/chat-assistant-turn';
 import { ChatWorkingIndicator } from '@/renderer/components/chat-turn-timer';
@@ -198,11 +198,8 @@ export function AgentSessionTimeline({
 		[messages],
 	);
 
+	// Reset per chat tab by the `key` its call site passes, not by an effect.
 	const [windowSize, setWindowSize] = useState(TRANSCRIPT_WINDOW);
-	// biome-ignore lint/correctness/useExhaustiveDependencies: the window resets per chat tab, not on anything the effect reads.
-	useEffect(() => {
-		setWindowSize(TRANSCRIPT_WINDOW);
-	}, [activeSession.chatTabId]);
 	const withheldMessages = Math.max(0, messages.length - windowSize);
 	const visibleMessages = useMemo(
 		() => (withheldMessages > 0 ? messages.slice(withheldMessages) : messages),

@@ -143,6 +143,7 @@ export default defineConfig({
 						'tests/main/text-context-menu-forwarding.test.ts',
 						'tests/main/text-edit-command-schema.test.ts',
 						'tests/main/validate-git-ref.test.ts',
+						'tests/main/git-checkpoint-diff-parse.test.ts',
 						'tests/main/worktree-placement.test.ts',
 						'tests/main/remove-directory.test.ts',
 						'tests/main/copy-directory.test.ts',

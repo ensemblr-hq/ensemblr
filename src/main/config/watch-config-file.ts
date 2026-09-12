@@ -2,6 +2,19 @@ import { type FSWatcher, watch } from 'node:fs';
 import path from 'node:path';
 
 /**
+ * Registers a watch on a config file — the shape {@link watchConfigFile} has,
+ * named so a caller can supply its own.
+ *
+ * Declared here rather than beside either consumer so the two services that
+ * take one do not have to import each other for the type.
+ */
+export type ConfigFileWatcher = (input: {
+	debounceMs: number;
+	filePath: string;
+	onChange: () => void;
+}) => { stop: () => void };
+
+/**
  * Watches a single config file for changes and invokes `onChange` after a
  * debounce. Watches the containing directory (not the file) so editors that save
  * via rename-replace don't orphan the watcher, and filters events to the target

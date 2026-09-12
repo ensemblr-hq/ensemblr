@@ -813,11 +813,9 @@ first step naming the ones it lacked:
 | `APPLE_CERT_PASSWORD` | password the `.p12` was exported with |
 | `KEYCHAIN_PASSWORD` | any throwaway string |
 
-One further secret narrows `verify:signing` and is optional: unset, the step
-warns instead of failing rather than blocking every release on a secret nobody
-provisioned yet.
+`verify:signing` additionally needs one repository **variable** — not a secret:
 
-| Secret | Value |
+| Variable | Value |
 | --- | --- |
 | `APPLE_TEAM_ID` | the 10-character Apple Developer Team ID the Developer ID certificate belongs to |
 
@@ -826,7 +824,21 @@ for *any* Developer ID certificate from *any* Apple developer account —
 matching only that authority string, which is what `verify:signing` did before,
 accepts a build signed by the wrong account. `ENSEMBLR_TEAM_ID`
 (`scripts/verify-signed-artifacts.mjs`) pins the parenthesized Team ID against
-this secret when it is set.
+it, and **fails when it is unset** — a pin that silently does nothing is the
+defect it was added to fix.
+
+A variable rather than a secret because a Team ID is not one: it is embedded in
+every binary the account signs and printed by `codesign -dv` on any machine that
+has a copy. Masking it would only make a mismatch read as `***` in the log that
+has to explain the failure. Set it with:
+
+```sh
+gh variable set APPLE_TEAM_ID --body <TEAMID>
+```
+
+To run `npm run verify:signing` locally, export the same value as
+`ENSEMBLR_TEAM_ID`; `security find-identity -v -p codesigning` prints it in
+parentheses after your name.
 
 One further secret is read by the release workflow alone, and is not signing
 material:

@@ -15,7 +15,27 @@
  * - `img-src https:` — a markdown document renders remote images untouched
  *   (`src/renderer/hooks/markdown/use-markdown-image-source.ts`), which is how a
  *   pull-request comment draws its badges.
+ * - `script-src`/`style-src chrome://resources` — see
+ *   {@link PDF_VIEWER_RESOURCES}.
  */
+
+/**
+ * Chromium's own PDF viewer builds its toolbar from `chrome://resources`, and a
+ * plugin document inherits the embedding document's policy rather than carrying
+ * one of its own. Without this the file preview's `<embed>` instantiates and
+ * then renders blank, reporting four violations for the viewer's Lit bundle,
+ * `load_time_data.js`, the Mojo bindings and one stylesheet.
+ *
+ * Measured to be the minimum: `img-src` and `font-src` need no addition. This
+ * widens nothing an app script can reach — Chromium refuses a `chrome:` fetch
+ * from an `http`/`file` origin whatever the policy says, and
+ * `navigationDecision` still blocks a top-level `chrome:` navigation. The
+ * addition is what lets the *browser's* own document paint.
+ *
+ * Rendering the PDF in-app instead (pdf.js) would remove this and let
+ * `plugins` go back off, which is the audit's SH-08.
+ */
+const PDF_VIEWER_RESOURCES = 'chrome://resources';
 
 /** Source list every directive inherits when the app is served from `file:`. */
 const PACKAGED_SELF = ["'self'", 'file:'];
@@ -65,8 +85,8 @@ export function contentSecurityPolicy(devServerOrigin: string | null): string {
 
 	return serializePolicy({
 		'default-src': ["'none'"],
-		'script-src': scriptSources,
-		'style-src': [...self, "'unsafe-inline'"],
+		'script-src': [...scriptSources, PDF_VIEWER_RESOURCES],
+		'style-src': [...self, "'unsafe-inline'", PDF_VIEWER_RESOURCES],
 		'img-src': [...self, 'data:', 'blob:', 'linear-asset:', 'https:'],
 		'font-src': [...self, 'data:'],
 		'media-src': [...self, 'data:', 'blob:'],

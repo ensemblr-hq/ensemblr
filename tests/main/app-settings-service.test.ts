@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
 
 import { createAppSettingsService } from '../../src/main/config/app-settings-service';
 import { DEFAULT_APP_SETTINGS } from '../../src/shared/config';
@@ -236,14 +236,26 @@ describe('createAppSettingsService', () => {
 	// across main re-read for the same reason: the answer is live. The watcher is
 	// what makes it live, so once it is running the parse is cached and only the
 	// three places that know the file moved invalidate it.
-	test('serves a cached parse while the watcher is running', async () => {
+	// The watcher is injected rather than real: what is under test is the caching
+	// contract — held while watching, dropped when the file moves — and `fs.watch`
+	// delivery belongs to the OS. Through a real watcher this asserts both, and
+	// the half it does not own is the half that fails: in a saturated parallel
+	// suite the event never arrives rather than arriving late.
+	test('serves a cached parse while the watcher is running', () => {
 		const configPath = tmpConfigPath();
-		const service = createAppSettingsService({ configPath });
+		let fileMoved: (() => void) | undefined;
+		const service = createAppSettingsService({
+			configPath,
+			watchFile: ({ onChange }) => {
+				fileMoved = onChange;
+				return { stop: () => undefined };
+			},
+		});
 		service.startWatching(() => undefined);
+		expect(fileMoved).toBeDefined();
 
-		// Reference equality rather than "the value has not changed yet": asserting
-		// staleness right after the write races the watcher, which under load can
-		// fire before the next read.
+		// Reference equality, not "the value has not changed yet": the same parse
+		// is served until something says the file moved.
 		const first = service.read();
 		expect(first.general.sendShortcut).toBe('enter');
 		expect(service.read()).toBe(first);
@@ -259,10 +271,11 @@ describe('createAppSettingsService', () => {
 				},
 			}),
 		);
+		expect(service.read()).toBe(first);
 
-		await vi.waitFor(() =>
-			expect(service.read().general.sendShortcut).toBe('mod+enter'),
-		);
+		fileMoved?.();
+
+		expect(service.read().general.sendShortcut).toBe('mod+enter');
 		service.stop();
 	});
 

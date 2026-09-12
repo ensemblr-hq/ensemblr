@@ -539,9 +539,11 @@ export function createWorkspaceService({
 				: failure(worktree.diagnostic);
 		}
 
-		// Best-effort: ensure `.context/` is git-ignored before anything can
-		// write to it. Failure is non-fatal (the directory is still usable;
-		// it just may show up in `git status`), so we do not roll back.
+		// Strictly before `runFilesToCopy`, which asks git which *gitignored*
+		// files match its patterns — the answer changes the moment this write
+		// lands, so running the two concurrently would race git's ignore state.
+		// Failure is non-fatal (the directory is still usable; it just may show
+		// up in `git status`), so we do not roll back.
 		const contextExcludeDiagnostic = await addContextDirToGitExclude({
 			localCommandService,
 			workspacePath: prepared.path,

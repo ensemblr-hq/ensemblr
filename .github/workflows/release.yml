@@ -174,7 +174,7 @@ jobs:
 
       - name: Verify every artifact is signed, notarized and stapled
         env:
-          ENSEMBLR_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ENSEMBLR_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
         run: npm run verify:signing
 
       - name: Attach the distributables to the release
