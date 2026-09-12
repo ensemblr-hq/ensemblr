@@ -1,5 +1,11 @@
 import { useAtomValue } from 'jotai';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from 'react';
 import { upsertTerminalSession } from '@/renderer/lib/terminal';
 import type {
 	CreateTerminalSessionResult,
@@ -106,10 +112,7 @@ export function useWorkspaceTerminalSessions(
 		closedTerminalIdsRef.current = new Set();
 	}
 
-	// The workspace the state below currently describes. React commits a render
-	// before it flushes the departing effect's cleanup, so between the reset and
-	// `cancelled` there is a window where an in-flight response for the previous
-	// workspace would publish into the new one's state.
+	// The workspace the state below describes.
 	const shownWorkspaceIdRef = useRef(workspaceId);
 
 	// Reset session state when the workspace changes; an inline-during-render
@@ -117,11 +120,18 @@ export function useWorkspaceTerminalSessions(
 	const [prevWorkspaceId, setPrevWorkspaceId] = useState(workspaceId);
 	if (prevWorkspaceId !== workspaceId) {
 		setPrevWorkspaceId(workspaceId);
-		shownWorkspaceIdRef.current = workspaceId;
 		setSessions([]);
 		setIsLoaded(false);
 		closedTerminalIdsRef.current.clear();
 	}
+
+	// Recording the switch has to happen in the commit, not the passive phase:
+	// React schedules passive cleanup as a later task, so between the reset and
+	// the `cancelled` that cleanup sets there is a window where an in-flight
+	// response for the workspace just left would publish into the new one.
+	useLayoutEffect(() => {
+		shownWorkspaceIdRef.current = workspaceId;
+	}, [workspaceId]);
 
 	useEffect(() => {
 		let cancelled = false;

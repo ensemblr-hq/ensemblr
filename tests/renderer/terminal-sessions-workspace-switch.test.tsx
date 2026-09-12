@@ -49,24 +49,22 @@ function terminalSnapshot(
 type TerminalSessionsState = ReturnType<typeof useWorkspaceTerminalSessions>;
 
 /**
- * Drives the hook under one workspace id and reports every rendered state. The
- * layout effect fires inside the same commit as the workspace switch — before
- * React flushes the departing effect's cleanup — which is the window a stale
- * list response can land in.
+ * Drives the hook under one workspace id and reports each committed state. The
+ * report runs in a layout effect declared after the hook's own, so it observes
+ * the commit the workspace switch lands in but still precedes the passive
+ * cleanup — the window a stale list response can arrive in.
  */
 function Probe({
 	onCommit,
-	onState,
 	workspaceId,
 }: {
-	onCommit: (workspaceId: string) => void;
-	onState: (state: TerminalSessionsState) => void;
+	onCommit: (workspaceId: string, state: TerminalSessionsState) => void;
 	workspaceId: string;
 }) {
-	onState(useWorkspaceTerminalSessions(workspaceId));
+	const state = useWorkspaceTerminalSessions(workspaceId);
 	useLayoutEffect(() => {
-		onCommit(workspaceId);
-	}, [onCommit, workspaceId]);
+		onCommit(workspaceId, state);
+	});
 	return null;
 }
 
@@ -106,10 +104,8 @@ test('a list settling after a workspace switch never reaches the new workspace',
 	});
 
 	const states: TerminalSessionsState[] = [];
-	const onState = (state: TerminalSessionsState) => {
+	const onCommit = (workspaceId: string, state: TerminalSessionsState) => {
 		states.push(state);
-	};
-	const onCommit = (workspaceId: string) => {
 		if (workspaceId === 'ws-2') {
 			first.resolve({ sessions: [terminalSnapshot('ws1-terminal', 'ws-1')] });
 		}
@@ -129,15 +125,11 @@ test('a list settling after a workspace switch never reaches the new workspace',
 		document.body.append(container);
 		root = createRoot(container);
 
-		root.render(
-			<Probe onCommit={onCommit} onState={onState} workspaceId='ws-1' />,
-		);
+		root.render(<Probe onCommit={onCommit} workspaceId='ws-1' />);
 		await settle();
 		expect(listTerminalSessions).toHaveBeenCalledWith({ workspaceId: 'ws-1' });
 
-		root.render(
-			<Probe onCommit={onCommit} onState={onState} workspaceId='ws-2' />,
-		);
+		root.render(<Probe onCommit={onCommit} workspaceId='ws-2' />);
 		await settle();
 
 		expect(listTerminalSessions).toHaveBeenCalledWith({ workspaceId: 'ws-2' });
