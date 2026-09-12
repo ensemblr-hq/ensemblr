@@ -15,6 +15,14 @@ updates:
           - electron
           - "@electron/*"
           - "@electron-forge/*"
+      # @lexical/react pins its own nested copy of lexical, so bumping one
+      # without the other leaves two copies in the tree — and two structurally
+      # identical but nominally distinct EditorState types, which fails
+      # typecheck. They only ever move together.
+      lexical:
+        patterns:
+          - lexical
+          - "@lexical/*"
       dev-dependencies:
         dependency-type: development
         exclude-patterns:
