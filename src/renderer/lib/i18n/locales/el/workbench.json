@@ -732,6 +732,7 @@
 			"label": "Εγκατάσταση"
 		},
 		"terminal": {
+			"label": "Τερματικό",
 			"numbered-label": "Τερματικό {{number}}"
 		}
 	},

@@ -225,6 +225,7 @@ export function useLiveWorkspaceModel({
 			pullRequest,
 			runScripts: scriptSettingsData?.runScripts ?? [],
 			scripts,
+			terminalTabsLoaded: terminalSessions.isLoaded,
 			workspaceFiles: liveWorkspaceFiles,
 		};
 	}, [
@@ -234,6 +235,7 @@ export function useLiveWorkspaceModel({
 		pullRequest,
 		scriptSettingsData,
 		terminalSessions.activeTerminalIds,
+		terminalSessions.isLoaded,
 		terminalSessions.sessions,
 		t,
 	]);

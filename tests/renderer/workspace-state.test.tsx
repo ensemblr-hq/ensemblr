@@ -17,6 +17,10 @@ import {
 	rightSidebarSizePercentAtom,
 	sessionVisitOrderByWorkspaceAtom,
 } from '../../src/renderer/state/workspace';
+import type {
+	TerminalDockTabId,
+	WorkspaceShellModel,
+} from '../../src/renderer/types/workbench';
 
 const STORAGE_KEYS = {
 	activeChatTabByWorkspace: 'ensemblr_workspace_active_chat_tab_by_workspace',
@@ -81,6 +85,27 @@ function installLocalStorage(initialItems?: Record<string, string>) {
 	});
 
 	return storage;
+}
+
+function withLoadedTerminals(
+	workspace: WorkspaceShellModel,
+	...ids: TerminalDockTabId[]
+): WorkspaceShellModel {
+	return {
+		...workspace,
+		dockTabs: [
+			...workspace.dockTabs,
+			...ids.map((id) => ({
+				id,
+				kind: 'terminal' as const,
+				label: 'Terminal',
+				sessionStatus: 'running' as const,
+				status: 'idle' as const,
+				terminalId: id.slice('terminal:'.length),
+			})),
+		],
+		terminalTabsLoaded: true,
+	};
 }
 
 afterEach(() => {
@@ -252,10 +277,13 @@ test('resolves per-workspace review and dock tab preferences', () => {
 			workspace,
 		}),
 	).toBe('run');
+	// The strip has loaded, so a preference naming none of its tabs is a closed
+	// terminal and falls through.
+	const withOpenTerminal = withLoadedTerminals(workspace, 'terminal:other');
 	expect(
 		getPreferredDockTab({
 			dockTabsByWorkspace: { [workspace.id]: 'terminal:missing' },
-			workspace,
+			workspace: withOpenTerminal,
 		}),
 	).toBe('setup');
 	// A closed terminal falls back to the dock tab visited before it, not Setup.
@@ -263,7 +291,7 @@ test('resolves per-workspace review and dock tab preferences', () => {
 		getPreferredDockTab({
 			dockTabsByWorkspace: { [workspace.id]: 'terminal:missing' },
 			visitOrder: ['terminal:missing', 'run', 'setup'],
-			workspace,
+			workspace: withOpenTerminal,
 		}),
 	).toBe('run');
 	// A valid route dock tab overrides the stored per-workspace preference.
@@ -274,6 +302,80 @@ test('resolves per-workspace review and dock tab preferences', () => {
 			workspace,
 		}),
 	).toBe('setup');
+});
+
+// Switching workspaces used to land on Setup and overwrite the remembered
+// terminal with it: a workspace's terminal sessions are listed asynchronously
+// and are absent entirely from the shell model behind a sidebar link, so the
+// preference matched nothing at the moment it was resolved.
+test('holds a remembered terminal tab while the strip has not loaded', () => {
+	const workspace = getDefaultWorkspace();
+
+	expect(
+		getPreferredDockTab({
+			dockTabsByWorkspace: { [workspace.id]: 'terminal:pending' },
+			workspace,
+		}),
+	).toBe('terminal:pending');
+	// Held over the visit fallback too — that fallback is for a terminal that is
+	// gone, and this one has not had the chance to appear.
+	expect(
+		getPreferredDockTab({
+			dockTabsByWorkspace: { [workspace.id]: 'terminal:pending' },
+			visitOrder: ['terminal:pending', 'run', 'setup'],
+			workspace,
+		}),
+	).toBe('terminal:pending');
+	expect(
+		getPreferredDockTab({
+			dockTabsByWorkspace: {},
+			routeDockTab: 'terminal:pending',
+			workspace,
+		}),
+	).toBe('terminal:pending');
+});
+
+// The hold ends when the strip does. Gating it on an empty strip instead would
+// hold the dead id for the whole life of a workspace with no terminal open —
+// an ordinary steady state — and the dock would render Setup over a preference
+// nothing could ever satisfy.
+test('releases a remembered terminal tab once the strip has loaded without it', () => {
+	const workspace = withLoadedTerminals(getDefaultWorkspace());
+
+	expect(
+		getPreferredDockTab({
+			dockTabsByWorkspace: { [workspace.id]: 'terminal:closed' },
+			visitOrder: ['terminal:closed', 'run', 'setup'],
+			workspace,
+		}),
+	).toBe('run');
+	expect(
+		getPreferredDockTab({
+			dockTabsByWorkspace: {},
+			routeDockTab: 'terminal:closed',
+			workspace,
+		}),
+	).toBe('setup');
+});
+
+// A dock restore relaunches terminals serially, so the strip carries the first
+// one while later ones are still arriving. Gating the hold on "some terminal is
+// present" would release the preference mid-restore and let the caller persist
+// a substitute over it.
+test('holds a remembered terminal tab while a restore is still relaunching', () => {
+	const workspace = getDefaultWorkspace();
+	const midRestore = {
+		...withLoadedTerminals(workspace, 'terminal:first'),
+		terminalTabsLoaded: false,
+	};
+
+	expect(
+		getPreferredDockTab({
+			dockTabsByWorkspace: { [workspace.id]: 'terminal:second' },
+			visitOrder: ['terminal:second', 'run', 'setup'],
+			workspace: midRestore,
+		}),
+	).toBe('terminal:second');
 });
 
 test('resolves the remembered chat tab per workspace', () => {

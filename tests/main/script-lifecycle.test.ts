@@ -29,6 +29,8 @@ const WORKSPACE_ID = 'workspace-1';
 const SIBLING_WORKSPACE_ID = 'workspace-2';
 /** Workspace of an unrelated repository, which run mode must never touch. */
 const OTHER_REPO_WORKSPACE_ID = 'workspace-3';
+/** Safety ceiling the fake puts under a caller that asked for no timeout. */
+const UNBOUNDED_WAIT_CEILING_MS = 2_000;
 
 function createDatabaseFixture(t: TestContext): DatabaseSync {
 	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-scripts-'));
@@ -235,8 +237,15 @@ function createTerminalServiceFake({
 		waitForExit: (terminalId, timeoutMs) =>
 			new Promise((resolve) => {
 				const start = Date.now();
-				// Tests cap the wait so a kill-resistant fake cannot hang the suite.
-				const effectiveTimeout = Math.min(timeoutMs ?? 500, 500);
+				// Tests cap a bounded wait so a kill-resistant fake cannot hang the
+				// suite. An unbounded caller keeps its own semantics — it must
+				// outlast the bounded cap — behind a wider ceiling for the same
+				// reason; its poll is unref'd so a fire-and-forget wait cannot hold
+				// the runner open.
+				const effectiveTimeout =
+					timeoutMs === undefined
+						? UNBOUNDED_WAIT_CEILING_MS
+						: Math.min(timeoutMs, 500);
 				const check = () => {
 					const session = sessions.get(terminalId);
 
@@ -250,7 +259,7 @@ function createTerminalServiceFake({
 						return;
 					}
 
-					setTimeout(check, 10);
+					setTimeout(check, 10).unref?.();
 				};
 
 				check();
@@ -1005,6 +1014,28 @@ test('runSetupScriptIfNeeded skips a second run once setup is recorded', async (
 
 	assert.equal(result.session, null);
 	assert.equal(result.diagnostics[0]?.code, 'setup-already-current');
+	assert.equal(fixture.createCalls.length, 1);
+});
+
+// A bounded exit wait abandoned any setup slower than its timeout — a cold
+// `npm install` routinely is — so the fingerprint was never written and every
+// later open re-ran setup, which read as setup firing at random. The fake caps a
+// bounded wait at 500ms, so a setup that exits after that stands in for one that
+// outlives the bound.
+test('runSetupScriptWithAutoRun records the fingerprint for a setup slower than a bounded wait', async (t) => {
+	const fixture = createServiceFixture(t, { setup: 'npm install' });
+
+	setTimeout(() => fixture.endSession('session-1', 'exited'), 700);
+	await fixture.service.runSetupScriptWithAutoRun({
+		workspaceId: WORKSPACE_ID,
+	});
+
+	const skipped = await fixture.service.runSetupScriptIfNeeded({
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(skipped.session, null);
+	assert.equal(skipped.diagnostics[0]?.code, 'setup-already-current');
 	assert.equal(fixture.createCalls.length, 1);
 });
 

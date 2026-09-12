@@ -1,5 +1,11 @@
 import { useAtomValue } from 'jotai';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from 'react';
 import { upsertTerminalSession } from '@/renderer/lib/terminal';
 import type {
 	CreateTerminalSessionResult,
@@ -23,6 +29,14 @@ interface WorkspaceTerminalSessionsState {
 		command?: string;
 		title?: string;
 	}) => Promise<CreateTerminalSessionResult>;
+	/**
+	 * Whether `sessions` holds the workspace's full set: the session list has
+	 * answered and any dock restore it triggered has finished. False covers the
+	 * mount window, where an empty list means "not asked yet" rather than "no
+	 * terminals" — a distinction the dock's tab memory depends on. A failed
+	 * listing still settles, since lifecycle broadcasts are all that will arrive.
+	 */
+	isLoaded: boolean;
 	sessions: TerminalSessionSnapshot[];
 }
 
@@ -33,12 +47,12 @@ interface WorkspaceTerminalSessionsState {
  * a later remount finds nothing to restore. Best-effort — a missing bridge or a
  * failed relaunch simply skips that tab.
  * @param workspaceId - Workspace whose dock to restore.
- * @param isCancelled - Reports whether the owning effect has since torn down.
+ * @param isStale - Reports whether the owning effect no longer speaks for the workspace on screen.
  * @param setSessions - Folds each relaunched session into dock state.
  */
 async function restoreDockTerminals(
 	workspaceId: string,
-	isCancelled: () => boolean,
+	isStale: () => boolean,
 	setSessions: (
 		updater: (previous: TerminalSessionSnapshot[]) => TerminalSessionSnapshot[],
 	) => void,
@@ -47,14 +61,14 @@ async function restoreDockTerminals(
 		?.listRestorableTerminals({ workspaceId })
 		.catch(() => null);
 
-	if (!result || isCancelled()) {
+	if (!result || isStale()) {
 		return;
 	}
 
 	for (const terminal of result.terminals) {
 		// Relaunch serially: each spawn assembles a workspace environment that
 		// allocates a port, so concurrent creates would race on allocation, and the
-		// between-spawn cancel check halts a torn-down effect mid-restore.
+		// between-spawn staleness check halts a superseded effect mid-restore.
 		// react-doctor-disable-next-line -- Serial relaunch is intentional; see above.
 		const created = await window.ensemblr
 			?.createTerminalSession({
@@ -65,7 +79,7 @@ async function restoreDockTerminals(
 			})
 			.catch(() => null);
 
-		if (isCancelled()) {
+		if (isStale()) {
 			return;
 		}
 
@@ -86,6 +100,7 @@ export function useWorkspaceTerminalSessions(
 	workspaceId: string,
 ): WorkspaceTerminalSessionsState {
 	const [sessions, setSessions] = useState<TerminalSessionSnapshot[]>([]);
+	const [isLoaded, setIsLoaded] = useState(false);
 	const activeTerminalIds = useAtomValue(activeTerminalIdsAtom);
 	// Tabs the user explicitly closed, covering the window before main has marked
 	// the session closed and stopped broadcasting for it — and the case where
@@ -97,22 +112,41 @@ export function useWorkspaceTerminalSessions(
 		closedTerminalIdsRef.current = new Set();
 	}
 
+	// The workspace the state below describes.
+	const shownWorkspaceIdRef = useRef(workspaceId);
+
 	// Reset session state when the workspace changes; an inline-during-render
 	// comparison avoids an extra render that an effect-based reset would force.
 	const [prevWorkspaceId, setPrevWorkspaceId] = useState(workspaceId);
 	if (prevWorkspaceId !== workspaceId) {
 		setPrevWorkspaceId(workspaceId);
 		setSessions([]);
+		setIsLoaded(false);
 		closedTerminalIdsRef.current.clear();
 	}
 
+	// Recording the switch has to happen in the commit, not the passive phase:
+	// React schedules passive cleanup as a later task, so between the reset and
+	// the `cancelled` that cleanup sets there is a window where an in-flight
+	// response for the workspace just left would publish into the new one.
+	useLayoutEffect(() => {
+		shownWorkspaceIdRef.current = workspaceId;
+	}, [workspaceId]);
+
 	useEffect(() => {
 		let cancelled = false;
+		const bridge = window.ensemblr;
+		const isStale = () =>
+			cancelled || shownWorkspaceIdRef.current !== workspaceId;
 
-		window.ensemblr
+		if (!bridge) {
+			setIsLoaded(true);
+		}
+
+		bridge
 			?.listTerminalSessions({ workspaceId })
-			.then((result) => {
-				if (cancelled) {
+			.then(async (result) => {
+				if (isStale()) {
 					return;
 				}
 				setSessions(result.sessions);
@@ -124,27 +158,29 @@ export function useWorkspaceTerminalSessions(
 					(session) => session.kind === 'terminal',
 				);
 				if (!hasLiveDockTerminal) {
-					void restoreDockTerminals(workspaceId, () => cancelled, setSessions);
+					await restoreDockTerminals(workspaceId, isStale, setSessions);
 				}
 			})
 			.catch(() => {
 				// Listing is best-effort; lifecycle broadcasts still hydrate state.
+			})
+			.finally(() => {
+				if (!isStale()) {
+					setIsLoaded(true);
+				}
 			});
 
-		const unsubscribeLifecycle = window.ensemblr?.onTerminalLifecycle(
-			(event) => {
-				if (
-					event.workspaceId !== workspaceId ||
-					closedTerminalIdsRef.current.has(event.terminalId)
-				) {
-					return;
-				}
+		const unsubscribeLifecycle = bridge?.onTerminalLifecycle((event) => {
+			if (
+				isStale() ||
+				event.workspaceId !== workspaceId ||
+				closedTerminalIdsRef.current.has(event.terminalId)
+			) {
+				return;
+			}
 
-				setSessions((previous) =>
-					upsertTerminalSession(previous, event.session),
-				);
-			},
-		);
+			setSessions((previous) => upsertTerminalSession(previous, event.session));
+		});
 
 		return () => {
 			cancelled = true;
@@ -195,5 +231,11 @@ export function useWorkspaceTerminalSessions(
 		}
 	}, []);
 
-	return { activeTerminalIds, closeTerminal, createTerminal, sessions };
+	return {
+		activeTerminalIds,
+		closeTerminal,
+		createTerminal,
+		isLoaded,
+		sessions,
+	};
 }

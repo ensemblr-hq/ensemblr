@@ -176,7 +176,40 @@ describe('mapTerminalSessionsToDockTabs', () => {
 			t: i18n.t,
 		});
 
-		expect(tabs.map((tab) => tab.label)).toEqual(['Terminal 1']);
+		expect(tabs.map((tab) => tab.label)).toEqual(['Terminal']);
+	});
+
+	// A number distinguishes tabs from each other; a lone tab has nothing to be
+	// distinguished from, so "Terminal 1" was only noise.
+	test('drops the number while one terminal is open and restores it on the second', () => {
+		const alone = mapTerminalSessionsToDockTabs({
+			sessions: [createSession({ id: 'a', titleIsDefault: true })],
+			t: i18n.t,
+		});
+		expect(alone.map((tab) => tab.label)).toEqual(['Terminal']);
+
+		const pair = mapTerminalSessionsToDockTabs({
+			sessions: [
+				createSession({ id: 'a', titleIsDefault: true }),
+				createSession({ id: 'b', titleIsDefault: true }),
+			],
+			t: i18n.t,
+		});
+		expect(pair.map((tab) => tab.label)).toEqual(['Terminal 1', 'Terminal 2']);
+	});
+
+	// A named sibling still fills a slot, so the strip is two tabs long and the
+	// unnamed one is numbered by where it sits.
+	test('numbers a lone unnamed terminal that shares the strip with a named one', () => {
+		const tabs = mapTerminalSessionsToDockTabs({
+			sessions: [
+				createSession({ id: 'a', title: 'Deploy' }),
+				createSession({ id: 'b', titleIsDefault: true }),
+			],
+			t: i18n.t,
+		});
+
+		expect(tabs.map((tab) => tab.label)).toEqual(['Deploy', 'Terminal 2']);
 	});
 
 	test('names the running command and reverts once it finishes', () => {
@@ -205,7 +238,7 @@ describe('mapTerminalSessionsToDockTabs', () => {
 			],
 			t: i18n.t,
 		});
-		expect(finished[0]?.label).toBe('Terminal 1');
+		expect(finished[0]?.label).toBe('Terminal');
 	});
 
 	test('shows recent interactive terminal output as activity', () => {

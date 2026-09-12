@@ -758,6 +758,7 @@
 			"label": "Настройка"
 		},
 		"terminal": {
+			"label": "Терминал",
 			"numbered-label": "Терминал {{number}}"
 		}
 	},

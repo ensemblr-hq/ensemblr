@@ -6,7 +6,10 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, test } from 'vitest';
 
 import { getDefaultWorkspace } from '@/renderer/fixtures/workbench';
-import { dockVisitOrderByWorkspaceAtom } from '@/renderer/state/workspace/layout-atoms';
+import {
+	activeDockTabByWorkspaceAtom,
+	dockVisitOrderByWorkspaceAtom,
+} from '@/renderer/state/workspace/layout-atoms';
 import { useWorkspacePanelTabState } from '@/renderer/state/workspace/panel-tabs';
 import { sessionVisitOrderByWorkspaceAtom } from '@/renderer/state/workspace/selection-atoms';
 import type {
@@ -15,17 +18,34 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 
-const TERMINAL_TAB: DockTabModel = {
-	id: 'terminal:1',
-	kind: 'terminal',
-	label: 'Terminal',
-	sessionStatus: 'running',
-	status: 'running',
-	terminalId: 'terminal-1',
-};
+function terminalTab(id: string): DockTabModel {
+	return {
+		id: `terminal:${id}`,
+		kind: 'terminal',
+		label: 'Terminal',
+		sessionStatus: 'running',
+		status: 'running',
+		terminalId: id,
+	};
+}
+
+function withTerminalTabs(
+	workspace: WorkspaceShellModel,
+	...ids: string[]
+): WorkspaceShellModel {
+	return {
+		...workspace,
+		dockTabs: [...workspace.dockTabs, ...ids.map(terminalTab)],
+		terminalTabsLoaded: true,
+	};
+}
 
 function withTerminalTab(workspace: WorkspaceShellModel): WorkspaceShellModel {
-	return { ...workspace, dockTabs: [...workspace.dockTabs, TERMINAL_TAB] };
+	return withTerminalTabs(workspace, '1');
+}
+
+function withLoadedStrip(workspace: WorkspaceShellModel): WorkspaceShellModel {
+	return { ...workspace, terminalTabsLoaded: true };
 }
 
 function renderPanelTabs(
@@ -93,6 +113,23 @@ describe('useWorkspacePanelTabState visit tracking', () => {
 	});
 
 	test('lands on the previously visited dock tab when the active terminal closes', () => {
+		const withBoth = withTerminalTabs(workspace, '1', '2');
+		const { rerender, result } = renderPanelTabs(store, {
+			activeWorkspace: withBoth,
+			search: { dock: 'run' },
+		});
+
+		rerender({ activeWorkspace: withBoth, search: { dock: 'terminal:1' } });
+		expect(result.current.activeDockTab).toBe('terminal:1');
+
+		rerender({ activeWorkspace: withTerminalTabs(workspace, '2') });
+
+		expect(result.current.activeDockTab).toBe('run');
+	});
+
+	// The last terminal closing empties the strip, which must not read as a strip
+	// that has not loaded: the fallback is what keeps the dock off Setup.
+	test('lands on the previously visited dock tab when the only terminal closes', () => {
 		const withTerminal = withTerminalTab(workspace);
 		const { rerender, result } = renderPanelTabs(store, {
 			activeWorkspace: withTerminal,
@@ -102,9 +139,50 @@ describe('useWorkspacePanelTabState visit tracking', () => {
 		rerender({ activeWorkspace: withTerminal, search: { dock: 'terminal:1' } });
 		expect(result.current.activeDockTab).toBe('terminal:1');
 
-		rerender({ activeWorkspace: workspace });
+		rerender({ activeWorkspace: withLoadedStrip(workspace) });
 
 		expect(result.current.activeDockTab).toBe('run');
+	});
+
+	// Switching workspaces used to land on Setup and persist it over the
+	// remembered terminal: the strip arrives a main-process round trip after the
+	// workspace mounts, so the preference matched nothing when it was resolved.
+	test('keeps the remembered terminal while the strip has not loaded', () => {
+		const withTerminal = withTerminalTab(workspace);
+		const { rerender, result } = renderPanelTabs(store, {
+			activeWorkspace: withTerminal,
+			search: { dock: 'terminal:1' },
+		});
+		expect(result.current.activeDockTab).toBe('terminal:1');
+
+		rerender({ activeWorkspace: workspace });
+		expect(result.current.activeDockTab).toBe('terminal:1');
+
+		rerender({ activeWorkspace: withTerminal });
+		expect(result.current.activeDockTab).toBe('terminal:1');
+	});
+
+	// A dock restore relaunches serially, so the strip carries the first terminal
+	// while the remembered one is still coming. Releasing the preference there
+	// would persist a substitute over it and the restore would arrive too late.
+	test('lands on the remembered terminal once a serial restore reaches it', () => {
+		const midRestore = {
+			...withTerminalTabs(workspace, '1'),
+			terminalTabsLoaded: false,
+		};
+		const { rerender, result } = renderPanelTabs(store, {
+			activeWorkspace: midRestore,
+			search: { dock: 'terminal:2' },
+		});
+
+		expect(result.current.activeDockTab).toBe('terminal:2');
+		expect(store.get(activeDockTabByWorkspaceAtom)).toEqual({
+			[workspace.id]: 'terminal:2',
+		});
+
+		rerender({ activeWorkspace: withTerminalTabs(workspace, '1', '2') });
+
+		expect(result.current.activeDockTab).toBe('terminal:2');
 	});
 
 	test('keeps visit history separate per workspace', () => {

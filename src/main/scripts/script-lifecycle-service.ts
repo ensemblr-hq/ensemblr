@@ -22,10 +22,11 @@ import { readSetupStateFile, writeSetupStateFile } from './setup-state-file.ts';
 const RESTART_WAIT_TIMEOUT_MS = 7_000;
 
 /**
- * Longest the service waits for a setup or archive script to exit before it
- * gives up. Shared so both bounded waits use one value.
+ * Longest the service waits for an archive script to exit before it gives up.
+ * Archiving blocks on this wait, so it stays bounded. Setup deliberately has no
+ * equivalent — see {@link finalizeSetup}.
  */
-const SCRIPT_EXIT_WAIT_TIMEOUT_MS = 60_000;
+const ARCHIVE_EXIT_WAIT_TIMEOUT_MS = 60_000;
 
 /** Inputs for {@link ScriptLifecycleService.runScript}. */
 export interface RunScriptOptions {
@@ -444,9 +445,25 @@ export function createScriptLifecycleService({
 	/**
 	 * Waits for a setup session to finish and, when it exits cleanly, records the
 	 * dependency fingerprint so later opens can skip setup, then chains the run
-	 * script if the repository enables `autoRunAfterSetup`. The wait is bounded;
-	 * setup failures, hangs, and mid-flight stops skip both the record and the
-	 * chain. Settings are re-read after the wait so a mid-setup opt-out is honored.
+	 * script if the repository enables `autoRunAfterSetup`. Setup failures and
+	 * mid-flight stops skip both the record and the chain. Settings are re-read
+	 * after the wait so a mid-setup opt-out is honored.
+	 *
+	 * The wait is deliberately unbounded. A bounded one abandoned any setup
+	 * slower than its timeout — a cold `npm install` routinely is — so the
+	 * fingerprint was never written and every later open re-ran setup, which read
+	 * as setup firing at random.
+	 *
+	 * Nothing the user waits on waits on this. `runSetupScriptIfNeeded` launches
+	 * it without awaiting, and `runSetupScriptWithAutoRun` — which does await it —
+	 * is itself only ever fired and forgotten, by the create hook in
+	 * `script-hooks.ts`. So an unbounded wait costs a pending promise rather than
+	 * a stalled caller, which matters because two cases never resolve one:
+	 * a session removed from the service while still running loses its waiter
+	 * list with it, and quit replaces each exit subscription before signalling the
+	 * PTY, so `finalizeSession` — the only place waiters are drained — does not
+	 * run for a setup still going when the app closes. Both cost at most one
+	 * redundant setup run on the next open.
 	 * @param options - The setup command, its session id, and the target workspace.
 	 */
 	async function finalizeSetup({
@@ -458,15 +475,9 @@ export function createScriptLifecycleService({
 		sessionId: string;
 		workspaceId: string;
 	}): Promise<void> {
-		const exited = await terminalService.waitForExit(
-			sessionId,
-			SCRIPT_EXIT_WAIT_TIMEOUT_MS,
-		);
+		await terminalService.waitForExit(sessionId);
 
-		if (
-			!exited ||
-			terminalService.getSnapshot(sessionId).session?.status !== 'exited'
-		) {
+		if (terminalService.getSnapshot(sessionId).session?.status !== 'exited') {
 			return;
 		}
 
@@ -545,8 +556,11 @@ export function createScriptLifecycleService({
 
 	/**
 	 * Runs the setup script, then records its fingerprint and chains the run
-	 * script per `autoRunAfterSetup` once it exits cleanly. Awaits the full tail
-	 * so callers know setup (and any chained run) has settled.
+	 * script per `autoRunAfterSetup` once it exits cleanly. Awaits the full tail,
+	 * so a caller that awaits this awaits the setup session itself: since
+	 * {@link finalizeSetup} waits for that exit without a bound, the returned
+	 * promise settles when setup does and not before. Call it without awaiting
+	 * unless blocking for the whole of setup is the intent.
 	 */
 	async function runSetupScriptWithAutoRun({
 		workspaceId,
@@ -674,7 +688,7 @@ export function createScriptLifecycleService({
 			return resolved.error ? [] : resolved.settings.runScripts;
 		},
 		runArchiveScriptAndWait: async ({
-			timeoutMs = SCRIPT_EXIT_WAIT_TIMEOUT_MS,
+			timeoutMs = ARCHIVE_EXIT_WAIT_TIMEOUT_MS,
 			workspaceId,
 		}) => {
 			const result = await runScript({ kind: 'archive', workspaceId });
