@@ -14,6 +14,7 @@ import type {
 	RegisterLocalRepositoryDiagnosticCode,
 } from '@/shared/ipc/contracts/repository';
 import type { RootDirectoryDiagnosticCode } from '@/shared/ipc/contracts/root-directory';
+import type { SettingsPublicationFailureCode } from '@/shared/ipc/contracts/settings-publication';
 import type { SharedRootAdoptionDiagnosticCode } from '@/shared/ipc/contracts/shared-root-adoption';
 import type { UpdateFailureCode } from '@/shared/ipc/contracts/update';
 import type {
@@ -66,6 +67,7 @@ export type AppFailureCode =
 	| RenameWorkspaceDiagnosticCode
 	| RootDirectoryDiagnosticCode
 	| SetWorkspaceBaseBranchDiagnosticCode
+	| SettingsPublicationFailureCode
 	| SharedRootAdoptionDiagnosticCode
 	| UnarchiveWorkspaceDiagnosticCode
 	| UpdateFailureCode
@@ -188,6 +190,11 @@ export const APP_FAILURE_TEXT: Record<
 		),
 	'infisical-unknown': (t) =>
 		t('errors:failure.infisical-unknown', 'The Infisical operation failed.'),
+	'infisical-workspace-required': (t) =>
+		t(
+			'errors:failure.infisical-workspace-required',
+			'The link is saved on this machine, but .ensemblr/settings.toml is written on a live workspace’s branch. Open a workspace for this repository, then save again.',
+		),
 	'callback-failed': (t) =>
 		t(
 			'errors:failure.callback-failed',
@@ -278,6 +285,16 @@ export const APP_FAILURE_TEXT: Record<
 		t(
 			'errors:failure.base-branch-unsynced',
 			'The base branch is out of sync with its remote.',
+		),
+	'base-branch-diverged': (t) =>
+		t(
+			'errors:failure.base-branch-diverged',
+			'The local base and its remote have diverged. Choose which branch to create from.',
+		),
+	'base-refresh-failed': (t) =>
+		t(
+			'errors:failure.base-refresh-failed',
+			'The remote base could not be refreshed. This workspace uses cached code and may not be current.',
 		),
 	'branch-adopted': (t) =>
 		t(
@@ -964,4 +981,83 @@ export const APP_FAILURE_TEXT: Record<
 		),
 	'write-failed': (t) =>
 		t('errors:failure.write-failed', 'That file could not be written.'),
+	'cleanup-unsafe': (t) =>
+		t(
+			'errors:failure.cleanup-unsafe',
+			'The repository’s settings are staged or conflicted, so the old copy could not be safely removed.',
+		),
+	'destination-changed': (t) =>
+		t(
+			'errors:failure.destination-changed',
+			'The workspace’s settings changed since this was captured.',
+		),
+	'git-unavailable': (t) =>
+		t(
+			'errors:failure.git-unavailable',
+			'Git could not read the settings file.',
+		),
+	'invalid-request': (t) =>
+		t('errors:failure.invalid-request', 'That request was malformed.'),
+	'merge-failed': (t) =>
+		t(
+			'errors:failure.merge-failed',
+			'The settings merge could not be completed automatically.',
+		),
+	'path-unsafe': (t) =>
+		t('errors:failure.path-unsafe', 'That settings path is not safe to use.'),
+	'preview-not-found': (t) =>
+		t(
+			'errors:failure.preview-not-found',
+			'That settings preview has expired. Preview it again.',
+		),
+	'preview-stale': (t) =>
+		t(
+			'errors:failure.preview-stale',
+			'The settings or Git state changed since this preview was prepared. Preview it again.',
+		),
+	'recovery-failed': (t) =>
+		t(
+			'errors:failure.recovery-failed',
+			'That settings recovery could not be completed.',
+		),
+	'recovery-not-found': (t) =>
+		t(
+			'errors:failure.recovery-not-found',
+			'That settings recovery is no longer available.',
+		),
+	'source-changed': (t) =>
+		t(
+			'errors:failure.source-changed',
+			'The repository’s settings changed after cleanup.',
+		),
+	'source-invalid': (t) =>
+		t(
+			'errors:failure.source-invalid',
+			'The repository’s settings are not valid TOML.',
+		),
+	'source-missing': (t) =>
+		t(
+			'errors:failure.source-missing',
+			'The repository has no unpublished settings changes.',
+		),
+	'source-unreadable': (t) =>
+		t(
+			'errors:failure.source-unreadable',
+			'The repository’s settings could not be read.',
+		),
+	'target-invalid': (t) =>
+		t(
+			'errors:failure.target-invalid',
+			'The workspace’s settings are not valid TOML.',
+		),
+	'target-not-found': (t) =>
+		t(
+			'errors:failure.target-not-found',
+			'The selected workspace is unavailable or belongs to another repository.',
+		),
+	'target-unreadable': (t) =>
+		t(
+			'errors:failure.target-unreadable',
+			'The workspace’s settings could not be read.',
+		),
 };

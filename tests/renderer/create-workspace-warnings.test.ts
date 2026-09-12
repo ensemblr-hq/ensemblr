@@ -49,6 +49,26 @@ describe('reportCreateWorkspaceWarnings', () => {
 		);
 	});
 
+	test('labels cached creation when the upstream refresh failed', () => {
+		reportCreateWorkspaceWarnings(
+			resultWith([
+				{
+					code: 'base-refresh-failed',
+					message:
+						'Could not refresh "origin/main"; the workspace was created from cached "main" and may not include the latest remote commits.',
+					severity: 'warning',
+				},
+			]),
+		);
+
+		expect(toastWarning).toHaveBeenCalledWith(
+			'The remote base could not be refreshed. This workspace uses cached code and may not be current.',
+			expect.objectContaining({
+				description: expect.stringContaining('origin/main'),
+			}),
+		);
+	});
+
 	test('translates the invalid-base code apart from the unresolvable one', () => {
 		reportCreateWorkspaceWarnings(
 			resultWith([

@@ -57,6 +57,8 @@ export interface UpdateRepositoryScriptsRequest {
 	archive: string | null;
 	autoRunAfterSetup: boolean;
 	repositoryId: string;
+	/** Live workspace whose branch receives the shared settings write. */
+	workspaceId: string;
 	/** Named run scripts; an empty list clears the personal override. */
 	runScripts: RunScriptDefinition[];
 	runScriptMode: 'concurrent' | 'nonconcurrent';

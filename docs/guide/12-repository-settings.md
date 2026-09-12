@@ -433,13 +433,23 @@ What that means in practice:
   directive, which is read back and restored above the rewritten document.
 - A file that does not parse is never overwritten. The save fails with an error
   and your file is untouched.
-- If the workspace you have open commits different scripts on its branch, the
-  pane tells you so — it runs the branch's version. Merge the file to change
-  what it runs.
+- **The write targets a live workspace you name, never the repository root
+  clone.** The pane shows which workspace receives it and lets you change it,
+  and it reads that same workspace, so what is on screen is what that workspace
+  runs. Commit the file on that branch and merge it to share the change. A
+  repository with no live workspace cannot edit its scripts here.
+
+Shared settings an older Ensemblr wrote into the repository's root clone are
+still recoverable: the **Settings file** pane previews a merge of them into a
+workspace, publishes it onto that workspace's branch, and — as a separate
+confirmed step — restores the root clone's copy to its committed state. A
+snapshot is kept before each step, so either side can be put back.
 
 Every other Repo settings pane — Environment, Git, Actions, Security, Misc —
 writes personal rows that never touch this file. Background:
-[ADR 0041](../adr/0041-write-repository-scripts-to-ensemblr-settings-toml.md).
+[ADR 0041](../adr/0041-write-repository-scripts-to-ensemblr-settings-toml.md)
+and
+[ADR 0070](../adr/0070-publish-shared-repository-settings-onto-a-workspace-branch.md).
 
 ---
 

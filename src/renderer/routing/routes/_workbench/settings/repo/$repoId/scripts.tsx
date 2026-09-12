@@ -5,6 +5,7 @@ import { ScriptsEditor } from '@/renderer/components/settings/repo-scripts/scrip
 import { SettingsLoadingState } from '@/renderer/components/settings/settings-async-state';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
+import { useSettingsWorkspaceTarget } from '@/renderer/hooks/use-settings-workspace-target';
 import type { RepoSettingsKey } from '@/renderer/state/preferences';
 import type { ScriptsForm } from '@/renderer/types/settings';
 import {
@@ -41,22 +42,50 @@ function readResolvedRunScripts(
 }
 
 /**
- * Per-repository Scripts settings. Reads and writes the repository root's
- * committed `.ensemblr/settings.toml`, which is the sole store for these
- * settings and the copy that gets committed and merged. The editor is remounted
- * per repo via `key` once the snapshot has loaded, so its initial values seed
- * from render state instead of a derive-into-state effect.
+ * Per-repository Scripts settings. Remounted per repo via `key` so its picked
+ * workspace resets when the route param changes.
  */
 function RepoScriptsSettings() {
-	const { t } = useTranslation();
 	const { repoId } = Route.useParams();
-	const root = useRepoSettings(repoId, 'root');
-	const workspace = useRepoSettings(repoId, 'workspace');
+	return <RepoScriptsSettingsForRepo key={repoId} repoId={repoId} />;
+}
 
-	// runScriptMode always resolves (built-in default) once the snapshot loads.
-	const settingsLoaded = root.resolved('runScriptMode') !== undefined;
+/**
+ * Reads and writes the committed `.ensemblr/settings.toml` of a live workspace
+ * the user picks, since shared repository config is no longer written to the
+ * root checkout. The editor is remounted via `key` once the snapshot for the
+ * currently selected workspace has loaded, so its initial values seed from
+ * render state instead of a derive-into-state effect.
+ * @param repoId - Repository whose scripts are being edited.
+ */
+function RepoScriptsSettingsForRepo({ repoId }: { repoId: string }) {
+	const { t } = useTranslation();
+	const { selectWorkspace, selectedWorkspaceId, workspaces } =
+		useSettingsWorkspaceTarget(repoId);
+	const settings = useRepoSettings(repoId, 'workspace', selectedWorkspaceId);
 
-	if (!settingsLoaded) {
+	if (workspaces.length === 0) {
+		return (
+			<SettingsSection
+				description={t(
+					'settings:repo.scripts.description',
+					'Commands that run when workspaces are set up, run, or archived. Saved to the repository’s committed .ensemblr/settings.toml.',
+				)}
+				title={t('settings:repo.scripts.title', 'Scripts')}
+			>
+				<p className='py-4 text-muted-foreground text-xs'>
+					{t(
+						'settings:repo.scripts.no-workspace',
+						'Scripts are saved to a live workspace’s branch. Open a workspace for this repository first.',
+					)}
+				</p>
+			</SettingsSection>
+		);
+	}
+
+	const snapshotLoaded = settings.resolved('runScriptMode') !== undefined;
+
+	if (!snapshotLoaded || !selectedWorkspaceId) {
 		return (
 			<SettingsSection
 				description={t(
@@ -74,39 +103,14 @@ function RepoScriptsSettings() {
 
 	return (
 		<ScriptsEditor
-			initial={readInitialForm(root.resolved)}
-			key={repoId}
-			project={root.project}
+			initial={readInitialForm(settings.resolved)}
+			key={selectedWorkspaceId}
+			onWorkspaceChange={selectWorkspace}
+			project={settings.project}
 			repoId={repoId}
-			workspaceDiverges={workspaceScriptsDiverge(root, workspace)}
+			selectedWorkspaceId={selectedWorkspaceId}
+			workspaces={workspaces}
 		/>
-	);
-}
-
-/**
- * Reports whether the open workspace's branch commits different scripts than
- * the repository root. The dock resolves against the worktree, so when the two
- * disagree the screen would otherwise imply it controls what that workspace
- * runs.
- * @param root - Settings bundle resolved against the repository root.
- * @param workspace - Settings bundle resolved against the open workspace.
- * @returns True when the two checkouts resolve different script settings.
- */
-function workspaceScriptsDiverge(
-	root: ReturnType<typeof useRepoSettings>,
-	workspace: ReturnType<typeof useRepoSettings>,
-): boolean {
-	if (
-		!workspace.settingsPath ||
-		workspace.settingsPath === root.settingsPath ||
-		workspace.resolved('runScriptMode') === undefined
-	) {
-		return false;
-	}
-
-	return (
-		JSON.stringify(readInitialForm(root.resolved)) !==
-		JSON.stringify(readInitialForm(workspace.resolved))
 	);
 }
 
@@ -127,7 +131,7 @@ function readCommandField(
 }
 
 /**
- * Seeds the editor from the repository root's resolved snapshot.
+ * Seeds the editor from the selected workspace's resolved snapshot.
  * @param resolved - Resolved-settings lookup for this repository.
  * @returns The form's initial values.
  */

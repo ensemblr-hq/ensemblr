@@ -184,7 +184,10 @@ async function resolveBranchPoint({
 	return {
 		baseBranch,
 		...raised,
-		plan: { forkRef: plan.forkRef?.trim() || baseBranch, kind: 'create' },
+		plan: {
+			...(plan.forkRef?.trim() ? { forkRef: plan.forkRef.trim() } : {}),
+			kind: 'create',
+		},
 	};
 }
 
@@ -615,7 +618,10 @@ export function createWorkspaceService({
 		};
 
 		return {
-			diagnostics: branchPoint.diagnostic ? [branchPoint.diagnostic] : [],
+			diagnostics: [
+				...(branchPoint.diagnostic ? [branchPoint.diagnostic] : []),
+				...worktree.diagnostics,
+			],
 			filesToCopy: filesToCopySnapshot,
 			reusedExisting: false,
 			status: 'success',

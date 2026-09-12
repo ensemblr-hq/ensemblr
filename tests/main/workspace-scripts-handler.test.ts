@@ -21,10 +21,12 @@ const { openEnsemblrDatabase } = await import(
 );
 
 const REPOSITORY_ID = 'repo-1';
+const WORKSPACE_ID = 'workspace-1';
 
 let database: DatabaseSync;
 let databaseDirectory: string;
 let repositoryPath: string;
+let workspacePath: string;
 
 /** Invokes the registered `update-repository-scripts` handler with a payload. */
 function invokeUpdate(request: unknown): { ok: boolean } {
@@ -54,7 +56,7 @@ function updateRequest(overrides: Record<string, unknown> = {}) {
 
 /** Reads the written config back as a plain record. */
 function readConfig(): Record<string, unknown> {
-	const configPath = path.join(repositoryPath, '.ensemblr', 'settings.toml');
+	const configPath = path.join(workspacePath, '.ensemblr', 'settings.toml');
 
 	return structuredClone(load(readFileSync(configPath, 'utf8'))) as Record<
 		string,
@@ -64,7 +66,10 @@ function readConfig(): Record<string, unknown> {
 
 beforeEach(() => {
 	handle.mockClear();
-	repositoryPath = mkdtempSync(path.join(tmpdir(), 'ensemblr-handler-'));
+	repositoryPath = mkdtempSync(path.join(tmpdir(), 'ensemblr-handler-root-'));
+	workspacePath = mkdtempSync(
+		path.join(tmpdir(), 'ensemblr-handler-workspace-'),
+	);
 	databaseDirectory = mkdtempSync(path.join(tmpdir(), 'ensemblr-handler-db-'));
 	database = openEnsemblrDatabase({
 		databasePath: path.join(databaseDirectory, 'ensemblr-test.db'),
@@ -80,6 +85,21 @@ beforeEach(() => {
 		slug: 'repo',
 		timestamp: new Date().toISOString(),
 	});
+	database
+		.prepare(
+			`INSERT INTO workspaces
+				(id, repository_id, slug, name, path, created_at, updated_at, metadata_json)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, '{}')`,
+		)
+		.run(
+			WORKSPACE_ID,
+			REPOSITORY_ID,
+			'workspace',
+			'Workspace',
+			workspacePath,
+			new Date().toISOString(),
+			new Date().toISOString(),
+		);
 
 	registerWorkspaceScriptHandlers({
 		databaseService: { getConnection: () => ({ database }) },
@@ -91,9 +111,10 @@ afterEach(() => {
 	database.close();
 	rmSync(databaseDirectory, { force: true, recursive: true });
 	rmSync(repositoryPath, { force: true, recursive: true });
+	rmSync(workspacePath, { force: true, recursive: true });
 });
 
-test('writes the repository root committed config', () => {
+test('writes the chosen workspace config without touching the repository root', () => {
 	const result = invokeUpdate(
 		updateRequest({
 			runScripts: [
@@ -105,10 +126,14 @@ test('writes the repository root committed config', () => {
 					name: 'dev',
 				},
 			],
+			workspaceId: WORKSPACE_ID,
 		}),
 	);
 
 	expect(result).toEqual({ ok: true });
+	expect(
+		existsSync(path.join(repositoryPath, '.ensemblr', 'settings.toml')),
+	).toBe(false);
 	expect(readConfig()).toEqual({
 		scripts: {
 			auto_run_after_setup: false,
@@ -125,8 +150,19 @@ test('writes the repository root committed config', () => {
 	});
 });
 
-test('refuses a repository id the app does not track', () => {
-	const result = invokeUpdate(updateRequest({ repositoryId: 'unknown-repo' }));
+test('refuses a payload with no workspaceId', () => {
+	const result = invokeUpdate(updateRequest());
+
+	expect(result).toEqual({ ok: false });
+	expect(
+		existsSync(path.join(workspacePath, '.ensemblr', 'settings.toml')),
+	).toBe(false);
+});
+
+test('refuses a workspace outside the requested repository', () => {
+	const result = invokeUpdate(
+		updateRequest({ repositoryId: 'unknown-repo', workspaceId: WORKSPACE_ID }),
+	);
 
 	expect(result).toEqual({ ok: false });
 	expect(
@@ -135,7 +171,9 @@ test('refuses a repository id the app does not track', () => {
 });
 
 test('refuses a malformed payload without touching the config', () => {
-	const result = invokeUpdate(updateRequest({ runScriptMode: 'sideways' }));
+	const result = invokeUpdate(
+		updateRequest({ runScriptMode: 'sideways', workspaceId: WORKSPACE_ID }),
+	);
 
 	expect(result).toEqual({ ok: false });
 	expect(
@@ -155,6 +193,7 @@ test('refuses duplicate run script names rather than dropping one', () => {
 	const result = invokeUpdate(
 		updateRequest({
 			runScripts: [duplicate('npm run dev'), duplicate('npm run dev:alt')],
+			workspaceId: WORKSPACE_ID,
 		}),
 	);
 

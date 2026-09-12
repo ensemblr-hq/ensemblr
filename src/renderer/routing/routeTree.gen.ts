@@ -38,6 +38,7 @@ import { Route as WorkbenchSettingsRepoRepoIdActionsRouteImport } from './routes
 import { Route as WorkbenchSettingsRepoRepoIdEnvironmentRouteImport } from './routes/_workbench/settings/repo/$repoId/environment'
 import { Route as WorkbenchSettingsRepoRepoIdGitRouteImport } from './routes/_workbench/settings/repo/$repoId/git'
 import { Route as WorkbenchSettingsRepoRepoIdMiscRouteImport } from './routes/_workbench/settings/repo/$repoId/misc'
+import { Route as WorkbenchSettingsRepoRepoIdPublicationRouteImport } from './routes/_workbench/settings/repo/$repoId/publication'
 import { Route as WorkbenchSettingsRepoRepoIdScriptsRouteImport } from './routes/_workbench/settings/repo/$repoId/scripts'
 import { Route as WorkbenchSettingsRepoRepoIdSecretsRouteImport } from './routes/_workbench/settings/repo/$repoId/secrets'
 import { Route as WorkbenchSettingsRepoRepoIdSecurityRouteImport } from './routes/_workbench/settings/repo/$repoId/security'
@@ -206,6 +207,12 @@ const WorkbenchSettingsRepoRepoIdMiscRoute =
     path: '/misc',
     getParentRoute: () => WorkbenchSettingsRepoRepoIdRoute,
   } as any)
+const WorkbenchSettingsRepoRepoIdPublicationRoute =
+  WorkbenchSettingsRepoRepoIdPublicationRouteImport.update({
+    id: '/publication',
+    path: '/publication',
+    getParentRoute: () => WorkbenchSettingsRepoRepoIdRoute,
+  } as any)
 const WorkbenchSettingsRepoRepoIdScriptsRoute =
   WorkbenchSettingsRepoRepoIdScriptsRouteImport.update({
     id: '/scripts',
@@ -274,6 +281,7 @@ export interface FileRoutesByFullPath {
   '/settings/repo/$repoId/environment': typeof WorkbenchSettingsRepoRepoIdEnvironmentRoute
   '/settings/repo/$repoId/git': typeof WorkbenchSettingsRepoRepoIdGitRoute
   '/settings/repo/$repoId/misc': typeof WorkbenchSettingsRepoRepoIdMiscRoute
+  '/settings/repo/$repoId/publication': typeof WorkbenchSettingsRepoRepoIdPublicationRoute
   '/settings/repo/$repoId/scripts': typeof WorkbenchSettingsRepoRepoIdScriptsRoute
   '/settings/repo/$repoId/secrets': typeof WorkbenchSettingsRepoRepoIdSecretsRoute
   '/settings/repo/$repoId/security': typeof WorkbenchSettingsRepoRepoIdSecurityRoute
@@ -307,6 +315,7 @@ export interface FileRoutesByTo {
   '/settings/repo/$repoId/environment': typeof WorkbenchSettingsRepoRepoIdEnvironmentRoute
   '/settings/repo/$repoId/git': typeof WorkbenchSettingsRepoRepoIdGitRoute
   '/settings/repo/$repoId/misc': typeof WorkbenchSettingsRepoRepoIdMiscRoute
+  '/settings/repo/$repoId/publication': typeof WorkbenchSettingsRepoRepoIdPublicationRoute
   '/settings/repo/$repoId/scripts': typeof WorkbenchSettingsRepoRepoIdScriptsRoute
   '/settings/repo/$repoId/secrets': typeof WorkbenchSettingsRepoRepoIdSecretsRoute
   '/settings/repo/$repoId/security': typeof WorkbenchSettingsRepoRepoIdSecurityRoute
@@ -344,6 +353,7 @@ export interface FileRoutesById {
   '/_workbench/settings/repo/$repoId/environment': typeof WorkbenchSettingsRepoRepoIdEnvironmentRoute
   '/_workbench/settings/repo/$repoId/git': typeof WorkbenchSettingsRepoRepoIdGitRoute
   '/_workbench/settings/repo/$repoId/misc': typeof WorkbenchSettingsRepoRepoIdMiscRoute
+  '/_workbench/settings/repo/$repoId/publication': typeof WorkbenchSettingsRepoRepoIdPublicationRoute
   '/_workbench/settings/repo/$repoId/scripts': typeof WorkbenchSettingsRepoRepoIdScriptsRoute
   '/_workbench/settings/repo/$repoId/secrets': typeof WorkbenchSettingsRepoRepoIdSecretsRoute
   '/_workbench/settings/repo/$repoId/security': typeof WorkbenchSettingsRepoRepoIdSecurityRoute
@@ -381,6 +391,7 @@ export interface FileRouteTypes {
     | '/settings/repo/$repoId/environment'
     | '/settings/repo/$repoId/git'
     | '/settings/repo/$repoId/misc'
+    | '/settings/repo/$repoId/publication'
     | '/settings/repo/$repoId/scripts'
     | '/settings/repo/$repoId/secrets'
     | '/settings/repo/$repoId/security'
@@ -414,6 +425,7 @@ export interface FileRouteTypes {
     | '/settings/repo/$repoId/environment'
     | '/settings/repo/$repoId/git'
     | '/settings/repo/$repoId/misc'
+    | '/settings/repo/$repoId/publication'
     | '/settings/repo/$repoId/scripts'
     | '/settings/repo/$repoId/secrets'
     | '/settings/repo/$repoId/security'
@@ -450,6 +462,7 @@ export interface FileRouteTypes {
     | '/_workbench/settings/repo/$repoId/environment'
     | '/_workbench/settings/repo/$repoId/git'
     | '/_workbench/settings/repo/$repoId/misc'
+    | '/_workbench/settings/repo/$repoId/publication'
     | '/_workbench/settings/repo/$repoId/scripts'
     | '/_workbench/settings/repo/$repoId/secrets'
     | '/_workbench/settings/repo/$repoId/security'
@@ -670,6 +683,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdMiscRouteImport
       parentRoute: typeof WorkbenchSettingsRepoRepoIdRoute
     }
+    '/_workbench/settings/repo/$repoId/publication': {
+      id: '/_workbench/settings/repo/$repoId/publication'
+      path: '/publication'
+      fullPath: '/settings/repo/$repoId/publication'
+      preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdPublicationRouteImport
+      parentRoute: typeof WorkbenchSettingsRepoRepoIdRoute
+    }
     '/_workbench/settings/repo/$repoId/scripts': {
       id: '/_workbench/settings/repo/$repoId/scripts'
       path: '/scripts'
@@ -776,6 +796,7 @@ interface WorkbenchSettingsRepoRepoIdRouteChildren {
   WorkbenchSettingsRepoRepoIdEnvironmentRoute: typeof WorkbenchSettingsRepoRepoIdEnvironmentRoute
   WorkbenchSettingsRepoRepoIdGitRoute: typeof WorkbenchSettingsRepoRepoIdGitRoute
   WorkbenchSettingsRepoRepoIdMiscRoute: typeof WorkbenchSettingsRepoRepoIdMiscRoute
+  WorkbenchSettingsRepoRepoIdPublicationRoute: typeof WorkbenchSettingsRepoRepoIdPublicationRoute
   WorkbenchSettingsRepoRepoIdScriptsRoute: typeof WorkbenchSettingsRepoRepoIdScriptsRoute
   WorkbenchSettingsRepoRepoIdSecretsRoute: typeof WorkbenchSettingsRepoRepoIdSecretsRoute
   WorkbenchSettingsRepoRepoIdSecurityRoute: typeof WorkbenchSettingsRepoRepoIdSecurityRoute
@@ -790,6 +811,8 @@ const WorkbenchSettingsRepoRepoIdRouteChildren: WorkbenchSettingsRepoRepoIdRoute
       WorkbenchSettingsRepoRepoIdEnvironmentRoute,
     WorkbenchSettingsRepoRepoIdGitRoute: WorkbenchSettingsRepoRepoIdGitRoute,
     WorkbenchSettingsRepoRepoIdMiscRoute: WorkbenchSettingsRepoRepoIdMiscRoute,
+    WorkbenchSettingsRepoRepoIdPublicationRoute:
+      WorkbenchSettingsRepoRepoIdPublicationRoute,
     WorkbenchSettingsRepoRepoIdScriptsRoute:
       WorkbenchSettingsRepoRepoIdScriptsRoute,
     WorkbenchSettingsRepoRepoIdSecretsRoute:

@@ -209,6 +209,12 @@ export const IPC_CHANNELS = {
 	openRepositoryConfigFile: 'ensemblr:open-repository-config-file',
 	updateRepositoryScripts: 'ensemblr:update-repository-scripts',
 	updateRepositorySettings: 'ensemblr:update-repository-settings',
+	previewSettingsPublication: 'ensemblr:preview-settings-publication',
+	applySettingsPublication: 'ensemblr:apply-settings-publication',
+	cleanupSettingsPublication: 'ensemblr:cleanup-settings-publication',
+	restoreSettingsPublication: 'ensemblr:restore-settings-publication',
+	settingsPublicationRecoveryStatus:
+		'ensemblr:settings-publication-recovery-status',
 	watchWorkspaceFiles: 'ensemblr:watch-workspace-files',
 	workspaceFilesChanged: 'ensemblr:workspace-files-changed',
 	writeForkSummary: 'ensemblr:write-fork-summary',

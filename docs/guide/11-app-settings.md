@@ -572,9 +572,10 @@ inline.
 
 Full reference for the committed file, including every key it accepts:
 [12. Repository settings](./12-repository-settings.md). Background:
-[ADR 0030](../adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md)
+[ADR 0030](../adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md),
+[ADR 0041](../adr/0041-write-repository-scripts-to-ensemblr-settings-toml.md),
 and
-[ADR 0041](../adr/0041-write-repository-scripts-to-ensemblr-settings-toml.md).
+[ADR 0070](../adr/0070-publish-shared-repository-settings-onto-a-workspace-branch.md).
 
 ---
 

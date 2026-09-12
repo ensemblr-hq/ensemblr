@@ -653,6 +653,8 @@
 			"no-accounts-action": "Open Integrations",
 			"no-accounts-description": "Ensemblr reads secrets through a Machine Identity. Add one to link this repository to an Infisical project.",
 			"no-accounts-title": "No Infisical account yet",
+			"no-workspace-description": "The project half of this link is committed to .ensemblr/settings.toml on a live workspace’s branch. Open a workspace for this repository first.",
+			"no-workspace-title": "No live workspace yet",
 			"path": "Secret path",
 			"path-description": "Folder inside the environment to read. Use / for the root.",
 			"project": "Project",
@@ -681,7 +683,11 @@
 			"unlink-confirm": "Confirm unlink",
 			"unreachable-project": "This repository points at project {{projectId}}, which none of your accounts can see. Add your Machine Identity to it in Infisical, or pick a different project.",
 			"unsaved": "Unsaved changes to this link.",
-			"unsaved-incomplete": "Pick a project and an environment to save this link."
+			"unsaved-incomplete": "Pick a project and an environment to save this link.",
+			"workspace-target": {
+				"description": "The project half of this link is committed on the chosen workspace’s branch, the same as any other change.",
+				"label": "Save to workspace"
+			}
 		},
 		"misc": {
 			"description": "Repository paths, preview URLs, files-to-copy patterns, and lifecycle.",
@@ -697,6 +703,71 @@
 			"name-placeholder": "Name",
 			"template-aria-label": "Preview URL template"
 		},
+		"publication": {
+			"applied": "Published. The workspace’s branch now carries the settings, and the root clone still holds its own copy.",
+			"apply": {
+				"action": "Publish to workspace",
+				"description": "Writes the merged file on the workspace’s branch. The root clone keeps its own copy until you remove it.",
+				"label": "Publish",
+				"retry": "Nothing was written. One of the two files changed while the preview was open, so it has been read again — check it and publish once more.",
+				"write-unverified": "The workspace file was replaced, but the write could not be verified. Use the recovery snapshot below to put it back, then publish again."
+			},
+			"applying": "Publishing…",
+			"cleanup": {
+				"action": "Remove root copy",
+				"armed": "Remove it",
+				"description": "Restores the root clone’s file to its committed HEAD state. A recovery snapshot is kept either way, so this can be put back.",
+				"done": "The root clone’s file is back to its committed state.",
+				"label": "Remove the root copy",
+				"unsafe-hint": "The root clone’s file is staged or conflicted. Settle it in git first — retrying will not clear this."
+			},
+			"conflict": {
+				"description": "Nothing has been changed and both files are still intact. Edit either the root clone’s file or the workspace’s file by hand to settle the difference, then check again.",
+				"label": "Publishing is unavailable"
+			},
+			"description": "Shared repository settings that were written into the root clone sit on no branch and in no diff. Publishing merges them into a live workspace’s committed .ensemblr/settings.toml, where they can be reviewed and committed like any other change.",
+			"empty": "The root clone holds no unpublished settings.",
+			"legacy-scripts": {
+				"description": "Retained script settings from an older Ensemblr version are folded into the merged file.",
+				"label": "Older script settings included"
+			},
+			"loading": "Reading the root clone…",
+			"merged": {
+				"clean-description": "This is what the workspace’s .ensemblr/settings.toml becomes.",
+				"conflict-description": "Git could not merge the two copies, so the block below carries its conflict markers.",
+				"label": "Merged file"
+			},
+			"no-workspace": "Settings are published onto a live workspace’s branch. Open a workspace for this repository first.",
+			"recovery": {
+				"applied-at": "Published {{when}}",
+				"cleaned-at": "Root copy removed {{when}}",
+				"description": "Copies captured before each publication and before each root cleanup, so either side can be put back.",
+				"label": "Recovery snapshots",
+				"loading": "Reading recovery snapshots…",
+				"not-applied": "Not published",
+				"not-cleaned": "Root copy still present",
+				"restore-armed": "Restore it",
+				"restore-destination": "Restore workspace file",
+				"restore-source": "Restore root file",
+				"unknown-workspace": "Archived workspace"
+			},
+			"source": {
+				"description": "The state of .ensemblr/settings.toml in the repository’s root clone, which is where these edits were stranded.",
+				"label": "Root clone"
+			},
+			"source-status": {
+				"deleted": "Deleted since the last commit",
+				"missing": "Not present",
+				"modified": "Edited since the last commit",
+				"untracked": "Never committed"
+			},
+			"title": "Settings file",
+			"unexpected": "Ensemblr could not complete the request. Nothing was changed — try again.",
+			"workspace-target": {
+				"description": "The merged file is written on this workspace’s branch, the same as any other commit.",
+				"label": "Publish to workspace"
+			}
+		},
 		"root-path": {
 			"description": "Do not move or delete this directory. Instead, delete the repository in Ensemblr.",
 			"label": "Root path"
@@ -711,9 +782,13 @@
 		},
 		"scripts": {
 			"description": "Commands that run when workspaces are set up, run, or archived. Saved to the repository’s committed .ensemblr/settings.toml.",
-			"diverges": "The workspace you have open commits different scripts on its branch, and runs those. Merge this file to change what it runs.",
 			"loading": "Reading scripts…",
-			"title": "Scripts"
+			"no-workspace": "Scripts are saved to a live workspace’s branch. Open a workspace for this repository first.",
+			"title": "Scripts",
+			"workspace-target": {
+				"description": "This file is saved on the chosen workspace’s branch, the same as any other commit.",
+				"label": "Save to workspace"
+			}
 		},
 		"secrets": {
 			"description": "Link this repository to an Infisical project so its secrets resolve into every workspace, terminal, and agent. Values are read at launch and never written into the repository.",
@@ -738,6 +813,9 @@
 			"label": "Setup script",
 			"placeholder": "e.g. npm ci"
 		},
+		"workspace-target": {
+			"placeholder": "Choose a workspace"
+		},
 		"workspaces-path": {
 			"description": "Do not move or delete the workspace subdirectories. Instead, archive workspaces in Ensemblr.",
 			"label": "Workspaces path"
@@ -750,6 +828,7 @@
 		"git": "Git",
 		"group": "Repository",
 		"misc": "Misc",
+		"publication": "Settings file",
 		"scripts": "Scripts",
 		"secrets": "Secrets",
 		"security": "Security"

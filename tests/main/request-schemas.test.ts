@@ -307,10 +307,31 @@ test('infisicalLinkScopeRequestSchema rejects a scope that cannot be linked', ()
 		infisicalLinkScopeRequestSchema.parse({
 			scope: 'repository',
 			scopeId: 'repo-1',
+			workspaceId: 'workspace-1',
 		}).scope,
 	).toBe('repository');
 	expect(() =>
-		infisicalLinkScopeRequestSchema.parse({ scope: 'app', scopeId: '' }),
+		infisicalLinkScopeRequestSchema.parse({
+			scope: 'app',
+			scopeId: '',
+			workspaceId: 'workspace-1',
+		}),
+	).toThrow();
+});
+
+test('infisicalLinkScopeRequestSchema rejects a request naming no workspace', () => {
+	expect(() =>
+		infisicalLinkScopeRequestSchema.parse({
+			scope: 'repository',
+			scopeId: 'repo-1',
+		}),
+	).toThrow();
+	expect(() =>
+		infisicalLinkScopeRequestSchema.parse({
+			scope: 'repository',
+			scopeId: 'repo-1',
+			workspaceId: '',
+		}),
 	).toThrow();
 });
 
@@ -333,9 +354,22 @@ test('setInfisicalLinkRequestSchema leaves the optional flags unset', () => {
 		projectId: 'proj-1',
 		scope: 'repository',
 		scopeId: 'repo-1',
+		workspaceId: 'workspace-1',
 	});
 	expect(parsed.recursive).toBeUndefined();
 	expect(parsed.secretPath).toBeUndefined();
+});
+
+test('setInfisicalLinkRequestSchema rejects a save naming no workspace', () => {
+	expect(() =>
+		setInfisicalLinkRequestSchema.parse({
+			accountId: 'acc-1',
+			environmentSlug: 'dev',
+			projectId: 'proj-1',
+			scope: 'repository',
+			scopeId: 'repo-1',
+		}),
+	).toThrow();
 });
 
 test('refreshAgentPlanUsageRequestSchema requires a non-empty session id', () => {

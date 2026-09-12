@@ -16,7 +16,8 @@ export type InfisicalFailureCode =
 	| 'infisical-rate-limited'
 	| 'infisical-secret-store-unavailable'
 	| 'infisical-server-error'
-	| 'infisical-unknown';
+	| 'infisical-unknown'
+	| 'infisical-workspace-required';
 
 /**
  * Typed failure envelope. `code` drives the localized renderer copy; `message`
@@ -108,10 +109,17 @@ export interface AddInfisicalAccountRequest {
 	siteUrl: string;
 }
 
-/** Request naming the Ensemblr scope whose link is being read or cleared. */
+/**
+ * Request naming the Ensemblr scope whose link is being read or cleared, plus
+ * the live workspace whose checkout carries the committed `[infisical]` block.
+ * Shared repository config is never read from or written to the root clone, so
+ * a repository-scoped request that names no live workspace is refused rather
+ * than falling back to it.
+ */
 export interface InfisicalLinkScopeRequest {
 	scope: InfisicalLinkScope;
 	scopeId: string;
+	workspaceId: string;
 }
 
 /** Request to create or replace the link attached to one scope. */

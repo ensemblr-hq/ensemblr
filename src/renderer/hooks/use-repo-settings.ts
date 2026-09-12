@@ -17,20 +17,28 @@ export type RepoSettingsOrigin = 'root' | 'workspace';
 
 /**
  * Picks the path a repository's committed `.ensemblr/settings.toml` is read
- * from: the workspace the user last had open, else any workspace of the repo,
- * else the repository root. The script lifecycle service resolves against the
+ * from: an explicitly requested workspace if it belongs to this repo, else the
+ * workspace the user last had open, else any workspace of the repo, else the
+ * repository root. The script lifecycle service resolves against the
  * workspace worktree, so reading the repository root here would show settings
  * that differ from what the dock actually runs — a root sitting on the default
  * branch has none of the config a workspace branch adds.
  * @param project - The repository being configured.
  * @param selection - The last-selected (project, workspace) pair.
+ * @param explicitWorkspaceId - A caller-chosen workspace to resolve against instead of `selection`.
  * @returns The worktree path to resolve settings from.
  */
 function resolveSettingsPath(
 	project: ProjectShellModel,
 	selection: { projectId: string; workspaceId: string } | null,
+	explicitWorkspaceId?: string,
 ): string {
-	const workspace =
+	const explicit = explicitWorkspaceId
+		? project.workspaces.find(
+				(candidate) => candidate.id === explicitWorkspaceId,
+			)
+		: undefined;
+	const lastOpened =
 		selection?.projectId === project.id
 			? project.workspaces.find(
 					(candidate) => candidate.id === selection.workspaceId,
@@ -38,7 +46,8 @@ function resolveSettingsPath(
 			: undefined;
 
 	return (
-		workspace?.pathLabel ??
+		explicit?.pathLabel ??
+		lastOpened?.pathLabel ??
 		project.workspaces[0]?.pathLabel ??
 		project.pathLabel
 	);
@@ -56,11 +65,14 @@ function resolveSettingsPath(
  *
  * `origin` selects the checkout to resolve against: the last-open workspace by
  * default, or the repository root for screens that edit the canonical committed
- * config rather than a branch's copy of it.
+ * config rather than a branch's copy of it. `workspaceId` overrides which
+ * workspace `'workspace'` resolves against, for a screen that lets the user
+ * choose a specific one rather than following the last-opened default.
  */
 export function useRepoSettings(
 	repoId: string,
 	origin: RepoSettingsOrigin = 'workspace',
+	workspaceId?: string,
 ) {
 	const loaderData = workbenchRouteApi.useLoaderData();
 	const project = loaderData.projects.find((p) => p.id === repoId);
@@ -68,7 +80,7 @@ export function useRepoSettings(
 	const settingsPath = project
 		? origin === 'root'
 			? project.pathLabel
-			: resolveSettingsPath(project, lastSelection)
+			: resolveSettingsPath(project, lastSelection, workspaceId)
 		: null;
 
 	const { data: resolutionData } = useQuery(

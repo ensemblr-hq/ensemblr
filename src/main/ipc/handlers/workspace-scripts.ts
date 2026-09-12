@@ -1,5 +1,3 @@
-import type { DatabaseSync } from 'node:sqlite';
-
 import { ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
@@ -13,12 +11,11 @@ import type {
 	UpdateRepositoryScriptsResult,
 } from '../../../shared/ipc/contracts/workspace-scripts';
 import {
-	isRepositoryConfigPathAllowed,
+	resolveWorkspaceSettingsTarget,
 	writeRepositoryScripts,
 } from '../../config';
 import type { ScriptLifecycleService } from '../../scripts';
 import type { EnsemblrDatabaseService } from '../../storage';
-import { selectRepositoryPathById } from '../../storage/repositories/repository-row-repository.ts';
 import { parseUpdateRepositoryScriptsRequest } from '../request-schemas.ts';
 
 /**
@@ -97,21 +94,25 @@ function saveRepositoryScripts(
 		return { ok: false };
 	}
 
-	const repositoryPath = resolveWritableRepositoryPath(
+	const target = resolveWorkspaceSettingsTarget({
 		database,
-		parsed.repositoryId,
-	);
+		repositoryId: parsed.repositoryId,
+		workspaceId: parsed.workspaceId,
+	});
 
-	if (!repositoryPath) {
+	if (!target) {
 		console.error(
 			'[workspace-scripts] no known repository for',
 			parsed.repositoryId,
+			parsed.workspaceId,
 		);
-
 		return { ok: false };
 	}
 
-	const result = writeRepositoryScripts({ ...parsed, repositoryPath });
+	const result = writeRepositoryScripts({
+		...parsed,
+		repositoryPath: target.workspacePath,
+	});
 
 	if (!result.ok) {
 		console.error(
@@ -121,26 +122,4 @@ function saveRepositoryScripts(
 	}
 
 	return { ok: result.ok };
-}
-
-/**
- * Resolves the root clone a Scripts save may write to, refusing any id that
- * does not map to a repository path the app already tracks.
- * @param database - Active database connection.
- * @param repositoryId - Repository the save targets.
- * @returns The writable root path, or null.
- */
-function resolveWritableRepositoryPath(
-	database: DatabaseSync,
-	repositoryId: string,
-): string | null {
-	const repositoryPath = selectRepositoryPathById({
-		database,
-		id: repositoryId,
-	});
-
-	return repositoryPath &&
-		isRepositoryConfigPathAllowed({ database, repositoryPath })
-		? repositoryPath
-		: null;
 }

@@ -12,6 +12,8 @@ export interface LinkedIssueRef {
 
 /** Machine-readable codes for problems raised while creating a workspace. */
 export type CreateWorkspaceDiagnosticCode =
+	| 'base-branch-diverged'
+	| 'base-refresh-failed'
 	| 'branch-already-checked-out'
 	| 'branch-name-invalid'
 	| 'branch-not-found'

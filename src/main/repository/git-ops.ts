@@ -24,13 +24,11 @@ type GitWorktreeAddOutcome =
 	| { status: 'git-missing'; message: string }
 	| { status: 'failure'; message: string };
 
-/**
- * Outcome of a best-effort base-ref sync. `synced` means the base now reflects
- * the latest remote; `skipped` means the sync could not run or advance (offline,
- * no upstream, divergence, dirty tree) and the caller should proceed from the
- * existing local base. Sync is a convenience, never a hard failure.
- */
-type GitBaseRefSyncOutcome = { status: 'synced' } | { status: 'skipped' };
+/** Outcome of resolving a base without moving its local branch or checkout. */
+type GitBaseRefSyncOutcome =
+	| { ref: string; status: 'fresh' | 'local' }
+	| { ref: string; status: 'offline'; upstreamRef: string }
+	| { ref: string; status: 'diverged'; upstreamRef: string };
 
 /**
  * What a `git worktree remove` left behind. `residue` is the state that is
@@ -101,15 +99,13 @@ const GIT_PROGRESS_PREFIXES = [
 ] as const;
 
 /**
- * Best-effort sync of a workspace base ref to the latest remote before a new
- * branch is created from it. Fetches the backing remote branch and fast-forwards
- * the local base when possible. Every failure mode (offline, no upstream,
- * divergence, dirty tree, base checked out elsewhere) degrades to `skipped` so
- * workspace creation still proceeds from the existing local base.
+ * Resolves the freshest safe fork ref without moving a local branch or touching
+ * any checkout. A behind/equal local branch yields its fetched upstream; an
+ * ahead branch stays local; divergence is reported for the caller to reject.
  * @param options - Base branch and Git command dependencies.
- * @returns Whether the base was synced or the sync was skipped.
+ * @returns The ref to fork, plus freshness or ancestry state.
  */
-export async function syncBaseRef({
+export async function resolveFreshForkRef({
 	baseBranch,
 	localCommandService,
 	repositoryPath,
@@ -129,7 +125,14 @@ export async function syncBaseRef({
 			remoteRef,
 			repositoryPath,
 		});
-		return fetched ? { status: 'synced' } : { status: 'skipped' };
+		const pinnedRef = await resolveCommitOid({
+			localCommandService,
+			ref: baseBranch,
+			repositoryPath,
+		});
+		return fetched
+			? { ref: pinnedRef, status: 'fresh' }
+			: { ref: pinnedRef, status: 'offline', upstreamRef: baseBranch };
 	}
 
 	const upstreamRef =
@@ -144,7 +147,14 @@ export async function syncBaseRef({
 			repositoryPath,
 		}));
 	if (!upstreamRef) {
-		return { status: 'skipped' };
+		return {
+			ref: await resolveCommitOid({
+				localCommandService,
+				ref: baseBranch,
+				repositoryPath,
+			}),
+			status: 'local',
+		};
 	}
 
 	const upstreamRemoteRef = await resolveConfiguredRemoteRef({
@@ -152,120 +162,82 @@ export async function syncBaseRef({
 		localCommandService,
 		repositoryPath,
 	});
-	if (!upstreamRemoteRef) {
-		return { status: 'skipped' };
-	}
-
-	const fetched = await fetchRemoteRef({
-		localCommandService,
-		remoteRef: upstreamRemoteRef,
-		repositoryPath,
-	});
-	if (!fetched) {
-		return { status: 'skipped' };
-	}
-
-	return advanceLocalBase({
-		baseBranch,
-		localCommandService,
-		repositoryPath,
-		upstreamRef,
-	});
-}
-
-/**
- * Fast-forwards a local base branch to its freshly fetched upstream when the
- * update is a clean fast-forward. A base that already contains the upstream is a
- * no-op success; divergence or a failed advance (dirty tree, base checked out in
- * another worktree) degrades to `skipped`.
- * @param options - Base branch, upstream ref, and Git command dependencies.
- * @returns Whether the base was advanced or the advance was skipped.
- */
-async function advanceLocalBase({
-	baseBranch,
-	localCommandService,
-	repositoryPath,
-	upstreamRef,
-}: {
-	baseBranch: string;
-	localCommandService: LocalCommandService;
-	repositoryPath: string;
-	upstreamRef: string;
-}): Promise<GitBaseRefSyncOutcome> {
-	const alreadyContainsUpstream = await runGitSucceeds({
-		args: ['merge-base', '--is-ancestor', upstreamRef, baseBranch],
-		localCommandService,
-		repositoryPath,
-	});
-	if (alreadyContainsUpstream) {
-		return { status: 'synced' };
-	}
-
-	const canFastForward = await runGitSucceeds({
-		args: ['merge-base', '--is-ancestor', baseBranch, upstreamRef],
-		localCommandService,
-		repositoryPath,
-	});
-	if (!canFastForward) {
-		return { status: 'skipped' };
-	}
-
-	const currentBranch = await runGitText({
-		args: ['rev-parse', '--abbrev-ref', 'HEAD'],
-		localCommandService,
-		repositoryPath,
-	});
 	if (
-		currentBranch === baseBranch &&
-		!(await isWorktreeClean({ localCommandService, repositoryPath }))
+		!upstreamRemoteRef ||
+		!(await fetchRemoteRef({
+			localCommandService,
+			remoteRef: upstreamRemoteRef,
+			repositoryPath,
+		}))
 	) {
-		return { status: 'skipped' };
+		return {
+			ref: await resolveCommitOid({
+				localCommandService,
+				ref: baseBranch,
+				repositoryPath,
+			}),
+			status: 'offline',
+			upstreamRef,
+		};
 	}
-	const advanced =
-		currentBranch === baseBranch
-			? await runGitSucceeds({
-					args: ['merge', '--ff-only', upstreamRef],
-					localCommandService,
-					repositoryPath,
-				})
-			: await runGitSucceeds({
-					args: ['branch', '--force', baseBranch, upstreamRef],
-					localCommandService,
-					repositoryPath,
-				});
-	return advanced ? { status: 'synced' } : { status: 'skipped' };
+
+	if (
+		await runGitSucceeds({
+			args: ['merge-base', '--is-ancestor', baseBranch, upstreamRef],
+			localCommandService,
+			repositoryPath,
+		})
+	) {
+		return {
+			ref: await resolveCommitOid({
+				localCommandService,
+				ref: upstreamRef,
+				repositoryPath,
+			}),
+			status: 'fresh',
+		};
+	}
+	if (
+		await runGitSucceeds({
+			args: ['merge-base', '--is-ancestor', upstreamRef, baseBranch],
+			localCommandService,
+			repositoryPath,
+		})
+	) {
+		return {
+			ref: await resolveCommitOid({
+				localCommandService,
+				ref: baseBranch,
+				repositoryPath,
+			}),
+			status: 'local',
+		};
+	}
+	return { ref: baseBranch, status: 'diverged', upstreamRef };
 }
 
 /**
- * Requires a clean checkout before a best-effort sync changes the user's files.
- * @param options - Git command service and repository path.
- * @returns True only when Git confirms there are no staged, unstaged or untracked changes.
+ * Pins a selected fork ref to its commit so a later fetch cannot move this
+ * creation's start point between resolution and `git worktree add`.
+ * @param options - Ref and Git command dependencies.
+ * @returns The resolved commit OID, or the original ref when resolution fails.
  */
-async function isWorktreeClean({
+async function resolveCommitOid({
 	localCommandService,
+	ref,
 	repositoryPath,
 }: {
 	localCommandService: LocalCommandService;
+	ref: string;
 	repositoryPath: string;
-}): Promise<boolean> {
-	try {
-		const result = await localCommandService.run({
-			args: [
-				'--no-optional-locks',
-				'status',
-				'--porcelain=v1',
-				'--untracked-files=normal',
-				'--ignore-submodules=none',
-			],
-			command: 'git',
-			cwd: repositoryPath,
-			maxOutputBytes: 4 * 1024,
-			timeoutMs: GIT_BRANCH_TIMEOUT_MS,
-		});
-		return result.status === 'success' && result.stdout.trim() === '';
-	} catch {
-		return false;
-	}
+}): Promise<string> {
+	return (
+		(await runGitText({
+			args: ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`],
+			localCommandService,
+			repositoryPath,
+		})) || ref
+	);
 }
 
 /**

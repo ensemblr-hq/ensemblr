@@ -16,12 +16,12 @@ import test, { type TestContext } from 'node:test';
 import { load } from 'js-toml';
 
 import {
-	migrateAllRepositoryScriptSettings,
-	migrateRepositoryScriptSettings,
+	dropRetainedRepositoryScripts,
+	readPendingRepositoryScripts,
 } from '../../src/main/config/repository-scripts-migration.ts';
+import { writeRepositoryScripts } from '../../src/main/config/repository-scripts-writer.ts';
 import { readSettingJson } from '../../src/main/environment/settings-table.ts';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
-import { insertRepositoryRow } from '../../src/main/storage/repositories/repository-row-repository.ts';
 
 const REPOSITORY_ID = 'repo-1';
 
@@ -99,12 +99,41 @@ function createFixture(t: TestContext): MigrationFixture {
 	};
 }
 
-function migrate(fixture: MigrationFixture) {
-	return migrateRepositoryScriptSettings({
+/**
+ * Replays what the retired launch-time pass did — read the retained rows, fold
+ * them into the checkout's config, drop the rows only once the write landed —
+ * so these cases still describe the behaviour the publication flow inherits.
+ * @param fixture - The disposable repository under test.
+ * @returns Whether rows were absent, folded in, or left behind by a failed write.
+ */
+function migrate(fixture: MigrationFixture): {
+	status: 'failed' | 'migrated' | 'skipped';
+} {
+	const pending = readPendingRepositoryScripts({
 		database: fixture.database,
 		repositoryId: REPOSITORY_ID,
 		repositoryPath: fixture.repositoryPath,
 	});
+
+	if (!pending) {
+		return { status: 'skipped' };
+	}
+
+	const result = writeRepositoryScripts({
+		...pending,
+		repositoryPath: fixture.repositoryPath,
+	});
+
+	if (!result.ok) {
+		return { status: 'failed' };
+	}
+
+	dropRetainedRepositoryScripts({
+		database: fixture.database,
+		repositoryId: REPOSITORY_ID,
+	});
+
+	return { status: 'migrated' };
 }
 
 test('does not touch the config when no legacy rows exist', (t) => {
@@ -207,58 +236,4 @@ test('keeps the rows when the config cannot be written', (t) => {
 
 	assert.equal(result.status, 'failed');
 	assert.deepEqual(fixture.storedKeys(), ['scripts.setup']);
-});
-
-test('the pass retries a repository whose earlier attempt failed', (t) => {
-	const fixture = createFixture(t);
-	insertRepositoryRow({
-		database: fixture.database,
-		defaultBranch: 'main',
-		id: REPOSITORY_ID,
-		metadataJson: '{}',
-		name: REPOSITORY_ID,
-		path: fixture.repositoryPath,
-		remoteUrl: '',
-		slug: REPOSITORY_ID,
-		timestamp: new Date().toISOString(),
-	});
-	fixture.seed('scripts.setup', 'npm ci');
-	const directory = path.dirname(fixture.configPath);
-	mkdirSync(directory, { recursive: true });
-	chmodSync(directory, 0o500);
-
-	assert.deepEqual(migrateAllRepositoryScriptSettings(fixture.database), []);
-	assert.deepEqual(fixture.storedKeys(), ['scripts.setup']);
-
-	chmodSync(directory, 0o700);
-
-	assert.deepEqual(migrateAllRepositoryScriptSettings(fixture.database), [
-		REPOSITORY_ID,
-	]);
-	assert.deepEqual(fixture.storedKeys(), []);
-});
-
-test('the pass is a no-op once every repository is drained', (t) => {
-	const fixture = createFixture(t);
-	insertRepositoryRow({
-		database: fixture.database,
-		defaultBranch: 'main',
-		id: REPOSITORY_ID,
-		metadataJson: '{}',
-		name: REPOSITORY_ID,
-		path: fixture.repositoryPath,
-		remoteUrl: '',
-		slug: REPOSITORY_ID,
-		timestamp: new Date().toISOString(),
-	});
-	fixture.seed('scripts.setup', 'npm ci');
-
-	assert.deepEqual(migrateAllRepositoryScriptSettings(fixture.database), [
-		REPOSITORY_ID,
-	]);
-	assert.deepEqual(migrateAllRepositoryScriptSettings(fixture.database), []);
-	assert.equal(
-		(fixture.readRecord().scripts as Record<string, unknown>).setup,
-		'npm ci',
-	);
 });

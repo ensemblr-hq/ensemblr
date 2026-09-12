@@ -39,6 +39,7 @@ export const updateRepositoryScriptsRequestSchema = z.object({
 	runScripts: runScriptListSchema,
 	runScriptMode: z.enum(['concurrent', 'nonconcurrent']),
 	setup: z.string().nullable(),
+	workspaceId: z.string().min(1),
 });
 
 /**

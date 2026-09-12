@@ -19,6 +19,7 @@ import type {
 	EnsemblrConfigResolutionService,
 	EnsemblrConfigService,
 	RepositoryConfigService,
+	SettingsPublicationService,
 } from '../config';
 import type { DictationService } from '../dictation';
 import type { EnvironmentVariablesService } from '../environment';
@@ -95,6 +96,7 @@ import { registerRepositorySourcesHandlers } from './handlers/repository-sources
 import { registerReviewHandlers } from './handlers/review';
 import { registerRootHandlers } from './handlers/root';
 import { registerSettingsHandlers } from './handlers/settings';
+import { registerSettingsPublicationHandlers } from './handlers/settings-publication';
 import { registerSetupHandlers } from './handlers/setup';
 import { registerShellSnapshotHandlers } from './handlers/shell-snapshot';
 import { registerTerminalHandlers } from './handlers/terminal';
@@ -180,6 +182,7 @@ interface RegisterIpcHandlersOptions {
 	setWorkspaceBaseBranchService: SetWorkspaceBaseBranchService;
 	sharedRootAdoptionService: SharedRootAdoptionService;
 	setupDiagnosticsService: SetupDiagnosticsService;
+	settingsPublicationService: SettingsPublicationService;
 	settingsResolutionService: EnsemblrConfigResolutionService;
 	terminalService: TerminalService;
 	unarchiveWorkspaceService: UnarchiveWorkspaceService;
@@ -252,6 +255,7 @@ export function registerIpcHandlers({
 	scriptLifecycleService,
 	setWorkspaceBaseBranchService,
 	setupDiagnosticsService,
+	settingsPublicationService,
 	settingsResolutionService,
 	sharedRootAdoptionService,
 	terminalService,
@@ -371,6 +375,7 @@ export function registerIpcHandlers({
 	});
 	registerWorkspaceScriptHandlers({ databaseService, scriptLifecycleService });
 	registerRepositorySettingsHandlers({ databaseService });
+	registerSettingsPublicationHandlers({ service: settingsPublicationService });
 	registerWorkspaceFilesHandlers({
 		listWorkspaceFilesService,
 		workspaceFilesWatcher,

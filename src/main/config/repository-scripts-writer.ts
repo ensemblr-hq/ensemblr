@@ -1,7 +1,9 @@
 /**
  * Writes the repository Scripts settings back into the committed
  * `.ensemblr/settings.toml`, which is their sole store (ADR 0041). The rewrite
- * is whole-file: values in other sections survive, comments do not.
+ * is whole-file: values in other sections survive, comments do not. The
+ * checkout written is a live workspace the user named rather than the
+ * repository root clone (ADR 0070).
  */
 import {
 	DEFAULT_RUN_SCRIPT_ICON,

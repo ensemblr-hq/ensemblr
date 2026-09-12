@@ -1164,8 +1164,9 @@ test('always branches from the live root, ignoring HEAD and a stale stored defau
 	assert.equal(result.workspace?.baseBranch, 'main');
 });
 
-test('syncs the default branch from origin before creating a workspace', async (t) => {
+test('forks from the fetched default branch without moving the root', async (t) => {
 	const harness = createHarness(t);
+	const localTip = runGit(harness.repositoryPath, ['rev-parse', 'main']);
 	const remotePath = path.join(harness.rootPath, 'remote.git');
 	const collaboratorPath = path.join(harness.rootPath, 'collaborator');
 	runGit(harness.rootPath, ['init', '--bare', remotePath]);
@@ -1202,14 +1203,12 @@ test('syncs the default branch from origin before creating a workspace', async (
 		readFileSync(path.join(result.workspace.path, 'README.md'), 'utf8'),
 		/latest remote change/,
 	);
-	assert.equal(
-		runGit(harness.repositoryPath, ['rev-parse', 'main']),
-		runGit(collaboratorPath, ['rev-parse', 'main']),
-	);
+	assert.equal(runGit(harness.repositoryPath, ['rev-parse', 'main']), localTip);
 });
 
-test('syncs origin default branch even when local branch has no upstream', async (t) => {
+test('forks from origin when the local default branch has no upstream', async (t) => {
 	const harness = createHarness(t);
+	const localTip = runGit(harness.repositoryPath, ['rev-parse', 'main']);
 	const remotePath = path.join(harness.rootPath, 'remote.git');
 	const collaboratorPath = path.join(harness.rootPath, 'collaborator');
 	runGit(harness.rootPath, ['init', '--bare', remotePath]);
@@ -1247,10 +1246,7 @@ test('syncs origin default branch even when local branch has no upstream', async
 		readFileSync(path.join(result.workspace.path, 'README.md'), 'utf8'),
 		/latest no-upstream change/,
 	);
-	assert.equal(
-		runGit(harness.repositoryPath, ['rev-parse', 'main']),
-		runGit(collaboratorPath, ['rev-parse', 'main']),
-	);
+	assert.equal(runGit(harness.repositoryPath, ['rev-parse', 'main']), localTip);
 });
 
 test('creates a workspace from the local base when the remote is unreachable', async (t) => {
@@ -1280,6 +1276,7 @@ test('creates a workspace from the local base when the remote is unreachable', a
 	});
 
 	assert.equal(result.status, 'success');
+	assert.equal(result.diagnostics[0]?.code, 'base-refresh-failed');
 	if (!result.workspace) {
 		throw new Error('workspace missing');
 	}

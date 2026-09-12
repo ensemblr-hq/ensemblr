@@ -52,12 +52,12 @@ export {
 	normalizeRepositoryConfigRequest,
 } from './repository-config.ts';
 export type {
-	MigrateRepositoryScriptSettingsInput,
-	MigrateRepositoryScriptSettingsOutcome,
+	PendingRepositoryScripts,
+	ReadPendingRepositoryScriptsInput,
 } from './repository-scripts-migration.ts';
 export {
-	migrateAllRepositoryScriptSettings,
-	migrateRepositoryScriptSettings,
+	dropRetainedRepositoryScripts,
+	readPendingRepositoryScripts,
 } from './repository-scripts-migration.ts';
 export type {
 	WriteRepositoryScriptsInput,
@@ -70,6 +70,13 @@ export {
 	readRepositorySettings,
 	rewriteRepositorySettings,
 } from './repository-settings-writer.ts';
+export type {
+	CreateSettingsPublicationServiceOptions,
+	SettingsPublicationService,
+} from './settings-publication-service.ts';
+export { createSettingsPublicationService } from './settings-publication-service.ts';
+export type { WorkspaceSettingsTarget } from './workspace-settings-target.ts';
+export { resolveWorkspaceSettingsTarget } from './workspace-settings-target.ts';
 
 /** Service exposed to IPC handlers for inspecting per-repository config. */
 export interface RepositoryConfigService {

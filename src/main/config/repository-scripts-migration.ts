@@ -1,10 +1,11 @@
 /**
- * Moves a repository's personal script settings out of SQLite and into the
- * committed `.ensemblr/settings.toml`, which owns them from ADR 0041 onward.
- * Committed values win per key, which is exactly how the resolver already
- * ranked the two sources — so the migration cannot change what a repository
- * runs. Draining the rows is what makes the pass idempotent, so it can run at
- * every launch and a repository that failed once still gets another chance.
+ * Reads and drains the personal script settings a pre-ADR-0041 Ensemblr kept in
+ * SQLite. The launch-time pass that wrote them straight into the repository's
+ * root clone is gone: a root write lands on no branch and in no diff, so
+ * retained rows now travel through the settings publication flow, which folds
+ * them into the file it writes onto a workspace branch and drains them only
+ * once that write has been verified. Committed values still win per key, which
+ * is how the resolver already ranked the two sources.
  */
 import type { DatabaseSync } from 'node:sqlite';
 
@@ -18,11 +19,10 @@ import {
 	deleteSetting,
 	readSettingJson,
 } from '../environment/settings-table.ts';
-import { selectLiveRepositoryPaths } from '../storage/repositories/repository-row-repository.ts';
 import { withTransaction } from '../storage/tx.ts';
 import { isPlainRecord } from './json-utils.ts';
 import { loadRepositoryConfig } from './repository-config.ts';
-import { writeRepositoryScripts } from './repository-scripts-writer.ts';
+import type { writeRepositoryScripts } from './repository-scripts-writer.ts';
 
 /** Repository-scoped SQLite keys the Scripts screen used to own. */
 const LEGACY_SETTING_KEYS = [
@@ -34,126 +34,77 @@ const LEGACY_SETTING_KEYS = [
 	'scripts.setup',
 ] as const;
 
-/**
- * Migrates every live repository that still has personal script rows. The pass
- * needs no "already ran" marker: a migrated repository has had its rows deleted,
- * so the next run skips it on its own. That keeps a repository whose checkout
- * was unwritable — or archived at the time — retryable on the next launch,
- * instead of stranding its rows behind a flag it can never clear.
- * @param database - Database handle.
- * @returns The ids of the repositories that were migrated.
- */
-export function migrateAllRepositoryScriptSettings(
-	database: DatabaseSync,
-): string[] {
-	const migrated: string[] = [];
-
-	for (const repository of selectLiveRepositoryPaths({ database })) {
-		if (migrateOneRepository(database, repository) === 'migrated') {
-			migrated.push(repository.id);
-		}
-	}
-
-	return migrated;
-}
-
-/**
- * Migrates one repository, turning a throw or a write failure into a logged
- * outcome so the surrounding pass continues. A failure leaves the rows in place
- * and is retried on the next launch.
- * @param database - Database handle.
- * @param repository - The repository's id and root clone path.
- * @returns The outcome status.
- */
-function migrateOneRepository(
-	database: DatabaseSync,
-	repository: { id: string; path: string },
-): MigrateRepositoryScriptSettingsOutcome['status'] {
-	try {
-		const outcome = migrateRepositoryScriptSettings({
-			database,
-			repositoryId: repository.id,
-			repositoryPath: repository.path,
-		});
-
-		if (outcome.status === 'failed') {
-			console.error(
-				'[repository-scripts] could not migrate',
-				repository.path,
-				outcome.message,
-			);
-		}
-
-		return outcome.status;
-	} catch (error) {
-		console.error(
-			'[repository-scripts] could not migrate',
-			repository.path,
-			error,
-		);
-
-		return 'failed';
-	}
-}
-
-/** Inputs for {@link migrateRepositoryScriptSettings}. */
-export interface MigrateRepositoryScriptSettingsInput {
+/** Inputs for {@link readPendingRepositoryScripts}. */
+export interface ReadPendingRepositoryScriptsInput {
 	database: DatabaseSync;
 	repositoryId: string;
-	/** Absolute path of the repository's root clone. */
+	/** Absolute path of the checkout holding the candidate config. */
 	repositoryPath: string;
 }
 
-/** What the migration did for one repository. */
-export type MigrateRepositoryScriptSettingsOutcome =
-	| { message: string; status: 'failed' }
-	| { status: 'migrated' }
-	| { status: 'skipped' };
+/** Legacy script values ready to fold into a workspace config preview. */
+export type PendingRepositoryScripts = Omit<
+	Parameters<typeof writeRepositoryScripts>[0],
+	'repositoryPath'
+>;
 
 /**
- * Folds a repository's personal script rows into its committed config and drops
- * the rows. Repositories with no such rows are left alone, so the pass never
- * writes a file it has nothing to add to. The rows are deleted only after the
- * file write succeeds, leaving a failed migration retryable.
- * @param input - Database handle, repository id, and its root clone path.
- * @returns Whether the repository was migrated, skipped, or failed.
+ * Reads retained SQLite script settings and merges them with the supplied
+ * config without mutating either source. Existing file values win per key.
+ * @param input - Database identity and path containing the candidate config.
+ * @returns Settings for the writer, or null when no legacy rows remain.
  */
-export function migrateRepositoryScriptSettings({
+export function readPendingRepositoryScripts({
 	database,
 	repositoryId,
 	repositoryPath,
-}: MigrateRepositoryScriptSettingsInput): MigrateRepositoryScriptSettingsOutcome {
+}: ReadPendingRepositoryScriptsInput): PendingRepositoryScripts | null {
 	const scope: NormalizedScope = { scope: 'repository', scopeId: repositoryId };
 	const personal = readPersonalSettings(database, scope);
 
 	if (personal.size === 0) {
-		return { status: 'skipped' };
+		return null;
 	}
 
 	const committed = readCommittedSettings(repositoryPath);
-	const resolve = (key: string): unknown =>
-		committed.get(key) ?? personal.get(key);
 
-	const result = writeRepositoryScripts({
-		archive: asCommand(resolve('scripts.archive')),
-		autoRunAfterSetup: asBoolean(resolve('autoRunAfterSetup')),
-		repositoryPath,
-		runScriptMode: asRunScriptMode(resolve('runScriptMode')),
-		runScripts: resolveRunScripts(resolve),
-		setup: asCommand(resolve('scripts.setup')),
-	});
+	return {
+		archive: asCommand(
+			committed.get('scripts.archive') ?? personal.get('scripts.archive'),
+		),
+		autoRunAfterSetup: asBoolean(
+			committed.get('autoRunAfterSetup') ?? personal.get('autoRunAfterSetup'),
+		),
+		runScriptMode: asRunScriptMode(
+			committed.get('runScriptMode') ?? personal.get('runScriptMode'),
+		),
+		runScripts: resolveRunScripts(committed, personal),
+		setup: asCommand(
+			committed.get('scripts.setup') ?? personal.get('scripts.setup'),
+		),
+	};
+}
 
-	if (!result.ok) {
-		return { message: result.message, status: 'failed' };
-	}
+/**
+ * Deletes the retained SQLite script rows for one repository. Call this only
+ * after the values have been written somewhere durable and that write has been
+ * verified, since nothing else in the app can reproduce them afterwards.
+ * @param input - Database handle and the repository whose rows to drop.
+ */
+export function dropRetainedRepositoryScripts({
+	database,
+	repositoryId,
+}: {
+	database: DatabaseSync;
+	repositoryId: string;
+}): void {
+	const scope: NormalizedScope = { scope: 'repository', scopeId: repositoryId };
 
 	withTransaction(database, () => {
 		for (const key of LEGACY_SETTING_KEYS) {
 			deleteSetting({ database, key, scope });
 		}
 	});
-
-	return { status: 'migrated' };
 }
 
 /**
@@ -178,7 +129,13 @@ function readPersonalSettings(
 
 		try {
 			settings.set(key, JSON.parse(raw));
-		} catch {}
+		} catch (error) {
+			console.warn(
+				'[repository-scripts] ignored malformed retained setting',
+				key,
+				error instanceof Error ? error.message : 'JSON parse failed',
+			);
+		}
 	}
 
 	return settings;
@@ -187,7 +144,9 @@ function readPersonalSettings(
 /**
  * Reads the script settings the committed config already declares, keyed the
  * same way as the personal rows so the two can be merged by key.
- * @param repositoryPath - Absolute path of the repository's root clone.
+ * @param repositoryPath - Absolute path of the checkout to read the committed
+ * `.ensemblr/settings.toml` from — the publication flow's temporary directory
+ * during a publish, or a repository's root clone during the legacy migration.
  * @returns The declared keys and their normalised values.
  */
 function readCommittedSettings(repositoryPath: string): Map<string, unknown> {
@@ -215,15 +174,25 @@ function readCommittedSettings(repositoryPath: string): Map<string, unknown> {
 /**
  * Resolves the merged run scripts through the shared parser, so a legacy
  * single-command row becomes the same implicit script the dock already offers.
- * @param resolve - Per-key lookup over the merged settings.
+ * @param committed - Script settings declared in the committed config.
+ * @param personal - Script settings declared in personal overrides.
  * @returns The run scripts to write.
  */
 function resolveRunScripts(
-	resolve: (key: string) => unknown,
+	committed: ReadonlyMap<string, unknown>,
+	personal: ReadonlyMap<string, unknown>,
 ): RunScriptDefinition[] {
 	return readConfiguredRunScripts([
-		{ key: 'scripts.run', value: resolve('scripts.run') },
-		{ key: 'scripts.runScripts', value: resolve('scripts.runScripts') },
+		{
+			key: 'scripts.run',
+			value: committed.get('scripts.run') ?? personal.get('scripts.run'),
+		},
+		{
+			key: 'scripts.runScripts',
+			value:
+				committed.get('scripts.runScripts') ??
+				personal.get('scripts.runScripts'),
+		},
 	]);
 }
 

@@ -25,6 +25,7 @@ export const addInfisicalAccountRequestSchema = z.object({
 export const infisicalLinkScopeRequestSchema = z.object({
 	scope: linkScopeSchema,
 	scopeId: z.string().min(1),
+	workspaceId: z.string().min(1),
 });
 
 /** {@link import('../../../shared/ipc').SetInfisicalLinkRequest}. */
@@ -38,4 +39,5 @@ export const setInfisicalLinkRequestSchema = z.object({
 	scope: linkScopeSchema,
 	scopeId: z.string().min(1),
 	secretPath: z.string().optional(),
+	workspaceId: z.string().min(1),
 });

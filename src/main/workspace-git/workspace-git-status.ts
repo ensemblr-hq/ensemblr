@@ -50,10 +50,10 @@ const COMMIT_LOG_FORMAT = ['%H', '%h', '%an', '%aI', '%ar', '%s']
 	.concat('%x1e');
 
 /**
- * The refs to try as a merge-base, in order: the stored ref first, then its
- * other shape. A stored `origin/x` falls back to the local `x` (repositories
- * whose remote is not named `origin`), and a stored bare `x` falls back to
- * `origin/x` (a target branch the user has never checked out locally).
+ * The stored merge-target ref and its other common shape. Resolution later
+ * adds the local branch's configured upstream and selects the nearest merge
+ * base each candidate shares with HEAD, preserving where this workspace forked
+ * even after the target refs move again.
  * @param baseRef - The base ref as persisted on the workspace.
  * @returns Candidate refs, deduplicated and in priority order.
  */
@@ -585,25 +585,110 @@ export function createWorkspaceGitService({
 	/**
 	 * The merge-base of `baseRef` and HEAD, or `null` when none resolves.
 	 *
-	 * Base refs reach SQLite in both shapes — bare from a repository's probed
-	 * default, `origin/<name>` from a picked branch or pull request — so a ref
-	 * that does not resolve as stored is retried in the other shape. Without
-	 * that, an unresolvable base silently degrades the whole review panel to
-	 * uncommitted changes only, with nothing to tell the user why.
+	 * Base refs reach SQLite in bare and remote-qualified shapes. The resolver
+	 * also considers a bare local branch's configured upstream, computes each
+	 * candidate's merge-base with HEAD, then selects the nearest of those merge
+	 * bases. A remote advancing again therefore retains the original fork point,
+	 * while a locally-ahead fork still compares against its local commits.
+	 * @param cwd - Workspace worktree to resolve in.
+	 * @param baseRef - The base ref as persisted on the workspace.
+	 * @returns The merge-base commit, or null when none resolves.
 	 */
 	async function resolveMergeBase(
 		cwd: string,
 		baseRef: string,
 	): Promise<string | null> {
-		for (const candidate of mergeBaseCandidates(baseRef)) {
+		const candidates = await refShapesToTry(cwd, baseRef);
+		const mergeBases = await mergeBasesWithHead(cwd, candidates);
+
+		return mergeBases.length > 1
+			? nearestToHead(cwd, mergeBases)
+			: (mergeBases[0] ?? null);
+	}
+
+	/**
+	 * The distinct refs worth trying as a merge target: the stored ref, its other
+	 * common shape, and the local branch's configured upstream when it has one.
+	 * @param cwd - Workspace worktree to resolve in.
+	 * @param baseRef - The base ref as persisted on the workspace.
+	 * @returns Deduplicated candidate refs.
+	 */
+	async function refShapesToTry(
+		cwd: string,
+		baseRef: string,
+	): Promise<string[]> {
+		const candidates = mergeBaseCandidates(baseRef);
+		const upstream = await runGit(cwd, [
+			'rev-parse',
+			'--abbrev-ref',
+			'--symbolic-full-name',
+			`${baseRef}@{upstream}`,
+		]);
+
+		if (upstream.status === 'success' && upstream.stdout.trim()) {
+			candidates.push(upstream.stdout.trim());
+		}
+
+		return [...new Set(candidates)];
+	}
+
+	/**
+	 * Each candidate's merge-base with HEAD, skipping the ones that do not
+	 * resolve. Sequential on purpose: concurrent git invocations contend for the
+	 * repository's single index lock and fail intermittently.
+	 * @param cwd - Workspace worktree to resolve in.
+	 * @param candidates - Refs to intersect with HEAD.
+	 * @returns The distinct merge-base commits found.
+	 */
+	async function mergeBasesWithHead(
+		cwd: string,
+		candidates: readonly string[],
+	): Promise<string[]> {
+		const mergeBases = new Set<string>();
+
+		for (const candidate of candidates) {
+			// oxlint-disable-next-line react-doctor/async-await-in-loop
 			const result = await runGit(cwd, ['merge-base', candidate, 'HEAD']);
-			const mergeBase =
-				result.status === 'success' ? result.stdout.trim() : null;
-			if (mergeBase) {
-				return mergeBase;
+
+			if (result.status === 'success' && result.stdout.trim()) {
+				mergeBases.add(result.stdout.trim());
 			}
 		}
-		return null;
+
+		return [...mergeBases];
+	}
+
+	/**
+	 * The merge-base nearest HEAD, so a remote that advanced again does not drag
+	 * the reported fork point back past commits this workspace already owns.
+	 * `merge-base --is-ancestor a b` exits zero exactly when `b` is the
+	 * descendant; two unrelated bases keep the first, which no ordering improves.
+	 * Sequential for the same index-lock reason as {@link mergeBasesWithHead}.
+	 * @param cwd - Workspace worktree to resolve in.
+	 * @param mergeBases - Two or more distinct merge-base commits.
+	 * @returns The nearest commit.
+	 */
+	async function nearestToHead(
+		cwd: string,
+		mergeBases: readonly string[],
+	): Promise<string | null> {
+		let nearest = mergeBases[0] ?? null;
+
+		for (const candidate of mergeBases.slice(1)) {
+			// oxlint-disable-next-line react-doctor/async-await-in-loop
+			const isNearer = await runGit(cwd, [
+				'merge-base',
+				'--is-ancestor',
+				nearest ?? candidate,
+				candidate,
+			]);
+
+			if (isNearer.status === 'success') {
+				nearest = candidate;
+			}
+		}
+
+		return nearest;
 	}
 
 	/** Maps changed paths to +/- counts versus HEAD, tolerating unborn branches. */

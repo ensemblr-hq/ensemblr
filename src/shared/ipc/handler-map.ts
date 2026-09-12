@@ -178,6 +178,18 @@ import type {
 	RootDirectorySnapshot,
 } from './contracts/root-directory';
 import type {
+	ApplySettingsPublicationRequest,
+	ApplySettingsPublicationResult,
+	CleanupSettingsPublicationRequest,
+	CleanupSettingsPublicationResult,
+	PreviewSettingsPublicationRequest,
+	PreviewSettingsPublicationResult,
+	RestoreSettingsPublicationRequest,
+	RestoreSettingsPublicationResult,
+	SettingsPublicationRecoveryStatusRequest,
+	SettingsPublicationRecoveryStatusResult,
+} from './contracts/settings-publication';
+import type {
 	SettingsResolutionRequest,
 	SettingsResolutionSnapshot,
 } from './contracts/settings-resolution';
@@ -671,6 +683,26 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.submitAgentPrompt]: IpcHandlerEntry<
 		SubmitAgentPromptRequest,
 		SubmitAgentPromptResult
+	>;
+	[IPC_CHANNELS.previewSettingsPublication]: IpcHandlerEntry<
+		PreviewSettingsPublicationRequest,
+		PreviewSettingsPublicationResult
+	>;
+	[IPC_CHANNELS.applySettingsPublication]: IpcHandlerEntry<
+		ApplySettingsPublicationRequest,
+		ApplySettingsPublicationResult
+	>;
+	[IPC_CHANNELS.cleanupSettingsPublication]: IpcHandlerEntry<
+		CleanupSettingsPublicationRequest,
+		CleanupSettingsPublicationResult
+	>;
+	[IPC_CHANNELS.restoreSettingsPublication]: IpcHandlerEntry<
+		RestoreSettingsPublicationRequest,
+		RestoreSettingsPublicationResult
+	>;
+	[IPC_CHANNELS.settingsPublicationRecoveryStatus]: IpcHandlerEntry<
+		SettingsPublicationRecoveryStatusRequest,
+		SettingsPublicationRecoveryStatusResult
 	>;
 	[IPC_CHANNELS.settingsResolution]: IpcHandlerEntry<
 		SettingsResolutionRequest | undefined,

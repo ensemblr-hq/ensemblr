@@ -148,6 +148,18 @@ export {
 	rootDirectoryChangeRequestSchema,
 } from './request-schemas/root.ts';
 export {
+	applySettingsPublicationRequestSchema,
+	cleanupSettingsPublicationRequestSchema,
+	parseApplySettingsPublicationRequest,
+	parseCleanupSettingsPublicationRequest,
+	parsePreviewSettingsPublicationRequest,
+	parseRestoreSettingsPublicationRequest,
+	parseSettingsPublicationRecoveryStatusRequest,
+	previewSettingsPublicationRequestSchema,
+	restoreSettingsPublicationRequestSchema,
+	settingsPublicationRecoveryStatusRequestSchema,
+} from './request-schemas/settings-publication.ts';
+export {
 	addWordToDictionaryRequestSchema,
 	replaceMisspellingRequestSchema,
 	textEditCommandSchema,
