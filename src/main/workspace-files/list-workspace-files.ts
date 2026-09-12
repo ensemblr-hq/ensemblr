@@ -1,3 +1,4 @@
+import type { Dirent } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type {
@@ -23,6 +24,7 @@ import {
 	pdfBytesLookValid,
 	previewEmbedMimeTypeForPath,
 } from '../../shared/preview-media.ts';
+import type { LocalCommandResult } from '../commands/command-types';
 import type { LocalCommandService } from '../commands/local-command';
 import {
 	writeContextActionPrompt,
@@ -45,11 +47,16 @@ import {
 	resolveWorkspacePath,
 } from './workspace-paths.ts';
 
+// `--stage` prefixes every indexed entry with its mode, so a tracked symlink is
+// identified by `120000` from the index instead of an lstat per listed file.
+// `--others` entries print as a bare path in the same stream, which is exactly
+// the set that still needs probing.
 const GIT_ARGS = [
 	'ls-files',
 	'--cached',
 	'--others',
 	'--exclude-standard',
+	'--stage',
 	'-z',
 ] as const;
 // Lists git-ignored entries. `--directory` collapses a fully-ignored directory
@@ -71,6 +78,16 @@ const GIT_IGNORED_ARGS = [
 // old and new path until the move is committed. It must be its own invocation:
 // adding `--deleted` to the primary call would add a category, not filter one.
 const GIT_DELETED_ARGS = ['ls-files', '--deleted', '-z'] as const;
+// Lists tracked paths whose worktree type no longer matches the index — a
+// symlink replaced by a regular file, or the reverse. `--stage` reports the
+// index mode, which is stale for exactly these paths, so the mode must not
+// decide their badge and an lstat has to settle them instead.
+const GIT_TYPECHANGED_ARGS = [
+	'diff-files',
+	'--diff-filter=T',
+	'--name-only',
+	'-z',
+] as const;
 const TIMEOUT_MS = 10_000;
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const MAX_ENTRIES = 5000;
@@ -148,10 +165,11 @@ export function createListWorkspaceFilesService({
 					timeoutMs: TIMEOUT_MS,
 				});
 
-			const [tracked, ignored, deleted] = await Promise.all([
+			const [tracked, ignored, deleted, typechanged] = await Promise.all([
 				runGit(GIT_ARGS),
 				runGit(GIT_IGNORED_ARGS),
 				runGit(GIT_DELETED_ARGS),
+				runGit(GIT_TYPECHANGED_ARGS),
 			]);
 
 			if (tracked.status !== 'success') {
@@ -173,30 +191,31 @@ export function createListWorkspaceFilesService({
 				};
 			}
 
-			// Best-effort like the ignored listing: a failure here must never drop
-			// the primary file list, so fall back to subtracting nothing.
-			const deletedPaths =
-				deleted.status === 'success'
-					? parseNulSeparatedPaths(deleted.stdout)
-					: new Set<string>();
-			const trackedEntries = parseGitLsFiles(tracked.stdout, deletedPaths);
+			const trackedListing = parseGitLsFiles(
+				tracked.stdout,
+				bestEffortPaths(deleted),
+				bestEffortPaths(typechanged),
+			);
 			// Ignored listing is best-effort: a failure there must never drop the
 			// primary file list, so fall back to no ignored entries.
-			const ignoredEntries =
+			const ignoredListing =
 				ignored.status === 'success'
 					? await expandIgnoredEntries({
-							budget: MAX_ENTRIES - trackedEntries.length,
+							budget: MAX_ENTRIES - trackedListing.entries.length,
 							rootMaxEntries: ignoredRootMaxEntries,
 							stdout: ignored.stdout,
-							trackedPaths: new Set(trackedEntries.map((entry) => entry.path)),
+							trackedPaths: new Set(
+								trackedListing.entries.map((entry) => entry.path),
+							),
 							workspaceCwd: cwdResult.cwd,
 						})
-					: [];
+					: { entries: [], probePaths: new Set<string>() };
 			return {
-				files: await annotateSymlinkTargets(cwdResult.cwd, [
-					...trackedEntries,
-					...ignoredEntries,
-				]),
+				files: await annotateSymlinkTargets(
+					cwdResult.cwd,
+					[...trackedListing.entries, ...ignoredListing.entries],
+					new Set([...trackedListing.probePaths, ...ignoredListing.probePaths]),
+				),
 			};
 		},
 		async read(request) {
@@ -312,18 +331,17 @@ export function createListWorkspaceFilesService({
 					if (isHiddenEntryPath(childPath)) {
 						continue;
 					}
-					entries.push(
-						ignoredEntry(
-							childPath,
-							dirent.isDirectory() ? 'directory' : 'file',
-						),
-					);
+					entries.push(ignoredDirentEntry(childPath, dirent));
 					if (entries.length >= MAX_ENTRIES) {
 						break;
 					}
 				}
 				return {
-					entries: await annotateSymlinkTargets(cwdResult.cwd, entries),
+					entries: await annotateSymlinkTargets(
+						cwdResult.cwd,
+						entries,
+						new Set<string>(),
+					),
 					path: target.relativePath,
 				};
 			} catch (cause) {
@@ -360,39 +378,141 @@ function parseNulSeparatedPaths(stdout: string): ReadonlySet<string> {
 }
 
 /**
- * Parses `git ls-files -z` output into directory rows followed by file rows.
+ * Reads an auxiliary `-z` path listing that only refines the primary one. Each
+ * is best-effort by design: a failure there must never drop the file list, so it
+ * degrades to naming no paths rather than propagating.
+ * @param result - Outcome of the auxiliary git invocation.
+ * @returns Every path the listing named, or none when the invocation failed.
+ */
+function bestEffortPaths(
+	result: Pick<LocalCommandResult, 'status' | 'stdout'>,
+): ReadonlySet<string> {
+	return result.status === 'success'
+		? parseNulSeparatedPaths(result.stdout)
+		: new Set<string>();
+}
+
+/** Index mode `git ls-files --stage` reports for a symlink blob. */
+const GIT_SYMLINK_MODE = '120000';
+// `<mode> <object> <stage>\t<path>` — an indexed entry under `--stage`. An
+// `--others` entry has no such prefix, and matching the prefix rather than the
+// first tab keeps a path that itself contains a tab from being mistaken for one.
+const GIT_STAGE_RECORD = /^(\d{6}) [0-9a-f]+ \d\t/;
+
+/**
+ * Reads one `git ls-files --stage -z` record, which carries an index mode for a
+ * tracked entry and nothing but the path for an untracked one.
+ * @param record - A single NUL-separated record of the stdout stream.
+ * @returns The record's path, plus its index mode when git reported one.
+ */
+function parseLsFilesRecord(record: string): { mode?: string; path: string } {
+	const staged = GIT_STAGE_RECORD.exec(record);
+	return staged
+		? { mode: staged[1], path: record.slice(staged[0].length).trim() }
+		: { path: record.trim() };
+}
+
+/** The paths of one `ls-files` stream, split by how their link status is known. */
+interface CollectedLsFilesPaths {
+	/** Listed file paths, in stream order. */
+	filePaths: string[];
+	/** Paths an index mode proved to be symlinks. */
+	linkPaths: Set<string>;
+	/** Paths whose link status only an lstat can settle. */
+	probePaths: Set<string>;
+}
+
+/**
+ * Reports whether a listed record names nothing the tree should carry a row for:
+ * a blank record, an index path whose worktree file is gone, or OS junk.
+ * @param entryPath - Path the record named, empty when the record was blank.
+ * @param deletedPaths - Index paths missing from the worktree.
+ * @returns True when the record should be dropped rather than listed.
+ */
+function isUnlistableLsFilesPath(
+	entryPath: string,
+	deletedPaths: ReadonlySet<string>,
+): boolean {
+	return (
+		!entryPath || deletedPaths.has(entryPath) || isHiddenEntryPath(entryPath)
+	);
+}
+
+/**
+ * Collects the file paths of a `git ls-files --stage -z` stream, routing each to
+ * the index mode that settles its link status or to the probe set when no mode
+ * can settle it.
+ *
+ * Three kinds of path cannot trust an index mode, and each would otherwise show
+ * the wrong icon. An untracked `--others` entry carries no mode at all. A
+ * typechanged entry's mode describes the type its worktree file no longer has.
+ * An unmerged entry emits one record per stage, whose modes may disagree both
+ * with each other and with what is on disk, so a repeat record demotes the path
+ * rather than letting the first stage decide.
+ * @param stdout - Raw NUL-separated `ls-files --stage` stdout.
+ * @param deletedPaths - Index paths missing from the worktree, dropped outright.
+ * @param typechangedPaths - Tracked paths whose worktree type left the index behind.
+ * @returns The listed paths, the index-proven links, and the paths needing a probe.
+ */
+function collectLsFilesPaths(
+	stdout: string,
+	deletedPaths: ReadonlySet<string>,
+	typechangedPaths: ReadonlySet<string>,
+): CollectedLsFilesPaths {
+	const filePaths: string[] = [];
+	const seenFiles = new Set<string>();
+	const linkPaths = new Set<string>();
+	const probePaths = new Set<string>();
+	for (const raw of stdout.split('\0')) {
+		const { mode, path: entryPath } = parseLsFilesRecord(raw);
+		if (isUnlistableLsFilesPath(entryPath, deletedPaths)) {
+			continue;
+		}
+		if (seenFiles.has(entryPath)) {
+			linkPaths.delete(entryPath);
+			probePaths.add(entryPath);
+			continue;
+		}
+		seenFiles.add(entryPath);
+		filePaths.push(entryPath);
+		if (mode === undefined || typechangedPaths.has(entryPath)) {
+			probePaths.add(entryPath);
+		} else if (mode === GIT_SYMLINK_MODE) {
+			linkPaths.add(entryPath);
+		}
+		if (filePaths.length >= MAX_ENTRIES) {
+			break;
+		}
+	}
+	return { filePaths, linkPaths, probePaths };
+}
+
+/**
+ * Parses `git ls-files --stage -z` output into directory rows followed by file
+ * rows, marking a tracked symlink from its index mode and reporting the paths
+ * whose link status only an lstat can settle.
  *
  * Index entries whose worktree file is gone are dropped before the directory
  * rows are collected, so a deleted or moved-away folder disappears entirely
  * rather than lingering as a row with no children. Applying the filter to the
  * whole listing is safe: the `--others` half is on disk by definition and can
  * never appear in `--deleted`.
- * @param stdout - Raw NUL-separated `ls-files` stdout.
+ * @param stdout - Raw NUL-separated `ls-files --stage` stdout.
  * @param deletedPaths - Index paths missing from the worktree.
- * @returns Directory rows followed by file rows, outermost directories first.
+ * @param typechangedPaths - Tracked paths whose worktree type left the index behind.
+ * @returns Directory rows followed by file rows, outermost directories first,
+ *   and the paths still needing a symlink probe.
  */
 function parseGitLsFiles(
 	stdout: string,
 	deletedPaths: ReadonlySet<string>,
-): readonly WorkspaceFileEntryWire[] {
-	const filePaths: string[] = [];
-	const seenFiles = new Set<string>();
-	for (const raw of stdout.split('\0')) {
-		const trimmed = raw.trim();
-		if (
-			!trimmed ||
-			seenFiles.has(trimmed) ||
-			deletedPaths.has(trimmed) ||
-			isHiddenEntryPath(trimmed)
-		) {
-			continue;
-		}
-		seenFiles.add(trimmed);
-		filePaths.push(trimmed);
-		if (filePaths.length >= MAX_ENTRIES) {
-			break;
-		}
-	}
+	typechangedPaths: ReadonlySet<string>,
+): { entries: readonly WorkspaceFileEntryWire[]; probePaths: Set<string> } {
+	const { filePaths, linkPaths, probePaths } = collectLsFilesPaths(
+		stdout,
+		deletedPaths,
+		typechangedPaths,
+	);
 
 	const entries: WorkspaceFileEntryWire[] = [];
 	const seenEntries = new Set<string>();
@@ -408,13 +528,18 @@ function parseGitLsFiles(
 		if (seenEntries.has(filePath)) {
 			continue;
 		}
-		entries.push({
+		const entry: WorkspaceFileEntryWire = {
 			kind: 'file',
 			name: filePath.split('/').pop() ?? filePath,
 			path: filePath,
-		});
+		};
+		entries.push(
+			linkPaths.has(filePath)
+				? { ...entry, symlinkTargetKind: 'unknown' }
+				: entry,
+		);
 	}
-	return entries;
+	return { entries, probePaths };
 }
 
 /**
@@ -454,6 +579,10 @@ function parseIgnoredRoots(stdout: string): {
  * on-disk contents of each ignored directory root, enumerated up to a per-root
  * cap. Roots that exceed the cap (e.g. `node_modules/`) stay collapsed so the
  * tree never enumerates a giant ignored subtree.
+ *
+ * An expanded root's entries come from a directory read that already reports
+ * link status, so only the individually-ignored files git named — which arrive
+ * as bare paths — are reported back as needing a symlink probe.
  */
 async function expandIgnoredEntries({
 	budget,
@@ -467,9 +596,10 @@ async function expandIgnoredEntries({
 	stdout: string;
 	trackedPaths: ReadonlySet<string>;
 	workspaceCwd: string;
-}): Promise<WorkspaceFileEntryWire[]> {
+}): Promise<{ entries: WorkspaceFileEntryWire[]; probePaths: Set<string> }> {
+	const probePaths = new Set<string>();
 	if (budget <= 0) {
-		return [];
+		return { entries: [], probePaths };
 	}
 	const { files, roots } = parseIgnoredRoots(stdout);
 	const entries: WorkspaceFileEntryWire[] = [];
@@ -477,10 +607,11 @@ async function expandIgnoredEntries({
 
 	for (const file of files) {
 		if (remaining <= 0) {
-			return entries;
+			return { entries, probePaths };
 		}
 		if (!trackedPaths.has(file.path)) {
 			entries.push(file);
+			probePaths.add(file.path);
 			remaining -= 1;
 		}
 	}
@@ -507,7 +638,28 @@ async function expandIgnoredEntries({
 		}
 	}
 
-	return entries;
+	return { entries, probePaths };
+}
+
+/**
+ * Builds an ignored tree row from a directory read, carrying over the link
+ * status the read already reported so the tree never lstats it. A symlink stays
+ * a leaf whatever it points at, which is what keeps the walk from following it.
+ * @param entryPath - Workspace-relative path of the entry.
+ * @param dirent - Directory entry the read produced for it.
+ * @returns The ignored row, marked when the entry is a symlink.
+ */
+function ignoredDirentEntry(
+	entryPath: string,
+	dirent: Dirent,
+): WorkspaceFileEntryWire {
+	if (dirent.isSymbolicLink()) {
+		return {
+			...ignoredEntry(entryPath, 'file'),
+			symlinkTargetKind: 'unknown',
+		};
+	}
+	return ignoredEntry(entryPath, dirent.isDirectory() ? 'directory' : 'file');
 }
 
 /**
@@ -540,12 +692,12 @@ async function walkIgnoredRoot(
 			if (isHiddenEntryPath(childPath)) {
 				continue;
 			}
-			const isDirectory = dirent.isDirectory();
-			entries.push(ignoredEntry(childPath, isDirectory ? 'directory' : 'file'));
+			const child = ignoredDirentEntry(childPath, dirent);
+			entries.push(child);
 			if (entries.length > cap) {
 				return null;
 			}
-			if (isDirectory) {
+			if (child.kind === 'directory') {
 				stack.push(childPath);
 			}
 		}

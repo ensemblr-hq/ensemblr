@@ -11,6 +11,7 @@ import {
 	rmSync,
 	statSync,
 	symlinkSync,
+	unlinkSync,
 	writeFileSync,
 } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
@@ -135,6 +136,68 @@ describe('createListWorkspaceFilesService.list', () => {
 		}
 		expect(byPath.has('linked-src/app.ts')).toBe(false);
 		expect(byPath.get('README.md')).not.toHaveProperty('symlinkTargetKind');
+	});
+
+	test('marks only observed links in a listing far larger than a probe budget', async () => {
+		const cwd = seedRepo();
+		for (let index = 0; index < 400; index++) {
+			writeFileSync(path.join(cwd, `noise-${index}.log`), 'noise\n');
+		}
+		symlinkSync('README.md', path.join(cwd, 'linked-readme'));
+		git(cwd, ['add', 'linked-readme']);
+
+		const result = await listFiles(cwd);
+
+		expect(result.files.length).toBeGreaterThan(400);
+		expect(result.files.filter((entry) => entry.symlinkTargetKind)).toEqual([
+			expect.objectContaining({
+				path: 'linked-readme',
+				symlinkTargetKind: 'file',
+			}),
+		]);
+	});
+
+	test('follows an unstaged typechange instead of the stale index mode', async () => {
+		const cwd = seedRepo();
+		symlinkSync('README.md', path.join(cwd, 'was-a-link'));
+		git(cwd, ['add', 'was-a-link']);
+		git(cwd, ['commit', '-m', 'add link']);
+		unlinkSync(path.join(cwd, 'was-a-link'));
+		writeFileSync(path.join(cwd, 'was-a-link'), 'a plain file now\n');
+		unlinkSync(path.join(cwd, 'README.md'));
+		symlinkSync('src/app.ts', path.join(cwd, 'README.md'));
+
+		const result = await listFiles(cwd);
+		const byPath = new Map(result.files.map((entry) => [entry.path, entry]));
+
+		expect(byPath.get('was-a-link')).not.toHaveProperty('symlinkTargetKind');
+		expect(byPath.get('README.md')).toMatchObject({
+			symlinkTargetKind: 'file',
+		});
+	});
+
+	test('probes an unmerged path rather than trusting its first stage', async () => {
+		const cwd = seedRepo();
+		symlinkSync('README.md', path.join(cwd, 'conflicted'));
+		git(cwd, ['add', 'conflicted']);
+		git(cwd, ['commit', '-m', 'link base']);
+		git(cwd, ['checkout', '-b', 'side']);
+		unlinkSync(path.join(cwd, 'conflicted'));
+		writeFileSync(path.join(cwd, 'conflicted'), 'side content\n');
+		git(cwd, ['commit', '-am', 'side replaces the link']);
+		git(cwd, ['checkout', 'main']);
+		unlinkSync(path.join(cwd, 'conflicted'));
+		writeFileSync(path.join(cwd, 'conflicted'), 'main content\n');
+		git(cwd, ['commit', '-am', 'main replaces the link']);
+		expect(() => git(cwd, ['merge', 'side'])).toThrow();
+
+		const result = await listFiles(cwd);
+		const conflicted = result.files.find(
+			(entry) => entry.path === 'conflicted',
+		);
+
+		expect(conflicted).toBeDefined();
+		expect(conflicted).not.toHaveProperty('symlinkTargetKind');
 	});
 
 	test('enumerates ignored directory contents so they are browsable', async () => {
