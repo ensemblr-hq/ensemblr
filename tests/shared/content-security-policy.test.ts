@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { contentSecurityPolicy } from '@/shared/content-security-policy';
+import { LINEAR_ASSET_SCHEME } from '@/shared/linear-assets';
 
 /**
  * Reads one directive's source list out of a rendered policy.
@@ -35,7 +36,6 @@ describe('contentSecurityPolicy', () => {
 		expect(directive(PACKAGED, 'script-src')).not.toContain("'unsafe-inline'");
 		expect(directive(PACKAGED, 'connect-src')).toEqual([
 			"'self'",
-			'file:',
 			'data:',
 			'blob:',
 		]);
@@ -47,7 +47,18 @@ describe('contentSecurityPolicy', () => {
 		expect(directive(DEV, 'connect-src')).toContain('ws://localhost:5173');
 	});
 
-	test('grants the packaged file: origin to every fetching directive', () => {
+	// `file:` used to be granted to every fetching directive, because a `file:`
+	// document's own assets are cross-origin to it. Serving the packaged renderer
+	// from `app://bundle` gives `'self'` something to resolve to, and a policy
+	// that no longer names `file:` is what stops a renderer XSS reaching
+	// `connect-src` at the user's own files.
+	test('names file: in neither serving mode', () => {
+		for (const policy of [PACKAGED, DEV]) {
+			expect(policy).not.toContain('file:');
+		}
+	});
+
+	test('grants every fetching directive nothing wider than self', () => {
 		for (const name of [
 			'script-src',
 			'style-src',
@@ -56,14 +67,13 @@ describe('contentSecurityPolicy', () => {
 			'connect-src',
 			'worker-src',
 		]) {
-			expect(directive(PACKAGED, name)).toContain('file:');
-			expect(directive(DEV, name)).not.toContain('file:');
+			expect(directive(PACKAGED, name)).toContain("'self'");
 		}
 	});
 
 	test('admits exactly the schemes the shipped surfaces need', () => {
 		expect(directive(PACKAGED, 'script-src')).toContain("'wasm-unsafe-eval'");
-		expect(directive(PACKAGED, 'img-src')).toContain('linear-asset:');
+		expect(directive(PACKAGED, 'img-src')).toContain(`${LINEAR_ASSET_SCHEME}:`);
 		expect(directive(PACKAGED, 'img-src')).toContain('https:');
 		expect(directive(PACKAGED, 'object-src')).toContain('blob:');
 		expect(directive(PACKAGED, 'frame-src')).toContain('blob:');

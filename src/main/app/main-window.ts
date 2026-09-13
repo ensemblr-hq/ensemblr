@@ -1,13 +1,12 @@
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { BrowserWindow, screen } from 'electron';
 import {
 	resolveWindowChrome,
 	type TitleBarPreference,
 } from '../../shared/window-chrome.ts';
+import { APP_ORIGIN, APP_RENDERER_ENTRY_URL } from './app-bundle';
 import { installContentSecurityPolicy } from './content-security-policy';
 import { routeExternalLinksToBrowser } from './external-links';
-import type { AppDocument } from './external-links-policy';
 import { linuxWindowIconPath } from './linux-desktop-identity';
 import { restrictMediaPermissions } from './media-permissions';
 import { forwardTextContextMenus } from './text-context-menu-forwarding';
@@ -24,33 +23,16 @@ import {
 } from './window-state';
 
 /**
- * Where the renderer is served from in this build: the Vite dev origin, or the
- * `file:` URL of the packaged `index.html`. Both the navigation policy and the
- * Content-Security-Policy key off it, and the packaged entry doubles as the
- * path `loadFile` is given.
- * @returns The app's own document, in the shape the policies read.
+ * The origin the renderer is served from in this build: the Vite dev origin, or
+ * the app scheme the packaged bundle is served over
+ * (`src/main/app/app-protocol.ts`). The navigation policy is the one thing that
+ * reads it — every destination on it stays in the window.
+ * @returns The app's own origin.
  */
-export function rendererDocument(): AppDocument {
+export function rendererOrigin(): string {
 	return MAIN_WINDOW_VITE_DEV_SERVER_URL
-		? {
-				appDocumentUrl: null,
-				appOrigin: new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin,
-			}
-		: {
-				appDocumentUrl: pathToFileURL(packagedRendererEntry()).href,
-				appOrigin: null,
-			};
-}
-
-/**
- * The packaged renderer's `index.html` on disk, beside the main bundle.
- * @returns The absolute path Vite's renderer build wrote.
- */
-function packagedRendererEntry(): string {
-	return path.join(
-		__dirname,
-		`../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`,
-	);
+		? new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin
+		: APP_ORIGIN;
 }
 
 /**
@@ -135,7 +117,7 @@ export function createMainWindow({
 
 	// Send every external link to the default system browser and cancel every
 	// navigation that is neither that nor the app's own document.
-	routeExternalLinksToBrowser(mainWindow.webContents, rendererDocument());
+	routeExternalLinksToBrowser(mainWindow.webContents, rendererOrigin());
 
 	mainWindow.once('ready-to-show', () => {
 		restoreMainWindowState(mainWindow, restoredState);
@@ -146,11 +128,9 @@ export function createMainWindow({
 		}
 	});
 
-	if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-		void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
-	} else {
-		void mainWindow.loadFile(packagedRendererEntry());
-	}
+	void mainWindow.loadURL(
+		MAIN_WINDOW_VITE_DEV_SERVER_URL ?? APP_RENDERER_ENTRY_URL,
+	);
 
 	return mainWindow;
 }

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **The renderer is served from its own `app://bundle` origin and `GrantFileProtocolExtraPrivileges` is off,** closing the last finding of the 2026-09-12 audit (SH-03). A page on `file:` may read every file its user can, so a renderer XSS reached `~/.ssh/id_ed25519` with no IPC handler in the loop, and the CSP could not close it — the app needed `connect-src file:` to load its own assets. `file:` is now named by no directive and refused by the fuse underneath. The origin move is carried by 0.1.15's storage mirror, which had to ship first and did — anyone who has run 0.1.15 or 0.1.16 keeps their renderer state. An install that jumps straight from a pre-0.1.15 version has no mirror to seed from and comes up with renderer defaults: board order, viewed marks, pins, per-chat overrides. Nothing else; the rest is in SQLite.
+
+### Fixed
+
+- **Images embedded in a Linear issue render again.** The Content-Security-Policy admitted `linear-asset:` while the registered scheme is `ensemblr-linear-asset`, so every proxied issue image was blocked in both serving modes.
+
 ## [0.1.16] - 2026-09-13
 
 Ensemblr 0.1.16 is a patch release: a planning agent on a trusted or read-only workspace gets its control surface back.

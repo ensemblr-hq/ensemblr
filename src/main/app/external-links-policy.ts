@@ -1,3 +1,5 @@
+import { documentOrigin } from './app-bundle';
+
 /**
  * Pure URL policy for external-link handling — no Electron imports, so it stays
  * unit-testable. The Electron glue (`shell.openExternal`, webContents handlers)
@@ -46,48 +48,29 @@ export type NavigationDecision =
 	| { action: 'block'; reason: string };
 
 /**
- * The app's own document, however it is being served: the dev server's origin,
- * or the packaged `index.html` the production build loads from `file:`.
- */
-export interface AppDocument {
-	/** `file:` URL of the packaged renderer entry, or `null` in development. */
-	appDocumentUrl: string | null;
-	/** The dev-server origin to treat as internal, or `null` in production. */
-	appOrigin: string | null;
-}
-
-/**
- * Strips the query and fragment so a hash-routed navigation still compares
- * equal to the document it happens inside.
- * @param url - The URL to reduce to its document identity
- * @returns The href with `search` and `hash` removed
- */
-function documentIdentity(url: URL): string {
-	const identity = new URL(url.href);
-	identity.hash = '';
-	identity.search = '';
-	return identity.href;
-}
-
-/**
  * Decides what to do with a navigation the renderer attempted, denying by
  * default.
  *
- * Only two destinations stay in the window: the app's own document (the dev
- * origin, or the packaged `index.html`) and, in development, anything else on
- * the dev-server origin that Vite serves. Every other http(s) URL goes to the
- * system browser, and everything else — `file:` outside the bundle, `blob:`,
- * `data:`, `javascript:`, an unparseable string — is cancelled rather than
- * followed, because nothing the app itself does produces one.
+ * One destination stays in the window: the app's own origin — the dev server's
+ * in development, `app://bundle` in a packaged build. Every other http(s) URL
+ * goes to the system browser, and everything else — `file:`, `blob:`, `data:`,
+ * `javascript:`, another host on the app scheme, an unparseable string — is
+ * cancelled rather than followed, because nothing the app itself does produces
+ * one.
+ *
+ * The origin is the whole test because the packaged renderer now has one. While
+ * it was a `file:` document its origin was opaque, so the entry had to be
+ * compared as a full URL with the query and fragment stripped off; serving it
+ * from a `standard` scheme replaced that with the same comparison development
+ * always used.
  *
  * @param url - The navigation target, exactly as the renderer gave it.
- * @param appDocumentUrl - `file:` URL of the packaged renderer entry, or `null` in development.
- * @param appOrigin - The dev-server origin to treat as internal, or `null` in production.
+ * @param appOrigin - The origin the app's own renderer is served from.
  * @returns The decision the Electron handler should act on.
  */
 export function navigationDecision(
 	url: string,
-	{ appDocumentUrl, appOrigin }: AppDocument,
+	appOrigin: string,
 ): NavigationDecision {
 	let parsed: URL;
 
@@ -97,14 +80,12 @@ export function navigationDecision(
 		return { action: 'block', reason: 'unparseable' };
 	}
 
-	if (ALLOWED_EXTERNAL_PROTOCOLS.has(parsed.protocol)) {
-		return appOrigin && parsed.origin === appOrigin
-			? { action: 'allow' }
-			: { action: 'external', url: parsed };
+	if (documentOrigin(parsed) === appOrigin) {
+		return { action: 'allow' };
 	}
 
-	if (appDocumentUrl && documentIdentity(parsed) === appDocumentUrl) {
-		return { action: 'allow' };
+	if (ALLOWED_EXTERNAL_PROTOCOLS.has(parsed.protocol)) {
+		return { action: 'external', url: parsed };
 	}
 
 	return { action: 'block', reason: parsed.protocol };
@@ -121,33 +102,26 @@ const PDF_VIEWER_ORIGIN = 'chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai';
  * Whether a `blob:` URL was minted by the app's own document.
  *
  * A blob URL carries the origin that created it after the `blob:` prefix, which
- * `URL` exposes as the `pathname`. From the dev server that inner origin is the
- * dev origin; from the packaged build the document is `file:`, whose origin is
- * opaque, so the protocol is as tight a comparison as the platform offers.
+ * `URL` exposes as the `pathname`. Comparing it is exact in both serving modes
+ * now that the packaged renderer has a real origin: while it was a `file:`
+ * document the only available comparison was the inner protocol, which admitted
+ * any `file:` blob rather than this document's.
  * @param url - The navigation target, exactly as the renderer gave it.
- * @param appDocument - Where the app's own renderer is being served from.
+ * @param appOrigin - The origin the app's own renderer is served from.
  * @returns True when the blob belongs to the app's own document.
  */
-function isAppOwnBlob(
-	url: string,
-	{ appDocumentUrl, appOrigin }: AppDocument,
-): boolean {
-	let parsed: URL;
-	let inner: URL;
-
+function isAppOwnBlob(url: string, appOrigin: string): boolean {
 	try {
-		parsed = new URL(url);
+		const parsed = new URL(url);
+
 		if (parsed.protocol !== 'blob:') {
 			return false;
 		}
-		inner = new URL(parsed.pathname);
+
+		return documentOrigin(new URL(parsed.pathname)) === appOrigin;
 	} catch {
 		return false;
 	}
-
-	return appOrigin
-		? inner.origin === appOrigin
-		: appDocumentUrl !== null && inner.protocol === 'file:';
 }
 
 /**
@@ -166,14 +140,14 @@ function isAppOwnBlob(
  * A top-level navigation to either is still blocked — this is the subframe
  * handler's decision, not a widening of {@link navigationDecision}.
  * @param url - The navigation target, exactly as the renderer gave it.
- * @param appDocument - Where the app's own renderer is being served from.
+ * @param appOrigin - The origin the app's own renderer is served from.
  * @returns The decision the Electron handler should act on.
  */
 export function subframeNavigationDecision(
 	url: string,
-	appDocument: AppDocument,
+	appOrigin: string,
 ): NavigationDecision {
-	if (isAppOwnBlob(url, appDocument)) {
+	if (isAppOwnBlob(url, appOrigin)) {
 		return { action: 'allow' };
 	}
 
@@ -181,5 +155,5 @@ export function subframeNavigationDecision(
 		return { action: 'allow' };
 	}
 
-	return navigationDecision(url, appDocument);
+	return navigationDecision(url, appOrigin);
 }

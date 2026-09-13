@@ -1,6 +1,7 @@
+export { registerAppProtocol } from './app-protocol';
 export { guardEveryWebContents } from './external-links';
 export { linuxWindowIconPath } from './linux-desktop-identity';
-export { createMainWindow, rendererDocument } from './main-window';
+export { createMainWindow, rendererOrigin } from './main-window';
 export type {
 	QuitCoordinator,
 	QuitCoordinatorOptions,

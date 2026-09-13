@@ -389,24 +389,19 @@ const config: ForgeConfig = {
 			[FuseV1Options.EnableNodeCliInspectArguments]: false,
 			[FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
 			[FuseV1Options.OnlyLoadAppFromAsar]: true,
-			// Left granted, and that is measured rather than assumed. The production
-			// renderer is a `file:` document whose entry is an ES module, and a
-			// module script is always fetched in CORS mode: with this off the `file:`
-			// origin turns opaque and Chromium refuses every `<script type="module">`
-			// in the bundle ("Cross origin requests are only supported for protocol
-			// schemes: … http, https"), so the window comes up blank. Closing it for
-			// real means serving the renderer from a custom `app://` scheme first —
-			// which also moves the origin, orphaning the localStorage the renderer
-			// keeps its preferences and per-chat overrides in.
+			// Off, which is only survivable because the renderer no longer runs on
+			// `file:`: it is served from `app://bundle` by
+			// `src/main/app/app-protocol.ts` (ADR 0072). A `file:` document with
+			// this off has no usable origin — module scripts are always fetched in
+			// CORS mode and every chunk is refused, and `localStorage` throws — so
+			// the two changes are one change, and reverting either without the
+			// other ships a blank window.
 			//
-			// That orphaning is now handled: the renderer mirrors its localStorage
-			// into the main process and the preload replays it into an empty origin
-			// (ADR 0071). What is still outstanding is the switch itself, and it has
-			// to ship after a release carrying the mirror — flipping this fuse in the
-			// same release as the move would leave nothing to replay. Declared rather
-			// than defaulted so the next reader finds this note instead of
-			// re-deriving it.
-			[FuseV1Options.GrantFileProtocolExtraPrivileges]: true,
+			// What it buys: a page on `file:` may read every file its user can, so
+			// a renderer XSS reached `~/.ssh/id_ed25519` with no IPC handler and no
+			// path validation in the loop. The CSP could not close that — the app
+			// needed `connect-src file:` to load its own assets. (Audit SH-03.)
+			[FuseV1Options.GrantFileProtocolExtraPrivileges]: false,
 		}),
 	],
 };

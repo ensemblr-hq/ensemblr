@@ -30,10 +30,11 @@ export type LanguageCatalogue = Record<I18nNamespace, object>;
  *
  * Statically importing all three languages put 1.03 MB raw / 272 KB gzip on the
  * critical path for the ~166 KB one launch renders; the other two are reachable
- * only after the user switches language. The packaged renderer loads from
- * `file://`, where an HTTP backend cannot resolve relative URLs — a glob keeps
- * every catalogue a build-time-resolved module specifier instead, so nothing
- * depends on a base URL at runtime.
+ * only after the user switches language. A glob keeps every catalogue a
+ * build-time-resolved module specifier, so nothing depends on a base URL at
+ * runtime and the loading path is the same in both serving modes — which is
+ * what let the packaged renderer move from `file://` to `app://bundle`
+ * (ADR 0072) without this file being touched.
  */
 const catalogueModules = import.meta.glob<{ default: object }>(
 	'./locales/*/*.json',

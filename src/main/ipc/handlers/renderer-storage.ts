@@ -6,6 +6,7 @@ import type {
 	RendererStorageMirrorResult,
 	RendererStorageSnapshot,
 } from '../../../shared/ipc/contracts/renderer-storage';
+import { documentOrigin } from '../../app/app-bundle';
 import type { EnsemblrDatabaseService } from '../../storage';
 import {
 	hasSeededOrigin,
@@ -163,23 +164,16 @@ function refuse(
 
 /**
  * The storage origin of the document a web contents is showing, in the
- * `scheme://host` shape web storage is partitioned by.
- *
- * Built from the URL's protocol and host rather than read off `URL.origin`,
- * which reports `null` for both `file:` and any non-special scheme — so the
- * packaged `file:` renderer and a future `app://bundle` would be
- * indistinguishable exactly where the distinction matters.
+ * `scheme://host` shape web storage is partitioned by. Shares
+ * {@link documentOrigin} with the navigation policy so the mirror and the
+ * origin it is keyed to cannot drift apart.
  * @param sender - The web contents that sent the message.
  * @returns The origin key, or null when the URL cannot be read.
  */
 function storageOriginOf(sender: WebContents): string | null {
 	try {
 		const url = sender.getURL();
-		if (!url) {
-			return null;
-		}
-		const parsed = new URL(url);
-		return `${parsed.protocol}//${parsed.host}`;
+		return url ? documentOrigin(new URL(url)) : null;
 	} catch {
 		return null;
 	}
