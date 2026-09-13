@@ -1,4 +1,4 @@
-import { useAtomValue, useStore } from 'jotai';
+import { useAtomValueRawSync, useStore } from 'jotai';
 import { useCallback, useEffect, useMemo } from 'react';
 
 import type { MenuCommandId, MenuContext } from '@/shared/menu-commands';
@@ -35,9 +35,12 @@ const ALWAYS_AVAILABLE: readonly MenuCommandId[] = ['tab.close'];
  */
 export function useMenuCommandBridge(): void {
 	const store = useStore();
-	const handlers = useAtomValue(menuCommandHandlersAtom);
-	const checked = useAtomValue(menuCheckedCommandsAtom);
-	const dynamic = useAtomValue(menuDynamicEntriesAtom);
+	// Jotai v3 dropped useAtomValue's extra post-mount render, so a descendant's
+	// effect-time registration lands before this hook subscribes and is missed
+	// until the next write. Only the useSyncExternalStore-backed read sees it.
+	const handlers = useAtomValueRawSync(menuCommandHandlersAtom);
+	const checked = useAtomValueRawSync(menuCheckedCommandsAtom);
+	const dynamic = useAtomValueRawSync(menuDynamicEntriesAtom);
 
 	useEffect(
 		() =>
