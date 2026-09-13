@@ -64,6 +64,20 @@ describe('answer typography', () => {
 		expect(markup).toContain(expected);
 	});
 
+	test('sizes the answer surface by width alone', () => {
+		// A full-height answer resolves its percentage against the parent height
+		// flex layout already computed from this block plus whatever follows it,
+		// so it grows over its siblings and they paint outside the parent — the
+		// raw-execution disclosure landing on top of the next timeline row.
+		const markup = renderWithMarkdownStyle(
+			'default',
+			<ChatMessageText text='Body copy.' />,
+		);
+
+		expect(markup).toContain('w-full');
+		expect(markup).not.toMatch(/class="[^"]*\b(?:size-full|h-full)\b/);
+	});
+
 	test('renders path chips on the inline prose scale', () => {
 		const markup = renderWithMarkdownStyle(
 			'default',
