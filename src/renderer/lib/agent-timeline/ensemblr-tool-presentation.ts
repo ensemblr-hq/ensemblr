@@ -7,13 +7,14 @@ import type {
 	ToolBadgeDescriptor,
 	ToolGlyph,
 } from '@/renderer/types/tool-presentation';
+import { controlPayloadRecord } from './ensemblr-control-presenter-helpers';
 import {
 	BOOKKEEPING_TOOL_NAMES,
 	canonicalEnsemblrToolName,
 	ENSEMBLR_TOOL_LABELS,
 	type TitlePair,
 } from './ensemblr-control-tool-registry';
-import { inputOf, outputOf } from './tool-part-fields';
+import { inputOf } from './tool-part-fields';
 
 /**
  * How the app's own control tools read in the timeline.
@@ -269,45 +270,6 @@ function filePathOf(
 }
 
 /**
- * Reads the payload a successful control call handed back.
- *
- * The two runtimes report the same payload differently: the Pi extension carries
- * the whole envelope on `details`, while the MCP bridge sends only the text it
- * rendered — which for a control op is that payload as JSON. Both are read here
- * so a row does not depend on which runtime happened to make the call.
- * @param part - The tool part to read
- * @returns The payload, or null when the call failed, is still running, or
- * reported something that is not an object
- */
-function controlResultData(
-	part: DynamicToolUIPart,
-): Record<string, unknown> | null {
-	const details = detailsOf(part);
-	if (isControlEnvelope(details)) {
-		return details.ok && isPlainObject(details.data) ? details.data : null;
-	}
-	return parseObject(outputOf(part)?.text ?? '');
-}
-
-/**
- * Reads a JSON object out of a result's text, tolerating anything that is not
- * one — the text is prose for most tools and only happens to be JSON for these.
- * @param text - The result text as the runtime rendered it
- * @returns The parsed object, or null when the text is not one
- */
-function parseObject(text: string): Record<string, unknown> | null {
-	if (!text.startsWith('{')) {
-		return null;
-	}
-	try {
-		const parsed: unknown = JSON.parse(text);
-		return isPlainObject(parsed) ? parsed : null;
-	} catch {
-		return null;
-	}
-}
-
-/**
  * Reads the id of the thing a call is about, from its arguments when it was
  * handed one and from its result when it produced one — `create_workspace` and
  * `start_conversation` both learn the id they made only on the way back.
@@ -319,7 +281,7 @@ function referencedIdOf(
 	part: DynamicToolUIPart,
 	keys: readonly string[],
 ): string | null {
-	const bags = [inputOf(part), controlResultData(part)];
+	const bags = [inputOf(part), controlPayloadRecord(part)];
 	for (const bag of bags) {
 		if (bag === null) {
 			continue;

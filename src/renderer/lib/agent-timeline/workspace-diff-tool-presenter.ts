@@ -6,7 +6,13 @@ import type {
 	ToolPreviewDescriptor,
 } from '@/renderer/types/tool-presentation';
 import type { GetWorkspaceDiffResult } from '@/shared/agent-control/contracts';
-import { inputOf, outputOf, pathOf } from './tool-part-fields';
+import {
+	codeSpan,
+	controlPayloadRecord,
+	isRecord,
+	numberValue,
+} from './ensemblr-control-presenter-helpers';
+import { inputOf, pathOf } from './tool-part-fields';
 import { fileBadge, languageFor, patchCounts } from './tool-presenter-helpers';
 
 /** One changed workspace file as returned by the diff tool's stat response. */
@@ -32,29 +38,6 @@ interface WorkspaceDiffData {
 	omittedFiles: GetWorkspaceDiffResult['omittedFiles'];
 	summary: WorkspaceDiffSummary | null;
 	truncated: GetWorkspaceDiffResult['truncated'];
-}
-
-/**
- * Narrows an unknown value to a non-array field record.
- * @param value - Value to inspect
- * @returns Whether the value can be read as a field record
- */
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/**
- * Reads a finite numeric field, preserving absent and malformed values as null.
- * @param record - Field record to read
- * @param key - Numeric field name
- * @returns The numeric field, or null
- */
-function numberValue(
-	record: Record<string, unknown>,
-	key: string,
-): number | null {
-	const value = record[key];
-	return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 /**
@@ -95,31 +78,12 @@ function readSummary(value: unknown): WorkspaceDiffSummary | null {
 }
 
 /**
- * Reads the control tool's data envelope or its JSON text fallback.
- * @param part - Completed workspace-diff tool call
- * @returns The normalized payload, or null when it was not structured data
- */
-function payloadOf(part: DynamicToolUIPart): Record<string, unknown> | null {
-	const details = outputOf(part)?.details;
-	if (isRecord(details) && details.ok === true && isRecord(details.data)) {
-		return details.data;
-	}
-	const text = outputOf(part)?.text ?? '';
-	try {
-		const parsed: unknown = JSON.parse(text);
-		return isRecord(parsed) ? parsed : null;
-	} catch {
-		return null;
-	}
-}
-
-/**
  * Normalizes a workspace-diff response before it is rendered.
  * @param part - Completed workspace-diff tool call
  * @returns Diff data, or null when the call supplied no usable payload
  */
 function workspaceDiffData(part: DynamicToolUIPart): WorkspaceDiffData | null {
-	const payload = payloadOf(part);
+	const payload = controlPayloadRecord(part);
 	if (payload === null) {
 		return null;
 	}
@@ -207,25 +171,6 @@ function statusLabel(status: string | null): string | null {
 }
 
 /**
- * Wraps an untrusted path in a Markdown code span that it cannot terminate.
- * @param path - Repository path to render
- * @returns A single-line Markdown code span
- */
-function pathCodeSpan(path: string): string {
-	const singleLine = path.replace(/[\r\n]+/g, ' ');
-	const longestRun = Math.max(
-		0,
-		...(singleLine.match(/`+/g) ?? []).map((run) => run.length),
-	);
-	if (longestRun === 0) {
-		return `\`${singleLine}\``;
-	}
-	// i18next-instrument-ignore -- Markdown code-span delimiter
-	const fence = '`'.repeat(longestRun + 1);
-	return `${fence} ${singleLine} ${fence}`;
-}
-
-/**
  * Renders the stat response as one readable Markdown item per changed file.
  * @param files - Changed files from a stat response
  * @returns The Markdown list body
@@ -238,7 +183,7 @@ function statMarkdown(files: readonly WorkspaceDiffFile[]): string {
 				file.deletions === null ? null : `−${file.deletions}`,
 			].filter((count): count is string => count !== null);
 			const status = statusLabel(file.status);
-			return `- ${pathCodeSpan(file.path)}${status ? ` · ${status}` : ''}${counts.length > 0 ? ` · ${counts.join(' ')}` : ''}`;
+			return `- ${codeSpan(file.path)}${status ? ` · ${status}` : ''}${counts.length > 0 ? ` · ${counts.join(' ')}` : ''}`;
 		})
 		.join('\n');
 }

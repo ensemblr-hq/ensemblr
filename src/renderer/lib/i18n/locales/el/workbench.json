@@ -377,6 +377,10 @@
 			"done": "Σας έκανε μια ερώτηση",
 			"running": "Σας κάνει μια ερώτηση"
 		},
+		"body": {
+			"more_one": "… και {{count}} ακόμη",
+			"more_other": "… και {{count}} ακόμη"
+		},
 		"close-tab": {
 			"done": "Έκλεισε μια καρτέλα",
 			"running": "Κλείνει μια καρτέλα"
@@ -453,6 +457,15 @@
 			"done": "Εκκίνησε ένα harness",
 			"running": "Εκκινεί ένα harness"
 		},
+		"linear": {
+			"comments-heading": "Σχόλια",
+			"omitted-comments_one": "{{count}} παλαιότερο σχόλιο δεν χώρεσε.",
+			"omitted-comments_other": "{{count}} παλαιότερα σχόλια δεν χώρεσαν.",
+			"omitted-issues_one": "{{count}} ακόμη ζήτημα δεν χώρεσε — περιορίστε την αναζήτηση.",
+			"omitted-issues_other": "{{count}} ακόμη ζητήματα δεν χώρεσαν — περιορίστε την αναζήτηση.",
+			"priority": "προτεραιότητα {{priority}}",
+			"unknown-author": "Άγνωστος"
+		},
 		"linear-create-comment": {
 			"done": "Σχολίασε ένα ζήτημα Linear",
 			"running": "Σχολιάζει ένα ζήτημα Linear"
@@ -513,6 +526,34 @@
 			"done": "Άνοιξε μια καρτέλα",
 			"running": "Ανοίγει μια καρτέλα"
 		},
+		"preview": {
+			"agents-pending_one": "{{count}} ακόμη εργάζεται",
+			"agents-pending_other": "{{count}} ακόμη εργάζονται",
+			"agents-settled_one": "{{count}} ολοκληρώθηκε",
+			"agents-settled_other": "{{count}} ολοκληρώθηκαν",
+			"comments_one": "{{count}} σχόλιο",
+			"comments_other": "{{count}} σχόλια",
+			"context": "{{percent}}% συμφραζομένων",
+			"entries_one": "{{count}} καταχώριση",
+			"entries_other": "{{count}} καταχωρίσεις",
+			"issues_one": "{{count}} ζήτημα",
+			"issues_other": "{{count}} ζητήματα",
+			"memories_one": "{{count}} μνήμη",
+			"memories_other": "{{count}} μνήμες",
+			"models_one": "{{count}} μοντέλο",
+			"models_other": "{{count}} μοντέλα",
+			"not-found_one": "{{count}} δεν βρέθηκε",
+			"not-found_other": "{{count}} δεν βρέθηκαν",
+			"resolved_one": "{{count}} επιλύθηκε",
+			"resolved_other": "{{count}} επιλύθηκαν",
+			"terminals_one": "{{count}} τερματικό",
+			"terminals_other": "{{count}} τερματικά",
+			"timed-out": "το παράθυρο αναμονής έληξε",
+			"turns_one": "{{count}} γύρος",
+			"turns_other": "{{count}} γύροι",
+			"workspaces_one": "{{count}} χώρος εργασίας",
+			"workspaces_other": "{{count}} χώροι εργασίας"
+		},
 		"read-conversation": {
 			"chat": {
 				"done": "Διάβασε τη μεταγραφή μιας συνομιλίας",
@@ -536,6 +577,13 @@
 		"resolve-diff-comments": {
 			"done": "Επίλυσε σχόλια αξιολόγησης",
 			"running": "Επιλύει σχόλια αξιολόγησης"
+		},
+		"review": {
+			"already-resolved-heading": "Ήδη επιλυμένα",
+			"archived": "Αρχειοθετημένο",
+			"by-agent": "Πράκτορας",
+			"by-user": "Εσείς",
+			"not-found-heading": "Δεν βρέθηκαν"
 		},
 		"send-follow-up": {
 			"chat": {
@@ -577,9 +625,29 @@
 			"done": "Ξεκίνησε ένα τερματικό",
 			"running": "Ξεκινά ένα τερματικό"
 		},
+		"status": {
+			"note-label": "Σημείωση:",
+			"report-label": "Αναφορά:",
+			"report-none": "Καμία ακόμη",
+			"report-ready": "Έτοιμη για ανάγνωση",
+			"runtime-closed": "Κλειστό",
+			"runtime-label": "Περιβάλλον:",
+			"runtime-open": "Ανοικτό"
+		},
 		"stop-terminal": {
 			"done": "Διέκοψε ένα τερματικό",
 			"running": "Διακόπτει ένα τερματικό"
+		},
+		"terminal": {
+			"idle": "αδρανές",
+			"tail_one": "τελευταίες {{lines}} γραμμές · {{count}} παλαιότερη κρυφή",
+			"tail_other": "τελευταίες {{lines}} γραμμές · {{count}} παλαιότερες κρυφές"
+		},
+		"transcript": {
+			"answer": "Απάντηση",
+			"error": "Σφάλμα",
+			"prompt": "Ερώτημα",
+			"tool": "Εργαλείο: {{name}}"
 		},
 		"update-app-settings": {
 			"done": "Ενημέρωσε τις ρυθμίσεις εφαρμογής",
@@ -588,6 +656,12 @@
 		"update-architecture-diagram": {
 			"done": "Ξανασχεδίασε το διάγραμμα αρχιτεκτονικής",
 			"running": "Ξανασχεδιάζει το διάγραμμα αρχιτεκτονικής"
+		},
+		"wait": {
+			"pending-heading": "Εργάζονται ακόμη",
+			"report-truncated": "η αναφορά περικόπηκε",
+			"settled-heading": "Ολοκληρώθηκαν",
+			"signal": "σήμα: {{reason}}"
 		},
 		"wait-for-agents": {
 			"chat": {

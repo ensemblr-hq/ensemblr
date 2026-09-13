@@ -12,6 +12,7 @@ import {
 } from '@/shared/tool-presentation';
 import { canonicalEnsemblrToolName } from './ensemblr-control-tool-registry';
 import { inputOf, outputOf } from './tool-part-fields';
+import { formatToolInput } from './tool-presenter-helpers';
 
 /** Core runtime tools whose presentation must remain host-owned. */
 const PROTECTED_CORE_TOOL_NAMES = new Set([
@@ -104,10 +105,9 @@ export function presentExtensionToolCall(
 		body: descriptor.body
 			? extensionBody(descriptor.body, fallback.body, language)
 			: fallback.body,
-		extensionOwned: true,
 		glyph: descriptor.glyph,
 		rawIO: {
-			input: formatInput(inputOf(part)),
+			input: formatToolInput(inputOf(part)),
 			output: outputOf(part)?.text ?? '',
 			toolName: part.toolName,
 		},
@@ -195,18 +195,5 @@ function extensionBody(
 			void exhaustive;
 			return fallback;
 		}
-	}
-}
-
-/**
- * Serializes tool input for the host-owned raw execution disclosure.
- * @param input - The input bag sent to the tool
- * @returns Deterministic JSON or a safe fallback string
- */
-function formatInput(input: unknown): string {
-	try {
-		return JSON.stringify(input, null, 2);
-	} catch {
-		return String(input);
 	}
 }

@@ -377,6 +377,10 @@
 			"done": "Asked you a question",
 			"running": "Asking you a question"
 		},
+		"body": {
+			"more_one": "… and {{count}} more",
+			"more_other": "… and {{count}} more"
+		},
 		"close-tab": {
 			"done": "Closed a tab",
 			"running": "Closing a tab"
@@ -453,6 +457,15 @@
 			"done": "Launched a harness",
 			"running": "Launching a harness"
 		},
+		"linear": {
+			"comments-heading": "Comments",
+			"omitted-comments_one": "{{count}} earlier comment did not fit.",
+			"omitted-comments_other": "{{count}} earlier comments did not fit.",
+			"omitted-issues_one": "{{count}} more issue did not fit — narrow the search.",
+			"omitted-issues_other": "{{count}} more issues did not fit — narrow the search.",
+			"priority": "priority {{priority}}",
+			"unknown-author": "Unknown"
+		},
 		"linear-create-comment": {
 			"done": "Commented on a Linear issue",
 			"running": "Commenting on a Linear issue"
@@ -513,6 +526,34 @@
 			"done": "Opened a tab",
 			"running": "Opening a tab"
 		},
+		"preview": {
+			"agents-pending_one": "{{count}} still working",
+			"agents-pending_other": "{{count}} still working",
+			"agents-settled_one": "{{count}} settled",
+			"agents-settled_other": "{{count}} settled",
+			"comments_one": "{{count}} comment",
+			"comments_other": "{{count}} comments",
+			"context": "{{percent}}% context",
+			"entries_one": "{{count}} entry",
+			"entries_other": "{{count}} entries",
+			"issues_one": "{{count}} issue",
+			"issues_other": "{{count}} issues",
+			"memories_one": "{{count}} memory",
+			"memories_other": "{{count}} memories",
+			"models_one": "{{count}} model",
+			"models_other": "{{count}} models",
+			"not-found_one": "{{count}} not found",
+			"not-found_other": "{{count}} not found",
+			"resolved_one": "{{count}} resolved",
+			"resolved_other": "{{count}} resolved",
+			"terminals_one": "{{count}} terminal",
+			"terminals_other": "{{count}} terminals",
+			"timed-out": "wait window expired",
+			"turns_one": "{{count}} turn",
+			"turns_other": "{{count}} turns",
+			"workspaces_one": "{{count}} workspace",
+			"workspaces_other": "{{count}} workspaces"
+		},
 		"read-conversation": {
 			"chat": {
 				"done": "Read a chat's transcript",
@@ -536,6 +577,13 @@
 		"resolve-diff-comments": {
 			"done": "Resolved review comments",
 			"running": "Resolving review comments"
+		},
+		"review": {
+			"already-resolved-heading": "Already resolved",
+			"archived": "Archived",
+			"by-agent": "Agent",
+			"by-user": "You",
+			"not-found-heading": "Not found"
 		},
 		"send-follow-up": {
 			"chat": {
@@ -577,9 +625,29 @@
 			"done": "Started a terminal",
 			"running": "Starting a terminal"
 		},
+		"status": {
+			"note-label": "Note:",
+			"report-label": "Report:",
+			"report-none": "None yet",
+			"report-ready": "Ready to read",
+			"runtime-closed": "Closed",
+			"runtime-label": "Runtime:",
+			"runtime-open": "Open"
+		},
 		"stop-terminal": {
 			"done": "Stopped a terminal",
 			"running": "Stopping a terminal"
+		},
+		"terminal": {
+			"idle": "idle",
+			"tail_one": "last {{lines}} lines · {{count}} earlier hidden",
+			"tail_other": "last {{lines}} lines · {{count}} earlier hidden"
+		},
+		"transcript": {
+			"answer": "Answer",
+			"error": "Error",
+			"prompt": "Prompt",
+			"tool": "Tool: {{name}}"
 		},
 		"update-app-settings": {
 			"done": "Updated app settings",
@@ -588,6 +656,12 @@
 		"update-architecture-diagram": {
 			"done": "Redrew the architecture diagram",
 			"running": "Redrawing the architecture diagram"
+		},
+		"wait": {
+			"pending-heading": "Still working",
+			"report-truncated": "report truncated",
+			"settled-heading": "Settled",
+			"signal": "signal: {{reason}}"
 		},
 		"wait-for-agents": {
 			"chat": {

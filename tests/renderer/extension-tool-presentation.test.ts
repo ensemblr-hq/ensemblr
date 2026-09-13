@@ -153,7 +153,6 @@ describe('extension tool presentation', () => {
 
 		expect(presentation).toMatchObject({
 			body: { kind: 'markdown', text: '**Extension result**' },
-			extensionOwned: true,
 			glyph: 'search',
 			rawIO: { toolName: 'lsp_diagnostics' },
 			title: 'Custom diagnostics',
@@ -171,7 +170,7 @@ describe('extension tool presentation', () => {
 				}),
 			);
 
-			expect(presentation.extensionOwned).not.toBe(true);
+			expect(presentation.rawIO).toBeUndefined();
 			expect(presentation.title).not.toBe('Extension core tool');
 		},
 	);
