@@ -16,6 +16,24 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
+ * The width at which the review rail can actually sit beside the content as a
+ * resizable panel, rather than over it as a sheet. Not a design choice — it is
+ * the sum the panel group has to clear before react-resizable-panels will seat
+ * both panels at once: 16rem of app sidebar, the main panel's 32rem minimum,
+ * the rail's 22rem minimum, and the 1px separator between them. Below it the
+ * library refuses the expansion by leaving the layout alone and reporting
+ * nothing, which is indistinguishable from a rail that simply never opened.
+ * Rounded up from that 70rem-and-a-pixel floor for the sidebar's border and any
+ * inset the shell grows later. `panel-layout.tsx` gates the panel and its
+ * handle on this, and `use-right-sidebar-controller.ts` matches the same width
+ * in JS as RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH — the two must move together or the
+ * rail is hosted by neither.
+ */
+@theme {
+	--breakpoint-rail: 72rem;
+}
+
+/*
  * WOFF2 rather than the release archive's TrueType: the four faces are 9.43 MB
  * of raw `.ttf` against 4.00 MB compressed, and the container is decoded to the
  * same SFNT before any consumer sees it. Measured in Electron 44 against

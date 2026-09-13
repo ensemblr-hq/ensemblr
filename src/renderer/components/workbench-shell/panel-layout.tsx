@@ -68,7 +68,7 @@ export function WorkbenchPanelLayout({
 				>
 					{mainContent}
 				</MainWorkspacePanel>
-				<ResizableHandle className='hidden lg:flex' />
+				<ResizableHandle className='rail:flex hidden' />
 				<ReviewDockPanel {...railProps} />
 			</ResizablePanelGroup>
 			{/*
@@ -115,18 +115,22 @@ function MainWorkspacePanel({
  * Right-hand collapsible review panel plus the bottom dock panel group.
  *
  * The panel stays registered with the group at every width — dropping it below
- * `lg` would re-lay the group out and lose the frozen `defaultSize` the
+ * `rail` would re-lay the group out and lose the frozen `defaultSize` the
  * persisted width is restored from, and would leave the handle beside it with no
- * neighbour. Only its contents move: below `lg` the panel is `hidden` and the
+ * neighbour. Only its contents move: below `rail` the panel is `hidden` and the
  * rail is hosted by {@link ReviewRailSheet} instead, so the rail — and the
  * terminals inside it — is mounted in exactly one place.
+ *
+ * The two `minSize`s below are what the `rail` breakpoint is derived from, so a
+ * change to either belongs in `styles/index.css` and
+ * `use-right-sidebar-controller.ts` in the same edit.
  */
 function ReviewDockPanel(props: ReviewRailProps) {
 	const { state, actions, meta } = useWorkbenchLayout();
 
 	return (
 		<ResizablePanel
-			className='hidden min-w-0 lg:flex'
+			className='rail:flex hidden min-w-0'
 			collapsedSize={RIGHT_SIDEBAR_COLLAPSED_SIZE}
 			collapsible
 			defaultSize={state.initialRightSidebarSize}
