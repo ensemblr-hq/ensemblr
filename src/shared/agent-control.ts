@@ -60,6 +60,11 @@ export {
 	ownContextPressureNote,
 } from './agent-control/context-pressure.ts';
 export * from './agent-control/contracts.ts';
+export {
+	bareEnsemblrControlToolName,
+	CONTROL_SERVER_NAME,
+	isEnsemblrControlTool,
+} from './agent-control/control-tool-names.ts';
 export { buildConversationTranscript } from './agent-control/conversation-transcript.ts';
 export type { DelegationInitiative } from './agent-control/delegation-initiative.ts';
 export {

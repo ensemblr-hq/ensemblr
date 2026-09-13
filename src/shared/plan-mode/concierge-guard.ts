@@ -10,6 +10,7 @@
  * of a security-sensitive classifier — so both belong in `shared/` behind the
  * control server.
  */
+import { isEnsemblrControlTool } from '../agent-control/control-tool-names.ts';
 import { isReadOnlyBashCommand } from './bash-guard.ts';
 
 /** A tool call being classified: its name, its target path, and its command. */
@@ -80,22 +81,46 @@ export const CONCIERGE_GUARDED_TOOLS: ReadonlySet<string> = new Set([
  * writes anywhere on disk. Add a runtime's new read-only built-in here; a
  * mutating one belongs in {@link CONCIERGE_WRITE_TOOLS} or
  * {@link CONCIERGE_SHELL_TOOLS}, which also forwards it.
+ *
+ * `ToolSearch` reads schemas rather than anything on disk, and it is what a
+ * runtime that defers a tool hands back its definition through — so a block here
+ * would strand a Concierge one step further back than the tool it was reaching
+ * for.
+ *
+ * Claude Code has renamed six of its built-ins, and **both spellings are
+ * members** for the reason `NATIVE_SUBAGENT_TOOLS` lists both in
+ * `src/main/claude-agent/claude-subagent-mode.ts`: the name depends on which
+ * `claude` binary is on the user's PATH, so naming one of a pair holds for only
+ * half of them. `Task` became `Agent` in v2.1.63, `KillShell` became `TaskStop`,
+ * `BashOutput` became `TaskOutput`, `ListPeers` became `ListAgents`, and the two
+ * MCP resource readers gained a `Tool` suffix. Pair a rename here rather than
+ * replacing the old name.
  */
 const CONCIERGE_READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
+	'Agent',
 	'AskUserQuestion',
 	'BashOutput',
 	'ExitPlanMode',
 	'Glob',
 	'Grep',
 	'KillShell',
+	'ListAgents',
 	'ListMcpResources',
+	'ListMcpResourcesTool',
+	'ListPeers',
 	'NotebookRead',
 	'Read',
 	'ReadMcpResource',
+	'ReadMcpResourceDir',
+	'ReadMcpResourceDirTool',
+	'ReadMcpResourceTool',
 	'Skill',
 	'SlashCommand',
 	'Task',
+	'TaskOutput',
+	'TaskStop',
 	'TodoWrite',
+	'ToolSearch',
 	'WebFetch',
 	'WebSearch',
 	'find',
@@ -105,22 +130,19 @@ const CONCIERGE_READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Prefix of Ensemblr's own control tools, cleared here because they are gated
- * somewhere better: the control server answers for each by op and by the
- * caller's role before it runs, and `CONCIERGE_BLOCKED_OPS` is what holds the
- * Concierge out of a workspace's write channels.
- */
-const CONTROL_TOOL_PREFIX = 'ensemblr_';
-
-/**
  * Reports whether a tool needs no Concierge opinion of its own.
+ *
+ * Ensemblr's own control tools clear here because they are gated somewhere
+ * better: the control server answers for each by op and by the caller's role
+ * before it runs, and `CONCIERGE_BLOCKED_OPS` is what holds the Concierge out of
+ * a workspace's write channels. `isEnsemblrControlTool` rather than a prefix
+ * test, because a Concierge on Claude Code reaches those tools over MCP and sees
+ * every one of them namespaced.
  * @param tool - The tool name being classified.
  * @returns True for a known read-only built-in or an Ensemblr control tool.
  */
 function runsUntouched(tool: string): boolean {
-	return (
-		CONCIERGE_READ_ONLY_TOOLS.has(tool) || tool.startsWith(CONTROL_TOOL_PREFIX)
-	);
+	return CONCIERGE_READ_ONLY_TOOLS.has(tool) || isEnsemblrControlTool(tool);
 }
 
 /**

@@ -4,11 +4,13 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, test } from 'vitest';
 
+import { TOOL_DEFS } from '../../src/main/agent-control/index.ts';
 import { createConciergeSessionGate } from '../../src/main/claude-agent/claude-concierge-guard.ts';
 import {
 	CONCIERGE_ONLY_OPS,
 	CONCIERGE_WITHHELD_OPS,
 	conciergeControlOpDenial,
+	isEnsemblrControlTool,
 	withheldControlOps,
 } from '../../src/shared/agent-control.ts';
 import {
@@ -443,6 +445,21 @@ describe('the Concierge guard denies a tool it cannot vouch for', () => {
 		expect(verdict(tool)).toEqual({ blocked: false });
 	});
 
+	// Claude Code renamed six built-ins, and which name arrives depends on which
+	// `claude` binary is on PATH. Listing one spelling of a pair left a Concierge
+	// on a current binary refused its own delegation tool.
+	test.each([
+		['Task', 'Agent'],
+		['KillShell', 'TaskStop'],
+		['BashOutput', 'TaskOutput'],
+		['ListPeers', 'ListAgents'],
+		['ListMcpResources', 'ListMcpResourcesTool'],
+		['ReadMcpResource', 'ReadMcpResourceTool'],
+	])('clears %s under both its spellings, including %s', (before, after) => {
+		expect(verdict(before)).toEqual({ blocked: false });
+		expect(verdict(after)).toEqual({ blocked: false });
+	});
+
 	// Gated per op and per role by the control server instead, and a blanket
 	// denial here would take away the supervision the Concierge exists for.
 	test.each([
@@ -451,6 +468,49 @@ describe('the Concierge guard denies a tool it cannot vouch for', () => {
 		'ensemblr_update_app_settings',
 	])('clears the control tool %s', (tool) => {
 		expect(verdict(tool)).toEqual({ blocked: false });
+	});
+
+	// A Concierge on Claude Code reaches the control server over MCP, where the
+	// SDK namespaces every tool by its server. The prefix test that stood here
+	// saw none of them, so a Claude Concierge was refused its own tools — the
+	// whole supervision surface — and told to hold a tool it also could not call.
+	test.each([
+		'mcp__ensemblr__ensemblr_list_workspaces',
+		'mcp__ensemblr__ensemblr_list_models',
+		'mcp__ensemblr__ensemblr_create_workspace',
+		'mcp__ensemblr__ensemblr_start_conversation',
+		'ensemblr__ensemblr_list_workspaces',
+		'ensemblr.ensemblr_list_workspaces',
+	])('clears the namespaced control tool %s', (tool) => {
+		expect(verdict(tool)).toEqual({ blocked: false });
+	});
+
+	// Membership rather than a prefix is what keeps that widening honest: another
+	// server's tool cannot borrow the clearance by carrying the prefix, and a
+	// control tool name cannot borrow it from a server that is not ours.
+	//
+	// The last two are why the wrapper is matched entire rather than by its final
+	// segment: an MCP server may carry the separator in its own name, so a name
+	// ending in an `ensemblr` segment is not the same claim as being served by
+	// the control server.
+	test.each([
+		'mcp__fs__ensemblr_write_file',
+		'mcp__fs__ensemblr_list_workspaces',
+		'ensemblr_delete_everything',
+		'mcp__fs__ensemblr__ensemblr_start_terminal',
+		'fs.ensemblr.ensemblr_write_terminal',
+	])('still blocks %s', (tool) => {
+		const result = verdict(tool);
+		expect(result.blocked).toBe(true);
+		expect(result.reason).toContain('refused rather than guessed at');
+	});
+
+	test('covers every control tool the MCP endpoint serves', () => {
+		for (const { name } of TOOL_DEFS) {
+			expect(isEnsemblrControlTool(name)).toBe(true);
+			expect(isEnsemblrControlTool(`mcp__ensemblr__${name}`)).toBe(true);
+			expect(verdict(`mcp__ensemblr__${name}`)).toEqual({ blocked: false });
+		}
 	});
 
 	// The write and shell policies still answer first, with their own reasons.
