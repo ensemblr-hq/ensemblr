@@ -7,6 +7,8 @@ import {
 	getNearestEditorFromDOMNode,
 	type LexicalCommand,
 	type LexicalEditor,
+	REDO_COMMAND,
+	UNDO_COMMAND,
 } from 'lexical';
 import { createRef, useRef, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -324,6 +326,104 @@ describe('composer editor', () => {
 			expect(latest()?.attachments).toEqual([]);
 		});
 		expect(latest()?.text).toBe('keep');
+	});
+
+	// A document rewritten after its chip landed lands at a new path, because the
+	// attachment store is content-addressed. The chip has to follow it without
+	// moving out of the sentence the user put it in.
+	it('repoints a chip at a rewritten document, leaving it where it sits', async () => {
+		const { handleRef, latest } = mountEditor();
+		const rewritten: ComposerAttachment = {
+			...APP_FILE,
+			path: 'src/app.rewritten.ts',
+		};
+
+		await write(() => handleRef.current?.appendText('before'));
+		await write(() => handleRef.current?.insertAttachment(APP_FILE));
+		await write(() => handleRef.current?.appendText('after'));
+		await write(() =>
+			handleRef.current?.updateAttachment(APP_FILE.id, rewritten),
+		);
+
+		await waitFor(() => {
+			expect(latest()?.attachments).toEqual([rewritten]);
+		});
+		expect(latest()?.segments).toEqual([
+			{ kind: 'text', text: 'before' },
+			{ attachment: rewritten, kind: 'attachment' },
+			{ kind: 'text', text: 'after' },
+		]);
+	});
+
+	// A repoint lands in the background, between keystrokes the user is still
+	// making, and changes nothing they can see. Recording it would spend their
+	// next undo on reverting a path — a keypress that looks like it did nothing.
+	it('does not spend an undo step on a repoint', async () => {
+		const { handleRef, latest } = mountEditor();
+
+		await write(() => handleRef.current?.insertAttachment(APP_FILE));
+		await write(() => handleRef.current?.appendText('typed'));
+		await write(() =>
+			handleRef.current?.updateAttachment(APP_FILE.id, {
+				...APP_FILE,
+				path: 'src/app.rewritten.ts',
+			}),
+		);
+		await write(() => {
+			mountedEditor().dispatchCommand(UNDO_COMMAND, undefined);
+		});
+
+		await waitFor(() => {
+			expect(latest()?.text).not.toContain('typed');
+		});
+	});
+
+	// Undo then redo has to land on the rewritten document, not the one the chip
+	// opened with. History records the state a repoint produced rather than
+	// discarding it, or redo silently hands back the shorter document and the
+	// comments the background pass fetched are gone with nothing saying so.
+	it('redoes back onto the rewritten document', async () => {
+		const { handleRef, latest } = mountEditor();
+		const rewritten: ComposerAttachment = {
+			...APP_FILE,
+			path: 'src/app.rewritten.ts',
+		};
+
+		await write(() => handleRef.current?.insertAttachment(APP_FILE));
+		await write(() => handleRef.current?.appendText('typed'));
+		await write(() =>
+			handleRef.current?.updateAttachment(APP_FILE.id, rewritten),
+		);
+		await write(() => {
+			mountedEditor().dispatchCommand(UNDO_COMMAND, undefined);
+		});
+		await write(() => {
+			mountedEditor().dispatchCommand(REDO_COMMAND, undefined);
+		});
+
+		await waitFor(() => {
+			expect(latest()?.text).toContain('typed');
+		});
+		expect(latest()?.attachments).toEqual([rewritten]);
+	});
+
+	it('ignores a repoint for a chip the draft no longer holds', async () => {
+		const { handleRef, latest } = mountEditor();
+
+		await write(() => handleRef.current?.appendText('keep'));
+		await write(() => handleRef.current?.insertAttachment(APP_FILE));
+		await write(() => handleRef.current?.removeAttachment(APP_FILE.id));
+		await write(() =>
+			handleRef.current?.updateAttachment(APP_FILE.id, {
+				...APP_FILE,
+				path: 'src/app.rewritten.ts',
+			}),
+		);
+
+		await waitFor(() => {
+			expect(latest()?.text).toBe('keep');
+		});
+		expect(latest()?.attachments).toEqual([]);
 	});
 
 	it('restores a whole draft from its snapshot, chips still in the sentence', async () => {

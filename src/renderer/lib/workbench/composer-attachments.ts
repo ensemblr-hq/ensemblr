@@ -17,6 +17,7 @@ import {
 import { issueDocumentFilename } from '@/renderer/lib/workbench/issue-document';
 import type {
 	ComposerAttachment,
+	ComposerIssueAttachment,
 	ComposerTextSource,
 	PullRequestCommentSummary,
 	WorkspaceFileSummary,
@@ -362,7 +363,7 @@ export async function attachIssueDocument({
 	provider: 'github' | 'linear';
 	reference: string;
 	workspaceCwd: string;
-}): Promise<ComposerAttachment> {
+}): Promise<ComposerIssueAttachment> {
 	const file = new File(
 		[document],
 		issueDocumentFilename(provider, reference),

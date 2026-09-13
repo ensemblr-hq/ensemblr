@@ -12,6 +12,7 @@ export type { CheckpointRestoreTarget } from './checkpoint';
 export type {
 	ComposerAttachment,
 	ComposerDraftSegment,
+	ComposerIssueAttachment,
 	ComposerSendIntent,
 	ComposerTextSource,
 	ConciergeReferenceMatch,

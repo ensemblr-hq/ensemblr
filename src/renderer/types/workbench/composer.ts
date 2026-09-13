@@ -183,6 +183,19 @@ export type ComposerAttachment =
 	  };
 
 /**
+ * The chip a tracker issue is attached as. Named because the document behind one
+ * is written more than once — a Linear issue's comments arrive after its chip has
+ * landed — and repointing the chip at the rewritten file reads a `path` that
+ * {@link ComposerAttachment} as a whole does not promise: an external file names
+ * itself by absolute path instead, and a reference chip stands for a surface of
+ * the app that has no file behind it at all.
+ */
+export type ComposerIssueAttachment = Extract<
+	ComposerAttachment,
+	{ kind: 'issue' }
+>;
+
+/**
  * One run of the composer draft, in the order it sits in the document: a stretch
  * of typed text, or a chip standing where the user put it. The send pipeline
  * walks these so the outgoing prompt reads in the order the user arranged, rather

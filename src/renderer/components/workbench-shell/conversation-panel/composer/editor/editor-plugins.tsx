@@ -12,6 +12,7 @@ import {
 	DRAGOVER_COMMAND,
 	DROP_COMMAND,
 	type EditorState,
+	HISTORY_MERGE_TAG,
 	type LexicalCommand,
 	type LexicalNode,
 	PASTE_COMMAND,
@@ -396,6 +397,14 @@ export function EditorHandlePlugin({
 					root.append(paragraph);
 					root.selectEnd();
 				});
+			},
+			updateAttachment(id: string, attachment: ComposerAttachment) {
+				editor.update(
+					() => {
+						$findAttachmentNode(id)?.setAttachment(attachment);
+					},
+					{ tag: HISTORY_MERGE_TAG },
+				);
 			},
 		};
 		return () => {

@@ -64,4 +64,17 @@ export interface ComposerEditorHandle {
 	restore: (snapshot: EditorState) => void;
 	/** Replaces the whole draft with plain text, dropping any chips. */
 	setText: (text: string) => void;
+	/**
+	 * Swaps the payload of a chip already in the draft, leaving it where it sits.
+	 * A no-op when the draft no longer holds that id, so a document finished in
+	 * the background cannot resurrect a chip the user has since removed, and it
+	 * takes no undo step of its own — a swap the user cannot see must not cost
+	 * them the keypress that would have undone their own last edit.
+	 *
+	 * The replacement stands for the same thing the chip already did: same `kind`,
+	 * same id, new content. Whether a chip is inline or a tray block is read once
+	 * when its host element is built and never revisited, so swapping across that
+	 * boundary leaves the payload and the element it renders into disagreeing.
+	 */
+	updateAttachment: (id: string, attachment: ComposerAttachment) => void;
 }
