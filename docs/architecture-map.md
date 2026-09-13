@@ -49,7 +49,7 @@ each exposing its public surface through `index.ts`.
 | Shipped Agent Skills | `agent-skills/` | Where the bundled skills live on disk, each addressed as a Pi skill directory and as a Claude plugin root. Two roots ship: `resources/agent-skills/` always, and `resources/agent-skills-architecture/` only while the Experimental architecture-diagram switch is on |
 | Plan mode | `plan-mode/` | Per-session plan registry, plan-file writing, plan submission — the enforcement classifiers live in `src/shared/plan-mode/` |
 | AFK Mode | `afk-mode/` | The per-session registry of which chats the user has stepped away from, which the IPC layer writes and the control layer reads (ADR&nbsp;0060) |
-| App lifecycle | `app/` | `BrowserWindow` creation, window state, and the quit guard + coordinator that confirm a quit while agents are still running |
+| App lifecycle | `app/` | `BrowserWindow` creation, window state, the quit guard + coordinator that confirm a quit while agents are still running, and the `app://bundle` protocol the packaged renderer is served from (ADR&nbsp;0072) |
 | Architecture diagram | `architecture/` | The committed `.ensemblr/architecture.json` document — the file reader/writer, the service the control ops and the diagram pane read through, and the staleness gate that decides whether the per-turn upkeep block asks an agent to redraw. Nothing derives a diagram; an agent authors it through the control op |
 | Chat tabs | `chat-tabs/` | Tab service, preview slot, placeholder-chat policy, terminal-session persistence |
 | Checkpoints | `checkpoints/` | Git-backed per-turn checkpoints (ADR&nbsp;0012) |

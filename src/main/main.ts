@@ -97,9 +97,10 @@ import { resolveNotificationTarget } from './agent-runtime/notification-target';
 import { createSessionSummaryWriter } from './agent-runtime/session-summary-writer';
 import { resolveAgentSkillBundle } from './agent-skills';
 import { createHarnessDetectionService } from './agents';
+import { registerAppProtocol } from './app/app-protocol';
 import { guardEveryWebContents, openExternalUrl } from './app/external-links';
 import { applyLinuxDesktopIdentity } from './app/linux-desktop-identity';
-import { createMainWindow, rendererDocument } from './app/main-window';
+import { createMainWindow, rendererOrigin } from './app/main-window';
 import type { QuitExit } from './app/quit-coordinator';
 import { createQuitCoordinator } from './app/quit-coordinator';
 import { createQuitGuard } from './app/quit-guard';
@@ -1440,7 +1441,7 @@ registerPrivilegedSchemes();
 // Module scope so no WebContents can be created ahead of the policy — the main
 // window's own handlers are installed in `createMainWindow`, and this is what
 // carries the same rules onto anything else Electron ever constructs.
-guardEveryWebContents(rendererDocument());
+guardEveryWebContents(rendererOrigin());
 const linearAuthService = createLinearAuthService({
 	configService,
 	databaseService,
@@ -1860,6 +1861,7 @@ app.whenReady().then(() => {
 
 	configService.load();
 	databaseService.open();
+	registerAppProtocol();
 	registerLinearAssetProtocol(linearAssetProxy);
 	// Everything the first paint depends on is now in place, and the renderer is
 	// a separate process: asking it to start here lets its own boot overlap with

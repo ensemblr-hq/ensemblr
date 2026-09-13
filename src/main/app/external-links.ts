@@ -1,7 +1,6 @@
 import { app, shell, type WebContents } from 'electron';
 
 import {
-	type AppDocument,
 	type NavigationDecision,
 	navigationDecision,
 	parseAllowedExternalUrl,
@@ -49,11 +48,11 @@ export async function openExternalUrl(url: unknown): Promise<void> {
  * load, a dev-server reload, or something the app did not ask for.
  *
  * @param webContents - The window contents to guard.
- * @param appDocument - Where the app's own renderer is being served from.
+ * @param appOrigin - The origin the app's own renderer is served from.
  */
 export function routeExternalLinksToBrowser(
 	webContents: WebContents,
-	appDocument: AppDocument,
+	appOrigin: string,
 ): void {
 	webContents.setWindowOpenHandler(({ url }) => {
 		void openExternalUrl(url);
@@ -82,7 +81,7 @@ export function routeExternalLinksToBrowser(
 		event: { preventDefault: () => void },
 		url: string,
 	): void => {
-		applyDecision(event, navigationDecision(url, appDocument));
+		applyDecision(event, navigationDecision(url, appOrigin));
 	};
 
 	webContents.on('will-navigate', applyNavigationPolicy);
@@ -95,7 +94,7 @@ export function routeExternalLinksToBrowser(
 		if (event.isMainFrame) {
 			return;
 		}
-		applyDecision(event, subframeNavigationDecision(event.url, appDocument));
+		applyDecision(event, subframeNavigationDecision(event.url, appOrigin));
 	});
 }
 
@@ -108,18 +107,16 @@ export function routeExternalLinksToBrowser(
  * the day that default changes, and it strips the preload rather than trusting
  * whoever set it.
  *
- * @param appDocument - Where the app's own renderer is being served from.
+ * @param appOrigin - The origin the app's own renderer is served from.
  */
-export function guardEveryWebContents(appDocument: AppDocument): void {
+export function guardEveryWebContents(appOrigin: string): void {
 	app.on('web-contents-created', (_event, contents) => {
 		contents.on('will-attach-webview', (event, webPreferences, params) => {
 			delete webPreferences.preload;
 			webPreferences.nodeIntegration = false;
 			webPreferences.contextIsolation = true;
 
-			if (
-				navigationDecision(params.src ?? '', appDocument).action !== 'allow'
-			) {
+			if (navigationDecision(params.src ?? '', appOrigin).action !== 'allow') {
 				console.warn('[external-links] refused a webview attach', params.src);
 				event.preventDefault();
 			}

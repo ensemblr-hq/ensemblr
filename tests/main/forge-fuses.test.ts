@@ -50,18 +50,12 @@ describe('the packaged binary fuses', () => {
 		expect(fuses()[FuseV1Options.OnlyLoadAppFromAsar]).toBe(true);
 	});
 
-	// The one fuse that is granted, and the only one whose value is not the
-	// conservative choice: the packaged renderer's entry is an ES module served
-	// over `file:`, and a module script is always fetched in CORS mode, so an
-	// opaque `file:` origin blocks the whole bundle. Asserted at `true` so
-	// flipping it is a deliberate edit made alongside an `app://` scheme, rather
-	// than a hardening change that ships a blank window.
-	//
-	// The preferences that move with the origin are already carried across by
-	// the localStorage mirror (ADR 0071), so what this still pins is the order:
-	// the mirror has to have shipped in an earlier release before the switch and
-	// this flip land together.
-	test('grant the extra file: protocol privileges, deliberately', () => {
-		expect(fuses()[FuseV1Options.GrantFileProtocolExtraPrivileges]).toBe(true);
+	// Closed, which the renderer only survives because it is no longer a `file:`
+	// document — `src/main/app/app-protocol.ts` serves it from `app://bundle`
+	// (ADR 0072). Pinned at `false` because the pair is one change: a build that
+	// loaded `file:` with this off would refuse every module script in the
+	// bundle and come up blank.
+	test('refuse the extra file: protocol privileges', () => {
+		expect(fuses()[FuseV1Options.GrantFileProtocolExtraPrivileges]).toBe(false);
 	});
 });

@@ -3,9 +3,9 @@
  * applied from two: the main process attaches it as a response header
  * (`src/main/app/content-security-policy.ts`), and the renderer build stamps the
  * production form into `index.html` as a `<meta http-equiv>`
- * (`vite.renderer.config.mts`). A `file:` document is served by Electron's own
- * protocol handler rather than through Chromium's network stack, so the header
- * alone cannot be relied on there.
+ * (`vite.renderer.config.mts`). The packaged document is served by a
+ * `protocol.handle` registration rather than through Chromium's network stack,
+ * so the header alone cannot be relied on there.
  *
  * Two directives are weaker than they look, and both are load-bearing rather
  * than oversights:
@@ -18,6 +18,8 @@
  * - `script-src`/`style-src chrome://resources` — see
  *   {@link PDF_VIEWER_RESOURCES}.
  */
+
+import { LINEAR_ASSET_SCHEME } from './linear-assets.ts';
 
 /**
  * Chromium's own PDF viewer builds its toolbar from `chrome://resources`, and a
@@ -37,8 +39,17 @@
  */
 const PDF_VIEWER_RESOURCES = 'chrome://resources';
 
-/** Source list every directive inherits when the app is served from `file:`. */
-const PACKAGED_SELF = ["'self'", 'file:'];
+/**
+ * Source list every directive inherits, in both serving modes.
+ *
+ * `'self'` is the whole list because the packaged renderer now has a real
+ * origin to resolve it against — it is served from `app://bundle`, a scheme
+ * registered `standard` + `secure`. While it was a `file:` document `'self'`
+ * resolved to an opaque origin and `file:` had to be granted alongside it,
+ * which is the same grant `GrantFileProtocolExtraPrivileges` made exploitable:
+ * `connect-src file:` let a renderer XSS read any file the user could.
+ */
+const SELF = ["'self'"];
 
 /**
  * Renders a directive map as a CSP header value.
@@ -71,29 +82,28 @@ function hmrSocketOrigin(devServerOrigin: string): string {
  * both relaxations are gated on a dev-server origin existing, so a packaged
  * build can never ship them.
  *
- * @param devServerOrigin - The Vite dev-server origin, or `null` for the packaged `file:` build.
+ * @param devServerOrigin - The Vite dev-server origin, or `null` for the packaged build.
  * @returns The policy string to send as `Content-Security-Policy`.
  */
 export function contentSecurityPolicy(devServerOrigin: string | null): string {
-	const self = devServerOrigin ? ["'self'"] : PACKAGED_SELF;
 	const scriptSources = devServerOrigin
-		? [...self, "'wasm-unsafe-eval'", "'unsafe-inline'"]
-		: [...self, "'wasm-unsafe-eval'"];
+		? [...SELF, "'wasm-unsafe-eval'", "'unsafe-inline'"]
+		: [...SELF, "'wasm-unsafe-eval'"];
 	const connectSources = devServerOrigin
-		? [...self, hmrSocketOrigin(devServerOrigin), 'data:', 'blob:']
-		: [...self, 'data:', 'blob:'];
+		? [...SELF, hmrSocketOrigin(devServerOrigin), 'data:', 'blob:']
+		: [...SELF, 'data:', 'blob:'];
 
 	return serializePolicy({
 		'default-src': ["'none'"],
 		'script-src': [...scriptSources, PDF_VIEWER_RESOURCES],
-		'style-src': [...self, "'unsafe-inline'", PDF_VIEWER_RESOURCES],
-		'img-src': [...self, 'data:', 'blob:', 'linear-asset:', 'https:'],
-		'font-src': [...self, 'data:'],
-		'media-src': [...self, 'data:', 'blob:'],
+		'style-src': [...SELF, "'unsafe-inline'", PDF_VIEWER_RESOURCES],
+		'img-src': [...SELF, 'data:', 'blob:', `${LINEAR_ASSET_SCHEME}:`, 'https:'],
+		'font-src': [...SELF, 'data:'],
+		'media-src': [...SELF, 'data:', 'blob:'],
 		'connect-src': connectSources,
-		'worker-src': [...self, 'blob:'],
-		'object-src': [...self, 'blob:'],
-		'frame-src': [...self, 'blob:'],
+		'worker-src': [...SELF, 'blob:'],
+		'object-src': [...SELF, 'blob:'],
+		'frame-src': [...SELF, 'blob:'],
 		'base-uri': ["'none'"],
 		'form-action': ["'none'"],
 	});

@@ -31,9 +31,10 @@ function declaresOwnPolicy(
  * nothing, and the document's own policy already covers everything it loads.
  *
  * This is one of two delivery paths and the only one that reaches the dev
- * server; the packaged `file:` document is served by Electron's protocol
- * handler rather than through the network stack, so the renderer build also
- * stamps the same policy into `index.html` as a `<meta http-equiv>`.
+ * server; the packaged document is served from `app://bundle` by a
+ * `protocol.handle` registration rather than through the network stack, so the
+ * renderer build also stamps the same policy into `index.html` as a
+ * `<meta http-equiv>`.
  *
  * @param session - The session whose responses to stamp.
  * @param devServerOrigin - The Vite dev-server origin, or `null` for the packaged build.

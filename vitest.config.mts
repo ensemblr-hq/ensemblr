@@ -92,6 +92,7 @@ export default defineConfig({
 						'tests/shared/**/*.test.ts',
 						'tests/scripts/**/*.test.mjs',
 						'tests/main/agent-skill-bundle.test.ts',
+						'tests/main/app-bundle.test.ts',
 						'tests/main/architecture-control-port.test.ts',
 						'tests/main/architecture-service.test.ts',
 						'tests/main/diagram-upkeep.test.ts',
