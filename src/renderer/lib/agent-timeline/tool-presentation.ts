@@ -6,6 +6,7 @@ import type {
 	TimelineSurface,
 	ToolPresentation,
 	ToolPresentationGlyph,
+	ToolRawIODescriptor,
 } from '@/renderer/types/tool-presentation';
 import {
 	canonicalEnsemblrToolName,
@@ -19,7 +20,8 @@ import {
 	presentExtensionToolCall,
 } from './extension-tool-presenter';
 import { looksLikeStackTrace } from './tool-output-classifier';
-import { outputOf } from './tool-part-fields';
+import { inputOf, outputOf } from './tool-part-fields';
+import { formatToolInput } from './tool-presenter-helpers';
 import { presenterForPart, restingGlyph } from './tool-presenters';
 
 /**
@@ -130,6 +132,38 @@ function shellExitCodeOf(
 }
 
 /**
+ * Keeps the actual exchange reachable beneath a control row's structured body.
+ *
+ * The app's own tools are the ones whose bodies are now shaped rather than
+ * dumped, and shaping a payload means choosing what to leave out. Most of these
+ * ops also answer a bare `{ ok: true }`, so their row would otherwise unfold
+ * onto nothing and never show the arguments it was called with. The disclosure
+ * is what makes both of those safe: the row reads as a summary, and the call
+ * itself is one click away.
+ *
+ * Named canonically rather than as the runtime reported it, so the summary line
+ * reads `ensemblr_list_models` on both runtimes instead of leaking the MCP
+ * namespacing one of them wraps every tool in.
+ * @param part - The tool part to read
+ * @param isRunning - Whether the call has yet to return
+ * @returns The raw exchange, or null for a non-control or unsettled call
+ */
+function controlRawIO(
+	part: DynamicToolUIPart,
+	isRunning: boolean,
+): ToolRawIODescriptor | null {
+	const canonicalName = canonicalEnsemblrToolName(part.toolName);
+	if (canonicalName === null || isRunning) {
+		return null;
+	}
+	return {
+		input: formatToolInput(inputOf(part)),
+		output: outputOf(part)?.text ?? '',
+		toolName: canonicalName,
+	};
+}
+
+/**
  * Projects any tool call into everything its row needs to render.
  *
  * Failures short-circuit before the per-tool presenters so a failed call reads
@@ -162,8 +196,10 @@ export function presentToolCall(
 			canonicalEnsemblrToolName(part.toolName) ?? part.toolName,
 		);
 		const exitCode = shellExitCodeOf(part, failureText);
+		const failedRawIO = controlRawIO(part, false);
 		return {
 			badge: null,
+			...(failedRawIO === null ? {} : { rawIO: failedRawIO }),
 			body: looksLikeStackTrace(failureText)
 				? { kind: 'stack-trace', trace: failureText }
 				: { kind: 'error', text: failureText },
@@ -200,8 +236,10 @@ export function presentToolCall(
 				) ?? hostProjected);
 	const controlLabel = ensemblrToolLabel(part, isRunning, surface, resolveRole);
 	const controlBadge = controlLabel?.badge;
+	const rawIO = controlRawIO(part, isRunning);
 	const presentation = {
 		...projected,
+		...(rawIO === null ? {} : { rawIO }),
 		badge:
 			controlBadge?.kind === 'file' && projected.badge?.kind === 'file'
 				? {

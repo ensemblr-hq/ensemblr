@@ -237,7 +237,6 @@ export interface ToolPresentation {
 	running?: boolean;
 	title: string;
 	tone: ToolTone;
-	extensionOwned?: boolean;
 	/**
 	 * Title to fall back to when the badge pins nothing on screen, which only a
 	 * chat or workspace badge can do — those resolve against a live catalogue and

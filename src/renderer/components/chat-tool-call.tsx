@@ -13,6 +13,7 @@ import {
 	conciergeReferenceChipKind,
 	conciergeReferenceTitle,
 } from '@/renderer/lib/concierge';
+import { cn } from '@/renderer/lib/utils';
 import type { PiCustomMessageData } from '@/renderer/types/agent-timeline';
 import type {
 	ToolBadgeDescriptor,
@@ -135,7 +136,9 @@ export function ChatSkillInvocation({ name }: { name: string }) {
  * that opens onto nothing — a clean diagnostics run is the common case. A body
  * of kind `pending` disables it for the same reason: the call has produced no
  * result yet, so the only thing behind the control is a placeholder repeating
- * what the row's own pulse already says.
+ * what the row's own pulse already says. Neither disables it while the row
+ * carries raw execution: one of the app's own control ops answering a bare
+ * `{ ok: true }` has an empty body and still has arguments worth opening.
  *
  * Memoized because the live turn re-renders on every streamed delta while the
  * rows above it are settled: each caller `useMemo`s its presentation on the part
@@ -153,7 +156,6 @@ const ToolRow = memo(function ToolRow({
 	const {
 		badge,
 		body,
-		extensionOwned,
 		glyph,
 		preview,
 		rawIO,
@@ -163,10 +165,12 @@ const ToolRow = memo(function ToolRow({
 		unpinnedTitle,
 	} = presentation;
 	const subject = useToolRowSubject(badge);
+	const hasEmptyBody = body.kind === 'empty' || body.kind === 'pending';
+	const hasNothingToUnfold = hasEmptyBody && !rawIO;
 
 	return (
 		<ToolCollapsible
-			disabled={body.kind === 'empty' || body.kind === 'pending'}
+			disabled={hasNothingToUnfold}
 			glyph={glyph}
 			pending={running ?? body.kind === 'pending'}
 			title={subject ? title : (unpinnedTitle ?? title)}
@@ -181,18 +185,31 @@ const ToolRow = memo(function ToolRow({
 			}
 		>
 			<ToolBody body={body} />
-			{extensionOwned && rawIO ? <ToolRawIODisclosure rawIO={rawIO} /> : null}
+			{rawIO ? (
+				<ToolRawIODisclosure rawIO={rawIO} spaced={!hasEmptyBody} />
+			) : null}
 		</ToolCollapsible>
 	);
 });
 
-/** Host-owned disclosure that keeps the actual execution visible beside custom UI. */
-function ToolRawIODisclosure({ rawIO }: { rawIO: ToolRawIODescriptor }) {
+/**
+ * Host-owned disclosure that keeps the actual execution reachable beneath a
+ * presentation somebody else shaped — an extension's custom UI, or one of the
+ * app's own control rows, whose structured body is a summary of the payload
+ * rather than the payload.
+ */
+function ToolRawIODisclosure({
+	rawIO,
+	spaced,
+}: {
+	rawIO: ToolRawIODescriptor;
+	spaced: boolean;
+}) {
 	const { t } = useTranslation();
 	const [open, setOpen] = useState(false);
 	return (
 		<details
-			className='mt-3 rounded-md border border-border/60'
+			className={cn('rounded-md border border-border/60', spaced && 'mt-3')}
 			data-role='tool-raw-io'
 			data-tool-name={rawIO.toolName}
 			onToggle={(event) => setOpen(event.currentTarget.open)}

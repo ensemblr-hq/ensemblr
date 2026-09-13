@@ -20,10 +20,8 @@ import {
 	CONTEXT7_TOOL_GLYPHS,
 	CONTEXT7_TOOL_PRESENTERS,
 } from './context7-tool-presenters';
-import {
-	canonicalEnsemblrToolName,
-	ensemblrToolGlyph,
-} from './ensemblr-tool-presentation';
+import { controlToolPresenter } from './ensemblr-control-tool-presenters';
+import { ensemblrToolGlyph } from './ensemblr-tool-presentation';
 import {
 	extensionPresentationOf,
 	isHostPermissionState,
@@ -51,6 +49,7 @@ import {
 } from './tool-part-fields';
 import {
 	fileBadge,
+	formatToolInput,
 	languageFor,
 	patchCounts,
 	textBody,
@@ -59,7 +58,6 @@ import {
 	WEB_ACCESS_TOOL_GLYPHS,
 	WEB_ACCESS_TOOL_PRESENTERS,
 } from './web-access-tool-presenters';
-import { presentWorkspaceDiff } from './workspace-diff-tool-presenter';
 
 /**
  * One presenter per tool the app knows by name, and the mark each of them
@@ -135,19 +133,6 @@ function lineCount(text: string): number {
 	}
 	const lines = text.split('\n');
 	return lines.at(-1) === '' ? lines.length - 1 : lines.length;
-}
-
-/**
- * Renders a tool input bag as pretty JSON for a labelled body.
- * @param input - The tool call's input record
- * @returns The formatted JSON, or the coerced string when it cannot serialize
- */
-function formatInput(input: Record<string, unknown>): string {
-	try {
-		return JSON.stringify(input, null, 2);
-	} catch {
-		return String(input);
-	}
 }
 
 /**
@@ -466,7 +451,7 @@ function presentGeneric(part: DynamicToolUIPart): ToolPresenterResult {
 								'Input:',
 							),
 							muted: true,
-							text: formatInput(input),
+							text: formatToolInput(input),
 						},
 						{
 							label: i18n.t(
@@ -584,36 +569,38 @@ const PRESENTERS: Record<
 
 /**
  * Picks the presenter that shapes a tool's row, falling back to the generic
- * extension shape for names the app does not know.
+ * extension shape for names the app does not know. Only reached for a tool that
+ * is not one of the app's own — {@link presenterForPart} resolves those against
+ * their canonical name before it gets here.
  * @param toolName - The tool name as the runtime reported it
  * @returns The presenter to project the call with
  */
 function presenterFor(
 	toolName: string,
 ): (part: DynamicToolUIPart) => ToolPresenterResult {
-	const isControlTool = canonicalEnsemblrToolName(toolName) !== null;
 	return (
 		PRESENTERS[toolName.toLowerCase()] ??
-		(isControlTool ? null : resolvePiMcpAdapterTool(toolName)) ??
+		resolvePiMcpAdapterTool(toolName) ??
 		presentGeneric
 	);
 }
 
 /**
- * Picks a presenter using both a tool's name and completed result metadata.
+ * Picks a presenter using both a tool's name and completed result metadata. The
+ * app's own control tools resolve first and by canonical name, because the two
+ * runtimes report them under different names and only one of those is the name
+ * the reported-name table above is keyed by.
  * @param part - Tool call to identify, including dynamic adapter metadata
  * @returns The presenter that should project the call
  */
 export function presenterForPart(
 	part: DynamicToolUIPart,
 ): (part: DynamicToolUIPart) => ToolPresenterResult {
-	const controlTool = canonicalEnsemblrToolName(part.toolName);
-	if (controlTool === 'ensemblr_get_workspace_diff') {
-		return presentWorkspaceDiff;
-	}
-	return controlTool === null
-		? (resolvePiMcpAdapterToolPart(part) ?? presenterFor(part.toolName))
-		: presenterFor(part.toolName);
+	return (
+		controlToolPresenter(part.toolName) ??
+		resolvePiMcpAdapterToolPart(part) ??
+		presenterFor(part.toolName)
+	);
 }
 
 /**

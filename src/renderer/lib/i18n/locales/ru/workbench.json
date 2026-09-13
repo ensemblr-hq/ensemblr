@@ -397,6 +397,12 @@
 			"done": "Задал вам вопрос",
 			"running": "Задаёт вам вопрос"
 		},
+		"body": {
+			"more_one": "… и ещё {{count}}",
+			"more_few": "… и ещё {{count}}",
+			"more_many": "… и ещё {{count}}",
+			"more_other": "… и ещё {{count}}"
+		},
 		"close-tab": {
 			"done": "Закрыл вкладку",
 			"running": "Закрывает вкладку"
@@ -473,6 +479,19 @@
 			"done": "Запустил харнесс",
 			"running": "Запускает харнесс"
 		},
+		"linear": {
+			"comments-heading": "Комментарии",
+			"omitted-comments_one": "{{count}} более ранний комментарий не поместился.",
+			"omitted-comments_few": "{{count}} более ранних комментария не поместились.",
+			"omitted-comments_many": "{{count}} более ранних комментариев не поместились.",
+			"omitted-comments_other": "{{count}} более ранних комментариев не поместились.",
+			"omitted-issues_one": "Ещё {{count}} задача не поместилась — сузьте поиск.",
+			"omitted-issues_few": "Ещё {{count}} задачи не поместились — сузьте поиск.",
+			"omitted-issues_many": "Ещё {{count}} задач не поместились — сузьте поиск.",
+			"omitted-issues_other": "Ещё {{count}} задач не поместились — сузьте поиск.",
+			"priority": "приоритет {{priority}}",
+			"unknown-author": "Неизвестно"
+		},
 		"linear-create-comment": {
 			"done": "Прокомментировал задачу в Linear",
 			"running": "Комментирует задачу в Linear"
@@ -533,6 +552,58 @@
 			"done": "Открыл вкладку",
 			"running": "Открывает вкладку"
 		},
+		"preview": {
+			"agents-pending_one": "{{count}} ещё работает",
+			"agents-pending_few": "{{count}} ещё работают",
+			"agents-pending_many": "{{count}} ещё работают",
+			"agents-pending_other": "{{count}} ещё работают",
+			"agents-settled_one": "{{count}} завершён",
+			"agents-settled_few": "{{count}} завершены",
+			"agents-settled_many": "{{count}} завершено",
+			"agents-settled_other": "{{count}} завершено",
+			"comments_one": "{{count}} комментарий",
+			"comments_few": "{{count}} комментария",
+			"comments_many": "{{count}} комментариев",
+			"comments_other": "{{count}} комментариев",
+			"context": "{{percent}}% контекста",
+			"entries_one": "{{count}} запись",
+			"entries_few": "{{count}} записи",
+			"entries_many": "{{count}} записей",
+			"entries_other": "{{count}} записей",
+			"issues_one": "{{count}} задача",
+			"issues_few": "{{count}} задачи",
+			"issues_many": "{{count}} задач",
+			"issues_other": "{{count}} задач",
+			"memories_one": "{{count}} воспоминание",
+			"memories_few": "{{count}} воспоминания",
+			"memories_many": "{{count}} воспоминаний",
+			"memories_other": "{{count}} воспоминаний",
+			"models_one": "{{count}} модель",
+			"models_few": "{{count}} модели",
+			"models_many": "{{count}} моделей",
+			"models_other": "{{count}} моделей",
+			"not-found_one": "{{count}} не найден",
+			"not-found_few": "{{count}} не найдены",
+			"not-found_many": "{{count}} не найдено",
+			"not-found_other": "{{count}} не найдено",
+			"resolved_one": "{{count}} закрыт",
+			"resolved_few": "{{count}} закрыты",
+			"resolved_many": "{{count}} закрыто",
+			"resolved_other": "{{count}} закрыто",
+			"terminals_one": "{{count}} терминал",
+			"terminals_few": "{{count}} терминала",
+			"terminals_many": "{{count}} терминалов",
+			"terminals_other": "{{count}} терминалов",
+			"timed-out": "окно ожидания истекло",
+			"turns_one": "{{count}} ход",
+			"turns_few": "{{count}} хода",
+			"turns_many": "{{count}} ходов",
+			"turns_other": "{{count}} ходов",
+			"workspaces_one": "{{count}} рабочее пространство",
+			"workspaces_few": "{{count}} рабочих пространства",
+			"workspaces_many": "{{count}} рабочих пространств",
+			"workspaces_other": "{{count}} рабочих пространств"
+		},
 		"read-conversation": {
 			"chat": {
 				"done": "Прочитал транскрипт чата",
@@ -556,6 +627,13 @@
 		"resolve-diff-comments": {
 			"done": "Закрыл комментарии к ревью",
 			"running": "Закрывает комментарии к ревью"
+		},
+		"review": {
+			"already-resolved-heading": "Уже закрыты",
+			"archived": "В архиве",
+			"by-agent": "Агент",
+			"by-user": "Вы",
+			"not-found-heading": "Не найдены"
 		},
 		"send-follow-up": {
 			"chat": {
@@ -597,9 +675,31 @@
 			"done": "Запустил терминал",
 			"running": "Запускает терминал"
 		},
+		"status": {
+			"note-label": "Примечание:",
+			"report-label": "Отчёт:",
+			"report-none": "Пока нет",
+			"report-ready": "Готов к чтению",
+			"runtime-closed": "Закрыта",
+			"runtime-label": "Среда:",
+			"runtime-open": "Открыта"
+		},
 		"stop-terminal": {
 			"done": "Остановил терминал",
 			"running": "Останавливает терминал"
+		},
+		"terminal": {
+			"idle": "простаивает",
+			"tail_one": "последние {{lines}} строк · {{count}} более ранняя скрыта",
+			"tail_few": "последние {{lines}} строк · {{count}} более ранние скрыты",
+			"tail_many": "последние {{lines}} строк · {{count}} более ранних скрыто",
+			"tail_other": "последние {{lines}} строк · {{count}} более ранних скрыто"
+		},
+		"transcript": {
+			"answer": "Ответ",
+			"error": "Ошибка",
+			"prompt": "Запрос",
+			"tool": "Инструмент: {{name}}"
 		},
 		"update-app-settings": {
 			"done": "Обновил настройки приложения",
@@ -608,6 +708,12 @@
 		"update-architecture-diagram": {
 			"done": "Перерисовал схему архитектуры",
 			"running": "Перерисовываю схему архитектуры"
+		},
+		"wait": {
+			"pending-heading": "Ещё работают",
+			"report-truncated": "отчёт сокращён",
+			"settled-heading": "Завершены",
+			"signal": "сигнал: {{reason}}"
 		},
 		"wait-for-agents": {
 			"chat": {

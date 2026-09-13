@@ -127,3 +127,18 @@ export function structuredToolOutputBody(
 	}
 	return classifiedToolOutputBody(toolName, text);
 }
+
+/**
+ * Serializes a tool's input bag as the JSON a labelled body or a raw-execution
+ * disclosure paints. Two spaces rather than the repository's tabs, because this
+ * is rendered inside a fixed-width panel rather than read as source.
+ * @param input - The input bag sent to the tool
+ * @returns Deterministic JSON, or the coerced value when it cannot serialize
+ */
+export function formatToolInput(input: unknown): string {
+	try {
+		return JSON.stringify(input, null, 2);
+	} catch {
+		return String(input);
+	}
+}
