@@ -253,11 +253,11 @@ are enforced:
 | `native` | left alone | withheld from the tool list |
 
 `NATIVE_DELEGATION_WITHHELD_OPS` is the third axis: `spawnChatTab`,
-`startConversation`, `sendFollowUp`, `waitForAgents`, and `listModels`. The
-conversation reads and `closeTab` stay — they act on tabs the user already has
-open, not only on children. `nativeOrchestratorAwareness` is the matching
-playbook, which names the runtime's own tool and says once that the spawn ops are
-absent rather than leaving it to be discovered.
+`startConversation`, `sendFollowUp`, `waitForAgents`, `listModels`, and
+`startReview`. The conversation reads and `closeTab` stay — they act on tabs
+the user already has open, not only on children. `nativeOrchestratorAwareness`
+is the matching playbook, which names the runtime's own tool and says once that
+the spawn ops are absent rather than leaving it to be discovered.
 
 **Denying the tool is not enough on a planning turn.** Claude Code's own prompt
 carries a standing *"Do not call the AgentTool unless the user requested it"*
@@ -1304,7 +1304,7 @@ minutes by its own guardrail, and a `wait: true` spawn.
 
 **Raising it per server means the app owes a bound per op.** A day is the right
 answer for the four ops that block by design and the wrong one for the other
-forty-one: before, a wedged port surfaced to the agent as its client's
+forty-eight: before, a wedged port surfaced to the agent as its client's
 60-second timeout and the turn carried on; after, the same wedge would hold the
 agent for a day while the heartbeat reported it healthy. Port coverage does not
 close that on its own — `linear-client.ts` and `workspace-git-status.ts` bound

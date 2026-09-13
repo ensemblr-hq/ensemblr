@@ -8,7 +8,9 @@ Everything below was read out of the source, not out of the SDK's docs. Where a
 row says "not set", it means no code path in this repo sets it — not that the SDK
 lacks the option.
 
-Verified against the tree at `4fbeb65` on 2026-08-08 (SDK pinned `^0.3.223`).
+Verified against the tree at `4fbeb65` on 2026-08-08 (SDK pinned `^0.3.223` then;
+now `^0.3.267` — the options and methods below were re-checked against the
+installed `0.3.267` tree and hold).
 
 ## `query({ options })` — a chat session
 
@@ -21,8 +23,11 @@ of `buildPiSessionArgs` for Pi.
 |---|---|---|
 | `permissionMode` | `bypassPermissions` \| `default` \| `plan` | From `resolvePermissionSettings({ mode, planMode })`; the plan-mode toggle wins over the workspace mode |
 | `allowDangerouslySkipPermissions` | `true`, only in `workspace-trusted` | Pairs with `bypassPermissions` |
-| `disallowedTools` | `Bash`, `BashOutput`, `Edit`, `KillShell`, `NotebookEdit`, `Write` — only in `read-only` | Plan mode is a mode the model can leave; the deny list is what actually holds |
+| `disallowedTools` | `Bash`, `BashOutput`, `Edit`, `KillShell`, `NotebookEdit`, `Write` in `read-only`; `Agent`, `Task` (both names Claude Code's own sub-agent tool has shipped under) whenever delegation is `ensemblr` or the session is a descendant, merged with the mode's own list | `resolveDisallowedTools` (`claude-subagent-mode.ts`) — plan mode is a mode the model can leave, so the deny list is what actually holds; the sub-agent deny keeps delegation on visible Ensemblr chat tabs rather than the SDK's own `Task`/`Agent` tool |
 | `canUseTool` | set only in `approval-required` | The per-tool approval card; falls back to an allow-and-warn placeholder when the composition root wired no gate |
+| `additionalDirectories` | `request.linkedDirectories`, when non-empty | Extra working-directory roots the session can reach beyond `cwd` |
+| `hooks` | `withAfkHooks(withPlanModeHooks(concierge?.hooks, isPlanning), isUnattended)` | Composes the AFK auto-approval guard, the plan-mode write-refusal guard, and (when applicable) the Concierge containment gate; each only denies, never pre-approves, so they compose |
+| `plugins` | `pluginDirectories.map((path) => ({ path, type: 'local' }))`, when non-empty | The shipped skill/plugin bundle; the sibling `skills` option is a context *filter* and is deliberately left unset so the CLI's own defaults hold |
 | `cwd` | `metadata.cwd` | The workspace worktree |
 | `env` | `stripLaunchContextEnv({ ...baseEnv, ...metadata.env })` | `baseEnv` is the login-shell env (ADR 0003 / ADR 0031) so a Finder-launched app still finds `claude`; the strip drops the macOS/Electron launch-context keys that would make LaunchServices re-attribute the child to Ensemblr |
 | `forwardSubagentText` | `true` | Without it a subagent forwards only its `tool_use`/`tool_result` blocks, so a `Task` card nests tool rows with none of the prose that explains them |
@@ -145,6 +150,7 @@ main model.
 | `user` | prompt echo | dropped — the adapter already emitted the prompt on submit |
 | `result` | any | `context-usage` (window from `modelUsage`); `status`→`idle` |
 | `result` | subtype ≠ `success` | additionally a recoverable `error`, `Claude ended the turn: <subtype>.` |
+| `rate_limit_event` | any | `plan-limit`, from `rate_limit_info` — the composer's plan-usage gauge tracks the account's rate-limit window without the app polling for it; a spent window banks its reset instant, a spendable one clears it |
 | anything else | | dropped |
 
 That last row is a deliberate choice, recorded in the normalizer's JSDoc: Pi

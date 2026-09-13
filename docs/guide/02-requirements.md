@@ -42,7 +42,7 @@ open a URL in your browser. Every check also offers a plain retry.
 | 1 | Declarative config | `~/.config/ensemblr/config.json` parses, if it exists | Open config diagnostics | yes |
 | 2 | SQLite database | The app-support database opens and its migrations completed | Retry only | yes |
 | 3 | Root directory | The configured root resolves, exists, and is writable | Choose another root | yes |
-| 4 | Managed directories | `repos/`, `workspaces/`, `archived-contexts/` present and writable under the root | Retry only | yes |
+| 4 | Managed directories | `repos/`, `workspaces/`, `archived-contexts/`, `concierge/` present and writable under the root | Retry only | yes |
 | 5 | Shell and process launch | Ensemblr can run a command through your login shell | Retry only | yes |
 | 6 | Secret storage — **Linux only** | A keyring daemon (gnome-keyring or KWallet) answers, so `safeStorage` encrypts rather than obfuscates | Retry only | no |
 | 7 | Environment variables | Every variable you marked required is set | Open environment settings | only if you marked one required |

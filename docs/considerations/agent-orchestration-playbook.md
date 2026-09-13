@@ -440,8 +440,8 @@ a leaf report as its own. It closes owned leaf tabs as they settle and keeps the
 root-tree lifetime/rate budget in mind; closing does not refund it.
 
 The surface is narrowed by durable descendant role **and validated persisted
-depth**. `SUBAGENT_BLOCKED_OPS` contains the twenty leaf denials. A manager gets
-only five removed: `startConversation`, `listModels`, `waitForAgents`,
+depth**. `SUBAGENT_BLOCKED_OPS` contains the twenty-two leaf denials. A manager
+gets only five removed: `startConversation`, `listModels`, `waitForAgents`,
 `sendFollowUp`, and `closeTab`. The service additionally requires the spawn to be
 a fresh immediate leaf; `chatTabId`, `peer`, explicit Plan/AFK overrides, Review,
 and native runtime delegation remain unavailable. Missing or malformed depth on

@@ -139,7 +139,7 @@ merged:
 | Runtime | Control | Levels |
 | --- | --- | --- |
 | Pi | **thinking** | `off` through `xhigh` — six levels |
-| Claude Code | **effort** | `low`, `medium`, `high`, `xhigh`, `max`, per what the model supports |
+| Claude Code | **effort** | `off` through `max` — six levels, per what the model supports |
 
 Like the runtime, the level pins to the session.
 
