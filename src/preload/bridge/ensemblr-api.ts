@@ -265,6 +265,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 		listRepositoryPullRequests: (request) =>
 			invoke('listRepositoryPullRequests', request),
 		listTurnCheckpoints: (request) => invoke('listTurnCheckpoints', request),
+		listWorkspaceCheckpoints: (request) =>
+			invoke('listWorkspaceCheckpoints', request),
 		listRestorableTerminals: (request) =>
 			invoke('listRestorableTerminals', request),
 		listTerminalSessions: (request) => invoke('listTerminalSessions', request),

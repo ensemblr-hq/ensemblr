@@ -1,5 +1,6 @@
 import type { UIMessage } from 'ai';
 import type { TFunction } from 'i18next';
+import type { ComponentProps } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChatAssistantTurn } from '@/renderer/components/chat-assistant-turn';
@@ -27,12 +28,17 @@ import {
 	turnMetadataOf,
 } from '@/renderer/lib/agent-timeline';
 import { cn } from '@/renderer/lib/utils';
+import type { TurnCheckpointScope } from '@/renderer/lib/workbench';
 import { resolveTurnTiming } from '@/renderer/lib/workbench/timeline-timing';
 import type {
 	SessionTabModel,
+	WorkspaceFileDiffOpener,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import { useTurnDiffOpener } from '../file-preview-context';
+import {
+	useTurnDiffOpener,
+	useWorkspaceFileDiffOpener,
+} from '../file-preview-context';
 import { RestoreCheckpointDialog } from './restore-checkpoint-dialog';
 import { RuntimeErrorRow } from './runtime-error-row';
 import { TimelineStartingState } from './timeline-starting-state';
@@ -166,6 +172,7 @@ export function AgentSessionTimeline({
 	const canFork = branchId.length > 0 && agentSessionId !== null;
 
 	const openTurnDiff = useTurnDiffOpener();
+	const openWorkspaceFileDiff = useWorkspaceFileDiffOpener();
 	const restore = useCheckpointRestore();
 
 	const requestRestore = useCallback(
@@ -302,9 +309,11 @@ export function AgentSessionTimeline({
 								isStreaming={isStreaming}
 								key={message.id}
 								message={message}
+								onOpenWorkspaceFileDiff={openWorkspaceFileDiff}
 								onRequestRestore={requestRestore}
 								onViewTurnDiff={openTurnDiff}
 								retryPrompt={retryPrompts.get(message.id) ?? null}
+								workspaceCwd={workspace.pathLabel ?? null}
 							/>
 						))}
 						{pendingStartMs !== null ? (
@@ -344,20 +353,24 @@ const TimelineMessage = memo(function TimelineMessage({
 	isLastMessage,
 	isStreaming,
 	message,
+	onOpenWorkspaceFileDiff,
 	onRequestRestore,
 	onViewTurnDiff,
 	retryPrompt,
+	workspaceCwd,
 }: {
-	checkpointsByTurnId: ReadonlyMap<string, { label: string }>;
+	checkpointsByTurnId: ReadonlyMap<string, TurnCheckpointScope>;
 	errorRecovery: RuntimeErrorRecovery;
 	fork: ReturnType<typeof useForkConversation> | null;
 	isLastMessage: boolean;
 	isStreaming: boolean;
 	message: UIMessage;
+	onOpenWorkspaceFileDiff: WorkspaceFileDiffOpener | null;
 	onRequestRestore: (target: { label: string; turnId: string }) => void;
 	onViewTurnDiff: ((input: { label: string; turnId: string }) => void) | null;
 	/** The prompt "Send again" re-sends, when this row is an error with one before it. */
 	retryPrompt: string | null;
+	workspaceCwd: string | null;
 }) {
 	if (message.role === 'system') {
 		return noticeMetadataOf(message) ? (
@@ -381,8 +394,10 @@ const TimelineMessage = memo(function TimelineMessage({
 			fork={fork}
 			isLiveTurn={isStreaming && isLastMessage}
 			message={message}
+			onOpenWorkspaceFileDiff={onOpenWorkspaceFileDiff}
 			onRequestRestore={onRequestRestore}
 			onViewTurnDiff={onViewTurnDiff}
+			workspaceCwd={workspaceCwd}
 		/>
 	);
 });
@@ -393,24 +408,32 @@ function AssistantTimelineTurn({
 	fork,
 	isLiveTurn,
 	message,
+	onOpenWorkspaceFileDiff,
 	onRequestRestore,
 	onViewTurnDiff,
+	workspaceCwd,
 }: {
-	checkpointsByTurnId: ReadonlyMap<string, { label: string }>;
+	checkpointsByTurnId: ReadonlyMap<string, TurnCheckpointScope>;
 	fork: ReturnType<typeof useForkConversation> | null;
 	isLiveTurn: boolean;
 	message: UIMessage;
+	onOpenWorkspaceFileDiff: WorkspaceFileDiffOpener | null;
 	onRequestRestore: (target: { label: string; turnId: string }) => void;
 	onViewTurnDiff: ((input: { label: string; turnId: string }) => void) | null;
+	workspaceCwd: string | null;
 }) {
 	const metadata = turnMetadataOf(message);
 	// Fork boundary = the last persisted event of THIS turn, so forking an
 	// earlier turn summarizes only the conversation up to that point.
 	const upToOrdinal = metadata?.lastOrdinal;
-	const turnId = metadata?.turnId ?? null;
-	const checkpoint = turnId ? checkpointsByTurnId.get(turnId) : undefined;
-	const checkpointTarget =
-		turnId && checkpoint ? { label: checkpoint.label, turnId } : null;
+	const checkpointed = checkpointAffordances({
+		checkpoint: metadata?.turnId
+			? checkpointsByTurnId.get(metadata.turnId)
+			: undefined,
+		onOpenWorkspaceFileDiff,
+		onRequestRestore,
+		onViewTurnDiff,
+	});
 
 	return (
 		<ChatAssistantTurn
@@ -422,17 +445,53 @@ function AssistantTimelineTurn({
 			onForkToNewWorkspace={
 				fork ? () => fork.forkToNewWorkspace(upToOrdinal) : undefined
 			}
-			onRestoreToCheckpoint={
-				checkpointTarget ? () => onRequestRestore(checkpointTarget) : undefined
-			}
-			onViewTurnDiff={
-				checkpointTarget && onViewTurnDiff
-					? () => onViewTurnDiff(checkpointTarget)
-					: undefined
-			}
 			timing={resolveTurnTiming({ isLiveTurn, metadata })}
+			workspaceCwd={workspaceCwd}
+			{...checkpointed}
 		/>
 	);
+}
+
+/**
+ * The footer affordances a turn only has once its pre-prompt checkpoint was
+ * captured: restoring to it, opening the whole-turn diff, the scope its file
+ * chips read, and opening one of those files at that scope.
+ *
+ * A turn whose capture failed gets `undefined` for every one of them, which is
+ * what makes the footer degrade to duration and copy alone rather than offering
+ * actions with nothing behind them.
+ * @param checkpoint - The turn's checkpoint scope, when one was captured
+ * @param onOpenWorkspaceFileDiff - Opens a file diff, or null outside a workspace
+ * @param onRequestRestore - Opens the restore confirmation for a turn
+ * @param onViewTurnDiff - Opens the whole-turn diff tab, or null when unavailable
+ * @returns The subset of turn props the checkpoint enables
+ */
+function checkpointAffordances({
+	checkpoint,
+	onOpenWorkspaceFileDiff,
+	onRequestRestore,
+	onViewTurnDiff,
+}: {
+	checkpoint: TurnCheckpointScope | undefined;
+	onOpenWorkspaceFileDiff: WorkspaceFileDiffOpener | null;
+	onRequestRestore: (target: { label: string; turnId: string }) => void;
+	onViewTurnDiff: ((input: { label: string; turnId: string }) => void) | null;
+}): Pick<
+	ComponentProps<typeof ChatAssistantTurn>,
+	'onOpenTurnFile' | 'onRestoreToCheckpoint' | 'onViewTurnDiff' | 'turnScope'
+> {
+	if (!checkpoint) {
+		return { turnScope: null };
+	}
+	const target = { label: checkpoint.label, turnId: checkpoint.turnId };
+	return {
+		onOpenTurnFile: onOpenWorkspaceFileDiff
+			? (filePath) => onOpenWorkspaceFileDiff(filePath, checkpoint.scope)
+			: undefined,
+		onRestoreToCheckpoint: () => onRequestRestore(target),
+		onViewTurnDiff: onViewTurnDiff ? () => onViewTurnDiff(target) : undefined,
+		turnScope: checkpoint.scope,
+	};
 }
 
 /**

@@ -445,6 +445,10 @@
 		"actions": "Действия хода",
 		"fork-tab": "Форк в новую вкладку",
 		"fork-workspace": "Форк в новое рабочее пространство",
+		"more-files_one": "Ещё {{count}} файл",
+		"more-files_few": "Ещё {{count}} файла",
+		"more-files_many": "Ещё {{count}} файлов",
+		"more-files_other": "Ещё {{count}} файла",
 		"restore-checkpoint": "Восстановить состояние до этого хода…",
 		"stopped": "Остановлено",
 		"view-diff": "Показать diff хода"

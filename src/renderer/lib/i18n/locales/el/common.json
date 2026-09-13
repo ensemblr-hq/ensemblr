@@ -419,6 +419,8 @@
 		"actions": "Ενέργειες γύρου",
 		"fork-tab": "Fork σε νέα καρτέλα",
 		"fork-workspace": "Fork σε νέο χώρο εργασίας",
+		"more-files_one": "+{{count}} ακόμη αρχείο",
+		"more-files_other": "+{{count}} ακόμη αρχεία",
 		"restore-checkpoint": "Επαναφορά στην κατάσταση πριν από αυτόν τον γύρο…",
 		"stopped": "Διακόπηκε",
 		"view-diff": "Προβολή diff του γύρου"

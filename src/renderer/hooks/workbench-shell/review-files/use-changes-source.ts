@@ -4,7 +4,11 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { workspaceGitStatusQuery } from '@/renderer/api/ensemblr';
+import {
+	workspaceCheckpointsQuery,
+	workspaceGitStatusQuery,
+} from '@/renderer/api/ensemblr';
+import { latestTurnCheckpointScope } from '@/renderer/lib/workbench';
 import { mapGitStatusToReviewFiles } from '@/renderer/lib/workbench/review-files';
 import { changesSourceByWorkspaceAtom } from '@/renderer/state/workspace';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
@@ -15,14 +19,21 @@ import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git
  * Resolves the active change source to the git diff scope a query needs.
  * @param source - The change source the user selected for this workspace
  * @param baseRef - Base branch the workspace branched from, when known
+ * @param latestTurn - Scope of the workspace's newest checkpointed turn, if any
  * @returns The scope to pass to the git status and diff queries
  */
 function sourceToScope(
 	source: ChangesSource,
 	baseRef: string | null,
+	latestTurn: WorkspaceGitDiffScope | null,
 ): WorkspaceGitDiffScope {
 	if (source.kind === 'commit') {
 		return { commitHash: source.hash, kind: 'commit' };
+	}
+	// No checkpoint means nothing to scope to — a workspace whose agent has not
+	// run yet degrades to the working tree rather than showing an empty list.
+	if (source.kind === 'latest-turn') {
+		return latestTurn ?? { kind: 'working-tree' };
 	}
 	// "All changes" means the whole branch — but it can only diff against a base
 	// when one is known; otherwise it degrades to the working-tree change set.
@@ -54,6 +65,18 @@ function emptyStateForSource(
 			title: t(
 				'git:changes-source.empty.uncommitted.title',
 				'No uncommitted changes yet',
+			),
+		};
+	}
+	if (source.kind === 'latest-turn') {
+		return {
+			message: t(
+				'git:changes-source.empty.latest-turn.message',
+				'The last agent turn left the files untouched.',
+			),
+			title: t(
+				'git:changes-source.empty.latest-turn.title',
+				'No changes in the latest turn',
 			),
 		};
 	}
@@ -126,9 +149,19 @@ export function useChangesSource(workspace: WorkspaceShellModel) {
 	const setSource = useSetChangesSource(workspace.id);
 
 	const baseRef = workspace.landingSummary?.branchSource.baseBranch ?? null;
+	// Only the turn source needs the checkpoint list, so it is not fetched until
+	// the user picks that source.
+	const { data: checkpointsData } = useQuery({
+		...workspaceCheckpointsQuery(workspace.id),
+		enabled: source.kind === 'latest-turn',
+	});
+	const latestTurn = useMemo(
+		() => latestTurnCheckpointScope(checkpointsData?.checkpoints ?? []),
+		[checkpointsData?.checkpoints],
+	);
 	const scope = useMemo(
-		() => sourceToScope(source, baseRef),
-		[source, baseRef],
+		() => sourceToScope(source, baseRef, latestTurn?.scope ?? null),
+		[source, baseRef, latestTurn],
 	);
 
 	const { data: sourceStatusData, isLoading: isSourceStatusLoading } = useQuery(
@@ -139,7 +172,9 @@ export function useChangesSource(workspace: WorkspaceShellModel) {
 	);
 	const statusData =
 		sourceStatusData && !sourceStatusData.error ? sourceStatusData : null;
-	const useModelChanges = !statusData && source.kind !== 'commit';
+	const hasLiveModelEquivalent =
+		source.kind === 'all' || source.kind === 'uncommitted';
+	const useModelChanges = !statusData && hasLiveModelEquivalent;
 
 	const sourceFiles = useMemo(
 		() =>
@@ -165,14 +200,14 @@ export function useChangesSource(workspace: WorkspaceShellModel) {
 			[workspace.reviewFiles],
 		),
 		emptyState: useMemo(() => emptyStateForSource(t, source), [t, source]),
-		isCommitLoading: source.kind === 'commit' && isSourceStatusLoading,
+		isSourceLoading: !hasLiveModelEquivalent && isSourceStatusLoading,
 		scope,
 		setSource,
 		source,
-		sourceError:
-			source.kind === 'commit'
-				? sourceStatusData?.error
-				: workspace.reviewFilesError,
+		latestTurnLabel: latestTurn?.label ?? null,
+		sourceError: hasLiveModelEquivalent
+			? workspace.reviewFilesError
+			: sourceStatusData?.error,
 		sourceFiles,
 	};
 }

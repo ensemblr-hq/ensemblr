@@ -22,14 +22,35 @@ const GIT_STATUS_REFETCH_INTERVAL_MS = 10_000;
 const MERGE_CONFLICTS_REFETCH_INTERVAL_MS = 120_000;
 
 /**
+ * Whether both sides of a scope are immutable, so re-reading it can never
+ * return anything new. A commit range is frozen; so is a turn range that ends
+ * at the next turn's checkpoint rather than at the working tree.
+ * @param scope - The diff scope being read, if any
+ * @returns Whether the scope's content is fixed
+ */
+function isFrozenScope(scope: WorkspaceGitDiffScope | undefined): boolean {
+	if (scope?.kind === 'commit') {
+		return true;
+	}
+	return scope?.kind === 'turn' && scope.toRef !== undefined;
+}
+
+/**
  * Query options for a workspace's changed-file rows and +/- summary. The
  * optional `scope` selects what to compare against — the working tree
- * (uncommitted, the default), a specific commit, or the whole branch.
+ * (uncommitted, the default), a specific commit, the whole branch, or one
+ * agent turn.
+ *
+ * A frozen scope does not poll. Every settled turn in an open transcript holds
+ * one of these queries, and the transcript is not virtualized, so polling them
+ * would re-run a `git diff` per visible turn every interval for content that
+ * cannot change.
  */
 export function workspaceGitStatusQuery(
 	workspaceCwd: string | null,
 	scope?: WorkspaceGitDiffScope,
 ) {
+	const frozen = isFrozenScope(scope);
 	return queryOptions({
 		enabled: !!workspaceCwd,
 		queryFn: () =>
@@ -45,8 +66,8 @@ export function workspaceGitStatusQuery(
 			workspaceCwd ?? '',
 			serializeWorkspaceGitDiffScope(scope),
 		),
-		refetchInterval: GIT_STATUS_REFETCH_INTERVAL_MS,
-		staleTime: 5_000,
+		refetchInterval: frozen ? false : GIT_STATUS_REFETCH_INTERVAL_MS,
+		staleTime: frozen ? Number.POSITIVE_INFINITY : 5_000,
 	});
 }
 

@@ -1082,3 +1082,98 @@ test('getStatus decodes a bare git exit code when git said nothing', async (t) =
 	assert.match(message, /fatal error \(exit code 128\)/);
 	assert.doesNotMatch(message, /^Command exited with code/);
 });
+
+test('getStatus (real git) scopes a frozen turn to its two checkpoints', async (t) => {
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-turn-'));
+	t.after(() => rm(dir, { force: true, recursive: true }));
+	const git = (...args: string[]) => execFileAsync('git', args, { cwd: dir });
+	await git('init', '-q');
+	await git('config', 'user.email', 'test@example.com');
+	await git('config', 'user.name', 'Test');
+	await writeFile(path.join(dir, 'a.ts'), 'one\n');
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'before the turn');
+	const beforeTurn = (await git('rev-parse', 'HEAD')).stdout.trim();
+
+	// The turn edits a.ts and adds b.ts; a later turn adds c.ts, which must not
+	// appear in the first turn's diff.
+	await writeFile(path.join(dir, 'a.ts'), 'one\nmore\n');
+	await writeFile(path.join(dir, 'b.ts'), 'two\n');
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'the turn');
+	const afterTurn = (await git('rev-parse', 'HEAD')).stdout.trim();
+	await writeFile(path.join(dir, 'c.ts'), 'three\n');
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'a later turn');
+
+	const service = createWorkspaceGitService({
+		localCommandService: realCommandService(),
+	});
+
+	const status = await service.getStatus({
+		scope: { fromRef: beforeTurn, kind: 'turn', toRef: afterTurn },
+		workspaceCwd: dir,
+	});
+	assert.equal(status.error, undefined);
+	assert.deepEqual(
+		status.files.map((file) => [file.path, file.status]).sort(),
+		[
+			['a.ts', 'modified'],
+			['b.ts', 'added'],
+		],
+	);
+	assert.deepEqual(status.summary, { additions: 2, deletions: 0, files: 2 });
+
+	const diff = await service.getFileDiff({
+		path: 'a.ts',
+		scope: { fromRef: beforeTurn, kind: 'turn', toRef: afterTurn },
+		workspaceCwd: dir,
+	});
+	assert.equal(diff.error, undefined);
+	assert.match(diff.patch ?? '', /\+more/);
+});
+
+test('getStatus (real git) runs the newest turn to the live working tree', async (t) => {
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-live-turn-'));
+	t.after(() => rm(dir, { force: true, recursive: true }));
+	const git = (...args: string[]) => execFileAsync('git', args, { cwd: dir });
+	await git('init', '-q');
+	await git('config', 'user.email', 'test@example.com');
+	await git('config', 'user.name', 'Test');
+	await writeFile(path.join(dir, 'a.ts'), 'one\n');
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'before the turn');
+	const beforeTurn = (await git('rev-parse', 'HEAD')).stdout.trim();
+
+	// Uncommitted and untracked alike: the newest turn has no checkpoint after
+	// it, so both sit on the live side of the diff.
+	await writeFile(path.join(dir, 'a.ts'), 'one\nmore\n');
+	await writeFile(path.join(dir, 'fresh.ts'), 'brand new\n');
+
+	const service = createWorkspaceGitService({
+		localCommandService: realCommandService(),
+	});
+
+	const status = await service.getStatus({
+		scope: { fromRef: beforeTurn, kind: 'turn' },
+		workspaceCwd: dir,
+	});
+	assert.equal(status.error, undefined);
+	assert.deepEqual(
+		status.files.map((file) => [file.path, file.status]).sort(),
+		[
+			['a.ts', 'modified'],
+			['fresh.ts', 'untracked'],
+		],
+	);
+
+	// An untracked file is absent from the checkpoint diff, so the file view has
+	// to fall back to the /dev/null comparison rather than reporting nothing.
+	const untracked = await service.getFileDiff({
+		path: 'fresh.ts',
+		scope: { fromRef: beforeTurn, kind: 'turn' },
+		workspaceCwd: dir,
+	});
+	assert.equal(untracked.error, undefined);
+	assert.match(untracked.patch ?? '', /\+brand new/);
+});

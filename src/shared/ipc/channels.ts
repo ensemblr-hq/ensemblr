@@ -151,6 +151,7 @@ export const IPC_CHANNELS = {
 	listAgentSessionEvents: 'ensemblr:list-agent-session-events',
 	listAgentSessions: 'ensemblr:list-agent-sessions',
 	listTurnCheckpoints: 'ensemblr:list-turn-checkpoints',
+	listWorkspaceCheckpoints: 'ensemblr:list-workspace-checkpoints',
 	listReviewComments: 'ensemblr:list-review-comments',
 	listReviewTodos: 'ensemblr:list-review-todos',
 	listRestorableTerminals: 'ensemblr:list-restorable-terminals',

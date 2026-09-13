@@ -26,5 +26,10 @@ export function diffTabTitle(
 	if (scope?.kind === 'commit') {
 		return `${name} (${scope.commitHash.slice(0, 7)})`;
 	}
+	// Two turns' views of one file are different diffs, so they need different
+	// titles or the second reuses the first's tab.
+	if (scope?.kind === 'turn') {
+		return `${name} (${scope.fromRef.slice(0, 7)})`;
+	}
 	return name;
 }

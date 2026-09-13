@@ -1,10 +1,15 @@
-import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef } from 'react';
 
 import {
 	agentSessionsForWorkspaceQuery,
+	ensemblrQueryKeys,
 	turnCheckpointsQuery,
 } from '@/renderer/api/ensemblr-queries';
+import {
+	type TurnCheckpointScope,
+	turnCheckpointScopes,
+} from '@/renderer/lib/workbench';
 import type {
 	SessionTabModel,
 	WorkspaceShellModel,
@@ -12,8 +17,11 @@ import type {
 
 /** The agent session a timeline renders, plus the flags its empty and live states key off. */
 export interface TimelineSession {
-	/** Checkpoint labels for turns the session captured, keyed by turn id. */
-	checkpointsByTurnId: ReadonlyMap<string, { label: string }>;
+	/**
+	 * Each checkpointed turn's label and the diff scope covering what that turn
+	 * changed, keyed by turn id.
+	 */
+	checkpointsByTurnId: ReadonlyMap<string, TurnCheckpointScope>;
 	branchId: string;
 	/** Another live session in the same workspace could clobber a restore. */
 	hasOtherOpenSessions: boolean;
@@ -59,15 +67,23 @@ export function useTimelineSession({
 	const { data: checkpointsData } = useQuery(
 		turnCheckpointsQuery(agentSessionId),
 	);
-	const checkpointsByTurnId = useMemo(() => {
-		const map = new Map<string, { label: string }>();
-		for (const checkpoint of checkpointsData?.checkpoints ?? []) {
-			if (checkpoint.turnId) {
-				map.set(checkpoint.turnId, { label: checkpoint.label });
-			}
-		}
-		return map;
-	}, [checkpointsData?.checkpoints]);
+	const checkpointsByTurnId = useMemo(
+		() => turnCheckpointScopes(checkpointsData?.checkpoints ?? []),
+		[checkpointsData?.checkpoints],
+	);
+
+	// Capture happens in main before the next prompt, and the checkpoint query
+	// neither polls nor is invalidated by the event stream — so without this the
+	// turn that just finished has no checkpoint until the tab remounts, and its
+	// diff affordances stay hidden.
+	const isStreaming =
+		activeAgentSession?.status === 'streaming' ||
+		activeAgentSession?.status === 'starting';
+	useCheckpointRefreshOnTurnEnd({
+		agentSessionId,
+		isStreaming,
+		workspaceId: workspace.id,
+	});
 
 	return {
 		branchId: activeAgentSession?.branchId ?? '',
@@ -78,12 +94,47 @@ export function useTimelineSession({
 		// Match the composer's busy definition (`starting || streaming`) so the live
 		// working indicator + turn timer appear during the pre-first-token gap and
 		// stay mounted for the whole agent run rather than flickering per tool round.
-		isStreaming:
-			activeAgentSession?.status === 'streaming' ||
-			activeAgentSession?.status === 'starting',
+		isStreaming,
 		agentSessionId,
 		sessionResolved: activeAgentSession !== undefined,
 		sessionsFetching,
 		tabAgentSessionId,
 	};
+}
+
+/**
+ * Refetches the checkpoint lists once a turn stops streaming, so the newly
+ * captured checkpoint reaches the timeline and the Changes panel without
+ * waiting for a remount.
+ * @param agentSessionId - Session whose checkpoint list to refresh
+ * @param isStreaming - Whether the session is mid-turn
+ * @param workspaceId - Workspace whose checkpoint list to refresh
+ */
+function useCheckpointRefreshOnTurnEnd({
+	agentSessionId,
+	isStreaming,
+	workspaceId,
+}: {
+	agentSessionId: string | null;
+	isStreaming: boolean;
+	workspaceId: string;
+}): void {
+	const queryClient = useQueryClient();
+	const wasStreamingRef = useRef(isStreaming);
+
+	useEffect(() => {
+		const wasStreaming = wasStreamingRef.current;
+		wasStreamingRef.current = isStreaming;
+		if (isStreaming || !wasStreaming) {
+			return;
+		}
+		if (agentSessionId) {
+			void queryClient.invalidateQueries({
+				queryKey: ensemblrQueryKeys.checkpointsForSession(agentSessionId),
+			});
+		}
+		void queryClient.invalidateQueries({
+			queryKey: ensemblrQueryKeys.checkpointsForWorkspace(workspaceId),
+		});
+	}, [agentSessionId, isStreaming, queryClient, workspaceId]);
 }

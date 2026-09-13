@@ -11,6 +11,11 @@ export const listTurnCheckpointsRequestSchema = z.object({
 	agentSessionId: z.string().min(1),
 });
 
+/** {@link import('../../../shared/ipc').ListWorkspaceCheckpointsRequest}. */
+export const listWorkspaceCheckpointsRequestSchema = z.object({
+	workspaceId: z.string().min(1),
+});
+
 /** {@link import('../../../shared/ipc').ComputeTurnDiffRequest}. */
 export const computeTurnDiffRequestSchema = z.object({
 	turnId: z.string().min(1),

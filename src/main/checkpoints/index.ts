@@ -5,6 +5,7 @@ export {
 	createCheckpointCapture,
 	isOrdinalHidden,
 	listTurnCheckpoints,
+	listWorkspaceCheckpoints,
 	readHiddenEventRanges,
 	restoreTurnCheckpoint,
 } from './checkpoint-service.ts';

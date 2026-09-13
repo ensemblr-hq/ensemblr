@@ -72,11 +72,14 @@ export function ChatAttachmentChip({
 	kind = 'file',
 	label,
 	onActivate,
+	trailing,
 	...rest
 }: ComponentProps<'span'> & {
 	kind?: ChatAttachmentChipKind;
 	label: string;
 	onActivate?: () => void;
+	/** Rendered inside the pill after the label, e.g. a diff's line counts. */
+	trailing?: ReactNode;
 }) {
 	const chipClassName = cn(
 		'inline-flex max-w-full items-center gap-1.5 rounded-md border border-border/50 bg-muted/60 px-2 py-0.5 font-medium text-foreground/90 text-xs leading-5',
@@ -88,6 +91,7 @@ export function ChatAttachmentChip({
 		<>
 			{chipIcon(kind, label)}
 			<span className='truncate'>{label}</span>
+			{trailing}
 		</>
 	);
 	if (onActivate) {

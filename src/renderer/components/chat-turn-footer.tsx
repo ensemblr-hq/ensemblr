@@ -12,37 +12,79 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
-import { formatTurnDuration } from '@/renderer/lib/format-duration';
+import {
+	formatTurnClockTime,
+	formatTurnDuration,
+} from '@/renderer/lib/format-duration';
 import { cn } from '@/renderer/lib/utils';
+import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
+import { ChatTurnDiffChips } from './chat-turn-diff-chips';
 import { CopyResponseButton } from './copy-response-button';
 
 /**
- * Footer row at the end of a completed assistant turn: total turn duration,
- * an icon-only copy-response button, and a `…` menu with fork actions. Fork
- * targets receive a to-the-point handoff summary of the conversation up to
- * this turn, attached as a composer file chip in the destination chat.
+ * How long the turn took and the wall-clock time it ended, `14s · 3:48 PM`.
+ * Either half may be missing, so the separator only appears between two values.
+ */
+function TurnTiming({
+	durationMs,
+	endedAtMs,
+}: {
+	durationMs: number | null;
+	endedAtMs: number | null;
+}) {
+	const parts = [
+		durationMs === null ? null : formatTurnDuration(Math.max(0, durationMs)),
+		endedAtMs === null ? null : formatTurnClockTime(endedAtMs),
+	].filter((part): part is string => part !== null);
+
+	return parts.map((part, index) => (
+		<span key={part}>
+			{/* i18next-instrument-ignore -- separator glyph */}
+			{index > 0 ? <span aria-hidden='true'>· </span> : null}
+			{part}
+		</span>
+	));
+}
+
+/**
+ * Footer row at the end of a completed assistant turn: the turn's duration and
+ * the wall-clock time it ended, an icon-only copy-response button, a `…` menu
+ * with fork actions, and a chip per file the turn changed. Fork targets receive
+ * a to-the-point handoff summary of the conversation up to this turn, attached
+ * as a composer file chip in the destination chat.
  */
 export function ChatTurnFooter({
 	answerText,
 	className,
 	durationMs,
+	endedAtMs = null,
 	forkDisabled = false,
 	onForkToNewTab,
 	onForkToNewWorkspace,
+	onOpenTurnFile,
 	onRestoreToCheckpoint,
 	onViewTurnDiff,
+	turnScope = null,
+	workspaceCwd = null,
 }: {
 	answerText: string;
 	className?: string;
 	durationMs: number | null;
+	/** Wall-clock end of the turn; omitted while the timing is unknown. */
+	endedAtMs?: number | null;
 	/** Disables the fork menu while a fork is already in flight. */
 	forkDisabled?: boolean;
 	onForkToNewTab?: () => void;
 	onForkToNewWorkspace?: () => void;
+	/** Opens one changed file's diff at this turn's scope. */
+	onOpenTurnFile?: (filePath: string) => void;
 	/** Restores workspace files to this turn's pre-prompt checkpoint. */
 	onRestoreToCheckpoint?: () => void;
 	/** Opens the diff between this turn's checkpoint and the post-turn state. */
 	onViewTurnDiff?: () => void;
+	/** What this turn changed; null when no checkpoint was captured for it. */
+	turnScope?: Extract<WorkspaceGitDiffScope, { kind: 'turn' }> | null;
+	workspaceCwd?: string | null;
 }) {
 	const { t } = useTranslation();
 	const hasForkActions = Boolean(
@@ -59,9 +101,7 @@ export function ChatTurnFooter({
 			)}
 			data-role='turn-footer'
 		>
-			{durationMs !== null ? (
-				<span>{formatTurnDuration(Math.max(0, durationMs))}</span>
-			) : null}
+			<TurnTiming durationMs={durationMs} endedAtMs={endedAtMs} />
 			{answerText.length > 0 ? <CopyResponseButton text={answerText} /> : null}
 			{hasForkActions ? (
 				<DropdownMenu>
@@ -124,6 +164,14 @@ export function ChatTurnFooter({
 						) : null}
 					</DropdownMenuContent>
 				</DropdownMenu>
+			) : null}
+			{turnScope && onOpenTurnFile ? (
+				<ChatTurnDiffChips
+					onOpenFile={onOpenTurnFile}
+					onOpenTurnDiff={onViewTurnDiff}
+					scope={turnScope}
+					workspaceCwd={workspaceCwd}
+				/>
 			) : null}
 		</div>
 	);

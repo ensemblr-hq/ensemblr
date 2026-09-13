@@ -45,10 +45,14 @@ export interface LifecycleSummaryRow {
  *   - `commit`: the changes a single commit introduced. The display fields
  *     (`shortHash`, `subject`) are carried so the badge renders without
  *     re-fetching the commit list.
+ *   - `latest-turn`: what the newest agent turn in this workspace changed.
+ *     Resolved rather than pinned — the panel is workspace-scoped, so it tracks
+ *     whichever checkpoint is newest instead of freezing the one selected.
  */
 export type ChangesSource =
 	| { kind: 'all' }
 	| { kind: 'uncommitted' }
+	| { kind: 'latest-turn' }
 	| { hash: string; kind: 'commit'; shortHash: string; subject: string };
 
 /**

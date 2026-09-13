@@ -58,11 +58,16 @@ export interface WorkspaceGitChangeSummaryWire {
  *     (`merge-base(baseRef, HEAD)`) to the working tree, so committed-on-branch
  *     changes and uncommitted edits both appear. Falls back to `working-tree`
  *     when no merge-base can be resolved.
+ *   - `turn`: what one agent turn changed, between the checkpoint commits
+ *     captured before each prompt (ADR 0012). An absent `toRef` means the live
+ *     working tree, which is what the newest turn diffs against — so that view
+ *     stays live and also carries any edit made by hand since the turn ended.
  */
 export type WorkspaceGitDiffScope =
 	| { kind: 'working-tree' }
 	| { commitHash: string; kind: 'commit' }
-	| { baseRef: string; kind: 'branch' };
+	| { baseRef: string; kind: 'branch' }
+	| { fromRef: string; kind: 'turn'; toRef?: string };
 
 /**
  * Stable short key for a diff scope. Backs query-cache keys and diff-tab
@@ -77,6 +82,9 @@ export function serializeWorkspaceGitDiffScope(
 	}
 	if (scope.kind === 'commit') {
 		return `commit:${scope.commitHash}`;
+	}
+	if (scope.kind === 'turn') {
+		return `turn:${scope.fromRef}..${scope.toRef ?? 'working-tree'}`;
 	}
 	return `branch:${scope.baseRef}`;
 }
@@ -95,13 +103,22 @@ export function parseWorkspaceGitDiffScope(
 	const scope = value as {
 		baseRef?: unknown;
 		commitHash?: unknown;
+		fromRef?: unknown;
 		kind?: unknown;
+		toRef?: unknown;
 	};
 	if (scope.kind === 'commit' && typeof scope.commitHash === 'string') {
 		return { commitHash: scope.commitHash, kind: 'commit' };
 	}
 	if (scope.kind === 'branch' && typeof scope.baseRef === 'string') {
 		return { baseRef: scope.baseRef, kind: 'branch' };
+	}
+	if (scope.kind === 'turn' && typeof scope.fromRef === 'string') {
+		return {
+			fromRef: scope.fromRef,
+			kind: 'turn',
+			...(typeof scope.toRef === 'string' ? { toRef: scope.toRef } : {}),
+		};
 	}
 	if (scope.kind === 'working-tree') {
 		return { kind: 'working-tree' };

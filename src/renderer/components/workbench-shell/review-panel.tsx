@@ -112,7 +112,8 @@ export function ReviewPanel({
 		changesCount,
 		discardablePaths,
 		emptyState,
-		isCommitLoading,
+		isSourceLoading,
+		latestTurnLabel,
 		scope,
 		setSource,
 		source,
@@ -171,6 +172,7 @@ export function ReviewPanel({
 									current === 'list' ? 'folders' : 'list',
 								)
 							}
+							latestTurnLabel={latestTurnLabel}
 							onDiscardAll={handleDiscardAll}
 							onFileSearchOpen={onFileSearchOpen}
 							onSelectSource={setSource}
@@ -201,7 +203,7 @@ export function ReviewPanel({
 					emptyState={emptyState}
 					error={sourceError}
 					files={sourceFiles}
-					isLoading={isCommitLoading}
+					isLoading={isSourceLoading}
 					onDiscardFile={handleDiscardFile}
 					pendingDiscardPaths={pendingDiscardPaths}
 					viewMode={changesViewMode}
@@ -229,6 +231,7 @@ function ReviewPanelActions({
 	activeTab,
 	canReview,
 	changesViewMode,
+	latestTurnLabel,
 	onChangesViewModeToggle,
 	onDiscardAll,
 	onFileSearchOpen,
@@ -239,6 +242,7 @@ function ReviewPanelActions({
 	activeTab: ReviewPanelTab;
 	canReview: boolean;
 	changesViewMode: ChangesViewMode;
+	latestTurnLabel: string | null;
 	onChangesViewModeToggle: () => void;
 	onDiscardAll: () => void;
 	onFileSearchOpen: () => void;
@@ -291,6 +295,7 @@ function ReviewPanelActions({
 						/>
 					) : (
 						<ChangesSourceBadge
+							latestTurnLabel={latestTurnLabel}
 							onClear={() => onSelectSource({ kind: 'all' })}
 							source={source}
 						/>

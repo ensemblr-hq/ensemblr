@@ -419,6 +419,8 @@
 		"actions": "Turn actions",
 		"fork-tab": "Fork to new tab",
 		"fork-workspace": "Fork to new workspace",
+		"more-files_one": "+{{count}} more file",
+		"more-files_other": "+{{count}} more files",
 		"restore-checkpoint": "Restore to before this turn…",
 		"stopped": "Stopped",
 		"view-diff": "View turn diff"
