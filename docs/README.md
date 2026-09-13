@@ -8,7 +8,7 @@ then dive in here.
 
 ## Using Ensemblr
 
-The current build is [`0.1.14`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.14), for macOS on Apple silicon and Linux on x86-64. On macOS, `brew install --cask ensemblr-hq/tap/ensemblr` or [download the `.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.14/Ensemblr-0.1.14-arm64.dmg) — signed, notarized and stapled. On Linux, `curl -fsSL https://www.ensemblr.dev/install.sh | sh`, or take the [`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.14/Ensemblr-0.1.14-x64.AppImage) yourself — it is unsigned, because Linux has no equivalent to notarization. You bring your own agent CLI — Pi or Claude Code, one is enough — plus `git` and an authenticated `gh`.
+The current build is [`0.1.15`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.15), for macOS on Apple silicon and Linux on x86-64. On macOS, `brew install --cask ensemblr-hq/tap/ensemblr` or [download the `.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.15/Ensemblr-0.1.15-arm64.dmg) — signed, notarized and stapled. On Linux, `curl -fsSL https://www.ensemblr.dev/install.sh | sh`, or take the [`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.15/Ensemblr-0.1.15-x64.AppImage) yourself — it is unsigned, because Linux has no equivalent to notarization. You bring your own agent CLI — Pi or Claude Code, one is enough — plus `git` and an authenticated `gh`.
 
 - [`guide/`](./guide) — the user guide: [install](./guide/01-install.md), [requirements](./guide/02-requirements.md), [first run](./guide/03-first-run.md), [concepts](./guide/04-concepts.md), and the day-to-day surfaces through to [troubleshooting](./guide/14-troubleshooting.md). Start at [`guide/README.md`](./guide/README.md).
 
@@ -28,10 +28,11 @@ The current build is [`0.1.14`](https://github.com/ensemblr-hq/ensemblr/releases
 
 - [`pi/`](./pi) — Pi integration internals: the [RPC protocol](./pi/rpc-protocol.md), [event taxonomy](./pi/event-taxonomy.md), [custom timeline tool presenters](./pi/custom-tool-presenters.md), and [extension-owned presentation v1 spec](./pi/tool-presentation-spec.md).
 - [`claude/`](./claude) — Claude Code runtime internals: the [runtime guide](./claude/README.md) (adapter wiring, discovery, live-discovered slash commands / MCP roster / model catalogue, effort, context measurement) and the [SDK surface reference](./claude/sdk-surface.md). [ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) is the decision record.
-- [`adr/`](./adr) — **66** Architecture Decision Records, numbered `0001`–`0067` (`0007` was withdrawn before acceptance), covering the accepted decisions and their supersessions. ADRs are historical records: some cite planning documents that were removed before the public release, and those references are left as written rather than rewritten after the fact.
+- [`adr/`](./adr) — **70** Architecture Decision Records, numbered `0001`–`0071` (`0007` was withdrawn before acceptance), covering the accepted decisions and their supersessions. ADRs are historical records: some cite planning documents that were removed before the public release, and those references are left as written rather than rewritten after the fact.
 - [`ux-conventions.md`](./ux-conventions.md) — the settled workflows, information architecture, visual design, copy, and icon conventions the shell is built to.
 - [`i18n-glossary.md`](./i18n-glossary.md) — the Russian and Greek product vocabulary every translation is held to. The completion contract itself is [`.claude/rules/i18n.md`](../.claude/rules/i18n.md).
 - [`considerations/`](./considerations) — design records and forward-looking notes: the [Ensemblr Control design](./considerations/agent-control-layer.md) and the [orchestration playbook](./considerations/agent-orchestration-playbook.md).
+- [`audits/`](./audits) — dated point-in-time security and performance audits, each with its own findings and a [remediation record](./audits/2026-09-12-security-performance/REMEDIATION.md) of what was fixed, accepted, or left unverified.
 
 ## Repository docs
 

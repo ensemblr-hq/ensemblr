@@ -271,9 +271,10 @@ Harness credentials are each tool's own; Ensemblr manages none of them. See
 Two distinct messages:
 
 **"Root contains unmanaged top-level content"** — an error. Anything in the root
-other than `repos/`, `workspaces/`, `archived-contexts/`, and `.DS_Store` trips
-it, and Ensemblr declines to create its subdirectories there. This is what
-happens when you point the root at an existing folder such as `~/Projects`.
+other than `repos/`, `workspaces/`, `archived-contexts/`, `concierge/`, and
+`.DS_Store` trips it, and Ensemblr declines to create its subdirectories there.
+This is what happens when you point the root at an existing folder such as
+`~/Projects`.
 **Fix:** pick a dedicated directory. **Settings → General → Ensemblr root
 directory**, or **Choose another root** on the check itself.
 

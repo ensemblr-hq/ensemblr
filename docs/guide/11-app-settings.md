@@ -364,10 +364,12 @@ from leaving it unset.
 
 #### The built-in catalogue
 
-Ensemblr ships a catalogue of 20 variables it already understands. They appear
-under **Show documented variables**, marked `Not set` until you give one a
-value. Adding a value to a catalogue entry does not change the variable's
-meaning, only its value.
+Ensemblr ships a catalogue of 20 variables it already understands. The ones you
+can set yourself appear under **Show documented variables**, marked `Not set`
+until you give one a value — the five reserved `ENSEMBLR_*` variables below are
+populated automatically and never appear in that list, since there is nothing
+for you to add. Adding a value to a catalogue entry does not change the
+variable's meaning, only its value.
 
 Each entry carries three statuses:
 
@@ -548,7 +550,7 @@ your machine, run with `--disable-features=SpellcheckService` until it is.
 
 ## Repository panes
 
-Switching the scope toggle to **Repo** gives you seven panes for the repository
+Switching the scope toggle to **Repo** gives you eight panes for the repository
 selected in the picker. They do not all write to the same place, and that
 matters — one set is committed and reviewed like code, the other is personal to
 your machine.
@@ -559,6 +561,7 @@ your machine.
 | **Secrets** | **`.ensemblr/settings.toml`** `[infisical]` — the committed file | **Yes** |
 | Git | Local state | No |
 | **Scripts** | **`.ensemblr/settings.toml`** — the committed file | **Yes** |
+| **Settings file** | **`.ensemblr/settings.toml`** on a live workspace's branch — merged in from the root clone's copy | **Yes** |
 | Actions | Local state, layered under the committed `[prompts]` block | Partly |
 | Security | Local state, for the agent permission mode | No |
 | Misc | Local state | No |
@@ -578,6 +581,13 @@ lose hand-written comments and blank-line grouping — the accepted cost of not
 shipping a comment-preserving TOML editor — with one exception: a leading
 `#:schema` directive is read back and restored above the document, because
 losing it would unhook every editor pointed at the published schema.
+
+**Settings file** is the third pane that reaches the committed file, but through
+a different mechanism: it three-way merges the root clone's own copy of
+`.ensemblr/settings.toml` — the one a script or secret change makes there when
+no workspace is open to receive it — onto a live workspace's branch, so it can
+be reviewed and committed like any other change. See
+[`./07-terminals-and-run-scripts.md`](./07-terminals-and-run-scripts.md).
 
 The other five panes write personal rows that never touch the repository. Where a
 committed key and a personal row define the same setting, **the committed value

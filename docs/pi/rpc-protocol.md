@@ -32,13 +32,15 @@ install with `npm ls -g @earendil-works/pi-coding-agent`:
 - RPC mode starts with `pi --mode rpc [options]` (`rpc.md` "Starting RPC
   Mode"). Ensemblr's base args are
   `DEFAULT_PI_RPC_ARGS = ['--mode', 'rpc']`
-  (`src/main/pi-agent/pi-cli-rpc-adapter.ts:39`); `buildPiSessionArgs` (same
+  (`src/main/pi-agent/pi-cli-rpc-adapter.ts:41`); `buildPiSessionArgs` (same
   file) then appends `--model <provider/id>`, `--thinking <level>`, and
   `--session-id <id>` from the resolved request when present. The composition
-  root overrides the base args with
-  `['--mode', 'rpc', '-e', piControlExtensionPath]` (`src/main/main.ts`) when the
-  shipped Ensemblr Control extension resolves, which is how Pi gets the
-  `ensemblr_*` tools — see [`../agent-control.md`](../agent-control.md).
+  root overrides the base args with `['--mode', 'rpc', ...(-e
+  piControlExtensionPath), ...(--skill <directory> per resolved skill)]`
+  (`src/main/main.ts`, `readAgentSkillBundle`) when the shipped Ensemblr Control
+  extension resolves, which is how Pi gets the `ensemblr_*` tools — see
+  [`../agent-control.md`](../agent-control.md). Base args are re-resolved per
+  session, so a skill switched on mid-run reaches the next spawn.
 - Useful flags: `--provider <name>`, `--model <pattern>`,
   `--name <session name>`, `--no-session` (disable persistence),
   `--session-dir <path>` (`rpc.md` "Starting RPC Mode"). Captures use

@@ -8,7 +8,7 @@ than shared with Pi.
 This is the Claude counterpart of [`../pi/rpc-protocol.md`](../pi/rpc-protocol.md),
 but it documents a different kind of thing. Pi is a CLI spoken to over JSONL on
 stdin/stdout, so its guide is a wire protocol. Claude Code is reached through
-`@anthropic-ai/claude-agent-sdk` (pinned `^0.3.223` in `package.json`), driven
+`@anthropic-ai/claude-agent-sdk` (pinned `^0.3.267` in `package.json`), driven
 **in-process from main** against the binary the user installed themselves. There
 is no Ensemblr-owned wire format to document — there is an SDK surface, and the
 translation from it to Ensemblr's provider-neutral event stream.
@@ -80,8 +80,9 @@ SDK option name:**
 
 - `AgentSessionRequest` and the `AgentEvent` union
   (`src/main/agent-runtime/agent-types.ts`). Events are `context-usage`,
-  `error`, `message`, `metadata`, `shutdown`, `status`; statuses are `closed`,
-  `errored`, `idle`, `starting`, `streaming`.
+  `session-cost`, `plan-limit`, `plan-windows`, `error`, `message`, `metadata`,
+  `shutdown`, `status`; statuses are `closed`, `errored`, `idle`, `starting`,
+  `streaming`.
 - Session open/resume, persistence, naming, summaries —
   `src/main/agent-runtime/session/`, `src/main/agent-runtime/naming/`,
   `src/main/agent-runtime/agent-session-persistence.ts`,
@@ -282,13 +283,15 @@ Remediations offered (copied to the clipboard, never executed):
 
 ### There is no blocking setup check for Claude
 
-This is the sharpest difference from Pi. `src/main/setup/` holds
-`src/main/setup/setup-checks-core.ts`,
-`src/main/setup/setup-checks-github.ts`,
-`src/main/setup/setup-checks-linear.ts`, and
-`src/main/setup/setup-checks-pi.ts` — **there is no `setup-checks-claude.ts`,
-and the word `claude` does not appear anywhere in that directory.** Pi's check
-is `blocking: true`; nothing gates the app on Claude Code at all.
+This is the sharpest difference from Pi. `src/main/setup/setup-checks-claude.ts`
+defines `claude-executable` (`blocking: false`, wired into `setup-diagnostics.ts`
+alongside the core, GitHub, Linear, and Pi checks): it discovers the `claude`
+binary a first-class session would launch, without starting one, and rolls up
+as non-blocking on purpose — Ensemblr needs *an* agent runtime, not this one, so
+a machine running only Pi still reports ready. Pi's own check (`pi-executable`
+in `src/main/setup/setup-checks-pi.ts`) is `blocking: true`; the onboarding
+wizard applies the either-or gate across the two, so nothing about Claude Code
+specifically blocks the app from starting.
 
 Claude readiness is probed on demand behind **Settings → Providers**
 (`src/renderer/components/settings/agent-providers/agent-providers-section.tsx`,
@@ -328,7 +331,8 @@ rather than a project one.
 - **Deduped in the renderer.** A runtime can report the same command many times
   (Claude Code resolves a skill once per discovery root, so `/code-review`
   arrived four times); `normalizeSlashCommands` in
-  `src/renderer/hooks/workbench-shell/composer/use-slash-commands.ts` sorts by
+  `src/renderer/lib/workbench/slash-command-order.ts` (used by
+  `src/renderer/hooks/workbench-shell/composer/use-slash-commands.ts`) sorts by
   menu group, then by how much each entry says about itself, and keeps one per
   name.
 - **Cached** for five minutes (`staleTime: 5 * 60_000`), and `enabled` only once

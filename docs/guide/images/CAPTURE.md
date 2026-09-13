@@ -43,12 +43,13 @@ inside the app.
   at 2×. To go higher, capture on a display with a larger backing store; there is
   no software lever.
 - **Budget: 600 KB per image, 9 MB for this directory.** The set in place is
-  8.3 MB across twenty-four shots, averaging 355 KB — roughly nine times what
-  the downscaled set cost, for four times the pixels and no lossy step. The two
-  create-workspace dialogs are the heaviest at 560 KB and 550 KB, because a long
-  list of distinct rows is the worst case for PNG. There is about two thirds of
-  a megabyte of headroom left, so the next shot added is the one that has to
-  justify itself against dropping another.
+  9.3 MB across twenty-five shots, averaging 373 KB — roughly ten times what
+  the downscaled set cost, for four times the pixels and no lossy step. The
+  Agents panel shot is the heaviest at 593 KB, with the two create-workspace
+  dialogs close behind at 578 KB and 560 KB, because a long list of distinct
+  rows is the worst case for PNG. The set is already past the directory
+  budget, so the next shot added has to come with an existing one dropped to
+  pay for it.
 
 ### Processing a raw capture
 
@@ -94,6 +95,7 @@ by the two commands above.
 | `08-changes.png` | `review-changes` | `README.md`, `08-reviewing-changes.md` | The diff viewer with an inline review comment thread open. |
 | `08-pr.png` | `checks-pull-request` | `08-reviewing-changes.md` | The Checks tab with the PR title and description editor filled in, over its check runs. |
 | `09-subagents.png` | `subagent-fanout` | `README.md`, `09-agent-control.md` | An orchestrator fanned out across four delegates, each a tab in the strip. |
+| `09-agents-panel.png` | `agents-panel` | `09-agent-control.md` | The Agents panel listing delegated conversations and their parent-child history. |
 | `10-linear.png` | `linear-issues` | `10-integrations.md` | The Linear view, issues grouped by state. |
 | `11-settings-providers.png` | `settings-providers` | `11-app-settings.md` | The Providers pane on the Pi tab, with the executable override control visible. |
 | `11-settings-providers-claude.png` | `settings-providers-claude` | `11-app-settings.md` | The same pane on the Claude Code tab, for the Account block the Pi tab has no equivalent of. |
@@ -111,7 +113,7 @@ Every shot in the list has a scenario, so nothing here is taken by hand any
 more. Additional available scenarios not yet published on guide pages are:
 
 - `dock-terminal`, `board`
-- `agents-panel`, `agents-history`, `architecture`
+- `agents-history`, `architecture`
 - `workspace-files`, `workspace-history`
 - `linear-issue-detail`, `harness-launcher`
 - `update-available`, `update-failure`

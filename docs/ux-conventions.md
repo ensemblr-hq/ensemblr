@@ -208,7 +208,7 @@ below landed by `0.1.0`; each line stays because it names the surface a change
 has to keep working, not because the work is outstanding.
 
 1. **Shipped.** The app shell contract: sidebar projects/workspaces, center tabbed workspace, right panel tabs, terminal dock, file-based route state (path-based workspace/chat selection plus `dock`/`review` search params), and Query-backed setup/health snapshots.
-2. **Shipped.** The settings shell: ten app panes and seven repository panes, documented in [`guide/11-app-settings.md`](./guide/11-app-settings.md).
+2. **Shipped.** The settings shell: ten app panes and eight repository panes, documented in [`guide/11-app-settings.md`](./guide/11-app-settings.md).
 3. **Shipped.** The setup gate: sixteen checks in `SETUP_CHECK_ORDER`, from declarative config through Linear, documented in [`guide/02-requirements.md`](./guide/02-requirements.md).
 4. **Shipped.** Repository add/open/clone: add menu, clone dialog, clone progress log, post-clone workspace landing.
 5. **Shipped.** Workspace core: worktree creation, default branch/remote, copied files, setup script, placeholder naming, context folder. Adopting an existing branch instead of always forking landed with ADR 0043.

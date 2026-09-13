@@ -58,7 +58,7 @@ each exposing its public surface through `index.ts`.
 | Config | `config/` | Declarative config loading, settings resolution, repository config |
 | Dictation | `dictation/` | The transcription service behind the composer's mic control, its endpoint policy, and the Keychain-held key it authenticates with |
 | Environment | `environment/` | Environment-variable catalogue and layered assembly, Infisical joining as its own layer |
-| IPC | `ipc/` | Handler registration (`handlers/`, 38 modules), request validation (`request-schemas/`, 24 modules), permission gate |
+| IPC | `ipc/` | Handler registration (`handlers/`, 41 modules), request validation (`request-schemas/`, 27 modules), permission gate |
 | Integrations | `github/`, `linear/`, `infisical/` | `gh` CLI wrapper, PR snapshots, cached issue backlog; Linear OAuth + client + per-account store; Infisical account store, REST boundary, token-caching client, per-scope cache, link store |
 | Linked directories | `linked-directories/` | Read grants for directories outside a workspace, plus the app-global recents list behind them |
 | Native menus | `menu/` | One builder per menu behind `createMenuItemFactory`, driven by the renderer's command report and the localized `menu-strings.ts` table |
@@ -70,6 +70,8 @@ each exposing its public surface through `index.ts`.
 | Secrets | `secrets/` | One store behind two backends — the macOS Keychain (ADR&nbsp;0018), or Electron `safeStorage` ciphertext in SQLite off darwin (ADR&nbsp;0056) — plus the metadata rows and the keyring-health probe the Linux setup check reads |
 | Setup | `setup/` | Setup diagnostics orchestration |
 | Storage | `storage/` | SQLite connection (`database.ts`), migrations, `repositories/`, `tx.ts` |
+| Concurrency | `concurrency/` | `mapWithConcurrency` and other bounded-parallelism helpers |
+| Filesystem safety | `safe-fs/` | Atomic writes and path-containment checks shared across main-process concerns |
 | Terminal | `terminal/` | `node-pty` PTY sessions, plus the scrollback renderer that makes an agent's terminal read legible |
 | Updates | `updates/` | The in-app updater: GitHub release resolution per build channel (`release-feed.ts`), the can-this-build-update gate (`update-preconditions.ts`), and the Squirrel.Mac state machine (ADR&nbsp;0055). Installing is a per-platform capability — darwin replaces the app bundle; Linux checksum-verifies and atomically swaps a writable AppImage, otherwise it reports and links (ADR&nbsp;0065) |
 | Workspace files / git | `workspace-files/`, `workspace-git/` | File watching and listing, the content-addressed composer attachment store (`context-attachments.ts`), path safety (`workspace-paths.ts`) and image-signature checks (`workspace-images.ts`); git status, commits, worktrees |
@@ -98,10 +100,10 @@ A new feature is split across these buckets, not given a folder of its own.
 | `components/` | React components and UI composition | `workbench-shell/`, `conversation/`, `diff-viewer/`, `code-surface/`, `settings/`, `setup-diagnostics/`, `onboarding/`, `git/`, `linear/`, `command-palette/`, `ask-user-question/`, `tool-approval/`, `tool-collapsible/`, `pi-replay/`, `text-context-menu/`, `welcome/`, `concierge/`, `markdown/` (the file-link and image renderers streamdown is handed), `ui/` (vendored shadcn) |
 | `config/` | Stable renderer constants (route stale times, knobs) | — |
 | `hooks/` | Renderer hooks that are not durable shared state | `workbench-shell/`, `workspace/`, `conversation/`, `code-surface/`, `setup-diagnostics/`, `preferences/`, `git/`, `linear/`, `ask-user-question/`, `welcome/`, `concierge/`, `markdown/` |
-| `lib/` | Runtime helpers grouped by concern | `workbench/`, `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `dictation/`, `i18n/` (i18next instance + bundled `locales/`), `onboarding/`, `instrumentation/`, `ask-user-question/`, `welcome/`, `notification-sound/` (the bundled chime and its player), `concierge/`, `architecture-diagram/` (the layout engine that compiles the stored document into a drawn canvas), plus the code→`t()` mappers `failure-text/`, `agent-failure-text/`, `setup-check-text/`, `provider-check-text/`, `plan-limit-text/`, `github-owner-text/` |
+| `lib/` | Runtime helpers grouped by concern | `workbench/`, `agents/` (conversation model, session-tab bookkeeping), `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `dictation/`, `i18n/` (i18next instance + bundled `locales/`), `onboarding/`, `instrumentation/`, `ask-user-question/`, `welcome/`, `notification-sound/` (the bundled chime and its player), `concierge/`, `architecture-diagram/` (the layout engine that compiles the stored document into a drawn canvas), `external-url/` (the renderer-side allowlist for URLs from outside the app), plus the code→`t()` mappers `failure-text/`, `agent-failure-text/`, `setup-check-text/`, `provider-check-text/`, `plan-limit-text/`, `github-owner-text/` |
 | `fixtures/` | Fixture/demo data production code may still consume | `workbench/` |
 | `routing/` | TanStack Router file routes + generated tree | `routes/` |
-| `state/` | Durable Jotai state | `workspace/`, `composer/`, `pi/`, `plan-mode/`, `afk-mode/`, `preferences/`, `dialogs/`, `recents/`, `sidebar/`, `settings-ui/`, `slash-commands/`, `tool-approval/`, `ask-user-question/`, `conversation-scroll/`, `menu-commands/`, `linear/`, `review-launch/`, `unread/`, `updates/`, `window-chrome/`, `concierge/` |
+| `state/` | Durable Jotai state | `workspace/`, `agents/`, `composer/`, `pi/`, `plan-mode/`, `afk-mode/`, `preferences/`, `dialogs/`, `recents/`, `sidebar/`, `settings-ui/`, `slash-commands/`, `tool-approval/`, `ask-user-question/`, `conversation-scroll/`, `menu-commands/`, `linear/`, `review-launch/`, `unread/`, `updates/`, `window-chrome/`, `concierge/` |
 | `styles/` | CSS entrypoint (`index.css`) and font assets | — |
 | `types/` | Exported renderer types and ambient declarations | `workbench/`, `workbench-shell/`, `components/`, `onboarding/` |
 
@@ -129,13 +131,14 @@ The only code both processes may import. Two shapes coexist:
 
 - **Single-file concerns** — plain root modules (`config.ts`, `permissions.ts`,
   `github.ts`, `slug.ts`, `menu-commands.ts`, `concierge-references.ts`,
-  `window-chrome.ts`, …); 41 `.ts` files sit at the shared root in total.
+  `window-chrome.ts`, …); 47 `.ts` files sit at the shared root in total.
 - **Multi-file concerns** — an implementation directory behind a stable
   entrypoint, in one of two forms:
-  - `<concern>/index.ts` — `ipc/` (43 contract modules under `ipc/contracts/`,
+  - `<concern>/index.ts` — `ipc/` (46 contract modules under `ipc/contracts/`,
     plus `channels.ts` and `handler-map.ts`), `pi-rpc/`, `keymap/`.
   - `<concern>.ts` + `<concern>/` — `afk-mode`, `agent-control`, `agent-failure`,
-    `architecture-diagram`, `plan-mode`, `review-brief`, `scripts`, `terminal`. This is the form
+    `architecture-diagram`, `plan-mode`, `review-brief`, `scripts`, `terminal`,
+    `tool-presentation`. This is the form
     `electron --test` can resolve, so prefer it for anything the main-process
     suites import.
 
