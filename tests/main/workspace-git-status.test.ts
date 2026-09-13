@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+	access,
+	mkdir,
+	mkdtemp,
+	readFile,
+	rm,
+	symlink,
+	writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -457,6 +465,34 @@ test('discardChanges (real git) reverts a tracked edit and deletes a new file', 
 	);
 	// …and the new file is gone from disk.
 	await assert.rejects(access(path.join(dir, 'new.ts')));
+});
+
+test('getStatus (real git) badges a changed symlink with its target kind', async (t) => {
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-symlink-'));
+	t.after(() => rm(dir, { force: true, recursive: true }));
+	const git = (...args: string[]) => execFileAsync('git', args, { cwd: dir });
+	await git('init', '-q');
+	await git('config', 'user.email', 'test@example.com');
+	await git('config', 'user.name', 'Test');
+	await writeFile(path.join(dir, 'README.md'), '# demo\n');
+	await mkdir(path.join(dir, 'packages'));
+	await writeFile(path.join(dir, 'packages', 'index.ts'), 'export {};\n');
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'init');
+	await symlink('packages', path.join(dir, 'linked-packages'));
+	await symlink('README.md', path.join(dir, 'linked-readme'));
+	await symlink('nowhere', path.join(dir, 'broken-link'));
+
+	const service = createWorkspaceGitService({
+		localCommandService: realCommandService(),
+	});
+	const result = await service.getStatus({ workspaceCwd: dir });
+	const byPath = new Map(result.files.map((file) => [file.path, file]));
+
+	assert.equal(result.error, undefined);
+	assert.equal(byPath.get('linked-packages')?.symlinkTargetKind, 'directory');
+	assert.equal(byPath.get('linked-readme')?.symlinkTargetKind, 'file');
+	assert.equal(byPath.get('broken-link')?.symlinkTargetKind, 'unknown');
 });
 
 test('discardChanges rejects paths escaping the workspace', async (t) => {

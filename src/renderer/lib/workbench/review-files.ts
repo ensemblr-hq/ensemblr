@@ -22,6 +22,9 @@ export function mapGitStatusToReviewFiles(
 						path: file.path,
 						...(file.renamedFrom ? { renamedFrom: file.renamedFrom } : {}),
 						status: file.status,
+						...(file.symlinkTargetKind
+							? { symlinkTargetKind: file.symlinkTargetKind }
+							: {}),
 					},
 				],
 	);

@@ -80,7 +80,8 @@
 			"message": "Files appear here as soon as they are created.",
 			"title": "No files yet"
 		},
-		"open-preview": "Open {{path}} preview"
+		"open-preview": "Open {{path}} preview",
+		"symlinked-directory": "{{path}} links to a directory and cannot be previewed"
 	},
 	"all-files-search": {
 		"description": "Open a repository file from the All files tab.",

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ContextMenuSeparator } from '@/renderer/components/ui/context-menu';
 import { WorkbenchContextMenuContent } from '@/renderer/components/workbench-shell/workbench-context-menu-content';
+import { isPreviewableWorkspaceFile } from '@/renderer/lib/workbench';
 
 import type { ReviewFileMenuTarget } from '@/renderer/types/workbench';
 
@@ -16,6 +17,9 @@ import { useReviewFileActions } from './review-file-actions-context';
  * diff to chat", "Open in <app>" for every installed target, Copy path, and
  * Discard changes — scoped to whichever row the user right-clicked. Keep open is
  * the keyboard-reachable equivalent of double-clicking the row.
+ *
+ * A symlink to a directory gets neither View nor Keep open, matching its own
+ * inert row: there is no diff or preview of a directory to open.
  *
  * One menu serves the whole list (the clicked row is captured into `target`)
  * instead of mounting a Radix menu per row. Renders nothing until a row is
@@ -43,6 +47,7 @@ export function ReviewFilesContextMenuContent({
 
 	const path = target.path;
 	const canDiscard = isDiscardable(path);
+	const canOpen = isPreviewableWorkspaceFile(target);
 	const invoke = (targetId: Parameters<typeof invokeTarget>[0]) =>
 		void invokeTarget(targetId, {
 			relativePath: path,
@@ -54,7 +59,9 @@ export function ReviewFilesContextMenuContent({
 			aria-label={t('review:file-menu.actions', '{{path}} actions', { path })}
 			className='min-w-48'
 		>
-			{openFile ? <OpenFileMenuItems openFile={openFile} path={path} /> : null}
+			{openFile && canOpen ? (
+				<OpenFileMenuItems openFile={openFile} path={path} />
+			) : null}
 			<FileMenuItem
 				icon={PaperclipIcon}
 				label={t('review:file-menu.attach-diff-to-chat', 'Attach diff to chat')}

@@ -64,6 +64,7 @@ export {
 	collectWorkspaceChangeSummaryUpdates,
 	getNavigationWorkspaceChangeSummaryTargets,
 } from './workspace-change-summaries';
+export { isPreviewableWorkspaceFile } from './workspace-file-preview';
 export { getWorkspaceSidebarState } from './workspace-sidebar-state';
 export {
 	branchSourceId,

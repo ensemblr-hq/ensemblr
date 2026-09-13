@@ -127,6 +127,7 @@
 		"discard": "Discard changes to {{path}}",
 		"open": "Open {{path}}",
 		"open-in": "Open {{path}} in…",
+		"symlinked-directory": "{{path}} links to a directory and cannot be opened",
 		"viewed": "Viewed"
 	},
 	"file-status": {

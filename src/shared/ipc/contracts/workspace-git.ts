@@ -4,6 +4,8 @@
  * receives derived rows and patches.
  */
 
+import type { SymlinkTargetKind } from './workspace-files.ts';
+
 /** Per-file change classification derived from `git status --porcelain -z`. */
 export type WorkspaceGitFileStatus =
 	| 'added'
@@ -30,6 +32,12 @@ export interface WorkspaceGitFileWire {
 	/** Previous path when `status` is `renamed`. */
 	renamedFrom?: string;
 	status: WorkspaceGitFileStatus;
+	/**
+	 * Present only where the row's working-tree path is a symlink, so the changes
+	 * list badges it exactly as the files tree does. Absent for a commit scope,
+	 * whose rows describe blobs rather than anything still on disk.
+	 */
+	symlinkTargetKind?: SymlinkTargetKind;
 }
 
 /** Aggregate counts across all changed files. */

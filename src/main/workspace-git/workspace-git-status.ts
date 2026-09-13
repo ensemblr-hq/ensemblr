@@ -1,7 +1,8 @@
-import { open, rm, stat } from 'node:fs/promises';
+import { lstat, open, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 import { bareBranchName, originQualifiedRef } from '../../shared/branch-ref.ts';
+import type { SymlinkTargetKind } from '../../shared/ipc/contracts/workspace-files.ts';
 import type {
 	DiscardWorkspaceChangesRequest,
 	DiscardWorkspaceChangesResult,
@@ -422,7 +423,7 @@ export function createWorkspaceGitService({
 			},
 		);
 
-		return summarizeWorkspaceGitFiles(await withContentIds(cwd, files));
+		return summarizeWorkspaceGitFiles(await withWorktreeFacts(cwd, files));
 	}
 
 	/** The changes a single commit introduced (`<parent>..<hash>`). */
@@ -492,19 +493,20 @@ export function createWorkspaceGitService({
 			return summarizeWorkspaceGitFiles(files);
 		}
 		files.push(...(await readUntrackedFiles(cwd)));
-		return summarizeWorkspaceGitFiles(await withContentIds(cwd, files));
+		return summarizeWorkspaceGitFiles(await withWorktreeFacts(cwd, files));
 	}
 
 	/**
-	 * Stamps each row with the current bytes of its working-tree file, so a
-	 * reviewer's "viewed" mark stops matching the moment the file is written
+	 * Reads what each row needs from its working-tree file: the content stamp, so
+	 * a reviewer's "viewed" mark stops matching the moment the file is written
 	 * again — including for a binary file, whose line counts are always `null`,
-	 * and for an edit that happens to leave the counts unchanged.
+	 * and for an edit that happens to leave the counts unchanged — plus the link
+	 * target behind a symlink row's badge.
 	 * @param cwd - Absolute workspace directory the paths are relative to
 	 * @param files - Rows whose new side is the working tree
-	 * @returns The same rows, each carrying a content stamp
+	 * @returns The same rows, each carrying a content stamp and any link target
 	 */
-	async function withContentIds(
+	async function withWorktreeFacts(
 		cwd: string,
 		files: readonly WorkspaceGitFileWire[],
 	): Promise<WorkspaceGitFileWire[]> {
@@ -513,7 +515,7 @@ export function createWorkspaceGitService({
 			MAX_CONCURRENT_UNTRACKED_READS,
 			async (file) => ({
 				...file,
-				contentId: await readContentId(cwd, file.path),
+				...(await readWorktreeFacts(cwd, file.path)),
 			}),
 		);
 	}
@@ -997,28 +999,69 @@ export function createWorkspaceGitService({
 }
 
 /**
- * Stamp of one working-tree file's current bytes.
+ * Everything one working-tree path can only answer from disk: its content stamp
+ * and, when it is a symlink, what the link resolves to.
  *
- * Size and modification time rather than a content hash: git's own index uses
- * the same pair to decide a file is dirty, while hashing would cost a
+ * The stamp is size and modification time rather than a content hash: git's own
+ * index uses the same pair to decide a file is dirty, while hashing would cost a
  * `git hash-object` process per changed row on every status poll. The trade is
  * deliberate — the stamp can change when the bytes did not (a rewrite with
  * identical content), which expires a mark that need not have expired, but it
  * cannot stay the same across a real edit, which is the failure that matters.
+ *
+ * Both answers come from one `lstat`, and the followed `stat` is paid only for
+ * the rare row that turns out to be a link: the two calls return the same stats
+ * for anything else, so probing both up front would double the syscalls on every
+ * changed row — and this runs on the dashboard's status poll for every workspace.
  * @param cwd - Absolute workspace directory the path is relative to
- * @param relativePath - Workspace-relative path to stamp
- * @returns An opaque stamp, or null when the path is gone or unreadable
+ * @param relativePath - Workspace-relative path to probe
+ * @returns The row's content stamp, plus a link target where there is one
  */
-async function readContentId(
+async function readWorktreeFacts(
 	cwd: string,
 	relativePath: string,
-): Promise<string | null> {
-	try {
-		const stats = await stat(path.join(cwd, relativePath));
-		return stats.isFile() ? `${stats.size}:${stats.mtimeMs}` : null;
-	} catch {
-		return null;
+): Promise<{
+	contentId: string | null;
+	symlinkTargetKind?: SymlinkTargetKind;
+}> {
+	const absolutePath = path.join(cwd, relativePath);
+	const link = await lstat(absolutePath).catch(() => null);
+	if (!link?.isSymbolicLink()) {
+		return { contentId: contentStampOf(link) };
 	}
+	const target = await stat(absolutePath).catch(() => null);
+	return {
+		contentId: contentStampOf(target),
+		symlinkTargetKind: resolveSymlinkTargetKind(target),
+	};
+}
+
+/**
+ * Stamps a file's current bytes from stats already read, leaving anything that
+ * is not a regular file — a directory, a broken link, an unreadable path —
+ * unstamped rather than stamping a size the reviewer's mark cannot be held to.
+ * @param stats - Stats of the path, or null when it could not be read
+ * @returns The stamp, or null when the path holds no bytes of its own
+ */
+function contentStampOf(
+	stats: Awaited<ReturnType<typeof stat>> | null,
+): string | null {
+	return stats?.isFile() ? `${stats.size}:${stats.mtimeMs}` : null;
+}
+
+/**
+ * Names what a link resolved to from the followed stat that chased it, leaving a
+ * broken or cyclic link `unknown` rather than guessing at a kind.
+ * @param target - Stats of the link's target, or null when it could not be read
+ * @returns The target's kind, or `unknown`
+ */
+function resolveSymlinkTargetKind(
+	target: Awaited<ReturnType<typeof stat>> | null,
+): SymlinkTargetKind {
+	if (!target) {
+		return 'unknown';
+	}
+	return target.isDirectory() ? 'directory' : 'file';
 }
 
 /** Adds two nullable line counts, propagating binary (`null`) markers. */

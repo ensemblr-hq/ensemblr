@@ -10,6 +10,7 @@ import {
 	CommandList,
 } from '@/renderer/components/ui/command';
 import { useReviewFilePreviewOpener } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
+import { isPreviewableWorkspaceFile } from '@/renderer/lib/workbench';
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
 
 import { WorkspaceFileIcon } from './workspace-file-icon';
@@ -26,7 +27,9 @@ export function AllFilesSearchDialog({
 }) {
 	const { t } = useTranslation();
 	const openFilePreview = useReviewFilePreviewOpener();
-	const searchableFiles = files.filter((file) => file.kind === 'file');
+	const searchableFiles = files.filter((file) =>
+		isPreviewableWorkspaceFile(file),
+	);
 	const closeSearch = () => {
 		onOpenChange(false);
 	};

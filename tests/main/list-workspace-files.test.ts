@@ -275,7 +275,7 @@ describe('createListWorkspaceFilesService.list', () => {
 			);
 		}
 		expect((await readDir(cwd, '.context/linked-folder')).error?.code).toBe(
-			'invalid-path',
+			'symlinked-directory',
 		);
 	});
 
@@ -1274,5 +1274,18 @@ describe('createListWorkspaceFilesService.readDirectory', () => {
 		const result = await readDir(seedRepo(), 'README.md');
 
 		expect(result.error?.code).toBe('not-directory');
+	});
+
+	test('refuses a symlinked directory instead of following the link', async () => {
+		const cwd = seedRepo();
+		symlinkSync(
+			path.join(cwd, 'node_modules'),
+			path.join(cwd, 'linked-modules'),
+		);
+
+		const result = await readDir(cwd, 'linked-modules');
+
+		expect(result.error?.code).toBe('symlinked-directory');
+		expect(result.entries).toHaveLength(0);
 	});
 });

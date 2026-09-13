@@ -1,6 +1,8 @@
+import type { SymlinkTargetKind } from '@/shared/ipc/contracts/workspace-files';
 import type { AgentActionKind } from './agent-actions';
 import type { ReviewFilePreviewOpener } from './file-preview';
 import type { OpenTargetsState } from './open-targets';
+
 import type { ReviewFileSummary, WorkspaceOpenTarget } from './workspace';
 
 /**
@@ -105,12 +107,24 @@ export interface ReviewFileActions {
 /** The changed file a right-click opened the shared menu against. */
 export interface ReviewFileMenuTarget {
 	path: string;
+	/**
+	 * The row's link target, carried so the menu can withhold View and Keep open
+	 * from a directory link exactly as the row withholds its click.
+	 */
+	symlinkTargetKind?: SymlinkTargetKind;
 }
 
 /** The file/folder a right-click opened the shared tree menu against. */
 export interface FileTreeMenuTarget {
 	relativePath: string;
 	relativePathKind: 'directory' | 'file';
+	/**
+	 * The row's link target, carried so the menu can withhold View and Keep open
+	 * from a directory link while `relativePathKind` stays the truth every other
+	 * action reads — a link is a leaf entry, so "Open in" and Attach to chat keep
+	 * treating it as the file it is rather than as the directory behind it.
+	 */
+	symlinkTargetKind?: SymlinkTargetKind;
 }
 
 /** What a confirmed discard will revert. */

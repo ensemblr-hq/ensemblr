@@ -1,16 +1,10 @@
 import { useVirtualizer, type Virtualizer } from '@tanstack/react-virtual';
 import { useAtomValue } from 'jotai';
-import {
-	type MouseEvent,
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { useFileTreeExpansion } from '@/renderer/hooks/workbench-shell/review-files/use-file-tree-expansion';
 import { useLazyIgnoredDirectories } from '@/renderer/hooks/workbench-shell/review-files/use-lazy-ignored-directories';
+import { useRowContextMenuTarget } from '@/renderer/hooks/workbench-shell/review-files/use-row-context-menu-target';
 import { toWorkspaceLookupPath } from '@/renderer/lib/agent-timeline';
 import {
 	buildFileTree,
@@ -165,35 +159,39 @@ function useDirectoryReveal({
 }
 
 /**
- * Tracks which row a right-click landed on so one shared context menu can serve
- * every row, and swallows a right-click that landed below the last row rather
- * than opening an empty menu.
+ * Describes the right-clicked row to the shared tree menu.
+ *
+ * The kind comes from the row's own markup because the listing cannot answer for
+ * every row: `buildFileTree` synthesizes a folder node for each path segment, so
+ * most directory rows have no entry of their own. The link target comes from the
+ * listing, which is where it is known — and only a file row can carry one, which
+ * is exactly the case the lookup does resolve.
+ *
+ * Keeping the two separate is the point: a symlink stays the leaf entry every
+ * action treats it as, and only View and Keep open consult what it points at.
+ * @param files - The listing a file row's link target is resolved against
  * @returns The row the menu should act on, and the capture handler that sets it
  */
-function useFileTreeContextMenu() {
-	const [menuTarget, setMenuTarget] = useState<FileTreeMenuTarget | null>(null);
-
-	const handleContextCapture = useCallback(
-		(event: MouseEvent<HTMLDivElement>) => {
-			const rowElement = (event.target as HTMLElement).closest<HTMLElement>(
-				'[data-row-path]',
-			);
-			if (!rowElement?.dataset.rowPath) {
-				// Right-click landed below the rows: don't open an empty menu.
-				event.preventDefault();
-				event.stopPropagation();
-				return;
+function useFileTreeContextMenu(files: readonly WorkspaceFileSummary[]) {
+	const buildTarget = useCallback(
+		(relativePath: string, rowElement: HTMLElement): FileTreeMenuTarget => {
+			if (rowElement.dataset.rowKind === 'directory') {
+				return { relativePath, relativePathKind: 'directory' };
 			}
-			setMenuTarget({
-				relativePath: rowElement.dataset.rowPath,
-				relativePathKind:
-					rowElement.dataset.rowKind === 'directory' ? 'directory' : 'file',
-			});
+			const row = files.find((file) => file.path === relativePath);
+
+			return {
+				relativePath,
+				relativePathKind: 'file',
+				...(row?.symlinkTargetKind
+					? { symlinkTargetKind: row.symlinkTargetKind }
+					: {}),
+			};
 		},
-		[],
+		[files],
 	);
 
-	return { handleContextCapture, menuTarget };
+	return useRowContextMenuTarget(buildTarget);
 }
 
 /**
@@ -285,7 +283,7 @@ export function useWorkspaceFileTree({
 		[toggleDirectory, loadIgnoredDirectory],
 	);
 
-	const { handleContextCapture, menuTarget } = useFileTreeContextMenu();
+	const { handleContextCapture, menuTarget } = useFileTreeContextMenu(allFiles);
 
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const virtualizer = useVirtualizer({

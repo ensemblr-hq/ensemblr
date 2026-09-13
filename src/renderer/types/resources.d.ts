@@ -831,6 +831,7 @@ export default interface Resources {
 			'source-unreadable': 'The repository’s settings could not be read.';
 			'spawn-error': 'The process could not be started.';
 			'state-mismatch': 'The Linear sign-in reply did not match this attempt, so it was rejected.';
+			'symlinked-directory': 'That path is a symlink to a directory, so it was not opened.';
 			'target-invalid': 'The workspace’s settings are not valid TOML.';
 			'target-not-found': 'The selected workspace is unavailable or belongs to another repository.';
 			'target-unreadable': 'The workspace’s settings could not be read.';
@@ -1613,6 +1614,7 @@ export default interface Resources {
 			discard: 'Discard changes to {{path}}';
 			open: 'Open {{path}}';
 			'open-in': 'Open {{path}} in…';
+			'symlinked-directory': '{{path}} links to a directory and cannot be opened';
 			viewed: 'Viewed';
 		};
 		'file-status': {
@@ -2699,6 +2701,7 @@ export default interface Resources {
 				title: 'No files yet';
 			};
 			'open-preview': 'Open {{path}} preview';
+			'symlinked-directory': '{{path}} links to a directory and cannot be previewed';
 		};
 		'all-files-search': {
 			description: 'Open a repository file from the All files tab.';
