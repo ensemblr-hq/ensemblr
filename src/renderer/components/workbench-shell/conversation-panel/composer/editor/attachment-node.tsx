@@ -166,6 +166,24 @@ export class AttachmentNode extends DecoratorNode<ReactNode> {
 	}
 
 	/**
+	 * Swaps the attachment this chip stands for, leaving the chip where it sits.
+	 * Backs a document rewritten after its chip was inserted: the store is
+	 * content-addressed, so fuller content lands at a new path and the chip has
+	 * to follow it rather than being torn down and reinserted somewhere else.
+	 *
+	 * The replacement stands for the same thing: same `kind`, same id, new
+	 * content. {@link createDOM} reads {@link isTrayChip} once to decide whether
+	 * the chip is inline or a block of its own, and {@link updateDOM} never
+	 * rebuilds it, so a swap across that boundary leaves the payload and the
+	 * element it renders into disagreeing.
+	 * @param attachment - The payload the chip stands for from now on
+	 */
+	// fallow-ignore-next-line unused-class-member
+	setAttachment(attachment: ComposerAttachment): void {
+		this.getWritable().__attachment = attachment;
+	}
+
+	/**
 	 * Renders the chip itself.
 	 * @returns The chip element React mounts into the host
 	 */

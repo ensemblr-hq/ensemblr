@@ -213,6 +213,13 @@ export function useComposerAttachments({
 		[editorRef],
 	);
 
+	const updateAttachment = useCallback(
+		(id: string, attachment: ComposerAttachment) => {
+			editorRef.current?.updateAttachment(id, attachment);
+		},
+		[editorRef],
+	);
+
 	return {
 		addAttachments,
 		attachmentError,
@@ -236,5 +243,6 @@ export function useComposerAttachments({
 		hasChips: attachments.length > 0,
 		removeAttachment,
 		setAttachmentError,
+		updateAttachment,
 	};
 }

@@ -192,9 +192,15 @@ function flatDraftSegments(
  * editor republishes a freshly built list on every keystroke, so without this
  * every character would hand the mirror atom a new identity and re-render
  * everything reading it.
+ *
+ * Compared by identity rather than by id: a chip holds one attachment object for
+ * as long as nothing rewrites it, so an untouched list republishes the same
+ * references, while a chip repointed at a rewritten document carries a new object
+ * under the same id. Matching on id alone would hold the mirror at the payload
+ * the chip opened with and leave it describing a file that is no longer attached.
  * @param left - The chip list currently mirrored
  * @param right - The chip list the editor just published
- * @returns True when both hold the same ids in the same order
+ * @returns True when both hold the same attachments in the same order
  */
 function sameAttachments(
 	left: readonly ComposerAttachment[],
@@ -202,7 +208,7 @@ function sameAttachments(
 ): boolean {
 	return (
 		left.length === right.length &&
-		left.every((attachment, index) => attachment.id === right[index]?.id)
+		left.every((attachment, index) => attachment === right[index])
 	);
 }
 
@@ -352,6 +358,7 @@ export function useComposerState({
 		hasChips,
 		removeAttachment,
 		setAttachmentError,
+		updateAttachment,
 	} = useComposerAttachments({
 		chatTabId,
 		disabled: composer.disabled,
@@ -371,6 +378,7 @@ export function useComposerState({
 		useIssueAttachments({
 			addAttachments,
 			setAttachmentError,
+			updateAttachment,
 			workspaceCwd: composer.workspaceCwd,
 		});
 
