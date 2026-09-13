@@ -87,10 +87,15 @@ export const MessageResponse = memo(
 		);
 		// Streamdown drops props it does not recognize, so the density mode has to
 		// travel on the class list rather than as a data attribute.
+		//
+		// Width only: `h-full` resolves against the parent's flex-determined
+		// height, which Chrome computes from this block plus whatever follows it,
+		// so the markdown grows to swallow its siblings' space and they paint
+		// outside the parent — over the next row of the timeline.
 		return (
 			<Streamdown
 				className={cn(
-					'ensemblr-answer size-full',
+					'ensemblr-answer w-full',
 					markdownStyle !== 'default' && `ensemblr-answer-${markdownStyle}`,
 					className,
 				)}
