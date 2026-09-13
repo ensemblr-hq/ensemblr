@@ -1,13 +1,13 @@
-# Ensemblr v0.1.14
+# Ensemblr v0.1.15
 
-Ensemblr 0.1.14 makes multi-agent work easier to direct and follow, with a bounded two-level delegation hierarchy, a live Agents panel, and safer unattended workflows.
+Ensemblr 0.1.15 is a hardening release: a full remediation of the 2026-09-12 security and performance audit, durable renderer state in SQLite, and shared repository settings that travel on a workspace branch.
 
 ### Highlights
 
-* **Two-level delegation with a live Agents panel.** An orchestrator can delegate a workstream to a manager, which can split it across leaf agents. Ensemblr preserves lineage and spawn budgets across restarts, shows live activity and context usage, links child conversations back to their parent, and keeps completed history compact. (#535, #544, #547)
-* **Models can be assigned orchestration roles.** Settings now support Sage, Coder, Builder, Grunt, and Explorer preferences, plus opt-in delegation between Pi and Claude Code. AFK agents choose review delegation for the work at hand, and delegation guidance preserves the parent orchestrator's context. (#537, #541, #542)
-* **Safer plans, workspaces, and guardrails.** Workspace Git operations scrub inherited Git environment state, Plan Mode preserves refinements and locks the composer while review is pending, and internal wait-barrier refusals stay out of the user-facing timeline without hiding real errors. (#536, #543, #546)
-* **Desktop workflow polish on macOS and Linux.** Caffeinate handling recovers cleanly across battery changes, Linux sidebar sheets clear the native title bar, the Concierge can manage app settings, and workspace files now distinguish symlinks and dotenv files. (#534, #538, #539, #545)
+* **The 2026-09-12 security and performance audit is fully remediated.** All 147 findings are closed. The per-repository permission mode is now read repository-first, so `read-only` and `approval-required` actually engage instead of showing as selected while inert; the permission gate covers all 54 write channels rather than the eleven that opted in, and a new channel is a compile error against the channel-to-action table. Plan Mode's bash allowlist no longer admits an escape through `sort --compress-program`, writers into the repository-controlled `.context` tree no longer follow symlinks, and the agent event log has a retention policy. (#569)
+* **Durable state and shared settings.** Renderer local storage is mirrored into SQLite, so UI state survives a cleared web storage partition. Shared repository settings — setup and run scripts, environment layers, prompt configuration — publish onto a workspace branch and reach collaborators through the repository instead of each machine. (#574, #561)
+* **Agent work is easier to follow and harder to lose.** Tool call previews render on one text surface across runtimes, activity indicators say more about what a session is doing, offscreen agent questions raise a notification, and delegation can be held until you ask for it. (#568, #553, #560, #567)
+* **Review, workspace, and Pi fixes.** The PR header waits for a merge the push has actually verified, the review rail is seated at a width the panel group can fit, the file and changes lists no longer follow a symlinked directory out of the worktree, a refused agent can correct itself, and Pi tool calls whose result line is discarded now settle. (#587, #588, #586, #566, #565, #564, #563, #589)
 
 ### Install
 
@@ -27,4 +27,4 @@ The `.dmg` is signed with a Developer ID certificate, hardened-runtime, notarize
 
 ---
 
-*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.1.12...v0.1.14>
+*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.1.14...v0.1.15>

@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-09-13
+
+Ensemblr 0.1.15 is a hardening release: a full remediation of the 2026-09-12 security and performance audit, durable renderer state in SQLite, and shared repository settings that travel on a workspace branch.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.15) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.15/Ensemblr-0.1.15-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.15/Ensemblr-0.1.15-x64.AppImage)
+
+### Added
+
+- **Renderer local storage is mirrored into SQLite,** so durable UI state survives a cleared web storage partition and is backed by the same database as the rest of the app. (#574)
+- **Shared repository settings publish onto a workspace branch,** so setup and run scripts, environment layers, and prompt configuration reach collaborators through the repository rather than each machine. (#561)
+- **Offscreen agent questions raise a notification,** so a question asked in a tab that is not on screen no longer waits unseen. (#560)
+- **Delegation can be held until you ask for it,** a settings opt-out for orchestrators that would otherwise fan out on their own. (#567)
+
+### Changed
+
+- **Tool call previews render on one text surface** across runtimes, instead of a per-runtime presentation path. (#568)
+- **Agent activity indicators are clearer** about what a session is doing and when it is waiting. (#553)
+- **Dependencies moved to current majors** — Jotai 3, Lexical 0.50, the React group, TanStack Router and Virtual, Zod 4.6, i18next 26.4.2, the Claude Agent SDK, and `ai` 7.0.97 — with Dependabot now grouping React, Lexical, and Electron security updates so paired packages move together. (#556, #558, #570, #571, #572, #573, #575, #576, #577, #578, #580, #581, #582, #584)
+
+### Fixed
+
+- **Plan Mode recognizes control tools under every runtime's naming,** so a control op is classified the same way whichever harness invokes it. (#589)
+- **The review PR header waits for a merge the push has actually verified** rather than reporting one optimistically. (#587)
+- **The review rail is seated at the width the panel group can actually fit.** (#588)
+- **The file and changes lists no longer follow a symlinked directory** out of the worktree. (#586)
+- **Symlink badges are read from the worktree** instead of a stale probe. (#566)
+- **A refused agent can correct itself** instead of being left unable to retry. (#565)
+- **Dock terminal tabs and the setup exit wait are hardened** against races on close. (#562)
+- **Pi tool calls whose result line is discarded now settle** rather than hanging in the timeline. (#564)
+- **The Pi delegation barrier's automatic resume loop is capped.** (#563)
+
+### Security
+
+- **All 147 findings from the 2026-09-12 security and performance audit are remediated.** The per-repository permission mode is now read repository-first, so `read-only` and `approval-required` actually engage; the permission gate covers all 54 write channels instead of the eleven that opted in, and a new channel is a compile error against the channel-to-action table. Plan Mode's bash allowlist no longer admits an escape through `sort --compress-program`, writers into the repository-controlled `.context` tree no longer follow symlinks, and the agent event log has a retention policy. (#569)
+
 ## [0.1.14] - 2026-09-10
 
 Ensemblr 0.1.14 makes multi-agent work easier to direct and follow, with a bounded two-level delegation hierarchy, a live Agents panel, and safer unattended workflows.
