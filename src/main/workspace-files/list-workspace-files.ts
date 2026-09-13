@@ -41,6 +41,7 @@ import {
 import type { PreviewPathScope } from './workspace-paths.ts';
 import {
 	hasErrorCode,
+	hasSymlinkedAncestor,
 	ignoredEntry,
 	isWithinWorkspaceReal,
 	resolvePreviewPath,
@@ -400,6 +401,17 @@ export function createListWorkspaceFilesService({
 						error: {
 							code: 'symlinked-directory',
 							message: 'Selected path is a symlink to a directory.',
+						},
+						path: target.relativePath,
+					};
+				}
+				if (await hasSymlinkedAncestor(cwdResult.cwd, target.relativePath)) {
+					return {
+						entries: [],
+						error: {
+							code: 'symlinked-directory',
+							message:
+								'Selected path reaches through a symlink to a directory.',
 						},
 						path: target.relativePath,
 					};

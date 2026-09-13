@@ -1288,4 +1288,31 @@ describe('createListWorkspaceFilesService.readDirectory', () => {
 		expect(result.error?.code).toBe('symlinked-directory');
 		expect(result.entries).toHaveLength(0);
 	});
+
+	test('refuses a path reaching through a link that stays in the workspace', async () => {
+		const cwd = seedRepo();
+		symlinkSync(
+			path.join(cwd, 'node_modules'),
+			path.join(cwd, 'linked-modules'),
+		);
+
+		const result = await readDir(cwd, 'linked-modules/react');
+
+		expect(result.error?.code).toBe('symlinked-directory');
+		expect(result.entries).toHaveLength(0);
+	});
+
+	test('refuses a path reaching through a link that leaves the workspace', async () => {
+		const cwd = seedRepo();
+		const outside = mkdtempSync(path.join(tmpdir(), 'outside-'));
+		tempDirs.push(outside);
+		mkdirSync(path.join(outside, 'secrets'), { recursive: true });
+		writeFileSync(path.join(outside, 'secrets', 'key.txt'), 'shh\n');
+		symlinkSync(outside, path.join(cwd, 'linked-outside'));
+
+		const result = await readDir(cwd, 'linked-outside/secrets');
+
+		expect(result.error?.code).toBe('symlinked-directory');
+		expect(result.entries).toHaveLength(0);
+	});
 });

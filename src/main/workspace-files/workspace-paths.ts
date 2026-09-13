@@ -10,7 +10,7 @@
  * {@link resolvePreviewPath} and may look outside it.
  */
 
-import { realpath } from 'node:fs/promises';
+import { lstat, realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import type { WorkspaceFileEntryWire } from '../../shared/ipc/contracts/workspace-files';
@@ -172,6 +172,33 @@ export async function isWithinWorkspaceReal(
 	} catch {
 		return false;
 	}
+}
+
+/**
+ * Reports whether any directory between the workspace root and the final path
+ * segment is a symlink. {@link isWithinWorkspaceReal} only refuses a link whose
+ * target escapes the workspace, so a link pointing back inside it still reaches
+ * `readdir` — which follows it, listing the same subtree under a second path the
+ * lister never traversed. The final segment is left to the caller, which
+ * distinguishes a link to a directory from a link to a file.
+ * @param workspaceCwd - Absolute workspace root.
+ * @param relativePath - Repo-relative path whose ancestors to inspect.
+ * @returns True when any ancestor below the root is a symlink.
+ */
+export async function hasSymlinkedAncestor(
+	workspaceCwd: string,
+	relativePath: string,
+): Promise<boolean> {
+	const segments = relativePath.split('/').filter((segment) => segment !== '');
+	const ancestors = segments
+		.slice(0, -1)
+		.map((_, index) =>
+			path.join(workspaceCwd, ...segments.slice(0, index + 1)),
+		);
+	const stats = await Promise.all(
+		ancestors.map((ancestor) => lstat(ancestor).catch(() => null)),
+	);
+	return stats.some((entry) => entry?.isSymbolicLink() === true);
 }
 
 /**
