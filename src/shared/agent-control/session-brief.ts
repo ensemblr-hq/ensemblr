@@ -312,6 +312,19 @@ const PLAN_FILE_CLAUSE = `Do not write the plan file your workflow names. Ensemb
 const SUBAGENT_PLAN_FILE_CLAUSE = `Do not write the plan file your workflow names either. You are not submitting a plan, nothing in Ensemblr reads \`~/.claude/plans/\`, and in a read-only workspace \`Write\` is denied outright. Your report is your whole output.`;
 
 /**
+ * Which exit a planning root actually holds, and which two tools its workflow
+ * names that it may not.
+ *
+ * Claude Code publishes `ExitPlanMode` and `AskUserQuestion` only to a session
+ * running behind a per-tool approval callback — `approval-required` here, and
+ * nothing else — so on a trusted or read-only workspace both are absent from the
+ * tool list while the plan workflow goes on naming them. A root that believes the
+ * workflow spends its turn on `No such tool available` and ends with the plan
+ * stranded in prose, which is the one outcome Plan Mode cannot have.
+ */
+const PLAN_EXIT_TOOL_CLAUSE = `Two tools your plan workflow names may not be in your tool list, and that is the workspace's permission mode rather than a fault to work around. Your runtime publishes its own \`ExitPlanMode\` and \`AskUserQuestion\` only to a session that runs behind a per-tool approval prompt, so on a trusted or read-only workspace \`No such tool available\` is the expected answer for both. Ensemblr's own are in your list instead: submit the plan with \`ensemblr_exit_plan_mode\`, and interview the user with \`ensemblr_ask_user_question\` unless a block on this turn says the user is away. The app treats a plan submitted either way identically, so reach for the control op first and do not spend a turn hunting for the native one.`;
+
+/**
  * Builds the delegation directive for one planning turn.
  *
  * Appended to every turn a directly-prompted runtime spends in Plan Mode, and
@@ -330,6 +343,11 @@ const SUBAGENT_PLAN_FILE_CLAUSE = `Do not write the plan file your workflow name
  * `systemPrompt` there, while the plan-mode toggle moves per turn. So the answer
  * rides the per-turn channel instead — the same resolution ADR 0050 reached for
  * the upkeep block, for the same reason.
+ *
+ * A root's block closes on {@link PLAN_EXIT_TOOL_CLAUSE}, which answers the same
+ * kind of mismatch one layer down: the workflow names two native tools the CLI
+ * withholds from every mode but `approval-required`, and the agent has no way to
+ * learn that except by calling one and being told it does not exist.
  *
  * A Concierge gets nothing. It is a panel rather than a chat tab, so the
  * plan-mode registry the caller gates on never holds its session — but that is a
@@ -361,5 +379,5 @@ export function buildPlanModeDelegationDirective({
 	}
 	const body =
 		delegation === 'native' ? NATIVE_DELEGATION_BODY : ENSEMBLR_DELEGATION_BODY;
-	return `${PLAN_MODE_DELEGATION_PREAMBLE}\n\n${body}\n\n${PLAN_FILE_CLAUSE}`;
+	return `${PLAN_MODE_DELEGATION_PREAMBLE}\n\n${body}\n\n${PLAN_FILE_CLAUSE}\n\n${PLAN_EXIT_TOOL_CLAUSE}`;
 }

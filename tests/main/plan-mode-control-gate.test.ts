@@ -421,20 +421,18 @@ describe('plan mode: getSessionBrief', () => {
 		});
 	});
 
-	// The branch rename is not one of them: it moves the git branch, which is what
-	// `git branch -m` does and the bash guard denies by name, and a branch moved
-	// under the user mid-plan breaks upstream tracking on the old name.
-	it('refuses the branch rename while planning', async () => {
+	// The branch rename is one of them too. It moves a git branch, but the one the
+	// workspace was cut with, and the plan-mode upkeep block asks for the name in
+	// the same breath as the tab title — refusing it here left the board showing a
+	// placeholder for the whole interview (ADR 0050).
+	it('leaves the branch rename available while planning', async () => {
 		const { service } = setup({ planning: true });
 
 		const result = await invoke(service, 'setBranchName', {
 			name: 'add-dark-mode',
 		});
 
-		expect(result).toMatchObject({ ok: false, code: 'denied-scope' });
-		if (!result.ok) {
-			expect(result.error).toContain('git branch -m');
-		}
+		expect(result).toMatchObject({ ok: true });
 	});
 });
 

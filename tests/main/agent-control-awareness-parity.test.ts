@@ -846,9 +846,6 @@ describe('agent-control AWARENESS parity', () => {
 			'ensemblr_launch_harness',
 			'ensemblr_start_terminal',
 			'ensemblr_write_terminal',
-			// Renaming the git branch is what `git branch -m` does, which the bash
-			// guard denies by name. Labelling the tab and the summary stay available.
-			'ensemblr_set_branch_name',
 		]) {
 			for (const playbook of PLAN_MODE_PLAYBOOKS) {
 				expect(playbook).toContain(toolName);
@@ -873,6 +870,23 @@ describe('agent-control AWARENESS parity', () => {
 				planModeControlOpDenial(controlOpForToolName(toolName), 'subagent'),
 			).not.toBeNull();
 		}
+	});
+
+	// Naming the work is bookkeeping the planning upkeep block asks for by name,
+	// so the playbook has to promise it and the guard has to grant it. A planning
+	// investigator is refused it by scope rather than by Plan Mode, which is why
+	// only its playbook says the tool is refused.
+	it('lets a planning orchestrator name the workspace and its branch', () => {
+		expect(planModeControlOpDenial('setBranchName', 'orchestrator')).toBeNull();
+		expect(PLAN_MODE_ORCHESTRATOR_AWARENESS).toContain(
+			'ensemblr_set_branch_name',
+		);
+		expect(PLAN_MODE_ORCHESTRATOR_AWARENESS).toContain(
+			'All three stay available while planning',
+		);
+		expect(PLAN_MODE_SUBAGENT_AWARENESS).toContain(
+			'belongs to the orchestrator that spawned you and is refused here',
+		);
 	});
 
 	// The orchestrator playbook promises `ensemblr_start_conversation` outright and
@@ -1164,15 +1178,18 @@ describe('agent-control AWARENESS parity', () => {
 		);
 	});
 
-	// While planning the answer is the opposite: the upkeep block may still ask
-	// for the branch, and the op is refused, so the playbook has to say where the
-	// name goes instead rather than leaving the agent to retry the call.
-	it('sends a planning root’s branch name into the plan instead', () => {
+	// While planning the timing is the opposite of the deferral above: the upkeep
+	// block asks for the branch and the op is granted, so the playbook has to send
+	// the agent to the call now rather than leave the name for the approved plan.
+	it('has a planning root name the branch during the interview', () => {
 		expect(PLAN_MODE_ORCHESTRATOR_AWARENESS).toContain(
+			'Name the work in the same breath as the tab, not once the plan is approved',
+		);
+		expect(PLAN_MODE_ORCHESTRATOR_AWARENESS).not.toContain(
 			'Put the name in the plan and apply it once the plan is approved',
 		);
 		expect(PLAN_MODE_ORCHESTRATOR_AWARENESS).toContain(
-			'is refused while planning, so put the name in the plan instead of calling it',
+			'every item on it stays allowed while you plan',
 		);
 	});
 

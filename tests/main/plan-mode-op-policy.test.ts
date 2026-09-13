@@ -68,10 +68,11 @@ const EXPECTED_DENIALS: Record<
 	readTerminalOutput: [],
 	resolveDiffComments: ['orchestrator', 'subagent'],
 	sendFollowUp: 'conditional',
-	// Denied for both roles: it renames the git branch, which is what `git branch
-	// -m` does and the bash guard denies by name, and a branch moved under the
-	// user mid-plan breaks upstream tracking on the old name.
-	setBranchName: ['orchestrator', 'subagent'],
+	// Allowed for both roles, and deliberately so: the branch it moves is the one
+	// the workspace was cut with, and ADR 0050 asks a planning session to name the
+	// work first rather than last. A sub-agent is refused it by `subagent-policy`,
+	// which is a scope rule rather than a plan-mode one.
+	setBranchName: [],
 	setName: [],
 	setSummary: [],
 	setWorkspaceStatus: [],

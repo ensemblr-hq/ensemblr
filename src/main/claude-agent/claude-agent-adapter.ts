@@ -36,6 +36,7 @@ import {
 	type ClaudeApprovalGate,
 	type ClaudeCanUseTool,
 	resolvePermissionSettings,
+	withholdsControlTools,
 } from './claude-permission-bridge.ts';
 import {
 	type ClaudePlanSubmittedEvent,
@@ -815,11 +816,14 @@ function buildQueryOptions({
 			concierge?.canUseTool ??
 			withAfkAutoApproval(buildCanUseTool({ canUseTool, mode }), isUnattended),
 		cwd: metadata.cwd,
-		// Both guards refuse and neither pre-approves, so they compose: a session
-		// can be planning, unattended and a Concierge at once, and a deny from any
-		// of the three stands.
+		// The three compose: a session can be planning, unattended and a Concierge
+		// at once, and a deny from any of them stands. Only the plan-mode guard
+		// pre-approves, and only over the control tools the other two already wave
+		// past, so its allow cannot overturn one of their refusals.
 		hooks: withAfkHooks(
-			withPlanModeHooks(concierge?.hooks, isPlanning),
+			withPlanModeHooks(concierge?.hooks, isPlanning, () =>
+				withholdsControlTools({ mode, planning: isPlanning() }),
+			),
 			isUnattended,
 		),
 		env: stripLaunchContextEnv({ ...baseEnv, ...metadata.env }),

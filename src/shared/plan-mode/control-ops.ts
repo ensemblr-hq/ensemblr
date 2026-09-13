@@ -28,6 +28,15 @@ import { planModeBlockReason } from './block-reason.ts';
  * launches with permission prompts skipped, and a terminal is a raw shell the
  * read-only command classifier cannot see into, so neither can be made safe by
  * inheritance the way a spawned agent conversation can.
+ *
+ * `setBranchName` is deliberately absent, and stays absent. It moves a git
+ * branch, which reads like the write this map exists to refuse — but the branch
+ * it moves is the one the workspace was cut with, `applyBranchSlug` refuses an
+ * adopted or already-named branch outright, and naming the work is what
+ * [ADR 0050](../../../docs/adr/0050-name-a-planning-workspace-before-the-agent-does.md)
+ * asks a planning session to do first rather than last. Blocking it here
+ * contradicted the plan-mode upkeep block, which asks for the name in the same
+ * breath as the tab title.
  */
 const PLAN_MODE_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 	[
@@ -53,10 +62,6 @@ const PLAN_MODE_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 	[
 		'updateArchitectureDiagram',
 		'`ensemblr_update_architecture_diagram` writes `.ensemblr/architecture.json`, which is a tracked file — a redraw from here lands in the user’s `git status` and in the Changes panel, and a working tree left untouched is the one thing planning promises. Reading it is not blocked: `ensemblr_get_architecture_diagram` is how you describe the architecture in the plan, and redrawing it is work the approved plan can carry',
-	],
-	[
-		'setBranchName',
-		'`ensemblr_set_branch_name` renames the git branch as well as the workspace, which is what `git branch -m` does and the bash guard denies by name — a branch moved under the user while they are still reading a plan they have not approved breaks upstream tracking on the old name. Naming the tab and the summary stay available: they label the conversation without touching the repository. Put the branch name in the plan and apply it once the plan is approved',
 	],
 	[
 		'linearCreateIssue',
