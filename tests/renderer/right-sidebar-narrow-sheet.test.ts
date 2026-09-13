@@ -1,68 +1,22 @@
 // @vitest-environment happy-dom
 
-import { act, renderHook } from '@testing-library/react';
-import { createStore, Provider } from 'jotai';
-import { createElement, type ReactNode } from 'react';
+import { act } from '@testing-library/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { useRightSidebarController } from '../../src/renderer/hooks/workbench-shell/use-right-sidebar-controller';
 import {
 	rightSidebarCollapsedAtom,
 	rightSidebarSizePercentAtom,
 } from '../../src/renderer/state/workspace';
 import { installLocalStorage } from './support/dom';
+import {
+	createPanelStub,
+	flushAnimationFrame,
+	installViewport,
+	renderRightSidebarController,
+	WIDE_VIEWPORT_QUERY,
+} from './support/right-sidebar';
 
-const WIDE_VIEWPORT_QUERY = '(min-width: 1024px)';
-const SIZE_STORAGE_KEY = 'ensemblr_workspace_right_sidebar_size_percent';
 const COLLAPSED_STORAGE_KEY = 'ensemblr_workspace_right_sidebar_collapsed';
-
-/**
- * Replaces `matchMedia` with a driveable stand-in, recording every query the
- * controller asks for so a test can hold it to using one.
- */
-function installViewport(startsWide: boolean) {
-	let isWide = startsWide;
-	const listeners = new Set<() => void>();
-	const queries: string[] = [];
-
-	vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => {
-		queries.push(query);
-
-		return {
-			get matches() {
-				return isWide;
-			},
-			addEventListener: (_type: string, listener: () => void) => {
-				listeners.add(listener);
-			},
-			removeEventListener: (_type: string, listener: () => void) => {
-				listeners.delete(listener);
-			},
-		} as unknown as MediaQueryList;
-	});
-
-	return {
-		queries,
-		resizeTo(nextIsWide: boolean) {
-			isWide = nextIsWide;
-			for (const listener of [...listeners]) {
-				listener();
-			}
-		},
-	};
-}
-
-function renderController(
-	seed?: (store: ReturnType<typeof createStore>) => void,
-) {
-	const store = createStore();
-
-	seed?.(store);
-
-	return renderHook(() => useRightSidebarController(), {
-		wrapper: ({ children }: { children: ReactNode }) =>
-			createElement(Provider, { store }, children),
-	});
-}
+const SIZE_STORAGE_KEY = 'ensemblr_workspace_right_sidebar_size_percent';
 
 function trackStorageWrites() {
 	const writes: string[] = [];
@@ -76,15 +30,6 @@ function trackStorageWrites() {
 	return writes;
 }
 
-/** Lets the queued animation frame the wide-layout restore runs in settle. */
-async function flushAnimationFrame() {
-	await act(async () => {
-		await new Promise((resolve) => {
-			window.requestAnimationFrame(() => resolve(undefined));
-		});
-	});
-}
-
 beforeEach(() => {
 	installLocalStorage();
 });
@@ -95,7 +40,7 @@ afterEach(() => {
 
 test('a narrow viewport reports the rail hidden until the sheet is opened', () => {
 	installViewport(false);
-	const { result } = renderController();
+	const { result } = renderRightSidebarController();
 
 	expect(result.current.isNarrowViewport).toBe(true);
 	expect(result.current.isRightSidebarSheetOpen).toBe(false);
@@ -104,7 +49,7 @@ test('a narrow viewport reports the rail hidden until the sheet is opened', () =
 
 test('expanding on a narrow viewport opens the sheet rather than the panel', () => {
 	installViewport(false);
-	const { result } = renderController();
+	const { result } = renderRightSidebarController();
 
 	act(() => {
 		result.current.expandRightSidebar();
@@ -116,7 +61,7 @@ test('expanding on a narrow viewport opens the sheet rather than the panel', () 
 
 test('collapsing on a narrow viewport closes the sheet', () => {
 	installViewport(false);
-	const { result } = renderController();
+	const { result } = renderRightSidebarController();
 
 	act(() => {
 		result.current.expandRightSidebar();
@@ -131,7 +76,7 @@ test('collapsing on a narrow viewport closes the sheet', () => {
 
 test('opening and closing the narrow sheet leaves the persisted wide layout alone', () => {
 	installViewport(false);
-	const { result } = renderController();
+	const { result } = renderRightSidebarController();
 	const writes = trackStorageWrites();
 
 	act(() => {
@@ -147,9 +92,11 @@ test('opening and closing the narrow sheet leaves the persisted wide layout alon
 
 test('widening seats the rail back in the panel and lets the sheet go', async () => {
 	const viewport = installViewport(false);
-	const { result } = renderController((store) => {
+	const { result } = renderRightSidebarController((store) => {
 		store.set(rightSidebarSizePercentAtom, 40);
 	});
+
+	result.current.rightSidebarPanelRef.current = createPanelStub(0).handle;
 
 	act(() => {
 		result.current.expandRightSidebar();
@@ -168,7 +115,7 @@ test('widening seats the rail back in the panel and lets the sheet go', async ()
 
 test('a sidebar the user had collapsed stays collapsed when the window widens', async () => {
 	const viewport = installViewport(false);
-	const { result } = renderController((store) => {
+	const { result } = renderRightSidebarController((store) => {
 		store.set(rightSidebarCollapsedAtom, true);
 	});
 
@@ -183,9 +130,11 @@ test('a sidebar the user had collapsed stays collapsed when the window widens', 
 
 test('a wide viewport keeps expanding the panel rather than opening a sheet', async () => {
 	installViewport(true);
-	const { result } = renderController((store) => {
+	const { result } = renderRightSidebarController((store) => {
 		store.set(rightSidebarCollapsedAtom, true);
 	});
+
+	result.current.rightSidebarPanelRef.current = createPanelStub(0).handle;
 
 	act(() => {
 		result.current.expandRightSidebar();
@@ -197,9 +146,9 @@ test('a wide viewport keeps expanding the panel rather than opening a sheet', as
 	expect(window.localStorage.getItem(COLLAPSED_STORAGE_KEY)).toBe('false');
 });
 
-test('every viewport test goes through one query, so narrow and lg cannot disagree', () => {
+test('every viewport test goes through one query, so narrow and rail cannot disagree', () => {
 	const viewport = installViewport(false);
-	const { result } = renderController();
+	const { result } = renderRightSidebarController();
 
 	act(() => {
 		result.current.expandRightSidebar();

@@ -11,6 +11,7 @@ import {
 	rightSidebarSizePercentAtom,
 } from '../../src/renderer/state/workspace';
 import { installLocalStorage } from './support/dom';
+import { installViewport } from './support/right-sidebar';
 
 const SIZE_STORAGE_KEY = 'ensemblr_workspace_right_sidebar_size_percent';
 const COLLAPSED_STORAGE_KEY = 'ensemblr_workspace_right_sidebar_collapsed';
@@ -61,6 +62,7 @@ function renderController(
 
 beforeEach(() => {
 	installLocalStorage();
+	installViewport(true);
 	vi.useFakeTimers();
 });
 

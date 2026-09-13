@@ -7,13 +7,13 @@ import {
 	useSyncExternalStore,
 } from 'react';
 import type { PanelImperativeHandle, PanelSize } from 'react-resizable-panels';
-
 import {
 	rightSidebarCollapsedAtom,
 	rightSidebarSizePercentAtom,
 } from '@/renderer/state/workspace';
+import { useRightSidebarRestore } from './use-right-sidebar-restore';
 
-const RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH = 1024;
+const RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH = 1152;
 const RIGHT_SIDEBAR_DEFAULT_SIZE_PERCENT = 34;
 const RIGHT_SIDEBAR_MAX_SIZE_PERCENT = 68;
 const RIGHT_SIDEBAR_COLLAPSED_THRESHOLD_PERCENT = 1;
@@ -21,10 +21,17 @@ const RIGHT_SIDEBAR_SIZE_COMMIT_DELAY_MS = 250;
 
 /**
  * The one query every viewport test here goes through, read positively for wide
- * and negated for narrow. It mirrors Tailwind's `lg` (64rem), which
- * `panel-layout.tsx` gates the resizable rail on — a separate `max-width:
- * 1023px` query would leave a fractional-width band where both read false and
- * the rail was neither panel nor sheet.
+ * and negated for narrow. It mirrors the `rail` breakpoint (72rem) declared in
+ * `styles/index.css`, which `panel-layout.tsx` gates the resizable rail on — a
+ * separate `max-width` query would leave a fractional-width band where both read
+ * false and the rail was neither panel nor sheet.
+ *
+ * It is deliberately wider than Tailwind's `lg`: the panel group needs 16rem of
+ * app sidebar plus the two panels' 32rem and 22rem minimums before
+ * react-resizable-panels will seat both at once, and inside the 1024–1120px band
+ * `lg` used to open it in, every expansion was refused silently and the rail's
+ * toggle did nothing at all. Below this width the sheet hosts the rail instead,
+ * which always works.
  */
 const RIGHT_SIDEBAR_WIDE_VIEWPORT_QUERY = `(min-width: ${RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH}px)`;
 
@@ -103,7 +110,12 @@ interface RightSidebarController {
 export function useRightSidebarController(): RightSidebarController {
 	const store = useStore();
 	const rightSidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
-	const rightSidebarCollapsedByViewportRef = useRef(false);
+	// Whether the last sync saw a narrow viewport, which is what separates the
+	// widening that owes the rail a restore from the every-other-reason the sync
+	// runs. Seeded by that sync rather than by the query, which there is no
+	// answer to until the hook is running in a browser. The user's own intent is
+	// not in here — that is the collapse preference, read alongside it.
+	const wasNarrowViewportRef = useRef(false);
 	const [storedRightSidebarCollapsed, setStoredRightSidebarCollapsed] = useAtom(
 		rightSidebarCollapsedAtom,
 	);
@@ -131,6 +143,10 @@ export function useRightSidebarController(): RightSidebarController {
 	);
 	const pendingRightSidebarSizePercentRef = useRef<number | null>(null);
 	const rightSidebarSizeCommitTimerRef = useRef<number | null>(null);
+	const { cancelRestore, restore } = useRightSidebarRestore(
+		rightSidebarPanelRef,
+		rightSidebarSizePercentRef,
+	);
 	const [isRightSidebarPanelCollapsed, setIsRightSidebarPanelCollapsed] =
 		useState(storedRightSidebarCollapsed);
 	const [isRightSidebarSheetOpen, setRightSidebarSheetOpen] = useState(false);
@@ -155,7 +171,7 @@ export function useRightSidebarController(): RightSidebarController {
 			return;
 		}
 
-		rightSidebarCollapsedByViewportRef.current = false;
+		cancelRestore();
 		rightSidebarPanelRef.current?.collapse();
 		rightSidebarCollapsedPreferenceRef.current = true;
 		setIsRightSidebarPanelCollapsed(true);
@@ -168,16 +184,10 @@ export function useRightSidebarController(): RightSidebarController {
 			return;
 		}
 
-		rightSidebarCollapsedByViewportRef.current = false;
-
-		window.requestAnimationFrame(() => {
-			rightSidebarPanelRef.current?.expand();
-			rightSidebarPanelRef.current?.resize(
-				`${rightSidebarSizePercentRef.current}%`,
-			);
-			rightSidebarCollapsedPreferenceRef.current = false;
+		rightSidebarCollapsedPreferenceRef.current = false;
+		setStoredRightSidebarCollapsed(false);
+		restore(() => {
 			setIsRightSidebarPanelCollapsed(false);
-			setStoredRightSidebarCollapsed(false);
 		});
 	};
 	/** Writes whatever width the drag last reported and drops the queued commit. */
@@ -256,24 +266,12 @@ export function useRightSidebarController(): RightSidebarController {
 		const wideViewportQuery = window.matchMedia(
 			RIGHT_SIDEBAR_WIDE_VIEWPORT_QUERY,
 		);
-		let restoreFrame: number | null = null;
 		const syncRightSidebarWithViewport = () => {
 			if (!wideViewportQuery.matches) {
-				if (restoreFrame !== null) {
-					window.cancelAnimationFrame(restoreFrame);
-					restoreFrame = null;
-				}
-
-				const wasAlreadyCollapsed =
-					rightSidebarPanelRef.current?.isCollapsed() ||
-					isRightSidebarPanelCollapsed;
-
+				cancelRestore();
+				wasNarrowViewportRef.current = true;
 				rightSidebarPanelRef.current?.collapse();
 				setIsRightSidebarPanelCollapsed(true);
-
-				if (!wasAlreadyCollapsed) {
-					rightSidebarCollapsedByViewportRef.current = true;
-				}
 				return;
 			}
 
@@ -281,38 +279,30 @@ export function useRightSidebarController(): RightSidebarController {
 			// holding it must let go first or both would show it at once.
 			setRightSidebarSheetOpen(false);
 
-			if (
-				rightSidebarCollapsedByViewportRef.current &&
-				!rightSidebarCollapsedPreferenceRef.current
-			) {
-				restoreFrame = window.requestAnimationFrame(() => {
-					rightSidebarPanelRef.current?.expand();
-					rightSidebarPanelRef.current?.resize(
-						`${rightSidebarSizePercentRef.current}%`,
-					);
-					setIsRightSidebarPanelCollapsed(false);
-					rightSidebarCollapsedByViewportRef.current = false;
-					restoreFrame = null;
-				});
-				return;
-			}
+			const hasJustWidened = wasNarrowViewportRef.current;
 
-			rightSidebarCollapsedByViewportRef.current = false;
+			wasNarrowViewportRef.current = false;
+
+			// A mount on a wide window is already seated by the panel's own
+			// `defaultSize`, so only a window that has just grown owes the rail
+			// anything — and only when the user had not collapsed it themselves.
+			if (hasJustWidened && !rightSidebarCollapsedPreferenceRef.current) {
+				restore(() => {
+					setIsRightSidebarPanelCollapsed(false);
+				});
+			}
 		};
 
 		syncRightSidebarWithViewport();
 		wideViewportQuery.addEventListener('change', syncRightSidebarWithViewport);
 
 		return () => {
-			if (restoreFrame !== null) {
-				window.cancelAnimationFrame(restoreFrame);
-			}
 			wideViewportQuery.removeEventListener(
 				'change',
 				syncRightSidebarWithViewport,
 			);
 		};
-	}, [isRightSidebarPanelCollapsed]);
+	}, [cancelRestore, restore]);
 
 	return {
 		collapseRightSidebar,
