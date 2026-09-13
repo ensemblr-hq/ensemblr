@@ -102,3 +102,22 @@ describe('fuzzyScore', () => {
 		expect(fuzzyScore('code-review', 'zzz')).toBe(0);
 	});
 });
+
+describe('case folding', () => {
+	test('folds ASCII case-insensitively through the native fast path', () => {
+		const result = fuzzyMatch('README.md', 'readme');
+		expect(result.tier).toBe(FUZZY_TIER.prefix);
+		expect(matchedText('README.md', result.ranges)).toEqual(['README']);
+	});
+
+	test('keeps the per-character walk for non-ASCII, so no index shifts', () => {
+		const haystack = 'İstanbul-notes.md';
+		const result = fuzzyMatch(haystack, 'stanbul');
+		expect(result.tier).toBe(FUZZY_TIER.substring);
+		expect(matchedText(haystack, result.ranges)).toEqual(['stanbul']);
+	});
+
+	test('folds an uppercase sigma per character rather than contextually', () => {
+		expect(fuzzyScore('ΟΔΟΣ', 'οδοσ')).toBe(1000);
+	});
+});
