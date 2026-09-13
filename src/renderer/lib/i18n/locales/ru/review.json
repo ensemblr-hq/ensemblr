@@ -141,6 +141,7 @@
 		"discard": "Отменить изменения в {{path}}",
 		"open": "Открыть {{path}}",
 		"open-in": "Открыть {{path}} в…",
+		"symlinked-directory": "{{path}} — ссылка на каталог, открыть нельзя",
 		"viewed": "Просмотрено"
 	},
 	"file-status": {

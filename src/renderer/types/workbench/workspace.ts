@@ -15,6 +15,7 @@ import type { RepositoryPreviewUrl } from '@/shared/ipc/contracts/repository-set
 import type { ReviewCommentOrigin } from '@/shared/ipc/contracts/review-comments';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
+import type { SymlinkTargetKind } from '@/shared/ipc/contracts/workspace-files';
 import type {
 	WorkspaceGitDiffScope,
 	WorkspaceGitFailure,
@@ -85,6 +86,8 @@ export interface ReviewFileSummary {
 		| 'modified'
 		| 'renamed'
 		| 'untracked';
+	/** Present only for symlinks; the row badges the link instead of its name. */
+	symlinkTargetKind?: SymlinkTargetKind;
 }
 
 /** Workspace file-list row, including optional icon-only symlink metadata. */
@@ -96,7 +99,7 @@ export interface WorkspaceFileSummary {
 	name: string;
 	path: string;
 	/** Present only for symlinks; unresolved targets use the file-link icon. */
-	symlinkTargetKind?: 'directory' | 'file' | 'unknown';
+	symlinkTargetKind?: SymlinkTargetKind;
 }
 
 /** A workspace file-tree entry that a path written by an agent was matched to. */

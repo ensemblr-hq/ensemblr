@@ -21,6 +21,7 @@ import { cn } from '@/renderer/lib/utils';
 import {
 	fileTreeIndentClassName,
 	getWorkspaceFileIconName,
+	isPreviewableWorkspaceFile,
 } from '@/renderer/lib/workbench';
 import type {
 	FileTreeNode,
@@ -241,7 +242,12 @@ const WorkspaceFolderRow = memo(
 		previous.labelParts.every((part, index) => part === next.labelParts[index]),
 );
 
-/** Clickable row that opens a workspace file in the preview pane. */
+/**
+ * Clickable row that opens a workspace file in the preview pane. A symlink to a
+ * directory renders here too — the listing carries it as a leaf — but stays
+ * inert: neither click gesture is bound, and the shared menu drops View and Keep
+ * open from the link target it reads off the listing.
+ */
 const WorkspaceFileRow = memo(function WorkspaceFileRow({
 	file,
 	level,
@@ -252,29 +258,37 @@ const WorkspaceFileRow = memo(function WorkspaceFileRow({
 	openFilePreview: ReviewFilePreviewOpener | null;
 }) {
 	const { t } = useTranslation();
+	const canPreview = isPreviewableWorkspaceFile(file);
+	const openPreview = canPreview ? openFilePreview : null;
 
 	return (
 		<Button
-			aria-label={t(
-				'workbench:all-files.open-preview',
-				'Open {{path}} preview',
-				{
-					path: file.path,
-				},
-			)}
+			aria-disabled={!canPreview}
+			aria-label={
+				canPreview
+					? t('workbench:all-files.open-preview', 'Open {{path}} preview', {
+							path: file.path,
+						})
+					: t(
+							'workbench:all-files.symlinked-directory',
+							'{{path}} links to a directory and cannot be previewed',
+							{ path: file.path },
+						)
+			}
 			aria-level={level + 1}
 			className={cn(
 				'h-7 w-full justify-start gap-1.5 rounded-md px-2 py-0.5 text-left font-normal',
 				fileTreeIndentClassName(level),
 				// Git-ignored entries stay visible but dimmed, VS Code style.
 				file.isIgnored && 'opacity-50',
+				!canPreview && 'cursor-default',
 			)}
 			data-row-kind='file'
 			data-row-path={file.path}
-			onClick={openFilePreview ? () => openFilePreview(file.path) : undefined}
+			onClick={openPreview ? () => openPreview(file.path) : undefined}
 			onDoubleClick={
-				openFilePreview
-					? () => openFilePreview(file.path, { preview: false })
+				openPreview
+					? () => openPreview(file.path, { preview: false })
 					: undefined
 			}
 			role='treeitem'

@@ -1,5 +1,5 @@
 import { GitPullRequestArrowIcon, TriangleAlertIcon } from 'lucide-react';
-import { type MouseEvent, useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -9,6 +9,7 @@ import {
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { PanelPlaceholder } from '@/renderer/components/workbench-shell/panel-placeholder';
 import { useBuildReviewFileActions } from '@/renderer/hooks/workbench-shell/review-files/use-build-review-file-actions';
+import { useRowContextMenuTarget } from '@/renderer/hooks/workbench-shell/review-files/use-row-context-menu-target';
 import { describeWorkspaceGitFailure } from '@/renderer/lib/workbench/git-failure-copy';
 import {
 	groupReviewFilesByConflict,
@@ -99,27 +100,21 @@ export function ReviewFileList({
 		[conflictPaths, markedFiles, listedFiles],
 	);
 
-	// One shared right-click menu serves every row; the clicked row is captured
-	// here from its `data-row-path` so we don't mount a menu per file.
-	const [menuTarget, setMenuTarget] = useState<ReviewFileMenuTarget | null>(
-		null,
-	);
-	const handleContextCapture = useCallback(
-		(event: MouseEvent<HTMLDivElement>) => {
-			const rowElement = (event.target as HTMLElement).closest<HTMLElement>(
-				'[data-row-path]',
-			);
-			if (!rowElement?.dataset.rowPath) {
-				// Right-click landed off a file row (folder header, empty area): don't
-				// open an empty menu.
-				event.preventDefault();
-				event.stopPropagation();
-				return;
-			}
-			setMenuTarget({ path: rowElement.dataset.rowPath });
+	const buildMenuTarget = useCallback(
+		(path: string): ReviewFileMenuTarget => {
+			const row = files.find((file) => file.path === path);
+
+			return {
+				path,
+				...(row?.symlinkTargetKind
+					? { symlinkTargetKind: row.symlinkTargetKind }
+					: {}),
+			};
 		},
-		[],
+		[files],
 	);
+	const { handleContextCapture, menuTarget } =
+		useRowContextMenuTarget(buildMenuTarget);
 
 	if (error) {
 		return (

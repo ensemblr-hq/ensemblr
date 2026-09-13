@@ -1,5 +1,5 @@
 import type { Dirent } from 'node:fs';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { lstat, readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type {
 	ListWorkspaceFilesRequest,
@@ -41,6 +41,7 @@ import {
 import type { PreviewPathScope } from './workspace-paths.ts';
 import {
 	hasErrorCode,
+	hasSymlinkedAncestor,
 	ignoredEntry,
 	isWithinWorkspaceReal,
 	resolvePreviewPath,
@@ -387,6 +388,30 @@ export function createListWorkspaceFilesService({
 						error: {
 							code: 'not-directory',
 							message: 'Selected path is not a directory.',
+						},
+						path: target.relativePath,
+					};
+				}
+				// Only a link the followed `stat` already called a directory reaches
+				// here, so refusing every symlink at this point cannot mislabel a link
+				// to a file — that one left as `not-directory` above.
+				if ((await lstat(target.absolutePath)).isSymbolicLink()) {
+					return {
+						entries: [],
+						error: {
+							code: 'symlinked-directory',
+							message: 'Selected path is a symlink to a directory.',
+						},
+						path: target.relativePath,
+					};
+				}
+				if (await hasSymlinkedAncestor(cwdResult.cwd, target.relativePath)) {
+					return {
+						entries: [],
+						error: {
+							code: 'symlinked-directory',
+							message:
+								'Selected path reaches through a symlink to a directory.',
 						},
 						path: target.relativePath,
 					};

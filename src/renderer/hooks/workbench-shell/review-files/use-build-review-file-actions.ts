@@ -7,6 +7,7 @@ import {
 import { useAttachToChat } from '@/renderer/hooks/workbench-shell/composer/use-attach-to-chat';
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
 import { diffNewSideIsWorkingTree } from '@/renderer/lib/diff/scope';
+import { isPreviewableWorkspaceFile } from '@/renderer/lib/workbench';
 import { reviewFileRevision } from '@/renderer/lib/workbench/review-files';
 import { useViewedChanges } from '@/renderer/state/workspace';
 import type {
@@ -130,6 +131,10 @@ export function useBuildReviewFileActions({
  * "Binary files differ", so the preview is the only view that shows the change.
  * Only scopes whose new side is the working tree qualify — a commit's image is a
  * historical blob the preview cannot read from disk.
+ *
+ * A symlink to a directory is held back even when its name carries an image
+ * extension: the preview would follow the link and find a directory, whereas the
+ * diff shows the one thing that actually changed — the path the link points at.
  * @param files - The change set's file rows.
  * @param diffScope - The scope those rows were listed at.
  * @returns Workspace-relative paths a row click should preview.
@@ -144,7 +149,11 @@ function previewableImagePathsIn(
 
 	const paths = new Set<string>();
 	for (const file of files) {
-		if (file.status !== 'deleted' && isPreviewableImagePath(file.path)) {
+		if (
+			file.status !== 'deleted' &&
+			isPreviewableImagePath(file.path) &&
+			isPreviewableWorkspaceFile(file)
+		) {
 			paths.add(file.path);
 		}
 	}

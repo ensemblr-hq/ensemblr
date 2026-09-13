@@ -1,3 +1,10 @@
+/**
+ * What a symlink resolved to, `unknown` when the target could not be reached.
+ * Every surface that badges a link shares this one union — the files tree, the
+ * changes list, and the rows either derives from.
+ */
+export type SymlinkTargetKind = 'directory' | 'file' | 'unknown';
+
 /** Wire shape for a single repo file surfaced to the renderer. */
 export interface WorkspaceFileEntryWire {
 	/**
@@ -9,7 +16,7 @@ export interface WorkspaceFileEntryWire {
 	name: string;
 	path: string;
 	/** Present only for symlinks; unresolved targets are unknown. Links stay leaf entries, never traversed. */
-	symlinkTargetKind?: 'directory' | 'file' | 'unknown';
+	symlinkTargetKind?: SymlinkTargetKind;
 }
 
 /** Request to list files under a workspace working directory. */
@@ -191,7 +198,8 @@ export type ReadWorkspaceDirectoryFailureCode =
 	| 'invalid-cwd'
 	| 'invalid-path'
 	| 'not-directory'
-	| 'read-failed';
+	| 'read-failed'
+	| 'symlinked-directory';
 
 /** The directory's immediate child entries, or a typed error on failure. */
 export interface ReadWorkspaceDirectoryResult {
@@ -224,7 +232,12 @@ export interface WorkspaceFilesApi {
 	onWorkspaceFilesChanged: (
 		listener: (event: WorkspaceFilesChangedBroadcast) => void,
 	) => () => void;
-	/** Lists an ignored directory's immediate children for lazy tree expansion. */
+	/**
+	 * Lists an ignored directory's immediate children for lazy tree expansion.
+	 * Refuses a symlinked directory with `symlinked-directory`: the tree shows a
+	 * link as a leaf whatever it points at, so opening one would follow the very
+	 * link the listing declined to walk.
+	 */
 	readWorkspaceDirectory: (
 		request: ReadWorkspaceDirectoryRequest,
 	) => Promise<ReadWorkspaceDirectoryResult>;

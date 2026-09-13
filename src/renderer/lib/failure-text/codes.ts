@@ -858,6 +858,11 @@ export const APP_FAILURE_TEXT: Record<
 		),
 	'spawn-error': (t) =>
 		t('errors:failure.spawn-error', 'The process could not be started.'),
+	'symlinked-directory': (t) =>
+		t(
+			'errors:failure.symlinked-directory',
+			'That path is a symlink to a directory, so it was not opened.',
+		),
 	'too-large': (t) => t('errors:failure.too-large', 'That file is too large.'),
 	'tracked-skipped': (t) =>
 		t(

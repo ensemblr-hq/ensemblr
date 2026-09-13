@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ContextMenuSeparator } from '@/renderer/components/ui/context-menu';
 import { WorkbenchContextMenuContent } from '@/renderer/components/workbench-shell/workbench-context-menu-content';
+import { isPreviewableWorkspaceFile } from '@/renderer/lib/workbench';
 import type {
 	FileTreeMenuTarget,
 	OpenTargetsState,
@@ -18,6 +19,11 @@ import { OpenInTargetsSubmenu } from './open-in-targets-submenu';
  * Keep open for file rows, "Attach to chat", "Open in <app>" for every installed
  * target, plus "Copy path", scoped to whichever row the user right-clicked. Keep
  * open is the keyboard-reachable equivalent of double-clicking the row.
+ *
+ * A symlink to a directory gets neither View nor Keep open, matching its own
+ * inert row: there is no preview of a directory to open. Every other action still
+ * treats it as the leaf entry it is, so "Open in" and Attach to chat act on the
+ * link rather than on the directory behind it.
  *
  * One menu serves the whole tree (the row that was clicked is captured into
  * `target`) instead of mounting a Radix `ContextMenu` per row, so thousands of
@@ -52,7 +58,12 @@ export function AllFilesContextMenuContent({
 	}
 
 	const path = target.relativePath;
-	const canOpen = openFilePreview && target.relativePathKind === 'file';
+	const canOpen =
+		openFilePreview &&
+		isPreviewableWorkspaceFile({
+			kind: target.relativePathKind,
+			symlinkTargetKind: target.symlinkTargetKind,
+		});
 	const invoke = (openTarget: WorkspaceOpenTarget) =>
 		void invokeTarget(openTarget, {
 			relativePath: path,

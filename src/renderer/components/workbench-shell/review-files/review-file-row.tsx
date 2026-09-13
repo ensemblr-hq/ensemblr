@@ -23,6 +23,7 @@ import { cn } from '@/renderer/lib/utils';
 import {
 	fileTreeIndentClassName,
 	getWorkspaceFileIconName,
+	isPreviewableWorkspaceFile,
 } from '@/renderer/lib/workbench';
 import type { ReviewFileSummary } from '@/renderer/types/workbench';
 
@@ -38,12 +39,13 @@ const fileStatusLabel: Record<ReviewFileSummary['status'], string> = {
 };
 
 /**
- * Single changed-file row. Click opens the file — its diff, or the image preview
- * when the workspace still holds a previewable image. On hover — or while its
- * open-in menu is open — the trailing +/- stats swap for a Discard button and an
- * "Open in" dropdown. A row marked viewed in the diff toolbar dims until the file
- * changes again, and a row whose discard is still running dims and stops
- * responding until git answers.
+ * Single changed-file row: the path and the click that opens it, then a trailing
+ * cluster that swaps the +/- stats for Discard and "Open in" on hover. A row
+ * marked viewed in the diff toolbar dims until the file changes again, and a row
+ * whose discard is still running dims and stops responding until git answers.
+ *
+ * Owns only the hover/viewed/discarding state the three clusters share; each
+ * reads the actions it needs from the row-actions context itself.
  */
 export function ReviewFileRow({
 	ariaLevel,
@@ -57,28 +59,11 @@ export function ReviewFileRow({
 	level?: number;
 	showPath: boolean;
 }) {
-	const {
-		copyTarget,
-		invokeTarget,
-		isDiscardable,
-		isDiscarding,
-		isViewed,
-		onDiscardFile,
-		openFile,
-		openInTargets,
-	} = useReviewFileActions();
-	const { t } = useTranslation();
+	const { isDiscarding, isViewed } = useReviewFileActions();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-	const fileName = getReviewFileName(file.path);
-	const hasOpenInMenu = openInTargets.length > 0 || Boolean(copyTarget);
-	const canDiscard = isDiscardable(file.path);
 	const discarding = isDiscarding(file.path);
 	const viewed = isViewed(file);
-	const openThisFile = openFile ? () => openFile(file.path) : undefined;
-	const keepThisFileOpen = openFile
-		? () => openFile(file.path, { preview: false })
-		: undefined;
 
 	return (
 		<div
@@ -105,94 +90,207 @@ export function ReviewFileRow({
 				? {}
 				: { 'aria-level': ariaLevel, role: 'treeitem' as const })}
 		>
-			<button
-				aria-label={t('review:file-row.open', 'Open {{path}}', {
-					path: file.path,
+			<ReviewFileOpenButton
+				discarding={discarding}
+				file={file}
+				showPath={showPath}
+			/>
+			<ReviewFileRowSummary
+				file={file}
+				isMenuOpen={isMenuOpen}
+				viewed={viewed}
+			/>
+			<ReviewFileRowActions
+				discarding={discarding}
+				file={file}
+				isMenuOpen={isMenuOpen}
+				onMenuOpenChange={setIsMenuOpen}
+			/>
+		</div>
+	);
+}
+
+/**
+ * The row's leading control: the file icon — the shortcut glyph when the path is
+ * a symlink, exactly as the files tree badges it — its name or path, and the
+ * click that opens the file: its diff, or the image preview when the workspace
+ * still holds a previewable image.
+ *
+ * A symlink to a directory is the one row that opens nothing, matching the files
+ * tree: neither the diff nor the preview describes what the reviewer clicked. It
+ * stays focusable and says so through `aria-disabled` rather than dropping out of
+ * the tab order, because the row's other controls remain live.
+ */
+function ReviewFileOpenButton({
+	discarding,
+	file,
+	showPath,
+}: {
+	discarding: boolean;
+	file: ReviewFileSummary;
+	showPath: boolean;
+}) {
+	const { openFile } = useReviewFileActions();
+	const { t } = useTranslation();
+
+	const fileName = getReviewFileName(file.path);
+	const canOpen = isPreviewableWorkspaceFile(file);
+	const open = canOpen ? openFile : null;
+
+	return (
+		<button
+			aria-disabled={!canOpen}
+			aria-label={
+				canOpen
+					? t('review:file-row.open', 'Open {{path}}', { path: file.path })
+					: t(
+							'review:file-row.symlinked-directory',
+							'{{path}} links to a directory and cannot be opened',
+							{ path: file.path },
+						)
+			}
+			className={cn(
+				'flex h-full min-w-0 flex-1 items-center gap-2 self-stretch rounded-md px-2 text-left font-mono text-xs',
+				!canOpen && 'cursor-default',
+			)}
+			disabled={discarding}
+			onClick={open ? () => open(file.path) : undefined}
+			onDoubleClick={
+				open ? () => open(file.path, { preview: false }) : undefined
+			}
+			type='button'
+		>
+			<Icon
+				aria-hidden='true'
+				className='size-3.5 shrink-0'
+				icon={getWorkspaceFileIconName({
+					kind: 'file',
+					name: fileName,
+					symlinkTargetKind: file.symlinkTargetKind,
 				})}
-				className='flex h-full min-w-0 flex-1 items-center gap-2 self-stretch rounded-md px-2 text-left font-mono text-xs'
-				disabled={discarding}
-				onClick={openThisFile}
-				onDoubleClick={keepThisFileOpen}
-				type='button'
-			>
-				<Icon
-					aria-hidden='true'
-					className='size-3.5 shrink-0'
-					icon={getWorkspaceFileIconName({ kind: 'file', name: fileName })}
+			/>
+			{showPath ? (
+				<FilePathLabel path={file.path} />
+			) : (
+				<span className='min-w-0 truncate'>{fileName}</span>
+			)}
+		</button>
+	);
+}
+
+/**
+ * The row's resting trailing cluster: the viewed tick, the +/- counts, and the
+ * status mark. Hidden on hover so the action buttons can take the same space.
+ */
+function ReviewFileRowSummary({
+	file,
+	isMenuOpen,
+	viewed,
+}: {
+	file: ReviewFileSummary;
+	isMenuOpen: boolean;
+	viewed: boolean;
+}) {
+	const { t } = useTranslation();
+
+	return (
+		<div
+			className={cn(
+				'items-center gap-1.5 pl-2',
+				isMenuOpen ? 'hidden' : 'flex group-hover:hidden',
+			)}
+		>
+			{viewed ? (
+				<CheckIcon
+					aria-label={t('review:file-row.viewed', 'Viewed')}
+					className='size-3.5 shrink-0 text-muted-foreground'
+					role='img'
 				/>
-				{showPath ? (
-					<FilePathLabel path={file.path} />
-				) : (
-					<span className='min-w-0 truncate'>{fileName}</span>
-				)}
-			</button>
-			<div
-				className={cn(
-					'items-center gap-1.5 pl-2',
-					isMenuOpen ? 'hidden' : 'flex group-hover:hidden',
-				)}
-			>
-				{viewed ? (
-					<CheckIcon
-						aria-label={t('review:file-row.viewed', 'Viewed')}
-						className='size-3.5 shrink-0 text-muted-foreground'
-						role='img'
-					/>
-				) : null}
-				<ReviewFileStats file={file} />
-				<ReviewFileStatusMark status={file.status} />
-			</div>
-			<div
-				className={cn(
-					'items-center gap-0.5 pl-2',
-					isMenuOpen ? 'flex' : 'hidden group-hover:flex',
-				)}
-			>
-				{canDiscard ? (
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<Button
-								aria-label={t(
-									'review:file-row.discard',
-									'Discard changes to {{path}}',
-									{ path: file.path },
-								)}
-								className='text-muted-foreground hover:text-foreground'
-								disabled={discarding}
-								onClick={() => onDiscardFile(file.path)}
-								size='icon-xs'
-								variant='ghost'
-							>
-								<Undo2Icon />
-							</Button>
-						</TooltipTrigger>
-						<TooltipContent>
-							{t('common:actions.discard-changes', 'Discard changes')}
-						</TooltipContent>
-					</Tooltip>
-				) : null}
-				{hasOpenInMenu ? (
-					<OpenInFileMenu
-						copyTarget={copyTarget}
-						filePath={file.path}
-						invokeTarget={invokeTarget}
-						onOpenChange={setIsMenuOpen}
-						openInTargets={openInTargets}
-					>
+			) : null}
+			<ReviewFileStats file={file} />
+			<ReviewFileStatusMark status={file.status} />
+		</div>
+	);
+}
+
+/**
+ * The row's hover cluster, taking the summary's place: Discard for an
+ * uncommitted change, and the "Open in" dropdown. Stays visible while that
+ * dropdown is open so the pointer can travel into it.
+ */
+function ReviewFileRowActions({
+	discarding,
+	file,
+	isMenuOpen,
+	onMenuOpenChange,
+}: {
+	discarding: boolean;
+	file: ReviewFileSummary;
+	isMenuOpen: boolean;
+	onMenuOpenChange: (open: boolean) => void;
+}) {
+	const {
+		copyTarget,
+		invokeTarget,
+		isDiscardable,
+		onDiscardFile,
+		openInTargets,
+	} = useReviewFileActions();
+	const { t } = useTranslation();
+
+	const hasOpenInMenu = openInTargets.length > 0 || Boolean(copyTarget);
+
+	return (
+		<div
+			className={cn(
+				'items-center gap-0.5 pl-2',
+				isMenuOpen ? 'flex' : 'hidden group-hover:flex',
+			)}
+		>
+			{isDiscardable(file.path) ? (
+				<Tooltip>
+					<TooltipTrigger asChild>
 						<Button
-							aria-label={t('review:file-row.open-in', 'Open {{path}} in…', {
-								path: file.path,
-							})}
+							aria-label={t(
+								'review:file-row.discard',
+								'Discard changes to {{path}}',
+								{ path: file.path },
+							)}
 							className='text-muted-foreground hover:text-foreground'
 							disabled={discarding}
+							onClick={() => onDiscardFile(file.path)}
 							size='icon-xs'
 							variant='ghost'
 						>
-							<ChevronDownIcon />
+							<Undo2Icon />
 						</Button>
-					</OpenInFileMenu>
-				) : null}
-			</div>
+					</TooltipTrigger>
+					<TooltipContent>
+						{t('common:actions.discard-changes', 'Discard changes')}
+					</TooltipContent>
+				</Tooltip>
+			) : null}
+			{hasOpenInMenu ? (
+				<OpenInFileMenu
+					copyTarget={copyTarget}
+					filePath={file.path}
+					invokeTarget={invokeTarget}
+					onOpenChange={onMenuOpenChange}
+					openInTargets={openInTargets}
+				>
+					<Button
+						aria-label={t('review:file-row.open-in', 'Open {{path}} in…', {
+							path: file.path,
+						})}
+						className='text-muted-foreground hover:text-foreground'
+						disabled={discarding}
+						size='icon-xs'
+						variant='ghost'
+					>
+						<ChevronDownIcon />
+					</Button>
+				</OpenInFileMenu>
+			) : null}
 		</div>
 	);
 }
