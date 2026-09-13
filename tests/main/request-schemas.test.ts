@@ -3,6 +3,8 @@ import { expect, test } from 'vitest';
 import {
 	activeChatContextSchema,
 	addInfisicalAccountRequestSchema,
+	getWorkspaceFileDiffRequestSchema,
+	getWorkspaceGitStatusRequestSchema,
 	infisicalLinkScopeRequestSchema,
 	launchAgentHarnessRequestSchema,
 	openChatTabRequestSchema,
@@ -402,4 +404,52 @@ test('parseDeleteRepositoryRequest drops the folder flag on a malformed payload'
 	expect(parseDeleteRepositoryRequest({ deleteFolder: true })).toEqual({
 		repositoryId: '',
 	});
+});
+
+const CHECKPOINT_HASH = 'a'.repeat(40);
+const NEXT_CHECKPOINT_HASH = 'b'.repeat(40);
+
+test('a turn scope carries both checkpoint refs through', () => {
+	const parsed = getWorkspaceGitStatusRequestSchema.parse({
+		scope: {
+			fromRef: CHECKPOINT_HASH,
+			kind: 'turn',
+			toRef: NEXT_CHECKPOINT_HASH,
+		},
+		workspaceCwd: '/tmp/ws',
+	});
+	expect(parsed.scope).toEqual({
+		fromRef: CHECKPOINT_HASH,
+		kind: 'turn',
+		toRef: NEXT_CHECKPOINT_HASH,
+	});
+});
+
+test('a turn scope may omit toRef, meaning the working tree', () => {
+	const parsed = getWorkspaceGitStatusRequestSchema.parse({
+		scope: { fromRef: CHECKPOINT_HASH, kind: 'turn' },
+		workspaceCwd: '/tmp/ws',
+	});
+	expect(parsed.scope).toEqual({ fromRef: CHECKPOINT_HASH, kind: 'turn' });
+});
+
+test.each([
+	['a flag', `-${'a'.repeat(39)}`],
+	['an abbreviation', 'a'.repeat(7)],
+	['a ref name', 'refs/ensemblr/checkpoints/ws/turn'],
+	['a path traversal', `../${'a'.repeat(37)}`],
+])('a turn scope refuses %s as a ref', (_label, ref) => {
+	expect(() =>
+		getWorkspaceGitStatusRequestSchema.parse({
+			scope: { fromRef: ref, kind: 'turn' },
+			workspaceCwd: '/tmp/ws',
+		}),
+	).toThrow();
+	expect(() =>
+		getWorkspaceFileDiffRequestSchema.parse({
+			path: 'src/app.ts',
+			scope: { fromRef: CHECKPOINT_HASH, kind: 'turn', toRef: ref },
+			workspaceCwd: '/tmp/ws',
+		}),
+	).toThrow();
 });

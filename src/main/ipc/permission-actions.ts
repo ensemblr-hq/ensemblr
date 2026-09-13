@@ -169,6 +169,7 @@ export const IPC_PERMISSION_ACTIONS = {
 	listAgentSessionEvents: null,
 	listAgentSessions: null,
 	listTurnCheckpoints: null,
+	listWorkspaceCheckpoints: null,
 	listReviewComments: null,
 	listReviewTodos: null,
 	listRestorableTerminals: null,

@@ -11,18 +11,27 @@ import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ChangesSource } from '@/renderer/types/workbench-shell';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 
+import { useLatestTurnScope } from './use-latest-turn-scope';
+
 /**
  * Resolves the active change source to the git diff scope a query needs.
  * @param source - The change source the user selected for this workspace
  * @param baseRef - Base branch the workspace branched from, when known
+ * @param latestTurn - Scope of the workspace's newest checkpointed turn, if any
  * @returns The scope to pass to the git status and diff queries
  */
 function sourceToScope(
 	source: ChangesSource,
 	baseRef: string | null,
+	latestTurn: WorkspaceGitDiffScope | null,
 ): WorkspaceGitDiffScope {
 	if (source.kind === 'commit') {
 		return { commitHash: source.hash, kind: 'commit' };
+	}
+	// No checkpoint means nothing to scope to — a workspace whose agent has not
+	// run yet degrades to the working tree rather than showing an empty list.
+	if (source.kind === 'latest-turn') {
+		return latestTurn ?? { kind: 'working-tree' };
 	}
 	// "All changes" means the whole branch — but it can only diff against a base
 	// when one is known; otherwise it degrades to the working-tree change set.
@@ -36,15 +45,29 @@ function sourceToScope(
  * Empty-state copy tailored to the active change source.
  * @param t - Translator bound to the active language
  * @param source - The change source currently being viewed
+ * @param turnLookupFailed - Whether the turn source's checkpoint read failed
  * @returns The title and message the empty file list shows
  */
 function emptyStateForSource(
 	t: TFunction,
 	source: ChangesSource,
+	turnLookupFailed: boolean,
 ): {
 	message: string;
 	title: string;
 } {
+	if (source.kind === 'latest-turn' && turnLookupFailed) {
+		return {
+			message: t(
+				'git:changes-source.empty.turn-lookup-failed.message',
+				'This workspace’s turn history could not be read, so there is nothing to scope the list to.',
+			),
+			title: t(
+				'git:changes-source.empty.turn-lookup-failed.title',
+				'Could not find the latest turn',
+			),
+		};
+	}
 	if (source.kind === 'uncommitted') {
 		return {
 			message: t(
@@ -54,6 +77,18 @@ function emptyStateForSource(
 			title: t(
 				'git:changes-source.empty.uncommitted.title',
 				'No uncommitted changes yet',
+			),
+		};
+	}
+	if (source.kind === 'latest-turn') {
+		return {
+			message: t(
+				'git:changes-source.empty.latest-turn.message',
+				'The last agent turn left the files untouched.',
+			),
+			title: t(
+				'git:changes-source.empty.latest-turn.title',
+				'No changes in the latest turn',
 			),
 		};
 	}
@@ -126,20 +161,39 @@ export function useChangesSource(workspace: WorkspaceShellModel) {
 	const setSource = useSetChangesSource(workspace.id);
 
 	const baseRef = workspace.landingSummary?.branchSource.baseBranch ?? null;
+	// Only the turn source needs the checkpoint list, so it is not read until the
+	// user picks that source.
+	const latestTurn = useLatestTurnScope(
+		workspace.id,
+		source.kind === 'latest-turn',
+	);
+	// Until that list lands there is no turn to scope to, and the working-tree
+	// scope below would answer with the user's own uncommitted edits under a
+	// "Latest turn" heading. So the status read waits rather than degrading.
+	const turnUnresolved = latestTurn.isPending || latestTurn.isError;
 	const scope = useMemo(
-		() => sourceToScope(source, baseRef),
-		[source, baseRef],
+		() => sourceToScope(source, baseRef, latestTurn.scope),
+		[source, baseRef, latestTurn.scope],
 	);
 
 	const { data: sourceStatusData, isLoading: isSourceStatusLoading } = useQuery(
 		{
 			...workspaceGitStatusQuery(workspace.pathLabel ?? null, scope),
+			enabled: Boolean(workspace.pathLabel) && !turnUnresolved,
 			placeholderData: keepPreviousData,
 		},
 	);
+	// `keepPreviousData` is what stops rows blinking away on a source switch, but
+	// it also means the previous source's rows are still here while the turn is
+	// unresolved — and showing those under a "Latest turn" heading is the very
+	// thing the disabled read above avoids.
 	const statusData =
-		sourceStatusData && !sourceStatusData.error ? sourceStatusData : null;
-	const useModelChanges = !statusData && source.kind !== 'commit';
+		!turnUnresolved && sourceStatusData && !sourceStatusData.error
+			? sourceStatusData
+			: null;
+	const hasLiveModelEquivalent =
+		source.kind === 'all' || source.kind === 'uncommitted';
+	const useModelChanges = !statusData && hasLiveModelEquivalent;
 
 	const sourceFiles = useMemo(
 		() =>
@@ -164,15 +218,20 @@ export function useChangesSource(workspace: WorkspaceShellModel) {
 			() => new Set(workspace.reviewFiles.map((file) => file.path)),
 			[workspace.reviewFiles],
 		),
-		emptyState: useMemo(() => emptyStateForSource(t, source), [t, source]),
-		isCommitLoading: source.kind === 'commit' && isSourceStatusLoading,
+		emptyState: useMemo(
+			() => emptyStateForSource(t, source, latestTurn.isError),
+			[t, source, latestTurn.isError],
+		),
+		isSourceLoading:
+			!hasLiveModelEquivalent &&
+			(isSourceStatusLoading || latestTurn.isPending),
 		scope,
 		setSource,
 		source,
-		sourceError:
-			source.kind === 'commit'
-				? sourceStatusData?.error
-				: workspace.reviewFilesError,
+		latestTurnLabel: latestTurn.label,
+		sourceError: hasLiveModelEquivalent
+			? workspace.reviewFilesError
+			: sourceStatusData?.error,
 		sourceFiles,
 	};
 }

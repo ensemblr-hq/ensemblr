@@ -17,6 +17,14 @@ const gitRefSchema = z
 	.regex(/^(?!-)[\w./@+~^-]+$/);
 
 /**
+ * A checkpoint commit hash reaching `git` as a positional argument. Checkpoint
+ * rows always carry a full object id, so the full 40 characters are required
+ * rather than the abbreviation a commit scope accepts — anything shorter, and
+ * anything opening with `-`, would be read by git as a flag.
+ */
+const checkpointHashSchema = z.string().regex(/^[0-9a-fA-F]{40}$/);
+
+/**
  * {@link import('../../../shared/ipc').WorkspaceGitDiffScope}. The commit hash also
  * reaches `git` directly, so it is restricted to hex characters.
  */
@@ -29,6 +37,11 @@ const workspaceGitDiffScopeSchema = z.discriminatedUnion('kind', [
 	z.object({
 		baseRef: gitRefSchema,
 		kind: z.literal('branch'),
+	}),
+	z.object({
+		fromRef: checkpointHashSchema,
+		kind: z.literal('turn'),
+		toRef: checkpointHashSchema.optional(),
 	}),
 ]);
 

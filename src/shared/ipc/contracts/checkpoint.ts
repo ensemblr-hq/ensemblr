@@ -25,6 +25,16 @@ export interface ListTurnCheckpointsResult {
 	checkpoints: readonly CheckpointWire[];
 }
 
+/**
+ * List every checkpoint captured in a workspace, oldest first, across all of
+ * its agent sessions. The Changes panel is workspace-scoped rather than
+ * chat-scoped, so "the latest turn" there means the newest checkpoint in the
+ * workspace whichever chat produced it.
+ */
+export interface ListWorkspaceCheckpointsRequest {
+	workspaceId: string;
+}
+
 /** One changed file in a turn diff. */
 export interface TurnDiffFileWire {
 	/** Added line count; null for binary files. */
@@ -92,6 +102,9 @@ export interface CheckpointApi {
 	) => Promise<ComputeTurnDiffResult>;
 	listTurnCheckpoints: (
 		request: ListTurnCheckpointsRequest,
+	) => Promise<ListTurnCheckpointsResult>;
+	listWorkspaceCheckpoints: (
+		request: ListWorkspaceCheckpointsRequest,
 	) => Promise<ListTurnCheckpointsResult>;
 	restoreCheckpoint: (
 		request: RestoreCheckpointRequest,

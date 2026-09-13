@@ -27,6 +27,27 @@ export function turnCheckpointsQuery(agentSessionId: string | null) {
 	});
 }
 
+/**
+ * Query options for every checkpoint captured in a workspace, oldest first.
+ * Backs the Changes panel's "Latest turn" source, which is workspace-scoped and
+ * so cannot read one chat's session list.
+ */
+export function workspaceCheckpointsQuery(workspaceId: string | null) {
+	return queryOptions({
+		enabled: Boolean(workspaceId),
+		queryFn: (): Promise<ListTurnCheckpointsResult> =>
+			profileElectronIpcCall(
+				{ channel: 'ensemblr:list-workspace-checkpoints', usesDatabase: true },
+				() =>
+					getEnsemblrApi().listWorkspaceCheckpoints({
+						workspaceId: workspaceId ?? '',
+					}),
+			),
+		queryKey: ensemblrQueryKeys.checkpointsForWorkspace(workspaceId ?? ''),
+		staleTime: 5000,
+	});
+}
+
 /** Query options for a turn's checkpoint diff (pre-prompt → post-turn state). */
 export function turnDiffQuery(turnId: string | null) {
 	return queryOptions({

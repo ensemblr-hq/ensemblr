@@ -31,3 +31,17 @@ export function formatTurnDuration(ms: number): string {
 	segments.push(`${s}.${ds}s`);
 	return segments.join(', ');
 }
+
+/**
+ * Wall-clock time a turn ended, in the user's own locale and 12/24-hour
+ * convention, for the footer line beside the turn's duration.
+ * @param epochMs - Turn end timestamp
+ * @param locale - BCP-47 tag; defaults to the runtime's own resolution
+ * @returns The formatted time, e.g. `3:48 PM`
+ */
+export function formatTurnClockTime(epochMs: number, locale?: string): string {
+	return new Date(epochMs).toLocaleTimeString(locale, {
+		hour: 'numeric',
+		minute: '2-digit',
+	});
+}

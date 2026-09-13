@@ -95,6 +95,7 @@ export {
 	getNextCheckpointInAgentSession,
 	insertCheckpoint,
 	listCheckpointsForAgentSession,
+	listCheckpointsForWorkspace,
 } from './checkpoint-repository.ts';
 export type {
 	ConciergeMemoryHit,

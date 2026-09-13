@@ -276,6 +276,12 @@ export function createWorkspaceGitService({
 					() => getBranchStatus(cwd.cwd, scope.baseRef),
 				);
 			}
+			if (scope.kind === 'turn') {
+				return shareStatusInFlight(
+					`${cwd.cwd}\u0000turn\u0000${scope.fromRef}\u0000${scope.toRef ?? ''}`,
+					() => getTurnStatus(cwd.cwd, scope.fromRef, scope.toRef),
+				);
+			}
 			return shareStatusInFlight(`${cwd.cwd}\u0000working-tree`, () =>
 				getWorkingTreeStatus(cwd.cwd),
 			);
@@ -376,6 +382,14 @@ export function createWorkspaceGitService({
 			if (scope.kind === 'branch') {
 				return getBranchFileDiff(cwd.cwd, target.path, scope.baseRef);
 			}
+			if (scope.kind === 'turn') {
+				return getTurnFileDiff(
+					cwd.cwd,
+					target.path,
+					scope.fromRef,
+					scope.toRef,
+				);
+			}
 			return getWorkingTreeFileDiff(cwd.cwd, target.path);
 		},
 	};
@@ -450,6 +464,61 @@ export function createWorkspaceGitService({
 			return getWorkingTreeStatus(cwd);
 		}
 		return buildDiffStatus(cwd, [mergeBase], true);
+	}
+
+	/**
+	 * What one agent turn changed: between its pre-prompt checkpoint and the
+	 * next one, or — for the newest turn, which has no checkpoint after it — the
+	 * live working tree. The live leg therefore also carries anything edited by
+	 * hand since the turn ended, which is what keeps that view current.
+	 */
+	async function getTurnStatus(
+		cwd: string,
+		fromRef: string,
+		toRef: string | undefined,
+	): Promise<GetWorkspaceGitStatusResult> {
+		return toRef
+			? buildDiffStatus(cwd, [fromRef, toRef], false)
+			: buildDiffStatus(cwd, [fromRef], true);
+	}
+
+	/** One file's diff across a turn, mirroring {@link getTurnStatus}'s two legs. */
+	async function getTurnFileDiff(
+		cwd: string,
+		relPath: string,
+		fromRef: string,
+		toRef: string | undefined,
+	): Promise<GetWorkspaceFileDiffResult> {
+		const result = await runGit(
+			cwd,
+			['diff', '--no-color', fromRef, ...(toRef ? [toRef] : []), '--', relPath],
+			MAX_DIFF_BYTES,
+		);
+		if (result.status === 'success' && result.stdout.trim()) {
+			return {
+				isTruncated: result.stdoutTruncated,
+				patch: result.stdout,
+				path: relPath,
+			};
+		}
+		// A file the turn created is untracked on the live leg, so it is absent
+		// from the checkpoint diff entirely; show it against /dev/null instead.
+		if (!toRef) {
+			const untracked = await untrackedFileDiff(cwd, relPath);
+			if (untracked) {
+				return untracked;
+			}
+		}
+		if (result.status === 'success') {
+			return { patch: '', path: relPath };
+		}
+		return {
+			error: {
+				code: classifyGitFailure(result.stderr),
+				message: gitFailureMessage(result, 'git diff failed in workspace.'),
+			},
+			path: relPath,
+		};
 	}
 
 	/**

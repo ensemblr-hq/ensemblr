@@ -419,8 +419,11 @@
 		"actions": "Ενέργειες γύρου",
 		"fork-tab": "Fork σε νέα καρτέλα",
 		"fork-workspace": "Fork σε νέο χώρο εργασίας",
+		"more-files_one": "+{{count}} ακόμη αρχείο",
+		"more-files_other": "+{{count}} ακόμη αρχεία",
 		"restore-checkpoint": "Επαναφορά στην κατάσταση πριν από αυτόν τον γύρο…",
 		"stopped": "Διακόπηκε",
+		"symlink": "Το {{path}} είναι συμβολικός σύνδεσμος και δεν έχει diff",
 		"view-diff": "Προβολή diff του γύρου"
 	},
 	"turn-summary": {

@@ -10,6 +10,7 @@ import {
 	getNextCheckpointInAgentSession,
 	insertCheckpoint,
 	listCheckpointsForAgentSession,
+	listCheckpointsForWorkspace,
 } from '../storage/repositories/index.ts';
 import {
 	captureWorkspaceCheckpoint,
@@ -127,6 +128,21 @@ export function listTurnCheckpoints({
 	agentSessionId: string;
 }): readonly CheckpointRow[] {
 	return listCheckpointsForAgentSession({ database, agentSessionId });
+}
+
+/**
+ * Lists checkpoints captured anywhere in a workspace, oldest first. The Changes
+ * panel is workspace-scoped rather than chat-scoped, so it resolves "the latest
+ * turn" from this rather than from one session's list.
+ */
+export function listWorkspaceCheckpoints({
+	database,
+	workspaceId,
+}: {
+	database: DatabaseSync;
+	workspaceId: string;
+}): readonly CheckpointRow[] {
+	return listCheckpointsForWorkspace({ database, workspaceId });
 }
 
 /** A turn's git diff paired with the checkpoint it was computed against. */

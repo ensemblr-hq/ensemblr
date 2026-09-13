@@ -421,8 +421,11 @@ export default interface Resources {
 			actions: 'Turn actions';
 			'fork-tab': 'Fork to new tab';
 			'fork-workspace': 'Fork to new workspace';
+			'more-files_one': '+{{count}} more file';
+			'more-files_other': '+{{count}} more files';
 			'restore-checkpoint': 'Restore to before this turn…';
 			stopped: 'Stopped';
+			symlink: '{{path}} is a symlink and has no diff';
 			'view-diff': 'View turn diff';
 		};
 		'turn-summary': {
@@ -1090,11 +1093,22 @@ export default interface Resources {
 					message: '{{shortHash}} touched no files.';
 					title: 'No changes in this commit';
 				};
+				'latest-turn': {
+					message: 'The last agent turn left the files untouched.';
+					title: 'No changes in the latest turn';
+				};
+				'turn-lookup-failed': {
+					message: 'This workspace’s turn history could not be read, so there is nothing to scope the list to.';
+					title: 'Could not find the latest turn';
+				};
 				uncommitted: {
 					message: 'Everything here is committed.';
 					title: 'No uncommitted changes yet';
 				};
 			};
+			'latest-turn': 'Changes from the latest turn';
+			'latest-turn-badge': 'Latest turn';
+			'latest-turn-empty': 'No agent turn has run here yet';
 			'menu-label': 'Open changes menu';
 			uncommitted: 'Uncommitted changes';
 			'uncommitted-badge': 'Uncommitted';

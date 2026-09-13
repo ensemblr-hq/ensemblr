@@ -11,6 +11,7 @@ import {
 	CheckpointServiceError,
 	computeTurnDiff,
 	listTurnCheckpoints,
+	listWorkspaceCheckpoints,
 	restoreTurnCheckpoint,
 } from '../../checkpoints/index.ts';
 import type { EnsemblrDatabaseService } from '../../storage';
@@ -23,6 +24,7 @@ import { getWorkspacePathById } from '../../storage/repositories/workspace-repos
 import {
 	computeTurnDiffRequestSchema,
 	listTurnCheckpointsRequestSchema,
+	listWorkspaceCheckpointsRequestSchema,
 	restoreCheckpointRequestSchema,
 } from '../request-schemas.ts';
 
@@ -50,6 +52,19 @@ export function registerCheckpointHandlers({
 			const checkpoints = listTurnCheckpoints({
 				database,
 				agentSessionId: request.agentSessionId,
+			});
+			return { checkpoints: checkpoints.map(toWire) };
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.listWorkspaceCheckpoints,
+		async (_event, raw: unknown): Promise<ListTurnCheckpointsResult> => {
+			const request = listWorkspaceCheckpointsRequestSchema.parse(raw);
+			const database = requireCheckpointDatabase();
+			const checkpoints = listWorkspaceCheckpoints({
+				database,
+				workspaceId: request.workspaceId,
 			});
 			return { checkpoints: checkpoints.map(toWire) };
 		},

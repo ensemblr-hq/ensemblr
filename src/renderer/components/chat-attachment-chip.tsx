@@ -9,6 +9,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceFileIconName } from '@/renderer/lib/workbench';
 import type { AttachmentMark } from '@/renderer/types/components';
+import type { SymlinkTargetKind } from '@/shared/ipc/contracts/workspace-files';
 import { AttachmentGlyph } from './attachment-glyph';
 
 /**
@@ -32,9 +33,14 @@ export type ChatAttachmentChipKind =
  * attachment glyph for everything carrying a mark.
  * @param kind - What the chip stands for.
  * @param label - Chip text, which a file icon is chosen by extension from.
+ * @param symlinkTargetKind - What the path links to, when it is a symlink.
  * @returns The icon element.
  */
-function chipIcon(kind: ChatAttachmentChipKind, label: string): ReactNode {
+function chipIcon(
+	kind: ChatAttachmentChipKind,
+	label: string,
+	symlinkTargetKind?: SymlinkTargetKind,
+): ReactNode {
 	if (kind === 'project') {
 		return <FolderGitIcon aria-hidden='true' className='size-3.5 shrink-0' />;
 	}
@@ -61,6 +67,7 @@ function chipIcon(kind: ChatAttachmentChipKind, label: string): ReactNode {
 			icon={getWorkspaceFileIconName({
 				kind: kind === 'folder' ? 'directory' : 'file',
 				name: label,
+				...(symlinkTargetKind ? { symlinkTargetKind } : {}),
 			})}
 		/>
 	);
@@ -72,11 +79,17 @@ export function ChatAttachmentChip({
 	kind = 'file',
 	label,
 	onActivate,
+	symlinkTargetKind,
+	trailing,
 	...rest
 }: ComponentProps<'span'> & {
 	kind?: ChatAttachmentChipKind;
 	label: string;
 	onActivate?: () => void;
+	/** What the path links to, when it is a symlink, so the glyph says so. */
+	symlinkTargetKind?: SymlinkTargetKind;
+	/** Rendered inside the pill after the label, e.g. a diff's line counts. */
+	trailing?: ReactNode;
 }) {
 	const chipClassName = cn(
 		'inline-flex max-w-full items-center gap-1.5 rounded-md border border-border/50 bg-muted/60 px-2 py-0.5 font-medium text-foreground/90 text-xs leading-5',
@@ -86,8 +99,9 @@ export function ChatAttachmentChip({
 	);
 	const content = (
 		<>
-			{chipIcon(kind, label)}
+			{chipIcon(kind, label, symlinkTargetKind)}
 			<span className='truncate'>{label}</span>
+			{trailing}
 		</>
 	);
 	if (onActivate) {

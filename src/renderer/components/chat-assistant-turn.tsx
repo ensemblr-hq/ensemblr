@@ -18,6 +18,7 @@ import type {
 } from '@/renderer/types/agent-timeline';
 import type { ChatAssistantTurnTiming } from '@/renderer/types/chat';
 import type { ToolPresentationGlyph } from '@/renderer/types/tool-presentation';
+import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 
 import { ChatMessageText } from './chat-message-text';
 import { ChatSubagentCall } from './chat-subagent-call';
@@ -52,9 +53,12 @@ export function ChatAssistantTurn({
 	message,
 	onForkToNewTab,
 	onForkToNewWorkspace,
+	onOpenTurnFile,
 	onRestoreToCheckpoint,
 	onViewTurnDiff,
 	timing,
+	turnScope = null,
+	workspaceCwd = null,
 }: {
 	className?: string;
 	/** Disables the footer fork menu while a fork is already running. */
@@ -65,9 +69,14 @@ export function ChatAssistantTurn({
 	message: UIMessage;
 	onForkToNewTab?: () => void;
 	onForkToNewWorkspace?: () => void;
+	/** Opens one file the turn changed, at this turn's diff scope. */
+	onOpenTurnFile?: (filePath: string) => void;
 	onRestoreToCheckpoint?: () => void;
 	onViewTurnDiff?: () => void;
 	timing: ChatAssistantTurnTiming;
+	/** What this turn changed; null when no checkpoint was captured for it. */
+	turnScope?: Extract<WorkspaceGitDiffScope, { kind: 'turn' }> | null;
+	workspaceCwd?: string | null;
 }) {
 	const { activityParts, finalParts } = useMemo(
 		() => splitTurnParts(visibleTurnParts(message.parts), isStreaming),
@@ -140,11 +149,15 @@ export function ChatAssistantTurn({
 				<ChatTurnFooter
 					answerText={answerText}
 					durationMs={durationMs}
+					endedAtMs={timing.endMs}
 					forkDisabled={forkDisabled}
 					onForkToNewTab={onForkToNewTab}
 					onForkToNewWorkspace={onForkToNewWorkspace}
+					onOpenTurnFile={onOpenTurnFile}
 					onRestoreToCheckpoint={onRestoreToCheckpoint}
 					onViewTurnDiff={onViewTurnDiff}
+					turnScope={turnScope}
+					workspaceCwd={workspaceCwd}
 				/>
 			) : null}
 		</div>

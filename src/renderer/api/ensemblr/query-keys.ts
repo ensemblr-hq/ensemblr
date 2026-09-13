@@ -18,6 +18,9 @@ export const ensemblrQueryKeys = {
 	/** Query key for an agent session's checkpoints. */
 	checkpointsForSession: (agentSessionId: string) =>
 		[...ensemblrQueryKeys.all, 'checkpoints', agentSessionId] as const,
+	/** Query key for every checkpoint captured in a workspace. */
+	checkpointsForWorkspace: (workspaceId: string) =>
+		[...ensemblrQueryKeys.all, 'workspace-checkpoints', workspaceId] as const,
 	/** Query key for the files under the Concierge's `artifacts/` directory. */
 	conciergeArtifacts: () =>
 		[...ensemblrQueryKeys.all, 'concierge-artifacts'] as const,

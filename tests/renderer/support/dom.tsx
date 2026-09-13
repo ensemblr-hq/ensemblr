@@ -56,6 +56,43 @@ export function clearEnsemblrApi(): void {
 }
 
 /**
+ * Replaces IntersectionObserver with one that reports every observed element as
+ * intersecting straight away. happy-dom ships a constructor that never fires,
+ * so a component gated on visibility would otherwise stay unmounted forever
+ * rather than merely late.
+ * @returns A restore function putting the original constructor back
+ */
+export function installImmediateIntersectionObserver(): () => void {
+	const original = globalThis.IntersectionObserver;
+	class ImmediateIntersectionObserver {
+		readonly root = null;
+		readonly rootMargin = '';
+		readonly scrollMargin = '';
+		readonly thresholds: readonly number[] = [];
+
+		constructor(private readonly callback: IntersectionObserverCallback) {}
+
+		observe(target: Element): void {
+			this.callback(
+				[{ isIntersecting: true, target } as IntersectionObserverEntry],
+				this as unknown as IntersectionObserver,
+			);
+		}
+
+		unobserve(): void {}
+		disconnect(): void {}
+		takeRecords(): IntersectionObserverEntry[] {
+			return [];
+		}
+	}
+	globalThis.IntersectionObserver =
+		ImmediateIntersectionObserver as unknown as typeof IntersectionObserver;
+	return () => {
+		globalThis.IntersectionObserver = original;
+	};
+}
+
+/**
  * Replaces the clipboard with a recorder that accepts both the plain and the
  * rich write paths, so a test can assert what a copy control actually offered.
  */
