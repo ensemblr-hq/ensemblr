@@ -70,6 +70,32 @@ describe('evaluatePlanModeTool', () => {
 		expect(evaluatePlanModeTool({ tool })).toEqual({ blocked: false });
 	});
 
+	// A harness reaching the control server over MCP sees every one of those
+	// tools namespaced by the server that serves them, so the prefix test that
+	// stood here recognized none of them.
+	it.each([
+		'mcp__ensemblr__ensemblr_get_workspace_diff',
+		'mcp__ensemblr__ensemblr_exit_plan_mode',
+		'ensemblr__ensemblr_start_conversation',
+	])('leaves the namespaced control tool %s to its own op gate', (tool) => {
+		expect(evaluatePlanModeTool({ tool })).toEqual({ blocked: false });
+	});
+
+	// Membership rather than a prefix: another server's tool cannot borrow the
+	// clearance by carrying the prefix, and a control tool name cannot borrow it
+	// from a server that is not ours. The last two are why the wrapper is matched
+	// entire rather than by its final segment — a server may carry the separator
+	// in its own name.
+	it.each([
+		'mcp__filesystem__ensemblr_write_file',
+		'mcp__filesystem__ensemblr_get_workspace_diff',
+		'ensemblr_write_file',
+		'mcp__filesystem__ensemblr__ensemblr_get_workspace_diff',
+		'filesystem.ensemblr.ensemblr_get_workspace_diff',
+	])('still blocks %s', (tool) => {
+		expect(evaluatePlanModeTool({ tool }).blocked).toBe(true);
+	});
+
 	it('always points the agent at the way out of plan mode', () => {
 		expect(evaluatePlanModeTool({ tool: 'write' }).reason).toContain(
 			'ensemblr_exit_plan_mode',

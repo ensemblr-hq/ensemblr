@@ -8,6 +8,7 @@
  * know to be a read, so an unknown name reaches here rather than running
  * unclassified, and this module refuses what it cannot vouch for.
  */
+import { isEnsemblrControlTool } from '../agent-control.ts';
 import { isReadOnlyBashCommand } from './bash-guard.ts';
 import { planModeBlockReason } from './block-reason.ts';
 
@@ -61,14 +62,6 @@ const PLAN_MODE_READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Prefix of Ensemblr's own control tools, which are cleared here because they
- * are gated somewhere better: `planModeControlOpDenial` answers for each one by
- * op and by the caller's role, and a blanket denial from this classifier would
- * take away the reads and the spawn route that planning is *for*.
- */
-const CONTROL_TOOL_PREFIX = 'ensemblr_';
-
-/**
  * Wraps the shared block reason in a verdict.
  * @param cause - What about this call is not allowed while planning.
  * @returns The blocked verdict carrying the full reason.
@@ -79,13 +72,18 @@ function blocked(cause: string): PlanModeToolVerdict {
 
 /**
  * Reports whether a tool needs no plan-mode opinion of its own.
+ *
+ * Ensemblr's own control tools clear here because they are gated somewhere
+ * better: `planModeControlOpDenial` answers for each one by op and by the
+ * caller's role, and a blanket denial from this classifier would take away the
+ * reads and the spawn route that planning is *for*. `isEnsemblrControlTool`
+ * rather than a prefix test, because a harness reaching those tools over MCP
+ * sees every one of them namespaced by the server that serves them.
  * @param tool - The tool name being classified.
  * @returns True for a read-only built-in or an Ensemblr control tool.
  */
 function runsUntouchedWhilePlanning(tool: string): boolean {
-	return (
-		PLAN_MODE_READ_ONLY_TOOLS.has(tool) || tool.startsWith(CONTROL_TOOL_PREFIX)
-	);
+	return PLAN_MODE_READ_ONLY_TOOLS.has(tool) || isEnsemblrControlTool(tool);
 }
 
 /**

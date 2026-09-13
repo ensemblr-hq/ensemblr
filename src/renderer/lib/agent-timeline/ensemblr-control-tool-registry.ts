@@ -1,5 +1,6 @@
 import { i18n } from '@/renderer/lib/i18n';
 import type { ToolGlyph } from '@/renderer/types/tool-presentation';
+import { bareEnsemblrControlToolName } from '@/shared/agent-control';
 
 /**
  * The table of what the app's own control tools are called in the timeline.
@@ -25,9 +26,6 @@ import type { ToolGlyph } from '@/renderer/types/tool-presentation';
  * `ensemblr-tool-presentation.ts` reads it and is the entrypoint the rest of the
  * app imports.
  */
-
-/** Wire-name prefix shared by every tool the app's control extension registers. */
-const CONTROL_TOOL_PREFIX = 'ensemblr_';
 
 /** Wire names of the bookkeeping calls the timeline omits when they succeed. */
 export const BOOKKEEPING_TOOL_NAMES: ReadonlySet<string> = new Set([
@@ -1058,18 +1056,18 @@ const CONTROL_TOOL_NAMES: ReadonlySet<string> = new Set([
  * every call from the second runtime titled with its wire name and marked with
  * the generic wrench.
  *
- * Taking the last `ensemblr_` segment resolves both shapes, and the registry
- * check keeps that slice honest: an unrelated tool whose name happens to carry
- * the prefix resolves to nothing rather than borrowing a label.
+ * Unwrapping the namespace is `bareEnsemblrControlToolName`'s job rather than a
+ * second answer to the same question: the Concierge and Plan Mode guards decide
+ * what to *allow* from that resolver, and a timeline that unwrapped names more
+ * loosely than they do would label a row those guards had refused. The registry
+ * check on top narrows it from every control tool to the ones this table names,
+ * so an op with no tool of its own resolves to nothing rather than a blank label.
  * @param toolName - The tool name as the runtime reported it
  * @returns The registered name, or null when the tool is not a control tool
  */
 export function canonicalEnsemblrToolName(toolName: string): string | null {
-	const lowered = toolName.toLowerCase();
-	const start = lowered.lastIndexOf(CONTROL_TOOL_PREFIX);
-	if (start === -1) {
-		return null;
-	}
-	const registered = lowered.slice(start);
-	return CONTROL_TOOL_NAMES.has(registered) ? registered : null;
+	const registered = bareEnsemblrControlToolName(toolName);
+	return registered !== null && CONTROL_TOOL_NAMES.has(registered)
+		? registered
+		: null;
 }

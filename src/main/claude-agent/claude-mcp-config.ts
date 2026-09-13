@@ -1,18 +1,12 @@
 import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 
+import { CONTROL_SERVER_NAME } from '../../shared/agent-control.ts';
 import {
 	CONTROL_TOKEN_ENV_KEY,
 	envVarReference,
 } from '../agent-control/control-env-keys.ts';
 import { MCP_TOOL_CALL_TIMEOUT_MS } from '../agent-control/mcp-tool-timeout.ts';
 import type { AgentControlMcpConfig } from '../agent-runtime/agent-types.ts';
-
-/**
- * Server name the Ensemblr Control tools are registered under. Matches the name
- * the terminal harnesses use, so the `ensemblr_*` tool names in the awareness
- * playbooks resolve identically whichever runtime reads them.
- */
-const CONTROL_SERVER_NAME = 'ensemblr';
 
 /**
  * Builds the `mcpServers` map pointing Claude Code at the loopback control

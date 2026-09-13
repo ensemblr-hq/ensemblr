@@ -98,6 +98,17 @@ describe('canonicalEnsemblrToolName', () => {
 		expect(canonicalEnsemblrToolName('ensemblr_not_a_real_tool')).toBe(null);
 		expect(canonicalEnsemblrToolName('bash')).toBe(null);
 	});
+
+	// The timeline resolves a name exactly as the guards do, so a row can never
+	// carry a control tool's label for a call those guards refused.
+	test('refuses a control tool name served by another server', () => {
+		expect(canonicalEnsemblrToolName('mcp__other__ensemblr_set_name')).toBe(
+			null,
+		);
+		expect(
+			canonicalEnsemblrToolName('mcp__other__ensemblr__ensemblr_set_name'),
+		).toBe(null);
+	});
 });
 
 describe('isHiddenEnsemblrToolCall', () => {
