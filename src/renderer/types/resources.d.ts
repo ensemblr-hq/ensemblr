@@ -1117,6 +1117,7 @@ export default interface Resources {
 				'push-branch': 'Push branch';
 			};
 			clean: 'Up to date with remote';
+			syncing: 'Syncing with remote';
 			uncommitted_one: '{{count}} uncommitted change';
 			uncommitted_other: '{{count}} uncommitted changes';
 			unpublished: 'Branch not pushed yet';

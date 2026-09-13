@@ -23,6 +23,15 @@ function mergeConflictsLabel(): string {
 	return i18n.t('git:pull-request.label.conflicts', 'Merge conflicts');
 }
 
+/**
+ * What the header reports while a push and the pull-request resync behind it are
+ * still running, in place of a git status that has already gone quiet.
+ * @returns The label in the active language.
+ */
+function syncingLabel(): string {
+	return i18n.t('git:git-status.syncing', 'Syncing with remote');
+}
+
 /** Options that adjust header derivation for signals outside the PR snapshot. */
 interface RightSidebarHeaderStateOptions {
 	/**
@@ -39,6 +48,15 @@ interface RightSidebarHeaderStateOptions {
 	 * base before `gh` does, and answers even when no pull request exists.
 	 */
 	hasConflicts?: boolean;
+	/**
+	 * Whether the header's own Push action is still running, counting the
+	 * pull-request resync that follows the push. The git status goes clean the
+	 * moment the push lands, well before GitHub has moved the pull request onto
+	 * the new commit and queued its checks, so without this the header would
+	 * leave the push behind and offer a merge against the previous commit's
+	 * verdict.
+	 */
+	isPushing?: boolean;
 }
 
 /** The parts of a PR-linked header state that vary with pull-request status. */
@@ -89,7 +107,11 @@ export function getRightSidebarHeaderState(
 		};
 	}
 
-	const variant = resolveNumberedHeaderVariant(pullRequest, hasConflicts);
+	const variant = resolveNumberedHeaderVariant(
+		pullRequest,
+		hasConflicts,
+		options.isPushing === true,
+	);
 	return {
 		...variant,
 		hasConflicts,
@@ -114,13 +136,22 @@ export function getRightSidebarHeaderState(
  * below that local work, since the branch has to be committed before it can be
  * resolved, and above every checks-derived status, which it makes moot.
  *
+ * A push in flight sits below the conflict instead of beside the local work,
+ * because what it makes stale is the checks verdict rather than the merge: git
+ * reports the branch level with its upstream as soon as the push lands, while
+ * the pull request still carries the checks of the commit that was replaced. A
+ * branch that will not merge cleanly still will not once the resync lands, so
+ * the conflict outranks it and stays on screen for the whole wait.
+ *
  * @param pullRequest - Pull-request slice of the workspace model.
  * @param hasConflicts - Whether either conflict source found the branch unmergeable.
+ * @param isPushing - Whether the header's Push action and its resync are running.
  * @returns The status-dependent parts of the header state.
  */
 function resolveNumberedHeaderVariant(
 	pullRequest: WorkspaceShellModel['pullRequest'],
 	hasConflicts: boolean,
+	isPushing: boolean,
 ): NumberedHeaderVariant {
 	if (pullRequest.state === 'merged') {
 		return {
@@ -148,6 +179,10 @@ function resolveNumberedHeaderVariant(
 			label: mergeConflictsLabel(),
 			tone: 'blocked',
 		};
+	}
+
+	if (isPushing) {
+		return { kind: 'pr-unpushed', label: syncingLabel(), tone: 'pending' };
 	}
 
 	if (pullRequest.status === 'ready-to-merge') {

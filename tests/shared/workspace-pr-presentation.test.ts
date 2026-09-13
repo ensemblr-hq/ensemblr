@@ -5,6 +5,7 @@ import {
 	isFresherPrObservation,
 } from '../../src/shared/github-pr-presentation';
 import type {
+	GitBranchSyncWire,
 	GithubCheckBucket,
 	GithubPullRequestSnapshotWire,
 	GithubPullRequestWire,
@@ -48,6 +49,26 @@ function check(
 	bucket: GithubCheckBucket,
 ): GithubPullRequestWire['checks'][number] {
 	return { bucket, id: `check-${bucket}`, name: bucket };
+}
+
+function syncedBranch(
+	overrides: Partial<GitBranchSyncWire> = {},
+): GitBranchSyncWire {
+	return {
+		ahead: 0,
+		behind: 0,
+		branchName: 'feature',
+		hasUpstream: true,
+		headSha: 'abc123',
+		...overrides,
+	};
+}
+
+function snapshotOn(
+	pullRequest: GithubPullRequestWire,
+	branchSync: GithubPullRequestSnapshotWire['branchSync'],
+): GithubPullRequestSnapshotWire {
+	return { branchSync, pullRequest, syncedAt: SYNCED_AT };
 }
 
 describe('deriveWorkspacePrPresentation', () => {
@@ -105,6 +126,99 @@ describe('deriveWorkspacePrPresentation', () => {
 				),
 			),
 		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'open' });
+	});
+
+	test('reports checks running while the PR head lags the pushed branch tip', () => {
+		expect(
+			deriveWorkspacePrPresentation(
+				snapshotOn(
+					pr({
+						checks: [check('passing')],
+						headCommitKnownLocally: true,
+						mergeable: 'mergeable',
+					}),
+					syncedBranch({ headSha: 'def456' }),
+				),
+			),
+		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'checking' });
+	});
+
+	test('leaves a PR head this repository never had to GitHub', () => {
+		// The remote branch moved on without us — a suggestion committed from
+		// GitHub's UI, "Update branch", a teammate's push. Nothing fetches this
+		// branch, so `ahead`/`behind` still read level against a stale tracking
+		// ref and only the missing commit tells the two cases apart.
+		expect(
+			deriveWorkspacePrPresentation(
+				snapshotOn(
+					pr({
+						checks: [check('passing')],
+						headCommitKnownLocally: false,
+						mergeable: 'mergeable',
+					}),
+					syncedBranch({ headSha: 'def456' }),
+				),
+			),
+		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'ready' });
+	});
+
+	test('leaves a PR to GitHub when git could not say whether it has the commit', () => {
+		expect(
+			deriveWorkspacePrPresentation(
+				snapshotOn(
+					pr({ checks: [check('passing')], mergeable: 'mergeable' }),
+					syncedBranch({ headSha: 'def456' }),
+				),
+			),
+		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'ready' });
+	});
+
+	test('reports ready once the PR head is the branch tip', () => {
+		expect(
+			deriveWorkspacePrPresentation(
+				snapshotOn(
+					pr({
+						checks: [check('passing')],
+						headCommitKnownLocally: true,
+						mergeable: 'mergeable',
+					}),
+					syncedBranch(),
+				),
+			),
+		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'ready' });
+	});
+
+	test('leaves a branch that is not level with its upstream to GitHub', () => {
+		const readyPr = pr({
+			checks: [check('passing')],
+			headCommitKnownLocally: true,
+			mergeable: 'mergeable',
+		});
+		for (const branchSync of [
+			syncedBranch({ ahead: 1, headSha: 'def456' }),
+			syncedBranch({ behind: 1, headSha: 'def456' }),
+			syncedBranch({ hasUpstream: false, headSha: 'def456' }),
+		]) {
+			expect(
+				deriveWorkspacePrPresentation(snapshotOn(readyPr, branchSync)),
+			).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'ready' });
+		}
+	});
+
+	test('a snapshot cached without a branch tip keeps its verdict', () => {
+		const { headSha: _dropped, ...withoutTip } = syncedBranch();
+		expect(
+			deriveWorkspacePrPresentation(
+				snapshotOn(
+					pr({
+						checks: [check('passing')],
+						headCommitKnownLocally: true,
+						mergeable: 'mergeable',
+					}),
+					withoutTip,
+				),
+			),
+		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'ready' });
 	});
 
 	test('stamps the presentation with the snapshot it was derived from', () => {

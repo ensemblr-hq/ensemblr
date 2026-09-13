@@ -11,6 +11,7 @@ import type {
 } from '@/renderer/types/workbench';
 import { deriveOpenPullRequestStatus } from '@/shared/github-pr-presentation';
 import type {
+	GitBranchSyncWire,
 	GithubCheckWire,
 	GithubCommentWire,
 	GithubFailure,
@@ -83,7 +84,7 @@ export function buildPullRequestShellModel({
 	}
 
 	const checks = pullRequest.checks.map(toCheckSummary);
-	const status = derivePullRequestStatus(pullRequest);
+	const status = derivePullRequestStatus(pullRequest, snapshot.branchSync);
 	const previewDeployment = derivePreviewDeployment({
 		checks,
 		comments: pullRequest.comments,
@@ -314,15 +315,18 @@ function buildTodoSummaries(
  * shell-status mapping (`ready` → `ready-to-merge`, draft/open → `idle`) lives
  * here; the underlying policy lives once in `deriveOpenPullRequestStatus`.
  * @param pullRequest - The pull request wire record.
+ * @param branchSync - The snapshot's branch sync state, which says whether the
+ * PR's verdict describes the branch tip the remote already holds.
  * @returns The shell status for the PR header.
  */
 function derivePullRequestStatus(
 	pullRequest: GithubPullRequestWire,
+	branchSync: GitBranchSyncWire | null,
 ): PullRequestShellStatus {
 	if (pullRequest.state !== 'open') {
 		return 'idle';
 	}
-	switch (deriveOpenPullRequestStatus(pullRequest)) {
+	switch (deriveOpenPullRequestStatus(pullRequest, branchSync)) {
 		case 'blocked':
 			return 'blocked';
 		case 'checking':

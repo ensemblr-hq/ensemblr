@@ -123,6 +123,19 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
 }
 
 /**
+ * Backoff delays (ms) between retries while GitHub's pull request record still
+ * names the commit the push replaced. The head moves first and the check runs
+ * for it are queued moments later, so the wait stops as soon as the record
+ * catches up.
+ *
+ * Each attempt is a full cache-bypassing snapshot fetch — `gh pr view` plus the
+ * deployments and review-thread queries behind it — so the entries buy coverage
+ * of the same fifteen seconds with one fetch fewer than a denser ramp would,
+ * and none of them is shorter than the round trip they are waiting on.
+ */
+const PR_PUSH_RECONCILE_DELAYS_MS = [2_000, 5_000, 8_000] as const;
+
+/**
  * Forces a PR-snapshot refresh and, when the snapshot still reports no PR,
  * retries with bounded backoff until one appears. Absorbs the read-after-create
  * race where `gh pr view` momentarily returns "no pull requests found" right
@@ -134,7 +147,7 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
  * timer or trailing `gh` fetch.
  * @returns The final snapshot result (the first non-empty one, or the last).
  */
-export async function refreshPullRequestSnapshotUntilPresent({
+export function refreshPullRequestSnapshotUntilPresent({
 	delaysMs = PR_PRESENCE_RETRY_DELAYS_MS,
 	queryClient,
 	signal,
@@ -147,13 +160,118 @@ export async function refreshPullRequestSnapshotUntilPresent({
 	workspaceCwd: string;
 	workspaceId: string;
 }): Promise<GetPullRequestSnapshotResult> {
+	return refreshPullRequestSnapshotUntil({
+		delaysMs,
+		hasSettled: (result) => result.snapshot?.pullRequest != null,
+		queryClient,
+		signal,
+		workspaceCwd,
+		workspaceId,
+	});
+}
+
+/**
+ * Refreshes the snapshot until GitHub's pull request record describes the commit
+ * a push just published, so the review surfaces report the new commit's checks
+ * rather than the previous commit's verdict.
+ *
+ * `gh pr view` answers from GitHub's read model, which advances the PR head some
+ * seconds after the push returns and only then queues the check runs for it. A
+ * single refresh therefore caches a verdict about the commit that was replaced —
+ * the one whose checks already passed — and the header offers a merge of work
+ * nothing has run yet. `expectsChecks` is the pre-push observation that this pull
+ * request does have CI, which is what makes an empty rollup on the new head worth
+ * waiting on rather than a repository that simply runs none.
+ *
+ * @param expectsChecks - Whether the PR reported any check before the push.
+ * @param pushedHeadSha - The commit the push published, when git reported one.
+ * @returns The final snapshot result (the first reconciled one, or the last).
+ */
+export function refreshPullRequestSnapshotAfterPush({
+	delaysMs = PR_PUSH_RECONCILE_DELAYS_MS,
+	expectsChecks,
+	pushedHeadSha,
+	queryClient,
+	signal,
+	workspaceCwd,
+	workspaceId,
+}: {
+	delaysMs?: readonly number[];
+	expectsChecks: boolean;
+	pushedHeadSha: string | null;
+	queryClient: QueryClient;
+	signal?: AbortSignal;
+	workspaceCwd: string;
+	workspaceId: string;
+}): Promise<GetPullRequestSnapshotResult> {
+	return refreshPullRequestSnapshotUntil({
+		delaysMs,
+		hasSettled: (result) =>
+			reflectsPushedCommit({ expectsChecks, pushedHeadSha, result }),
+		queryClient,
+		signal,
+		workspaceCwd,
+		workspaceId,
+	});
+}
+
+/**
+ * Whether a refreshed snapshot already describes the pushed commit.
+ * @param expectsChecks - Whether the PR reported any check before the push.
+ * @param pushedHeadSha - The commit the push published, when git reported one.
+ * @param result - The snapshot result to judge.
+ * @returns True when there is nothing left to wait for.
+ */
+function reflectsPushedCommit({
+	expectsChecks,
+	pushedHeadSha,
+	result,
+}: {
+	expectsChecks: boolean;
+	pushedHeadSha: string | null;
+	result: GetPullRequestSnapshotResult;
+}): boolean {
+	const pullRequest = result.snapshot?.pullRequest;
+	if (!pullRequest) {
+		return true;
+	}
+	if (pushedHeadSha && pullRequest.headRefOid !== pushedHeadSha) {
+		return false;
+	}
+	return !expectsChecks || pullRequest.checks.length > 0;
+}
+
+/**
+ * Refreshes the snapshot, then retries through a bounded backoff until the
+ * caller's condition holds. Shared by the post-create and post-push waits, which
+ * differ only in what they are waiting for.
+ * @param delaysMs - One entry per extra attempt, in order.
+ * @param hasSettled - Reads a result and says whether to stop.
+ * @returns The first settled result, or the last one attempted.
+ */
+async function refreshPullRequestSnapshotUntil({
+	delaysMs,
+	hasSettled,
+	queryClient,
+	signal,
+	workspaceCwd,
+	workspaceId,
+}: {
+	delaysMs: readonly number[];
+	hasSettled: (result: GetPullRequestSnapshotResult) => boolean;
+	queryClient: QueryClient;
+	signal?: AbortSignal;
+	workspaceCwd: string;
+	workspaceId: string;
+}): Promise<GetPullRequestSnapshotResult> {
 	const result = await refreshPullRequestSnapshot({
 		queryClient,
 		workspaceCwd,
 		workspaceId,
 	});
-	return retryPullRequestSnapshotUntilPresent({
+	return retryPullRequestSnapshotUntil({
 		delaysMs,
+		hasSettled,
 		queryClient,
 		result,
 		signal,
@@ -163,12 +281,13 @@ export async function refreshPullRequestSnapshotUntilPresent({
 }
 
 /**
- * Recurses through the bounded PR snapshot backoff until a PR appears or retries
- * are exhausted.
- * @returns The first non-empty snapshot, or the last attempted result.
+ * Recurses through the bounded PR snapshot backoff until the condition holds or
+ * the retries are exhausted.
+ * @returns The first settled snapshot, or the last attempted result.
  */
-async function retryPullRequestSnapshotUntilPresent({
+async function retryPullRequestSnapshotUntil({
 	delaysMs,
+	hasSettled,
 	queryClient,
 	result,
 	signal,
@@ -176,17 +295,14 @@ async function retryPullRequestSnapshotUntilPresent({
 	workspaceId,
 }: {
 	delaysMs: readonly number[];
+	hasSettled: (result: GetPullRequestSnapshotResult) => boolean;
 	queryClient: QueryClient;
 	result: GetPullRequestSnapshotResult;
 	signal?: AbortSignal;
 	workspaceCwd: string;
 	workspaceId: string;
 }): Promise<GetPullRequestSnapshotResult> {
-	if (
-		result.snapshot?.pullRequest ||
-		signal?.aborted ||
-		delaysMs.length === 0
-	) {
+	if (hasSettled(result) || signal?.aborted || delaysMs.length === 0) {
 		return result;
 	}
 	const [wait, ...remainingDelays] = delaysMs;
@@ -199,8 +315,9 @@ async function retryPullRequestSnapshotUntilPresent({
 		workspaceCwd,
 		workspaceId,
 	});
-	return retryPullRequestSnapshotUntilPresent({
+	return retryPullRequestSnapshotUntil({
 		delaysMs: remainingDelays,
+		hasSettled,
 		queryClient,
 		result: nextResult,
 		signal,

@@ -167,6 +167,29 @@ test('an uncommitted worktree hands the chore to the agent', async () => {
 	expect(commitAndPush).toHaveBeenCalledOnce();
 });
 
+test('a push in flight holds the agent off the worktree it is tracking', () => {
+	// Uncommitted work outranks the resync in the header, so this button is on
+	// screen for the length of the wait. Letting the agent commit here would
+	// move the tip the push is waiting for GitHub to acknowledge.
+	renderHeader(
+		workspaceWithPr({
+			gitStatus: {
+				actionLabel: 'Commit and push',
+				kind: 'uncommitted',
+				label: '3 uncommitted changes',
+				status: 'pending',
+			},
+			label: 'Ready to merge',
+			status: 'ready-to-merge',
+		}),
+		stubReviewActions({ isPushingBranch: true }),
+	);
+
+	expect(
+		screen.getByRole('button', { name: 'Commit and push' }),
+	).toBeDisabled();
+});
+
 test('unpushed commits push directly, skipping the agent', async () => {
 	const pushBranch = vi.fn();
 	const user = userEvent.setup();
@@ -187,6 +210,19 @@ test('the Push button waits on the push it started', () => {
 	);
 
 	expect(screen.getByRole('button', { name: 'Push' })).toBeDisabled();
+});
+
+test('a push in flight holds the header off the merge it has not verified', () => {
+	// git reports the branch level with the remote the moment the push lands,
+	// while the pull request still carries the previous commit's checks.
+	renderHeader(
+		workspaceWithPr({ label: 'Ready to merge', status: 'ready-to-merge' }),
+		stubReviewActions({ isPushingBranch: true }),
+	);
+
+	expect(screen.queryByRole('button', { name: 'Merge' })).toBeNull();
+	expect(screen.getByRole('button', { name: 'Push' })).toBeDisabled();
+	expect(screen.getByText('Syncing with remote')).toBeInTheDocument();
 });
 
 test('a conflicting PR offers the resolve action in its overflow menu', async () => {

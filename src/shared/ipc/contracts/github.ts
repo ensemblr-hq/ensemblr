@@ -111,6 +111,15 @@ export interface GithubPullRequestWire {
 	comments: readonly GithubCommentWire[];
 	deletions: number | null;
 	deployments: readonly GithubDeploymentWire[];
+	/**
+	 * Whether this repository holds the commit named by `headRefOid`. It tells a
+	 * PR record that is merely *behind* the local tip — the commit is ours, so
+	 * GitHub has yet to catch up with a push — from one that is *ahead* of a
+	 * remote-tracking ref nobody has fetched, where the commit was never ours.
+	 * Absent when git rendered no verdict, and on snapshots cached before this
+	 * field existed.
+	 */
+	headCommitKnownLocally?: boolean;
 	headRefName: string;
 	/** Head-branch tip commit at the PR, used to confirm branch identity. */
 	headRefOid: string;
@@ -137,6 +146,13 @@ export interface GitBranchSyncWire {
 	ahead: number;
 	behind: number;
 	branchName: string;
+	/**
+	 * The branch's own tip commit, which is what a synced upstream holds. Read
+	 * beside a pull request's `headRefOid` and `headCommitKnownLocally` it says
+	 * whether GitHub's PR record has caught up with the commit the remote
+	 * already has; absent on snapshots cached before this field existed.
+	 */
+	headSha?: string;
 	hasUpstream: boolean;
 }
 
@@ -177,6 +193,15 @@ export interface PushWorkspaceBranchRequest {
 /** Result of pushing a workspace branch. */
 export interface PushWorkspaceBranchResult {
 	error?: GithubFailure;
+	/**
+	 * The commit the push published, so the caller can wait for GitHub's pull
+	 * request record to name it rather than trusting the first snapshot that
+	 * comes back. Absent when `git rev-parse` could not answer, and when the
+	 * worktree tip moved while the push ran — nothing locks the checkout for the
+	 * length of the command, so a tip that changed leaves no way to say which
+	 * commit went out.
+	 */
+	headSha?: string;
 	ok: boolean;
 }
 

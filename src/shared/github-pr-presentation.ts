@@ -1,4 +1,5 @@
 import type {
+	GitBranchSyncWire,
 	GithubPullRequestSnapshotWire,
 	GithubPullRequestWire,
 } from './ipc/contracts/github';
@@ -33,7 +34,7 @@ export function deriveWorkspacePrPresentation(
 	}
 	return {
 		number: pullRequest.number,
-		status: derivePresentationStatus(pullRequest),
+		status: derivePresentationStatus(pullRequest, snapshot.branchSync),
 		syncedAt: snapshot.syncedAt,
 	};
 }
@@ -43,10 +44,12 @@ export function deriveWorkspacePrPresentation(
  * GitHub's own state, and an open one collapses through the shared open-PR
  * policy.
  * @param pullRequest - The pull request wire record.
+ * @param branchSync - The branch's sync state, when the snapshot carries one.
  * @returns The compact presentation status.
  */
 function derivePresentationStatus(
 	pullRequest: GithubPullRequestWire,
+	branchSync: GitBranchSyncWire | null,
 ): WorkspacePrPresentationStatus {
 	if (pullRequest.state === 'merged') {
 		return 'merged';
@@ -54,7 +57,7 @@ function derivePresentationStatus(
 	if (pullRequest.state === 'closed') {
 		return 'closed';
 	}
-	return deriveOpenPullRequestStatus(pullRequest);
+	return deriveOpenPullRequestStatus(pullRequest, branchSync);
 }
 
 /**
@@ -120,10 +123,15 @@ export type OpenPullRequestPresentationStatus = Extract<
  * `buildPullRequestShellModel` delegates here so the active row and the cached
  * sidebar rows can never drift on merged/blocked/checking/ready.
  * @param pullRequest - The open pull request wire record.
+ * @param branchSync - The branch's sync state, used to tell a verdict about the
+ * branch tip from one GitHub has not recomputed yet. Required rather than
+ * optional so a caller decides for itself, instead of skipping that test by
+ * omission; pass null where the snapshot genuinely has none.
  * @returns The presentation status for an open PR.
  */
 export function deriveOpenPullRequestStatus(
 	pullRequest: GithubPullRequestWire,
+	branchSync: GitBranchSyncWire | null,
 ): OpenPullRequestPresentationStatus {
 	const hasFailing = pullRequest.checks.some(
 		(check) => check.bucket === 'failing',
@@ -140,7 +148,7 @@ export function deriveOpenPullRequestStatus(
 	if (hasFailing || isBlockedByPolicy) {
 		return 'blocked';
 	}
-	if (hasPending) {
+	if (hasPending || lagsBranchTip(pullRequest, branchSync)) {
 		return 'checking';
 	}
 	if (pullRequest.isDraft) {
@@ -153,4 +161,46 @@ export function deriveOpenPullRequestStatus(
 		return 'ready';
 	}
 	return 'open';
+}
+
+/**
+ * Whether the pull request record still names the commit a push replaced — the
+ * window in which GitHub is moving the PR head and queueing check runs for it.
+ *
+ * A verdict read in that window describes the *previous* commit, so reporting it
+ * as `ready` offers a merge of work whose checks have not started. The test is
+ * narrow on purpose, because the same shape of evidence has a second cause that
+ * must not be caught: `ahead`/`behind` are counted against a remote-tracking ref
+ * nothing in the app fetches for this branch, so a remote branch that moved on
+ * without us (a suggestion committed from GitHub's UI, "Update branch", a
+ * teammate's push) also reads as level with a PR head that differs.
+ *
+ * `headCommitKnownLocally` is what separates them: a PR waiting to catch up
+ * names a commit this repository has, while a remote that ran ahead names one it
+ * has never seen. Everything short of that evidence — an unfetched remote, a
+ * branch with local work outstanding, a snapshot cached before either field
+ * existed — is left to the checks GitHub did compute.
+ *
+ * @param pullRequest - The open pull request wire record.
+ * @param branchSync - The branch's sync state, when the snapshot carries one.
+ * @returns True when the PR's head is a commit of ours that its tip has passed.
+ */
+function lagsBranchTip(
+	pullRequest: GithubPullRequestWire,
+	branchSync: GitBranchSyncWire | null,
+): boolean {
+	if (!branchSync?.headSha || !pullRequest.headRefOid) {
+		return false;
+	}
+	if (
+		!branchSync.hasUpstream ||
+		branchSync.ahead > 0 ||
+		branchSync.behind > 0
+	) {
+		return false;
+	}
+	if (pullRequest.headCommitKnownLocally !== true) {
+		return false;
+	}
+	return branchSync.headSha !== pullRequest.headRefOid;
 }

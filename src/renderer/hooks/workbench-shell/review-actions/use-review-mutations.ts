@@ -5,7 +5,7 @@ import {
 	useQueryClient,
 } from '@tanstack/react-query';
 import { useSetAtom } from 'jotai';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -17,6 +17,7 @@ import {
 	mergePullRequest,
 	pushWorkspaceBranch,
 	refreshPullRequestSnapshot,
+	refreshPullRequestSnapshotAfterPush,
 } from '@/renderer/api/ensemblr-queries';
 import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
 import { failureText } from '@/renderer/lib/failure-text';
@@ -53,6 +54,19 @@ interface ReviewRunTarget {
 /** The merged workspace a continue run targets, and the PR it moves past. */
 interface ContinueMergedWorkspaceTarget extends ReviewRunTarget {
 	pullRequestNumber: number | undefined;
+}
+
+/**
+ * The workspace a push targets, plus what its pull request looked like before
+ * the push. `expectsChecks` says whether the reconcile that follows should read
+ * an empty check rollup on the new commit as "not queued yet" or as "this
+ * repository runs none", and is therefore an observation over the session rather
+ * than a reading of the live array: a rollup goes empty for a few seconds every
+ * time GitHub moves the head, so a push made in that gap would otherwise settle
+ * the moment the head matched and offer a merge of unrun work.
+ */
+interface PushRunTarget extends ReviewRunTarget {
+	expectsChecks: boolean;
 }
 
 /**
@@ -151,6 +165,13 @@ function announceContinueSuccess(
  * archive succeeds it redirects to Welcome, since the just archived workspace can
  * no longer render a shell.
  *
+ * The push does not settle on the first snapshot it gets back: GitHub advances
+ * the pull request's head some seconds after `git push` returns, so
+ * `refreshPullRequestSnapshotAfterPush` keeps refreshing until the record names
+ * the commit that was pushed. The run stays pending for that whole window, which
+ * is what keeps `isPushingBranch` true and the header off a merge offer made
+ * against the previous commit's checks.
+ *
  * Both merged-header runs carry their workspace in the mutation's variables and
  * report busy against that workspace rather than against `isPending` alone. The
  * hook outlives a workspace switch — the route component is reused across
@@ -184,6 +205,12 @@ export function useReviewMutations({
 	);
 	const workspaceCwd = activeWorkspace.pathLabel;
 	const workspaceId = activeWorkspace.id;
+	// Which workspaces have shown a check at any point this session. The live
+	// array is the wrong thing to read at click time: it empties for a few
+	// seconds each time GitHub moves the head, and a push started in that gap
+	// would take it for a repository that runs no CI. @see PushRunTarget
+	const checkedWorkspaces = useRef<ReadonlySet<string>>(new Set());
+	const hasChecks = activeWorkspace.pullRequest.checks.length > 0;
 	const removeWorkspace = useRemoveWorkspaceAction({
 		activeWorkspaceId: workspaceId,
 	});
@@ -339,7 +366,7 @@ export function useReviewMutations({
 	});
 
 	const pushBranchMutation = useMutation({
-		mutationFn: async (target: ReviewRunTarget) => {
+		mutationFn: async (target: PushRunTarget) => {
 			const result = await pushWorkspaceBranch({
 				setUpstream: mergeSettings.setUpstreamOnPush,
 				workspaceCwd: target.workspaceCwd,
@@ -347,6 +374,7 @@ export function useReviewMutations({
 			if (!result.ok) {
 				throw new ReviewActionError(result.error);
 			}
+			return result.headSha ?? null;
 		},
 		mutationKey: PUSH_BRANCH_MUTATION_KEY,
 		onError: (error) =>
@@ -354,10 +382,12 @@ export function useReviewMutations({
 				t('errors:push.failed.title', 'Push failed'),
 				error,
 			),
-		onSuccess: async (_result, target) => {
+		onSuccess: async (pushedHeadSha, target) => {
 			toast.success(t('errors:push.success.title', 'Branch pushed.'));
 			await Promise.all([
-				refreshPullRequestSnapshot({
+				refreshPullRequestSnapshotAfterPush({
+					expectsChecks: target.expectsChecks,
+					pushedHeadSha,
 					queryClient,
 					workspaceCwd: target.workspaceCwd,
 					workspaceId: target.workspaceId,
@@ -396,10 +426,24 @@ export function useReviewMutations({
 		startMerge({ workspaceCwd, workspaceId });
 	}, [startMerge, workspaceCwd, workspaceId]);
 
+	useEffect(() => {
+		if (!hasChecks || checkedWorkspaces.current.has(workspaceId)) {
+			return;
+		}
+		checkedWorkspaces.current = new Set([
+			...checkedWorkspaces.current,
+			workspaceId,
+		]);
+	}, [hasChecks, workspaceId]);
+
 	/** Pushes the workspace's branch with git, skipping the agent. */
 	const pushBranch = useCallback(() => {
-		startPush({ workspaceCwd, workspaceId });
-	}, [startPush, workspaceCwd, workspaceId]);
+		startPush({
+			expectsChecks: hasChecks || checkedWorkspaces.current.has(workspaceId),
+			workspaceCwd,
+			workspaceId,
+		});
+	}, [hasChecks, startPush, workspaceCwd, workspaceId]);
 
 	const lifecycleRun = useWorkspaceLifecycleRun(workspaceId);
 	const isContinuingMergedWorkspace = useWorkspaceRunIsPending(
