@@ -23,16 +23,27 @@ test('a frozen turn and a live turn serialize to different keys', () => {
 });
 
 test('a turn scope round-trips through persisted tab metadata', () => {
-	// A diff tab stores its scope as untyped metadata; losing the turn arm here
-	// would silently reopen the tab against the working tree instead.
-	for (const scope of [
-		{ fromRef: FROM_REF, kind: 'turn' as const },
-		{ fromRef: FROM_REF, kind: 'turn' as const, toRef: TO_REF },
-	]) {
-		expect(
-			parseWorkspaceGitDiffScope(JSON.parse(JSON.stringify(scope))),
-		).toEqual(scope);
-	}
+	// A diff tab stores its scope as an untyped record; losing the turn arm here
+	// would silently reopen the tab against the working tree instead. The inputs
+	// are written untyped because that is what comes back off the tab row.
+	expect(
+		parseWorkspaceGitDiffScope({ fromRef: FROM_REF, kind: 'turn' }),
+	).toEqual({ fromRef: FROM_REF, kind: 'turn' });
+	expect(
+		parseWorkspaceGitDiffScope({
+			fromRef: FROM_REF,
+			kind: 'turn',
+			toRef: TO_REF,
+		}),
+	).toEqual({ fromRef: FROM_REF, kind: 'turn', toRef: TO_REF });
+	// Extra keys a future writer might add are dropped rather than carried.
+	expect(
+		parseWorkspaceGitDiffScope({
+			fromRef: FROM_REF,
+			kind: 'turn',
+			stray: 'ignored',
+		}),
+	).toEqual({ fromRef: FROM_REF, kind: 'turn' });
 });
 
 test('a malformed turn scope is refused rather than half-parsed', () => {
@@ -40,8 +51,16 @@ test('a malformed turn scope is refused rather than half-parsed', () => {
 	expect(
 		parseWorkspaceGitDiffScope({ fromRef: 7, kind: 'turn' }),
 	).toBeUndefined();
-	// A non-string toRef is dropped, leaving the live-working-tree reading.
+	// A malformed toRef is refused rather than read as the live working tree —
+	// that reading would widen a historical turn to every edit made since.
 	expect(
 		parseWorkspaceGitDiffScope({ fromRef: FROM_REF, kind: 'turn', toRef: 7 }),
-	).toEqual({ fromRef: FROM_REF, kind: 'turn' });
+	).toBeUndefined();
+	expect(
+		parseWorkspaceGitDiffScope({
+			fromRef: FROM_REF,
+			kind: 'turn',
+			toRef: null,
+		}),
+	).toBeUndefined();
 });

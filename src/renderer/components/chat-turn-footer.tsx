@@ -38,7 +38,7 @@ function TurnTiming({
 	].filter((part): part is string => part !== null);
 
 	return parts.map((part, index) => (
-		<span key={part}>
+		<span className='whitespace-nowrap' key={part}>
 			{/* i18next-instrument-ignore -- separator glyph */}
 			{index > 0 ? <span aria-hidden='true'>· </span> : null}
 			{part}
@@ -96,75 +96,79 @@ export function ChatTurnFooter({
 	return (
 		<div
 			className={cn(
-				'flex items-center gap-1 text-muted-foreground/80 text-xs',
+				'flex items-start gap-2 text-muted-foreground/80 text-xs',
 				className,
 			)}
 			data-role='turn-footer'
 		>
-			<TurnTiming durationMs={durationMs} endedAtMs={endedAtMs} />
-			{answerText.length > 0 ? <CopyResponseButton text={answerText} /> : null}
-			{hasForkActions ? (
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<button
-							aria-label={t('common:turn-footer.actions', 'Turn actions')}
-							className='rounded-md p-1 text-muted-foreground opacity-70 transition-[color,background-color,opacity] hover:bg-secondary/60 hover:text-foreground hover:opacity-100 data-[state=open]:bg-secondary/60 data-[state=open]:text-foreground data-[state=open]:opacity-100'
-							disabled={forkDisabled}
-							type='button'
-						>
-							<EllipsisIcon aria-hidden='true' className='size-3.5' />
-						</button>
-					</DropdownMenuTrigger>
-					{/* Content width defaults to the trigger width — far too narrow
+			<div className='flex min-h-6 shrink-0 items-center gap-1'>
+				<TurnTiming durationMs={durationMs} endedAtMs={endedAtMs} />
+				{answerText.length > 0 ? (
+					<CopyResponseButton text={answerText} />
+				) : null}
+				{hasForkActions ? (
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<button
+								aria-label={t('common:turn-footer.actions', 'Turn actions')}
+								className='rounded-md p-1 text-muted-foreground opacity-70 transition-[color,background-color,opacity] hover:bg-secondary/60 hover:text-foreground hover:opacity-100 data-[state=open]:bg-secondary/60 data-[state=open]:text-foreground data-[state=open]:opacity-100'
+								disabled={forkDisabled}
+								type='button'
+							>
+								<EllipsisIcon aria-hidden='true' className='size-3.5' />
+							</button>
+						</DropdownMenuTrigger>
+						{/* Content width defaults to the trigger width — far too narrow
 					    for the icon-only trigger, so let it size to the items. */}
-					<DropdownMenuContent align='start' className='w-auto'>
-						{onForkToNewTab ? (
-							<DropdownMenuItem
-								className='whitespace-nowrap'
-								disabled={forkDisabled}
-								onSelect={() => onForkToNewTab()}
-							>
-								<SquarePlusIcon aria-hidden='true' className='size-4' />
-								{t('common:turn-footer.fork-tab', 'Fork to new tab')}
-							</DropdownMenuItem>
-						) : null}
-						{onForkToNewWorkspace ? (
-							<DropdownMenuItem
-								className='whitespace-nowrap'
-								disabled={forkDisabled}
-								onSelect={() => onForkToNewWorkspace()}
-							>
-								<SplitIcon aria-hidden='true' className='size-4' />
-								{t(
-									'common:turn-footer.fork-workspace',
-									'Fork to new workspace',
-								)}
-							</DropdownMenuItem>
-						) : null}
-						{onViewTurnDiff ? (
-							<DropdownMenuItem
-								className='whitespace-nowrap'
-								onSelect={() => onViewTurnDiff()}
-							>
-								<FileDiffIcon aria-hidden='true' className='size-4' />
-								{t('common:turn-footer.view-diff', 'View turn diff')}
-							</DropdownMenuItem>
-						) : null}
-						{onRestoreToCheckpoint ? (
-							<DropdownMenuItem
-								className='whitespace-nowrap'
-								onSelect={() => onRestoreToCheckpoint()}
-							>
-								<HistoryIcon aria-hidden='true' className='size-4' />
-								{t(
-									'common:turn-footer.restore-checkpoint',
-									'Restore to before this turn…',
-								)}
-							</DropdownMenuItem>
-						) : null}
-					</DropdownMenuContent>
-				</DropdownMenu>
-			) : null}
+						<DropdownMenuContent align='start' className='w-auto'>
+							{onForkToNewTab ? (
+								<DropdownMenuItem
+									className='whitespace-nowrap'
+									disabled={forkDisabled}
+									onSelect={() => onForkToNewTab()}
+								>
+									<SquarePlusIcon aria-hidden='true' className='size-4' />
+									{t('common:turn-footer.fork-tab', 'Fork to new tab')}
+								</DropdownMenuItem>
+							) : null}
+							{onForkToNewWorkspace ? (
+								<DropdownMenuItem
+									className='whitespace-nowrap'
+									disabled={forkDisabled}
+									onSelect={() => onForkToNewWorkspace()}
+								>
+									<SplitIcon aria-hidden='true' className='size-4' />
+									{t(
+										'common:turn-footer.fork-workspace',
+										'Fork to new workspace',
+									)}
+								</DropdownMenuItem>
+							) : null}
+							{onViewTurnDiff ? (
+								<DropdownMenuItem
+									className='whitespace-nowrap'
+									onSelect={() => onViewTurnDiff()}
+								>
+									<FileDiffIcon aria-hidden='true' className='size-4' />
+									{t('common:turn-footer.view-diff', 'View turn diff')}
+								</DropdownMenuItem>
+							) : null}
+							{onRestoreToCheckpoint ? (
+								<DropdownMenuItem
+									className='whitespace-nowrap'
+									onSelect={() => onRestoreToCheckpoint()}
+								>
+									<HistoryIcon aria-hidden='true' className='size-4' />
+									{t(
+										'common:turn-footer.restore-checkpoint',
+										'Restore to before this turn…',
+									)}
+								</DropdownMenuItem>
+							) : null}
+						</DropdownMenuContent>
+					</DropdownMenu>
+				) : null}
+			</div>
 			{turnScope && onOpenTurnFile ? (
 				<ChatTurnDiffChips
 					onOpenFile={onOpenTurnFile}

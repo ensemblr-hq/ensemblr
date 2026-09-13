@@ -18,6 +18,19 @@ import type {
 const MAX_VISIBLE_CHIPS = 6;
 
 /**
+ * Whether a changed row names bytes the diff viewer can show. A symlink does
+ * not: its content is the path it points at, so a diff of it reports a link
+ * target rather than a change, and an untracked one has no counts to report
+ * either. Both listings carry links as ordinary file rows, so this is the only
+ * thing separating them.
+ * @param file - A changed-file row from the git status read
+ * @returns Whether the row can open a diff
+ */
+function isDiffableFile(file: WorkspaceGitFileWire): boolean {
+	return file.symlinkTargetKind === undefined;
+}
+
+/**
  * Line counts for one changed file, rendered inside its chip.
  *
  * Binary files report `null` for both, in which case nothing is drawn rather
@@ -106,16 +119,31 @@ export function ChatTurnDiffChips({
 	const overflow = files.length - visible.length;
 
 	return (
-		<span className='flex min-w-0 flex-wrap items-center gap-1' ref={anchorRef}>
-			{visible.map((file) => (
-				<ChatAttachmentChip
-					key={file.path}
-					label={chipLabelForPath(file.path)}
-					onActivate={() => onOpenFile(file.path)}
-					title={file.path}
-					trailing={<DiffCounts file={file} />}
-				/>
-			))}
+		<span
+			className='flex min-w-0 flex-1 flex-wrap items-center gap-1'
+			ref={anchorRef}
+		>
+			{visible.map((file) => {
+				const diffable = isDiffableFile(file);
+				return (
+					<ChatAttachmentChip
+						key={file.path}
+						label={chipLabelForPath(file.path)}
+						onActivate={diffable ? () => onOpenFile(file.path) : undefined}
+						symlinkTargetKind={file.symlinkTargetKind}
+						title={
+							diffable
+								? file.path
+								: t(
+										'common:turn-footer.symlink',
+										'{{path}} is a symlink and has no diff',
+										{ path: file.path },
+									)
+						}
+						trailing={diffable ? <DiffCounts file={file} /> : null}
+					/>
+				);
+			})}
 			{overflow > 0 ? (
 				<button
 					className='rounded-md px-1 text-muted-foreground text-xs underline-offset-2 hover:text-foreground hover:underline'

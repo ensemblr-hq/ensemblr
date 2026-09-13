@@ -423,6 +423,7 @@
 		"more-files_other": "+{{count}} ακόμη αρχεία",
 		"restore-checkpoint": "Επαναφορά στην κατάσταση πριν από αυτόν τον γύρο…",
 		"stopped": "Διακόπηκε",
+		"symlink": "Το {{path}} είναι συμβολικός σύνδεσμος και δεν έχει diff",
 		"view-diff": "Προβολή diff του γύρου"
 	},
 	"turn-summary": {

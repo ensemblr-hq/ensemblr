@@ -114,11 +114,15 @@ export function parseWorkspaceGitDiffScope(
 		return { baseRef: scope.baseRef, kind: 'branch' };
 	}
 	if (scope.kind === 'turn' && typeof scope.fromRef === 'string') {
-		return {
-			fromRef: scope.fromRef,
-			kind: 'turn',
-			...(typeof scope.toRef === 'string' ? { toRef: scope.toRef } : {}),
-		};
+		// An absent `toRef` means the live working tree, so it cannot double as the
+		// reading for a malformed one: a corrupt stored scope would then widen a
+		// historical turn's diff to include every edit made since.
+		if (scope.toRef === undefined) {
+			return { fromRef: scope.fromRef, kind: 'turn' };
+		}
+		return typeof scope.toRef === 'string'
+			? { fromRef: scope.fromRef, kind: 'turn', toRef: scope.toRef }
+			: undefined;
 	}
 	if (scope.kind === 'working-tree') {
 		return { kind: 'working-tree' };

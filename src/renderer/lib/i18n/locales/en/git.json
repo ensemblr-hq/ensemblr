@@ -32,6 +32,10 @@
 				"message": "The last agent turn left the files untouched.",
 				"title": "No changes in the latest turn"
 			},
+			"turn-lookup-failed": {
+				"message": "This workspace’s turn history could not be read, so there is nothing to scope the list to.",
+				"title": "Could not find the latest turn"
+			},
 			"uncommitted": {
 				"message": "Everything here is committed.",
 				"title": "No uncommitted changes yet"

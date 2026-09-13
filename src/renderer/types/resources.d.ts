@@ -425,6 +425,7 @@ export default interface Resources {
 			'more-files_other': '+{{count}} more files';
 			'restore-checkpoint': 'Restore to before this turn…';
 			stopped: 'Stopped';
+			symlink: '{{path}} is a symlink and has no diff';
 			'view-diff': 'View turn diff';
 		};
 		'turn-summary': {
@@ -1095,6 +1096,10 @@ export default interface Resources {
 				'latest-turn': {
 					message: 'The last agent turn left the files untouched.';
 					title: 'No changes in the latest turn';
+				};
+				'turn-lookup-failed': {
+					message: 'This workspace’s turn history could not be read, so there is nothing to scope the list to.';
+					title: 'Could not find the latest turn';
 				};
 				uncommitted: {
 					message: 'Everything here is committed.';

@@ -451,6 +451,7 @@
 		"more-files_other": "Ещё {{count}} файла",
 		"restore-checkpoint": "Восстановить состояние до этого хода…",
 		"stopped": "Остановлено",
+		"symlink": "{{path}} — символьная ссылка, diff недоступен",
 		"view-diff": "Показать diff хода"
 	},
 	"turn-summary": {

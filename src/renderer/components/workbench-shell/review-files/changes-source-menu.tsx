@@ -4,10 +4,7 @@ import { CheckIcon, MoreVerticalIcon, Undo2Icon, XIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import {
-	workspaceCheckpointsQuery,
-	workspaceCommitsQuery,
-} from '@/renderer/api/ensemblr';
+import { workspaceCommitsQuery } from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	DropdownMenu,
@@ -17,8 +14,8 @@ import {
 	DropdownMenuShortcut,
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
+import { useLatestTurnScope } from '@/renderer/hooks/workbench-shell/review-files/use-latest-turn-scope';
 import { cn } from '@/renderer/lib/utils';
-import { latestTurnCheckpointScope } from '@/renderer/lib/workbench';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ChangesSource } from '@/renderer/types/workbench-shell';
 import { formatChord } from '@/shared/keymap';
@@ -123,13 +120,7 @@ export function ChangesOverflowMenu({
 	// Scope the list to this branch's own commits so base-branch history (and the
 	// root/initial commit) never pollutes the menu.
 	const baseRef = workspace.landingSummary?.branchSource.baseBranch ?? null;
-	const { data: checkpointsData } = useQuery({
-		...workspaceCheckpointsQuery(workspace.id),
-		enabled: open,
-	});
-	const latestTurnLabel =
-		latestTurnCheckpointScope(checkpointsData?.checkpoints ?? [])?.label ??
-		null;
+	const { label: latestTurnLabel } = useLatestTurnScope(workspace.id, open);
 	const uncommittedCount = workspace.changeSummary.files;
 
 	return (

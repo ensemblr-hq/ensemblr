@@ -112,3 +112,64 @@ test('the footer prints the wall-clock time the turn ended beside its duration',
 	expect(screen.getByText('14.0s')).toBeInTheDocument();
 	expect(screen.getByText(/3:48|15:48/)).toBeInTheDocument();
 });
+
+test('a symlink chip carries no counts and opens nothing', async () => {
+	installEnsemblrApi({
+		getWorkspaceGitStatus: async () => ({
+			files: [
+				{
+					additions: 0,
+					deletions: 0,
+					path: 'hello2',
+					status: 'untracked',
+					symlinkTargetKind: 'file',
+				},
+			],
+			summary: { additions: 0, deletions: 0, files: 1 },
+		}),
+	});
+	const onOpenTurnFile = vi.fn();
+
+	renderWithProviders(
+		<ChatTurnFooter
+			answerText=''
+			durationMs={null}
+			onOpenTurnFile={onOpenTurnFile}
+			turnScope={{ fromRef: FROM_REF, kind: 'turn' }}
+			workspaceCwd='/tmp/ws'
+		/>,
+	);
+
+	const chip = await screen.findByText('hello2');
+	// A link's content is the path it points at, so `+0 -0` would be a lie.
+	expect(screen.queryByText('+0')).not.toBeInTheDocument();
+	expect(screen.queryByText('-0')).not.toBeInTheDocument();
+
+	await userEvent.click(chip);
+	expect(onOpenTurnFile).not.toHaveBeenCalled();
+});
+
+test('the timing cluster cannot wrap away from the chips beside it', async () => {
+	installEnsemblrApi({ getWorkspaceGitStatus: async () => statusResult() });
+
+	const { container } = renderWithProviders(
+		<ChatTurnFooter
+			answerText=''
+			durationMs={197_100}
+			endedAtMs={new Date('2026-09-13T16:53:00').getTime()}
+			onOpenTurnFile={() => undefined}
+			turnScope={{ fromRef: FROM_REF, kind: 'turn' }}
+			workspaceCwd='/tmp/ws'
+		/>,
+	);
+
+	await screen.findByText('AGENTS.md');
+	// `3m, 17.1s` broke across two lines once the chips started wrapping, so the
+	// cluster holding it is unshrinkable and each part is nowrap.
+	const timing = screen.getByText('3m, 17.1s');
+	expect(timing).toHaveClass('whitespace-nowrap');
+	expect(timing.parentElement).toHaveClass('shrink-0');
+	expect(container.querySelector('[data-role="turn-footer"]')).toHaveClass(
+		'items-start',
+	);
+});

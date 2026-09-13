@@ -21,9 +21,17 @@ function workspace(): WorkspaceShellModel {
 	return {
 		changeSummary: { additions: 0, deletions: 0, files: 0 },
 		id: 'ws-1',
+		// A known base makes the default "all" source resolve to a branch scope, so
+		// a working-tree read can only have come from the turn source degrading.
+		landingSummary: { branchSource: { baseBranch: 'master' } },
 		pathLabel: '/tmp/ws',
 		reviewFiles: [],
 	} as unknown as WorkspaceShellModel;
+}
+
+/** Every diff scope the stub bridge was asked to read, in call order. */
+function scopesRead(calls: readonly [{ scope?: unknown }][]): unknown[] {
+	return calls.map(([request]) => request.scope);
 }
 
 /** A checkpoint row as the workspace listing returns it. */
@@ -98,4 +106,65 @@ test('a workspace with no checkpoint degrades to the working tree', async () => 
 	});
 	expect(result.current.scope).toEqual({ kind: 'working-tree' });
 	expect(result.current.latestTurnLabel).toBeNull();
+});
+
+test('a failed checkpoint read never shows working-tree files as the latest turn', async () => {
+	const getWorkspaceGitStatus = vi.fn(
+		async (_request: { scope?: unknown }) => ({
+			files: [
+				{ additions: 3, deletions: 0, path: 'scratch.ts', status: 'untracked' },
+			],
+			summary: { additions: 3, deletions: 0, files: 1 },
+		}),
+	);
+	installEnsemblrApi({
+		getWorkspaceGitStatus,
+		listWorkspaceCheckpoints: async () => {
+			throw new Error('database unavailable');
+		},
+	});
+
+	const { result } = renderHook(() => useChangesSource(workspace()), {
+		wrapper,
+	});
+	result.current.setSource({ kind: 'latest-turn' });
+
+	await waitFor(() => {
+		expect(result.current.emptyState.title).toBe(
+			'Could not find the latest turn',
+		);
+	});
+	// The uncommitted file the working-tree scope would have returned must not
+	// appear under a "Latest turn" heading, so that read never runs.
+	expect(result.current.sourceFiles).toEqual([]);
+	expect(result.current.changesCount).toBe(0);
+	expect(result.current.isSourceLoading).toBe(false);
+	expect(scopesRead(getWorkspaceGitStatus.mock.calls)).not.toContainEqual({
+		kind: 'working-tree',
+	});
+});
+
+test('the turn source stays in its loading state until checkpoints land', async () => {
+	const getWorkspaceGitStatus = vi.fn(
+		async (_request: { scope?: unknown }) => ({
+			files: [],
+			summary: { additions: 0, deletions: 0, files: 0 },
+		}),
+	);
+	installEnsemblrApi({
+		getWorkspaceGitStatus,
+		listWorkspaceCheckpoints: () => new Promise(() => undefined),
+	});
+
+	const { result } = renderHook(() => useChangesSource(workspace()), {
+		wrapper,
+	});
+	result.current.setSource({ kind: 'latest-turn' });
+
+	await waitFor(() => {
+		expect(result.current.isSourceLoading).toBe(true);
+	});
+	expect(scopesRead(getWorkspaceGitStatus.mock.calls)).not.toContainEqual({
+		kind: 'working-tree',
+	});
 });
