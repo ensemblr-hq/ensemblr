@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.16] - 2026-09-13
+
+Ensemblr 0.1.16 is a patch release: a planning agent on a trusted or read-only workspace gets its control surface back.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.16) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.16/Ensemblr-0.1.16-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.16/Ensemblr-0.1.16-x64.AppImage)
+
+### Fixed
+
+- **A planning agent can name its tab and branch, record a summary, ask a question, delegate, and submit its plan again.** Two gates were closing on a planning Claude session at once: `setBranchName` had been added to the plan-mode block list against ADR 0050, and Claude Code routed the whole `mcp__ensemblr__*` surface — plus its own `ExitPlanMode` and `AskUserQuestion` — through a permission callback that only `approval-required` workspaces wire, leaving a planning session on every other mode with no exit at all. The block-list entry is removed and the plan-mode `PreToolUse` guard now clears the control tools with a hook `allow`; authority stays with the control server, per op and per role. (#593)
+
+### Changed
+
+- **Documentation drift corrected and pinned to the published release** — ADR counts, IPC and contract module counts, the agent-control op tables, the Claude SDK surface, and every version reference, download URL, and asset filename. (#591)
+
 ## [0.1.15] - 2026-09-13
 
 Ensemblr 0.1.15 is a hardening release: a full remediation of the 2026-09-12 security and performance audit, durable renderer state in SQLite, and shared repository settings that travel on a workspace branch.
