@@ -1,4 +1,5 @@
 import {
+	ArrowUpIcon,
 	CircleEllipsisIcon,
 	GitBranchIcon,
 	GitMergeConflictIcon,
@@ -13,6 +14,8 @@ import type {
 	WorkspaceSidebarState,
 } from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+
+import { hasUnsentLocalWork } from './pull-request-model';
 
 /**
  * Derives the icon and tone for a workspace sidebar row from its status.
@@ -104,7 +107,22 @@ export function getWorkspaceSidebarState(
 	};
 }
 
-/** PR-derived sidebar state, or `null` when no PR is attached to the workspace. */
+/**
+ * PR-derived sidebar state, or `null` when no PR is attached to the workspace.
+ *
+ * Unsent local work displaces `pr-ready` only. GitHub computed that verdict
+ * against the published tip, so on a branch holding work it has not seen the
+ * verdict does not describe what merging would take — the same reason the
+ * right-sidebar header puts `pr-uncommitted` and `pr-unpushed` above `pr-ready`.
+ * A blocked or checking PR is not softened the same way: neither claims to be
+ * mergeable, so the more urgent verdict stays on the row.
+ *
+ * How much the row knows depends on which model it came from. A live workspace
+ * has both halves — its working-tree query answers for uncommitted edits and its
+ * snapshot for unpushed commits. A cached navigation row has only the snapshot's
+ * `branchSync`, so it reports unpushed commits and stays quiet about an
+ * uncommitted edit until the workspace is opened.
+ */
 function getPullRequestSidebarState(
 	workspace: WorkspaceShellModel,
 ): WorkspaceSidebarState | null {
@@ -123,6 +141,13 @@ function getPullRequestSidebarState(
 	}
 
 	if (workspace.pullRequest.status === 'ready-to-merge') {
+		if (hasUnsentLocalWork(workspace.pullRequest.gitStatus)) {
+			return {
+				className: 'text-status-warning',
+				icon: ArrowUpIcon,
+				kind: 'pr-unpushed',
+			};
+		}
 		return {
 			className: 'text-status-ok',
 			icon: GitPullRequestArrowIcon,

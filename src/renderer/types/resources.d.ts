@@ -3282,6 +3282,7 @@ export default interface Resources {
 					'pr-merged': 'merged';
 					'pr-open': 'open';
 					'pr-ready': 'ready to merge';
+					'pr-unpushed': 'changes not pushed';
 					'pr-working': 'agent working';
 					'workspace-archiving': 'archiving';
 					'workspace-blocked': 'workspace blocked';

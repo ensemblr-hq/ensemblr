@@ -22,6 +22,10 @@ import type {
  * orderable by which happens to be loaded, which is what lets a status move
  * backwards; see {@link isFresherPrObservation}.
  *
+ * `branchSync` rides along for the same reason the status does: it is already in
+ * the snapshot this parses, so every row can report unpushed commits without the
+ * renderer opening a second git query per workspace.
+ *
  * @param snapshot - The cached PR snapshot, or null when none is stored.
  * @returns The compact presentation, or null when the workspace has no PR.
  */
@@ -33,6 +37,7 @@ export function deriveWorkspacePrPresentation(
 		return null;
 	}
 	return {
+		branchSync: snapshot.branchSync,
 		number: pullRequest.number,
 		status: derivePresentationStatus(pullRequest, snapshot.branchSync),
 		syncedAt: snapshot.syncedAt,

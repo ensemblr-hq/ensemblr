@@ -30,6 +30,10 @@ export const WORKSPACE_PATHS = {
 
 /**
  * Builds one workspace row.
+ *
+ * A pull request defaults to a branch level with its upstream, since a row whose
+ * branch holds unpushed commits reports that instead of its GitHub verdict; a
+ * scenario that wants the unpushed badge passes its own `branchSync`.
  * @param repositoryId - Repository the workspace belongs to.
  * @param options - The fields that differ between workspaces.
  * @returns The row the sidebar, the board, and every route resolve from.
@@ -41,7 +45,9 @@ function workspace(
 		id: string;
 		name: string;
 		path: string;
-		pullRequest?: Omit<WorkspacePrPresentation, 'syncedAt'>;
+		pullRequest?: Omit<WorkspacePrPresentation, 'branchSync' | 'syncedAt'> & {
+			branchSync?: WorkspacePrPresentation['branchSync'];
+		};
 		slug: string;
 	},
 ): RepositoryWorkspaceNavigationWorkspace {
@@ -55,7 +61,18 @@ function workspace(
 		name: options.name,
 		path: options.path,
 		...(options.pullRequest
-			? { pullRequest: { ...options.pullRequest, syncedAt: DEMO_CLOCK } }
+			? {
+					pullRequest: {
+						...options.pullRequest,
+						branchSync: options.pullRequest.branchSync ?? {
+							ahead: 0,
+							behind: 0,
+							branchName: options.branchName,
+							hasUpstream: true,
+						},
+						syncedAt: DEMO_CLOCK,
+					},
+				}
 			: {}),
 		repositoryId,
 		slug: options.slug,

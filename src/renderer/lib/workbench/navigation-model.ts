@@ -1,6 +1,7 @@
 import { i18n } from '@/renderer/lib/i18n';
 import { parseGithubRepoFromRemoteUrl } from '@/renderer/lib/workbench/github-compare-url';
 import { PENDING_WORKSPACE_CREATION_METADATA_KEY } from '@/renderer/lib/workbench/optimistic-workspace';
+import { buildGitStatus } from '@/renderer/lib/workbench/pull-request-model';
 import type {
 	DockTabModel,
 	ProjectShellModel,
@@ -17,6 +18,14 @@ import type {
 	RepositoryWorkspaceNavigationWorkspace,
 	WorkspacePrPresentation,
 } from '@/shared/ipc/contracts/repository-navigation';
+
+/**
+ * Stands in for the working-tree counts a navigation row does not have. The
+ * snapshot behind a row says what the branch has not pushed but nothing about
+ * uncommitted edits, and claiming zero is what keeps the git-status row from
+ * reading a branch diff as one.
+ */
+const NO_WORKTREE_CHANGES = { additions: 0, deletions: 0, files: 0 } as const;
 
 // --- Public mappers ---------------------------------------------------------
 
@@ -248,6 +257,12 @@ function mapPresentationChecks(
  * `git:pull-request.label.*` keys the live model uses, so the pill reads its real
  * status from the first frame instead of a placeholder that changes a second
  * later.
+ *
+ * The git-status row is built from the presentation's `branchSync` through the
+ * same builder the live model uses, with a zeroed change summary: the cached
+ * snapshot knows what the branch has not pushed but nothing about the worktree,
+ * so an uncommitted edit stays invisible here until the workspace is opened and
+ * its working-tree query answers.
  */
 function mapPresentationPullRequest(
 	presentation: WorkspacePrPresentation | null,
@@ -256,14 +271,6 @@ function mapPresentationPullRequest(
 		checks: [],
 		comments: [],
 		description: [],
-		gitStatus: {
-			kind: 'clean' as const,
-			label: i18n.t(
-				'workbench:workspace-pull-request.clean.label',
-				'No PR open',
-			),
-			status: 'open' as const,
-		},
 		title: '',
 		todos: [],
 	};
@@ -274,6 +281,14 @@ function mapPresentationPullRequest(
 				'workbench:workspace-pull-request.absent.detail',
 				'No pull request for this branch yet.',
 			),
+			gitStatus: {
+				kind: 'clean' as const,
+				label: i18n.t(
+					'workbench:workspace-pull-request.clean.label',
+					'No PR open',
+				),
+				status: 'open' as const,
+			},
 			label: i18n.t('workbench:workspace-pull-request.absent.label', 'No PR'),
 			status: 'idle',
 		};
@@ -285,6 +300,7 @@ function mapPresentationPullRequest(
 			'workbench:workspace-pull-request.present.detail',
 			'Pull request status from the last GitHub sync.',
 		),
+		gitStatus: buildGitStatus(NO_WORKTREE_CHANGES, presentation.branchSync),
 		label: mapPresentationLabel(presentation.status),
 		number: presentation.number,
 		state,

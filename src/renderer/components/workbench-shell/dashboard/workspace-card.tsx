@@ -209,6 +209,11 @@ function workspaceStateLabel(
 			return t('workbench:dashboard.card.state.pr-open', 'open');
 		case 'pr-ready':
 			return t('workbench:dashboard.card.state.pr-ready', 'ready to merge');
+		case 'pr-unpushed':
+			return t(
+				'workbench:dashboard.card.state.pr-unpushed',
+				'changes not pushed',
+			);
 		case 'pr-working':
 			return t('workbench:dashboard.card.state.pr-working', 'agent working');
 		case 'workspace-archiving':

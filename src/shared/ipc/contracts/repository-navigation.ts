@@ -16,6 +16,7 @@ import type {
 } from '../../menu-bar.ts';
 import type { MenuCommandBroadcast, MenuContext } from '../../menu-commands.ts';
 import type { WindowChromeSnapshot } from '../../window-chrome.ts';
+import type { GitBranchSyncWire } from './github.ts';
 import type {
 	ActiveChatContext,
 	ChatTurnFinishedBroadcast,
@@ -47,6 +48,14 @@ export type WorkspacePrPresentationStatus =
 
 /** The compact PR presentation attached to a navigation workspace row. */
 export interface WorkspacePrPresentation {
+	/**
+	 * The branch's sync state as of `syncedAt`, so a row can say whether the
+	 * branch still holds commits the remote has not seen. Carried verbatim from
+	 * the cached snapshot rather than collapsed to a flag: the same fields decide
+	 * which git action publishes the work and how many commits it covers, and a
+	 * row that only knew "unsent" could not name either.
+	 */
+	branchSync: GitBranchSyncWire | null;
 	number: number;
 	status: WorkspacePrPresentationStatus;
 	/**
