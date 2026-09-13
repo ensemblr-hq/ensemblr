@@ -543,6 +543,36 @@ test('pushWorkspaceBranch reports the commit it published', async () => {
 	assert.equal(result.headSha, HEAD_SHA);
 });
 
+test('pushWorkspaceBranch reports no commit when the tip moved while it ran', async () => {
+	// A chat agent or a terminal can commit mid-push; nothing locks the
+	// checkout, so the reads bracketing the push disagree and neither one can be
+	// claimed as what went out.
+	const tips = [`${HEAD_SHA}\n`, `${'b'.repeat(40)}\n`];
+	const { service } = createService((request) =>
+		request.args?.[0] === 'rev-parse'
+			? buildResult({ stdout: tips.shift() ?? '' })
+			: buildResult(),
+	);
+
+	const result = await service.pushWorkspaceBranch({ workspaceCwd: '/tmp/ws' });
+
+	assert.equal(result.ok, true);
+	assert.equal(result.headSha, undefined);
+});
+
+test('pushWorkspaceBranch reports no commit when git cannot read the tip', async () => {
+	const { service } = createService((request) =>
+		request.args?.[0] === 'rev-parse'
+			? buildResult({ exitCode: 128, status: 'failure' })
+			: buildResult(),
+	);
+
+	const result = await service.pushWorkspaceBranch({ workspaceCwd: '/tmp/ws' });
+
+	assert.equal(result.ok, true);
+	assert.equal(result.headSha, undefined);
+});
+
 test('createPullRequest parses URL and number from stdout', async () => {
 	const { calls, service } = createService(() =>
 		buildResult({ stdout: 'https://github.com/o/r/pull/42\n' }),

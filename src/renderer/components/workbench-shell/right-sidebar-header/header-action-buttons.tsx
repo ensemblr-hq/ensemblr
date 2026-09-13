@@ -60,7 +60,11 @@ export function MergePullRequestAction() {
 	);
 }
 
-/** Hands staging, committing, and pushing the worktree to the chat agent. */
+/**
+ * Hands staging, committing, and pushing the worktree to the chat agent. Held
+ * shut while a direct push is still reconciling, since the agent would move the
+ * tip that push is waiting for GitHub to acknowledge.
+ */
 export function CommitAndPushAction() {
 	const { t } = useTranslation();
 	const reviewActions = useReviewActions();
@@ -68,7 +72,7 @@ export function CommitAndPushAction() {
 	return (
 		<Button
 			className={HEADER_ACTION_BUTTON_CLASSES}
-			disabled={reviewActions === null}
+			disabled={reviewActions === null || reviewActions.isPushingBranch}
 			onClick={reviewActions?.commitAndPush}
 			size='sm'
 		>

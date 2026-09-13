@@ -196,7 +196,10 @@ export interface PushWorkspaceBranchResult {
 	/**
 	 * The commit the push published, so the caller can wait for GitHub's pull
 	 * request record to name it rather than trusting the first snapshot that
-	 * comes back. Absent when `git rev-parse` could not answer.
+	 * comes back. Absent when `git rev-parse` could not answer, and when the
+	 * worktree tip moved while the push ran — nothing locks the checkout for the
+	 * length of the command, so a tip that changed leaves no way to say which
+	 * commit went out.
 	 */
 	headSha?: string;
 	ok: boolean;

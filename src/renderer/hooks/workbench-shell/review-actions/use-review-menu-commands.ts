@@ -9,10 +9,11 @@ import type { ReviewActionsValue } from '@/renderer/types/workbench';
  * buttons inside the collapsible right sidebar.
  *
  * Every item is gated on `isAgentWorking` for the same reason the buttons are:
- * the agent is about to change the state these actions would act on. Push and
- * Merge are gated on the push in flight as well — a second push would race the
- * first, and a merge fired before the resync lands would merge on the previous
- * commit's checks.
+ * the agent is about to change the state these actions would act on. Push, Merge
+ * and Commit and push are gated on the push in flight as well — a second push
+ * would race the first, a merge fired before the resync lands would merge on the
+ * previous commit's checks, and Commit and push hands the agent a worktree whose
+ * tip the resync is still tracking.
  * @param actions - The review action bundle the provider publishes
  */
 export function useReviewMenuCommands(actions: ReviewActionsValue): void {
@@ -43,7 +44,7 @@ export function useReviewMenuCommands(actions: ReviewActionsValue): void {
 	const isPushSettled = enabled && !isPushingBranch;
 
 	useMenuCommand('review.review', review, enabled);
-	useMenuCommand('review.commitAndPush', commitAndPush, enabled);
+	useMenuCommand('review.commitAndPush', commitAndPush, isPushSettled);
 	useMenuCommand('review.pushBranch', pushBranch, isPushSettled);
 	useMenuCommand('review.createPullRequest', createPullRequest, enabled);
 	useMenuCommand(

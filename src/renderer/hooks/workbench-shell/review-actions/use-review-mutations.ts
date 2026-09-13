@@ -5,7 +5,7 @@ import {
 	useQueryClient,
 } from '@tanstack/react-query';
 import { useSetAtom } from 'jotai';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -58,9 +58,12 @@ interface ContinueMergedWorkspaceTarget extends ReviewRunTarget {
 
 /**
  * The workspace a push targets, plus what its pull request looked like before
- * the push. `expectsChecks` is read at click time because the reconcile that
- * follows needs to know whether an empty check rollup on the new commit means
- * "not queued yet" or "this repository runs none".
+ * the push. `expectsChecks` says whether the reconcile that follows should read
+ * an empty check rollup on the new commit as "not queued yet" or as "this
+ * repository runs none", and is therefore an observation over the session rather
+ * than a reading of the live array: a rollup goes empty for a few seconds every
+ * time GitHub moves the head, so a push made in that gap would otherwise settle
+ * the moment the head matched and offer a merge of unrun work.
  */
 interface PushRunTarget extends ReviewRunTarget {
 	expectsChecks: boolean;
@@ -202,6 +205,12 @@ export function useReviewMutations({
 	);
 	const workspaceCwd = activeWorkspace.pathLabel;
 	const workspaceId = activeWorkspace.id;
+	// Which workspaces have shown a check at any point this session. The live
+	// array is the wrong thing to read at click time: it empties for a few
+	// seconds each time GitHub moves the head, and a push started in that gap
+	// would take it for a repository that runs no CI. @see PushRunTarget
+	const checkedWorkspaces = useRef<ReadonlySet<string>>(new Set());
+	const hasChecks = activeWorkspace.pullRequest.checks.length > 0;
 	const removeWorkspace = useRemoveWorkspaceAction({
 		activeWorkspaceId: workspaceId,
 	});
@@ -417,19 +426,24 @@ export function useReviewMutations({
 		startMerge({ workspaceCwd, workspaceId });
 	}, [startMerge, workspaceCwd, workspaceId]);
 
+	useEffect(() => {
+		if (!hasChecks || checkedWorkspaces.current.has(workspaceId)) {
+			return;
+		}
+		checkedWorkspaces.current = new Set([
+			...checkedWorkspaces.current,
+			workspaceId,
+		]);
+	}, [hasChecks, workspaceId]);
+
 	/** Pushes the workspace's branch with git, skipping the agent. */
 	const pushBranch = useCallback(() => {
 		startPush({
-			expectsChecks: activeWorkspace.pullRequest.checks.length > 0,
+			expectsChecks: hasChecks || checkedWorkspaces.current.has(workspaceId),
 			workspaceCwd,
 			workspaceId,
 		});
-	}, [
-		activeWorkspace.pullRequest.checks.length,
-		startPush,
-		workspaceCwd,
-		workspaceId,
-	]);
+	}, [hasChecks, startPush, workspaceCwd, workspaceId]);
 
 	const lifecycleRun = useWorkspaceLifecycleRun(workspaceId);
 	const isContinuingMergedWorkspace = useWorkspaceRunIsPending(

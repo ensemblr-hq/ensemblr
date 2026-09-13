@@ -116,6 +116,22 @@ test('a workspace with no PR offers Commit and push for its uncommitted changes'
 	expect(commitAndPush).toHaveBeenCalledTimes(1);
 });
 
+test('a push in flight disables Commit and push in the Checks panel', () => {
+	const commitAndPush = vi.fn();
+	renderChecksPanel(
+		createWorkspace({
+			gitStatus: UNCOMMITTED_GIT_STATUS,
+			pullRequest: { number: 220, state: 'open', status: 'idle' },
+		}),
+		stubReviewActions({ commitAndPush, isPushingBranch: true }),
+	);
+
+	expect(
+		screen.getByRole('button', { name: 'Commit and push' }),
+	).toBeDisabled();
+	expect(commitAndPush).not.toHaveBeenCalled();
+});
+
 test('an open PR offers Commit and push for its uncommitted changes', () => {
 	const commitAndPush = vi.fn();
 	renderChecksPanel(

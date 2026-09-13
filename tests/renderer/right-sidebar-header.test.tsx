@@ -167,6 +167,29 @@ test('an uncommitted worktree hands the chore to the agent', async () => {
 	expect(commitAndPush).toHaveBeenCalledOnce();
 });
 
+test('a push in flight holds the agent off the worktree it is tracking', () => {
+	// Uncommitted work outranks the resync in the header, so this button is on
+	// screen for the length of the wait. Letting the agent commit here would
+	// move the tip the push is waiting for GitHub to acknowledge.
+	renderHeader(
+		workspaceWithPr({
+			gitStatus: {
+				actionLabel: 'Commit and push',
+				kind: 'uncommitted',
+				label: '3 uncommitted changes',
+				status: 'pending',
+			},
+			label: 'Ready to merge',
+			status: 'ready-to-merge',
+		}),
+		stubReviewActions({ isPushingBranch: true }),
+	);
+
+	expect(
+		screen.getByRole('button', { name: 'Commit and push' }),
+	).toBeDisabled();
+});
+
 test('unpushed commits push directly, skipping the agent', async () => {
 	const pushBranch = vi.fn();
 	const user = userEvent.setup();

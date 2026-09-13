@@ -156,6 +156,11 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 	const todoActions = useTodoActions(workspace.id);
 	const reviewActions = useReviewActions();
 	const isAgentWorking = reviewActions?.isAgentWorking === true;
+	// A row with no action renders disabled, which is how a direct push still
+	// reconciling keeps the agent off the tip that push is waiting on.
+	const commitAndPush = reviewActions?.isPushingBranch
+		? undefined
+		: reviewActions?.commitAndPush;
 	const draft = usePrDetailsDraft(workspace);
 	const { data: reviewCommentsData } = useQuery(
 		reviewCommentsQuery(workspace.id),
@@ -239,7 +244,7 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 				}
 				conflictsSection={conflictsSection}
 				isAgentWorking={isAgentWorking}
-				onCommitAndPush={reviewActions?.commitAndPush}
+				onCommitAndPush={commitAndPush}
 				onCreatePullRequest={sendCreatePullRequest}
 				state={panelState}
 				todoSection={
@@ -260,7 +265,7 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 			conflictsSection={conflictsSection}
 			isAgentWorking={isAgentWorking}
 			localComments={localComments}
-			onCommitAndPush={reviewActions?.commitAndPush}
+			onCommitAndPush={commitAndPush}
 			onUpdatePullRequest={sendCreatePullRequest}
 			state={panelState}
 			todoActions={todoActions}

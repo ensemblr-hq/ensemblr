@@ -693,6 +693,12 @@ export function createGithubService({
 				request.setUpstream === false
 					? ['push', 'origin', 'HEAD']
 					: ['push', '--set-upstream', 'origin', 'HEAD'];
+			// `git push origin HEAD` resolves HEAD as it runs, and nothing locks the
+			// worktree for the length of the command — a chat agent or a terminal
+			// can commit while it is in flight. Two matching reads are the only
+			// evidence the tip held still across the push; do not collapse them.
+			const tipBeforePush = await readHeadSha(cwd.cwd);
+			// react-doctor-disable-next-line -- The ordering IS the guarantee: the read has to land before the push starts, so running the pair together would report a tip the push never saw.
 			const pushResult = await run('git', cwd.cwd, pushArgs);
 			if (pushResult.status !== 'success') {
 				return {
@@ -700,8 +706,10 @@ export function createGithubService({
 					ok: false,
 				};
 			}
-			const headSha = await readHeadSha(cwd.cwd);
-			return { ...(headSha ? { headSha } : {}), ok: true };
+			const tipAfterPush = await readHeadSha(cwd.cwd);
+			const publishedSha =
+				tipBeforePush && tipBeforePush === tipAfterPush ? tipBeforePush : null;
+			return { ...(publishedSha ? { headSha: publishedSha } : {}), ok: true };
 		},
 
 		async createPullRequest(request) {

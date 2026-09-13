@@ -398,6 +398,46 @@ test('stays busy until the post-push resync settles', async () => {
 	});
 });
 
+test('remembers that a PR runs checks after its rollup goes empty', async () => {
+	// GitHub empties the rollup for a few seconds every time it moves the head,
+	// so a push started in that gap must not read the PR as one that runs no CI
+	// and settle the moment the head matches.
+	pushWorkspaceBranch.mockResolvedValue({ headSha: 'bbb222', ok: true });
+	const { rerender, result } = renderReviewMutations(false);
+
+	rerender({
+		workspace: {
+			...activeWorkspace,
+			pullRequest: { checks: [], number: 7 },
+		} as unknown as WorkspaceShellModel,
+	});
+	act(() => {
+		result.current.pushBranch();
+	});
+
+	await waitFor(() => {
+		expect(refreshPullRequestSnapshotAfterPush).toHaveBeenCalledWith(
+			expect.objectContaining({ expectsChecks: true }),
+		);
+	});
+});
+
+test('settles a push on a PR that has never reported a check', async () => {
+	pushWorkspaceBranch.mockResolvedValue({ headSha: 'bbb222', ok: true });
+	const { rerender, result } = renderReviewMutations(false);
+
+	rerender({ workspace: otherWorkspace });
+	act(() => {
+		result.current.pushBranch();
+	});
+
+	await waitFor(() => {
+		expect(refreshPullRequestSnapshotAfterPush).toHaveBeenCalledWith(
+			expect.objectContaining({ expectsChecks: false, workspaceId: 'houston' }),
+		);
+	});
+});
+
 test('archives the workspace the merge ran against, not the one now on screen', async () => {
 	const mergeGate = deferred<{ merged: boolean }>();
 	mergePullRequest.mockReturnValue(mergeGate.promise);
