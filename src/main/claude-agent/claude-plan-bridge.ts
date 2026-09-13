@@ -4,12 +4,15 @@
  * runtimes save the plan under `.context/plans/`, post it into the chat, and
  * raise the one review panel the renderer already renders.
  *
- * A Claude root holds both tools and either one works; only a spawned sub-agent
- * has `exitPlanMode` withheld from its MCP list. That withholding is what makes
- * the role check below load-bearing: the native tool is never on the deny list,
- * so without it an investigator submits through `ExitPlanMode` the plan the
- * control op would have refused, raising a review panel in a tab nobody is
- * watching.
+ * Either tool works for a Claude root that holds both, which is fewer sessions
+ * than it looks: the CLI publishes `ExitPlanMode` only to a session running
+ * behind a per-tool approval callback, so `approval-required` holds both and a
+ * trusted or read-only workspace holds only the control op. A spawned sub-agent
+ * has `exitPlanMode` withheld from its MCP list instead. That withholding is
+ * what makes the role check below load-bearing: the native tool is never on the
+ * deny list, so without it an investigator whose mode does publish it submits
+ * through `ExitPlanMode` the plan the control op would have refused, raising a
+ * review panel in a tab nobody is watching.
  *
  * `PLAN_MODE_GUARDED_TOOLS` names Pi's tools, so this bridge is the whole of
  * Claude's plan path, and it starts from the adapter's event stream rather than

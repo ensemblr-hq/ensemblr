@@ -1070,6 +1070,43 @@ agent is not left discovering the refusal by trial. Claude Code ships its own
 with a `PreToolUse` hook rather than a `disallowedTools` entry, because the SDK
 fixes that list when `query()` opens and the chip moves per turn.
 
+#### What Claude Code withholds while `permissionMode` is `plan`
+
+Two CLI behaviours, both undocumented and both measured against 2.1.270, decide
+which tools a planning Claude session actually holds. They are the reason
+`src/main/claude-agent/claude-plan-mode-guard.ts` is the one guard in this app
+that *pre-approves* rather than only refusing.
+
+**A tool that requires user interaction is published only to a session that
+supplies `canUseTool`.** `ExitPlanMode`, `EnterPlanMode`, and `AskUserQuestion`
+are absent from the tool list otherwise — `buildCanUseTool` returns a callback
+for `approval-required` and nothing else, so on a `workspace-trusted` or
+`read-only` workspace the model is told `No such tool available: ExitPlanMode`
+by the same plan workflow that just instructed it to call one. Ensemblr's own
+`ensemblr_exit_plan_mode` and `ensemblr_ask_user_question` are always there, and
+`PLAN_EXIT_TOOL_CLAUSE` in `src/shared/agent-control/session-brief.ts` says so on
+every planning turn.
+
+**Every MCP tool the CLI cannot read as read-only is routed to `canUseTool`
+while the mode is `plan`** — an annotation check, and this server publishes no
+`readOnlyHint`, so it covers the whole control surface. With no callback wired
+the call is refused outright, which left a planning session on a trusted
+workspace unable to name its tab, name its branch, record a summary, ask a
+question, fan out, *or* submit the plan. The guard clears `mcp__ensemblr__*` with
+a hook `allow`, which the CLI honours ahead of the mode; the control server's own
+`planModeControlOpDenial` remains the gate, per op and per role, which is the
+finer answer, and `gatePermission` still applies the workspace mode on top — so a
+`read-only` workspace regains the reads, the question, and the exit while its
+`app-control-write` ops stay blocked.
+
+`withholdsControlTools` in `src/main/claude-agent/claude-permission-bridge.ts`
+decides when that clearance applies, and it reads two things rather than one.
+`read-only` sits in `plan` for every turn whether or not the chat is planning, so
+the flag alone would leave it without a control surface. And
+`approval-required` is excluded: it is the one mode that wires a `canUseTool`, so
+the routing ends at the user's own approval card rather than at a refusal, and
+clearing the tool there would spend the gate that mode is chosen for.
+
 Two more surfaces park a turn on a human, and AFK answers them differently.
 The `approval-required` confirmation `gatePermission` raises is **auto-approved**
 while AFK, as is the per-tool card Claude raises through `canUseTool` in that

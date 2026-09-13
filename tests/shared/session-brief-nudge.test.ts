@@ -465,4 +465,26 @@ describe('buildPlanModeDelegationDirective', () => {
 		expect(child).toContain('Your report is your whole output');
 		expect(child).not.toContain('.context/plans/');
 	});
+
+	// Claude Code publishes `ExitPlanMode` and `AskUserQuestion` only to a session
+	// running behind a per-tool approval callback, so a trusted or read-only
+	// workspace holds neither and the workflow goes on naming both. A root told
+	// nothing spends its turn on `No such tool available` and strands the plan.
+	test('tells a root which exit and question tools it actually holds', () => {
+		for (const directive of [root, native]) {
+			expect(directive).toContain('ensemblr_exit_plan_mode');
+			expect(directive).toContain('ensemblr_ask_user_question');
+			expect(directive).toContain('No such tool available');
+			expect(directive).toContain('per-tool approval prompt');
+		}
+	});
+
+	// A child holds neither Ensemblr op, so the clause would name two more tools
+	// it cannot reach on top of the two its workflow already names.
+	test('withholds the exit-tool clause from an investigator', () => {
+		for (const directive of [manager, child]) {
+			expect(directive).not.toContain('No such tool available');
+			expect(directive).not.toContain('ensemblr_ask_user_question');
+		}
+	});
 });

@@ -117,6 +117,39 @@ export function resolvePermissionSettings({
 }
 
 /**
+ * Reports whether the CLI is withholding Ensemblr's control tools with nothing
+ * in the session able to approve them, which is what the plan-mode guard's
+ * clearance answers.
+ *
+ * Two conditions, and both are load-bearing. The CLI routes every MCP tool it
+ * cannot read as read-only to `canUseTool` while its `permissionMode` is `plan`,
+ * which is this turn's plan flag *or* a `read-only` workspace — that one sits in
+ * `plan` for every turn, planning or not, so reading the flag alone leaves it
+ * without a control surface. And only `approval-required` wires a `canUseTool`
+ * (see {@link buildCanUseTool}), so it is the one mode where that routing ends
+ * in the user's own approval card rather than in a refusal. Clearing the tools
+ * there would spend the gate the mode exists to provide.
+ * @param input - The workspace's permission mode and whether this turn is planning.
+ * @returns True when the tools would otherwise be refused outright.
+ */
+export function withholdsControlTools({
+	mode,
+	planning,
+}: {
+	mode: PermissionMode;
+	planning: boolean;
+}): boolean {
+	if (mode === 'approval-required') {
+		return false;
+	}
+	return (
+		planning ||
+		resolvePermissionSettings({ mode, planMode: false }).permissionMode ===
+			'plan'
+	);
+}
+
+/**
  * Builds the `canUseTool` callback for approval-required mode, preferring the
  * approval handler the composition root injected and falling back to the
  * placeholder when none is wired.
