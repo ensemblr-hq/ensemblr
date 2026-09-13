@@ -19,6 +19,7 @@ export type WorkspaceSidebarStateKind =
 	| 'pr-merged'
 	| 'pr-open'
 	| 'pr-ready'
+	| 'pr-unpushed'
 	| 'pr-working'
 	| 'workspace-archiving'
 	| 'workspace-blocked'

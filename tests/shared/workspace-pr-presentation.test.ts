@@ -10,6 +10,7 @@ import type {
 	GithubPullRequestSnapshotWire,
 	GithubPullRequestWire,
 } from '../../src/shared/ipc/contracts/github';
+import type { WorkspacePrPresentation } from '../../src/shared/ipc/contracts/repository-navigation';
 
 function pr(overrides: Partial<GithubPullRequestWire>): GithubPullRequestWire {
 	return {
@@ -71,6 +72,18 @@ function snapshotOn(
 	return { branchSync, pullRequest, syncedAt: SYNCED_AT };
 }
 
+/**
+ * The presentation a snapshot of PR #7 should derive to. `branchSync` rides
+ * along verbatim so a sidebar row can report unpushed commits without a second
+ * git query, which is why every case asserts the one it was given back.
+ */
+function presentationOf(
+	status: WorkspacePrPresentation['status'],
+	branchSync: GitBranchSyncWire | null = null,
+): WorkspacePrPresentation {
+	return { branchSync, number: 7, status, syncedAt: SYNCED_AT };
+}
+
 describe('deriveWorkspacePrPresentation', () => {
 	test('returns null when there is no snapshot or no PR', () => {
 		expect(deriveWorkspacePrPresentation(null)).toBeNull();
@@ -80,10 +93,10 @@ describe('deriveWorkspacePrPresentation', () => {
 	test('reports merged and closed straight from PR state', () => {
 		expect(
 			deriveWorkspacePrPresentation(snapshot(pr({ state: 'merged' }))),
-		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'merged' });
+		).toEqual(presentationOf('merged'));
 		expect(
 			deriveWorkspacePrPresentation(snapshot(pr({ state: 'closed' }))),
-		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'closed' });
+		).toEqual(presentationOf('closed'));
 	});
 
 	test('failing checks or policy blocks win over pending', () => {
@@ -91,10 +104,10 @@ describe('deriveWorkspacePrPresentation', () => {
 			deriveWorkspacePrPresentation(
 				snapshot(pr({ checks: [check('failing'), check('pending')] })),
 			),
-		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'blocked' });
+		).toEqual(presentationOf('blocked'));
 		expect(
 			deriveWorkspacePrPresentation(snapshot(pr({ mergeable: 'conflicting' }))),
-		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'blocked' });
+		).toEqual(presentationOf('blocked'));
 	});
 
 	test('pending checks report as checking', () => {
@@ -102,7 +115,7 @@ describe('deriveWorkspacePrPresentation', () => {
 			deriveWorkspacePrPresentation(
 				snapshot(pr({ checks: [check('pending')] })),
 			),
-		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'checking' });
+		).toEqual(presentationOf('checking'));
 	});
 
 	test('clean mergeable PR without required review is ready', () => {
@@ -110,7 +123,7 @@ describe('deriveWorkspacePrPresentation', () => {
 			deriveWorkspacePrPresentation(
 				snapshot(pr({ checks: [check('passing')], mergeable: 'mergeable' })),
 			),
-		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'ready' });
+		).toEqual(presentationOf('ready'));
 	});
 
 	test('draft and review-required PRs stay open', () => {
@@ -118,14 +131,14 @@ describe('deriveWorkspacePrPresentation', () => {
 			deriveWorkspacePrPresentation(
 				snapshot(pr({ isDraft: true, mergeable: 'mergeable' })),
 			),
-		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'open' });
+		).toEqual(presentationOf('open'));
 		expect(
 			deriveWorkspacePrPresentation(
 				snapshot(
 					pr({ mergeable: 'mergeable', reviewDecision: 'REVIEW_REQUIRED' }),
 				),
 			),
-		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'open' });
+		).toEqual(presentationOf('open'));
 	});
 
 	test('reports checks running while the PR head lags the pushed branch tip', () => {
@@ -140,7 +153,7 @@ describe('deriveWorkspacePrPresentation', () => {
 					syncedBranch({ headSha: 'def456' }),
 				),
 			),
-		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'checking' });
+		).toEqual(presentationOf('checking', syncedBranch({ headSha: 'def456' })));
 	});
 
 	test('leaves a PR head this repository never had to GitHub', () => {
@@ -159,7 +172,7 @@ describe('deriveWorkspacePrPresentation', () => {
 					syncedBranch({ headSha: 'def456' }),
 				),
 			),
-		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'ready' });
+		).toEqual(presentationOf('ready', syncedBranch({ headSha: 'def456' })));
 	});
 
 	test('leaves a PR to GitHub when git could not say whether it has the commit', () => {
@@ -170,7 +183,7 @@ describe('deriveWorkspacePrPresentation', () => {
 					syncedBranch({ headSha: 'def456' }),
 				),
 			),
-		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'ready' });
+		).toEqual(presentationOf('ready', syncedBranch({ headSha: 'def456' })));
 	});
 
 	test('reports ready once the PR head is the branch tip', () => {
@@ -185,7 +198,7 @@ describe('deriveWorkspacePrPresentation', () => {
 					syncedBranch(),
 				),
 			),
-		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'ready' });
+		).toEqual(presentationOf('ready', syncedBranch()));
 	});
 
 	test('leaves a branch that is not level with its upstream to GitHub', () => {
@@ -201,7 +214,7 @@ describe('deriveWorkspacePrPresentation', () => {
 		]) {
 			expect(
 				deriveWorkspacePrPresentation(snapshotOn(readyPr, branchSync)),
-			).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'ready' });
+			).toEqual(presentationOf('ready', branchSync));
 		}
 	});
 
@@ -218,7 +231,7 @@ describe('deriveWorkspacePrPresentation', () => {
 					withoutTip,
 				),
 			),
-		).toEqual({ number: 7, syncedAt: SYNCED_AT, status: 'ready' });
+		).toEqual(presentationOf('ready', withoutTip));
 	});
 
 	test('stamps the presentation with the snapshot it was derived from', () => {

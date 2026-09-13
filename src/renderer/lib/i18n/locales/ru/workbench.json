@@ -773,6 +773,7 @@
 				"pr-merged": "выполнен merge",
 				"pr-open": "открыт",
 				"pr-ready": "готов к merge",
+				"pr-unpushed": "изменения без push",
 				"pr-working": "агент работает",
 				"workspace-archiving": "архивируется",
 				"workspace-blocked": "рабочее пространство заблокировано",

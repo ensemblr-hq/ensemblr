@@ -48,9 +48,10 @@ VALUES ('${WORKSPACE_ID}', 'repo-pr-cache', 'feature', 'Feature', '/tmp/ensemblr
 function snapshotAt(
 	syncedAt: string,
 	bucket: 'failing' | 'passing' | 'pending',
+	branchSync: GithubPullRequestSnapshotWire['branchSync'] = null,
 ): GithubPullRequestSnapshotWire {
 	return {
-		branchSync: null,
+		branchSync,
 		pullRequest: {
 			additions: null,
 			baseRefName: 'master',
@@ -157,9 +158,35 @@ describe('navigation snapshot PR presentation', () => {
 		const navigation = getRepositoryWorkspaceNavigationSnapshot({ database });
 		const workspace = navigation.repositories[0]?.workspaces[0];
 		expect(workspace?.pullRequest).toEqual({
+			branchSync: null,
 			number: 42,
 			status: 'checking',
 			syncedAt: LATER,
+		});
+	});
+
+	// The row reads unpushed commits off this copy rather than opening a git
+	// query per workspace, so it has to survive the cache round-trip.
+	test('carries the cached branch sync onto the row', () => {
+		const database = openTestDatabase();
+		writeCachedPullRequestSnapshot({
+			database,
+			snapshot: snapshotAt(LATER, 'passing', {
+				ahead: 2,
+				behind: 0,
+				branchName: 'feature',
+				hasUpstream: true,
+			}),
+			workspaceId: WORKSPACE_ID,
+		});
+		const navigation = getRepositoryWorkspaceNavigationSnapshot({ database });
+		expect(
+			navigation.repositories[0]?.workspaces[0]?.pullRequest?.branchSync,
+		).toEqual({
+			ahead: 2,
+			behind: 0,
+			branchName: 'feature',
+			hasUpstream: true,
 		});
 	});
 });

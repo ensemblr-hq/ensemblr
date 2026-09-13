@@ -721,6 +721,7 @@
 				"pr-merged": "έγινε merge",
 				"pr-open": "ανοιχτό",
 				"pr-ready": "έτοιμο για merge",
+				"pr-unpushed": "αλλαγές χωρίς push",
 				"pr-working": "ο πράκτορας εργάζεται",
 				"workspace-archiving": "αρχειοθετείται",
 				"workspace-blocked": "ο χώρος εργασίας είναι αποκλεισμένος",

@@ -54,7 +54,7 @@ export function buildPullRequestShellModel({
 	syncFailure,
 	todos,
 }: BuildPullRequestShellModelInput): WorkspaceShellModel['pullRequest'] {
-	const gitStatus = buildGitStatus(changeSummary, snapshot);
+	const gitStatus = buildGitStatus(changeSummary, snapshot?.branchSync ?? null);
 	const todoSummaries = buildTodoSummaries(todos);
 	const localCommentSummaries = buildLocalCommentSummaries(localComments);
 	const pullRequest = snapshot?.pullRequest ?? null;
@@ -447,10 +447,35 @@ function deriveDetail({
 	}
 }
 
-/** Builds the git-status row from local change counts + branch sync state. */
-function buildGitStatus(
+/**
+ * Whether the branch is carrying work its remote does not have — the whole
+ * complement of `clean`, which is what {@link PullRequestGitStatusKind} defines
+ * its other members as. Callers that only need "is there anything unsent" ask
+ * here instead of enumerating kinds, so a kind added to the union is picked up
+ * everywhere rather than in whichever call sites happened to list it.
+ * @param gitStatus - The PR model's git-status row.
+ * @returns True when the worktree or the branch holds work the remote lacks.
+ */
+export function hasUnsentLocalWork(
+	gitStatus: PullRequestGitStatusSummary,
+): boolean {
+	return gitStatus.kind !== 'clean';
+}
+
+/**
+ * Builds the git-status row from local change counts + branch sync state.
+ *
+ * `changeSummary` must be the *working-tree* count (uncommitted versus HEAD);
+ * a branch-scoped count would read every commit on the branch as an uncommitted
+ * edit. Pass a zeroed summary where no worktree observation is available, which
+ * leaves the row answering from `branchSync` alone.
+ * @param changeSummary - Working-tree change counts for the workspace.
+ * @param branchSync - The branch's sync state, or null when unobserved.
+ * @returns The git-status row the header, Checks panel, and sidebar rows render.
+ */
+export function buildGitStatus(
 	changeSummary: WorkspaceShellModel['changeSummary'],
-	snapshot: GithubPullRequestSnapshotWire | null,
+	branchSync: GitBranchSyncWire | null,
 ): PullRequestGitStatusSummary {
 	if (changeSummary.files > 0) {
 		return {
@@ -467,7 +492,6 @@ function buildGitStatus(
 			status: 'pending',
 		};
 	}
-	const branchSync = snapshot?.branchSync;
 	if (branchSync && !branchSync.hasUpstream) {
 		return {
 			actionLabel: i18n.t('git:git-status.action.push-branch', 'Push branch'),

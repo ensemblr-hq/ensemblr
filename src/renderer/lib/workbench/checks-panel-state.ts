@@ -5,6 +5,8 @@ import type {
 } from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
+import { hasUnsentLocalWork } from './pull-request-model';
+
 /** Derives the checks-panel summary state from the workspace + PR. */
 export function getChecksPanelState(
 	workspace: WorkspaceShellModel,
@@ -152,14 +154,14 @@ export function resolveGitStatusSection(
 	const { pullRequest } = state;
 	const isClosedOrMerged =
 		pullRequest.state === 'merged' || pullRequest.state === 'closed';
-	const hasUnsentLocalWork = pullRequest.gitStatus.kind !== 'clean';
+	const hasUnsentWork = hasUnsentLocalWork(pullRequest.gitStatus);
 
-	if (isClosedOrMerged && !hasUnsentLocalWork) {
+	if (isClosedOrMerged && !hasUnsentWork) {
 		return null;
 	}
 
 	return {
-		showCommitAction: state.kind !== 'pr-ready' || hasUnsentLocalWork,
+		showCommitAction: state.kind !== 'pr-ready' || hasUnsentWork,
 		showUpdateAction: !isClosedOrMerged,
 	};
 }
