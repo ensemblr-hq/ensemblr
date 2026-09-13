@@ -10,7 +10,7 @@
  * of a security-sensitive classifier — so both belong in `shared/` behind the
  * control server.
  */
-import { isEnsemblrControlTool } from '../agent-control/control-tool-names.ts';
+import { isEnsemblrControlTool } from '../agent-control.ts';
 import { isReadOnlyBashCommand } from './bash-guard.ts';
 
 /** A tool call being classified: its name, its target path, and its command. */

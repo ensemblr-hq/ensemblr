@@ -8,7 +8,7 @@
  * know to be a read, so an unknown name reaches here rather than running
  * unclassified, and this module refuses what it cannot vouch for.
  */
-import { isEnsemblrControlTool } from '../agent-control/control-tool-names.ts';
+import { isEnsemblrControlTool } from '../agent-control.ts';
 import { isReadOnlyBashCommand } from './bash-guard.ts';
 import { planModeBlockReason } from './block-reason.ts';
 
