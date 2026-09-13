@@ -255,6 +255,7 @@ Rules of thumb:
 | Selected | Выбрано | Επιλεγμένο | Screen-reader-only checked state on a picker row, where the tick glyph is `aria-hidden`. Neuter short form, because it qualifies nothing on the page — it is announced on its own. |
 | Spawn | Запустить | Εκκίνηση | Starting a sub-agent. |
 | Clone | Клонировать | Κλωνοποίηση | |
+| Syncing with remote | Синхронизация с удалённым репозиторием | Συγχρονισμός με το απομακρυσμένο αποθετήριο | What the pull-request header reports while a push and the snapshot resync behind it are still running. Both languages take the noun phrase already fixed by `git-status.clean` one row of the same panel away (`Синхронизировано с удалённым репозиторием`/`Ενημερωμένο με το απομακρυσμένο αποθετήριο`), so the two states of one row read as the same sentence. Deliberately avoids the untranslated `Push` below: the wait is for GitHub to catch up, which outlasts the push itself. |
 | Push | Push | Push | Git; untranslated. |
 | Merge | Merge | Merge | Git; untranslated. |
 | Conflict *(merge)* | Конфликт | Σύγκρουση | A file that will not merge cleanly with the base branch, and the Checks section that lists them. The noun is localized even though `merge` beside it is not — hence `Конфликты merge`/`Συγκρούσεις merge` for the header badge, and a bare `Конфликты`/`Συγκρούσεις` where the context is already git. The adjectival form follows it (`конфликтующие файлы`/`αρχεία με συγκρούσεις`); never `коллизия`/`διένεξη`, which read as a hash collision and an interpersonal dispute. |

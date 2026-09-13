@@ -287,6 +287,43 @@ test('a branch with no upstream resolves to the same push action', () => {
 	);
 });
 
+test('a push in flight holds the header off a merge it has not verified', () => {
+	const readyPr = workspaceWithPr({
+		label: 'Ready to merge',
+		status: 'ready-to-merge',
+	});
+
+	expect(
+		getRightSidebarHeaderState(readyPr, false, { isPushing: true }),
+	).toMatchObject({
+		kind: 'pr-unpushed',
+		label: 'Syncing with remote',
+		tone: 'pending',
+	});
+});
+
+test('a conflict outranks the push resyncing behind it', () => {
+	// The resync only makes the checks verdict stale. A branch that will not
+	// merge cleanly still will not once it lands, so the blocked signal stays up
+	// rather than being replaced by a spinner for the length of the wait.
+	const readyPr = workspaceWithPr({
+		label: 'Ready to merge',
+		status: 'ready-to-merge',
+	});
+
+	expect(
+		getRightSidebarHeaderState(readyPr, false, {
+			hasConflicts: true,
+			isPushing: true,
+		}),
+	).toMatchObject({
+		hasConflicts: true,
+		kind: 'pr-blocked',
+		label: 'Merge conflicts',
+		tone: 'blocked',
+	});
+});
+
 test('a trial-merge conflict blocks the header before gh has caught up', () => {
 	const quietPr = workspaceWithPr({ label: '', status: 'idle' });
 

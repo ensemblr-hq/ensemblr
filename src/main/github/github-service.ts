@@ -58,6 +58,13 @@ const SNAPSHOT_TTL_MS = 5_000;
  * lookup before a preview URL can be surfaced.
  */
 const DEPLOYMENT_PAGE_SIZE = 5;
+/**
+ * Shape an object name must have before it is handed to git as an argument.
+ * `gh` reports full hex oids, so anything else is either absent or malformed —
+ * and rejecting it here keeps a value that opens with `-` from being read as an
+ * option. Sized for both sha1 and sha256 repositories.
+ */
+const COMMIT_OID_PATTERN = /^[0-9a-f]{7,64}$/;
 
 /**
  * `gh` processes the deployment-status fan-out may hold open at once. Two, not
@@ -199,6 +206,7 @@ export function createGithubService({
 			return { branchSync: null, remoteHeadRef: null };
 		}
 		const branchName = branchResult.stdout.trim();
+		const headSha = await readHeadSha(cwd);
 		const bareBase = bareBranchName(baseBranch);
 		const upstreamBranch = await resolveUpstreamBranch(cwd, branchName);
 		const inheritedBaseUpstream =
@@ -207,27 +215,46 @@ export function createGithubService({
 			branchName !== bareBase;
 		if (inheritedBaseUpstream) {
 			return {
-				branchSync: { ahead: 0, behind: 0, branchName, hasUpstream: false },
+				branchSync: {
+					ahead: 0,
+					behind: 0,
+					branchName,
+					hasUpstream: false,
+					...(headSha ? { headSha } : {}),
+				},
 				remoteHeadRef: null,
 			};
 		}
 		return {
-			branchSync: await readBranchSync(cwd, branchName),
+			branchSync: await readBranchSync(cwd, branchName, headSha),
 			remoteHeadRef: upstreamBranch,
 		};
+	}
+
+	/**
+	 * Reads the workspace's current commit.
+	 * @param cwd - Workspace working directory.
+	 * @returns The HEAD commit sha, or null when git could not answer.
+	 */
+	async function readHeadSha(cwd: string): Promise<string | null> {
+		const result = await run('git', cwd, ['rev-parse', 'HEAD']);
+		return result.status === 'success' ? result.stdout.trim() || null : null;
 	}
 
 	/**
 	 * Reads ahead/behind state for the workspace branch versus its upstream.
 	 * @param cwd - Workspace working directory.
 	 * @param branchName - Current local branch name.
+	 * @param headSha - The branch's tip commit, when git could report it.
 	 * @returns The branch's sync counts, reporting no upstream when the rev-list
 	 * against `@{upstream}` cannot run.
 	 */
 	async function readBranchSync(
 		cwd: string,
 		branchName: string,
+		headSha: string | null,
 	): Promise<GitBranchSyncWire> {
+		const tip = headSha ? { headSha } : {};
 		const countResult = await run('git', cwd, [
 			'rev-list',
 			'--left-right',
@@ -235,7 +262,7 @@ export function createGithubService({
 			'@{upstream}...HEAD',
 		]);
 		if (countResult.status !== 'success') {
-			return { ahead: 0, behind: 0, branchName, hasUpstream: false };
+			return { ahead: 0, behind: 0, branchName, hasUpstream: false, ...tip };
 		}
 		const [behind = '0', ahead = '0'] = countResult.stdout.trim().split(/\s+/);
 		return {
@@ -243,6 +270,7 @@ export function createGithubService({
 			behind: Number.parseInt(behind, 10) || 0,
 			branchName,
 			hasUpstream: true,
+			...tip,
 		};
 	}
 
@@ -329,6 +357,41 @@ export function createGithubService({
 	}
 
 	/**
+	 * Whether this repository holds the PR's head commit at all, which is a
+	 * weaker question than {@link isPullRequestHeadOnBranch} and a different one.
+	 *
+	 * A PR record that differs from the branch tip has two causes that look
+	 * identical from the outside. Either GitHub has not caught up with a push
+	 * yet, in which case the commit it still names is one of ours — reachable
+	 * after a fast-forward, merely present after an amend or rebase dropped it
+	 * off the branch. Or the remote branch moved on without us (a suggestion
+	 * committed from GitHub's UI, "Update branch", a teammate's push) and the
+	 * commit it names was never ours, because nothing in the app fetches this
+	 * branch. Object presence separates the two where reachability cannot:
+	 * amending is the common way to re-push, and its old head stops being an
+	 * ancestor the moment it is replaced.
+	 *
+	 * @param cwd - Workspace working directory.
+	 * @param headRefOid - The commit `gh` reports as the PR's head.
+	 * @returns Whether the object is present, or null when git rendered no
+	 * verdict and the caller should assume nothing.
+	 */
+	async function hasCommitLocally(
+		cwd: string,
+		headRefOid: string,
+	): Promise<boolean | null> {
+		if (!COMMIT_OID_PATTERN.test(headRefOid)) {
+			return null;
+		}
+		const result = await run('git', cwd, [
+			'cat-file',
+			'-e',
+			`${headRefOid}^{commit}`,
+		]);
+		return typeof result.exitCode === 'number' ? result.exitCode === 0 : null;
+	}
+
+	/**
 	 * An "ok, no PR" snapshot for the current branch — used whenever the branch
 	 * has no PR of its own: none found, or a stale name-matched one suppressed.
 	 */
@@ -398,13 +461,15 @@ export function createGithubService({
 			return emptySnapshot(branchSync);
 		}
 
-		const [deployments, reviewThreads] = await Promise.all([
-			fetchDeployments(
-				cwd,
-				[pullRequest.headRefOid, pullRequest.headRefName].filter(Boolean),
-			),
-			fetchReviewThreads(cwd, pullRequest.number),
-		]);
+		const [deployments, headCommitKnownLocally, reviewThreads] =
+			await Promise.all([
+				fetchDeployments(
+					cwd,
+					[pullRequest.headRefOid, pullRequest.headRefName].filter(Boolean),
+				),
+				hasCommitLocally(cwd, pullRequest.headRefOid),
+				fetchReviewThreads(cwd, pullRequest.number),
+			]);
 
 		return {
 			ok: true,
@@ -414,6 +479,9 @@ export function createGithubService({
 					...pullRequest,
 					comments: [...pullRequest.comments, ...reviewThreads],
 					deployments,
+					...(headCommitKnownLocally === null
+						? {}
+						: { headCommitKnownLocally }),
 				},
 				syncedAt: now().toISOString(),
 			},
@@ -607,11 +675,9 @@ export function createGithubService({
 				};
 			}
 
-			const hashResult = await run('git', cwd.cwd, ['rev-parse', 'HEAD']);
+			const commitHash = await readHeadSha(cwd.cwd);
 			return {
-				...(hashResult.status === 'success'
-					? { commitHash: hashResult.stdout.trim() }
-					: {}),
+				...(commitHash ? { commitHash } : {}),
 				ok: true,
 			};
 		},
@@ -634,7 +700,8 @@ export function createGithubService({
 					ok: false,
 				};
 			}
-			return { ok: true };
+			const headSha = await readHeadSha(cwd.cwd);
+			return { ...(headSha ? { headSha } : {}), ok: true };
 		},
 
 		async createPullRequest(request) {

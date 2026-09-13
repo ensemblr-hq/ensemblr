@@ -147,8 +147,10 @@ export function RightSidebarHeaderInlineActions({
  * Resolves the header state for a workspace, honouring the locally dismissed
  * merged PR so a continued workspace stops showing the merged header before the
  * next `gh` snapshot lands, the live agent-busy flag the review provider
- * publishes so the header freezes for the length of an agent turn, and the same
- * conflict probe the Checks panel and Changes list read so all three agree.
+ * publishes so the header freezes for the length of an agent turn, the push the
+ * header itself started so it does not move on to a merge offer while GitHub is
+ * still catching up with the pushed commit, and the same conflict probe the
+ * Checks panel and Changes list read so all three agree.
  *
  * Every header label comes back already translated, off the `i18n` singleton
  * React cannot observe, so this hook subscribes its caller to `languageChanged`
@@ -172,6 +174,7 @@ function useRightSidebarHeaderState(
 		agentBusy: reviewActions?.isAgentWorking === true,
 		continuedPullRequestNumber: continuedMergedPullRequests[activeWorkspace.id],
 		hasConflicts: conflictPaths.size > 0,
+		isPushing: reviewActions?.isPushingBranch === true,
 	});
 }
 

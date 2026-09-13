@@ -55,6 +55,7 @@
 			"push-branch": "Push κλάδου"
 		},
 		"clean": "Ενημερωμένο με το απομακρυσμένο αποθετήριο",
+		"syncing": "Συγχρονισμός με το απομακρυσμένο αποθετήριο",
 		"uncommitted_one": "{{count}} αλλαγή χωρίς commit",
 		"uncommitted_other": "{{count}} αλλαγές χωρίς commit",
 		"unpublished": "Δεν έχει γίνει ακόμη push του κλάδου",

@@ -189,6 +189,19 @@ test('the Push button waits on the push it started', () => {
 	expect(screen.getByRole('button', { name: 'Push' })).toBeDisabled();
 });
 
+test('a push in flight holds the header off the merge it has not verified', () => {
+	// git reports the branch level with the remote the moment the push lands,
+	// while the pull request still carries the previous commit's checks.
+	renderHeader(
+		workspaceWithPr({ label: 'Ready to merge', status: 'ready-to-merge' }),
+		stubReviewActions({ isPushingBranch: true }),
+	);
+
+	expect(screen.queryByRole('button', { name: 'Merge' })).toBeNull();
+	expect(screen.getByRole('button', { name: 'Push' })).toBeDisabled();
+	expect(screen.getByText('Syncing with remote')).toBeInTheDocument();
+});
+
 test('a conflicting PR offers the resolve action in its overflow menu', async () => {
 	const runAgentAction = vi.fn();
 	const user = userEvent.setup();

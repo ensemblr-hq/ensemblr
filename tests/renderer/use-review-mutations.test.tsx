@@ -14,6 +14,7 @@ const {
 	mergePullRequest,
 	pushWorkspaceBranch,
 	refreshPullRequestSnapshot,
+	refreshPullRequestSnapshotAfterPush,
 	removeWorkspace,
 } = vi.hoisted(() => ({
 	archiveWorkspace: vi.fn(),
@@ -23,6 +24,7 @@ const {
 	mergePullRequest: vi.fn().mockResolvedValue({ merged: true }),
 	pushWorkspaceBranch: vi.fn().mockResolvedValue({ ok: true }),
 	refreshPullRequestSnapshot: vi.fn().mockResolvedValue(undefined),
+	refreshPullRequestSnapshotAfterPush: vi.fn().mockResolvedValue(undefined),
 	removeWorkspace: {
 		archived: vi.fn().mockResolvedValue(undefined),
 		deleted: vi.fn().mockResolvedValue(undefined),
@@ -37,6 +39,7 @@ vi.mock('@/renderer/api/ensemblr-queries', () => ({
 	mergePullRequest,
 	pushWorkspaceBranch,
 	refreshPullRequestSnapshot,
+	refreshPullRequestSnapshotAfterPush,
 }));
 
 vi.mock('sonner', () => ({
@@ -69,13 +72,13 @@ import type { WorkspaceShellModel } from '../../src/renderer/types/workbench';
 const activeWorkspace = {
 	id: 'san-antonio',
 	pathLabel: '/tmp/san-antonio',
-	pullRequest: { number: 7 },
+	pullRequest: { checks: [{ id: 'build' }], number: 7 },
 } as unknown as WorkspaceShellModel;
 
 const otherWorkspace = {
 	id: 'houston',
 	pathLabel: '/tmp/houston',
-	pullRequest: { number: 9 },
+	pullRequest: { checks: [], number: 9 },
 } as unknown as WorkspaceShellModel;
 
 /**
@@ -124,6 +127,7 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	mergePullRequest.mockResolvedValue({ merged: true });
 	pushWorkspaceBranch.mockResolvedValue({ ok: true });
+	refreshPullRequestSnapshotAfterPush.mockResolvedValue(undefined);
 	getDefaultStore().set(workspaceLifecycleRunsAtom, new Map());
 });
 
@@ -325,7 +329,7 @@ test('keeps the continue busy flag on across a shell unmount and remount', async
 });
 
 test('leaves the push busy flag off a workspace that is not the one pushing', async () => {
-	const pushGate = deferred<{ ok: boolean }>();
+	const pushGate = deferred<{ headSha: string; ok: boolean }>();
 	pushWorkspaceBranch.mockReturnValue(pushGate.promise);
 	const { rerender, result } = renderReviewMutations(false);
 
@@ -340,13 +344,57 @@ test('leaves the push busy flag off a workspace that is not the one pushing', as
 	expect(result.current.isPushingBranch).toBe(false);
 
 	await act(async () => {
-		pushGate.resolve({ ok: true });
+		pushGate.resolve({ headSha: 'bbb222', ok: true });
 		await pushGate.promise;
 	});
 	await waitFor(() => {
-		expect(refreshPullRequestSnapshot).toHaveBeenCalledWith(
+		expect(refreshPullRequestSnapshotAfterPush).toHaveBeenCalledWith(
 			expect.objectContaining({ workspaceId: 'san-antonio' }),
 		);
+	});
+});
+
+test('waits for the pull request to catch up with the commit it pushed', async () => {
+	pushWorkspaceBranch.mockResolvedValue({ headSha: 'bbb222', ok: true });
+	const { result } = renderReviewMutations(false);
+
+	act(() => {
+		result.current.pushBranch();
+	});
+
+	await waitFor(() => {
+		expect(refreshPullRequestSnapshotAfterPush).toHaveBeenCalledWith(
+			expect.objectContaining({
+				expectsChecks: true,
+				pushedHeadSha: 'bbb222',
+				workspaceCwd: '/tmp/san-antonio',
+				workspaceId: 'san-antonio',
+			}),
+		);
+	});
+	expect(refreshPullRequestSnapshot).not.toHaveBeenCalled();
+});
+
+test('stays busy until the post-push resync settles', async () => {
+	const resyncGate = deferred<undefined>();
+	pushWorkspaceBranch.mockResolvedValue({ headSha: 'bbb222', ok: true });
+	refreshPullRequestSnapshotAfterPush.mockReturnValue(resyncGate.promise);
+	const { result } = renderReviewMutations(false);
+
+	act(() => {
+		result.current.pushBranch();
+	});
+	await waitFor(() => {
+		expect(refreshPullRequestSnapshotAfterPush).toHaveBeenCalled();
+	});
+	expect(result.current.isPushingBranch).toBe(true);
+
+	await act(async () => {
+		resyncGate.resolve(undefined);
+		await resyncGate.promise;
+	});
+	await waitFor(() => {
+		expect(result.current.isPushingBranch).toBe(false);
 	});
 });
 

@@ -191,6 +191,8 @@ const DEPLOYMENT_STATUSES_JSON = JSON.stringify([
 	},
 ]);
 
+const HEAD_SHA = '1f0c2b7a9d3e4f5061728394a5b6c7d8e9f00112';
+
 function respondToGitPrelude(
 	request: LocalCommandRequest,
 ): LocalCommandResult | undefined {
@@ -198,7 +200,9 @@ function respondToGitPrelude(
 		return undefined;
 	}
 	if (request.args?.[0] === 'rev-parse') {
-		return buildResult({ stdout: 'feature/x\n' });
+		return buildResult({
+			stdout: request.args?.[1] === '--abbrev-ref' ? 'feature/x\n' : HEAD_SHA,
+		});
 	}
 	if (request.args?.[0] === 'config') {
 		return buildResult({ exitCode: 1, status: 'failure' });
@@ -526,6 +530,19 @@ test('pushWorkspaceBranch omits --set-upstream when disabled', async () => {
 	assert.deepEqual(push?.args, ['push', 'origin', 'HEAD']);
 });
 
+test('pushWorkspaceBranch reports the commit it published', async () => {
+	const { service } = createService((request) =>
+		request.args?.[0] === 'rev-parse'
+			? buildResult({ stdout: `${HEAD_SHA}\n` })
+			: buildResult(),
+	);
+
+	const result = await service.pushWorkspaceBranch({ workspaceCwd: '/tmp/ws' });
+
+	assert.equal(result.ok, true);
+	assert.equal(result.headSha, HEAD_SHA);
+});
+
 test('createPullRequest parses URL and number from stdout', async () => {
 	const { calls, service } = createService(() =>
 		buildResult({ stdout: 'https://github.com/o/r/pull/42\n' }),
@@ -567,6 +584,118 @@ test('getPullRequestSnapshot returns no-PR snapshot when gh finds none', async (
 	assert.equal(result.error, undefined);
 	assert.equal(result.snapshot?.pullRequest, null);
 	assert.equal(result.snapshot?.branchSync?.branchName, 'feature/x');
+});
+
+test('getPullRequestSnapshot reports the branch tip beside its sync counts', async () => {
+	const { service } = createService(
+		(request) =>
+			respondToSnapshotPrelude(request) ??
+			buildResult({ exitCode: 1, status: 'failure', stderr: 'HTTP 404' }),
+	);
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.snapshot?.branchSync?.headSha, HEAD_SHA);
+});
+
+/** A snapshot response whose PR head is a real-shaped oid the probe will test. */
+function respondToHexHeadSnapshot(
+	request: LocalCommandRequest,
+	catFileExitCode: number | null,
+): LocalCommandResult | undefined {
+	if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+		return buildResult({
+			stdout: JSON.stringify({
+				...JSON.parse(PR_VIEW_JSON),
+				headRefOid: HEAD_SHA,
+			}),
+		});
+	}
+	if (request.args?.[0] === 'cat-file') {
+		assert.deepEqual(request.args, ['cat-file', '-e', `${HEAD_SHA}^{commit}`]);
+		return catFileExitCode === null
+			? buildResult({ exitCode: null, status: 'failure' })
+			: buildResult({
+					exitCode: catFileExitCode,
+					status: catFileExitCode === 0 ? 'success' : 'failure',
+				});
+	}
+	return respondToGitPrelude(request);
+}
+
+test('getPullRequestSnapshot reports a PR head this repository holds', async () => {
+	const { service } = createService(
+		(request) =>
+			respondToHexHeadSnapshot(request, 0) ??
+			buildResult({ stdout: '[]', status: 'success' }),
+	);
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.snapshot?.pullRequest?.headCommitKnownLocally, true);
+});
+
+test('getPullRequestSnapshot reports a PR head this repository has never seen', async () => {
+	const { service } = createService(
+		(request) =>
+			respondToHexHeadSnapshot(request, 128) ??
+			buildResult({ stdout: '[]', status: 'success' }),
+	);
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.snapshot?.pullRequest?.headCommitKnownLocally, false);
+});
+
+test('getPullRequestSnapshot omits the head-commit verdict when git cannot answer', async () => {
+	const { service } = createService(
+		(request) =>
+			respondToHexHeadSnapshot(request, null) ??
+			buildResult({ stdout: '[]', status: 'success' }),
+	);
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.ok(
+		!('headCommitKnownLocally' in (result.snapshot?.pullRequest ?? {})),
+	);
+});
+
+test('getPullRequestSnapshot never hands git a head oid that is not a commit name', async () => {
+	const { calls, service } = createService(
+		(request) =>
+			respondToSnapshotPrelude(request) ??
+			buildResult({ stdout: '[]', status: 'success' }),
+	);
+
+	await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	// PR_VIEW_JSON's head oid is `feature-tip-oid`, which is not hex, so the
+	// probe refuses it rather than passing it through to git as an argument.
+	assert.equal(
+		calls.some((call) => call.args?.[0] === 'cat-file'),
+		false,
+	);
 });
 
 test('getPullRequestSnapshot queries gh by the remote head branch, not the local name', async () => {
