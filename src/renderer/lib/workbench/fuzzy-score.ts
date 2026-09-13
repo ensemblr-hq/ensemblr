@@ -31,6 +31,7 @@ const EMPTY_NEEDLE_MATCH: FuzzyMatch = {
 const TRAILING_COMBINING = /^\p{M}$/u;
 const VARIATION_SELECTOR = '\uFE0F';
 const ZERO_WIDTH_JOINER = '\u200D';
+const NON_ASCII = /[^\p{ASCII}]/u;
 
 /**
  * Lowercases a string for matching without changing its length, so every index
@@ -40,14 +41,24 @@ const ZERO_WIDTH_JOINER = '\u200D';
  * than itself, and folding it would shift every later index and misplace the
  * highlight. It is left unfolded instead, which costs case-insensitivity for one
  * character and buys index safety everywhere.
+ *
+ * Pure ASCII takes a native whole-string `toLowerCase`, which is an order of
+ * magnitude cheaper than the per-character walk and provably identical over that
+ * range — every ASCII lowercase mapping is one character wide and
+ * context-free. It is not identical beyond it: whole-string lowercasing applies
+ * Unicode's contextual rules, so `ΑΣ` folds to `ας` rather than the `ασ` a
+ * per-character walk produces. Anything non-ASCII therefore keeps the walk.
  * @param value - Text to fold.
  * @returns The folded text, the same UTF-16 length as `value`.
  */
 function foldForMatching(value: string): string {
+	if (!NON_ASCII.test(value)) {
+		return value.toLowerCase();
+	}
 	let folded = '';
 	for (const char of value) {
-		const lowered = char.toLowerCase();
-		folded += lowered.length === char.length ? lowered : char;
+		const loweredChar = char.toLowerCase();
+		folded += loweredChar.length === char.length ? loweredChar : char;
 	}
 	return folded;
 }
