@@ -8,7 +8,11 @@ import type { SessionTabModel } from '../../src/renderer/types/workbench';
 import { renderWithProviders } from './support/dom';
 
 /** Builds a chat tab fixture for compact sub-agent strip assertions. */
-function chatTab(id: string, isSubAgent = false): SessionTabModel {
+function chatTab(
+	id: string,
+	isSubAgent = false,
+	status: SessionTabModel['status'] = 'idle',
+): SessionTabModel {
 	return {
 		agentSessionId: `session-${id}`,
 		chatTabId: id,
@@ -17,15 +21,29 @@ function chatTab(id: string, isSubAgent = false): SessionTabModel {
 		isSubAgent,
 		kind: 'chat',
 		label: id === 'child' ? 'Child task' : 'Parent task',
-		status: 'idle',
+		status,
 		summary: '',
 		updatedLabel: '',
 	};
 }
 
 /** Renders the production strip with one root and one spawned child. */
-function renderStrip(activeId: string, childIsAfk = false) {
-	const sessions = [chatTab('parent'), chatTab('child', true)];
+function renderStrip(
+	activeId: string,
+	{
+		childIsAfk = false,
+		childStatus = 'idle',
+		parentStatus = 'idle',
+	}: {
+		childIsAfk?: boolean;
+		childStatus?: SessionTabModel['status'];
+		parentStatus?: SessionTabModel['status'];
+	} = {},
+) {
+	const sessions = [
+		chatTab('parent', false, parentStatus),
+		chatTab('child', true, childStatus),
+	];
 	const activeSession = sessions.find((session) => session.id === activeId);
 	if (!activeSession) {
 		throw new Error(`Missing fixture ${activeId}`);
@@ -66,7 +84,7 @@ describe('sub-agent session tabs', () => {
 	});
 
 	test('keeps the child mode in its compact accessible name', () => {
-		const { container } = renderStrip('parent', true);
+		const { container } = renderStrip('parent', { childIsAfk: true });
 		const childButton = container.querySelector(
 			'[data-tab-key="child"] button',
 		);
@@ -83,5 +101,30 @@ describe('sub-agent session tabs', () => {
 			'Child task',
 		);
 		expect(child?.querySelector('button[aria-label*="Close"]')).not.toBeNull();
+	});
+
+	test('withholds the close control from a working active child', () => {
+		const { container } = renderStrip('child', { childStatus: 'working' });
+		const child = container.querySelector('[data-tab-key="child"]');
+
+		expect(child?.className).not.toContain('w-8');
+		expect(child?.querySelector('button[aria-label*="Close"]')).toBeNull();
+	});
+
+	// `deriveTabStatus` cannot yet produce 'blocked' for a live chat tab, so this
+	// pins the union-wide rule the strip and `resolveRunningCloseTarget` share:
+	// anything that is not 'idle' counts as running.
+	test('withholds the close control from a blocked active child', () => {
+		const { container } = renderStrip('child', { childStatus: 'blocked' });
+		const child = container.querySelector('[data-tab-key="child"]');
+
+		expect(child?.querySelector('button[aria-label*="Close"]')).toBeNull();
+	});
+
+	test('keeps the close control on a working root chat', () => {
+		const { container } = renderStrip('parent', { parentStatus: 'working' });
+		const parent = container.querySelector('[data-tab-key="parent"]');
+
+		expect(parent?.querySelector('button[aria-label*="Close"]')).not.toBeNull();
 	});
 });

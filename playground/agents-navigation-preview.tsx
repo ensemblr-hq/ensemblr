@@ -36,8 +36,11 @@ function AgentsNavigationWorkbench({
 }) {
 	const { actions } = useWorkbenchLayout();
 	const setSheetOpen = actions.setRightSidebarSheetOpen;
+	// This scene demos closing and restoring a spawned child, and a sub-agent's
+	// tab withholds its close control while the delegate runs. The matrix scene
+	// keeps the working default for the spinner and tool-activity showcase.
 	const [conversations, setConversations] = useState(() =>
-		createAgentConversations(),
+		createAgentConversations({ status: 'idle' }),
 	);
 	const [selectedId, setSelectedId] = useState('root-roadmap');
 	const [previewTab, setPreviewTab] = useState<SessionTabModel | null>(

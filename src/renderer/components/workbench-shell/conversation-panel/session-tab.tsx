@@ -83,7 +83,8 @@ export function SessionTab({
 	const isChatKind = (session.kind ?? 'chat') === 'chat';
 	const isCompactSubAgent = isChatKind && session.isSubAgent && !isActive;
 	const canClose = isChatKind ? openChatTabCount > 1 : true;
-	const showCloseControls = canClose && !isDraggingTab && !isCompactSubAgent;
+	const showCloseControls =
+		canClose && !isDraggingTab && !withholdsCloseControl(session, isActive);
 	const isUnread =
 		!isActive && !isDraggingTab && isSessionUnread(session, unreadKeys);
 	const clickGuard = useTabClickGuard({
@@ -135,6 +136,27 @@ export function SessionTab({
 			/>
 		</Reorder.Item>
 	);
+}
+
+/**
+ * Whether a tab must withhold its close control. A sub-agent's tab does while it
+ * is compact, and again while its delegate is mid-run: closing it then kills a
+ * child its orchestrator is still waiting on, and the control exists for the
+ * opposite case — a finished delegate whose orchestrator never cleaned the tab
+ * up. `resolveRunningCloseTarget` refuses the same closes on the ⌘W path, so
+ * hiding the control here is the affordance rather than the whole rule.
+ * @param session - The tab to test
+ * @param isActive - Whether the tab is the foreground one
+ * @returns True when the close control must not be rendered
+ */
+function withholdsCloseControl(
+	session: SessionTabModel,
+	isActive: boolean,
+): boolean {
+	if ((session.kind ?? 'chat') !== 'chat' || !session.isSubAgent) {
+		return false;
+	}
+	return !isActive || session.status !== 'idle';
 }
 
 /**
