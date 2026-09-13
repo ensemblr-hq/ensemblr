@@ -18,6 +18,11 @@ import {
  * confirm-then-cancel step when the target tab's agent is mid-turn. It belongs
  * at this seam because this is the one place holding both the registered close
  * action and the composer's live streaming state.
+ *
+ * Both paths run the same refusal first, so a running sub-agent's tab cannot be
+ * closed through ⌘W either — `SessionTab` withholds its close control for the
+ * same reason, and an affordance hidden in one place and reachable through a
+ * shortcut in the other is not a rule.
  * @param activeSessionId - Id of the chat tab currently in the foreground
  * @param agentComposer - Live composer controller for the active tab
  * @param sessionNavigation - Session tab state whose close is being wrapped
@@ -54,41 +59,53 @@ export function useGuardedSessionClose({
 		[activeSessionId, agentComposer.onStop, stopAgentSessionById],
 	);
 
+	/**
+	 * Resolves one close attempt against the live composer flag, so both the ⌘W
+	 * and tab-strip paths refuse and confirm on exactly the same reading.
+	 */
+	const resolveTarget = useCallback(
+		(targetId: string) =>
+			resolveRunningCloseTarget({
+				activeSessionId,
+				isActiveStreaming: agentComposer.isStreaming,
+				tabs: sessionNavigation.sessionTabs,
+				targetId,
+			}),
+		[activeSessionId, agentComposer.isStreaming, sessionNavigation.sessionTabs],
+	);
+
 	const requestActiveClose = useCallback(() => {
+		if (resolveTarget(activeSessionId).isRefused) {
+			return;
+		}
 		closeGuard.requestClose({
 			isRunning: agentComposer.isStreaming,
 			onClose: sessionNavigation.closeActiveOrReset,
 			onStop: agentComposer.onStop,
 		});
 	}, [
+		activeSessionId,
 		closeGuard,
 		agentComposer.isStreaming,
 		agentComposer.onStop,
+		resolveTarget,
 		sessionNavigation.closeActiveOrReset,
 	]);
 	useMenuCommand('tab.close', requestActiveClose);
 
 	const requestTabClose = useCallback(
 		(targetId: string) => {
-			const target = resolveRunningCloseTarget({
-				activeSessionId,
-				isActiveStreaming: agentComposer.isStreaming,
-				tabs: sessionNavigation.sessionTabs,
-				targetId,
-			});
+			const target = resolveTarget(targetId);
+			if (target.isRefused) {
+				return;
+			}
 			closeGuard.requestClose({
 				isRunning: target.isRunning,
 				onClose: () => sessionNavigation.closeSessionTab(targetId),
 				onStop: stopFor(targetId, target.agentSessionId),
 			});
 		},
-		[
-			activeSessionId,
-			closeGuard,
-			agentComposer.isStreaming,
-			sessionNavigation,
-			stopFor,
-		],
+		[closeGuard, resolveTarget, sessionNavigation, stopFor],
 	);
 
 	return {

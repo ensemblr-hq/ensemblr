@@ -11,7 +11,7 @@ import type { SessionTabModel } from '../../src/renderer/types/workbench';
 
 function createTab(
 	overrides: Partial<
-		Pick<SessionTabModel, 'id' | 'agentSessionId' | 'status'>
+		Pick<SessionTabModel, 'id' | 'agentSessionId' | 'isSubAgent' | 'status'>
 	> = {},
 ): SessionTabModel {
 	return {
@@ -132,7 +132,7 @@ describe('resolveRunningCloseTarget', () => {
 				tabs: [active],
 				targetId: 'chat-1',
 			}),
-		).toEqual({ isRunning: true, agentSessionId: 'agent-1' });
+		).toEqual({ isRefused: false, isRunning: true, agentSessionId: 'agent-1' });
 	});
 
 	test('reports the active tab as idle when it is not streaming', () => {
@@ -149,7 +149,11 @@ describe('resolveRunningCloseTarget', () => {
 				tabs: [active],
 				targetId: 'chat-1',
 			}),
-		).toEqual({ isRunning: false, agentSessionId: 'agent-1' });
+		).toEqual({
+			isRefused: false,
+			isRunning: false,
+			agentSessionId: 'agent-1',
+		});
 	});
 
 	test('falls back to persisted status for a background tab', () => {
@@ -165,7 +169,23 @@ describe('resolveRunningCloseTarget', () => {
 				tabs: [createTab(), background],
 				targetId: 'chat-2',
 			}),
-		).toEqual({ isRunning: true, agentSessionId: 'agent-2' });
+		).toEqual({ isRefused: false, isRunning: true, agentSessionId: 'agent-2' });
+	});
+
+	test('treats a blocked background tab as running', () => {
+		const background = createTab({
+			id: 'chat-2',
+			agentSessionId: 'agent-2',
+			status: 'blocked',
+		});
+		expect(
+			resolveRunningCloseTarget({
+				activeSessionId: 'chat-1',
+				isActiveStreaming: false,
+				tabs: [createTab(), background],
+				targetId: 'chat-2',
+			}).isRunning,
+		).toBe(true);
 	});
 
 	test('reports an idle background tab as not running', () => {
@@ -177,7 +197,11 @@ describe('resolveRunningCloseTarget', () => {
 				tabs: [createTab(), background],
 				targetId: 'chat-2',
 			}),
-		).toEqual({ isRunning: false, agentSessionId: 'agent-2' });
+		).toEqual({
+			isRefused: false,
+			isRunning: false,
+			agentSessionId: 'agent-2',
+		});
 	});
 
 	test('treats an unknown target as not running with no session', () => {
@@ -188,6 +212,97 @@ describe('resolveRunningCloseTarget', () => {
 				tabs: [createTab()],
 				targetId: 'missing',
 			}),
-		).toEqual({ isRunning: false, agentSessionId: null });
+		).toEqual({ isRefused: false, isRunning: false, agentSessionId: null });
+	});
+});
+
+describe('resolveRunningCloseTarget sub-agent refusal', () => {
+	function subAgentTabs(status: SessionTabModel['status']) {
+		return [
+			createTab({ id: 'chat-1', agentSessionId: 'agent-1' }),
+			createTab({
+				id: 'child',
+				agentSessionId: 'agent-child',
+				isSubAgent: true,
+				status,
+			}),
+		];
+	}
+
+	test('refuses closing a working sub-agent from the tab strip', () => {
+		expect(
+			resolveRunningCloseTarget({
+				activeSessionId: 'chat-1',
+				isActiveStreaming: false,
+				tabs: subAgentTabs('working'),
+				targetId: 'child',
+			}).isRefused,
+		).toBe(true);
+	});
+
+	test('refuses closing a blocked sub-agent from the tab strip', () => {
+		expect(
+			resolveRunningCloseTarget({
+				activeSessionId: 'chat-1',
+				isActiveStreaming: false,
+				tabs: subAgentTabs('blocked'),
+				targetId: 'child',
+			}).isRefused,
+		).toBe(true);
+	});
+
+	test('refuses the active sub-agent that ⌘W targets while it streams', () => {
+		expect(
+			resolveRunningCloseTarget({
+				activeSessionId: 'child',
+				isActiveStreaming: true,
+				tabs: subAgentTabs('idle'),
+				targetId: 'child',
+			}).isRefused,
+		).toBe(true);
+	});
+
+	test('refuses the active sub-agent whose snapshot still reads working', () => {
+		// The live flag has already cleared but the persisted status has not; the
+		// strip still withholds its close control, so ⌘W must not reach past it.
+		expect(
+			resolveRunningCloseTarget({
+				activeSessionId: 'child',
+				isActiveStreaming: false,
+				tabs: subAgentTabs('working'),
+				targetId: 'child',
+			}).isRefused,
+		).toBe(true);
+	});
+
+	test('allows closing an idle sub-agent the orchestrator left behind', () => {
+		expect(
+			resolveRunningCloseTarget({
+				activeSessionId: 'child',
+				isActiveStreaming: false,
+				tabs: subAgentTabs('idle'),
+				targetId: 'child',
+			}),
+		).toEqual({
+			isRefused: false,
+			isRunning: false,
+			agentSessionId: 'agent-child',
+		});
+	});
+
+	test('never refuses a working root chat', () => {
+		const root = createTab({
+			id: 'chat-1',
+			agentSessionId: 'agent-1',
+			status: 'working',
+		});
+		expect(
+			resolveRunningCloseTarget({
+				activeSessionId: 'chat-2',
+				isActiveStreaming: false,
+				tabs: [root, createTab({ id: 'chat-2' })],
+				targetId: 'chat-1',
+			}).isRefused,
+		).toBe(false);
 	});
 });

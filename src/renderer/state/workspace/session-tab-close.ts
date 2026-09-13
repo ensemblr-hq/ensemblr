@@ -78,19 +78,41 @@ export function decideActiveClose(
 export interface RunningCloseTarget {
 	/** True when the target tab's agent is actively running. */
 	isRunning: boolean;
+	/**
+	 * True when the close must be refused outright rather than confirmed. A
+	 * sub-agent's tab stays open while its delegate runs: closing it kills a child
+	 * its orchestrator is still waiting on, so no close path may offer it.
+	 */
+	isRefused: boolean;
 	/** Agent session to cancel on confirm, or `null` when the tab has none. */
 	agentSessionId: string | null;
 }
 
 /**
+ * Whether a tab hosts a spawned sub-agent rather than a chat the user owns.
+ * @param tab - The tab to test, or undefined when the target is unknown
+ * @returns True when the tab is a sub-agent chat
+ */
+function isSubAgentChat(tab: SessionTabModel | undefined): boolean {
+	return tab !== undefined && (tab.kind ?? 'chat') === 'chat' && tab.isSubAgent;
+}
+
+/**
  * Resolves whether closing the tab `targetId` should prompt the running-chat
- * confirmation, and which agent session to cancel when it does.
+ * confirmation or be refused outright, and which agent session to cancel when it
+ * is merely confirmed.
  *
  * The active tab uses the composer's live `isActiveStreaming` flag — it flips
  * on a pending submit/stop mutation before the persisted runtime status catches
  * up, so it is the truer signal for the tab the user is looking at. Background
  * tabs have no live composer, so they fall back to their persisted
- * `status === 'working'` snapshot. An unknown target is treated as not running.
+ * non-idle snapshot. An unknown target is treated as not running.
+ *
+ * `isRefused` takes the union of both signals rather than whichever one
+ * `isRunning` picked, so enforcement is never weaker than the affordance:
+ * `SessionTab` can only read the persisted status, and a close it has already
+ * withheld must not become reachable through ⌘W in the window where the live
+ * flag and the snapshot disagree.
  */
 export function resolveRunningCloseTarget({
 	activeSessionId,
@@ -104,9 +126,12 @@ export function resolveRunningCloseTarget({
 	targetId: string;
 }): RunningCloseTarget {
 	const tab = tabs.find((candidate) => candidate.id === targetId);
+	const isPersistedRunning = tab !== undefined && tab.status !== 'idle';
 	const isRunning =
-		targetId === activeSessionId
-			? isActiveStreaming
-			: tab?.status === 'working';
-	return { agentSessionId: tab?.agentSessionId ?? null, isRunning };
+		targetId === activeSessionId ? isActiveStreaming : isPersistedRunning;
+	return {
+		agentSessionId: tab?.agentSessionId ?? null,
+		isRefused: isSubAgentChat(tab) && (isRunning || isPersistedRunning),
+		isRunning,
+	};
 }
