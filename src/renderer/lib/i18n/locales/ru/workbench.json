@@ -1546,6 +1546,11 @@
 			"truncated": "обрезано"
 		},
 		"bash": {
+			"auto-backgrounded": "переведено в фон через {{seconds}} с",
+			"auto-backgrounded-title": "Команда, переведённая в фон",
+			"background-title": "Запуск фоновой команды",
+			"exit": "код {{code}}",
+			"interrupted": "прервано",
 			"title": "Bash"
 		},
 		"context7": {
@@ -1713,7 +1718,10 @@
 			"title": "Навык"
 		},
 		"subagent": {
+			"async-title": "Запуск асинхронного суб-агента",
 			"named": "Суб-агент: {{type}}",
+			"no-subject": "(без описания)",
+			"output-file": "Файл прогресса: {{path}}",
 			"title": "Суб-агент"
 		},
 		"symbol-search": {
@@ -1833,6 +1841,10 @@
 		"archiving": "Архивирование…",
 		"archiving-aria": "Рабочее пространство {{workspace}} архивируется",
 		"archiving-tooltip": "{{workspace}} архивируется",
+		"claude-background_one": "{{count}} фоновая задача выполняется",
+		"claude-background_few": "{{count}} фоновые задачи выполняются",
+		"claude-background_many": "{{count}} фоновых задач выполняется",
+		"claude-background_other": "{{count}} фоновых задач выполняется",
 		"creating": "Создание рабочего пространства…",
 		"creating-aria": "Рабочее пространство {{workspace}} создаётся",
 		"creating-tooltip": "{{workspace}} создаётся",

@@ -7,6 +7,11 @@ import {
 	createAgentActivityState,
 	reduceAgentActivity,
 } from '@/shared/agent-activity';
+import {
+	type ClaudeBackgroundTaskState,
+	createClaudeBackgroundTaskState,
+	reduceClaudeBackgroundTasks,
+} from '@/shared/claude-background-tasks';
 import type {
 	AgentPersistedEnvelope,
 	AgentSessionContextSnapshotWire,
@@ -18,6 +23,7 @@ import type {
 export interface AgentConversationLiveState {
 	activity: AgentActivityState;
 	branchId: string;
+	claudeBackgroundTasks: ClaudeBackgroundTaskState;
 	contextUsage: AgentSessionContextSnapshotWire | null;
 	lastEventOrdinal: number;
 	runtimeIdentity: string;
@@ -89,6 +95,9 @@ export const seedAgentConversationSnapshotsAtom = atom(
 					? previous.activity
 					: createAgentActivityState(session.currentTools),
 				branchId: session.branchId,
+				claudeBackgroundTasks: preserveLiveState
+					? previous.claudeBackgroundTasks
+					: createClaudeBackgroundTaskState(),
 				contextUsage: preserveLiveState
 					? previous.contextUsage
 					: (session.contextUsage ?? null),
@@ -140,6 +149,10 @@ export const applyAgentConversationEventAtom = atom(
 				? input.envelope.status
 				: previous.status;
 		const activity = reduceAgentActivity(previous.activity, input.envelope);
+		const claudeBackgroundTasks = reduceClaudeBackgroundTasks(
+			previous.claudeBackgroundTasks,
+			input.envelope,
+		);
 		// `reduceAgentActivity` hands back the same object when an event moves
 		// nothing, so an event that only advances the ordinal — a prose-only
 		// message, a status the projection ignores — writes nothing and re-renders
@@ -147,6 +160,7 @@ export const applyAgentConversationEventAtom = atom(
 		// event that is by definition a no-op.
 		if (
 			activity === previous.activity &&
+			claudeBackgroundTasks === previous.claudeBackgroundTasks &&
 			contextUsage === previous.contextUsage &&
 			status === previous.status
 		) {
@@ -159,6 +173,7 @@ export const applyAgentConversationEventAtom = atom(
 				[input.sessionId]: {
 					...previous,
 					activity,
+					claudeBackgroundTasks,
 					contextUsage,
 					lastEventOrdinal: input.ordinal,
 					status,

@@ -127,7 +127,7 @@ function transitionTitle(number: string | null, status: string): string {
  * @returns The reported id, or null when the call named none
  */
 function backgroundTaskId(part: DynamicToolUIPart): string | null {
-	return stringField(inputOf(part), 'task_id', 'taskId', 'shell_id');
+	return stringField(inputOf(part), 'task_id', 'taskId', 'shell_id', 'bash_id');
 }
 
 /**

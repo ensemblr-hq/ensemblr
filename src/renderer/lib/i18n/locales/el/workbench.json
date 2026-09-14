@@ -1470,6 +1470,11 @@
 			"truncated": "περικομμένο"
 		},
 		"bash": {
+			"auto-backgrounded": "μεταφέρθηκε στο παρασκήνιο μετά από {{seconds}} δευτ.",
+			"auto-backgrounded-title": "Εντολή που μεταφέρθηκε στο παρασκήνιο",
+			"background-title": "Εκκίνηση εντολής παρασκηνίου",
+			"exit": "κωδικός {{code}}",
+			"interrupted": "διακόπηκε",
 			"title": "Bash"
 		},
 		"context7": {
@@ -1623,7 +1628,10 @@
 			"title": "Δεξιότητα"
 		},
 		"subagent": {
+			"async-title": "Εκκίνηση ασύγχρονου υποπράκτορα",
 			"named": "Υποπράκτορας: {{type}}",
+			"no-subject": "(χωρίς περιγραφή)",
+			"output-file": "Αρχείο προόδου: {{path}}",
 			"title": "Υποπράκτορας"
 		},
 		"symbol-search": {
@@ -1725,6 +1733,8 @@
 		"archiving": "Αρχειοθέτηση…",
 		"archiving-aria": "Ο χώρος εργασίας {{workspace}} αρχειοθετείται",
 		"archiving-tooltip": "Ο {{workspace}} αρχειοθετείται",
+		"claude-background_one": "{{count}} εργασία παρασκηνίου σε εκτέλεση",
+		"claude-background_other": "{{count}} εργασίες παρασκηνίου σε εκτέλεση",
 		"creating": "Δημιουργία χώρου εργασίας…",
 		"creating-aria": "Ο χώρος εργασίας {{workspace}} δημιουργείται",
 		"creating-tooltip": "Ο {{workspace}} δημιουργείται",

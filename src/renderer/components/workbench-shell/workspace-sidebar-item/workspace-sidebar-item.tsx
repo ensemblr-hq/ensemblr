@@ -133,6 +133,7 @@ export function WorkspaceSidebarItem({
 	);
 	const { renderWorkspaceLink } = useNavigation();
 	const {
+		claudeBackgroundTaskCount,
 		dockActivityState,
 		hasDiffStats,
 		isUnread,
@@ -144,6 +145,7 @@ export function WorkspaceSidebarItem({
 
 	const buttonContent = (
 		<WorkspaceSidebarItemContent
+			claudeBackgroundTaskCount={claudeBackgroundTaskCount}
 			dockActivityState={dockActivityState}
 			hasDiffStats={hasDiffStats}
 			isUnread={isUnread}

@@ -9,6 +9,7 @@ import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy'
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
 import { useWorkspaceUnreadCount } from '@/renderer/state/unread';
 import {
+	claudeBackgroundTaskCountByWorkspaceAtomFamily,
 	useWorkspaceIsUnread,
 	useWorkspaceLifecycleRun,
 	type WorkspaceDockActivityState,
@@ -92,6 +93,9 @@ export function useWorkspaceSidebarRow({
 		[workspace.id],
 	);
 	const dockActivityState = useAtomValue(liveDockActivityAtom);
+	const claudeBackgroundTaskCount = useAtomValue(
+		claudeBackgroundTaskCountByWorkspaceAtomFamily(workspace.id),
+	);
 
 	const liveWorkspace =
 		livePullRequest === workspace.pullRequest
@@ -99,6 +103,7 @@ export function useWorkspaceSidebarRow({
 			: { ...workspace, pullRequest: livePullRequest };
 
 	return {
+		claudeBackgroundTaskCount,
 		dockActivityState,
 		hasDiffStats:
 			workspace.changeSummary.additions > 0 ||

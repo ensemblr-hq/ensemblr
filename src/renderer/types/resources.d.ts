@@ -4105,6 +4105,11 @@ export default interface Resources {
 				truncated: 'truncated';
 			};
 			bash: {
+				'auto-backgrounded': 'auto-backgrounded after {{seconds}}s';
+				'auto-backgrounded-title': 'Auto-backgrounded shell';
+				'background-title': 'Start background shell';
+				exit: 'exit {{code}}';
+				interrupted: 'interrupted';
 				title: 'Bash';
 			};
 			context7: {
@@ -4258,7 +4263,10 @@ export default interface Resources {
 				title: 'Skill';
 			};
 			subagent: {
+				'async-title': 'Launch async sub-agent';
 				named: 'Sub-agent: {{type}}';
+				'no-subject': '(no description)';
+				'output-file': 'Progress file: {{path}}';
 				title: 'Sub-agent';
 			};
 			'symbol-search': {
@@ -4360,6 +4368,8 @@ export default interface Resources {
 			archiving: 'Archiving…';
 			'archiving-aria': 'Workspace {{workspace}} is being archived';
 			'archiving-tooltip': '{{workspace}} is being archived';
+			'claude-background_one': '{{count}} background task running';
+			'claude-background_other': '{{count}} background tasks running';
 			creating: 'Creating workspace…';
 			'creating-aria': 'Workspace {{workspace}} is being created';
 			'creating-tooltip': '{{workspace}} is being created';
