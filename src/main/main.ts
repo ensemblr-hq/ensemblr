@@ -2029,6 +2029,7 @@ const quitGuard = createQuitGuard({
 		BrowserWindow.getAllWindows().some((window) => !window.isDestroyed()),
 	/** Every agent-harness terminal, across all workspaces. */
 	listAgentTerminals: () => terminalService.listByKind('agent'),
+	listRunningBackgroundTasks: agentActivityMonitor.listRunningBackgroundTasks,
 	listRunningSessions: agentActivityMonitor.listRunning,
 	/** Workspace id to display name, read once per prompt. */
 	listWorkspaceNames: async () => {

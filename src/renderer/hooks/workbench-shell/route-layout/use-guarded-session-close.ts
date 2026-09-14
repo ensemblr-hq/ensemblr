@@ -1,3 +1,4 @@
+import { useAtomValue } from 'jotai';
 import { useCallback, useMemo } from 'react';
 import {
 	type useAgentComposerController,
@@ -5,6 +6,7 @@ import {
 } from '@/renderer/state/composer';
 import { useMenuCommand } from '@/renderer/state/menu-commands';
 import {
+	claudeBackgroundTaskCountBySessionAtom,
 	resolveRunningCloseTarget,
 	useCloseRunningChatGuard,
 	type useSessionTabState,
@@ -42,6 +44,20 @@ export function useGuardedSessionClose({
 }) {
 	const closeGuard = useCloseRunningChatGuard();
 	const stopAgentSessionById = useStopAgentSession(workspaceId);
+	const backgroundTaskCounts = useAtomValue(
+		claudeBackgroundTaskCountBySessionAtom,
+	);
+
+	/**
+	 * Background tasks a close target still has running. A chat whose turn ended
+	 * but whose shell has not looks idle everywhere else, so without this the
+	 * close would take the work away with no warning at all.
+	 */
+	const backgroundTasksOf = useCallback(
+		(agentSessionId: string | null) =>
+			agentSessionId ? (backgroundTaskCounts[agentSessionId] ?? 0) : 0,
+		[backgroundTaskCounts],
+	);
 
 	const stopFor = useCallback(
 		(targetId: string, agentSessionId: string | null) => async () => {
@@ -75,16 +91,19 @@ export function useGuardedSessionClose({
 	);
 
 	const requestActiveClose = useCallback(() => {
-		if (resolveTarget(activeSessionId).isRefused) {
+		const target = resolveTarget(activeSessionId);
+		if (target.isRefused) {
 			return;
 		}
 		closeGuard.requestClose({
+			backgroundTaskCount: backgroundTasksOf(target.agentSessionId),
 			isRunning: agentComposer.isStreaming,
 			onClose: sessionNavigation.closeActiveOrReset,
 			onStop: agentComposer.onStop,
 		});
 	}, [
 		activeSessionId,
+		backgroundTasksOf,
 		closeGuard,
 		agentComposer.isStreaming,
 		agentComposer.onStop,
@@ -100,12 +119,13 @@ export function useGuardedSessionClose({
 				return;
 			}
 			closeGuard.requestClose({
+				backgroundTaskCount: backgroundTasksOf(target.agentSessionId),
 				isRunning: target.isRunning,
 				onClose: () => sessionNavigation.closeSessionTab(targetId),
 				onStop: stopFor(targetId, target.agentSessionId),
 			});
 		},
-		[closeGuard, resolveTarget, sessionNavigation, stopFor],
+		[backgroundTasksOf, closeGuard, resolveTarget, sessionNavigation, stopFor],
 	);
 
 	return {

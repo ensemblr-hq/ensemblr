@@ -1,24 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import {
+	activeBackgroundTasks,
+	countActiveBackgroundTasks,
 	createClaudeBackgroundTaskState,
 	reduceClaudeBackgroundTasks,
 } from '../../src/shared/claude-background-tasks.ts';
-import type { AgentPersistedEnvelope } from '../../src/shared/ipc/contracts/agent-session.ts';
+import type {
+	AgentBackgroundTaskWire,
+	AgentPersistedEnvelope,
+} from '../../src/shared/ipc/contracts/agent-session.ts';
 
-const toolResult = (
-	toolCallId: string,
-	output: unknown,
-	isError = false,
-): AgentPersistedEnvelope => ({
-	kind: 'message',
-	payload: {
-		isError,
-		kind: 'tool-result',
-		output,
-		toolCallId,
-	},
-	role: 'tool',
+const task = (
+	taskId: string,
+	overrides: Partial<AgentBackgroundTaskWire> = {},
+): AgentBackgroundTaskWire => ({
+	description: `run ${taskId}`,
+	taskId,
+	taskType: 'local_bash',
+	...overrides,
 });
+
+const level = (
+	...tasks: readonly AgentBackgroundTaskWire[]
+): AgentPersistedEnvelope => ({ kind: 'background-tasks', tasks });
 
 const statusEnvelope = (
 	status: 'idle' | 'starting' | 'streaming' | 'closed' | 'errored',
@@ -29,178 +33,147 @@ const statusEnvelope = (
 });
 
 describe('claude background tasks projection', () => {
-	it('starts with an empty live-task set', () => {
-		expect(createClaudeBackgroundTaskState().liveTaskIds.size).toBe(0);
+	it('starts empty', () => {
+		expect(createClaudeBackgroundTaskState().tasks).toEqual([]);
 	});
 
-	it('records a background bash launch by its structured task id', () => {
-		const state = reduceClaudeBackgroundTasks(
+	it('replaces its set with each reported level', () => {
+		const one = reduceClaudeBackgroundTasks(
 			createClaudeBackgroundTaskState(),
-			toolResult('call-1', {
-				content: [{ text: 'Command running in background' }],
-				details: { backgroundTaskId: 'bash_1' },
-			}),
+			level(task('a')),
 		);
-		expect([...state.liveTaskIds]).toEqual(['bash_1']);
+		expect(one.tasks.map((entry) => entry.taskId)).toEqual(['a']);
+
+		const two = reduceClaudeBackgroundTasks(one, level(task('a'), task('b')));
+		expect(two.tasks.map((entry) => entry.taskId)).toEqual(['a', 'b']);
+
+		// The level is authoritative: `a` vanishing from the payload removes it,
+		// with no stop edge anywhere in the stream.
+		const dropped = reduceClaudeBackgroundTasks(two, level(task('b')));
+		expect(dropped.tasks.map((entry) => entry.taskId)).toEqual(['b']);
 	});
 
-	it('records an agent async launch via agentId + isAsync', () => {
-		const state = reduceClaudeBackgroundTasks(
-			createClaudeBackgroundTaskState(),
-			toolResult('call-2', {
-				content: [{ text: 'Agent launched' }],
-				details: { agentId: 'agent_9', isAsync: true },
-			}),
-		);
-		expect([...state.liveTaskIds]).toEqual(['agent_9']);
-	});
-
-	it('ignores an agent result without the isAsync flag', () => {
-		const state = reduceClaudeBackgroundTasks(
-			createClaudeBackgroundTaskState(),
-			toolResult('call-3', {
-				content: [],
-				details: { agentId: 'agent_x' },
-			}),
-		);
-		expect(state.liveTaskIds.size).toBe(0);
-	});
-
-	it('falls back to a text parse when no details bag is present', () => {
-		const state = reduceClaudeBackgroundTasks(
-			createClaudeBackgroundTaskState(),
-			toolResult(
-				'call-4',
-				'Command running in the background. shell ID: bash_7',
-			),
-		);
-		expect([...state.liveTaskIds]).toEqual(['bash_7']);
-	});
-
-	it('clears a task when TaskStop reports it stopped', () => {
-		const withOne = reduceClaudeBackgroundTasks(
-			createClaudeBackgroundTaskState(),
-			toolResult('call-5', {
-				content: [],
-				details: { backgroundTaskId: 'bash_2' },
-			}),
-		);
-		const cleared = reduceClaudeBackgroundTasks(
-			withOne,
-			toolResult('call-6', {
-				content: [{ text: 'stopped' }],
-				details: { stopped: true, taskId: 'bash_2' },
-			}),
-		);
-		expect(cleared.liveTaskIds.size).toBe(0);
-	});
-
-	it('clears a task when TaskOutput reports a terminal status', () => {
-		const withOne = reduceClaudeBackgroundTasks(
-			createClaudeBackgroundTaskState(),
-			toolResult('call-7', {
-				content: [],
-				details: { backgroundTaskId: 'bash_3' },
-			}),
-		);
-		const cleared = reduceClaudeBackgroundTasks(
-			withOne,
-			toolResult('call-8', {
-				content: [{ text: 'exit 0' }],
-				details: { status: 'completed', taskId: 'bash_3' },
-			}),
-		);
-		expect(cleared.liveTaskIds.size).toBe(0);
-	});
-
-	it('does not clear when TaskOutput reports the task still running', () => {
-		const withOne = reduceClaudeBackgroundTasks(
-			createClaudeBackgroundTaskState(),
-			toolResult('call-9', {
-				content: [],
-				details: { backgroundTaskId: 'bash_4' },
-			}),
-		);
-		const polled = reduceClaudeBackgroundTasks(
-			withOne,
-			toolResult('call-10', {
-				content: [{ text: 'still running' }],
-				details: { status: 'running', taskId: 'bash_4' },
-			}),
-		);
-		expect([...polled.liveTaskIds]).toEqual(['bash_4']);
-	});
-
-	it('holds many concurrent tasks and removes them one at a time', () => {
-		let state = createClaudeBackgroundTaskState();
-		for (const id of ['bash_a', 'bash_b', 'bash_c']) {
-			state = reduceClaudeBackgroundTasks(
-				state,
-				toolResult(`call-${id}`, {
-					content: [],
-					details: { backgroundTaskId: id },
-				}),
-			);
-		}
-		expect(state.liveTaskIds.size).toBe(3);
-		state = reduceClaudeBackgroundTasks(
-			state,
-			toolResult('call-stop-b', {
-				content: [],
-				details: { stopped: true, taskId: 'bash_b' },
-			}),
-		);
-		expect([...state.liveTaskIds].sort()).toEqual(['bash_a', 'bash_c']);
-	});
-
-	it('clears every live task on session shutdown', () => {
+	it('empties when the runtime reports no live tasks', () => {
 		const withTasks = reduceClaudeBackgroundTasks(
 			createClaudeBackgroundTaskState(),
-			toolResult('call-11', {
-				content: [],
-				details: { backgroundTaskId: 'bash_5' },
-			}),
+			level(task('a'), task('b')),
 		);
-		const shutdown = reduceClaudeBackgroundTasks(withTasks, {
-			kind: 'shutdown',
-			reason: 'manual',
-		});
-		expect(shutdown.liveTaskIds.size).toBe(0);
+		expect(reduceClaudeBackgroundTasks(withTasks, level()).tasks).toEqual([]);
 	});
 
-	it('clears every live task on a closed status', () => {
+	it('holds object identity when an unchanged level is re-emitted', () => {
 		const withTasks = reduceClaudeBackgroundTasks(
 			createClaudeBackgroundTaskState(),
-			toolResult('call-12', {
-				content: [],
-				details: { backgroundTaskId: 'bash_6' },
-			}),
+			level(task('a')),
 		);
-		const closed = reduceClaudeBackgroundTasks(
+		expect(reduceClaudeBackgroundTasks(withTasks, level(task('a')))).toBe(
 			withTasks,
-			statusEnvelope('closed'),
 		);
-		expect(closed.liveTaskIds.size).toBe(0);
 	});
 
-	it('returns the same object for irrelevant events', () => {
-		const state = createClaudeBackgroundTaskState();
-		const after = reduceClaudeBackgroundTasks(state, statusEnvelope('idle'));
-		expect(after).toBe(state);
+	it('re-renders when only the ambient flag flips', () => {
+		const active = reduceClaudeBackgroundTasks(
+			createClaudeBackgroundTaskState(),
+			level(task('a')),
+		);
+		const flipped = reduceClaudeBackgroundTasks(
+			active,
+			level(task('a', { ambient: true })),
+		);
+		expect(flipped).not.toBe(active);
+		expect(countActiveBackgroundTasks(flipped)).toBe(0);
 	});
 
-	it('ignores a tool-result flagged as an error', () => {
+	it('excludes ambient housekeeping from the activity count and list', () => {
 		const state = reduceClaudeBackgroundTasks(
 			createClaudeBackgroundTaskState(),
-			toolResult(
-				'call-13',
-				{
-					content: [],
-					details: { backgroundTaskId: 'bash_x' },
-				},
-				true,
-			),
+			level(task('a'), task('watcher', { ambient: true }), task('b')),
 		);
-		expect(state.liveTaskIds.size).toBe(0);
+		expect(countActiveBackgroundTasks(state)).toBe(2);
+		expect(activeBackgroundTasks(state).map((entry) => entry.taskId)).toEqual([
+			'a',
+			'b',
+		]);
+	});
+
+	it('empties on a session starting, since the set is per runtime process', () => {
+		const withTasks = reduceClaudeBackgroundTasks(
+			createClaudeBackgroundTaskState(),
+			level(task('a')),
+		);
+		expect(
+			reduceClaudeBackgroundTasks(withTasks, statusEnvelope('starting')).tasks,
+		).toEqual([]);
+	});
+
+	it('empties on close, on error, and on shutdown', () => {
+		const withTasks = reduceClaudeBackgroundTasks(
+			createClaudeBackgroundTaskState(),
+			level(task('a')),
+		);
+		expect(
+			reduceClaudeBackgroundTasks(withTasks, statusEnvelope('closed')).tasks,
+		).toEqual([]);
+		expect(
+			reduceClaudeBackgroundTasks(withTasks, statusEnvelope('errored')).tasks,
+		).toEqual([]);
+		expect(
+			reduceClaudeBackgroundTasks(withTasks, {
+				kind: 'shutdown',
+				reason: 'manual',
+			}).tasks,
+		).toEqual([]);
+	});
+
+	it('survives a turn ending, which is the whole point', () => {
+		const launched = reduceClaudeBackgroundTasks(
+			createClaudeBackgroundTaskState(),
+			level(task('a')),
+		);
+		const idle = reduceClaudeBackgroundTasks(launched, statusEnvelope('idle'));
+		expect(idle).toBe(launched);
+		expect(countActiveBackgroundTasks(idle)).toBe(1);
+	});
+
+	it('ignores events that say nothing about background tasks', () => {
+		const state = createClaudeBackgroundTaskState();
+		expect(
+			reduceClaudeBackgroundTasks(state, statusEnvelope('streaming')),
+		).toBe(state);
+		expect(
+			reduceClaudeBackgroundTasks(state, {
+				kind: 'message',
+				payload: { kind: 'text', text: 'hello' },
+				role: 'agent',
+			}),
+		).toBe(state);
+	});
+});
+
+describe('the disappearing-notice regression', () => {
+	// The first cut kept the level only in the renderer's live projection, which
+	// a snapshot re-seed replaces on every turn end. The notice therefore went
+	// dark exactly when the agent stopped talking — the one moment it was the
+	// only thing still saying the work was running. The reducer's half of the
+	// fix is that an idle status moves nothing; the snapshot carries the rest.
+	it('keeps its tasks across the whole turn-end sequence', () => {
+		let state = reduceClaudeBackgroundTasks(
+			createClaudeBackgroundTaskState(),
+			level(task('bash_1')),
+		);
+		for (const status of ['streaming', 'idle'] as const) {
+			state = reduceClaudeBackgroundTasks(state, statusEnvelope(status));
+		}
+		state = reduceClaudeBackgroundTasks(state, {
+			kind: 'message',
+			payload: {
+				endsResponse: true,
+				kind: 'message',
+				parts: [],
+				role: 'assistant',
+			},
+			role: 'agent',
+		});
+		expect(countActiveBackgroundTasks(state)).toBe(1);
 	});
 });

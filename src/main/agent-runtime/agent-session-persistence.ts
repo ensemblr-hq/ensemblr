@@ -17,6 +17,11 @@ import type { AgentEvent } from './agent-types.ts';
  */
 export function eventPayload(event: AgentEvent): AgentPersistedEnvelope {
 	switch (event.type) {
+		case 'background-tasks':
+			return {
+				kind: 'background-tasks',
+				tasks: event.tasks.map((task) => ({ ...task })),
+			};
 		case 'context-usage':
 			return {
 				kind: 'context-usage',

@@ -507,6 +507,10 @@ function handleEvent(
 			result.push(noticeMessage);
 			return null;
 		}
+		// The background-task level is live state the composer and the sidebar
+		// read, not a thing that happened at a point in the transcript. It draws
+		// no row: the launch's own tool call already reported it.
+		case 'background-tasks':
 		case 'context-usage':
 		case 'plan-limit':
 		case 'plan-windows':

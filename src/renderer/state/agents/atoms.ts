@@ -9,7 +9,6 @@ import {
 } from '@/shared/agent-activity';
 import {
 	type ClaudeBackgroundTaskState,
-	createClaudeBackgroundTaskState,
 	reduceClaudeBackgroundTasks,
 } from '@/shared/claude-background-tasks';
 import type {
@@ -95,9 +94,14 @@ export const seedAgentConversationSnapshotsAtom = atom(
 					? previous.activity
 					: createAgentActivityState(session.currentTools),
 				branchId: session.branchId,
+				// Seeded from the snapshot rather than emptied, because a re-seed
+				// lands on every turn end and a background task outlives the turn.
+				// Emptying here is what made the notice vanish the moment the agent
+				// stopped talking — exactly when it was the only thing still saying
+				// the work was running.
 				claudeBackgroundTasks: preserveLiveState
 					? previous.claudeBackgroundTasks
-					: createClaudeBackgroundTaskState(),
+					: { tasks: session.backgroundTasks ?? [] },
 				contextUsage: preserveLiveState
 					? previous.contextUsage
 					: (session.contextUsage ?? null),

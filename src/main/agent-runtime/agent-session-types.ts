@@ -1,5 +1,6 @@
 import type { AgentSessionLineage } from '../../shared/agent-control/lineage.ts';
 import type {
+	AgentBackgroundTaskWire,
 	AgentSessionContextSnapshotWire,
 	AgentSessionToolActivityWire,
 } from '../../shared/ipc/contracts/agent-session.ts';
@@ -13,6 +14,14 @@ import type {
 export interface AgentSessionSnapshot {
 	/** Highest persisted event ordinal represented by the activity projection. */
 	activityOrdinal?: number;
+	/**
+	 * Background tasks the runtime last reported as live, ambient housekeeping
+	 * already excluded. Carried on the snapshot for the same reason
+	 * `currentTools` is — a re-seed would otherwise wipe the renderer's live
+	 * projection — but unlike `currentTools` it is filled whether or not the
+	 * session is active, because the work outlives the turn.
+	 */
+	backgroundTasks?: readonly AgentBackgroundTaskWire[];
 	branchId: string;
 	closedAt: string | null;
 	contextUsage?: AgentSessionContextSnapshotWire | null;

@@ -13,18 +13,26 @@ import type { KeymapBinding } from '@/renderer/types/keymap';
 import { formatChord } from '@/shared/keymap';
 
 /**
- * Confirmation shown before closing a tab whose agent is still running. Closing
+ * Confirmation shown before closing a tab that still has work in flight. Closing
  * a running chat cancels its agent (see {@link useCloseRunningChatGuard}), so we
  * make the user opt into that rather than silently aborting an in-flight turn.
+ *
+ * A chat held for background tasks gets different copy, because it is a
+ * different situation and the turn-cancel sentence would be a lie: its turn
+ * already ended, and what is still going is a backgrounded shell or an async
+ * subagent that the chat is the user's only window onto.
  *
  * Default focus lands on Cancel (Radix focuses the first focusable child), so a
  * stray Enter never destroys work; ⌘/Ctrl+↵ is the deliberate confirm.
  */
 export function CloseRunningChatDialog({
+	backgroundTaskCount,
 	onCancel,
 	onConfirm,
 	open,
 }: {
+	/** Background tasks still running; zero means the chat's turn is in flight. */
+	backgroundTaskCount: number;
 	/** Dismisses the dialog and keeps the chat open. */
 	onCancel: () => void;
 	/** Cancels the agent and closes the chat. */
@@ -32,6 +40,7 @@ export function CloseRunningChatDialog({
 	open: boolean;
 }) {
 	const { t } = useTranslation();
+	const holdsBackgroundTasks = backgroundTaskCount > 0;
 	const submitBindings = useMemo<readonly KeymapBinding<HTMLDivElement>[]>(
 		() => [
 			[
@@ -61,13 +70,26 @@ export function CloseRunningChatDialog({
 			>
 				<DialogHeader>
 					<DialogTitle className='font-medium text-[0.9375rem]'>
-						{t('workbench:close-running-chat.title', 'Close running chat?')}
+						{holdsBackgroundTasks
+							? t(
+									'workbench:close-running-chat.background-title',
+									'Close chat with background tasks?',
+								)
+							: t('workbench:close-running-chat.title', 'Close running chat?')}
 					</DialogTitle>
 					<p className='text-muted-foreground text-xs'>
-						{t(
-							'workbench:close-running-chat.description',
-							'This chat is currently running. Closing it will stop the current agent session.',
-						)}
+						{holdsBackgroundTasks
+							? t('workbench:close-running-chat.background-description', {
+									count: backgroundTaskCount,
+									defaultValue_one:
+										'This chat still has {{count}} background task running. Closing it is the last place that work is visible.',
+									defaultValue_other:
+										'This chat still has {{count}} background tasks running. Closing it is the last place that work is visible.',
+								})
+							: t(
+									'workbench:close-running-chat.description',
+									'This chat is currently running. Closing it will stop the current agent session.',
+								)}
 					</p>
 				</DialogHeader>
 

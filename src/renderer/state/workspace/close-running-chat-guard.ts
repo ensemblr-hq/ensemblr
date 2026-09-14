@@ -6,12 +6,26 @@
 
 /** A close deferred behind the confirmation dialog: stop the agent, then close. */
 export interface PendingClose {
+	/**
+	 * How many background tasks the chat still has running. Zero means the target
+	 * was deferred because its turn is in flight, which is the case the dialog's
+	 * original copy describes; above zero the dialog says so instead, because a
+	 * chat whose turn has ended and whose shell has not is a different warning.
+	 */
+	backgroundTaskCount: number;
 	onClose: () => void;
 	onStop: () => Promise<void> | void;
 }
 
 /** Input describing one tab-close attempt the guard may need to confirm. */
 export interface CloseRunningChatRequest {
+	/**
+	 * Background tasks the target chat still has running. Counted separately from
+	 * {@link isRunning} because a background task outlives the turn that started
+	 * it: the chat reads as idle while the work continues, which is exactly when
+	 * a close would take it away unannounced.
+	 */
+	backgroundTaskCount: number;
 	/** True when the target tab's agent is running and closing needs confirming. */
 	isRunning: boolean;
 	/** Closes the tab. Runs immediately when idle, or after confirm when running. */
@@ -26,17 +40,21 @@ type CloseRequestPlan =
 	| { kind: 'defer'; pending: PendingClose };
 
 /**
- * Decides whether a close request runs immediately (idle target) or must be
- * deferred behind the confirmation dialog (running target). Returning the
- * `PendingClose` rather than acting keeps the branch pure and testable.
+ * Decides whether a close request runs immediately (idle target with nothing in
+ * the background) or must be deferred behind the confirmation dialog. Returning
+ * the `PendingClose` rather than acting keeps the branch pure and testable.
  */
 export function planClose(request: CloseRunningChatRequest): CloseRequestPlan {
-	if (!request.isRunning) {
+	if (!request.isRunning && request.backgroundTaskCount === 0) {
 		return { kind: 'close-now' };
 	}
 	return {
 		kind: 'defer',
-		pending: { onClose: request.onClose, onStop: request.onStop },
+		pending: {
+			backgroundTaskCount: request.isRunning ? 0 : request.backgroundTaskCount,
+			onClose: request.onClose,
+			onStop: request.onStop,
+		},
 	};
 }
 

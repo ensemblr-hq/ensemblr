@@ -5,11 +5,16 @@
  * `before-quit`, which tears down every Pi RPC child and PTY inside a three
  * second grace. This decides whether that teardown gets to run unannounced.
  *
- * Two independent things count as an agent at work, and the dialog must agree
+ * Three independent things count as work in flight, and the dialog must agree
  * with what the sidebar already shows the user: a chat session mid-turn (from
- * the activity monitor) and a harness terminal mid-turn (from the terminal
- * service, using the same busy predicate the renderer applies). Every
+ * the activity monitor), a harness terminal mid-turn (from the terminal
+ * service, using the same busy predicate the renderer applies), and a
+ * background task still running (also from the activity monitor). Every
  * dependency is injected so this stays free of the `electron` import.
+ *
+ * The background task is the one a user cannot otherwise see coming: it
+ * outlives the turn that started it, so its chat reads as idle and every other
+ * signal in the app has gone quiet by the time the quit lands.
  */
 
 import type { AppLanguage } from '../../shared/i18n.ts';
@@ -18,7 +23,10 @@ import {
 	isHarnessTitleBusy,
 	stripHarnessTitleDecoration,
 } from '../../shared/terminal.ts';
-import type { RunningAgentSession } from '../agent-runtime/agent-activity-monitor.ts';
+import type {
+	RunningAgentSession,
+	RunningBackgroundTask,
+} from '../agent-runtime/agent-activity-monitor.ts';
 import {
 	type QuitGuardStrings,
 	quitGuardStrings,
@@ -54,6 +62,11 @@ export interface QuitGuardOptions {
 	hasWindow: () => boolean;
 	/** Every live terminal session of kind `agent`, across all workspaces. */
 	listAgentTerminals: () => readonly TerminalSessionSnapshot[];
+	/**
+	 * Every background task still running, across all workspaces. Its chat is
+	 * usually idle, so nothing else in the dialog would name it.
+	 */
+	listRunningBackgroundTasks: () => readonly RunningBackgroundTask[];
 	/** Every chat session mid-turn, across all workspaces. */
 	listRunningSessions: () => readonly RunningAgentSession[];
 	/** Workspace id → display name, for naming what is still running. */
@@ -122,11 +135,15 @@ function harnessDetail(session: TerminalSessionSnapshot): string | null {
  * @returns The entries to list, in display order.
  */
 function buildEntries({
+	backgroundTasks,
+	backgroundTaskLabel,
 	readChatDetail,
 	sessions,
 	terminals,
 	workspaceNames,
 }: {
+	backgroundTaskLabel: (task: RunningBackgroundTask) => string;
+	backgroundTasks: readonly RunningBackgroundTask[];
 	readChatDetail: (sessionId: string) => string;
 	sessions: readonly RunningAgentSession[];
 	terminals: readonly TerminalSessionSnapshot[];
@@ -142,6 +159,10 @@ function buildEntries({
 		...terminals.map((terminal) => ({
 			detail: harnessDetail(terminal),
 			workspaceName: nameOf(terminal.workspaceId),
+		})),
+		...backgroundTasks.map((task) => ({
+			detail: backgroundTaskLabel(task),
+			workspaceName: nameOf(task.workspaceId),
 		})),
 	];
 	const sortKey = (entry: RunningAgentEntry): string =>
@@ -220,11 +241,22 @@ export function createQuitGuard(options: QuitGuardOptions): QuitGuard {
 		}
 		const sessions = options.listRunningSessions();
 		const terminals = options.listAgentTerminals().filter(isHarnessBusy);
-		if (sessions.length === 0 && terminals.length === 0) {
+		const backgroundTasks = options.listRunningBackgroundTasks();
+		if (
+			sessions.length === 0 &&
+			terminals.length === 0 &&
+			backgroundTasks.length === 0
+		) {
 			return true;
 		}
 		const strings = quitGuardStrings(options.getLanguage());
 		const entries = buildEntries({
+			backgroundTaskLabel: (task) =>
+				strings.backgroundTask.replace(
+					'{{description}}',
+					task.description.trim() || strings.untitledBackgroundTask,
+				),
+			backgroundTasks,
 			readChatDetail: (sessionId) => readChatDetail(sessionId, strings),
 			sessions,
 			terminals,

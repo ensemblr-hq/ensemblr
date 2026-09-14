@@ -141,6 +141,7 @@ main model.
 |---|---|---|
 | `system` | `init` | `metadata` (model + runtime `sessionId`, via `onDiscovery`); `status` `starting`→`idle` **only** if still `starting` |
 | `system` | `compact_boundary` | `context-usage` from `compact_metadata.post_tokens` |
+| `system` | `background_tasks_changed` | `background-tasks`, carrying the whole reported set |
 | `stream_event` | `message_start` | nothing — resets the reasoning buffer |
 | `stream_event` | `content_block_delta` / `text_delta` | `message` · `text-delta` (broadcast, never persisted) |
 | `stream_event` | `content_block_delta` / `thinking_delta` | `message` · `reasoning-delta`, **and** banks the text under the block index |
@@ -155,9 +156,37 @@ main model.
 
 That last row is a deliberate choice, recorded in the normalizer's JSDoc: Pi
 emits a handful of frame types and the SDK emits dozens (hook chatter, task
-notifications, rate-limit pings), so unmodelled types are dropped rather than
-forwarded as `unknown` — each would otherwise surface as a system notice on the
-timeline.
+progress and notification bookends, rate-limit pings), so unmodelled types are
+dropped rather than forwarded as `unknown` — each would otherwise surface as a
+system notice on the timeline.
+
+### Background tasks are read as a level, never as edges
+
+`background_tasks_changed` carries **every** live background task after a
+change, and Ensemblr swaps its set for that payload. The SDK is explicit that
+this is what a host wanting "is background work running" must do rather than
+pair the `task_started` / `task_notification` bookends, because one dropped edge
+wedges a running indicator that never clears — and an indicator the user learns
+to distrust is worse than none. Those bookends are consequently **not**
+normalized; nothing in Ensemblr reads them.
+
+Two consequences the projection has to honour, both from the SDK's own note:
+
+- The set is **per CLI process** and nothing is emitted at startup, so a
+  consumer resets to empty on every `starting` and lets the next change
+  repopulate it. `reduceClaudeBackgroundTasks` does this, and it is why a full
+  replay of a branch still lands on the live process's set.
+- An entry flagged `ambient` is housekeeping (a watcher, anything
+  `skip_transcript`) and must stay out of activity indicators. The flag travels
+  on the wire rather than being filtered at the boundary, so the surface
+  deciding what counts as activity is the one that applies it —
+  `countActiveBackgroundTasks` and `activeBackgroundTasks` are that filter.
+
+The level is persisted like any other envelope and re-derived onto
+`AgentSessionSnapshotWire.backgroundTasks` by `projectSessionActivity`. That
+snapshot field is load-bearing rather than an optimization: the renderer re-seeds
+its live projection on every turn end, so without it the indicator goes dark at
+precisely the moment it becomes the only thing still reporting the work.
 
 ### Message parts
 

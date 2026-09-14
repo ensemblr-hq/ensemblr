@@ -245,6 +245,7 @@ export function WorkspaceRouteContent({
 				MainContent={WorkspaceMainContentOutlet}
 			/>
 			<CloseRunningChatDialog
+				backgroundTaskCount={closeGuard.backgroundTaskCount}
 				onCancel={closeGuard.cancelClose}
 				onConfirm={closeGuard.confirmClose}
 				open={closeGuard.isConfirming}

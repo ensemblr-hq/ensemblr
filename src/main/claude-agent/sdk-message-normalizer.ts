@@ -1,6 +1,7 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
 import type {
+	AgentBackgroundTask,
 	AgentContextUsage,
 	AgentEvent,
 	AgentMessagePart,
@@ -179,6 +180,16 @@ export function createSdkMessageNormalizer({
 			}
 			contextTokens = tokens;
 			return reportUsage();
+		}
+
+		if (message.subtype === 'background_tasks_changed') {
+			return [
+				{
+					at: at(),
+					tasks: readBackgroundTasks(message.tasks),
+					type: 'background-tasks',
+				},
+			];
 		}
 
 		return [];
@@ -694,4 +705,35 @@ function readTokenCount(value: unknown): number {
  */
 function readString(value: unknown): string | null {
 	return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/**
+ * Projects the runtime's live background-task set onto the provider-neutral
+ * shape. An entry without a usable id is dropped rather than carried as a blank
+ * one, because the id is what every consumer keys the task by; the descriptive
+ * fields fall back to empty strings so a sparse entry still counts as activity.
+ * @param tasks - The `tasks` array from a `background_tasks_changed` frame.
+ * @returns The tasks, in the order the runtime reported them.
+ */
+function readBackgroundTasks(tasks: unknown): readonly AgentBackgroundTask[] {
+	if (!Array.isArray(tasks)) {
+		return [];
+	}
+	return tasks.flatMap((entry) => {
+		if (!isRecord(entry)) {
+			return [];
+		}
+		const taskId = readString(entry.task_id);
+		if (taskId === null) {
+			return [];
+		}
+		return [
+			{
+				...(entry.ambient === true ? { ambient: true as const } : {}),
+				description: readString(entry.description) ?? '',
+				taskId,
+				taskType: readString(entry.task_type) ?? '',
+			},
+		];
+	});
 }

@@ -2853,6 +2853,9 @@ export default interface Resources {
 			};
 		};
 		'close-running-chat': {
+			'background-description_one': 'This chat still has {{count}} background task running. Closing it is the last place that work is visible.';
+			'background-description_other': 'This chat still has {{count}} background tasks running. Closing it is the last place that work is visible.';
+			'background-title': 'Close chat with background tasks?';
 			confirm: 'Close anyway';
 			description: 'This chat is currently running. Closing it will stop the current agent session.';
 			title: 'Close running chat?';
@@ -2889,6 +2892,9 @@ export default interface Resources {
 		composer: {
 			'aria-label': 'Agent composer';
 			'attachment-failed': 'Failed to attach selected file.';
+			'background-task-untitled': 'Untitled background task';
+			'background-tasks_one': '{{count}} background task still running';
+			'background-tasks_other': '{{count}} background tasks still running';
 			'blocked-follow-up': 'Follow-ups are held while the agent works — sending or {{shortcut}} adds to the queue, and you send it from there once the agent finishes.';
 			'chat-initializing': 'Workspace chat tab is still initializing. Try again in a moment.';
 			'delivery-unconfirmed': 'The session stopped; delivery is unconfirmed. Review the message before sending it again.';
