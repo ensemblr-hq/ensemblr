@@ -12,6 +12,8 @@ import {
 	type AgentControlRole,
 	type AgentSessionLineage,
 	awarenessForAudience,
+	controlToolNamingForRuntime,
+	MCP_CLIENT_RUNTIMES,
 	type SubagentMechanism,
 } from '../../../shared/agent-control.ts';
 import type { AgentProviderId } from '../../../shared/agent-provider.ts';
@@ -31,22 +33,18 @@ import type { AgentControlMcpConfig } from '../agent-types.ts';
 const SUBAGENT_ROLE: AgentControlRole = 'subagent';
 
 /**
- * Runtimes that connect to the Ensemblr Control MCP server themselves. Declared
- * as a capability rather than tested by name at each use, so a third runtime
- * says once whether it brings its own MCP client.
- */
-const NATIVE_MCP_PROVIDERS: ReadonlySet<AgentProviderId> = new Set(['claude']);
-
-/**
  * Whether a runtime reaches the control server through its own MCP client, and
  * so needs the loopback endpoint handed to it at session open. A runtime that
  * does not — Pi, which loads the shipped extension — reads the same control
  * server out of its env instead.
+ *
+ * The same membership decides how that runtime's agent sees the tools spelled,
+ * so it is declared once in `control-tool-names.ts` rather than restated here.
  * @param provider - The runtime a session is pinned to.
  * @returns True when the session needs the MCP endpoint on its open request.
  */
 export function usesNativeControlMcp(provider: AgentProviderId): boolean {
-	return NATIVE_MCP_PROVIDERS.has(provider);
+	return MCP_CLIENT_RUNTIMES.has(provider);
 }
 
 /**
@@ -259,7 +257,7 @@ export function resolveAgentControlWiring({
 		workspaceId,
 	});
 
-	const controlMcp = NATIVE_MCP_PROVIDERS.has(provider)
+	const controlMcp = usesNativeControlMcp(provider)
 		? readControlMcp(env)
 		: null;
 	if (!controlMcp) {
@@ -288,6 +286,7 @@ export function resolveAgentControlWiring({
 			depth: readControlDepth(env, role),
 			hasChatTab: true,
 			role,
+			toolNaming: controlToolNamingForRuntime(provider),
 			tuiHarnesses: readTuiHarnessesEnabled?.() ?? false,
 		}),
 	};

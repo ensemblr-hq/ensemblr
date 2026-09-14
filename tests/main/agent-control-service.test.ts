@@ -3974,6 +3974,7 @@ describe('agent-control service: audience resolution', () => {
 			hasChatTab: true,
 			retired: false,
 			role: 'orchestrator',
+			toolNaming: 'bare',
 		});
 	});
 
@@ -3988,6 +3989,7 @@ describe('agent-control service: audience resolution', () => {
 			hasChatTab: true,
 			retired: false,
 			role: 'orchestrator',
+			toolNaming: 'mcp',
 		});
 	});
 
@@ -4002,6 +4004,7 @@ describe('agent-control service: audience resolution', () => {
 			retired: false,
 			role: 'orchestrator',
 			depth: 0,
+			toolNaming: 'bare',
 		});
 	});
 
@@ -4019,6 +4022,7 @@ describe('agent-control service: audience resolution', () => {
 			retired: false,
 			role: 'subagent',
 			depth: 0,
+			toolNaming: 'mcp',
 		});
 	});
 
@@ -4034,6 +4038,7 @@ describe('agent-control service: audience resolution', () => {
 			retired: true,
 			role: 'concierge',
 			depth: 0,
+			toolNaming: 'bare',
 		});
 	});
 
@@ -4051,6 +4056,7 @@ describe('agent-control service: audience resolution', () => {
 			depth: 2,
 			hasChatTab: false,
 			role: 'subagent',
+			toolNaming: 'bare',
 		});
 	});
 

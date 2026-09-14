@@ -25,7 +25,9 @@ import type {
 } from '../../shared/agent-control.ts';
 import {
 	buildConversationTranscript,
+	controlToolNamingForRuntime,
 	MAX_AGENT_PAYLOAD_CHARS,
+	namespaceControlToolNames,
 	resolveAgentRole,
 	spawnedChildRole,
 } from '../../shared/agent-control.ts';
@@ -813,6 +815,17 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				})),
 			};
 		},
+		/**
+		 * Opens a spawned conversation and submits its first prompt.
+		 *
+		 * The prompt is respelled for the runtime the model resolved onto, because
+		 * the spelling that matters is the *recipient's* and nothing upstream knows
+		 * it: the service composes the brief before a model is picked, and a review
+		 * withholds `callerRuntime` outright so the pinned model may open on a
+		 * runtime the caller never had. Both halves need it — the app's own peer and
+		 * review directives name control tools, and a brief one agent writes for
+		 * another crosses runtimes whenever `allowedRuntimes` lets it.
+		 */
 		startConversation: async (request) => {
 			const {
 				callerConcierge,
@@ -849,16 +862,23 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			const selection = resolution.selection;
 			const executable = await requireExecutableFor(selection.runtime);
 			const tab = allocateConversationTab(deps, request);
+			const spawnRequest = {
+				...request,
+				prompt: namespaceControlToolNames(
+					request.prompt,
+					controlToolNamingForRuntime(selection.runtime),
+				),
+			};
 			const snapshot = await openSpawnedSession({
 				deps,
 				executable,
-				request,
+				request: spawnRequest,
 				selection,
 				tab,
 			});
 			await submitSpawnedConversation({
 				deps,
-				request,
+				request: spawnRequest,
 				selection,
 				sessionId: snapshot.id,
 				tab,
@@ -876,17 +896,25 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				ok: true,
 			};
 		},
+		/**
+		 * Steers a live conversation with another turn, respelled for the runtime
+		 * that conversation runs on rather than the one the sender runs on — a
+		 * follow-up reaches a child, a peer, or the Review conversation, any of which
+		 * may hold the wrapped names while its sender holds the bare ones.
+		 */
 		sendFollowUp: async ({ agentSessionId, prompt }) => {
 			// Ahead of the submit, so the tab is back on screen before the turn it
 			// steers starts streaming into it.
 			reopenClosedChatTab(deps, { agentSessionId });
-			const streaming =
-				deps.agentSessionService.getSession(agentSessionId)?.status ===
-				'streaming';
+			const session = deps.agentSessionService.getSession(agentSessionId);
 			await deps.agentSessionService.submitPrompt({
 				sessionId: agentSessionId,
-				prompt,
-				streamingBehavior: streaming ? 'followUp' : undefined,
+				prompt: namespaceControlToolNames(
+					prompt,
+					controlToolNamingForRuntime(session?.provider ?? null),
+				),
+				streamingBehavior:
+					session?.status === 'streaming' ? 'followUp' : undefined,
 			});
 		},
 		setName: async ({ agentSessionId, name }) => {

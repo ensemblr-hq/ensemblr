@@ -226,6 +226,7 @@ export default defineConfig({
 						'tests/main/pi-delegation-barrier.test.ts',
 						'tests/main/agent-control-awareness-parity.test.ts',
 						'tests/main/agent-control-arg-naming.test.ts',
+						'tests/main/agent-control-tool-namespacing.test.ts',
 						'tests/main/agent-control-doc-parity.test.ts',
 						'tests/main/agent-control-timeline-labels.test.ts',
 						'tests/main/agent-control-session-naming.test.ts',

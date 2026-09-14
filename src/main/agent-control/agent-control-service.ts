@@ -99,6 +99,7 @@ import {
 	conciergeControlOpDenial,
 	delegateContextPressureNote,
 	isWriteOp,
+	namespaceControlToolNames,
 	ownContextPressureNote,
 	PEER_ORCHESTRATOR_LIMITS,
 	PLAN_REFINEMENT_DIRECTIVE,
@@ -137,6 +138,7 @@ import {
 	type AgentControlPorts,
 	originHasChatTab,
 	originRuntime,
+	originToolNaming,
 	type ReviewLaunchBrief,
 } from './ports.ts';
 import { createReviewFocus } from './review-focus.ts';
@@ -3918,6 +3920,7 @@ export function createAgentControlService({
 				depth: 2,
 				hasChatTab: false,
 				role: 'subagent',
+				toolNaming: 'bare',
 				tuiHarnesses,
 			};
 		}
@@ -3928,6 +3931,7 @@ export function createAgentControlService({
 			hasChatTab: originHasChatTab(origin),
 			retired: origin.retired,
 			role: await resolveRole(origin),
+			toolNaming: originToolNaming(origin),
 			tuiHarnesses,
 		};
 	};
@@ -3958,7 +3962,9 @@ export function createAgentControlService({
 			issueDirectiveFor(origin, role),
 			readCoAuthorDirective(),
 		].filter((block) => block !== null);
-		return blocks.length > 0 ? blocks.join('\n\n') : null;
+		return blocks.length > 0
+			? namespaceControlToolNames(blocks.join('\n\n'), originToolNaming(origin))
+			: null;
 	};
 
 	const readIssueDirective = async (token: string): Promise<string | null> => {

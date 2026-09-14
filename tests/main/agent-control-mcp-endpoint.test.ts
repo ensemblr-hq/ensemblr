@@ -53,6 +53,7 @@ const HARNESS_ROOT: ControlAudience = {
 	delegation: 'ensemblr',
 	hasChatTab: false,
 	role: 'orchestrator',
+	toolNaming: 'bare',
 };
 
 /**
@@ -341,6 +342,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
+			toolNaming: 'bare',
 		});
 
 		for (const tool of CHAT_TAB_TOOLS) {
@@ -359,6 +361,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 			delegation: 'native',
 			hasChatTab: true,
 			role: 'orchestrator',
+			toolNaming: 'bare',
 		});
 
 		for (const tool of [
@@ -399,6 +402,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 			depth: 2,
 			hasChatTab: true,
 			role: 'subagent',
+			toolNaming: 'bare',
 		});
 
 		expect(names).toContain('ensemblr_set_name');
@@ -433,6 +437,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 			depth: 1,
 			hasChatTab: true,
 			role: 'subagent',
+			toolNaming: 'bare',
 		});
 
 		for (const tool of [
@@ -461,6 +466,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
+			toolNaming: 'bare',
 		});
 
 		expect(client.getInstructions()).toBe(ORCHESTRATOR_AWARENESS);
@@ -476,6 +482,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 			depth: 1,
 			hasChatTab: true,
 			role: 'subagent',
+			toolNaming: 'bare',
 		});
 		const leaf = await connectAs({
 			architectureDiagram: true,
@@ -484,6 +491,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 			depth: 2,
 			hasChatTab: true,
 			role: 'subagent',
+			toolNaming: 'bare',
 		});
 
 		expect(manager.getInstructions()).toBe(MANAGER_SUBAGENT_AWARENESS);
@@ -527,6 +535,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 				delegation: 'ensemblr',
 				hasChatTab: true,
 				role: 'orchestrator',
+				toolNaming: 'bare',
 			},
 			'LANGUAGE: reply in Русский.',
 		);
@@ -567,6 +576,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 				delegation: 'ensemblr',
 				hasChatTab: true,
 				role: 'orchestrator',
+				toolNaming: 'bare',
 			},
 			null,
 			'LINKED ISSUE: this workspace was created from ENG-106.',
@@ -584,6 +594,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 			delegation: 'ensemblr',
 			hasChatTab: false,
 			role: 'concierge',
+			toolNaming: 'bare',
 		});
 		const workspaceAgent = await toolNamesFor({
 			architectureDiagram: true,
@@ -591,6 +602,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 			delegation: 'ensemblr',
 			hasChatTab: true,
 			role: 'orchestrator',
+			toolNaming: 'bare',
 		});
 
 		expect(concierge).toContain('ensemblr_get_app_settings');
@@ -607,6 +619,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 				delegation: 'ensemblr',
 				hasChatTab: true,
 				role: 'orchestrator',
+				toolNaming: 'bare',
 			}),
 		);
 		const mentioned = new Set(
@@ -628,6 +641,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 			delegation: 'native',
 			hasChatTab: true,
 			role: 'orchestrator',
+			toolNaming: 'bare',
 		};
 		const served = new Set(await toolNamesFor(audience));
 		const withheldOps = withheldControlOps(audience);
@@ -681,6 +695,7 @@ const CHAT_TAB_ROOT: ControlAudience = {
 	delegation: 'ensemblr',
 	hasChatTab: true,
 	role: 'orchestrator',
+	toolNaming: 'bare',
 };
 
 // `ensemblr_ask_user_question` promises the agent it will wait however long the
@@ -814,5 +829,68 @@ describe('agent-control MCP endpoint, a call that outlives the client', () => {
 		});
 		blocking.release();
 		await call;
+	});
+});
+
+describe('control tool names in a result body', () => {
+	const MCP_ROOT: ControlAudience = {
+		...HARNESS_ROOT,
+		hasChatTab: true,
+		toolNaming: 'mcp',
+	};
+
+	/** A bare control tool name, as the app's own prose spells one. */
+	const NOTE = 'then call ensemblr_set_name';
+
+	/**
+	 * Serves one result carrying {@link NOTE} and returns the text the client
+	 * received, so a test reads what an agent would actually hold.
+	 */
+	const resultTextFor = async (
+		name: string,
+		args: Record<string, unknown>,
+		outcome: 'ok' | 'fail' = 'ok',
+	): Promise<string> => {
+		server = await startControlServer({
+			...makeStubService(MCP_ROOT),
+			invoke: async (command) => {
+				calls.push(command);
+				return outcome === 'ok'
+					? { ok: true, data: { note: NOTE, op: command.op } }
+					: { ok: false, code: 'not-found', error: NOTE };
+			},
+		});
+		const client = await connect('good');
+		const result = await client.callTool({ arguments: args, name });
+		const content = result.content as Array<{ type: string; text: string }>;
+		await client.close();
+		return content[0]?.text ?? '';
+	};
+
+	it('respells a tool an ordinary result recommends', async () => {
+		expect(
+			await resultTextFor('ensemblr_start_terminal', { kind: 'run' }),
+		).toContain('mcp__ensemblr__ensemblr_set_name');
+	});
+
+	// A diff, a transcript, scrollback, and a stored diagram are content the app
+	// read rather than prose it wrote, and Ensemblr's own source carries these
+	// names — rewriting one hands an agent a file that disagrees with disk.
+	it('leaves a verbatim result exactly as the app read it', async () => {
+		const text = await resultTextFor('ensemblr_get_workspace_diff', {
+			stat: true,
+		});
+		expect(text).toContain(NOTE);
+		expect(text).not.toContain('mcp__ensemblr__');
+	});
+
+	it('respells a failure whatever op raised it, because the app wrote it', async () => {
+		expect(
+			await resultTextFor(
+				'ensemblr_get_workspace_diff',
+				{ stat: true },
+				'fail',
+			),
+		).toContain('mcp__ensemblr__ensemblr_set_name');
 	});
 });

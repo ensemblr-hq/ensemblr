@@ -16,27 +16,33 @@ import { buildClaudeMcpServers } from '../../src/main/claude-agent/claude-mcp-co
 import {
 	harnessAwareness,
 	managerSubagentAwareness,
+	namespaceControlToolNames,
 	orchestratorAwareness,
 	subagentAwareness,
 } from '../../src/shared/agent-control.ts';
 
-/** Each playbook with the architecture diagram on, as these tests wire it. */
-const HARNESS_AWARENESS = harnessAwareness({
-	architectureDiagram: true,
-	tuiHarnesses: true,
-});
-const ORCHESTRATOR_AWARENESS = orchestratorAwareness({
-	architectureDiagram: true,
-	tuiHarnesses: true,
-});
-const MANAGER_SUBAGENT_AWARENESS = managerSubagentAwareness({
-	architectureDiagram: true,
-	tuiHarnesses: true,
-});
-const SUBAGENT_AWARENESS = subagentAwareness({
-	architectureDiagram: true,
-	tuiHarnesses: true,
-});
+/**
+ * Each playbook with the architecture diagram on, spelled as a Claude session
+ * receives it. Every playbook assertion below wires `provider: 'claude'`, whose
+ * tool list carries `mcp__ensemblr__ensemblr_set_name` and nothing called
+ * `ensemblr_set_name` — so the bare literal is the one spelling this append may
+ * never be.
+ */
+const forClaude = (playbook: string) =>
+	namespaceControlToolNames(playbook, 'mcp');
+
+const HARNESS_AWARENESS = forClaude(
+	harnessAwareness({ architectureDiagram: true, tuiHarnesses: true }),
+);
+const ORCHESTRATOR_AWARENESS = forClaude(
+	orchestratorAwareness({ architectureDiagram: true, tuiHarnesses: true }),
+);
+const MANAGER_SUBAGENT_AWARENESS = forClaude(
+	managerSubagentAwareness({ architectureDiagram: true, tuiHarnesses: true }),
+);
+const SUBAGENT_AWARENESS = forClaude(
+	subagentAwareness({ architectureDiagram: true, tuiHarnesses: true }),
+);
 
 const WORKSPACE = 'ws-1';
 const CWD = '/tmp/ws-1';

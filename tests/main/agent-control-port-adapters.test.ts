@@ -2220,3 +2220,91 @@ describe('agent-control port adapters: terminal lifecycle', () => {
 		]);
 	});
 });
+
+describe('agent-control port adapters: control tool names in a prompt', () => {
+	/** A brief naming a control tool, as the app's own peer and review blocks do. */
+	const BRIEF = 'report back with ensemblr_send_follow_up';
+	const WRAPPED = 'report back with mcp__ensemblr__ensemblr_send_follow_up';
+
+	/** Wires the session service and Pi snapshot a spawn needs, over one catalog. */
+	const spawnDeps = (runtime: 'claude' | 'pi') => {
+		const openSession = vi.fn().mockResolvedValue({ id: 'sess-1' });
+		const submitPrompt = vi.fn().mockResolvedValue({});
+		const { deps } = makeDeps();
+		(deps as { spawnModelResolver: unknown }).spawnModelResolver =
+			fakeSpawnModelResolver([modelOption({ id: `${runtime}/one`, runtime })]);
+		(deps as { agentSessionService: unknown }).agentSessionService = {
+			getSession: vi.fn(),
+			listSessionsForWorkspace: () => [],
+			openSession,
+			setSessionName: vi.fn().mockResolvedValue({ applied: false }),
+			submitPrompt,
+		};
+		(deps as { piExecutableService: unknown }).piExecutableService = {
+			getSnapshot: vi
+				.fn()
+				.mockResolvedValue({ command: 'pi', status: 'ready' }),
+		};
+		return { deps, openSession, submitPrompt };
+	};
+
+	const startOn = async (runtime: 'claude' | 'pi') => {
+		const wired = spawnDeps(runtime);
+		await createAgentControlPorts(wired.deps).conversations.startConversation({
+			afkMode: false,
+			asPeer: false,
+			callerConcierge: false,
+			callerRuntime: runtime,
+			parentSessionId: 'parent-1',
+			planMode: false,
+			prompt: BRIEF,
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+		return wired;
+	};
+
+	// The spelling that matters is the recipient's, and nothing upstream knows it:
+	// the service composes the brief before a model has been picked.
+	it('respells a spawned prompt for the runtime the model resolved onto', async () => {
+		const { openSession, submitPrompt } = await startOn('claude');
+		expect(openSession).toHaveBeenCalledWith(
+			expect.objectContaining({ initialPrompt: WRAPPED }),
+		);
+		expect(submitPrompt).toHaveBeenCalledWith(
+			expect.objectContaining({ prompt: WRAPPED }),
+		);
+	});
+
+	it('leaves a spawned prompt bound for Pi as its sender wrote it', async () => {
+		const { submitPrompt } = await startOn('pi');
+		expect(submitPrompt).toHaveBeenCalledWith(
+			expect.objectContaining({ prompt: BRIEF }),
+		);
+	});
+
+	it('respells a follow-up for the runtime its target runs on', async () => {
+		vi.mocked(getChatTabByAgentSessionId).mockReturnValue(
+			null as unknown as ReturnType<typeof getChatTabByAgentSessionId>,
+		);
+		const submitPrompt = vi.fn();
+		const { deps } = makeDeps();
+		(deps as { agentSessionService: unknown }).agentSessionService = {
+			getSession: vi.fn(() => ({
+				provider: 'claude',
+				status: 'idle',
+				workspaceId: 'ws',
+			})),
+			submitPrompt,
+		};
+
+		await createAgentControlPorts(deps).conversations.sendFollowUp({
+			agentSessionId: 'sess-1',
+			prompt: BRIEF,
+		});
+
+		expect(submitPrompt).toHaveBeenCalledWith(
+			expect.objectContaining({ prompt: WRAPPED }),
+		);
+	});
+});
