@@ -9,13 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Security
+## [0.1.17] - 2026-09-14
 
-- **The renderer is served from its own `app://bundle` origin and `GrantFileProtocolExtraPrivileges` is off,** closing the last finding of the 2026-09-12 audit (SH-03). A page on `file:` may read every file its user can, so a renderer XSS reached `~/.ssh/id_ed25519` with no IPC handler in the loop, and the CSP could not close it — the app needed `connect-src file:` to load its own assets. `file:` is now named by no directive and refused by the fuse underneath. The origin move is carried by 0.1.15's storage mirror, which had to ship first and did — anyone who has run 0.1.15 or 0.1.16 keeps their renderer state. An install that jumps straight from a pre-0.1.15 version has no mirror to seed from and comes up with renderer defaults: board order, viewed marks, pins, per-chat overrides. Nothing else; the rest is in SQLite. (#596)
+Ensemblr 0.1.17 closes the 2026-09-12 audit with a renderer origin move, gives the review workflow a per-turn diff on every turn footer and in the Changes panel, ships structured bodies for the app's own control-tool timeline rows, and hardens the file-search dialog, the composer's Linear picker, and the sub-agent tab close path.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.17) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.17/Ensemblr-0.1.17-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.17/Ensemblr-0.1.17-x64.AppImage)
+
+### Added
+
+- **Every turn footer carries a diff of what the turn changed,** with a chip per file that opens the diff viewer at the turn's scope, and the Changes panel gains a "Latest turn" source resolved from the workspace's newest checkpoint. Each turn's `git diff` is held back until its footer scrolls into view, so a long transcript never pre-loads what nobody is looking at, and a frozen turn range stops polling. (#592)
+- **Every `ensemblr_*` control-tool row now has a real body.** Twelve ops — `wait_for_agents`, `read_conversation`, `get_last_message`, `get_conversation_status`, `list_models`, `recall_memory`, `list_workspaces`, `list_terminals`, `read_terminal_output`, `linear_list_issues`, `linear_get_issue`, `get_diff_comments`, plus `resolve_diff_comments` showing the ids it could not close — replace the raw JSON dump the timeline was falling back to, and every settled control row carries the "Raw execution" disclosure that was previously gated behind extension-owned presentations. (#600)
+- **A ready-to-merge PR whose branch still holds unpushed commits reports `pr-unpushed` with a warning-tone up-arrow** on the sidebar row and the board card, instead of the green ready glyph. The change surfaces through `hasUnsentLocalWork`, so a kind added to `PullRequestGitStatusKind` is picked up on every surface at once. (#601)
+- **A sub-agent's tab close is withheld while its delegate is still running,** on both the tab-strip control and the ⌘W accelerator. An orchestrator that spawned the child stays connected to what it is waiting on; the close path is unchanged for a finished delegate. (#599)
 
 ### Fixed
 
+- **Picking a Linear issue from the composer's "Link issue" picker shows the chip immediately** instead of waiting five seconds for the issue's comments to arrive. The chip lands from the row the picker already holds, and the comments are fetched behind it, rewritten, and the chip repointed at the fuller document. (#598)
+- **The file search dialog is snappy again and no longer opens mid-list.** Ranking moved into the dialog behind `shouldFilter={false}` with a debounced query and an ASCII fast path for case-folding, cutting a settled keystroke on a 5,000-file workspace from 25-87 ms to 3-6.5 ms, and the selection now survives a re-rank so Enter is never inert. (#597)
+- **A tool row's "Raw execution" disclosure paints inside its own row again,** instead of overflowing onto the next two rows of the timeline. `size-full` on the Streamdown root was making Chrome measure the parent's flex height as definite; the fix sizes the markdown by width alone. (#602)
 - **Images embedded in a Linear issue render again.** The Content-Security-Policy admitted `linear-asset:` while the registered scheme is `ensemblr-linear-asset`, so every proxied issue image was blocked in both serving modes. (#596)
+
+### Security
+
+- **The renderer is served from its own `app://bundle` origin and `GrantFileProtocolExtraPrivileges` is off,** closing the last finding of the 2026-09-12 audit (SH-03). A page on `file:` may read every file its user can, so a renderer XSS reached `~/.ssh/id_ed25519` with no IPC handler in the loop, and the CSP could not close it — the app needed `connect-src file:` to load its own assets. `file:` is now named by no directive and refused by the fuse underneath. The origin move is carried by 0.1.15's storage mirror, which had to ship first and did — anyone who has run 0.1.15 or 0.1.16 keeps their renderer state. An install that jumps straight from a pre-0.1.15 version has no mirror to seed from and comes up with renderer defaults: board order, viewed marks, pins, per-chat overrides. Nothing else; the rest is in SQLite. (#596)
 
 ## [0.1.16] - 2026-09-13
 
