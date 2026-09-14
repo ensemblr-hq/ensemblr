@@ -409,11 +409,14 @@ const NATIVE_DELEGATION_WITHHELD_OPS: ReadonlySet<AgentControlOp> = new Set([
  * sub-agent?" about something that can never be one — but the feature axis still
  * applies to it, because a Concierge holding an op of a feature the user has
  * switched off would be handed something the rest of the app does not serve.
+ * `toolNaming` is the one axis this does not read, and is excluded rather than
+ * ignored: which ops a caller holds is decided before anything renders, and a
+ * caller's spelling could only change what the withheld list is *called*.
  * @param audience - Whether the caller has a chat tab, its lineage role, its delegation mechanism, and which optional features are on.
  * @returns The ops to withhold from that caller's tool list.
  */
 export function withheldControlOps(
-	audience: ControlAudience,
+	audience: Omit<ControlAudience, 'toolNaming'>,
 ): ReadonlySet<AgentControlOp> {
 	const featureWithheld = [
 		...(audience.architectureDiagram ? [] : ARCHITECTURE_DIAGRAM_OPS),

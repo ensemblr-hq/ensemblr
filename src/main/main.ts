@@ -15,6 +15,8 @@ import {
 	awarenessForAudience,
 	buildCoAuthorDirective,
 	buildLanguageDirective,
+	controlToolNamingForRuntime,
+	namespaceControlToolNames,
 	parseAskUserQuestionReply,
 	parseReviewBriefReply,
 	resolveAgentRole,
@@ -1244,6 +1246,7 @@ const conciergeSessionService = createConciergeSessionService({
 							delegation: 'ensemblr',
 							hasChatTab: true,
 							role: 'concierge',
+							toolNaming: controlToolNamingForRuntime(provider),
 							tuiHarnesses: readTuiHarnessesEnabled(),
 						})
 					: null,
@@ -1489,12 +1492,24 @@ const conciergePorts = {
 		/**
 		 * Hands a workspace agent's message to whichever Concierge conversation is
 		 * live, as an ordinary turn so the user reads it in the panel like any
-		 * other. Passed straight through rather than assembled here: resolving the
-		 * session and refusing to open one are the same decision, and the service
-		 * that owns the attachment is the only place both can be made at once.
+		 * other. Assembled by the caller rather than here: resolving the session and
+		 * refusing to open one are the same decision, and the service that owns the
+		 * attachment is the only place both can be made at once.
+		 *
+		 * Respelled for the Concierge's own runtime on the way in, because the
+		 * message frame names the ops it expects a reply through and the sender is a
+		 * workspace agent that may run on the other runtime. The configured provider
+		 * is what the session opened on — a change to it needs a new session.
 		 */
 		deliverMessage: (input: { prompt: string }) =>
-			conciergeSessionService.deliverAgentMessage(input),
+			conciergeSessionService.deliverAgentMessage({
+				prompt: namespaceControlToolNames(
+					input.prompt,
+					controlToolNamingForRuntime(
+						appSettingsService.read().concierge.provider,
+					),
+				),
+			}),
 		/** How full the live Concierge conversation's own window is. */
 		describeContextUsage: () => conciergeSessionService.describeContextUsage(),
 		/** What the live Concierge conversation runs on, for a child to inherit. */

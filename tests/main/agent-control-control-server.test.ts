@@ -22,6 +22,7 @@ const stubService: AgentControlService = {
 		delegation: 'ensemblr',
 		hasChatTab: false,
 		role: 'orchestrator',
+		toolNaming: 'bare',
 	}),
 	invoke: async (command) => {
 		calls.push(command);
@@ -207,6 +208,7 @@ describe('control server', () => {
 				delegation: 'ensemblr',
 				hasChatTab: false,
 				role: 'orchestrator',
+				toolNaming: 'bare',
 			}),
 			isKnownToken: (token) => token === 'good',
 			readIssueDirective: async () => null,
@@ -281,6 +283,7 @@ describe('control server', () => {
 				delegation: 'ensemblr',
 				hasChatTab: false,
 				role: 'orchestrator',
+				toolNaming: 'bare',
 			}),
 			isKnownToken: (token) => token === 'good',
 			readIssueDirective: async () => null,

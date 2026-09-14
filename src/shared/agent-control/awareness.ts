@@ -56,6 +56,10 @@
  * reference for the same guidance and is kept in step by hand.
  */
 import { CONTEXT_PRESSURE_PERCENT } from './context-pressure.ts';
+import {
+	type ControlToolNaming,
+	namespaceControlToolNames,
+} from './control-tool-names.ts';
 import type { SubagentMechanism } from './subagent-mechanism.ts';
 
 /**
@@ -107,6 +111,16 @@ export interface ControlAudience extends AwarenessFeatures {
 	retired?: boolean;
 	/** Which delegation mechanism this caller's session was opened under. */
 	delegation: SubagentMechanism;
+	/**
+	 * How this caller's client spells the control tools. Required rather than
+	 * defaulted: the playbooks are written in the bare spelling and rewritten on
+	 * the way out, so a site that left this off would hand an MCP client a few
+	 * hundred names it cannot call — the failure the field exists to prevent, and
+	 * one no test would catch. `controlToolNamingForRuntime` already answers
+	 * `bare` for a caller whose client the app cannot name, so an omission could
+	 * say nothing it does not.
+	 */
+	toolNaming: ControlToolNaming;
 }
 
 /**
@@ -1294,10 +1308,28 @@ Your last message is your answer, and the app collapses everything before it int
  * it actually holds. Plan Mode replaces the result for the turns it is on, which
  * is the runtime's own swap to make: it owns the live toggle, and this selection
  * happens once per connection.
- * @param audience - Whether the caller has a chat tab, and its lineage role.
+ *
+ * The selected playbook leaves here spelled for the caller's own client, which
+ * is why every injection point goes through this function rather than reaching
+ * for a variant directly: the variants are written in Pi's bare spelling and an
+ * MCP client's agent cannot call a single name in them.
+ * @param audience - Whether the caller has a chat tab, its lineage role, and how its client names tools.
  * @returns The playbook to inject for that caller.
  */
 export function awarenessForAudience(audience: ControlAudience): string {
+	return namespaceControlToolNames(
+		selectAwareness(audience),
+		audience.toolNaming,
+	);
+}
+
+/**
+ * Picks the playbook variant matching a caller's role, planning axis, and
+ * surface, in the bare spelling every variant is written in.
+ * @param audience - Whether the caller has a chat tab, and its lineage role.
+ * @returns The matching playbook variant.
+ */
+function selectAwareness(audience: ControlAudience): string {
 	if (audience.role === 'concierge') {
 		return conciergeAwareness(audience);
 	}

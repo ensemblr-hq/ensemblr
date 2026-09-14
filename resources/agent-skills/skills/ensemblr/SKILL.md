@@ -31,9 +31,12 @@ switch being off rather than a tool to hunt for.
 Either way you reach the app through tools named `ensemblr_*`. Claude and
 harnesses use the loopback MCP endpoint; Pi's bundled extension registers the
 tools and calls the same control service through `/invoke`.
-**A harness may re-expose them under its own naming scheme** — an
-extra `ensemblr` segment in front, an `mcp__` wrapper — so match on the tail of
-the name rather than the whole of it. It is the same tool.
+**Every caller that reaches the endpoint over MCP sees those names under its own
+client's wrapper** — `mcp__ensemblr__ensemblr_set_name` under Claude, an extra
+`ensemblr` segment or a dotted form under other clients. Only Pi, which loads
+the extension in-process, holds them bare. This file writes them bare
+throughout, so wherever your own tool list disagrees, **your tool list is
+right**: match on the tail of the name and call what you actually hold.
 
 ## The vocabulary
 

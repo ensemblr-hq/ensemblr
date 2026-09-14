@@ -4,6 +4,7 @@
  * unit-testable; concrete adapters wire these to the real chat-tab, Pi session,
  * terminal, script, and harness services at composition time.
  */
+
 import type {
 	AddDiffCommentsResult,
 	AgentControlAppSettings,
@@ -20,6 +21,7 @@ import type {
 	AgentSessionLineage,
 	AskUserQuestionItem,
 	AskUserQuestionResult,
+	ControlToolNaming,
 	CreatedWorkspaceResult,
 	ExitPlanModeArgs,
 	ExitPlanModeResult,
@@ -53,6 +55,7 @@ import type {
 	WorkspaceBoardStatusValue,
 	WorkspaceLinkedIssue,
 } from '../../shared/agent-control.ts';
+import { controlToolNamingForRuntime } from '../../shared/agent-control.ts';
 import type { AgentProviderId } from '../../shared/agent-provider.ts';
 import type { AppLanguage } from '../../shared/i18n.ts';
 import type { PermissionMode } from '../../shared/permissions.ts';
@@ -171,6 +174,20 @@ export function originRuntime(
 	origin: AgentControlOrigin,
 ): AgentProviderId | null {
 	return origin.species === 'harness' ? null : origin.species;
+}
+
+/**
+ * How a caller's client spells the control tools, which is what every piece of
+ * prose the app hands it has to match. A harness resolves to the bare names:
+ * its origin is minted per workspace, so the app cannot tell which of the three
+ * MCP clients is reading, and the harness playbook says so in as many words.
+ * @param origin - Resolved caller identity.
+ * @returns The naming scheme to render agent-facing prose in.
+ */
+export function originToolNaming(
+	origin: AgentControlOrigin,
+): ControlToolNaming {
+	return controlToolNamingForRuntime(originRuntime(origin));
 }
 
 /** Reads and writes the allowed app preferences for the active Concierge. */

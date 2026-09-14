@@ -38,9 +38,12 @@ import {
 	CONCIERGE_MESSAGE_REASONS,
 	CONTEXT_PRESSURE_PERCENT,
 	type ControlAudience,
+	type ControlToolNaming,
 	EXIT_PLAN_MODE_LIMITS,
 	LINEAR_AGENT_LIMITS,
+	namespaceControlToolNames,
 	SET_SUMMARY_LIMITS,
+	VERBATIM_RESULT_OPS,
 	WORKSPACE_BOARD_STATUSES,
 	withheldControlOps,
 } from '../../shared/agent-control.ts';
@@ -668,15 +671,37 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 ];
 
 /**
- * Renders a control result as MCP tool content.
+ * Renders a control result as MCP tool content, with every control tool the
+ * result names spelled the way the caller's own tool list spells it. Results are
+ * where the surface hands an agent its next move — the op to call for the rest of
+ * a report, the one that closes a finished tab — so a bare name here is a
+ * dead-end recommendation rather than a cosmetic mismatch.
+ *
+ * An op in {@link VERBATIM_RESULT_OPS} is exempt: its result is content the app
+ * read rather than prose the app wrote, and a name inside it is a fact about that
+ * content. A failure is never exempt — the message is always the app's own.
  * @param result - The control envelope from the service.
+ * @param naming - How the caller's client names control tools.
+ * @param op - The op that produced this result, which decides whether its body is rewritten.
  * @returns MCP tool result content with an error flag.
  */
-function toMcpResult(result: AgentControlResult<unknown>) {
-	const text = result.ok
-		? JSON.stringify(result.data ?? { ok: true })
-		: `Error (${result.code}): ${result.error}`;
-	return { content: [{ type: 'text' as const, text }], isError: !result.ok };
+function toMcpResult(
+	result: AgentControlResult<unknown>,
+	naming: ControlToolNaming,
+	op: AgentControlOp,
+) {
+	if (!result.ok) {
+		const error = namespaceControlToolNames(
+			`Error (${result.code}): ${result.error}`,
+			naming,
+		);
+		return { content: [{ type: 'text' as const, text: error }], isError: true };
+	}
+	const body = JSON.stringify(result.data ?? { ok: true });
+	const text = VERBATIM_RESULT_OPS.has(op)
+		? body
+		: namespaceControlToolNames(body, naming);
+	return { content: [{ type: 'text' as const, text }], isError: false };
 }
 
 /**
@@ -715,14 +740,20 @@ async function instructionsFor(
 	if (audience.hasChatTab) {
 		return playbook;
 	}
-	const blocks = [
-		playbook,
+	const directives = [
 		service.readLanguageDirective(),
 		await service.readIssueDirective(token),
 		service.readDelegationDirective(audience),
 		service.readCoAuthorDirective(),
 	].filter((block) => block !== null);
-	return blocks.join('\n\n');
+	if (directives.length === 0) {
+		return playbook;
+	}
+	const rendered = namespaceControlToolNames(
+		directives.join('\n\n'),
+		audience.toolNaming,
+	);
+	return `${playbook}\n\n${rendered}`;
 }
 
 /**
@@ -740,6 +771,7 @@ async function buildMcpServer(
 	audience: ControlAudience,
 	progressIntervalMs: number | undefined,
 ): Promise<McpServer> {
+	const naming = audience.toolNaming;
 	const server = new McpServer(
 		{ name: 'ensemblr-control', version: '1.0.0' },
 		{ instructions: await instructionsFor(service, audience, token) },
@@ -747,7 +779,10 @@ async function buildMcpServer(
 	for (const def of toolDefsFor(audience)) {
 		server.registerTool(
 			def.name,
-			{ description: def.description, inputSchema: def.shape },
+			{
+				description: namespaceControlToolNames(def.description, naming),
+				inputSchema: def.shape,
+			},
 			async (args: unknown, extra) =>
 				toMcpResult(
 					await withProgressHeartbeat(
@@ -765,6 +800,8 @@ async function buildMcpServer(
 								token,
 							}),
 					),
+					naming,
+					def.op,
 				),
 		);
 	}
