@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.18] - 2026-09-14
+
+Ensemblr 0.1.18 is a patch release: an inline delegation keeps its card for the whole run, and the narrow-window navigation sidebar opens clear of the title bar.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.18) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.18/Ensemblr-0.1.18-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.18/Ensemblr-0.1.18-x64.AppImage)
+
+### Fixed
+
+- **An inline delegation reads as a card for its whole life, not only once a nested row has landed.** A `Task` or `Agent` row used to stay a plain tool row with its disclosure disabled until its delegate produced something, leaving the stretch a user most wants to watch inert. Making the card depend per render on whether a row had arrived swaps the component mid-run and remounts it, closing a disclosure the user had opened — so `ownsNestedActivity` now grants the card unconditionally for an inline delegation, before the first nested row and after a run that produced none, with the empty body wording which of the two it is. `Skill` is deliberately absent: an ordinary skill load hands `SKILL.md` back to its caller and owns nothing, while a skill Claude Code does run in a subagent still earns its card from the parent link. A background launch is refused, because its work reports through the background-task surface instead. (#609)
+- **The navigation sidebar's sheet opens below the title bar, and its top strip is no longer a drag region.** Below the `md` breakpoint the sidebar becomes a sheet, and a sheet pins itself to the viewport's top edge — which on Linux, where Ensemblr draws its own title bar, is the strip the window controls live in, leaving the first row unclickable. Both stylesheet rules that hold a sheet clear of that strip key on `data-slot="sheet-content"`, which the sidebar primitive stamps over after the spread; the sidebar slipped both. The sizing rule now keys on `data-mobile`, which separates the sheet from the desktop wrapper that must not be sized, and the `no-drag` rule wraps its ancestor in `:where()` so it lands at the weight of the drag rule it takes back. The second rule is why press-and-drag on the sheet's empty top strip used to move the macOS window out from under the open sheet. (#608)
+
+### Changed
+
+- **The guide is pinned to the published release** — version references, download URLs, and asset filenames. (#607)
+
 ## [0.1.17] - 2026-09-14
 
 Ensemblr 0.1.17 closes the last finding of the 2026-09-12 audit, wires per-turn diffs across the transcript footer and Changes panel, gives the app's own control-tool rows real bodies, tracks Claude Code background tasks on every surface that cares, and hardens the file search, composer, and sub-agent close paths.
