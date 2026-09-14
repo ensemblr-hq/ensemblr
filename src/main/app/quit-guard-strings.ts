@@ -15,28 +15,34 @@ import { type AppLanguage, FALLBACK_LANGUAGE } from '../../shared/i18n.ts';
 
 const QUIT_GUARD_LABELS = {
 	en: {
+		backgroundTask: 'Background task: {{description}}',
 		cancel: 'Cancel',
 		chat: 'Chat',
 		detailIntro: 'Quitting now stops them mid-turn.',
 		message: 'Agents are still running',
 		more: '+{{count}} more',
 		quitAnyway: 'Quit Anyway',
+		untitledBackgroundTask: 'untitled',
 	},
 	ru: {
+		backgroundTask: 'Фоновая задача: {{description}}',
 		cancel: 'Отмена',
 		chat: 'Чат',
 		detailIntro: 'Выход сейчас прервёт их работу.',
 		message: 'Агенты ещё работают',
 		more: '+ ещё {{count}}',
 		quitAnyway: 'Всё равно завершить',
+		untitledBackgroundTask: 'без названия',
 	},
 	el: {
+		backgroundTask: 'Εργασία παρασκηνίου: {{description}}',
 		cancel: 'Άκυρο',
 		chat: 'Συνομιλία',
 		detailIntro: 'Η έξοδος τώρα θα τους διακόψει.',
 		message: 'Πράκτορες εκτελούνται ακόμη',
 		more: '+ {{count}} ακόμη',
 		quitAnyway: 'Τερματισμός ούτως ή άλλως',
+		untitledBackgroundTask: 'χωρίς τίτλο',
 	},
 } as const satisfies Record<AppLanguage, Record<string, string>>;
 

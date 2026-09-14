@@ -36,6 +36,12 @@ export {
 } from './board-status';
 export { installAgentControlBoardStatusSync } from './board-status-sync';
 export {
+	claudeBackgroundTaskCountBySessionAtom,
+	claudeBackgroundTaskCountByWorkspaceAtomFamily,
+	claudeBackgroundTasksBySessionAtomFamily,
+	claudeBackgroundTasksByWorkspaceAtom,
+} from './claude-background-activity';
+export {
 	useDiffLineReveal,
 	useRequestDiffLineReveal,
 	useSettleDiffLineReveal,

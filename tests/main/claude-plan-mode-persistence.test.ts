@@ -16,8 +16,11 @@ const MUTATING_TOOLS = [
 	'Bash',
 	'BashOutput',
 	'Edit',
+	'KillBash',
 	'KillShell',
 	'NotebookEdit',
+	'TaskOutput',
+	'TaskStop',
 	'Write',
 ];
 

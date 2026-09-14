@@ -9,23 +9,113 @@ interface StructuredPatchHunk {
 
 /**
  * Projects Claude's structured tool output onto the `details` bag the timeline's
- * tool presenters read. Only changes to a file carry anything today: the unified
- * patch their card renders as a diff, instead of the prose confirmation the tool
- * writes back to the model.
+ * tool presenters read. Two shapes today: a file-editing tool's unified patch,
+ * and the background-task fields the `Bash` / `Agent` / `TaskOutput` / `TaskStop`
+ * tools carry outside the prose their `content` blocks send to the model. A
+ * background field lands only when the raw `tool_use_result` actually reports
+ * it, so results that are neither an edit nor a background lifecycle event
+ * still yield null and the timeline reads them as it always has.
  * @param toolUseResult - The `tool_use_result` field of a `user` SDK message
  * @returns The details bag, or null when the result carries nothing to project
  */
 export function toolResultDetails(
 	toolUseResult: unknown,
 ): Record<string, unknown> | null {
-	if (!isRecord(toolUseResult) || describesNewFile(toolUseResult)) {
+	if (!isRecord(toolUseResult)) {
 		return null;
 	}
+	const patch = describesNewFile(toolUseResult)
+		? null
+		: readPatch(toolUseResult);
+	const background = readBackgroundTaskFields(toolUseResult);
+	if (patch === null && background === null) {
+		return null;
+	}
+	return { ...(background ?? {}), ...(patch ?? {}) };
+}
+
+/**
+ * Reads the unified-diff `patch` field a file-editing tool result carries.
+ * @param toolUseResult - The structured result to project
+ * @returns The `{ patch }` bag, or null when the result has no complete hunks
+ */
+function readPatch(
+	toolUseResult: Record<string, unknown>,
+): Record<string, unknown> | null {
 	const hunks = readHunks(toolUseResult.structuredPatch);
 	if (hunks.length === 0) {
 		return null;
 	}
 	return { patch: unifiedPatch(readPath(toolUseResult.filePath), hunks) };
+}
+
+/**
+ * Reads the background-task lifecycle fields a `Bash` / `Agent` / `TaskOutput`
+ * / `TaskStop` result carries. Every field is optional and each is emitted only
+ * when the SDK actually reported it, so the shape a reducer or presenter reads
+ * matches what the runtime said rather than a normalized union.
+ *
+ * - `backgroundTaskId` (Bash launch confirmation and poll while the task lives)
+ * - `agentId` + `isAsync: true` (Agent `async_launched`)
+ * - `taskId` (poll / stop input id, resolved through legacy `shell_id`)
+ * - `exitCode`, `interrupted`, `timedOutAfterMs`, `backgroundedByUser` (Bash output)
+ * - `status` (poll status word, when the SDK sends one)
+ * - `outputFile` (path the async agent writes to)
+ * @param toolUseResult - The structured result to inspect
+ * @returns The background-task bag, or null when nothing to project
+ */
+function readBackgroundTaskFields(
+	toolUseResult: Record<string, unknown>,
+): Record<string, unknown> | null {
+	const fields: Record<string, unknown> = {};
+	const backgroundTaskId = readNonEmptyString(toolUseResult.backgroundTaskId);
+	if (backgroundTaskId !== null) {
+		fields.backgroundTaskId = backgroundTaskId;
+	}
+	const taskId =
+		readNonEmptyString(toolUseResult.task_id) ??
+		readNonEmptyString(toolUseResult.taskId) ??
+		readNonEmptyString(toolUseResult.shell_id);
+	if (taskId !== null) {
+		fields.taskId = taskId;
+	}
+	const agentId = readNonEmptyString(toolUseResult.agentId);
+	if (agentId !== null && toolUseResult.isAsync === true) {
+		fields.agentId = agentId;
+		fields.isAsync = true;
+	}
+	const status = readNonEmptyString(toolUseResult.status);
+	if (status !== null) {
+		fields.status = status;
+	}
+	const exitCode = readCount(toolUseResult.exitCode);
+	if (exitCode !== null) {
+		fields.exitCode = exitCode;
+	}
+	if (toolUseResult.interrupted === true) {
+		fields.interrupted = true;
+	}
+	if (toolUseResult.backgroundedByUser === true) {
+		fields.backgroundedByUser = true;
+	}
+	const timedOutAfterMs = readCount(toolUseResult.timedOutAfterMs);
+	if (timedOutAfterMs !== null) {
+		fields.timedOutAfterMs = timedOutAfterMs;
+	}
+	const outputFile = readNonEmptyString(toolUseResult.outputFile);
+	if (outputFile !== null) {
+		fields.outputFile = outputFile;
+	}
+	return Object.keys(fields).length === 0 ? null : fields;
+}
+
+/**
+ * Reads an unknown value as a non-empty string, rejecting anything else.
+ * @param value - Raw field value
+ * @returns The string as reported, or null when the field carries none
+ */
+function readNonEmptyString(value: unknown): string | null {
+	return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 /**

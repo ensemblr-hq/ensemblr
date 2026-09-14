@@ -1,4 +1,5 @@
 import type { TFunction } from 'i18next';
+import { useAtomValue } from 'jotai';
 import { GitBranchIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -8,12 +9,14 @@ import {
 	ContextMenu,
 	ContextMenuTrigger,
 } from '@/renderer/components/ui/context-menu';
+import { ClaudeBackgroundDot } from '@/renderer/components/workbench-shell/workspace-sidebar-item/claude-background-dot';
 import { WorkspaceContextMenuContent } from '@/renderer/components/workbench-shell/workspace-sidebar-item/context-menu';
 import { WorkspaceDiffStats } from '@/renderer/components/workbench-shell/workspace-sidebar-item/diff-stats';
 import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
 import {
+	claudeBackgroundTaskCountByWorkspaceAtomFamily,
 	useWorkspaceIsUnread,
 	useWorkspaceLifecycleRun,
 } from '@/renderer/state/workspace';
@@ -94,6 +97,9 @@ export function WorkspaceCard({
 	const menu = useBoardWorkspaceMenuController();
 	const isUnread = useWorkspaceIsUnread(workspace.id);
 	const lifecycleRun = useWorkspaceLifecycleRun(workspace.id);
+	const claudeBackgroundTaskCount = useAtomValue(
+		claudeBackgroundTaskCountByWorkspaceAtomFamily(workspace.id),
+	);
 	const isTearingDown = lifecycleRun !== null;
 	const showsDiffStats =
 		!isTearingDown &&
@@ -136,9 +142,12 @@ export function WorkspaceCard({
 						>
 							{workspace.name}
 						</span>
-						{showsDiffStats ? (
-							<WorkspaceDiffStats workspace={workspace} />
-						) : null}
+						<div className='flex shrink-0 items-center gap-1.5'>
+							{showsDiffStats ? (
+								<WorkspaceDiffStats workspace={workspace} />
+							) : null}
+							<ClaudeBackgroundDot count={claudeBackgroundTaskCount} />
+						</div>
 					</div>
 					<span className='truncate text-muted-foreground text-xxs'>
 						{projectName}

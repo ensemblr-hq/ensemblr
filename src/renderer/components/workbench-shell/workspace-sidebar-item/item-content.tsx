@@ -6,6 +6,7 @@ import type { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
 import type { WorkspaceDockActivityState } from '@/renderer/state/workspace';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
+import { ClaudeBackgroundDot } from './claude-background-dot';
 import { WorkspaceDiffStats } from './diff-stats';
 import { DockActivityDot } from './dock-activity-dot';
 import { WorkspaceUnreadDot } from './unread-dot';
@@ -22,6 +23,8 @@ export type WorkspacePendingLifecycle =
 
 /** What a sidebar row renders inside its button, live state already resolved. */
 interface WorkspaceSidebarItemContentProps {
+	/** Live Claude Code background-task count in this workspace; zero renders no dot. */
+	claudeBackgroundTaskCount: number;
 	dockActivityState: WorkspaceDockActivityState | null;
 	hasDiffStats: boolean;
 	isUnread: boolean;
@@ -67,6 +70,7 @@ function workspaceSubtitle(
  * already says what is happening to the workspace.
  */
 export function WorkspaceSidebarItemContent({
+	claudeBackgroundTaskCount,
 	dockActivityState,
 	hasDiffStats,
 	isUnread,
@@ -108,6 +112,7 @@ export function WorkspaceSidebarItemContent({
 						{showsDiffStats ? (
 							<WorkspaceDiffStats workspace={workspace} />
 						) : null}
+						<ClaudeBackgroundDot count={claudeBackgroundTaskCount} />
 						{dockActivityState ? (
 							<DockActivityDot state={dockActivityState} />
 						) : null}

@@ -1602,3 +1602,79 @@ test('banks reasoning per thread so a subagent cannot refill the main seal', () 
 		['main thread reasoning'],
 	);
 });
+
+test('projects the runtime background-task level as a replace-semantics event', () => {
+	const { normalize } = createNormalizer();
+
+	const events = normalize({
+		session_id: 's1',
+		subtype: 'background_tasks_changed',
+		tasks: [
+			{
+				description: 'Emit 30 timestamped ticks',
+				task_id: 'bash_1',
+				task_type: 'local_bash',
+			},
+			{
+				ambient: true,
+				description: 'watch for updates',
+				task_id: 'watch_1',
+				task_type: 'local_watch',
+			},
+		],
+		type: 'system',
+		uuid: 'u1',
+	});
+
+	assert.deepEqual(events, [
+		{
+			at: NOW.toISOString(),
+			tasks: [
+				{
+					description: 'Emit 30 timestamped ticks',
+					taskId: 'bash_1',
+					taskType: 'local_bash',
+				},
+				{
+					ambient: true,
+					description: 'watch for updates',
+					taskId: 'watch_1',
+					taskType: 'local_watch',
+				},
+			],
+			type: 'background-tasks',
+		},
+	]);
+});
+
+test('reports an emptied background-task level rather than dropping it', () => {
+	const { normalize } = createNormalizer();
+
+	const events = normalize({
+		session_id: 's1',
+		subtype: 'background_tasks_changed',
+		tasks: [],
+		type: 'system',
+		uuid: 'u1',
+	});
+
+	assert.deepEqual(events, [
+		{ at: NOW.toISOString(), tasks: [], type: 'background-tasks' },
+	]);
+});
+
+test('drops a background-task entry the runtime gave no id', () => {
+	const { normalize } = createNormalizer();
+
+	const events = normalize({
+		session_id: 's1',
+		subtype: 'background_tasks_changed',
+		tasks: [{ description: 'nameless', task_type: 'local_bash' }, 'nonsense'],
+		type: 'system',
+		uuid: 'u1',
+	});
+
+	assert.deepEqual(events, [
+		{ at: NOW.toISOString(), tasks: [], type: 'background-tasks' },
+	]);
+});

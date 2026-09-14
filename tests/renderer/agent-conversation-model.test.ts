@@ -5,6 +5,7 @@ import { ensureLanguageCatalogue } from '../../src/renderer/lib/i18n';
 import type { AgentConversationLiveState } from '../../src/renderer/state/agents';
 import { createAgentActivityState } from '../../src/shared/agent-activity';
 import type { AgentSessionLineage } from '../../src/shared/agent-control';
+import { createClaudeBackgroundTaskState } from '../../src/shared/claude-background-tasks';
 import { APP_LANGUAGES } from '../../src/shared/i18n';
 import type { AgentSessionSnapshotWire } from '../../src/shared/ipc/contracts/agent-session';
 import type { ChatTabWire } from '../../src/shared/ipc/contracts/chat-tab';
@@ -333,6 +334,7 @@ describe('toAgentConversations', () => {
 				},
 			]),
 			branchId: snapshot.branchId,
+			claudeBackgroundTasks: createClaudeBackgroundTaskState(),
 			contextUsage: null,
 			lastEventOrdinal: -1,
 			runtimeIdentity: 'pi:runtime-session-1',
@@ -397,6 +399,7 @@ describe('toAgentConversations', () => {
 							},
 						]),
 						branchId: snapshot.branchId,
+						claudeBackgroundTasks: createClaudeBackgroundTaskState(),
 						contextUsage: null,
 						lastEventOrdinal: -1,
 						runtimeIdentity: 'pi:runtime-session-1',
@@ -477,6 +480,7 @@ describe('toAgentConversations', () => {
 						},
 					]),
 					branchId: snapshot.branchId,
+					claudeBackgroundTasks: createClaudeBackgroundTaskState(),
 					contextUsage: null,
 					lastEventOrdinal: -1,
 					runtimeIdentity: 'pi:runtime-session-1',

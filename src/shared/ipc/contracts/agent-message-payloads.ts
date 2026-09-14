@@ -147,6 +147,27 @@ export interface AgentContextUsageWire {
 }
 
 /**
+ * One background task a runtime reports as live: work that outlives the turn
+ * that started it — a backgrounded shell command, an async subagent.
+ *
+ * `ambient` marks housekeeping the runtime runs for itself (live-update
+ * watchers, anything it flags `skip_transcript`). The runtime's own guidance is
+ * that a host must keep those out of activity indicators, so the field travels
+ * rather than being filtered at the boundary: the surface deciding what counts
+ * as activity is the one that should apply it.
+ */
+export interface AgentBackgroundTaskWire {
+	/** Housekeeping rather than activity; excluded from activity indicators. */
+	ambient?: boolean;
+	/** What the task is doing, in the runtime's own words. */
+	description: string;
+	/** Runtime's task id, unique within the session. */
+	taskId: string;
+	/** Runtime's own kind word, e.g. `local_bash`, `local_agent`. */
+	taskType: string;
+}
+
+/**
  * One plan rate-limit window. `id` is the runtime's own window key — `five_hour`
  * and `seven_day` are the ones every subscription reports; per-model buckets
  * arrive with a server-supplied `displayName` instead of a name the app knows.
@@ -205,6 +226,17 @@ export interface AgentSessionCostWire {
  * sniffing a runtime's raw frames.
  */
 export type AgentPersistedEnvelope =
+	| {
+			kind: 'background-tasks';
+			/**
+			 * Every live background task after the change — REPLACE semantics. The
+			 * runtime emits the whole set on each membership change rather than
+			 * start/stop edges, precisely so a dropped edge cannot wedge a stale
+			 * running indicator. A consumer swaps its set for this one; it never
+			 * pairs this against anything.
+			 */
+			tasks: readonly AgentBackgroundTaskWire[];
+	  }
 	| { kind: 'context-usage'; usage: AgentContextUsageWire }
 	| { kind: 'error'; error: AgentWireError }
 	| {

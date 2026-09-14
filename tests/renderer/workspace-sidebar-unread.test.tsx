@@ -16,6 +16,7 @@ const workspace = {
 function renderRow(unreadCount: number) {
 	return renderWithProviders(
 		<WorkspaceSidebarItemContent
+			claudeBackgroundTaskCount={0}
 			dockActivityState={null}
 			hasDiffStats={false}
 			isUnread={unreadCount > 0}

@@ -14,10 +14,11 @@ describe('quitGuardStrings', () => {
 		}
 	});
 
-	test('leaves no unsubstituted placeholder outside the overflow count', () => {
+	test('leaves no unsubstituted placeholder outside the two that take one', () => {
 		for (const language of APP_LANGUAGES) {
-			const { more, ...rest } = quitGuardStrings(language);
+			const { backgroundTask, more, ...rest } = quitGuardStrings(language);
 			expect(more).toContain('{{count}}');
+			expect(backgroundTask).toContain('{{description}}');
 			for (const value of Object.values(rest)) {
 				expect(value).not.toContain('{{');
 			}

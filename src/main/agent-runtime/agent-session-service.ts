@@ -799,6 +799,7 @@ export function snapshotToWire(
 	}));
 	return {
 		activityOrdinal: snapshot.activityOrdinal,
+		backgroundTasks: snapshot.backgroundTasks,
 		branchId: snapshot.branchId,
 		closedAt: snapshot.closedAt,
 		contextUsage: snapshot.contextUsage,

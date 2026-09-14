@@ -4,7 +4,13 @@ import {
 	createAgentActivityState,
 	reduceAgentActivity,
 } from '../../../shared/agent-activity.ts';
+import {
+	activeBackgroundTasks,
+	createClaudeBackgroundTaskState,
+	reduceClaudeBackgroundTasks,
+} from '../../../shared/claude-background-tasks.ts';
 import type {
+	AgentBackgroundTaskWire,
 	AgentContextUsageWire,
 	AgentPersistedEnvelope,
 	AgentSessionContextSnapshotWire,
@@ -163,6 +169,51 @@ function readCurrentTools({
 }
 
 /**
+ * Replays the whole branch for the runtime's last reported background-task
+ * level.
+ *
+ * Unlike {@link readCurrentTools} this is deliberately not turn-scoped: a
+ * background task outlives the turn that started it, so scoping the scan to the
+ * current turn is exactly the bug that makes the indicator vanish the moment the
+ * agent stops talking. The reducer empties itself on every `starting`, so a full
+ * replay still lands on the live process's own set rather than resurrecting a
+ * dead one's.
+ * @param input - Open database and the branch to replay.
+ * @returns The non-ambient tasks the runtime last reported as live.
+ */
+function readBackgroundTasks({
+	branchId,
+	database,
+}: {
+	branchId: string;
+	database: DatabaseSync;
+}): readonly AgentBackgroundTaskWire[] {
+	const payloads: AgentPersistedEnvelope[] = [];
+	for (const { payload } of iterateBranchPayloadsDescending({
+		branchId,
+		database,
+	})) {
+		if (!payload) {
+			continue;
+		}
+		payloads.push(payload);
+		// The level replaces rather than accumulates, and the reducer resets on
+		// `starting`, so the newest of either settles the answer on its own.
+		if (payload.kind === 'background-tasks') {
+			break;
+		}
+		if (payload.kind === 'status' && payload.status === 'starting') {
+			break;
+		}
+	}
+	let state = createClaudeBackgroundTaskState();
+	for (const payload of payloads.toReversed()) {
+		state = reduceClaudeBackgroundTasks(state, payload);
+	}
+	return activeBackgroundTasks(state);
+}
+
+/**
  * Adds compact live activity, durable lineage, and the newest usable context reading.
  * @param input - Active view, database, and base persisted snapshot.
  * @returns The snapshot enriched for renderer activity surfaces.
@@ -185,6 +236,12 @@ export function projectSessionActivity({
 	return {
 		...snapshot,
 		activityOrdinal: getMaxOrdinalForBranch({
+			branchId: snapshot.branchId,
+			database,
+		}),
+		// Read whether or not the session is active: a chat the user closed the tab
+		// on still has its runtime process, and its shells are still running.
+		backgroundTasks: readBackgroundTasks({
 			branchId: snapshot.branchId,
 			database,
 		}),

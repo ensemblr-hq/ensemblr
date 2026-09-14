@@ -85,10 +85,13 @@ const TOOL_GLYPHS: Record<string, ToolGlyph> = {
 	...WEB_ACCESS_TOOL_GLYPHS,
 	agent: 'bot',
 	bash: 'terminal',
+	bashoutput: TASK_TOOL_GLYPHS.taskoutput ?? 'scroll-text',
 	cli: 'terminal',
 	edit: 'file-pen',
 	glob: 'folder-tree',
 	grep: 'search',
+	killbash: TASK_TOOL_GLYPHS.taskstop ?? 'circle-stop',
+	killshell: TASK_TOOL_GLYPHS.taskstop ?? 'circle-stop',
 	list_directory: 'folder-tree',
 	ls: 'folder-tree',
 	lsp_diagnostics: 'stethoscope',
@@ -305,18 +308,171 @@ function shellTranscript(command: string, output: string): string {
 }
 
 /**
- * Runs a shell command. The title says what the command does, the command line
- * itself stays the preview, and the body holds the command with its output.
- * @param part - The shell tool part to project
+ * Names the shell command a row runs. The SDK `description` the call may carry
+ * is deliberately not used: it is English prose the model wrote for a reader
+ * who cannot see the command, and this row shows the command in its preview.
+ * {@link shellCommandTitle} is a translated vocabulary, so preferring the
+ * description would leave a Russian or Greek timeline with English titles.
+ * @param command - The command line, or null when the call named none
+ * @returns The row title
+ */
+function bashRowTitle(command: string | null): string {
+	return command === null
+		? i18n.t('workbench:tool-call.bash.title', 'Bash')
+		: shellCommandTitle(command);
+}
+
+/**
+ * Trailing suffix that reports how a bash call ended when the SDK's structured
+ * details bag says something worth pinning to the collapsed row. An exit code
+ * of zero is silent; a non-zero one, an interrupt, or an auto-background all
+ * earn a note that reads at a glance rather than requiring the reader to
+ * unfold the row's body.
+ * @param details - The `details` bag on the tool-result, or null.
+ * @returns The suffix to append to the title, or empty when none applies.
+ */
+function bashOutcomeSuffix(
+	details: Readonly<Record<string, unknown>> | null,
+): string {
+	if (details === null) {
+		return '';
+	}
+	if (details.interrupted === true) {
+		return ` · ${i18n.t('workbench:tool-call.bash.interrupted', 'interrupted')}`;
+	}
+	const timedOutAfterMs =
+		typeof details.timedOutAfterMs === 'number'
+			? details.timedOutAfterMs
+			: null;
+	if (timedOutAfterMs !== null && timedOutAfterMs > 0) {
+		return ` · ${i18n.t('workbench:tool-call.bash.auto-backgrounded', 'auto-backgrounded after {{seconds}}s', { seconds: Math.round(timedOutAfterMs / 1000) })}`;
+	}
+	const exitCode = typeof details.exitCode === 'number' ? details.exitCode : 0;
+	if (exitCode !== 0) {
+		return ` · ${i18n.t('workbench:tool-call.bash.exit', 'exit {{code}}', { code: exitCode })}`;
+	}
+	return '';
+}
+
+/**
+ * Whether a Bash call was launched into the background — either explicitly via
+ * `run_in_background`, via the SDK's structured launch confirmation, or via
+ * auto-background on a foreground timeout.
+ * @param input - The tool call's input bag.
+ * @param details - The `details` bag on the tool-result, or null.
+ * @returns True when the call should present as a background launch.
+ */
+function isBashBackgroundLaunch(
+	input: Record<string, unknown>,
+	details: Readonly<Record<string, unknown>> | null,
+): boolean {
+	if (input.run_in_background === true) {
+		return true;
+	}
+	if (details === null) {
+		return false;
+	}
+	if (typeof details.backgroundTaskId === 'string') {
+		return true;
+	}
+	if (
+		typeof details.timedOutAfterMs === 'number' &&
+		details.timedOutAfterMs > 0
+	) {
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Runs a background shell. The title says the row is a background launch; the
+ * preview leads with the assigned task id when the SDK reported one, because
+ * that id is what ties this row to the `TaskOutput` and `TaskStop` rows further
+ * down, which title themselves by it. The body still shows the transcript,
+ * which for a background launch is the "Command running in the background"
+ * confirmation the model reads.
+ * @param part - The `Bash` tool part to project
  * @returns The row's title, badge, preview, and body
  */
-function presentBash(part: DynamicToolUIPart): ToolPresenterResult {
+function presentBashBackgroundLaunch(
+	part: DynamicToolUIPart,
+): ToolPresenterResult {
 	const input = inputOf(part);
 	const command = stringField(input, 'command', 'cmd');
 	const commandLine =
 		command ??
 		i18n.t('workbench:tool-call.placeholder.no-command', '(no command)');
 	const output = outputOf(part);
+	const details = output?.details ?? null;
+	const taskId = backgroundTaskIdOf(details);
+	const timedOutAfterMs =
+		details && typeof details.timedOutAfterMs === 'number'
+			? details.timedOutAfterMs
+			: null;
+	return {
+		badge: null,
+		body: textBody(
+			shellTranscript(commandLine, output?.text ?? ''),
+			'bash' as BundledLanguage,
+		),
+		glyph: 'play',
+		preview: {
+			font: 'mono',
+			text: taskId === null ? commandLine : `${taskId} · ${commandLine}`,
+		},
+		title:
+			timedOutAfterMs !== null && timedOutAfterMs > 0
+				? i18n.t(
+						'workbench:tool-call.bash.auto-backgrounded-title',
+						'Auto-backgrounded shell',
+					)
+				: i18n.t(
+						'workbench:tool-call.bash.background-title',
+						'Start background shell',
+					),
+		tone: 'default',
+	};
+}
+
+/**
+ * Reads the task id the SDK assigned a background launch, under either of the
+ * two names its results use.
+ * @param details - The `details` bag on the tool-result, or null.
+ * @returns The task id, or null when the result reported none.
+ */
+function backgroundTaskIdOf(
+	details: Readonly<Record<string, unknown>> | null,
+): string | null {
+	if (details === null) {
+		return null;
+	}
+	if (typeof details.backgroundTaskId === 'string') {
+		return details.backgroundTaskId;
+	}
+	return typeof details.taskId === 'string' ? details.taskId : null;
+}
+
+/**
+ * Runs a shell command. The title says what the command does, the command line
+ * itself stays the preview, and the body holds the command with its output.
+ * A background launch — whether opt-in via `run_in_background`, structurally
+ * confirmed by a `backgroundTaskId`, or auto-backgrounded on timeout — takes
+ * the {@link presentBashBackgroundLaunch} shape instead.
+ * @param part - The shell tool part to project
+ * @returns The row's title, badge, preview, and body
+ */
+function presentBash(part: DynamicToolUIPart): ToolPresenterResult {
+	const input = inputOf(part);
+	const output = outputOf(part);
+	const details = output?.details ?? null;
+	if (isBashBackgroundLaunch(input, details)) {
+		return presentBashBackgroundLaunch(part);
+	}
+	const command = stringField(input, 'command', 'cmd');
+	const commandLine =
+		command ??
+		i18n.t('workbench:tool-call.placeholder.no-command', '(no command)');
+	const outcome = bashOutcomeSuffix(details);
 	return {
 		badge: null,
 		body: textBody(
@@ -324,10 +480,7 @@ function presentBash(part: DynamicToolUIPart): ToolPresenterResult {
 			'bash' as BundledLanguage,
 		),
 		preview: { font: 'mono', text: commandLine },
-		title:
-			command === null
-				? i18n.t('workbench:tool-call.bash.title', 'Bash')
-				: shellCommandTitle(command),
+		title: `${bashRowTitle(command)}${outcome}`,
 		tone: 'default',
 	};
 }
@@ -502,6 +655,62 @@ function presentSkill(part: DynamicToolUIPart): ToolPresenterResult {
 }
 
 /**
+ * Whether an `Agent` / `Task` call was launched asynchronously — the model
+ * asked for a background subagent, or the SDK confirmed one with an
+ * `async_launched` status.
+ * @param input - The tool call's input bag.
+ * @param details - The `details` bag on the tool-result, or null.
+ * @returns True when the call should present as an async launch.
+ */
+function isAgentAsyncLaunch(
+	input: Record<string, unknown>,
+	details: Readonly<Record<string, unknown>> | null,
+): boolean {
+	if (input.run_in_background === true) {
+		return true;
+	}
+	return details !== null && details.isAsync === true;
+}
+
+/**
+ * Launches an async subagent that keeps running past the current turn. The row
+ * pins the assigned agent id and, when the SDK reports one, the file the async
+ * agent writes its progress to.
+ * @param part - The `Agent` / `Task` tool part to project.
+ * @returns The row's title, badge, preview, and body.
+ */
+function presentAgentAsyncLaunch(part: DynamicToolUIPart): ToolPresenterResult {
+	const input = inputOf(part);
+	const subject =
+		stringField(input, 'description', 'name', 'prompt') ??
+		i18n.t('workbench:tool-call.subagent.no-subject', '(no description)');
+	const output = outputOf(part);
+	const details = output?.details ?? null;
+	const agentId =
+		details && typeof details.agentId === 'string' ? details.agentId : null;
+	const outputFile =
+		details && typeof details.outputFile === 'string'
+			? details.outputFile
+			: null;
+	const previewText = agentId === null ? subject : `${agentId} · ${subject}`;
+	const bodyText =
+		outputFile === null
+			? subject
+			: `${subject}\n\n${i18n.t('workbench:tool-call.subagent.output-file', 'Progress file: {{path}}', { path: outputFile })}`;
+	return {
+		badge: null,
+		body: { kind: 'markdown', text: bodyText },
+		glyph: 'play',
+		preview: { font: 'sans', text: previewText },
+		title: i18n.t(
+			'workbench:tool-call.subagent.async-title',
+			'Launch async sub-agent',
+		),
+		tone: 'default',
+	};
+}
+
+/**
  * Delegates a slice of the turn to a subagent. The wire name is the same for
  * every delegation, so a turn that spawned three of them would read as three
  * identical rows; what it was spawned as and what it was asked to do are the two
@@ -510,15 +719,22 @@ function presentSkill(part: DynamicToolUIPart): ToolPresenterResult {
  * The result is the subagent's own closing report — prose, not a payload — so it
  * renders as markdown rather than the generic input/output JSON. The rows the
  * subagent produced along the way are nested into this one by the timeline, not
- * by the presenter.
+ * by the presenter. An async launch — `run_in_background`, or the SDK's own
+ * `async_launched` status — takes the {@link presentAgentAsyncLaunch} shape
+ * instead, so the row is not read as a completed delegation with an empty report.
  * @param part - The `task` tool part to project
  * @returns The row's title, badge, preview, and body
  */
 function presentSubagent(part: DynamicToolUIPart): ToolPresenterResult {
 	const input = inputOf(part);
+	const output = outputOf(part);
+	const details = output?.details ?? null;
+	if (isAgentAsyncLaunch(input, details)) {
+		return presentAgentAsyncLaunch(part);
+	}
 	const subagentType = stringField(input, 'subagent_type', 'subagentType');
 	const task = stringField(input, 'description', 'name', 'prompt');
-	const report = outputOf(part)?.text.trim() ?? '';
+	const report = output?.text.trim() ?? '';
 
 	return {
 		badge: null,
@@ -546,10 +762,13 @@ const PRESENTERS: Record<
 	...WEB_ACCESS_TOOL_PRESENTERS,
 	agent: presentSubagent,
 	bash: presentBash,
+	bashoutput: TASK_TOOL_PRESENTERS.taskoutput,
 	cli: presentBash,
 	edit: presentEdit,
 	glob: presentGlob,
 	grep: presentGrep,
+	killbash: TASK_TOOL_PRESENTERS.taskstop,
+	killshell: TASK_TOOL_PRESENTERS.taskstop,
 	list_directory: presentList,
 	ls: presentList,
 	lsp_diagnostics: presentDiagnostics,

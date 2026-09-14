@@ -2,6 +2,7 @@ import type { AgentSessionLineage } from '../../agent-control/lineage.ts';
 import type { AgentProviderId } from '../../agent-provider.ts';
 import type { ToolPresentationV1 } from '../../tool-presentation.ts';
 import type {
+	AgentBackgroundTaskWire,
 	AgentContextUsageWire,
 	AgentEventStreamWire,
 	AgentPersistedEnvelope,
@@ -10,6 +11,7 @@ import type {
 import type { AgentModelCatalog } from './agent-models.ts';
 
 export type {
+	AgentBackgroundTaskWire,
 	AgentContextUsageWire,
 	AgentEventStreamWire,
 	AgentPersistedEnvelope,
@@ -71,6 +73,13 @@ export interface AgentSessionContextSnapshotWire {
 export interface AgentSessionSnapshotWire {
 	/** Highest persisted event ordinal incorporated into this activity snapshot. */
 	activityOrdinal?: number;
+	/**
+	 * Background tasks the runtime last reported as live, ambient housekeeping
+	 * already excluded. Present whether or not the session is active, because a
+	 * background task outlives the turn that started it — and the whole point of
+	 * reporting it is the window where the chat looks idle and the work is not.
+	 */
+	backgroundTasks?: readonly AgentBackgroundTaskWire[];
 	branchId: string;
 	closedAt: string | null;
 	/** Latest valid usage reading, absent on snapshots produced before this field shipped. */

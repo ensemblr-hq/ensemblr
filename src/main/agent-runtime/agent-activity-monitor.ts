@@ -60,6 +60,20 @@ export interface RunningAgentSession {
 	workspaceId: string;
 }
 
+/**
+ * A background task the monitor believes is still running, and where it lives.
+ * Distinct from {@link RunningAgentSession}: a background task outlives the turn
+ * that started it, so its session is usually idle while this is live. That gap
+ * is the whole reason this is tracked — an idle-looking chat whose shell is
+ * still running is exactly what a user closes or quits out from under.
+ */
+export interface RunningBackgroundTask {
+	description: string;
+	sessionId: string;
+	taskId: string;
+	workspaceId: string;
+}
+
 /** Thin seam over Electron's `powerSaveBlocker` so the monitor stays testable. */
 export interface PowerSaveControls {
 	start: (type: 'prevent-app-suspension' | 'prevent-display-sleep') => number;
@@ -145,6 +159,12 @@ interface AgentActivityMonitor {
 	}) => void;
 	/** Every session currently mid-turn, across all workspaces. */
 	listRunning: () => readonly RunningAgentSession[];
+	/**
+	 * Every background task still running, across all workspaces. Ambient
+	 * housekeeping the runtime flags for itself is already excluded, so every
+	 * entry here is work the user would want to know about before quitting.
+	 */
+	listRunningBackgroundTasks: () => readonly RunningBackgroundTask[];
 	/** Re-evaluate the power blocker (e.g. after a settings change). */
 	refresh: () => void;
 	/** Release the blocker and timers (call on app quit). */
@@ -228,6 +248,14 @@ export function createAgentActivityMonitor(
 	const now = options.now ?? Date.now;
 
 	const streamingSessions = new Map<string, string>();
+	// Live background tasks per session. Separate from `streamingSessions`
+	// because the two answer different questions: that map says a turn is in
+	// flight, this one says work outlives the turn. A session is routinely absent
+	// from the first and present here.
+	const backgroundTasks = new Map<
+		string,
+		{ tasks: readonly RunningBackgroundTask[]; workspaceId: string }
+	>();
 	// Held apart from `streamingSessions` so the Concierge stays out of
 	// `listRunning`, which the quit guard names workspaces from.
 	let conciergeStreamingSessionId: string | null = null;
@@ -406,9 +434,31 @@ export function createAgentActivityMonitor(
 		if (disposed || !payload) {
 			return;
 		}
+		if (payload.kind === 'background-tasks') {
+			const tasks = payload.tasks
+				.filter((task) => task.ambient !== true)
+				.map((task) => ({
+					description: task.description,
+					sessionId,
+					taskId: task.taskId,
+					workspaceId,
+				}));
+			if (tasks.length === 0) {
+				backgroundTasks.delete(sessionId);
+			} else {
+				backgroundTasks.set(sessionId, { tasks, workspaceId });
+			}
+			return;
+		}
 		if (payload.kind === 'status') {
 			const active =
 				payload.status === 'streaming' || payload.status === 'starting';
+			// The runtime's task set is per process and is never seeded at startup,
+			// so a session opening drops whatever the previous process left behind
+			// rather than carrying it into a process that knows nothing about it.
+			if (payload.status === 'starting') {
+				backgroundTasks.delete(sessionId);
+			}
 			if (active) {
 				streamingSessions.set(sessionId, workspaceId);
 			} else {
@@ -423,6 +473,7 @@ export function createAgentActivityMonitor(
 		}
 		if (payload.kind === 'shutdown') {
 			streamingSessions.delete(sessionId);
+			backgroundTasks.delete(sessionId);
 			userStoppedSessions.delete(sessionId);
 			reconcilePower();
 		}
@@ -465,6 +516,9 @@ export function createAgentActivityMonitor(
 			workspaceId,
 		}));
 
+	const listRunningBackgroundTasks = (): readonly RunningBackgroundTask[] =>
+		[...backgroundTasks.values()].flatMap((entry) => entry.tasks);
+
 	/** Permanently stops monitoring so late events and battery reads cannot re-arm it. */
 	const dispose = (): void => {
 		disposed = true;
@@ -475,6 +529,7 @@ export function createAgentActivityMonitor(
 			blockerId = null;
 		}
 		streamingSessions.clear();
+		backgroundTasks.clear();
 		conciergeStreamingSessionId = null;
 		userStoppedSessions.clear();
 	};
@@ -484,6 +539,7 @@ export function createAgentActivityMonitor(
 		handle,
 		handleConcierge,
 		listRunning,
+		listRunningBackgroundTasks,
 		noteUserStop: (sessionId) => {
 			userStoppedSessions.add(sessionId);
 		},

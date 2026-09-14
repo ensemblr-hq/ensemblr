@@ -40,13 +40,23 @@ export type ClaudeApprovalGate = (session: {
  * Tools Claude Code exposes that mutate the workspace or run commands. Withheld
  * outright in read-only mode, where `plan` alone would still let the model edit
  * once it left plan mode via its own `ExitPlanMode` call.
+ *
+ * `BashOutput` / `KillShell` are the legacy names for the background-task
+ * lifecycle verbs; `TaskOutput` / `TaskStop` are the current ones (see the
+ * naming note in `src/shared/plan-mode/concierge-guard.ts`). `KillBash` is a
+ * transitional alias some CLI builds still ship. Every one is listed so a mode
+ * that blocks `Bash` cannot then be steered around by polling or killing a
+ * shell an earlier session left running.
  */
 const MUTATING_TOOLS = [
 	'Bash',
 	'BashOutput',
 	'Edit',
+	'KillBash',
 	'KillShell',
 	'NotebookEdit',
+	'TaskOutput',
+	'TaskStop',
 	'Write',
 ] as const;
 

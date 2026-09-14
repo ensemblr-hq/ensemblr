@@ -11,12 +11,16 @@ export type { CloseRunningChatRequest } from './close-running-chat-guard';
 
 /** Imperative surface wiring tab closes to the running-chat confirmation dialog. */
 export interface CloseRunningChatGuard {
+	/** Background tasks the held chat still has running; zero when it has none. */
+	backgroundTaskCount: number;
 	/** Dismisses the dialog and abandons the deferred close. */
 	cancelClose: () => void;
 	/** Cancels the agent, then runs the deferred close. */
 	confirmClose: () => void;
 	/** True while a running tab is awaiting confirmation. */
 	isConfirming: boolean;
+	/** True when the held chat's own turn is in flight, so confirming cancels it. */
+	isRunningTurn: boolean;
 	/** Closes idle tabs immediately; defers running tabs behind the dialog. */
 	requestClose: (request: CloseRunningChatRequest) => void;
 }
@@ -62,9 +66,11 @@ export function useCloseRunningChatGuard(): CloseRunningChatGuard {
 	// render and defeat their memoisation.
 	return useMemo(
 		() => ({
+			backgroundTaskCount: pending?.backgroundTaskCount ?? 0,
 			cancelClose,
 			confirmClose,
 			isConfirming: pending !== null,
+			isRunningTurn: pending?.isRunning ?? false,
 			requestClose,
 		}),
 		[cancelClose, confirmClose, pending, requestClose],

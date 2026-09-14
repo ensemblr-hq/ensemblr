@@ -1,6 +1,7 @@
 import type { SubagentMechanism } from '../../shared/agent-control';
 import type { AgentProviderId } from '../../shared/agent-provider';
 import type {
+	AgentBackgroundTaskWire,
 	AgentPlanLimitWindowWire,
 	AgentPlanLimitWire,
 	AgentSessionCostWire,
@@ -349,8 +350,23 @@ export type AgentPlanLimitWindow = AgentPlanLimitWindowWire;
 /** Running cost totals a session reports for itself. */
 export type AgentSessionCost = AgentSessionCostWire;
 
+/** One background task a runtime reports as outliving the turn that began it. */
+export type AgentBackgroundTask = AgentBackgroundTaskWire;
+
 /** Discriminated event stream emitted by a session. */
 export type AgentEvent =
+	| {
+			at: string;
+			/**
+			 * Every live background task after the change. A level signal with
+			 * REPLACE semantics rather than a start/stop edge, so a dropped frame
+			 * cannot wedge a stale running indicator. The set is per runtime process
+			 * and is not seeded at startup: a consumer resets to empty whenever the
+			 * session's process (re)starts and lets the next change repopulate it.
+			 */
+			tasks: readonly AgentBackgroundTask[];
+			type: 'background-tasks';
+	  }
 	| {
 			at: string;
 			type: 'context-usage';

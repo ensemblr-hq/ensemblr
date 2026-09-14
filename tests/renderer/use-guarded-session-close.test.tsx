@@ -23,11 +23,14 @@ vi.mock('@/renderer/state/menu-commands', () => ({
 // The resolver and the guard stay real: this file exists to prove the hook
 // honours `isRefused`, which a mocked resolver would decide for it.
 vi.mock('@/renderer/state/workspace', async () => {
-	const [closeTarget, guard] = await Promise.all([
+	const [closeTarget, guard, backgroundActivity] = await Promise.all([
 		import('@/renderer/state/workspace/session-tab-close'),
 		import('@/renderer/state/workspace/use-close-running-chat-guard'),
+		import('@/renderer/state/workspace/claude-background-activity'),
 	]);
 	return {
+		claudeBackgroundTaskCountBySessionAtom:
+			backgroundActivity.claudeBackgroundTaskCountBySessionAtom,
 		resolveRunningCloseTarget: closeTarget.resolveRunningCloseTarget,
 		useCloseRunningChatGuard: guard.useCloseRunningChatGuard,
 	};

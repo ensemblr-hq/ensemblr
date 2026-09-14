@@ -94,6 +94,7 @@ export function UnreadScene() {
 								>
 									<SidebarMenuButton className='h-auto min-h-12 items-start gap-2 py-2'>
 										<WorkspaceSidebarItemContent
+											claudeBackgroundTaskCount={0}
 											dockActivityState={
 												rowCase.workspace.id === 'row-unread-busy'
 													? 'running'

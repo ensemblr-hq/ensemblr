@@ -12,6 +12,7 @@ import type {
 	WorkspaceLinkedIssueSummary,
 } from '@/renderer/types/workbench';
 import { AfkModeWarningDialog } from './composer/afk-mode-warning-dialog';
+import { BackgroundTasksNotice } from './composer/background-tasks-notice';
 import { ComposerControls } from './composer/composer-controls';
 import { ComposerNotices } from './composer/composer-notices';
 import { ComposerEditor } from './composer/editor';
@@ -235,6 +236,10 @@ function ComposerPanelBody({
 							ref={state.fileInputRef}
 							tabIndex={-1}
 							type='file'
+						/>
+
+						<BackgroundTasksNotice
+							agentSessionId={composer.activeAgentSessionId}
 						/>
 
 						<ComposerNotices

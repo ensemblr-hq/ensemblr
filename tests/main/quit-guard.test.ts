@@ -53,6 +53,7 @@ function makeGuard(overrides: Partial<QuitGuardOptions> = {}): Harness {
 		getLanguage: () => 'en',
 		hasWindow: () => true,
 		listAgentTerminals: () => [],
+		listRunningBackgroundTasks: () => [],
 		listRunningSessions: () => [],
 		listWorkspaceNames: () =>
 			Promise.resolve(
@@ -81,6 +82,41 @@ describe('createQuitGuard — when it prompts', () => {
 		await h.guard.confirmQuit();
 		expect(h.requests).toHaveLength(1);
 		expect(h.requests[0].detail).toContain('• api-refactor — Chat');
+	});
+
+	test('prompts for a background task whose chat is already idle', async () => {
+		const h = makeGuard({
+			listRunningBackgroundTasks: () => [
+				{
+					description: 'Emit 30 timestamped ticks',
+					sessionId: 's1',
+					taskId: 'bash_1',
+					workspaceId: 'w1',
+				},
+			],
+		});
+		await expect(h.guard.confirmQuit()).resolves.toBe(false);
+		expect(h.requests).toHaveLength(1);
+		expect(h.requests[0].detail).toContain(
+			'• api-refactor — Background task: Emit 30 timestamped ticks',
+		);
+	});
+
+	test('names a background task the runtime gave no description', async () => {
+		const h = makeGuard({
+			listRunningBackgroundTasks: () => [
+				{
+					description: '   ',
+					sessionId: 's1',
+					taskId: 'bash_1',
+					workspaceId: 'w2',
+				},
+			],
+		});
+		await h.guard.confirmQuit();
+		expect(h.requests[0].detail).toContain(
+			'• design-tokens — Background task: untitled',
+		);
 	});
 
 	test('prompts for a harness spinning in its OSC title', async () => {
