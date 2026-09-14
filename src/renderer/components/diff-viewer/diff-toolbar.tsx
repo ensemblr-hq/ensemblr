@@ -37,44 +37,19 @@ interface DiffToolbarProps {
 }
 
 /**
- * Toolbar of diff-viewer toggles: a Diff/File segmented switch plus unified ↔
- * split, hidden characters, and word wrap, and — where the surrounding viewer
- * tracks review state — a Viewed marker. Layout, whitespace, and word-wrap are
- * persisted app-wide; the diff/file mode is owned by the surrounding viewer.
+ * The three app-wide toggles that decide how any diff is drawn: unified ↔ split,
+ * hidden characters, and word wrap. Split out from {@link DiffToolbar} so a
+ * surface showing many diffs at once — the turn diff — can hoist one copy into
+ * its own header instead of repeating them above every file.
  */
-export function DiffToolbar({
-	fileModeDisabled,
-	onViewedChange,
-	onViewModeChange,
-	viewed = false,
-	viewMode,
-}: DiffToolbarProps) {
+export function DiffDisplayToggles() {
 	const { t } = useTranslation();
 	const [layout, setLayout] = useAtom(diffLayoutAtom);
 	const [showWhitespace, setShowWhitespace] = useAtom(diffShowWhitespaceAtom);
 	const [wordWrap, setWordWrap] = useAtom(diffWordWrapAtom);
 
 	return (
-		<div className='flex items-center gap-1'>
-			<div className='mr-1 flex items-center rounded-md border border-border p-0.5'>
-				<ViewModeButton
-					active={viewMode === 'diff'}
-					icon={FileDiffIcon}
-					label={t('review:diff-toolbar.mode-diff', 'Diff')}
-					onClick={() => onViewModeChange('diff')}
-				/>
-				<ViewModeButton
-					active={viewMode === 'file'}
-					disabled={fileModeDisabled}
-					disabledHint={t(
-						'review:diff-toolbar.mode-file-unavailable',
-						'Full file view is unavailable for this diff',
-					)}
-					icon={FileIcon}
-					label={t('review:diff-toolbar.mode-file', 'File')}
-					onClick={() => onViewModeChange('file')}
-				/>
-			</div>
+		<>
 			<IconToggle
 				active={layout === 'split'}
 				label={
@@ -108,6 +83,47 @@ export function DiffToolbar({
 			>
 				<WrapTextIcon />
 			</IconToggle>
+		</>
+	);
+}
+
+/**
+ * Toolbar of diff-viewer toggles: a Diff/File segmented switch plus the shared
+ * display toggles, and — where the surrounding viewer tracks review state — a
+ * Viewed marker. Layout, whitespace, and word-wrap are persisted app-wide; the
+ * diff/file mode is owned by the surrounding viewer.
+ */
+export function DiffToolbar({
+	fileModeDisabled,
+	onViewedChange,
+	onViewModeChange,
+	viewed = false,
+	viewMode,
+}: DiffToolbarProps) {
+	const { t } = useTranslation();
+
+	return (
+		<div className='flex items-center gap-1'>
+			<div className='mr-1 flex items-center rounded-md border border-border p-0.5'>
+				<ViewModeButton
+					active={viewMode === 'diff'}
+					icon={FileDiffIcon}
+					label={t('review:diff-toolbar.mode-diff', 'Diff')}
+					onClick={() => onViewModeChange('diff')}
+				/>
+				<ViewModeButton
+					active={viewMode === 'file'}
+					disabled={fileModeDisabled}
+					disabledHint={t(
+						'review:diff-toolbar.mode-file-unavailable',
+						'Full file view is unavailable for this diff',
+					)}
+					icon={FileIcon}
+					label={t('review:diff-toolbar.mode-file', 'File')}
+					onClick={() => onViewModeChange('file')}
+				/>
+			</div>
+			<DiffDisplayToggles />
 			{onViewedChange ? (
 				<>
 					<div aria-hidden='true' className='mx-1 h-4 w-px bg-border' />

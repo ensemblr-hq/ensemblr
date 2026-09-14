@@ -4,7 +4,10 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { turnDiffQuery } from '@/renderer/api/ensemblr-queries';
 import { CodeViewerHeader } from '@/renderer/components/code-surface';
-import { DiffViewer } from '@/renderer/components/diff-viewer';
+import {
+	DiffDisplayToggles,
+	DiffViewer,
+} from '@/renderer/components/diff-viewer';
 import { splitCombinedPatch } from '@/renderer/lib/diff/parse';
 import { failureText } from '@/renderer/lib/failure-text';
 import type { TurnDiffFileWire } from '@/shared/ipc/contracts/checkpoint';
@@ -16,6 +19,11 @@ import { PanelMessage } from './panel-message';
  * changes between a turn's pre-prompt checkpoint and the post-turn state
  * (next checkpoint, or the live working tree for the latest turn), rendering
  * one rich {@link DiffViewer} per changed file.
+ *
+ * The display toggles sit in this panel's own header rather than above every
+ * file: they are app-wide preferences, so stacking one copy per file repeated a
+ * control that acts on all of them at once. The diff/file switch is left out
+ * entirely — nothing here loads full file sources to switch to.
  */
 export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 	const { t } = useTranslation();
@@ -78,13 +86,17 @@ export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 		<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
 			<CodeViewerHeader
 				actions={
-					<span className='text-muted-foreground text-xs tabular-nums'>
-						{t('workbench:turn-diff.file-count', {
-							count: files.length,
-							defaultValue_one: '{{count}} file',
-							defaultValue_other: '{{count}} files',
-						})}
-					</span>
+					<>
+						<span className='text-muted-foreground text-xs tabular-nums'>
+							{t('workbench:turn-diff.file-count', {
+								count: files.length,
+								defaultValue_one: '{{count}} file',
+								defaultValue_other: '{{count}} files',
+							})}
+						</span>
+						<div aria-hidden='true' className='mx-1 h-4 w-px bg-border' />
+						<DiffDisplayToggles />
+					</>
 				}
 				icon={
 					<FileDiffIcon
@@ -124,6 +136,7 @@ export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 								fillHeight={false}
 								filePath={file.path}
 								patch={file.patch}
+								showToolbar={false}
 							/>
 						</div>
 					))}

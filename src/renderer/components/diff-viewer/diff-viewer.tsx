@@ -61,6 +61,7 @@ export function DiffViewer({
 	onViewedChange,
 	patch,
 	reveal,
+	showToolbar = true,
 	viewed,
 }: {
 	commentsByChangeKey?: ReadonlyMap<string, readonly DiffComment[]>;
@@ -88,6 +89,14 @@ export function DiffViewer({
 	patch: string;
 	/** When set, scrolls to and flashes the requested line once per `requestId`. */
 	reveal?: DiffLineReveal | null;
+	/**
+	 * Whether the header carries the toggle toolbar. Set false where a surface
+	 * stacks many viewers and hoists one copy of the display toggles into its own
+	 * header, leaving each file row the path alone. The Diff/File switch and the
+	 * Viewed marker travel with the toolbar, so a viewer that suppresses it also
+	 * suppresses those — pass `onViewedChange` only where the toolbar is drawn.
+	 */
+	showToolbar?: boolean;
 	viewed?: boolean;
 }) {
 	const {
@@ -127,6 +136,7 @@ export function DiffViewer({
 				headerActions={headerActions}
 				onViewedChange={onViewedChange}
 				onViewModeChange={setViewMode}
+				showToolbar={showToolbar}
 				viewed={viewed}
 				viewMode={viewMode}
 			>
@@ -148,6 +158,7 @@ export function DiffViewer({
 			headerActions={headerActions}
 			onViewedChange={onViewedChange}
 			onViewModeChange={setViewMode}
+			showToolbar={showToolbar}
 			viewed={viewed}
 			viewMode={viewMode}
 		>
@@ -399,13 +410,15 @@ interface DiffViewerFrameProps {
 	headerActions?: ReactNode;
 	onViewedChange?: (viewed: boolean) => void;
 	onViewModeChange: (mode: DiffViewMode) => void;
+	showToolbar: boolean;
 	viewed?: boolean;
 	viewMode: DiffViewMode;
 }
 
 /**
  * Chrome around the diff body: the shared code-viewer header carrying the file
- * path, then the toggle toolbar and the caller's actions.
+ * path, then the toggle toolbar and the caller's actions. With neither, the
+ * header is left to render the path alone rather than an empty action row.
  *
  * The header is the same bar the file viewer uses, so toggling a tab between a
  * file and its diff moves nothing but the body underneath.
@@ -423,9 +436,20 @@ function DiffViewerFrame({
 	headerActions,
 	onViewedChange,
 	onViewModeChange,
+	showToolbar,
 	viewed,
 	viewMode,
 }: DiffViewerFrameProps) {
+	const toolbar = showToolbar ? (
+		<DiffToolbar
+			fileModeDisabled={fileModeDisabled}
+			onViewedChange={onViewedChange}
+			onViewModeChange={onViewModeChange}
+			viewed={viewed}
+			viewMode={viewMode}
+		/>
+	) : null;
+
 	return (
 		<div
 			className={cn(
@@ -435,16 +459,12 @@ function DiffViewerFrame({
 		>
 			<CodeViewerHeader
 				actions={
-					<>
-						{headerActions}
-						<DiffToolbar
-							fileModeDisabled={fileModeDisabled}
-							onViewedChange={onViewedChange}
-							onViewModeChange={onViewModeChange}
-							viewed={viewed}
-							viewMode={viewMode}
-						/>
-					</>
+					headerActions || toolbar ? (
+						<>
+							{headerActions}
+							{toolbar}
+						</>
+					) : null
 				}
 				title={filePath}
 			/>
