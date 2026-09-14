@@ -42,6 +42,7 @@ import { parseToolDiagnostics } from './tool-diagnostics';
 import { classifyToolOutput } from './tool-output-classifier';
 import {
 	inputOf,
+	isAsyncAgentLaunch,
 	numberField,
 	outputOf,
 	pathOf,
@@ -655,24 +656,6 @@ function presentSkill(part: DynamicToolUIPart): ToolPresenterResult {
 }
 
 /**
- * Whether an `Agent` / `Task` call was launched asynchronously — the model
- * asked for a background subagent, or the SDK confirmed one with an
- * `async_launched` status.
- * @param input - The tool call's input bag.
- * @param details - The `details` bag on the tool-result, or null.
- * @returns True when the call should present as an async launch.
- */
-function isAgentAsyncLaunch(
-	input: Record<string, unknown>,
-	details: Readonly<Record<string, unknown>> | null,
-): boolean {
-	if (input.run_in_background === true) {
-		return true;
-	}
-	return details !== null && details.isAsync === true;
-}
-
-/**
  * Launches an async subagent that keeps running past the current turn. The row
  * pins the assigned agent id and, when the SDK reports one, the file the async
  * agent writes its progress to.
@@ -726,12 +709,11 @@ function presentAgentAsyncLaunch(part: DynamicToolUIPart): ToolPresenterResult {
  * @returns The row's title, badge, preview, and body
  */
 function presentSubagent(part: DynamicToolUIPart): ToolPresenterResult {
-	const input = inputOf(part);
-	const output = outputOf(part);
-	const details = output?.details ?? null;
-	if (isAgentAsyncLaunch(input, details)) {
+	if (isAsyncAgentLaunch(part)) {
 		return presentAgentAsyncLaunch(part);
 	}
+	const input = inputOf(part);
+	const output = outputOf(part);
 	const subagentType = stringField(input, 'subagent_type', 'subagentType');
 	const task = stringField(input, 'description', 'name', 'prompt');
 	const report = output?.text.trim() ?? '';

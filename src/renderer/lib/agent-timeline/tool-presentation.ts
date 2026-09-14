@@ -42,6 +42,16 @@ const RUNNING_STATES = new Set([
 ]);
 
 /**
+ * Whether a tool call is still in flight, which every projection reads to decide
+ * whether the row pulses and whether its body is a result or a placeholder.
+ * @param part - The tool part to inspect
+ * @returns True while the call has produced no result
+ */
+function isToolCallRunning(part: DynamicToolUIPart): boolean {
+	return RUNNING_STATES.has(part.state);
+}
+
+/**
  * Turns a raw tool name into a title-cased, space-separated label.
  * @param name - The raw tool name
  * @returns The humanized label, or `'Tool'` when the name is empty
@@ -219,7 +229,7 @@ export function presentToolCall(
 		};
 	}
 	const glyph = restingGlyph(part);
-	const isRunning = RUNNING_STATES.has(part.state);
+	const isRunning = isToolCallRunning(part);
 	const hostProjected = presenterForPart(part)(part);
 	const extension =
 		isProtectedToolName(part.toolName) || isHostPermissionState(part)

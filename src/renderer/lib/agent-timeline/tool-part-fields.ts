@@ -55,6 +55,25 @@ export function outputOf(part: DynamicToolUIPart): AgentToolOutput | null {
 }
 
 /**
+ * Whether an `Agent` / `Task` call launched its subagent into the background
+ * instead of running it inline — the model asked for one with
+ * `run_in_background`, or the SDK confirmed one with an `async_launched` status.
+ *
+ * A background launch reports through the background-task surface and through
+ * its own result body, which names the agent id and the progress file, so no row
+ * ever arrives beneath the launch itself.
+ * @param part - The tool part to inspect
+ * @returns True when the call launched an async subagent
+ */
+export function isAsyncAgentLaunch(part: DynamicToolUIPart): boolean {
+	if (inputOf(part).run_in_background === true) {
+		return true;
+	}
+	const details = outputOf(part)?.details ?? null;
+	return details !== null && details.isAsync === true;
+}
+
+/**
  * Reads the first non-empty string among the given keys.
  * @param bag - Record to read from
  * @param keys - Keys to try, in order

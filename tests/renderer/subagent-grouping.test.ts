@@ -3,6 +3,7 @@ import {
 	countNestedToolCalls,
 	dropEchoedSubagentReports,
 	groupSubagentActivity,
+	ownsNestedActivity,
 	parentToolCallIdOf,
 } from '@/renderer/lib/agent-timeline';
 import type {
@@ -37,6 +38,33 @@ function settledToolPart(
 		state: 'output-available',
 		toolCallId,
 		toolName,
+		type: 'dynamic-tool',
+	} satisfies ParentedDynamicToolUIPart as UIMessagePart;
+}
+
+function asyncLaunchPart(
+	toolCallId: string,
+	input: Record<string, unknown>,
+): UIMessagePart {
+	return {
+		input,
+		state: 'input-available',
+		toolCallId,
+		toolName: 'Agent',
+		type: 'dynamic-tool',
+	} satisfies ParentedDynamicToolUIPart as UIMessagePart;
+}
+
+function settledAsyncLaunchPart(
+	toolCallId: string,
+	details: Record<string, unknown>,
+): UIMessagePart {
+	return {
+		input: {},
+		output: { details, text: 'Agent launched' },
+		state: 'output-available',
+		toolCallId,
+		toolName: 'Agent',
 		type: 'dynamic-tool',
 	} satisfies ParentedDynamicToolUIPart as UIMessagePart;
 }
@@ -274,5 +302,41 @@ describe('dropEchoedSubagentReports', () => {
 			'dynamic-tool',
 			'dynamic-tool',
 		]);
+	});
+});
+
+describe('ownsNestedActivity', () => {
+	it('reads Claude Code’s subagent tool under both names it has shipped under', () => {
+		expect(ownsNestedActivity(toolPart('call-1', 'Task'))).toBe(true);
+		expect(ownsNestedActivity(toolPart('call-2', 'Agent'))).toBe(true);
+	});
+
+	it('leaves a skill out, whose load hands SKILL.md back rather than opening a sub-context', () => {
+		expect(ownsNestedActivity(toolPart('call-1', 'Skill'))).toBe(false);
+	});
+
+	it('leaves an async launch out, whose subagent reports nowhere beneath it', () => {
+		expect(
+			ownsNestedActivity(
+				asyncLaunchPart('call-1', { run_in_background: true }),
+			),
+		).toBe(false);
+		expect(
+			ownsNestedActivity(settledAsyncLaunchPart('call-2', { isAsync: true })),
+		).toBe(false);
+	});
+
+	it('matches however the runtime cased the tool name', () => {
+		expect(ownsNestedActivity(toolPart('call-1', 'agent'))).toBe(true);
+		expect(ownsNestedActivity(toolPart('call-2', 'TASK'))).toBe(true);
+	});
+
+	it('leaves an ordinary tool alone', () => {
+		expect(ownsNestedActivity(toolPart('call-1', 'Grep'))).toBe(false);
+		expect(ownsNestedActivity(toolPart('call-2', 'Bash'))).toBe(false);
+	});
+
+	it('leaves a non-tool part alone', () => {
+		expect(ownsNestedActivity(textPart('thinking about it'))).toBe(false);
 	});
 });
