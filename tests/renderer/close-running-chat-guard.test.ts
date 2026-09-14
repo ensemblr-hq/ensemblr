@@ -52,9 +52,10 @@ describe('planClose', () => {
 		}
 	});
 
-	test('a running target reports no background count, so the dialog says turn', () => {
-		// Both reasons at once is still a running turn first: cancelling it is what
-		// the confirm actually does, and that is the sentence that must be true.
+	test('a running target that also holds background tasks carries both', () => {
+		// The two are independent and the dialog names both: confirming cancels the
+		// turn *and* takes the background work with it, and a user who is only told
+		// about the turn loses the shells without being asked.
 		const plan = planClose({
 			backgroundTaskCount: 3,
 			isRunning: true,
@@ -63,7 +64,21 @@ describe('planClose', () => {
 		});
 		expect(plan.kind).toBe('defer');
 		if (plan.kind === 'defer') {
-			expect(plan.pending.backgroundTaskCount).toBe(0);
+			expect(plan.pending.backgroundTaskCount).toBe(3);
+			expect(plan.pending.isRunning).toBe(true);
+		}
+	});
+
+	test('an idle target deferred for background tasks reports no running turn', () => {
+		const plan = planClose({
+			backgroundTaskCount: 2,
+			isRunning: false,
+			onClose: vi.fn(() => {}),
+			onStop: vi.fn(() => {}),
+		});
+		expect(plan.kind).toBe('defer');
+		if (plan.kind === 'defer') {
+			expect(plan.pending.isRunning).toBe(false);
 		}
 	});
 });
@@ -73,6 +88,7 @@ describe('runConfirmedClose', () => {
 		const order: string[] = [];
 		await runConfirmedClose({
 			backgroundTaskCount: 0,
+			isRunning: true,
 			onClose: () => {
 				order.push('close');
 			},
@@ -95,6 +111,7 @@ describe('runConfirmedClose', () => {
 
 		await runConfirmedClose({
 			backgroundTaskCount: 0,
+			isRunning: true,
 			onClose: () => {
 				order.push('close');
 			},
@@ -111,6 +128,7 @@ describe('runConfirmedClose', () => {
 		const onClose = vi.fn(() => {});
 		await runConfirmedClose({
 			backgroundTaskCount: 0,
+			isRunning: true,
 			onClose,
 			onStop: () => Promise.reject(new Error('stop failed')),
 		});
@@ -121,6 +139,7 @@ describe('runConfirmedClose', () => {
 		const onClose = vi.fn(() => {});
 		await runConfirmedClose({
 			backgroundTaskCount: 0,
+			isRunning: true,
 			onClose,
 			onStop: () => {
 				throw new Error('boom');
@@ -133,6 +152,7 @@ describe('runConfirmedClose', () => {
 		const order: string[] = [];
 		await runConfirmedClose({
 			backgroundTaskCount: 0,
+			isRunning: true,
 			onClose: () => {
 				order.push('close');
 			},

@@ -34,6 +34,21 @@ describe('Claude Code background Bash presenters', () => {
 
 		expect(presentation.title).toContain('Start background shell');
 		expect(presentation.glyph).toBe('play');
+		expect(presentation.preview).toEqual({
+			font: 'mono',
+			text: 'bash_1 · sleep 60',
+		});
+	});
+
+	test('a background launch with no reported id previews the command alone', () => {
+		const presentation = presentToolCall(
+			callWithDetails(
+				'Bash',
+				{ command: 'sleep 60', run_in_background: true },
+				{ text: 'Command running in the background', details: null },
+			),
+		);
+
 		expect(presentation.preview).toEqual({ font: 'mono', text: 'sleep 60' });
 	});
 
@@ -66,7 +81,7 @@ describe('Claude Code background Bash presenters', () => {
 		expect(presentation.title).not.toContain('background');
 	});
 
-	test('foreground Bash uses the SDK description as the title when present', () => {
+	test('foreground Bash keeps the translated title over the SDK description', () => {
 		const presentation = presentToolCall(
 			callWithDetails(
 				'Bash',
@@ -75,7 +90,7 @@ describe('Claude Code background Bash presenters', () => {
 			),
 		);
 
-		expect(presentation.title).toBe('Show working tree status');
+		expect(presentation.title).toBe('Checking git status');
 	});
 
 	test('BashOutput routes through the TaskOutput presenter alias', () => {

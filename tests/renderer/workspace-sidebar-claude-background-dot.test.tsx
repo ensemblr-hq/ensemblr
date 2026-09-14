@@ -33,6 +33,19 @@ describe('claude background dot', () => {
 			<ClaudeBackgroundDot count={1} />,
 		);
 		const dot = container.querySelector('[data-workspace-claude-background]');
-		expect(dot?.getAttribute('title')).toBe('1 background task running');
+		expect(dot?.getAttribute('aria-hidden')).toBeNull();
+		expect(dot?.querySelector('.sr-only')?.textContent).toBe(
+			'1 background task running',
+		);
+	});
+
+	test('pluralizes the announced count above one', () => {
+		const { container } = renderWithProviders(
+			<ClaudeBackgroundDot count={3} />,
+		);
+		const dot = container.querySelector('[data-workspace-claude-background]');
+		expect(dot?.querySelector('.sr-only')?.textContent).toBe(
+			'3 background tasks running',
+		);
 	});
 });

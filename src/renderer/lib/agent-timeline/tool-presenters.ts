@@ -308,25 +308,18 @@ function shellTranscript(command: string, output: string): string {
 }
 
 /**
- * Names the shell command a row runs. The tool call may carry an SDK
- * `description` that already says what the command does in plain words; that
- * beats a parse of the shell line because it is what the model wrote, and the
- * parse falls through for the many commands nothing tries to summarize.
+ * Names the shell command a row runs. The SDK `description` the call may carry
+ * is deliberately not used: it is English prose the model wrote for a reader
+ * who cannot see the command, and this row shows the command in its preview.
+ * {@link shellCommandTitle} is a translated vocabulary, so preferring the
+ * description would leave a Russian or Greek timeline with English titles.
  * @param command - The command line, or null when the call named none
- * @param description - The SDK-provided plain-language summary, when present
  * @returns The row title
  */
-function bashRowTitle(
-	command: string | null,
-	description: string | null,
-): string {
-	if (description !== null) {
-		return description;
-	}
-	if (command === null) {
-		return i18n.t('workbench:tool-call.bash.title', 'Bash');
-	}
-	return shellCommandTitle(command);
+function bashRowTitle(command: string | null): string {
+	return command === null
+		? i18n.t('workbench:tool-call.bash.title', 'Bash')
+		: shellCommandTitle(command);
 }
 
 /**
@@ -392,10 +385,12 @@ function isBashBackgroundLaunch(
 }
 
 /**
- * Runs a background shell. The title says the row is a background launch and
- * names the assigned task id when the SDK reported one; the preview stays the
- * command; the body still shows the transcript, which for a background launch
- * is the "Command running in the background" confirmation the model reads.
+ * Runs a background shell. The title says the row is a background launch; the
+ * preview leads with the assigned task id when the SDK reported one, because
+ * that id is what ties this row to the `TaskOutput` and `TaskStop` rows further
+ * down, which title themselves by it. The body still shows the transcript,
+ * which for a background launch is the "Command running in the background"
+ * confirmation the model reads.
  * @param part - The `Bash` tool part to project
  * @returns The row's title, badge, preview, and body
  */
@@ -404,34 +399,16 @@ function presentBashBackgroundLaunch(
 ): ToolPresenterResult {
 	const input = inputOf(part);
 	const command = stringField(input, 'command', 'cmd');
-	const description = stringField(input, 'description');
 	const commandLine =
 		command ??
 		i18n.t('workbench:tool-call.placeholder.no-command', '(no command)');
 	const output = outputOf(part);
 	const details = output?.details ?? null;
-	const taskId =
-		(details && typeof details.backgroundTaskId === 'string'
-			? details.backgroundTaskId
-			: null) ??
-		(details && typeof details.taskId === 'string' ? details.taskId : null);
+	const taskId = backgroundTaskIdOf(details);
 	const timedOutAfterMs =
 		details && typeof details.timedOutAfterMs === 'number'
 			? details.timedOutAfterMs
 			: null;
-	const summary = description ?? command ?? '';
-	const openingTitle =
-		timedOutAfterMs !== null && timedOutAfterMs > 0
-			? i18n.t(
-					'workbench:tool-call.bash.auto-backgrounded-title',
-					'Auto-backgrounded shell',
-				)
-			: i18n.t(
-					'workbench:tool-call.bash.background-title',
-					'Start background shell',
-				);
-	const suffix =
-		summary.length > 0 ? `: ${summary}` : taskId !== null ? ` (${taskId})` : '';
 	return {
 		badge: null,
 		body: textBody(
@@ -439,10 +416,40 @@ function presentBashBackgroundLaunch(
 			'bash' as BundledLanguage,
 		),
 		glyph: 'play',
-		preview: { font: 'mono', text: commandLine },
-		title: `${openingTitle}${suffix}`,
+		preview: {
+			font: 'mono',
+			text: taskId === null ? commandLine : `${taskId} · ${commandLine}`,
+		},
+		title:
+			timedOutAfterMs !== null && timedOutAfterMs > 0
+				? i18n.t(
+						'workbench:tool-call.bash.auto-backgrounded-title',
+						'Auto-backgrounded shell',
+					)
+				: i18n.t(
+						'workbench:tool-call.bash.background-title',
+						'Start background shell',
+					),
 		tone: 'default',
 	};
+}
+
+/**
+ * Reads the task id the SDK assigned a background launch, under either of the
+ * two names its results use.
+ * @param details - The `details` bag on the tool-result, or null.
+ * @returns The task id, or null when the result reported none.
+ */
+function backgroundTaskIdOf(
+	details: Readonly<Record<string, unknown>> | null,
+): string | null {
+	if (details === null) {
+		return null;
+	}
+	if (typeof details.backgroundTaskId === 'string') {
+		return details.backgroundTaskId;
+	}
+	return typeof details.taskId === 'string' ? details.taskId : null;
 }
 
 /**
@@ -462,7 +469,6 @@ function presentBash(part: DynamicToolUIPart): ToolPresenterResult {
 		return presentBashBackgroundLaunch(part);
 	}
 	const command = stringField(input, 'command', 'cmd');
-	const description = stringField(input, 'description');
 	const commandLine =
 		command ??
 		i18n.t('workbench:tool-call.placeholder.no-command', '(no command)');
@@ -474,7 +480,7 @@ function presentBash(part: DynamicToolUIPart): ToolPresenterResult {
 			'bash' as BundledLanguage,
 		),
 		preview: { font: 'mono', text: commandLine },
-		title: `${bashRowTitle(command, description)}${outcome}`,
+		title: `${bashRowTitle(command)}${outcome}`,
 		tone: 'default',
 	};
 }

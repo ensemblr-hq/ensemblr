@@ -218,8 +218,10 @@
 		}
 	},
 	"close-running-chat": {
-		"background-description_one": "This chat still has {{count}} background task running. Closing it is the last place that work is visible.",
-		"background-description_other": "This chat still has {{count}} background tasks running. Closing it is the last place that work is visible.",
+		"background-also_one": "Closing also ends the {{count}} background task it left running.",
+		"background-also_other": "Closing also ends the {{count}} background tasks it left running.",
+		"background-description_one": "This chat still has {{count}} background task running. Closing it loses the only place that work is visible.",
+		"background-description_other": "This chat still has {{count}} background tasks running. Closing it loses the only place that work is visible.",
 		"background-title": "Close chat with background tasks?",
 		"confirm": "Close anyway",
 		"description": "This chat is currently running. Closing it will stop the current agent session.",

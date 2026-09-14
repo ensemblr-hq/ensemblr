@@ -7,12 +7,15 @@
 /** A close deferred behind the confirmation dialog: stop the agent, then close. */
 export interface PendingClose {
 	/**
-	 * How many background tasks the chat still has running. Zero means the target
-	 * was deferred because its turn is in flight, which is the case the dialog's
-	 * original copy describes; above zero the dialog says so instead, because a
-	 * chat whose turn has ended and whose shell has not is a different warning.
+	 * How many background tasks the chat still has running. Carried alongside
+	 * {@link isRunning} rather than instead of it: the two are independent, and
+	 * the case where both hold — a model that backgrounded a shell and is still
+	 * talking — is the one where closing costs the most, so the dialog names both
+	 * rather than picking whichever came first.
 	 */
 	backgroundTaskCount: number;
+	/** True when the chat's own turn is in flight, so confirming cancels it. */
+	isRunning: boolean;
 	onClose: () => void;
 	onStop: () => Promise<void> | void;
 }
@@ -51,7 +54,8 @@ export function planClose(request: CloseRunningChatRequest): CloseRequestPlan {
 	return {
 		kind: 'defer',
 		pending: {
-			backgroundTaskCount: request.isRunning ? 0 : request.backgroundTaskCount,
+			backgroundTaskCount: request.backgroundTaskCount,
+			isRunning: request.isRunning,
 			onClose: request.onClose,
 			onStop: request.onStop,
 		},

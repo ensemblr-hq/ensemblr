@@ -252,9 +252,12 @@ export function createQuitGuard(options: QuitGuardOptions): QuitGuard {
 		const strings = quitGuardStrings(options.getLanguage());
 		const entries = buildEntries({
 			backgroundTaskLabel: (task) =>
+				// A replacer function, never a replacement string: the description is
+				// a raw command line, and `$&` or `$'` in one would otherwise expand
+				// against the match rather than appear.
 				strings.backgroundTask.replace(
 					'{{description}}',
-					task.description.trim() || strings.untitledBackgroundTask,
+					() => task.description.trim() || strings.untitledBackgroundTask,
 				),
 			backgroundTasks,
 			readChatDetail: (sessionId) => readChatDetail(sessionId, strings),

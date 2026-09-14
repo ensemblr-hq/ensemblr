@@ -112,7 +112,7 @@ function readBackgroundTaskFields(
 /**
  * Reads an unknown value as a non-empty string, rejecting anything else.
  * @param value - Raw field value
- * @returns The trimmed non-empty string, or null when the field carries none
+ * @returns The string as reported, or null when the field carries none
  */
 function readNonEmptyString(value: unknown): string | null {
 	return typeof value === 'string' && value.length > 0 ? value : null;

@@ -246,6 +246,7 @@ export function WorkspaceRouteContent({
 			/>
 			<CloseRunningChatDialog
 				backgroundTaskCount={closeGuard.backgroundTaskCount}
+				isRunningTurn={closeGuard.isRunningTurn}
 				onCancel={closeGuard.cancelClose}
 				onConfirm={closeGuard.confirmClose}
 				open={closeGuard.isConfirming}
