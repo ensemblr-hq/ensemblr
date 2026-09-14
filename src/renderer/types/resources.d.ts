@@ -4272,7 +4272,9 @@ export default interface Resources {
 			};
 			subagent: {
 				'async-title': 'Launch async sub-agent';
+				'awaiting-activity': 'No steps reported yet.';
 				named: 'Sub-agent: {{type}}';
+				'no-activity': 'Reported no steps.';
 				'no-subject': '(no description)';
 				'output-file': 'Progress file: {{path}}';
 				title: 'Sub-agent';

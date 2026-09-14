@@ -1733,7 +1733,9 @@
 		},
 		"subagent": {
 			"async-title": "Запуск асинхронного суб-агента",
+			"awaiting-activity": "Шагов пока нет.",
 			"named": "Суб-агент: {{type}}",
+			"no-activity": "Шагов не было.",
 			"no-subject": "(без описания)",
 			"output-file": "Файл прогресса: {{path}}",
 			"title": "Суб-агент"

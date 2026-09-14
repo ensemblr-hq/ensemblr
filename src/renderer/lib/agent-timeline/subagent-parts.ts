@@ -3,7 +3,7 @@ import type {
 	TimelineActivityNode,
 	UIMessagePart,
 } from '@/renderer/types/agent-timeline';
-import { outputOf } from './tool-part-fields.ts';
+import { isAsyncAgentLaunch, outputOf } from './tool-part-fields.ts';
 
 /**
  * Reads the tool call a part ran inside.
@@ -13,6 +13,43 @@ import { outputOf } from './tool-part-fields.ts';
 export function parentToolCallIdOf(part: UIMessagePart): string | null {
 	const parent = (part as ParentedUIMessagePart).parentToolCallId;
 	return typeof parent === 'string' && parent.length > 0 ? parent : null;
+}
+
+/**
+ * Tool names whose call runs an agent loop inline, so the rows that loop
+ * produces come back stamped with the call's own id rather than the turn's.
+ *
+ * `Task` is Claude Code's sub-agent tool under its pre-v2.1.63 name and `Agent`
+ * under its current one. `Skill` is deliberately absent: the SDK stamps
+ * `parentToolCallId` on the frames of a *subagent* a tool call started, and an
+ * ordinary skill load hands `SKILL.md` straight back to the caller rather than
+ * opening one, so most skill calls own nothing. A skill Claude Code does run in
+ * a subagent still gets its card — from its first nested row, like any tool
+ * missing from this list, because {@link groupSubagentActivity} nests on the
+ * parent link alone.
+ */
+const INLINE_DELEGATION_TOOL_NAMES: ReadonlySet<string> = new Set([
+	'agent',
+	'task',
+]);
+
+/**
+ * Whether a tool call hosts the rows of an agent loop it ran inline, and so
+ * reads as a delegation for its whole life rather than from the moment its first
+ * nested row arrives.
+ *
+ * A background launch is not one: it reports through the background-task surface
+ * and through its own result body, so treating it as a host would promise rows
+ * that never come.
+ * @param part - The timeline part to inspect
+ * @returns True when the call hosts nested rows
+ */
+export function ownsNestedActivity(part: UIMessagePart): boolean {
+	return (
+		part.type === 'dynamic-tool' &&
+		INLINE_DELEGATION_TOOL_NAMES.has(part.toolName.toLowerCase()) &&
+		!isAsyncAgentLaunch(part)
+	);
 }
 
 /**

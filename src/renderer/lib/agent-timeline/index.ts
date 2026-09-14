@@ -37,6 +37,7 @@ export {
 	countNestedToolCalls,
 	dropEchoedSubagentReports,
 	groupSubagentActivity,
+	ownsNestedActivity,
 	parentToolCallIdOf,
 } from './subagent-parts.ts';
 export { foldTaskPlanRuns } from './task-plan-runs.ts';

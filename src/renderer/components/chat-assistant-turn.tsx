@@ -8,6 +8,7 @@ import {
 	glyphForToolCall,
 	groupSubagentActivity,
 	isHiddenEnsemblrToolCall,
+	ownsNestedActivity,
 	parentToolCallIdOf,
 } from '@/renderer/lib/agent-timeline';
 import { customMessageDataOf, skillPartDataOf } from '@/renderer/lib/pi';
@@ -197,15 +198,32 @@ function IncompleteTurnMarker() {
  * produced. Recursion lives here rather than in the card so the card needs to
  * know nothing about part types, and so a row that turns out to have no children
  * renders exactly as it did before subagents were nested at all.
+ *
+ * An inline delegation takes the card for its whole life — before its first
+ * nested row, and after a run that produced none. A plain row disables its
+ * disclosure while the call is pending, which is right for an ordinary tool
+ * whose pulse already says everything an empty body would, but it would leave a
+ * `Task` or `Agent` call inert for exactly the stretch the user wants to watch.
+ * Deciding per render on whether a row had arrived yet would instead swap the
+ * component mid-run and drop a disclosure they had opened.
  */
 function ActivityNodeRow({ node }: { node: TimelineActivityNode }) {
 	const { part } = node;
-	if (node.children.length === 0 || part.type !== 'dynamic-tool') {
+	if (part.type !== 'dynamic-tool') {
 		return <ActivityPart part={part} />;
 	}
+	const hostsNestedRows = node.children.length > 0 || ownsNestedActivity(part);
+	if (!hostsNestedRows) {
+		return <ActivityPart part={part} />;
+	}
+	const rows = foldTaskPlanRuns(node.children);
 	return (
-		<ChatSubagentCall part={part} toolCallCount={countNestedToolCalls(node)}>
-			{foldTaskPlanRuns(node.children).map((child) => (
+		<ChatSubagentCall
+			hasNestedRows={rows.length > 0}
+			part={part}
+			toolCallCount={countNestedToolCalls(node)}
+		>
+			{rows.map((child) => (
 				<ActivityRow key={child.key} row={child} />
 			))}
 		</ChatSubagentCall>

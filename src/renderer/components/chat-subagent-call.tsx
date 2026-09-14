@@ -16,8 +16,10 @@ import { ToolCommandChip } from './tool-collapsible/tool-chips';
  * turn belonged to a delegate. Nested rows come first and the subagent's closing
  * report last, which is the order it produced them in.
  *
- * The timeline renders this only for a delegation that produced rows; one that
- * produced none is a plain tool row and never reaches here.
+ * The timeline renders this for an inline delegation and for any call that
+ * turned out to own rows, so it is reached with an empty body twice over: before
+ * a running delegation's first row lands, and after one that produced none at
+ * all. Either way it says which rather than opening onto a blank panel.
  *
  * Unlike a plain tool row, a delegation still in flight stays open for business:
  * its nested rows arrive while it runs, so the disclosure has real work behind
@@ -26,10 +28,13 @@ import { ToolCommandChip } from './tool-collapsible/tool-chips';
  */
 export function ChatSubagentCall({
 	children,
+	hasNestedRows,
 	part,
 	toolCallCount,
 }: {
 	children: ReactNode;
+	/** Whether `children` holds rows to paint, which only the caller can know. */
+	hasNestedRows: boolean;
 	part: DynamicToolUIPart;
 	/** How many tool calls the subagent ran, at every depth. */
 	toolCallCount: number;
@@ -40,7 +45,7 @@ export function ChatSubagentCall({
 		() => presentToolCall(part),
 		[part, i18n.language],
 	);
-	const { body, glyph, preview, title, tone } = presentation;
+	const { body, glyph, preview, running, title, tone } = presentation;
 	const hasBody = body.kind !== 'empty' && body.kind !== 'pending';
 
 	return (
@@ -69,12 +74,29 @@ export function ChatSubagentCall({
 			}
 		>
 			<div className='flex flex-col gap-2'>
-				<div
-					className='flex flex-col gap-1.5 border-border/40 border-l pl-3'
-					data-role='subagent-children'
-				>
-					{children}
-				</div>
+				{hasNestedRows ? (
+					<div
+						className='flex flex-col gap-1.5 border-border/40 border-l pl-3'
+						data-role='subagent-children'
+					>
+						{children}
+					</div>
+				) : (
+					<p
+						className='text-muted-foreground text-xs'
+						data-role='subagent-awaiting'
+					>
+						{running
+							? t(
+									'workbench:tool-call.subagent.awaiting-activity',
+									'No steps reported yet.',
+								)
+							: t(
+									'workbench:tool-call.subagent.no-activity',
+									'Reported no steps.',
+								)}
+					</p>
+				)}
 				{hasBody ? <ToolBody body={body} /> : null}
 			</div>
 		</ToolCollapsible>
