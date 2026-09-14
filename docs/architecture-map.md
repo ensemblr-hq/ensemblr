@@ -131,7 +131,7 @@ The only code both processes may import. Two shapes coexist:
 
 - **Single-file concerns** — plain root modules (`config.ts`, `permissions.ts`,
   `github.ts`, `slug.ts`, `menu-commands.ts`, `concierge-references.ts`,
-  `window-chrome.ts`, …); 47 `.ts` files sit at the shared root in total.
+  `window-chrome.ts`, …); 48 `.ts` files sit at the shared root in total.
 - **Multi-file concerns** — an implementation directory behind a stable
   entrypoint, in one of two forms:
   - `<concern>/index.ts` — `ipc/` (46 contract modules under `ipc/contracts/`,
