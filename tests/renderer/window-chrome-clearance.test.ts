@@ -11,17 +11,9 @@
  * only on Linux, only once a menu is opened.
  */
 
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
 import { expect, test } from 'vitest';
 
-const STYLESHEET = readFileSync(
-	fileURLToPath(
-		new URL('../../src/renderer/styles/index.css', import.meta.url),
-	),
-	'utf8',
-);
+import { readStyleRule } from './support/stylesheet';
 
 const CLEARANCE =
 	'padding-block-start: var(--ensemblr-window-chrome-inset-top)';
@@ -30,13 +22,13 @@ const SHEET_OFFSET =
 	'inset-block-start: var(--ensemblr-window-chrome-inset-top)';
 
 /**
- * Reads one top-level rule out of the stylesheet's `@layer base` block.
- * @param selector - The selector whose declarations to read.
+ * Reads one top-level rule's declarations, treating a rule the stylesheet no
+ * longer carries as one that declares nothing.
+ * @param anchor - The rule's first selector, written as the stylesheet writes it.
  * @returns The rule's declarations, or an empty string when it has no rule.
  */
-function declarationsFor(selector: string): string {
-	const rule = new RegExp(`\\n\\t${selector} \\{([^{}]*)\\}`).exec(STYLESHEET);
-	return rule?.[1] ?? '';
+function declarationsFor(anchor: string): string {
+	return readStyleRule(anchor)?.declarations ?? '';
 }
 
 test('the app root clears the title bar Ensemblr draws above it', () => {
@@ -48,10 +40,9 @@ test('body does not, because Radix rewrites its padding on every open menu', () 
 });
 
 test('side sheets clear the custom title bar without losing usable height', () => {
-	const sideSheetRule =
-		/\n\t\[data-slot="sheet-content"\]\[data-side="left"\],[^{]+\{([^{}]*)\}/.exec(
-			STYLESHEET,
-		)?.[1];
+	const sideSheetRule = declarationsFor(
+		'[data-slot="sheet-content"][data-side="left"]',
+	);
 
 	expect(sideSheetRule).toContain(SHEET_HEIGHT);
 	expect(sideSheetRule).toContain(SHEET_OFFSET);

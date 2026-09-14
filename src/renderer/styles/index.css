@@ -768,17 +768,30 @@
 	   where Ensemblr draws the title bar it would slide out over that strip and
 	   its window controls. Apply the resolved chrome variables directly rather
 	   than relying on a document marker; both resolve to the unmodified viewport
-	   size everywhere without a top inset. */
+	   size everywhere without a top inset.
+
+	   The navigation sidebar's own sheet needs naming separately: it stamps
+	   `data-slot="sidebar"` over the primitive's `sheet-content` — after the
+	   spread, so the sheet's slot is gone rather than doubled — which left the
+	   narrow-window sidebar as the one sheet still opening underneath the title
+	   bar, its first row unclickable. `data-mobile` is what separates it from the
+	   desktop wrapper, which carries that same slot and must not be sized. */
 	[data-slot="sheet-content"][data-side="left"],
-	[data-slot="sheet-content"][data-side="right"] {
+	[data-slot="sheet-content"][data-side="right"],
+	[data-slot="sidebar"][data-mobile="true"] {
 		block-size: var(--ensemblr-shell-height);
 		inset-block-start: var(--ensemblr-window-chrome-inset-top);
 	}
 
 	/* A toolbar inside a sheet is overlay chrome rather than the window's title
 	   bar, so dragging its empty space must not drag the window out from under
-	   the sheet. */
-	[data-slot="sheet-content"] .native-toolbar {
+	   the sheet. The navigation sidebar's sheet needs naming separately here for
+	   the same reason it does above, and the strip it draws is a
+	   `window-chrome-spacer` rather than a toolbar. It takes the drag rule back
+	   at that rule's own weight and wins on source order, which is what the
+	   `:where()` up there is written to allow. */
+	[data-slot="sheet-content"] .native-toolbar,
+	:where([data-slot="sidebar"][data-mobile="true"]) .window-chrome-spacer {
 		-webkit-app-region: no-drag;
 	}
 
