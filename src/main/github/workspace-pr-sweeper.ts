@@ -15,12 +15,19 @@ export interface RefreshSnapshotOutcome {
 /** One non-archived workspace the sweeper should refresh. */
 export interface SweepableWorkspace {
 	/**
-	 * Whether the workspace's cached snapshot holds an open pull request with a
-	 * check still running. Those rows are the ones whose persisted status goes
-	 * wrong fastest — a check finishing is invisible until the next refresh — so
+	 * Whether the workspace's cached snapshot holds an open pull request whose
+	 * status is still moving — a check running, a rollup GitHub has yet to
+	 * register for a head it just accepted, or a pull request the branch tip has
+	 * passed. Those rows are the ones whose persisted status goes wrong fastest,
+	 * since each of those transitions is invisible until the next refresh, so
 	 * they are swept on the short cadence.
+	 *
+	 * Independent of whether the pull request also reads as *blocked*: a
+	 * protected repository reports `BLOCKED` for as long as its required checks
+	 * run, so treating blocked as settled would put the commonest CI window on
+	 * the idle cadence.
 	 */
-	hasPendingChecks: boolean;
+	hasUnsettledStatus: boolean;
 	id: string;
 	path: string;
 }
@@ -28,7 +35,7 @@ export interface SweepableWorkspace {
 /** Dependencies for {@link createWorkspacePrStatusSweeper}. */
 export interface WorkspacePrStatusSweeperOptions {
 	/**
-	 * How often a workspace with no checks in flight is refreshed. Defaults to
+	 * How often a workspace whose status has settled is refreshed. Defaults to
 	 * {@link DEFAULT_IDLE_SWEEP_INTERVAL_MS}.
 	 */
 	idleIntervalMs?: number;
@@ -37,8 +44,8 @@ export interface WorkspacePrStatusSweeperOptions {
 	/** Clock seam; defaults to `Date.now`. */
 	now?: () => number;
 	/**
-	 * How often a workspace with checks in flight is refreshed, which is also the
-	 * tick cadence. Defaults to {@link DEFAULT_PENDING_SWEEP_INTERVAL_MS}.
+	 * How often a workspace whose status has not settled is refreshed, which is
+	 * also the tick cadence. Defaults to {@link DEFAULT_PENDING_SWEEP_INTERVAL_MS}.
 	 */
 	pendingIntervalMs?: number;
 	/**
@@ -66,7 +73,7 @@ export interface WorkspacePrStatusSweeper {
 }
 
 /**
- * Cadence for a workspace whose pull request has a check in flight. A check
+ * Cadence for a workspace whose pull request status has not settled. A check
  * completing is the transition that makes the persisted status wrong, and the
  * whole app reads that persisted status until a live snapshot lands — so the
  * window between "checks passed" and "the app knows" is what a user sees as the
@@ -81,8 +88,16 @@ const DEFAULT_PENDING_SWEEP_INTERVAL_MS = 30_000;
  * across many workspaces (the sweep fetches sequentially), short enough that a
  * merged pull request or a newly failing check surfaces on cold sidebar rows
  * within a couple of minutes.
+ *
+ * Exported so `tests/main/sweep-cadence-invariant.test.ts` can hold
+ * `CHECK_REGISTRATION_GRACE_MS` strictly above it, which is what makes the grace
+ * reachable at all: it is measured from the last non-empty rollup, so the first
+ * empty rollup an idle workspace observes is already one full interval past that
+ * stamp. Above this cadence that first observation is still inside the grace and
+ * moves the workspace onto the short one; at or below it, the grace has lapsed
+ * before anything can act on it.
  */
-const DEFAULT_IDLE_SWEEP_INTERVAL_MS = 120_000;
+export const DEFAULT_IDLE_SWEEP_INTERVAL_MS = 120_000;
 
 /**
  * Failure codes that do not recover on a timer — the `gh` CLI is missing or
@@ -149,8 +164,8 @@ function defaultSchedule(callback: () => void, ms: number): () => void {
 /**
  * Periodically refreshes every non-archived workspace's cached GitHub PR
  * snapshot so sidebar rows reflect real merge/checks status even for workspaces
- * the user has not opened this session. Workspaces with a check in flight are
- * swept on a short cadence and the rest on a long one, so the status a freshly
+ * the user has not opened this session. Workspaces whose status has not settled
+ * are swept on a short cadence and the rest on a long one, so the status a freshly
  * opened workspace renders before its own live fetch lands is rarely stale.
  * Fetches sequentially to keep `gh` load bounded, and never throws out of a
  * sweep so one failing workspace cannot stall the rest.
@@ -189,7 +204,7 @@ export function createWorkspacePrStatusSweeper(
 		if (sweptAtMs === undefined) {
 			return true;
 		}
-		const intervalMs = workspace.hasPendingChecks
+		const intervalMs = workspace.hasUnsettledStatus
 			? pendingIntervalMs
 			: idleIntervalMs;
 		return currentMs - sweptAtMs >= intervalMs;

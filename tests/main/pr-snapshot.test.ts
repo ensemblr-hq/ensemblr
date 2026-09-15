@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
 	parseReviewThreads,
+	retainCheckObservation,
 	retainKnownMergeability,
 } from '../../src/main/github/pr-snapshot.ts';
 import type {
@@ -255,4 +256,95 @@ test('retainKnownMergeability passes through when there is nothing cached', () =
 
 	assert.equal(retainKnownMergeability(fetched, null), fetched);
 	assert.equal(retainKnownMergeability(fetched, snapshot(null)), fetched);
+});
+
+test('retainCheckObservation stamps the fetch that reported a check', () => {
+	const stamped = retainCheckObservation(
+		snapshot(
+			{ checks: [{ bucket: 'pending', id: 'ci:0', name: 'ci' }] },
+			'2026-08-20T12:00:00.000Z',
+		),
+		null,
+	);
+
+	assert.equal(
+		stamped.pullRequest?.checksLastObservedAt,
+		'2026-08-20T12:00:00.000Z',
+	);
+});
+
+test('retainCheckObservation carries the stamp across an empty rollup', () => {
+	const cached = retainCheckObservation(
+		snapshot(
+			{ checks: [{ bucket: 'passing', id: 'ci:0', name: 'ci' }] },
+			'2026-08-20T11:41:00.000Z',
+		),
+		null,
+	);
+	const carried = retainCheckObservation(
+		snapshot({ checks: [] }, '2026-08-20T11:41:30.000Z'),
+		cached,
+	);
+
+	assert.equal(
+		carried.pullRequest?.checksLastObservedAt,
+		'2026-08-20T11:41:00.000Z',
+	);
+});
+
+test('retainCheckObservation restarts the stamp when a push moved the head', () => {
+	const cached = retainCheckObservation(
+		snapshot(
+			{
+				checks: [{ bucket: 'passing', id: 'ci:0', name: 'ci' }],
+				headRefOid: 'abc123',
+			},
+			'2026-08-20T11:41:00.000Z',
+		),
+		null,
+	);
+	const pushed = retainCheckObservation(
+		snapshot({ checks: [], headRefOid: 'def456' }, '2026-08-20T12:41:00.000Z'),
+		cached,
+	);
+
+	assert.equal(
+		pushed.pullRequest?.checksLastObservedAt,
+		'2026-08-20T12:41:00.000Z',
+	);
+});
+
+test('retainCheckObservation leaves a moved head alone when no check was ever seen', () => {
+	const fetched = snapshot({ checks: [], headRefOid: 'def456' });
+
+	assert.equal(
+		retainCheckObservation(fetched, snapshot({ headRefOid: 'abc123' })),
+		fetched,
+	);
+});
+
+test('retainCheckObservation drops the stamp of a different pull request', () => {
+	const cached = retainCheckObservation(
+		snapshot({ checks: [{ bucket: 'passing', id: 'ci:0', name: 'ci' }] }),
+		null,
+	);
+	const carried = retainCheckObservation(
+		snapshot({ checks: [], number: 512 }),
+		cached,
+	);
+
+	assert.equal(carried.pullRequest?.checksLastObservedAt, undefined);
+});
+
+test('retainCheckObservation leaves a pull request that never had checks alone', () => {
+	const fetched = snapshot({ checks: [] });
+
+	assert.equal(retainCheckObservation(fetched, null), fetched);
+	assert.equal(retainCheckObservation(fetched, snapshot(null)), fetched);
+});
+
+test('retainCheckObservation passes through when there is no pull request', () => {
+	const fetched = snapshot(null);
+
+	assert.equal(retainCheckObservation(fetched, null), fetched);
 });

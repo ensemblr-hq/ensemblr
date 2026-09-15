@@ -9,7 +9,10 @@ import type {
 	PullRequestTodoSummary,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import { deriveOpenPullRequestStatus } from '@/shared/github-pr-presentation';
+import {
+	deriveOpenPullRequestStatus,
+	type OpenPullRequestStatusInput,
+} from '@/shared/github-pr-presentation';
 import type {
 	GitBranchSyncWire,
 	GithubCheckWire,
@@ -84,7 +87,11 @@ export function buildPullRequestShellModel({
 	}
 
 	const checks = pullRequest.checks.map(toCheckSummary);
-	const status = derivePullRequestStatus(pullRequest, snapshot.branchSync);
+	const status = derivePullRequestStatus({
+		branchSync: snapshot.branchSync,
+		observedAt: snapshot.syncedAt,
+		pullRequest,
+	});
 	const previewDeployment = derivePreviewDeployment({
 		checks,
 		comments: pullRequest.comments,
@@ -314,19 +321,18 @@ function buildTodoSummaries(
  * so this header model and the cached sidebar rows stay in lockstep. Only the
  * shell-status mapping (`ready` → `ready-to-merge`, draft/open → `idle`) lives
  * here; the underlying policy lives once in `deriveOpenPullRequestStatus`.
- * @param pullRequest - The pull request wire record.
- * @param branchSync - The snapshot's branch sync state, which says whether the
- * PR's verdict describes the branch tip the remote already holds.
+ * @param options - The pull request, the snapshot's branch sync state (which
+ * says whether the PR's verdict describes the branch tip the remote already
+ * holds), and when the snapshot observed GitHub.
  * @returns The shell status for the PR header.
  */
 function derivePullRequestStatus(
-	pullRequest: GithubPullRequestWire,
-	branchSync: GitBranchSyncWire | null,
+	options: OpenPullRequestStatusInput,
 ): PullRequestShellStatus {
-	if (pullRequest.state !== 'open') {
+	if (options.pullRequest.state !== 'open') {
 		return 'idle';
 	}
-	switch (deriveOpenPullRequestStatus(pullRequest, branchSync)) {
+	switch (deriveOpenPullRequestStatus(options)) {
 		case 'blocked':
 			return 'blocked';
 		case 'checking':

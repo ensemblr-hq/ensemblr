@@ -1,11 +1,9 @@
 import type { DatabaseSync } from 'node:sqlite';
-import { deriveWorkspacePrPresentation } from '../../../shared/github-pr-presentation.ts';
-import type { GithubPullRequestSnapshotWire } from '../../../shared/ipc/contracts/github';
+import { parseWorkspacePrPresentation } from '../../../shared/github-pr-presentation.ts';
 import type {
 	RepositoryWorkspaceNavigationMetadata,
 	RepositoryWorkspaceNavigationRepository,
 	RepositoryWorkspaceNavigationSnapshot,
-	WorkspacePrPresentation,
 } from '../../../shared/ipc/contracts/repository-navigation';
 import { liveRepositoryOrderClause } from './repository-row-repository.ts';
 
@@ -145,7 +143,7 @@ export function getRepositoryWorkspaceNavigationSnapshot({
 			metadata: parseMetadataJson(row.metadataJson),
 			name: row.name,
 			path: row.path,
-			pullRequest: parsePullRequestPresentation(row.pullRequestSnapshotJson),
+			pullRequest: parseWorkspacePrPresentation(row.pullRequestSnapshotJson),
 			repositoryId: row.repositoryId,
 			slug: row.slug,
 			updatedAt: row.updatedAt,
@@ -156,33 +154,6 @@ export function getRepositoryWorkspaceNavigationSnapshot({
 		generatedAt,
 		repositories: Array.from(repositoriesById.values()),
 	};
-}
-
-/**
- * Parses a joined PR-snapshot JSON column into the compact presentation the
- * sidebar row renders, tolerating a missing join or malformed cache row.
- *
- * A row with no readable `syncedAt` yields no presentation rather than an
- * unstamped one: the renderer orders this observation against the workspace's
- * own live snapshot by that timestamp, and an absent stamp would silently mean
- * "always the older of the two".
- * @param snapshotJson - Raw `integration_metadata.metadata_json`, or null.
- * @returns The compact PR presentation, or null when absent/unparseable.
- */
-function parsePullRequestPresentation(
-	snapshotJson: string | null,
-): WorkspacePrPresentation | null {
-	if (!snapshotJson) {
-		return null;
-	}
-	try {
-		const parsed = JSON.parse(snapshotJson) as GithubPullRequestSnapshotWire;
-		return typeof parsed?.syncedAt === 'string'
-			? deriveWorkspacePrPresentation(parsed)
-			: null;
-	} catch {
-		return null;
-	}
 }
 
 /**

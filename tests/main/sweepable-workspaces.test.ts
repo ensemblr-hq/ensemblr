@@ -7,6 +7,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 
 import { listSweepableWorkspaces } from '../../src/main/github/sweepable-workspaces.ts';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
+import { listActiveWorkspacePrStatusRows } from '../../src/main/storage/repositories/workspace-repository.ts';
 
 const cleanups: Array<() => void> = [];
 
@@ -69,17 +70,33 @@ function cacheSnapshot(
 		.run(`im-${workspaceId}`, workspaceId, metadataJson);
 }
 
-/** Serializes a snapshot around a pull request's state and check buckets. */
+const SYNCED_AT = '2026-08-20T11:41:00.000Z';
+
+/**
+ * Serializes a snapshot around a pull request's state and check buckets,
+ * carrying the bulky fields a real cached row holds so the listing's
+ * `json_remove` runs against a document that actually has them.
+ */
 function snapshotJson(
 	state: string | null,
 	buckets: readonly string[],
+	overrides: Record<string, unknown> = {},
+	branchSync: unknown = null,
 ): string {
 	return JSON.stringify({
-		branchSync: null,
+		branchSync,
 		pullRequest: state
-			? { checks: buckets.map((bucket) => ({ bucket })), state }
+			? {
+					body: 'A pull request body long enough to be worth dropping.',
+					checks: buckets.map((bucket) => ({ bucket })),
+					comments: [{ body: 'A review thread', id: 'c1' }],
+					deployments: [{ environment: 'preview', id: 'd1' }],
+					number: 7,
+					state,
+					...overrides,
+				}
 			: null,
-		syncedAt: '2026-08-20T11:41:00.000Z',
+		syncedAt: SYNCED_AT,
 	});
 }
 
@@ -95,7 +112,7 @@ describe('listSweepableWorkspaces', () => {
 
 		expect(listSweepableWorkspaces({ database })).toEqual([
 			{
-				hasPendingChecks: true,
+				hasUnsettledStatus: true,
 				id: 'ws-pending',
 				path: '/tmp/ensemblr/sweep/ws-pending',
 			},
@@ -111,7 +128,7 @@ describe('listSweepableWorkspaces', () => {
 			snapshotJson('open', ['passing', 'failing', 'skipped']),
 		);
 
-		expect(listSweepableWorkspaces({ database })[0]?.hasPendingChecks).toBe(
+		expect(listSweepableWorkspaces({ database })[0]?.hasUnsettledStatus).toBe(
 			false,
 		);
 	});
@@ -121,7 +138,7 @@ describe('listSweepableWorkspaces', () => {
 		insertWorkspace(database, 'ws-merged');
 		cacheSnapshot(database, 'ws-merged', snapshotJson('merged', ['pending']));
 
-		expect(listSweepableWorkspaces({ database })[0]?.hasPendingChecks).toBe(
+		expect(listSweepableWorkspaces({ database })[0]?.hasUnsettledStatus).toBe(
 			false,
 		);
 	});
@@ -130,7 +147,7 @@ describe('listSweepableWorkspaces', () => {
 		const database = openTestDatabase();
 		insertWorkspace(database, 'ws-cold');
 
-		expect(listSweepableWorkspaces({ database })[0]?.hasPendingChecks).toBe(
+		expect(listSweepableWorkspaces({ database })[0]?.hasUnsettledStatus).toBe(
 			false,
 		);
 	});
@@ -140,7 +157,7 @@ describe('listSweepableWorkspaces', () => {
 		insertWorkspace(database, 'ws-nopr');
 		cacheSnapshot(database, 'ws-nopr', snapshotJson(null, []));
 
-		expect(listSweepableWorkspaces({ database })[0]?.hasPendingChecks).toBe(
+		expect(listSweepableWorkspaces({ database })[0]?.hasUnsettledStatus).toBe(
 			false,
 		);
 	});
@@ -152,11 +169,105 @@ describe('listSweepableWorkspaces', () => {
 
 		expect(listSweepableWorkspaces({ database })).toEqual([
 			{
-				hasPendingChecks: false,
+				hasUnsettledStatus: false,
 				id: 'ws-corrupt',
 				path: '/tmp/ensemblr/sweep/ws-corrupt',
 			},
 		]);
+	});
+
+	test('flags an empty rollup on a pull request that just had checks', () => {
+		const database = openTestDatabase();
+		insertWorkspace(database, 'ws-queueing');
+		cacheSnapshot(
+			database,
+			'ws-queueing',
+			snapshotJson('open', [], {
+				checksLastObservedAt: '2026-08-20T11:40:00.000Z',
+				mergeable: 'mergeable',
+			}),
+		);
+
+		expect(listSweepableWorkspaces({ database })[0]?.hasUnsettledStatus).toBe(
+			true,
+		);
+	});
+
+	test('flags a pull request whose head lags the pushed branch tip', () => {
+		const database = openTestDatabase();
+		insertWorkspace(database, 'ws-lagging');
+		cacheSnapshot(
+			database,
+			'ws-lagging',
+			snapshotJson(
+				'open',
+				['passing'],
+				{
+					headCommitKnownLocally: true,
+					headRefOid: 'abc123',
+					mergeable: 'mergeable',
+				},
+				{
+					ahead: 0,
+					behind: 0,
+					branchName: 'feature',
+					hasUpstream: true,
+					headSha: 'def456',
+				},
+			),
+		);
+
+		expect(listSweepableWorkspaces({ database })[0]?.hasUnsettledStatus).toBe(
+			true,
+		);
+	});
+
+	test('flags a blocked pull request whose checks are still running', () => {
+		const database = openTestDatabase();
+		insertWorkspace(database, 'ws-blocked');
+		cacheSnapshot(
+			database,
+			'ws-blocked',
+			snapshotJson('open', ['pending'], {
+				mergeStateStatus: 'BLOCKED',
+				mergeable: 'mergeable',
+			}),
+		);
+
+		expect(listSweepableWorkspaces({ database })[0]?.hasUnsettledStatus).toBe(
+			true,
+		);
+	});
+
+	test('flags a pull request with one check failed and another running', () => {
+		const database = openTestDatabase();
+		insertWorkspace(database, 'ws-mixed');
+		cacheSnapshot(
+			database,
+			'ws-mixed',
+			snapshotJson('open', ['failing', 'pending'], { mergeable: 'mergeable' }),
+		);
+
+		expect(listSweepableWorkspaces({ database })[0]?.hasUnsettledStatus).toBe(
+			true,
+		);
+	});
+
+	test('flags a pull request awaiting changes while its checks run', () => {
+		const database = openTestDatabase();
+		insertWorkspace(database, 'ws-changes');
+		cacheSnapshot(
+			database,
+			'ws-changes',
+			snapshotJson('open', ['pending'], {
+				mergeable: 'mergeable',
+				reviewDecision: 'CHANGES_REQUESTED',
+			}),
+		);
+
+		expect(listSweepableWorkspaces({ database })[0]?.hasUnsettledStatus).toBe(
+			true,
+		);
 	});
 
 	test('leaves archived workspaces out of the listing', () => {
@@ -168,5 +279,39 @@ describe('listSweepableWorkspaces', () => {
 		expect(listSweepableWorkspaces({ database }).map((row) => row.id)).toEqual([
 			'ws-live',
 		]);
+	});
+});
+
+describe('listActiveWorkspacePrStatusRows', () => {
+	test('sheds the bulky fields and keeps what the derivation reads', () => {
+		const database = openTestDatabase();
+		insertWorkspace(database, 'ws-trim');
+		cacheSnapshot(
+			database,
+			'ws-trim',
+			snapshotJson('open', ['pending'], {
+				headRefOid: 'abc123',
+				mergeStateStatus: 'BLOCKED',
+				mergeable: 'mergeable',
+			}),
+		);
+
+		const row = listActiveWorkspacePrStatusRows({ database })[0];
+		const parsed = JSON.parse(row?.snapshotJson ?? 'null');
+
+		expect(parsed.pullRequest).not.toHaveProperty('body');
+		expect(parsed.pullRequest).not.toHaveProperty('comments');
+		expect(parsed.pullRequest).not.toHaveProperty('deployments');
+		expect(parsed).toMatchObject({
+			pullRequest: {
+				checks: [{ bucket: 'pending' }],
+				headRefOid: 'abc123',
+				mergeStateStatus: 'BLOCKED',
+				mergeable: 'mergeable',
+				number: 7,
+				state: 'open',
+			},
+			syncedAt: SYNCED_AT,
+		});
 	});
 });

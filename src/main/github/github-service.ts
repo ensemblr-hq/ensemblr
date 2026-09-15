@@ -39,6 +39,7 @@ import {
 	parseDeployments,
 	parsePullRequestView,
 	parseReviewThreads,
+	retainCheckObservation,
 	retainKnownMergeability,
 } from './pr-snapshot.ts';
 
@@ -786,7 +787,10 @@ export function createGithubService({
 				};
 			}
 
-			const snapshot = retainKnownMergeability(fetched.snapshot, cached);
+			const snapshot = retainCheckObservation(
+				retainKnownMergeability(fetched.snapshot, cached),
+				cached,
+			);
 			if (database) {
 				writeCachedPullRequestSnapshot({
 					database,
@@ -825,9 +829,16 @@ export function createGithubService({
 			if (database) {
 				const refreshed = await fetchSnapshot(cwd.cwd, baseBranch);
 				if (refreshed.ok) {
+					const cached = readCachedPullRequestSnapshot({
+						database,
+						workspaceId: request.workspaceId,
+					});
 					writeCachedPullRequestSnapshot({
 						database,
-						snapshot: refreshed.snapshot,
+						snapshot: retainCheckObservation(
+							retainKnownMergeability(refreshed.snapshot, cached),
+							cached,
+						),
 						workspaceId: request.workspaceId,
 					});
 				}
