@@ -95,9 +95,13 @@ function realCommandService(): LocalCommandService {
 		}),
 		run: async (request) => {
 			const args = [...(request.args ?? [])];
+			// The real service overlays `env` onto the resolved environment; the
+			// worktree snapshot points git at a throwaway index that way.
+			const env = { ...process.env, ...request.env } as NodeJS.ProcessEnv;
 			try {
 				const { stdout, stderr } = await execFileAsync('git', args, {
 					cwd: request.cwd,
+					env,
 					maxBuffer: 16 * 1024 * 1024,
 				});
 				return buildResult({ args, cwd: request.cwd, stderr, stdout });
@@ -1163,12 +1167,12 @@ test('getStatus (real git) runs the newest turn to the live working tree', async
 		status.files.map((file) => [file.path, file.status]).sort(),
 		[
 			['a.ts', 'modified'],
-			['fresh.ts', 'untracked'],
+			// A turn range says what the turn did, so a file it created reads as
+			// added rather than borrowing the index's word for it.
+			['fresh.ts', 'added'],
 		],
 	);
 
-	// An untracked file is absent from the checkpoint diff, so the file view has
-	// to fall back to the /dev/null comparison rather than reporting nothing.
 	const untracked = await service.getFileDiff({
 		path: 'fresh.ts',
 		scope: { fromRef: beforeTurn, kind: 'turn' },
@@ -1176,4 +1180,139 @@ test('getStatus (real git) runs the newest turn to the live working tree', async
 	});
 	assert.equal(untracked.error, undefined);
 	assert.match(untracked.patch ?? '', /\+brand new/);
+});
+
+/**
+ * Captures the working tree the way `src/main/checkpoints/` does: everything on
+ * disk, untracked files included, staged into a throwaway index so the
+ * workspace's own index is untouched. A real turn checkpoint is this, not a
+ * commit — which is exactly why the live leg of a turn diff cannot be read
+ * through the real index.
+ */
+async function captureCheckpointCommit(dir: string): Promise<string> {
+	const indexDir = await mkdtemp(path.join(tmpdir(), 'ensemblr-test-ckpt-'));
+	const env = { ...process.env, GIT_INDEX_FILE: path.join(indexDir, 'index') };
+	const git = (...args: string[]) =>
+		execFileAsync('git', args, { cwd: dir, env });
+	try {
+		await git('add', '-A', '--', '.');
+		const tree = (await git('write-tree')).stdout.trim();
+		const parent = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+			cwd: dir,
+		})
+			.then((head) => head.stdout.trim())
+			.catch(() => '');
+		const commit = await git(
+			'commit-tree',
+			tree,
+			...(parent ? ['-p', parent] : []),
+			'-m',
+			'checkpoint',
+		);
+		return commit.stdout.trim();
+	} finally {
+		await rm(indexDir, { force: true, recursive: true });
+	}
+}
+
+/** A repo with one commit, ready for checkpoints to be captured over it. */
+async function seedTurnRepo(dir: string) {
+	const git = (...args: string[]) => execFileAsync('git', args, { cwd: dir });
+	await git('init', '-q');
+	await git('config', 'user.email', 'test@example.com');
+	await git('config', 'user.name', 'Test');
+	await writeFile(path.join(dir, 'tracked.ts'), 'one\n');
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'base');
+	return git;
+}
+
+test('getStatus (real git) reports nothing for a turn that changed nothing', async (t) => {
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-quiet-turn-'));
+	t.after(() => rm(dir, { force: true, recursive: true }));
+	await seedTurnRepo(dir);
+
+	// An earlier turn left an untracked file behind. The next turn's checkpoint
+	// therefore already contains it, and that turn then changes nothing at all.
+	await writeFile(path.join(dir, 'fresh.ts'), 'a\nb\nc\n');
+	const quietTurnStart = await captureCheckpointCommit(dir);
+
+	const service = createWorkspaceGitService({
+		localCommandService: realCommandService(),
+	});
+	const status = await service.getStatus({
+		scope: { fromRef: quietTurnStart, kind: 'turn' },
+		workspaceCwd: dir,
+	});
+
+	assert.equal(status.error, undefined);
+	assert.deepEqual(status.files, []);
+	assert.deepEqual(status.summary, { additions: 0, deletions: 0, files: 0 });
+});
+
+test('getStatus (real git) attributes a new file to the turn that created it', async (t) => {
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-new-file-turn-'));
+	t.after(() => rm(dir, { force: true, recursive: true }));
+	await seedTurnRepo(dir);
+	const turnStart = await captureCheckpointCommit(dir);
+	await writeFile(path.join(dir, 'fresh.ts'), 'a\nb\nc\n');
+
+	const service = createWorkspaceGitService({
+		localCommandService: realCommandService(),
+	});
+	const status = await service.getStatus({
+		scope: { fromRef: turnStart, kind: 'turn' },
+		workspaceCwd: dir,
+	});
+
+	assert.equal(status.error, undefined);
+	assert.deepEqual(
+		status.files.map((file) => [file.path, file.status, file.additions]),
+		[['fresh.ts', 'added', 3]],
+	);
+	// The live leg still stamps its rows: those bytes can change under a reviewer.
+	assert.ok(status.files[0]?.contentId);
+});
+
+test('getStatus (real git) reports a turn deletion once, not as an add/delete pair', async (t) => {
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-turn-delete-'));
+	t.after(() => rm(dir, { force: true, recursive: true }));
+	await seedTurnRepo(dir);
+	await writeFile(path.join(dir, 'fresh.ts'), 'a\nb\nc\n');
+	const turnStart = await captureCheckpointCommit(dir);
+	await rm(path.join(dir, 'fresh.ts'));
+
+	const service = createWorkspaceGitService({
+		localCommandService: realCommandService(),
+	});
+	const status = await service.getStatus({
+		scope: { fromRef: turnStart, kind: 'turn' },
+		workspaceCwd: dir,
+	});
+
+	assert.equal(status.error, undefined);
+	assert.deepEqual(
+		status.files.map((file) => [file.path, file.status, file.deletions]),
+		[['fresh.ts', 'deleted', 3]],
+	);
+});
+
+test('getFileDiff (real git) shows no patch for a file a turn left alone', async (t) => {
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-quiet-file-'));
+	t.after(() => rm(dir, { force: true, recursive: true }));
+	await seedTurnRepo(dir);
+	await writeFile(path.join(dir, 'fresh.ts'), 'a\nb\nc\n');
+	const quietTurnStart = await captureCheckpointCommit(dir);
+
+	const service = createWorkspaceGitService({
+		localCommandService: realCommandService(),
+	});
+	const diff = await service.getFileDiff({
+		path: 'fresh.ts',
+		scope: { fromRef: quietTurnStart, kind: 'turn' },
+		workspaceCwd: dir,
+	});
+
+	assert.equal(diff.error, undefined);
+	assert.equal(diff.patch, '');
 });

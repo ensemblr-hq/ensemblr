@@ -173,3 +173,45 @@ test('the timing cluster cannot wrap away from the chips beside it', async () =>
 		'items-start',
 	);
 });
+
+test('two changed files sharing a name are told apart by their directory', async () => {
+	installEnsemblrApi({
+		getWorkspaceGitStatus: async () => ({
+			files: [
+				{
+					additions: 0,
+					deletions: 162,
+					path: 'tests/main/agent-control-tool-namespacing.test.ts',
+					status: 'deleted' as const,
+				},
+				{
+					additions: 162,
+					deletions: 0,
+					path: 'tests/renderer/agent-control-tool-namespacing.test.ts',
+					status: 'added' as const,
+				},
+			],
+			summary: { additions: 162, deletions: 162, files: 2 },
+		}),
+	});
+
+	renderWithProviders(
+		<ChatTurnFooter
+			answerText=''
+			durationMs={null}
+			onOpenTurnFile={() => undefined}
+			turnScope={{ fromRef: FROM_REF, kind: 'turn', toRef: TO_REF }}
+			workspaceCwd='/tmp/ws'
+		/>,
+	);
+
+	expect(
+		await screen.findByText('main/agent-control-tool-namespacing.test.ts'),
+	).toBeInTheDocument();
+	expect(
+		screen.getByText('renderer/agent-control-tool-namespacing.test.ts'),
+	).toBeInTheDocument();
+	expect(
+		screen.queryByText('agent-control-tool-namespacing.test.ts'),
+	).not.toBeInTheDocument();
+});

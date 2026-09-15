@@ -226,10 +226,3 @@ export function parsePromptAttachments(prompt: string): ParsedPrompt {
 
 	return { parts };
 }
-
-/** Convenience: just the chip-displayable path basename. */
-export function chipLabelForPath(path: string): string {
-	const trimmed = path.replace(/\/+$/, '');
-	const idx = trimmed.lastIndexOf('/');
-	return idx >= 0 ? trimmed.slice(idx + 1) : trimmed;
-}

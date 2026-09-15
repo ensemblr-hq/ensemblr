@@ -12,6 +12,10 @@
  * exported renderer types belong under `@/renderer/types/`.
  */
 
+export {
+	chipLabelForPath,
+	chipLabelsForPaths,
+} from './chip-labels.ts';
 export { isHiddenEnsemblrToolCall } from './ensemblr-tool-presentation.ts';
 export {
 	createTimelineProjector,
@@ -27,10 +31,7 @@ export {
 	matchOptimisticAgainstMessages,
 	optimisticToUIMessage,
 } from './optimistic-prompts.ts';
-export {
-	chipLabelForPath,
-	parsePromptAttachments,
-} from './prompt-attachment-parser.ts';
+export { parsePromptAttachments } from './prompt-attachment-parser.ts';
 export { parseStackTrace } from './stack-trace.ts';
 export { splitSettledMarkdown } from './streaming-markdown-split.ts';
 export {
