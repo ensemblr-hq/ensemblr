@@ -9,6 +9,16 @@ const MIN_THUMB_WIDTH = 24;
 /** Idle delay before the overlay scrollbar fades back out, in milliseconds. */
 const THUMB_HIDE_DELAY_MS = 900;
 
+/** Share of the visible strip one arrow click travels. */
+const ARROW_PAGE_RATIO = 0.8;
+
+/**
+ * Subpixel slack when deciding whether an edge has been reached, in pixels. A
+ * strip scrolled flush to an end can land a fraction short of its own overflow,
+ * which without slack reads as "still scrollable" and flickers the arrow.
+ */
+const EDGE_EPSILON = 1;
+
 /**
  * Finds the tab element carrying `key` in its `data-tab-key` attribute. Matching
  * on the dataset value rather than a selector keeps ids that contain CSS-special
@@ -90,6 +100,21 @@ function syncThumb(viewport: HTMLElement, thumb: HTMLElement): boolean {
 }
 
 /**
+ * Publishes how far the strip can still travel in each direction, so the edge
+ * fades and the arrow buttons can be pure CSS off the wrapper's dataset rather
+ * than React state that would re-render the strip on every scroll frame.
+ * @param viewport - Scrolling element that clips the tab strip
+ * @param wrapper - Element carrying the published edge state
+ */
+function syncEdges(viewport: HTMLElement, wrapper: HTMLElement) {
+	const overflow = viewport.scrollWidth - viewport.clientWidth;
+	const canScrollStart = viewport.scrollLeft > EDGE_EPSILON;
+	const canScrollEnd = viewport.scrollLeft < overflow - EDGE_EPSILON;
+	wrapper.dataset.overflowStart = canScrollStart ? 'true' : 'false';
+	wrapper.dataset.overflowEnd = canScrollEnd ? 'true' : 'false';
+}
+
+/**
  * Makes the thumb draggable: while the pointer is down, the viewport scrolls by
  * the drag delta scaled up to the strip's overflow, so the thumb tracks the
  * cursor. Reports drag start and end so the caller can hold the scrollbar
@@ -146,9 +171,10 @@ function attachThumbDrag({
 
 /**
  * Wires the auto-hiding overlay scrollbar to a scrolling tab strip: keeps the
- * thumb in sync with the viewport, reveals it while the user scrolls, hovers, or
- * drags it, and fades it out once all three stop. Also reports every reflow, so
- * the caller can re-reveal the active tab after a resize moves it out of view.
+ * thumb and the published edge state in sync with the viewport, reveals the
+ * thumb while the user scrolls, hovers, or drags it, and fades it out once all
+ * three stop. Also reports every reflow, so the caller can re-reveal the active
+ * tab after a resize moves it out of view.
  * @param input - Surfaces of one strip, plus the reflow callback
  * @returns Teardown removing every listener and observer it registered
  */
@@ -182,10 +208,13 @@ function attachOverlayScrollbar({
 	};
 
 	/**
-	 * Resizes the thumb, shows it whenever the strip overflows, and queues the
-	 * fade-out unless the pointer is still hovering or dragging the strip.
+	 * Republishes the edge state, resizes the thumb, shows it whenever the strip
+	 * overflows, and queues the fade-out unless the pointer is still hovering or
+	 * dragging the strip. The edges are synced ahead of the thumb's own
+	 * overflow check, so a strip that has stopped overflowing still clears them.
 	 */
 	const reveal = () => {
+		syncEdges(viewport, wrapper);
 		const isOverflowing = syncThumb(viewport, thumb);
 		if (hideTimer) {
 			clearTimeout(hideTimer);
@@ -254,10 +283,11 @@ function attachOverlayScrollbar({
 
 /**
  * Keeps a horizontally scrolling tab strip usable: brings the active tab fully
- * into view whenever it changes or a reflow pushes it out, and drives an
- * auto-hiding overlay scrollbar that costs the strip no layout height.
+ * into view whenever it changes or a reflow pushes it out, drives an auto-hiding
+ * overlay scrollbar that costs the strip no layout height, and publishes how far
+ * the strip can still travel in each direction for its edge affordances.
  * @param activeKey - `data-tab-key` of the active tab, or null when none is active
- * @returns Refs the strip attaches to its wrapper, viewport, and thumb elements
+ * @returns The paging action, plus refs for the wrapper, viewport, and thumb
  */
 export function useTabScroller(activeKey: string | null) {
 	const wrapperRef = useRef<HTMLDivElement>(null);
@@ -315,5 +345,23 @@ export function useTabScroller(activeKey: string | null) {
 		});
 	}, [alignActiveTab]);
 
-	return { thumbRef, viewportRef, wrapperRef };
+	/**
+	 * Travels most of a viewport width toward one end, keeping a sliver of the
+	 * outgoing tabs on screen as an anchor. The smooth scroll emits its own
+	 * scroll events, so the edge state follows the animation without extra work.
+	 * @param direction - -1 to page toward the start, 1 toward the end
+	 */
+	const scrollByPage = useCallback((direction: -1 | 1) => {
+		const viewport = viewportRef.current;
+		if (!viewport) {
+			return;
+		}
+
+		viewport.scrollBy({
+			behavior: 'smooth',
+			left: direction * viewport.clientWidth * ARROW_PAGE_RATIO,
+		});
+	}, []);
+
+	return { scrollByPage, thumbRef, viewportRef, wrapperRef };
 }

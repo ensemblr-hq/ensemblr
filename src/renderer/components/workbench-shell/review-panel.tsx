@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { TabScroller } from '@/renderer/components/tab-scroller';
 import { Button } from '@/renderer/components/ui/button';
 import { Tabs, TabsContent } from '@/renderer/components/ui/tabs';
 import { AgentsPanel } from '@/renderer/components/workbench-shell/agents-panel/agents-panel';
@@ -58,8 +59,8 @@ export function ReviewPanelTabsHeader<TabId extends string>({
 }) {
 	return (
 		<div className='flex h-10 shrink-0 items-center justify-between gap-2 overflow-hidden border-border border-b px-3'>
-			<div className='no-scrollbar min-w-0 flex-1 overflow-x-auto overflow-y-hidden'>
-				<div className='flex w-max min-w-full items-center gap-1'>
+			<TabScroller activeKey={activeTab} className='h-full flex-1'>
+				<div className='flex h-full w-max min-w-full items-center gap-1'>
 					{tabs.map((tab) => (
 						<ReviewTabButton
 							count={tab.count}
@@ -67,10 +68,11 @@ export function ReviewPanelTabsHeader<TabId extends string>({
 							key={tab.id}
 							label={tab.label}
 							onSelect={() => onTabChange(tab.id)}
+							tabKey={tab.id}
 						/>
 					))}
 				</div>
-			</div>
+			</TabScroller>
 			{actions}
 		</div>
 	);
@@ -371,18 +373,24 @@ function ChecksRefreshButton() {
 	);
 }
 
+/** Props of one review-panel header tab. */
+interface ReviewTabButtonProps {
+	count?: number;
+	isActive: boolean;
+	label: string;
+	onSelect: () => void;
+	/** Published as `data-tab-key` so `TabScroller` can scroll this tab into view. */
+	tabKey: string;
+}
+
 /** Individual tab button rendered inside the review-panel header. */
 function ReviewTabButton({
 	count,
 	isActive,
 	label,
 	onSelect,
-}: {
-	count?: number;
-	isActive: boolean;
-	label: string;
-	onSelect: () => void;
-}) {
+	tabKey,
+}: ReviewTabButtonProps) {
 	return (
 		<Button
 			aria-pressed={isActive}
@@ -390,6 +398,7 @@ function ReviewTabButton({
 				'h-8 shrink-0 gap-2 rounded-md px-2.5 text-xs',
 				isActive ? 'font-medium' : undefined,
 			)}
+			data-tab-key={tabKey}
 			onClick={onSelect}
 			size='sm'
 			variant='ghost'

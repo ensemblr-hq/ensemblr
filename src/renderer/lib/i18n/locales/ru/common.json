@@ -422,6 +422,10 @@
 	"status": {
 		"coming-soon": "Скоро"
 	},
+	"tab-scroller": {
+		"scroll-left": "Прокрутить вкладки влево",
+		"scroll-right": "Прокрутить вкладки вправо"
+	},
 	"thinking": {
 		"reasoned": "Размышление заняло {{seconds}} с",
 		"reasoning": "Размышление… {{seconds}} с"

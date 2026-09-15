@@ -679,6 +679,30 @@
 	);
 }
 
+/*
+ * How far each end of a tab strip has faded out. Registered rather than left as
+ * plain custom properties because an unregistered property is not interpolable,
+ * which would pop the fade in and out at the moment a strip reaches its end
+ * instead of growing it.
+ *
+ * `initial-value` has to be computationally independent, and a font-relative
+ * unit is not — `0rem` makes the browser reject the whole registration, which
+ * then leaves `var()` resolving to nothing and invalidates the mask that reads
+ * it. So the resting value is `0px` even though every value set against these
+ * is authored in rem.
+ */
+@property --tab-scroller-fade-start {
+	syntax: "<length>";
+	inherits: false;
+	initial-value: 0px;
+}
+
+@property --tab-scroller-fade-end {
+	syntax: "<length>";
+	inherits: false;
+	initial-value: 0px;
+}
+
 @layer base {
 	* {
 		box-sizing: border-box;
@@ -874,6 +898,44 @@
 
 	.no-scrollbar::-webkit-scrollbar {
 		display: none;
+	}
+
+	/*
+	 * Fades whichever end of a tab strip still has tabs beyond it. A mask rather
+	 * than a gradient overlay because the three strips that wear this sit on
+	 * three different surfaces, and masking the tabs themselves needs to know
+	 * nothing about what is painted behind them. Both ends live in one
+	 * declaration, so the two widths animate against a single mask image.
+	 *
+	 * The inner stops bow the ramp well below the straight line a two-stop
+	 * gradient would draw, holding the tabs near-invisible across most of the
+	 * span and lifting them to full strength only at its very inside. A linear
+	 * ramp reads as a smear at this width, and leaves the arrow that sits over
+	 * the span competing with half-opaque label text behind it.
+	 */
+	.tab-scroller-fade {
+		mask-image: linear-gradient(
+			to right,
+			transparent 0,
+			rgb(0 0 0 / 6%) calc(var(--tab-scroller-fade-start) * 0.4),
+			rgb(0 0 0 / 28%) calc(var(--tab-scroller-fade-start) * 0.72),
+			black var(--tab-scroller-fade-start),
+			black calc(100% - var(--tab-scroller-fade-end)),
+			rgb(0 0 0 / 28%) calc(100% - var(--tab-scroller-fade-end) * 0.72),
+			rgb(0 0 0 / 6%) calc(100% - var(--tab-scroller-fade-end) * 0.4),
+			transparent 100%
+		);
+		transition:
+			--tab-scroller-fade-start 150ms ease-out,
+			--tab-scroller-fade-end 150ms ease-out;
+	}
+
+	[data-slot="tab-scroller"][data-overflow-start="true"] .tab-scroller-fade {
+		--tab-scroller-fade-start: 5rem;
+	}
+
+	[data-slot="tab-scroller"][data-overflow-end="true"] .tab-scroller-fade {
+		--tab-scroller-fade-end: 5rem;
 	}
 
 	/*
