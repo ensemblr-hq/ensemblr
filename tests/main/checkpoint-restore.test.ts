@@ -239,7 +239,7 @@ test('computeTurnDiff keeps an unfinished turn running to the working tree', asy
 		},
 	});
 	const capture = createCheckpointCapture();
-	await capture({
+	const otherCheckpoint = await capture({
 		cwd: fixture.repoDirectory,
 		database: fixture.connection.database,
 		label: 'other chat',
@@ -247,6 +247,7 @@ test('computeTurnDiff keeps an unfinished turn running to the working tree', asy
 		turnId: otherTurn.id,
 		workspaceId: fixture.workspaceId,
 	});
+	assert.ok(otherCheckpoint, 'other chat checkpoint capture failed');
 	// Written after the other chat checkpointed, but still this turn's work.
 	writeFileSync(path.join(fixture.repoDirectory, 'app.txt'), 'late write\n');
 

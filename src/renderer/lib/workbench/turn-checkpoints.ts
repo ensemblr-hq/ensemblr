@@ -84,7 +84,11 @@ function nextInWorkspace(
 	if (isStreaming || !workspaceCheckpoints) {
 		return null;
 	}
-	const captured = workspaceCheckpoints.filter((entry) => entry.gitHash !== null);
+	const captured = workspaceCheckpoints.filter(
+		(entry) => entry.gitHash !== null,
+	);
+	const position = captured.findIndex((entry) => entry.id === checkpoint.id);
+	return position === -1 ? null : (captured[position + 1]?.gitHash ?? null);
 }
 
 /**
