@@ -292,6 +292,37 @@ test('retainCheckObservation carries the stamp across an empty rollup', () => {
 	);
 });
 
+test('retainCheckObservation restarts the stamp when a push moved the head', () => {
+	const cached = retainCheckObservation(
+		snapshot(
+			{
+				checks: [{ bucket: 'passing', id: 'ci:0', name: 'ci' }],
+				headRefOid: 'abc123',
+			},
+			'2026-08-20T11:41:00.000Z',
+		),
+		null,
+	);
+	const pushed = retainCheckObservation(
+		snapshot({ checks: [], headRefOid: 'def456' }, '2026-08-20T12:41:00.000Z'),
+		cached,
+	);
+
+	assert.equal(
+		pushed.pullRequest?.checksLastObservedAt,
+		'2026-08-20T12:41:00.000Z',
+	);
+});
+
+test('retainCheckObservation leaves a moved head alone when no check was ever seen', () => {
+	const fetched = snapshot({ checks: [], headRefOid: 'def456' });
+
+	assert.equal(
+		retainCheckObservation(fetched, snapshot({ headRefOid: 'abc123' })),
+		fetched,
+	);
+});
+
 test('retainCheckObservation drops the stamp of a different pull request', () => {
 	const cached = retainCheckObservation(
 		snapshot({ checks: [{ bucket: 'passing', id: 'ci:0', name: 'ci' }] }),

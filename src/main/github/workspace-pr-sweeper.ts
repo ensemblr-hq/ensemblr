@@ -90,9 +90,12 @@ const DEFAULT_PENDING_SWEEP_INTERVAL_MS = 30_000;
  * within a couple of minutes.
  *
  * Exported so `tests/main/sweep-cadence-invariant.test.ts` can hold
- * `CHECK_REGISTRATION_GRACE_MS` above it. That grace is measured from the last
- * non-empty rollup, so at or below this cadence the first empty rollup an idle
- * workspace observes has already outlived it.
+ * `CHECK_REGISTRATION_GRACE_MS` strictly above it, which is what makes the grace
+ * reachable at all: it is measured from the last non-empty rollup, so the first
+ * empty rollup an idle workspace observes is already one full interval past that
+ * stamp. Above this cadence that first observation is still inside the grace and
+ * moves the workspace onto the short one; at or below it, the grace has lapsed
+ * before anything can act on it.
  */
 export const DEFAULT_IDLE_SWEEP_INTERVAL_MS = 120_000;
 

@@ -94,22 +94,96 @@ export function parseWorkspacePrUnsettled(
 
 /**
  * Parses a stored snapshot column, tolerating a missing join or a malformed
- * cache row, and rejecting one with no readable `syncedAt`.
+ * cache row, and rejecting one whose shape the derivations above cannot read.
+ *
+ * Valid JSON is not enough: the callers reach this with whatever a cache row
+ * holds — a value written by an older build, hand-edited, or narrowed by the
+ * sweeper's `json_remove` — and a `pullRequest` missing its `checks` array would
+ * throw out of `hasFailingCheck`, taking the whole workspace listing or sweep
+ * with it. Only the fields both derivations read are checked, which is why the
+ * three bulky ones the sweeper strips are not among them.
  * @param snapshotJson - Raw cached snapshot JSON, or null when there is none.
- * @returns The parsed snapshot, or null when absent, unparseable, or unstamped.
+ * @returns The parsed snapshot, or null when absent, unparseable, or malformed.
  */
 function parseSnapshotJson(
 	snapshotJson: string | null,
 ): GithubPullRequestSnapshotWire | null {
-	if (!snapshotJson) {
+	const parsed = parseJsonRecord(snapshotJson);
+	if (!parsed || typeof parsed.syncedAt !== 'string') {
+		return null;
+	}
+	const pullRequest = parsed.pullRequest ?? null;
+	if (pullRequest !== null && !isDerivablePullRequest(pullRequest)) {
+		return null;
+	}
+	return {
+		branchSync: derivableBranchSync(parsed.branchSync),
+		pullRequest,
+		syncedAt: parsed.syncedAt,
+	};
+}
+
+/**
+ * Parses a JSON column into a plain object, rejecting anything else it may hold.
+ * @param json - The raw column value, or null when there is none.
+ * @returns The parsed object, or null when absent, unparseable, or not an object.
+ */
+function parseJsonRecord(json: string | null): Record<string, unknown> | null {
+	if (!json) {
 		return null;
 	}
 	try {
-		const parsed = JSON.parse(snapshotJson) as GithubPullRequestSnapshotWire;
-		return typeof parsed?.syncedAt === 'string' ? parsed : null;
+		const parsed: unknown = JSON.parse(json);
+		return isRecord(parsed) ? parsed : null;
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * Whether a value is a plain JSON object rather than null, an array, or a scalar.
+ * @param value - The value to test.
+ * @returns True when the value can be read by key.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Whether a cached `pullRequest` holds the fields the status derivations read.
+ * `checks` is the load-bearing one — every other field is read defensively, but
+ * a rollup that is not an array of records throws rather than deriving.
+ * @param value - The cached pull request, already known to be present.
+ * @returns True when the pull request can be derived from.
+ */
+function isDerivablePullRequest(
+	value: unknown,
+): value is GithubPullRequestWire {
+	return (
+		isRecord(value) &&
+		typeof value.number === 'number' &&
+		typeof value.state === 'string' &&
+		Array.isArray(value.checks) &&
+		value.checks.every(isRecord)
+	);
+}
+
+/**
+ * The cached `branchSync` when it holds the counters a row reports unpushed work
+ * from, and null when it does not. A malformed one costs the row its
+ * ahead/behind badge rather than its pull-request status, which the rest of the
+ * snapshot still derives.
+ * @param value - The cached branch sync state, when the row carries one.
+ * @returns The branch sync state, or null when absent or malformed.
+ */
+function derivableBranchSync(value: unknown): GitBranchSyncWire | null {
+	return isRecord(value) &&
+		typeof value.ahead === 'number' &&
+		typeof value.behind === 'number' &&
+		typeof value.branchName === 'string' &&
+		typeof value.hasUpstream === 'boolean'
+		? (value as unknown as GitBranchSyncWire)
+		: null;
 }
 
 /**

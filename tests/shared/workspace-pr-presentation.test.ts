@@ -4,6 +4,7 @@ import {
 	deriveWorkspacePrPresentation,
 	isFresherPrObservation,
 	parseWorkspacePrPresentation,
+	parseWorkspacePrUnsettled,
 } from '../../src/shared/github-pr-presentation';
 import type {
 	GitBranchSyncWire,
@@ -369,6 +370,101 @@ describe('parseWorkspacePrPresentation', () => {
 				JSON.stringify(snapshot(pr({ checks: [check('pending')] }))),
 			),
 		).toEqual(presentationOf('checking'));
+	});
+
+	test('returns null for a row whose pull request cannot be derived from', () => {
+		for (const pullRequest of [
+			{},
+			{ number: 7, state: 'open' },
+			{ checks: {}, number: 7, state: 'open' },
+			{ checks: [null], number: 7, state: 'open' },
+			{ checks: [], number: '7', state: 'open' },
+		]) {
+			expect(
+				parseWorkspacePrPresentation(
+					JSON.stringify({
+						branchSync: null,
+						pullRequest,
+						syncedAt: SYNCED_AT,
+					}),
+				),
+			).toBeNull();
+		}
+	});
+
+	test('returns null for a row that is valid JSON but not an object', () => {
+		expect(parseWorkspacePrPresentation('"a string"')).toBeNull();
+		expect(parseWorkspacePrPresentation('[]')).toBeNull();
+		expect(parseWorkspacePrPresentation('null')).toBeNull();
+	});
+
+	test('parses the narrowed row the sweeper reads, minus the stripped fields', () => {
+		const { body, comments, deployments, ...narrowed } = pr({
+			checks: [check('pending')],
+		});
+
+		expect(
+			parseWorkspacePrPresentation(
+				JSON.stringify({
+					branchSync: null,
+					pullRequest: narrowed,
+					syncedAt: SYNCED_AT,
+				}),
+			),
+		).toEqual(presentationOf('checking'));
+	});
+
+	test('drops a malformed branchSync without losing the PR status', () => {
+		expect(
+			parseWorkspacePrPresentation(
+				JSON.stringify({
+					branchSync: 'not-a-branch-sync',
+					pullRequest: pr({ checks: [check('pending')] }),
+					syncedAt: SYNCED_AT,
+				}),
+			),
+		).toEqual(presentationOf('checking'));
+	});
+});
+
+describe('parseWorkspacePrUnsettled', () => {
+	test('is false for an absent, malformed, or non-object row', () => {
+		expect(parseWorkspacePrUnsettled(null)).toBe(false);
+		expect(parseWorkspacePrUnsettled('{ not json')).toBe(false);
+		expect(parseWorkspacePrUnsettled('[]')).toBe(false);
+		expect(
+			parseWorkspacePrUnsettled(
+				JSON.stringify({
+					branchSync: null,
+					pullRequest: { number: 7, state: 'open' },
+					syncedAt: SYNCED_AT,
+				}),
+			),
+		).toBe(false);
+	});
+
+	test('is true for an open pull request whose checks are still running', () => {
+		expect(
+			parseWorkspacePrUnsettled(
+				JSON.stringify(snapshot(pr({ checks: [check('pending')] }))),
+			),
+		).toBe(true);
+	});
+
+	test('is false for a settled open pull request', () => {
+		expect(
+			parseWorkspacePrUnsettled(
+				JSON.stringify(
+					snapshot(
+						pr({
+							checks: [check('passing')],
+							mergeable: 'mergeable',
+							mergeStateStatus: 'CLEAN',
+						}),
+					),
+				),
+			),
+		).toBe(false);
 	});
 });
 

@@ -29,9 +29,9 @@ const MERGEABILITY_RETENTION_MS = 120_000;
  * run. The stamp is the evidence that this pull request does have CI; the status
  * derivation bounds how long it may withhold `ready` on that basis.
  *
- * Kept only while the cached snapshot describes the *same* pull request: a
- * workspace that continues onto a successor branch gets a different number, and
- * the previous one's checks say nothing about it.
+ * Kept only while the cached snapshot describes the *same* pull request at the
+ * *same* head: a workspace that continues onto a successor branch gets a
+ * different number, and a head a push replaced has runs of its own coming.
  * @param fetched - The snapshot just fetched from `gh`.
  * @param cached - The last snapshot persisted for the same workspace, if any.
  * @returns The snapshot to persist and return.
@@ -47,7 +47,11 @@ export function retainCheckObservation(
 	const checksLastObservedAt =
 		pullRequest.checks.length > 0
 			? fetched.syncedAt
-			: carriedCheckObservation(pullRequest, cached);
+			: emptyRollupObservation({
+					cached,
+					fetched: pullRequest,
+					fetchedAt: fetched.syncedAt,
+				});
 	if (!checksLastObservedAt) {
 		return fetched;
 	}
@@ -58,19 +62,44 @@ export function retainCheckObservation(
 }
 
 /**
- * The cached check-observation stamp worth carrying onto a fetch that saw none.
- * @param fetched - The freshly fetched pull request.
- * @param cached - The last snapshot persisted for the same workspace, if any.
- * @returns The stamp to carry, or undefined when there is no comparable one.
+ * The stamp an empty rollup is recorded against: the cached one while the head
+ * has not moved, and this fetch's own once it has.
+ *
+ * A push empties the rollup for a head GitHub has only just accepted, so the
+ * stamp the previous head earned bounds nothing about this one. Carrying it
+ * forward lets the new head read as `ready` the moment that old stamp outlives
+ * the grace — which is what a workspace hits on the first fetch after a gap
+ * longer than the grace, since neither the branch tip (already level with the
+ * new head) nor `mergeStateStatus` (`CLEAN`, computed for the commit that
+ * passed) contradicts it. Restarting the stamp reopens the window for the head
+ * the checks are actually coming for.
+ *
+ * Only a cached snapshot of the same pull request that carries a stamp of its
+ * own qualifies: a successor branch's pull request has a different number, and a
+ * pull request no check has ever been reported for is never held back.
+ * @param options - The freshly fetched pull request, the snapshot last persisted
+ * for this workspace, and when the fetch observed GitHub.
+ * @returns The stamp to record, or undefined when there is no comparable one.
  */
-function carriedCheckObservation(
-	fetched: GithubPullRequestWire,
-	cached: GithubPullRequestSnapshotWire | null,
-): string | undefined {
+function emptyRollupObservation({
+	cached,
+	fetched,
+	fetchedAt,
+}: {
+	cached: GithubPullRequestSnapshotWire | null;
+	fetched: GithubPullRequestWire;
+	fetchedAt: string;
+}): string | undefined {
 	const cachedPullRequest = cached?.pullRequest;
-	return cachedPullRequest?.number === fetched.number
+	if (
+		cachedPullRequest?.number !== fetched.number ||
+		!cachedPullRequest.checksLastObservedAt
+	) {
+		return undefined;
+	}
+	return cachedPullRequest.headRefOid === fetched.headRefOid
 		? cachedPullRequest.checksLastObservedAt
-		: undefined;
+		: fetchedAt;
 }
 
 /** The mergeability fields {@link retainKnownMergeability} grafts onto a snapshot. */

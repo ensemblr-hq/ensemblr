@@ -115,6 +115,10 @@ export interface GithubPullRequestWire {
 	 * checks at all — which is what lets the status derivation tell the two
 	 * apart. Absent until a check has been seen, and on snapshots cached before
 	 * this field existed.
+	 *
+	 * Restarted at the fetch that first sees a new `headRefOid` with an empty
+	 * rollup: the checks that earned the stamp ran against a commit a push has
+	 * replaced, so the window reopens for the head whose runs are still coming.
 	 */
 	checksLastObservedAt?: string;
 	comments: readonly GithubCommentWire[];
