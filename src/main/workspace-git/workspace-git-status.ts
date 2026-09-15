@@ -19,6 +19,7 @@ import type {
 	WorkspaceGitFileWire,
 } from '../../shared/ipc/contracts/workspace-git.ts';
 import { summarizeWorkspaceGitFiles } from '../../shared/ipc/contracts/workspace-git.ts';
+import type { LocalCommandResult } from '../commands/command-types.ts';
 import type { LocalCommandService } from '../commands/local-command';
 // react-doctor-disable-next-line -- Cross-concern imports use the stable public entrypoint.
 import { mapWithConcurrency } from '../concurrency/index.ts';
@@ -36,6 +37,7 @@ import {
 	parsePorcelainStatus,
 	parseWorkspaceCommits,
 } from './workspace-git-parsers.ts';
+import { snapshotWorktreeTree } from './workspace-git-worktree-snapshot.ts';
 
 const TIMEOUT_MS = 15_000;
 const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
@@ -168,13 +170,14 @@ export function createWorkspaceGitService({
 	 * rather than spawning every process at once.
 	 * @param cwd - Absolute working directory to run git in
 	 * @param args - Git arguments, excluding the `git` executable itself
-	 * @param maxOutputBytes - Cap on captured stdout; defaults to the service limit
+	 * @param options - Environment overlay, and a cap on captured stdout that
+	 *   defaults to the service limit
 	 * @returns The command execution result
 	 */
 	async function runGit(
 		cwd: string,
 		args: readonly string[],
-		maxOutputBytes = MAX_OUTPUT_BYTES,
+		options: { env?: Record<string, string>; maxOutputBytes?: number } = {},
 	) {
 		await acquireGitSlot();
 		try {
@@ -182,7 +185,8 @@ export function createWorkspaceGitService({
 				args: [...args],
 				command: 'git',
 				cwd,
-				maxOutputBytes,
+				...(options.env ? { env: options.env } : {}),
+				maxOutputBytes: options.maxOutputBytes ?? MAX_OUTPUT_BYTES,
 				timeoutMs: TIMEOUT_MS,
 			});
 		} finally {
@@ -446,7 +450,10 @@ export function createWorkspaceGitService({
 		hash: string,
 	): Promise<GetWorkspaceGitStatusResult> {
 		const parent = await resolveCommitParent(cwd, hash);
-		return buildDiffStatus(cwd, [parent, hash], false);
+		return buildDiffStatus(cwd, [parent, hash], {
+			appendUntracked: false,
+			stampWorktree: false,
+		});
 	}
 
 	/**
@@ -463,23 +470,63 @@ export function createWorkspaceGitService({
 		if (!mergeBase) {
 			return getWorkingTreeStatus(cwd);
 		}
-		return buildDiffStatus(cwd, [mergeBase], true);
+		return buildDiffStatus(cwd, [mergeBase], {
+			appendUntracked: true,
+			stampWorktree: true,
+		});
+	}
+
+	/**
+	 * The revision a turn scope's new side names: the next turn's checkpoint, or
+	 * — for the newest turn, which has none after it — a tree written from the
+	 * live working tree.
+	 *
+	 * Both legs are therefore tree-to-tree. Diffing the checkpoint against the
+	 * working tree directly would route through the real index, which
+	 * {@link snapshotWorktreeTree} explains is not the same set of files.
+	 * @param cwd - Absolute workspace directory
+	 * @param toRef - The next checkpoint, or undefined for the live leg
+	 * @returns The revision to diff against, or the failed git step
+	 */
+	async function resolveTurnToRev(
+		cwd: string,
+		toRef: string | undefined,
+	): Promise<
+		{ failure: LocalCommandResult; ok: false } | { ok: true; rev: string }
+	> {
+		if (toRef) {
+			return { ok: true, rev: toRef };
+		}
+		const snapshot = await snapshotWorktreeTree({ cwd, runGit });
+		return snapshot.ok
+			? { ok: true, rev: snapshot.treeHash }
+			: { failure: snapshot.failure, ok: false };
 	}
 
 	/**
 	 * What one agent turn changed: between its pre-prompt checkpoint and the
-	 * next one, or — for the newest turn, which has no checkpoint after it — the
-	 * live working tree. The live leg therefore also carries anything edited by
-	 * hand since the turn ended, which is what keeps that view current.
+	 * next one, or — for the newest turn — the live working tree. The live leg
+	 * therefore also carries anything edited by hand since the turn ended, which
+	 * is what keeps that view current.
 	 */
 	async function getTurnStatus(
 		cwd: string,
 		fromRef: string,
 		toRef: string | undefined,
 	): Promise<GetWorkspaceGitStatusResult> {
-		return toRef
-			? buildDiffStatus(cwd, [fromRef, toRef], false)
-			: buildDiffStatus(cwd, [fromRef], true);
+		const toRev = await resolveTurnToRev(cwd, toRef);
+		if (!toRev.ok) {
+			return emptyStatusResult(
+				gitFailure(toRev.failure, 'git could not read the working tree.'),
+			);
+		}
+		// git's untracked listing is relative to the index rather than to the
+		// checkpoint, and the snapshot already holds those files, so appending it
+		// here would report every one of them twice.
+		return buildDiffStatus(cwd, [fromRef, toRev.rev], {
+			appendUntracked: false,
+			stampWorktree: toRef === undefined,
+		});
 	}
 
 	/** One file's diff across a turn, mirroring {@link getTurnStatus}'s two legs. */
@@ -489,51 +536,59 @@ export function createWorkspaceGitService({
 		fromRef: string,
 		toRef: string | undefined,
 	): Promise<GetWorkspaceFileDiffResult> {
-		const result = await runGit(
-			cwd,
-			['diff', '--no-color', fromRef, ...(toRef ? [toRef] : []), '--', relPath],
-			MAX_DIFF_BYTES,
-		);
-		if (result.status === 'success' && result.stdout.trim()) {
+		const toRev = await resolveTurnToRev(cwd, toRef);
+		if (!toRev.ok) {
 			return {
-				isTruncated: result.stdoutTruncated,
-				patch: result.stdout,
+				error: {
+					code: classifyGitFailure(toRev.failure.stderr),
+					message: gitFailureMessage(
+						toRev.failure,
+						'git could not read the working tree.',
+					),
+				},
 				path: relPath,
 			};
 		}
-		// A file the turn created is untracked on the live leg, so it is absent
-		// from the checkpoint diff entirely; show it against /dev/null instead.
-		if (!toRef) {
-			const untracked = await untrackedFileDiff(cwd, relPath);
-			if (untracked) {
-				return untracked;
-			}
-		}
-		if (result.status === 'success') {
-			return { patch: '', path: relPath };
+		const result = await runGit(
+			cwd,
+			['diff', '--no-color', fromRef, toRev.rev, '--', relPath],
+			{ maxOutputBytes: MAX_DIFF_BYTES },
+		);
+		if (result.status !== 'success') {
+			return {
+				error: {
+					code: classifyGitFailure(result.stderr),
+					message: gitFailureMessage(result, 'git diff failed in workspace.'),
+				},
+				path: relPath,
+			};
 		}
 		return {
-			error: {
-				code: classifyGitFailure(result.stderr),
-				message: gitFailureMessage(result, 'git diff failed in workspace.'),
-			},
+			isTruncated: result.stdoutTruncated,
+			patch: result.stdout,
 			path: relPath,
 		};
 	}
 
 	/**
 	 * Builds file rows from a `git diff` against `diffArgs` (a single ref to
-	 * compare with the working tree, or `parent hash` for a commit range).
+	 * compare with the working tree, or two revisions for a range).
 	 *
-	 * `newSideIsWorkingTree` says which of the two the rows describe. When set,
-	 * untracked files are appended — a plain `git diff` never lists them — and
-	 * every row carries a content stamp, since the bytes it describes can still
-	 * change. A commit range needs neither: its content is already frozen.
+	 * The two options are separate because a turn's live leg needs one without
+	 * the other. `appendUntracked` covers a diff whose new side is the working
+	 * tree *through the index*, which never lists untracked files; a diff
+	 * against a tree written from that working tree already holds them.
+	 * `stampWorktree` covers any diff whose new side is bytes still on disk —
+	 * those can change under a reviewer, whether or not the index was involved.
+	 * A frozen range needs neither.
 	 */
 	async function buildDiffStatus(
 		cwd: string,
 		diffArgs: readonly string[],
-		newSideIsWorkingTree: boolean,
+		{
+			appendUntracked,
+			stampWorktree,
+		}: { appendUntracked: boolean; stampWorktree: boolean },
 	): Promise<GetWorkspaceGitStatusResult> {
 		const [nameStatusResult, numstatResult] = await Promise.all([
 			runGit(cwd, ['diff', '--no-color', '--name-status', '-z', ...diffArgs]),
@@ -558,11 +613,12 @@ export function createWorkspaceGitService({
 			return { ...entry, ...counts };
 		});
 
-		if (!newSideIsWorkingTree) {
-			return summarizeWorkspaceGitFiles(files);
+		if (appendUntracked) {
+			files.push(...(await readUntrackedFiles(cwd)));
 		}
-		files.push(...(await readUntrackedFiles(cwd)));
-		return summarizeWorkspaceGitFiles(await withWorktreeFacts(cwd, files));
+		return stampWorktree
+			? summarizeWorkspaceGitFiles(await withWorktreeFacts(cwd, files))
+			: summarizeWorkspaceGitFiles(files);
 	}
 
 	/**
@@ -624,7 +680,7 @@ export function createWorkspaceGitService({
 		const tracked = await runGit(
 			cwd,
 			['diff', '--no-color', 'HEAD', '--', relPath],
-			MAX_DIFF_BYTES,
+			{ maxOutputBytes: MAX_DIFF_BYTES },
 		);
 		if (tracked.status === 'success' && tracked.stdout.trim()) {
 			return {
@@ -663,7 +719,7 @@ export function createWorkspaceGitService({
 		const result = await runGit(
 			cwd,
 			['diff', '--no-color', parent, hash, '--', relPath],
-			MAX_DIFF_BYTES,
+			{ maxOutputBytes: MAX_DIFF_BYTES },
 		);
 		if (result.status === 'success') {
 			return {
@@ -694,7 +750,7 @@ export function createWorkspaceGitService({
 		const result = await runGit(
 			cwd,
 			['diff', '--no-color', mergeBase, '--', relPath],
-			MAX_DIFF_BYTES,
+			{ maxOutputBytes: MAX_DIFF_BYTES },
 		);
 		if (result.status === 'success' && result.stdout.trim()) {
 			return {
@@ -728,7 +784,7 @@ export function createWorkspaceGitService({
 		const result = await runGit(
 			cwd,
 			['diff', '--no-color', '--no-index', '--', DEV_NULL, relPath],
-			MAX_DIFF_BYTES,
+			{ maxOutputBytes: MAX_DIFF_BYTES },
 		);
 		if (result.stdout.trim()) {
 			return {

@@ -93,6 +93,7 @@ export type { CheckpointRow } from './checkpoint-repository.ts';
 export {
 	getCheckpointByTurnId,
 	getNextCheckpointInAgentSession,
+	getNextCheckpointInWorkspace,
 	insertCheckpoint,
 	listCheckpointsForAgentSession,
 	listCheckpointsForWorkspace,

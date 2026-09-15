@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import {
+	type AgentTurnRow,
 	getAgentSessionBranchById,
 	getTurnById,
 	setBranchMetadata,
@@ -8,6 +9,7 @@ import {
 	type CheckpointRow,
 	getCheckpointByTurnId,
 	getNextCheckpointInAgentSession,
+	getNextCheckpointInWorkspace,
 	insertCheckpoint,
 	listCheckpointsForAgentSession,
 	listCheckpointsForWorkspace,
@@ -151,9 +153,9 @@ interface TurnDiffResult extends GitDiffResult {
 }
 
 /**
- * Diff between a turn's pre-prompt checkpoint and the post-turn state: the
- * next checkpoint in the same session when one exists, otherwise the live
- * working tree (tracked + untracked).
+ * Diff between a turn's pre-prompt checkpoint and the post-turn state, which
+ * {@link findNextCheckpoint} resolves to a later checkpoint or — for a turn
+ * nothing has followed — the live working tree (tracked + untracked).
  */
 export async function computeTurnDiff({
 	cwd,
@@ -165,7 +167,11 @@ export async function computeTurnDiff({
 	turnId: string;
 }): Promise<TurnDiffResult> {
 	const checkpoint = requireCheckpointForTurn({ database, turnId });
-	const next = findNextCheckpoint({ checkpoint, database });
+	const next = findNextCheckpoint({
+		checkpoint,
+		database,
+		turn: getTurnById({ database, id: turnId }),
+	});
 	const toRev = next?.gitHash ?? (await snapshotWorkingTree(cwd));
 	const diff = await diffTrees({
 		cwd,
@@ -270,23 +276,42 @@ function requireCheckpointForTurn({
 }
 
 /**
- * Find the checkpoint captured after the given one in the same agent session.
- * @returns The next checkpoint, or null when it is the latest or unlinked
+ * Find the checkpoint that closes a turn: the next one in the same agent
+ * session, or — once the turn has settled with none — the next one taken
+ * anywhere in the workspace.
+ *
+ * The wider bound is what stops a finished chat's last turn from diffing the
+ * live working tree forever and reporting every other chat's work since as its
+ * own. It waits for `completedAt` because bounding a turn that is still writing
+ * would drop whatever it writes after the other chat's prompt.
+ * @param checkpoint - The turn's pre-prompt checkpoint
+ * @param database - Open database connection
+ * @param turn - The turn being diffed, or null when its row is gone
+ * @returns The closing checkpoint, or null to diff against the working tree
  */
 function findNextCheckpoint({
 	checkpoint,
 	database,
+	turn,
 }: {
 	checkpoint: CheckpointRow;
 	database: DatabaseSync;
+	turn: AgentTurnRow | null;
 }): CheckpointRow | null {
-	if (!checkpoint.agentSessionId) {
-		return null;
+	const inSession = checkpoint.agentSessionId
+		? getNextCheckpointInAgentSession({
+				checkpointId: checkpoint.id,
+				database,
+				agentSessionId: checkpoint.agentSessionId,
+			})
+		: null;
+	if (inSession || !turn?.completedAt) {
+		return inSession;
 	}
-	return getNextCheckpointInAgentSession({
+	return getNextCheckpointInWorkspace({
 		checkpointId: checkpoint.id,
 		database,
-		agentSessionId: checkpoint.agentSessionId,
+		workspaceId: checkpoint.workspaceId,
 	});
 }
 

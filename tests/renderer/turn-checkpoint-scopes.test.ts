@@ -80,3 +80,54 @@ test('two turns viewing one file get distinguishable tab titles', () => {
 		diffTabTitle('src/app.ts', { fromRef: second, kind: 'turn' }),
 	).not.toBe(diffTabTitle('src/app.ts', { fromRef: first, kind: 'turn' }));
 });
+
+test("a settled session's last turn stops at the next turn taken anywhere in the workspace", () => {
+	const ownCheckpoints = [checkpoint({ id: 'a' }), checkpoint({ id: 'b' })];
+	// Another chat in the same workspace prompted after this session went idle.
+	const workspaceCheckpoints = [
+		...ownCheckpoints,
+		checkpoint({ agentSessionId: 'session-2', id: 'c' }),
+	];
+
+	const scopes = turnCheckpointScopes(ownCheckpoints, {
+		workspaceCheckpoints,
+	});
+
+	expect(scopes.get('turn-b')?.scope).toEqual({
+		fromRef: 'b'.repeat(40),
+		kind: 'turn',
+		toRef: 'c'.repeat(40),
+	});
+	// Earlier turns keep their own session's bound rather than the workspace's.
+	expect(scopes.get('turn-a')?.scope.toRef).toBe('b'.repeat(40));
+});
+
+test('a session that is still the newest in its workspace stays live', () => {
+	const ownCheckpoints = [checkpoint({ id: 'a' }), checkpoint({ id: 'b' })];
+
+	const scopes = turnCheckpointScopes(ownCheckpoints, {
+		workspaceCheckpoints: ownCheckpoints,
+	});
+
+	expect(scopes.get('turn-b')?.scope).toEqual({
+		fromRef: 'b'.repeat(40),
+		kind: 'turn',
+	});
+});
+
+test('an in-flight turn stays live even once another chat has checkpointed', () => {
+	const ownCheckpoints = [checkpoint({ id: 'a' }), checkpoint({ id: 'b' })];
+	const workspaceCheckpoints = [
+		...ownCheckpoints,
+		checkpoint({ agentSessionId: 'session-2', id: 'c' }),
+	];
+
+	// Bounding a turn that is still writing files would drop everything it
+	// wrote after the other chat's prompt — under-reporting its own work.
+	const scopes = turnCheckpointScopes(ownCheckpoints, {
+		isStreaming: true,
+		workspaceCheckpoints,
+	});
+
+	expect(scopes.get('turn-b')?.scope.toRef).toBeUndefined();
+});

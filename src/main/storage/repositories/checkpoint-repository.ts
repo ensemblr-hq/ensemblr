@@ -116,7 +116,7 @@ export function listCheckpointsForAgentSession({
 }): readonly CheckpointRow[] {
 	const rows = database
 		.prepare(
-			`${SELECT_CHECKPOINT} WHERE agent_session_id = ? ORDER BY created_at ASC`,
+			`${SELECT_CHECKPOINT} WHERE agent_session_id = ? ORDER BY created_at ASC, id ASC`,
 		)
 		.all(agentSessionId) as unknown as CheckpointRowShape[];
 	return rows.map(mapRow);
@@ -147,6 +147,32 @@ export function getNextCheckpointInAgentSession({
 	return row ? mapRow(row) : null;
 }
 
+/**
+ * Returns the next checkpoint captured anywhere in the workspace after the
+ * given one, whichever agent session took it, or `null` when it is the newest.
+ * Bounds a settled turn that has no successor in its own session.
+ */
+export function getNextCheckpointInWorkspace({
+	checkpointId,
+	database,
+	workspaceId,
+}: {
+	checkpointId: string;
+	database: DatabaseSync;
+	workspaceId: string;
+}): CheckpointRow | null {
+	const row = database
+		.prepare(
+			`${SELECT_CHECKPOINT}
+			 WHERE workspace_id = ?
+			   AND (created_at, id) > (SELECT created_at, id FROM checkpoints WHERE id = ?)
+			 ORDER BY created_at ASC, id ASC
+			 LIMIT 1`,
+		)
+		.get(workspaceId, checkpointId) as CheckpointRowShape | undefined;
+	return row ? mapRow(row) : null;
+}
+
 /** Returns all checkpoints for a workspace, oldest first. */
 export function listCheckpointsForWorkspace({
 	database,
@@ -157,7 +183,7 @@ export function listCheckpointsForWorkspace({
 }): readonly CheckpointRow[] {
 	const rows = database
 		.prepare(
-			`${SELECT_CHECKPOINT} WHERE workspace_id = ? ORDER BY created_at ASC`,
+			`${SELECT_CHECKPOINT} WHERE workspace_id = ? ORDER BY created_at ASC, id ASC`,
 		)
 		.all(workspaceId) as unknown as CheckpointRowShape[];
 	return rows.map(mapRow);

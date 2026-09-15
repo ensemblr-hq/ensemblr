@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { workspaceGitStatusQuery } from '@/renderer/api/ensemblr';
 import { ChatAttachmentChip } from '@/renderer/components/chat-attachment-chip';
-import { chipLabelForPath } from '@/renderer/lib/agent-timeline';
+import { chipLabelsForPaths } from '@/renderer/lib/agent-timeline';
 import type {
 	WorkspaceGitDiffScope,
 	WorkspaceGitFileWire,
@@ -117,6 +117,10 @@ export function ChatTurnDiffChips({
 	const files = data && !data.error ? data.files : [];
 	const visible = files.slice(0, MAX_VISIBLE_CHIPS);
 	const overflow = files.length - visible.length;
+	// Resolved over the visible chips alone: a name the overflow count hides is
+	// not on screen to be confused with, and lengthening a label for it would
+	// read as noise.
+	const labels = chipLabelsForPaths(visible.map((file) => file.path));
 
 	return (
 		<span
@@ -128,7 +132,7 @@ export function ChatTurnDiffChips({
 				return (
 					<ChatAttachmentChip
 						key={file.path}
-						label={chipLabelForPath(file.path)}
+						label={labels.get(file.path) ?? file.path}
 						onActivate={diffable ? () => onOpenFile(file.path) : undefined}
 						symlinkTargetKind={file.symlinkTargetKind}
 						title={
