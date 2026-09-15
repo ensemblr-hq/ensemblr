@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
 	deriveWorkspacePrPresentation,
 	isFresherPrObservation,
+	parseWorkspacePrPresentation,
 } from '../../src/shared/github-pr-presentation';
 import type {
 	GitBranchSyncWire,
@@ -234,6 +235,98 @@ describe('deriveWorkspacePrPresentation', () => {
 		).toEqual(presentationOf('ready', withoutTip));
 	});
 
+	test('an empty rollup on a PR that just had checks reads as checking', () => {
+		expect(
+			deriveWorkspacePrPresentation(
+				snapshot(
+					pr({
+						checksLastObservedAt: '2026-07-14T23:59:00.000Z',
+						mergeable: 'mergeable',
+						mergeStateStatus: 'CLEAN',
+					}),
+				),
+			),
+		).toEqual(presentationOf('checking'));
+	});
+
+	test('an empty rollup goes ready once the registration grace lapses', () => {
+		expect(
+			deriveWorkspacePrPresentation(
+				snapshot(
+					pr({
+						checksLastObservedAt: '2026-07-14T23:58:00.000Z',
+						mergeable: 'mergeable',
+						mergeStateStatus: 'CLEAN',
+					}),
+				),
+			),
+		).toEqual(presentationOf('ready'));
+	});
+
+	test('a repository that has never reported a check stays ready', () => {
+		expect(
+			deriveWorkspacePrPresentation(
+				snapshot(pr({ mergeable: 'mergeable', mergeStateStatus: 'CLEAN' })),
+			),
+		).toEqual(presentationOf('ready'));
+	});
+
+	test('a rollup that came back keeps its own verdict inside the grace', () => {
+		expect(
+			deriveWorkspacePrPresentation(
+				snapshot(
+					pr({
+						checks: [check('passing')],
+						checksLastObservedAt: '2026-07-14T23:59:00.000Z',
+						mergeable: 'mergeable',
+					}),
+				),
+			),
+		).toEqual(presentationOf('ready'));
+	});
+
+	test('a non-passing merge state reads as checks still running', () => {
+		expect(
+			deriveWorkspacePrPresentation(
+				snapshot(
+					pr({
+						checks: [check('passing')],
+						mergeable: 'mergeable',
+						mergeStateStatus: 'UNSTABLE',
+					}),
+				),
+			),
+		).toEqual(presentationOf('checking'));
+	});
+
+	test('a head GitHub reports as out of date is blocked', () => {
+		expect(
+			deriveWorkspacePrPresentation(
+				snapshot(
+					pr({
+						checks: [check('passing')],
+						mergeable: 'mergeable',
+						mergeStateStatus: 'BEHIND',
+					}),
+				),
+			),
+		).toEqual(presentationOf('blocked'));
+	});
+
+	test('a failing check outranks a non-passing merge state', () => {
+		expect(
+			deriveWorkspacePrPresentation(
+				snapshot(
+					pr({
+						checks: [check('failing')],
+						mergeable: 'mergeable',
+						mergeStateStatus: 'UNSTABLE',
+					}),
+				),
+			),
+		).toEqual(presentationOf('blocked'));
+	});
+
 	test('stamps the presentation with the snapshot it was derived from', () => {
 		expect(
 			deriveWorkspacePrPresentation({
@@ -242,6 +335,26 @@ describe('deriveWorkspacePrPresentation', () => {
 				syncedAt: '2026-07-15T09:30:00.000Z',
 			})?.syncedAt,
 		).toBe('2026-07-15T09:30:00.000Z');
+	});
+});
+
+describe('parseWorkspacePrPresentation', () => {
+	test('returns null for an absent, malformed, or unstamped snapshot', () => {
+		expect(parseWorkspacePrPresentation(null)).toBeNull();
+		expect(parseWorkspacePrPresentation('{ not json')).toBeNull();
+		expect(
+			parseWorkspacePrPresentation(
+				JSON.stringify({ branchSync: null, pullRequest: pr({}) }),
+			),
+		).toBeNull();
+	});
+
+	test('derives the presentation from a stored snapshot column', () => {
+		expect(
+			parseWorkspacePrPresentation(
+				JSON.stringify(snapshot(pr({ checks: [check('pending')] }))),
+			),
+		).toEqual(presentationOf('checking'));
 	});
 });
 

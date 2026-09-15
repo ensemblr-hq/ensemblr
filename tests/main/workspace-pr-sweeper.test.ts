@@ -6,8 +6,8 @@ import {
 } from '../../src/main/github/workspace-pr-sweeper';
 
 const WORKSPACES: SweepableWorkspace[] = [
-	{ hasPendingChecks: false, id: 'a', path: '/repo/a' },
-	{ hasPendingChecks: false, id: 'b', path: '/repo/b' },
+	{ hasUnsettledStatus: false, id: 'a', path: '/repo/a' },
+	{ hasUnsettledStatus: false, id: 'b', path: '/repo/b' },
 ];
 
 /** Fires the scheduler callback the sweeper registered on `start`. */
@@ -121,7 +121,7 @@ describe('createWorkspacePrStatusSweeper', () => {
 		createWorkspacePrStatusSweeper({
 			idleIntervalMs: 120_000,
 			listActiveWorkspaces: () => [
-				{ hasPendingChecks: true, id: 'pending', path: '/repo/pending' },
+				{ hasUnsettledStatus: true, id: 'pending', path: '/repo/pending' },
 			],
 			now: () => nowMs,
 			pendingIntervalMs: 20_000,
@@ -142,7 +142,7 @@ describe('createWorkspacePrStatusSweeper', () => {
 		createWorkspacePrStatusSweeper({
 			idleIntervalMs: 120_000,
 			listActiveWorkspaces: () => [
-				{ hasPendingChecks: false, id: 'idle', path: '/repo/idle' },
+				{ hasUnsettledStatus: false, id: 'idle', path: '/repo/idle' },
 			],
 			now: () => nowMs,
 			pendingIntervalMs: 20_000,
@@ -164,12 +164,12 @@ describe('createWorkspacePrStatusSweeper', () => {
 	test('a workspace backs off to the idle cadence once its checks land', async () => {
 		const scheduleInterval = vi.fn((_callback: () => void) => () => undefined);
 		let nowMs = 0;
-		let hasPendingChecks = true;
+		let hasUnsettledStatus = true;
 		const refreshSnapshot = vi.fn(async () => undefined);
 		createWorkspacePrStatusSweeper({
 			idleIntervalMs: 120_000,
 			listActiveWorkspaces: () => [
-				{ hasPendingChecks, id: 'flip', path: '/repo/flip' },
+				{ hasUnsettledStatus, id: 'flip', path: '/repo/flip' },
 			],
 			now: () => nowMs,
 			pendingIntervalMs: 20_000,
@@ -182,7 +182,7 @@ describe('createWorkspacePrStatusSweeper', () => {
 		tick(scheduleInterval);
 		await vi.waitFor(() => expect(refreshSnapshot).toHaveBeenCalledTimes(2));
 
-		hasPendingChecks = false;
+		hasUnsettledStatus = false;
 		nowMs = 40_000;
 		tick(scheduleInterval);
 		await flushSweep();
@@ -236,7 +236,7 @@ describe('createWorkspacePrStatusSweeper', () => {
 		createWorkspacePrStatusSweeper({
 			idleIntervalMs: 120_000,
 			listActiveWorkspaces: () => [
-				{ hasPendingChecks: true, id: 'flaky', path: '/repo/flaky' },
+				{ hasUnsettledStatus: true, id: 'flaky', path: '/repo/flaky' },
 			],
 			now: () => nowMs,
 			pendingIntervalMs: 20_000,
@@ -266,7 +266,7 @@ describe('createWorkspacePrStatusSweeper', () => {
 		createWorkspacePrStatusSweeper({
 			idleIntervalMs: 120_000,
 			listActiveWorkspaces: () => [
-				{ hasPendingChecks: false, id: 'unauthed', path: '/repo/unauthed' },
+				{ hasUnsettledStatus: false, id: 'unauthed', path: '/repo/unauthed' },
 			],
 			now: () => nowMs,
 			pendingIntervalMs: 20_000,
@@ -295,7 +295,7 @@ describe('createWorkspacePrStatusSweeper', () => {
 		createWorkspacePrStatusSweeper({
 			idleIntervalMs: 120_000,
 			listActiveWorkspaces: () => [
-				{ hasPendingChecks: true, id: 'recovers', path: '/repo/recovers' },
+				{ hasUnsettledStatus: true, id: 'recovers', path: '/repo/recovers' },
 			],
 			now: () => nowMs,
 			pendingIntervalMs: 20_000,
@@ -325,7 +325,7 @@ describe('createWorkspacePrStatusSweeper', () => {
 		createWorkspacePrStatusSweeper({
 			idleIntervalMs: 120_000,
 			listActiveWorkspaces: () => [
-				{ hasPendingChecks: true, id: 'throws', path: '/repo/throws' },
+				{ hasUnsettledStatus: true, id: 'throws', path: '/repo/throws' },
 			],
 			now: () => nowMs,
 			pendingIntervalMs: 20_000,
@@ -348,7 +348,7 @@ describe('createWorkspacePrStatusSweeper', () => {
 		const scheduleInterval = vi.fn((_callback: () => void) => () => undefined);
 		let nowMs = 0;
 		let listed: SweepableWorkspace[] = [
-			{ hasPendingChecks: false, id: 'idle', path: '/repo/idle' },
+			{ hasUnsettledStatus: false, id: 'idle', path: '/repo/idle' },
 		];
 		const refreshSnapshot = vi.fn(async () => undefined);
 		createWorkspacePrStatusSweeper({
@@ -367,7 +367,7 @@ describe('createWorkspacePrStatusSweeper', () => {
 		await flushSweep();
 		expect(refreshSnapshot).toHaveBeenCalledTimes(1);
 
-		listed = [{ hasPendingChecks: false, id: 'idle', path: '/repo/idle' }];
+		listed = [{ hasUnsettledStatus: false, id: 'idle', path: '/repo/idle' }];
 		nowMs = 40_000;
 		tick(scheduleInterval);
 		await vi.waitFor(() => expect(refreshSnapshot).toHaveBeenCalledTimes(2));

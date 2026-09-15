@@ -39,6 +39,7 @@ import {
 	parseDeployments,
 	parsePullRequestView,
 	parseReviewThreads,
+	retainCheckObservation,
 	retainKnownMergeability,
 } from './pr-snapshot.ts';
 
@@ -786,7 +787,10 @@ export function createGithubService({
 				};
 			}
 
-			const snapshot = retainKnownMergeability(fetched.snapshot, cached);
+			const snapshot = retainCheckObservation(
+				retainKnownMergeability(fetched.snapshot, cached),
+				cached,
+			);
 			if (database) {
 				writeCachedPullRequestSnapshot({
 					database,

@@ -18,6 +18,61 @@ import type {
  */
 const MERGEABILITY_RETENTION_MS = 120_000;
 
+/**
+ * Records when GitHub last reported a check for this pull request, so a later
+ * empty rollup can be told from a repository that runs no checks at all.
+ *
+ * GitHub advances a pull request's head the moment it accepts a push and queues
+ * that head's check runs seconds later. A snapshot read in between carries an
+ * empty rollup and a mergeability verdict computed for the commit that already
+ * passed — which every surface reads as "ready to merge" for work nothing has
+ * run. The stamp is the evidence that this pull request does have CI; the status
+ * derivation bounds how long it may withhold `ready` on that basis.
+ *
+ * Kept only while the cached snapshot describes the *same* pull request: a
+ * workspace that continues onto a successor branch gets a different number, and
+ * the previous one's checks say nothing about it.
+ * @param fetched - The snapshot just fetched from `gh`.
+ * @param cached - The last snapshot persisted for the same workspace, if any.
+ * @returns The snapshot to persist and return.
+ */
+export function retainCheckObservation(
+	fetched: GithubPullRequestSnapshotWire,
+	cached: GithubPullRequestSnapshotWire | null,
+): GithubPullRequestSnapshotWire {
+	const pullRequest = fetched.pullRequest;
+	if (!pullRequest) {
+		return fetched;
+	}
+	const checksLastObservedAt =
+		pullRequest.checks.length > 0
+			? fetched.syncedAt
+			: carriedCheckObservation(pullRequest, cached);
+	if (!checksLastObservedAt) {
+		return fetched;
+	}
+	return {
+		...fetched,
+		pullRequest: { ...pullRequest, checksLastObservedAt },
+	};
+}
+
+/**
+ * The cached check-observation stamp worth carrying onto a fetch that saw none.
+ * @param fetched - The freshly fetched pull request.
+ * @param cached - The last snapshot persisted for the same workspace, if any.
+ * @returns The stamp to carry, or undefined when there is no comparable one.
+ */
+function carriedCheckObservation(
+	fetched: GithubPullRequestWire,
+	cached: GithubPullRequestSnapshotWire | null,
+): string | undefined {
+	const cachedPullRequest = cached?.pullRequest;
+	return cachedPullRequest?.number === fetched.number
+		? cachedPullRequest.checksLastObservedAt
+		: undefined;
+}
+
 /** The mergeability fields {@link retainKnownMergeability} grafts onto a snapshot. */
 type MergeabilityFields = Pick<
 	GithubPullRequestWire,

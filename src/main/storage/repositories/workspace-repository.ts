@@ -594,47 +594,54 @@ export function listActiveWorkspacePathRows({
 }
 
 /**
- * `id` + worktree `path` for one non-archived workspace, plus the two slices of
- * its cached GitHub snapshot that decide how often it needs refreshing. Both
- * snapshot columns are null when the workspace has no cache row or the row does
- * not hold parseable JSON.
+ * `id` + worktree `path` for one non-archived workspace, plus the cached GitHub
+ * snapshot that decides how often it needs refreshing. `snapshotJson` is null
+ * when the workspace has no cache row or the row does not hold parseable JSON.
  */
-export interface ActiveWorkspacePrCheckRow {
-	/** The cached pull request's `checks` array, still JSON-encoded. */
-	checksJson: string | null;
+export interface ActiveWorkspacePrStatusRow {
 	id: string;
 	path: string;
-	/** The cached pull request's state (`open`, `merged`, `closed`). */
-	pullRequestState: string | null;
+	/**
+	 * The cached PR snapshot, JSON-encoded, with the three bulky fields the
+	 * status derivation never reads stripped out.
+	 */
+	snapshotJson: string | null;
 }
 
 /**
- * Returns every non-archived workspace alongside the cached pull request's state
- * and checks, joined from `integration_metadata` in one statement. The PR-status
- * sweeper reads this each tick to decide which workspaces are refreshing on the
- * short cadence, so it narrows the snapshot in SQL rather than inflating each
- * cached row's comments, body, and deployments to answer one question about
- * checks. `json_valid` guards the extraction because the cache tolerates a
- * malformed row rather than failing the whole listing.
+ * Returns every non-archived workspace alongside its cached pull-request
+ * snapshot, joined from `integration_metadata` in one statement. The PR-status
+ * sweeper reads this each tick to decide which workspaces refresh on the short
+ * cadence, and it answers that from the same derivation every other surface
+ * uses — so the snapshot has to arrive whole enough to derive from, rather than
+ * pre-narrowed to one field.
+ *
+ * `json_remove` drops the three fields that derivation never reads and that
+ * carry nearly all of a snapshot's weight, so a tick over many workspaces does
+ * not haul every review thread and PR body out of SQLite. `json_valid` guards
+ * it because the cache tolerates a malformed row rather than failing the whole
+ * listing.
  * @param options - The open database connection.
  * @returns One row per active workspace.
  */
-export function listActiveWorkspacePrCheckRows({
+export function listActiveWorkspacePrStatusRows({
 	database,
 }: {
 	database: DatabaseSync;
-}): ActiveWorkspacePrCheckRow[] {
+}): ActiveWorkspacePrStatusRow[] {
 	return database
 		.prepare(
 			`SELECT
 				w.id AS id,
 				w.path AS path,
 				CASE WHEN json_valid(im.metadata_json)
-					THEN json_extract(im.metadata_json, '$.pullRequest.state')
-				END AS pullRequestState,
-				CASE WHEN json_valid(im.metadata_json)
-					THEN json_extract(im.metadata_json, '$.pullRequest.checks')
-				END AS checksJson
+					THEN json_remove(
+						im.metadata_json,
+						'$.pullRequest.comments',
+						'$.pullRequest.deployments',
+						'$.pullRequest.body'
+					)
+				END AS snapshotJson
 			FROM workspaces w
 			LEFT JOIN integration_metadata im
 				ON im.provider = 'github'
@@ -643,7 +650,7 @@ export function listActiveWorkspacePrCheckRows({
 				AND im.external_id = ''
 			WHERE w.archived_at IS NULL`,
 		)
-		.all() as unknown as ActiveWorkspacePrCheckRow[];
+		.all() as unknown as ActiveWorkspacePrStatusRow[];
 }
 
 /** Inputs for {@link listActiveWorkspaceMetadataRows}. */

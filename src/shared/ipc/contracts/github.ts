@@ -108,6 +108,15 @@ export interface GithubPullRequestWire {
 	baseRefName: string;
 	body: string;
 	checks: readonly GithubCheckWire[];
+	/**
+	 * When GitHub last reported at least one check for this pull request. An
+	 * empty rollup read shortly after that stamp is GitHub still queueing runs
+	 * for a head it has only just accepted, rather than a repository that runs no
+	 * checks at all — which is what lets the status derivation tell the two
+	 * apart. Absent until a check has been seen, and on snapshots cached before
+	 * this field existed.
+	 */
+	checksLastObservedAt?: string;
 	comments: readonly GithubCommentWire[];
 	deletions: number | null;
 	deployments: readonly GithubDeploymentWire[];

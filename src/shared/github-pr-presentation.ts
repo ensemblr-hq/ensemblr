@@ -39,30 +39,61 @@ export function deriveWorkspacePrPresentation(
 	return {
 		branchSync: snapshot.branchSync,
 		number: pullRequest.number,
-		status: derivePresentationStatus(pullRequest, snapshot.branchSync),
+		status: derivePresentationStatus({
+			branchSync: snapshot.branchSync,
+			observedAt: snapshot.syncedAt,
+			pullRequest,
+		}),
 		syncedAt: snapshot.syncedAt,
 	};
+}
+
+/**
+ * Derives the compact presentation from a stored snapshot column, tolerating a
+ * missing join or a malformed cache row.
+ *
+ * A row with no readable `syncedAt` yields no presentation rather than an
+ * unstamped one: consumers order this observation against a live snapshot by
+ * that timestamp, and an absent stamp would silently mean "always the older of
+ * the two". It is also what the check-registration grace is measured against,
+ * so an unstamped row could not be judged for staleness either.
+ * @param snapshotJson - Raw cached snapshot JSON, or null when there is none.
+ * @returns The compact PR presentation, or null when absent or unparseable.
+ */
+export function parseWorkspacePrPresentation(
+	snapshotJson: string | null,
+): WorkspacePrPresentation | null {
+	if (!snapshotJson) {
+		return null;
+	}
+	try {
+		const parsed = JSON.parse(snapshotJson) as GithubPullRequestSnapshotWire;
+		return typeof parsed?.syncedAt === 'string'
+			? deriveWorkspacePrPresentation(parsed)
+			: null;
+	} catch {
+		return null;
+	}
 }
 
 /**
  * The compact status for a pull request in any state: `merged`/`closed` mirror
  * GitHub's own state, and an open one collapses through the shared open-PR
  * policy.
- * @param pullRequest - The pull request wire record.
- * @param branchSync - The branch's sync state, when the snapshot carries one.
+ * @param options - The pull request, its branch sync state, and when the
+ * snapshot observed GitHub.
  * @returns The compact presentation status.
  */
 function derivePresentationStatus(
-	pullRequest: GithubPullRequestWire,
-	branchSync: GitBranchSyncWire | null,
+	options: OpenPullRequestStatusInput,
 ): WorkspacePrPresentationStatus {
-	if (pullRequest.state === 'merged') {
+	if (options.pullRequest.state === 'merged') {
 		return 'merged';
 	}
-	if (pullRequest.state === 'closed') {
+	if (options.pullRequest.state === 'closed') {
 		return 'closed';
 	}
-	return deriveOpenPullRequestStatus(pullRequest, branchSync);
+	return deriveOpenPullRequestStatus(options);
 }
 
 /**
@@ -121,23 +152,72 @@ export type OpenPullRequestPresentationStatus = Extract<
 >;
 
 /**
+ * How long an empty check rollup is read as GitHub still registering runs for a
+ * head it has just accepted, rather than as a pull request that runs no checks.
+ * Measured from the last time GitHub did report a check for this pull request,
+ * against the moment the snapshot observed GitHub — so a repository that has
+ * never run one is never held back, and a workflow that genuinely stops
+ * producing runs (a path filter that no longer matches) settles once the window
+ * lapses instead of waiting forever.
+ */
+const CHECK_REGISTRATION_GRACE_MS = 120_000;
+
+/**
+ * `mergeStateStatus` values that mean GitHub will not take the merge: the merge
+ * is gated (`BLOCKED`), cannot be created (`DIRTY`), or names a head the base has
+ * moved past where the repository requires branches to be current (`BEHIND`).
+ */
+const BLOCKING_MERGE_STATES: ReadonlySet<string> = new Set([
+	'BEHIND',
+	'BLOCKED',
+	'DIRTY',
+]);
+
+/**
+ * GitHub's own verdict that the head commit's status is not (yet) passing.
+ * `CLEAN` and `HAS_HOOKS` are the two mergeable-and-passing states, so
+ * `UNSTABLE` is how a rollup that is still running or partially reported shows
+ * up when the rollup rows themselves have not landed.
+ */
+const NON_PASSING_MERGE_STATE = 'UNSTABLE';
+
+/** What {@link deriveOpenPullRequestStatus} needs to judge an open pull request. */
+export interface OpenPullRequestStatusInput {
+	/**
+	 * The branch's sync state, used to tell a verdict about the branch tip from
+	 * one GitHub has not recomputed yet. Required rather than optional so a
+	 * caller decides for itself instead of skipping that test by omission; pass
+	 * null where the snapshot genuinely has none.
+	 */
+	branchSync: GitBranchSyncWire | null;
+	/** When the snapshot carrying this pull request observed GitHub. */
+	observedAt: string;
+	pullRequest: GithubPullRequestWire;
+}
+
+/**
  * Derives the presentation status for an OPEN pull request from its check
  * buckets and mergeability signals. Failing checks or policy blocks win over a
  * still-running check run, which in turn wins over a draft or ready state. This
  * is the single source of truth for open-PR status: the renderer's fuller
  * `buildPullRequestShellModel` delegates here so the active row and the cached
  * sidebar rows can never drift on merged/blocked/checking/ready.
- * @param pullRequest - The open pull request wire record.
- * @param branchSync - The branch's sync state, used to tell a verdict about the
- * branch tip from one GitHub has not recomputed yet. Required rather than
- * optional so a caller decides for itself, instead of skipping that test by
- * omission; pass null where the snapshot genuinely has none.
+ *
+ * `ready` is withheld on three kinds of evidence that GitHub has not finished
+ * with the head commit, because each of them otherwise reads as an absence of
+ * bad news and offers a merge of work nothing has run: a rollup that is empty
+ * only because the runs are still being queued, a `mergeStateStatus` GitHub
+ * itself calls non-passing, and a pull request whose head the branch tip has
+ * already passed.
+ * @param options - The pull request, its branch sync state, and when the
+ * snapshot observed GitHub.
  * @returns The presentation status for an open PR.
  */
-export function deriveOpenPullRequestStatus(
-	pullRequest: GithubPullRequestWire,
-	branchSync: GitBranchSyncWire | null,
-): OpenPullRequestPresentationStatus {
+export function deriveOpenPullRequestStatus({
+	branchSync,
+	observedAt,
+	pullRequest,
+}: OpenPullRequestStatusInput): OpenPullRequestPresentationStatus {
 	const hasFailing = pullRequest.checks.some(
 		(check) => check.bucket === 'failing',
 	);
@@ -147,13 +227,18 @@ export function deriveOpenPullRequestStatus(
 	const isBlockedByPolicy =
 		pullRequest.mergeable === 'conflicting' ||
 		pullRequest.reviewDecision === 'CHANGES_REQUESTED' ||
-		pullRequest.mergeStateStatus === 'BLOCKED' ||
-		pullRequest.mergeStateStatus === 'DIRTY';
+		(pullRequest.mergeStateStatus !== undefined &&
+			BLOCKING_MERGE_STATES.has(pullRequest.mergeStateStatus));
 
 	if (hasFailing || isBlockedByPolicy) {
 		return 'blocked';
 	}
-	if (hasPending || lagsBranchTip(pullRequest, branchSync)) {
+	if (
+		hasPending ||
+		pullRequest.mergeStateStatus === NON_PASSING_MERGE_STATE ||
+		awaitsCheckRegistration(pullRequest, observedAt) ||
+		lagsBranchTip(pullRequest, branchSync)
+	) {
 		return 'checking';
 	}
 	if (pullRequest.isDraft) {
@@ -166,6 +251,40 @@ export function deriveOpenPullRequestStatus(
 		return 'ready';
 	}
 	return 'open';
+}
+
+/**
+ * Whether an empty check rollup is a gap GitHub is about to fill rather than a
+ * pull request with no checks.
+ *
+ * GitHub advances a pull request's head as soon as it accepts a push and queues
+ * that head's check runs moments later, so there is a window in which the rollup
+ * is empty, mergeability still answers from the commit that already passed, and
+ * nothing in the snapshot says the checks are coming. Reading that as `ready`
+ * offers a merge of work nothing has run — and unlike {@link lagsBranchTip} it
+ * survives the head catching up, so it is the window that outlasts every other
+ * test here.
+ *
+ * `checksLastObservedAt` is the evidence that this pull request does have CI:
+ * a repository that has never reported a check has no stamp and is never held
+ * back, and one that stops reporting them settles once the grace lapses.
+ * @param pullRequest - The open pull request wire record.
+ * @param observedAt - When the snapshot observed GitHub.
+ * @returns True when the rollup is empty but checks are expected to arrive.
+ */
+function awaitsCheckRegistration(
+	pullRequest: GithubPullRequestWire,
+	observedAt: string,
+): boolean {
+	if (pullRequest.checks.length > 0) {
+		return false;
+	}
+	const lastObserved = parseTimestamp(pullRequest.checksLastObservedAt);
+	const observed = parseTimestamp(observedAt);
+	if (lastObserved === null || observed === null) {
+		return false;
+	}
+	return observed - lastObserved < CHECK_REGISTRATION_GRACE_MS;
 }
 
 /**
