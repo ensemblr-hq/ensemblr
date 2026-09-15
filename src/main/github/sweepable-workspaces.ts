@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import { parseWorkspacePrPresentation } from '../../shared/github-pr-presentation.ts';
+import { parseWorkspacePrUnsettled } from '../../shared/github-pr-presentation.ts';
 import { listActiveWorkspacePrStatusRows } from '../storage/repositories/workspace-repository.ts';
 import type { SweepableWorkspace } from './workspace-pr-sweeper.ts';
 
@@ -18,8 +18,7 @@ export function listSweepableWorkspaces({
 	database: DatabaseSync;
 }): SweepableWorkspace[] {
 	return listActiveWorkspacePrStatusRows({ database }).map((row) => ({
-		hasUnsettledStatus:
-			parseWorkspacePrPresentation(row.snapshotJson)?.status === 'checking',
+		hasUnsettledStatus: parseWorkspacePrUnsettled(row.snapshotJson),
 		id: row.id,
 		path: row.path,
 	}));

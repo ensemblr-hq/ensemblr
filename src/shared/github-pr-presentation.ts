@@ -63,14 +63,50 @@ export function deriveWorkspacePrPresentation(
 export function parseWorkspacePrPresentation(
 	snapshotJson: string | null,
 ): WorkspacePrPresentation | null {
+	return deriveWorkspacePrPresentation(parseSnapshotJson(snapshotJson));
+}
+
+/**
+ * Whether a stored snapshot column describes an open pull request whose verdict
+ * is still moving, which is what earns a workspace the sweeper's short cadence.
+ *
+ * Asks {@link isPullRequestUnsettled} rather than testing the presentation
+ * status for `checking`: the two answer different questions, and a pull request
+ * that is blocked *and* still running checks is exactly the row the sweeper must
+ * not drop to the idle cadence.
+ * @param snapshotJson - Raw cached snapshot JSON, or null when there is none.
+ * @returns True when the cached pull request is open and unsettled.
+ */
+export function parseWorkspacePrUnsettled(
+	snapshotJson: string | null,
+): boolean {
+	const snapshot = parseSnapshotJson(snapshotJson);
+	const pullRequest = snapshot?.pullRequest;
+	if (!snapshot || !pullRequest || pullRequest.state !== 'open') {
+		return false;
+	}
+	return isPullRequestUnsettled({
+		branchSync: snapshot.branchSync,
+		observedAt: snapshot.syncedAt,
+		pullRequest,
+	});
+}
+
+/**
+ * Parses a stored snapshot column, tolerating a missing join or a malformed
+ * cache row, and rejecting one with no readable `syncedAt`.
+ * @param snapshotJson - Raw cached snapshot JSON, or null when there is none.
+ * @returns The parsed snapshot, or null when absent, unparseable, or unstamped.
+ */
+function parseSnapshotJson(
+	snapshotJson: string | null,
+): GithubPullRequestSnapshotWire | null {
 	if (!snapshotJson) {
 		return null;
 	}
 	try {
 		const parsed = JSON.parse(snapshotJson) as GithubPullRequestSnapshotWire;
-		return typeof parsed?.syncedAt === 'string'
-			? deriveWorkspacePrPresentation(parsed)
-			: null;
+		return typeof parsed?.syncedAt === 'string' ? parsed : null;
 	} catch {
 		return null;
 	}
@@ -159,8 +195,17 @@ export type OpenPullRequestPresentationStatus = Extract<
  * never run one is never held back, and a workflow that genuinely stops
  * producing runs (a path filter that no longer matches) settles once the window
  * lapses instead of waiting forever.
+ *
+ * It has to exceed the background sweeper's idle cadence, and that is the whole
+ * reason it is not two minutes. `checksLastObservedAt` only advances on a fetch
+ * that saw a *non-empty* rollup, so the first empty rollup a workspace on the
+ * idle cadence observes is already one full idle interval past its stamp. At
+ * equal values the strict comparison below can never hold and the test is dead
+ * on that path — which is the sidebar row, not just the header pill.
+ * `tests/main/sweep-cadence-invariant.test.ts` pins the relation, since
+ * `src/shared/` must not import the main-process constant to state it here.
  */
-const CHECK_REGISTRATION_GRACE_MS = 120_000;
+export const CHECK_REGISTRATION_GRACE_MS = 180_000;
 
 /**
  * `mergeStateStatus` values that mean GitHub will not take the merge: the merge
@@ -213,32 +258,14 @@ export interface OpenPullRequestStatusInput {
  * snapshot observed GitHub.
  * @returns The presentation status for an open PR.
  */
-export function deriveOpenPullRequestStatus({
-	branchSync,
-	observedAt,
-	pullRequest,
-}: OpenPullRequestStatusInput): OpenPullRequestPresentationStatus {
-	const hasFailing = pullRequest.checks.some(
-		(check) => check.bucket === 'failing',
-	);
-	const hasPending = pullRequest.checks.some(
-		(check) => check.bucket === 'pending',
-	);
-	const isBlockedByPolicy =
-		pullRequest.mergeable === 'conflicting' ||
-		pullRequest.reviewDecision === 'CHANGES_REQUESTED' ||
-		(pullRequest.mergeStateStatus !== undefined &&
-			BLOCKING_MERGE_STATES.has(pullRequest.mergeStateStatus));
-
-	if (hasFailing || isBlockedByPolicy) {
+export function deriveOpenPullRequestStatus(
+	options: OpenPullRequestStatusInput,
+): OpenPullRequestPresentationStatus {
+	const { pullRequest } = options;
+	if (hasFailingCheck(pullRequest) || isBlockedByPolicy(pullRequest)) {
 		return 'blocked';
 	}
-	if (
-		hasPending ||
-		pullRequest.mergeStateStatus === NON_PASSING_MERGE_STATE ||
-		awaitsCheckRegistration(pullRequest, observedAt) ||
-		lagsBranchTip(pullRequest, branchSync)
-	) {
+	if (isPullRequestUnsettled(options)) {
 		return 'checking';
 	}
 	if (pullRequest.isDraft) {
@@ -251,6 +278,60 @@ export function deriveOpenPullRequestStatus({
 		return 'ready';
 	}
 	return 'open';
+}
+
+/**
+ * Whether GitHub's verdict on this open pull request is still moving, and the
+ * app should therefore expect the status it has cached to go wrong soon.
+ *
+ * Deliberately independent of {@link deriveOpenPullRequestStatus}: that
+ * collapses a pull request to one word for display and lets `blocked` win, which
+ * makes it the wrong question for scheduling. A pull request can be blocked *and*
+ * unsettled at once — a repository with branch protection reports
+ * `mergeStateStatus: BLOCKED` for the whole time its required checks are
+ * running, and a lint job that fails fast leaves the slow test job still going —
+ * and those are precisely the rows whose cached status is about to change.
+ * Reading `status === 'checking'` instead would drop every one of them onto the
+ * idle cadence.
+ * @param options - The pull request, its branch sync state, and when the
+ * snapshot observed GitHub.
+ * @returns True when something about this pull request is still in flight.
+ */
+function isPullRequestUnsettled({
+	branchSync,
+	observedAt,
+	pullRequest,
+}: OpenPullRequestStatusInput): boolean {
+	return (
+		pullRequest.checks.some((check) => check.bucket === 'pending') ||
+		pullRequest.mergeStateStatus === NON_PASSING_MERGE_STATE ||
+		awaitsCheckRegistration(pullRequest, observedAt) ||
+		lagsBranchTip(pullRequest, branchSync)
+	);
+}
+
+/**
+ * Whether any check on the rollup has finished badly.
+ * @param pullRequest - The open pull request wire record.
+ * @returns True when at least one check failed.
+ */
+function hasFailingCheck(pullRequest: GithubPullRequestWire): boolean {
+	return pullRequest.checks.some((check) => check.bucket === 'failing');
+}
+
+/**
+ * Whether GitHub will refuse the merge on grounds other than a check result: a
+ * conflicting diff, a review that asked for changes, or a `mergeStateStatus`
+ * naming a gate the pull request has not cleared.
+ * @param pullRequest - The open pull request wire record.
+ * @returns True when policy blocks the merge.
+ */
+function isBlockedByPolicy(pullRequest: GithubPullRequestWire): boolean {
+	return (
+		pullRequest.mergeable === 'conflicting' ||
+		pullRequest.reviewDecision === 'CHANGES_REQUESTED' ||
+		BLOCKING_MERGE_STATES.has(pullRequest.mergeStateStatus ?? '')
+	);
 }
 
 /**

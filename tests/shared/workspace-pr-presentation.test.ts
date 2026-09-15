@@ -254,13 +254,27 @@ describe('deriveWorkspacePrPresentation', () => {
 			deriveWorkspacePrPresentation(
 				snapshot(
 					pr({
-						checksLastObservedAt: '2026-07-14T23:58:00.000Z',
+						checksLastObservedAt: '2026-07-14T23:57:00.000Z',
 						mergeable: 'mergeable',
 						mergeStateStatus: 'CLEAN',
 					}),
 				),
 			),
 		).toEqual(presentationOf('ready'));
+	});
+
+	test('an empty rollup still reads as checking one idle sweep after the stamp', () => {
+		expect(
+			deriveWorkspacePrPresentation(
+				snapshot(
+					pr({
+						checksLastObservedAt: '2026-07-14T23:58:00.000Z',
+						mergeable: 'mergeable',
+						mergeStateStatus: 'CLEAN',
+					}),
+				),
+			),
+		).toEqual(presentationOf('checking'));
 	});
 
 	test('a repository that has never reported a check stays ready', () => {

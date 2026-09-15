@@ -829,9 +829,16 @@ export function createGithubService({
 			if (database) {
 				const refreshed = await fetchSnapshot(cwd.cwd, baseBranch);
 				if (refreshed.ok) {
+					const cached = readCachedPullRequestSnapshot({
+						database,
+						workspaceId: request.workspaceId,
+					});
 					writeCachedPullRequestSnapshot({
 						database,
-						snapshot: refreshed.snapshot,
+						snapshot: retainCheckObservation(
+							retainKnownMergeability(refreshed.snapshot, cached),
+							cached,
+						),
 						workspaceId: request.workspaceId,
 					});
 				}

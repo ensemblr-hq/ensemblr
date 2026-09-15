@@ -4,7 +4,6 @@ import type {
 	RepositoryWorkspaceNavigationMetadata,
 	RepositoryWorkspaceNavigationRepository,
 	RepositoryWorkspaceNavigationSnapshot,
-	WorkspacePrPresentation,
 } from '../../../shared/ipc/contracts/repository-navigation';
 import { liveRepositoryOrderClause } from './repository-row-repository.ts';
 

@@ -21,6 +21,11 @@ export interface SweepableWorkspace {
 	 * passed. Those rows are the ones whose persisted status goes wrong fastest,
 	 * since each of those transitions is invisible until the next refresh, so
 	 * they are swept on the short cadence.
+	 *
+	 * Independent of whether the pull request also reads as *blocked*: a
+	 * protected repository reports `BLOCKED` for as long as its required checks
+	 * run, so treating blocked as settled would put the commonest CI window on
+	 * the idle cadence.
 	 */
 	hasUnsettledStatus: boolean;
 	id: string;
@@ -83,8 +88,13 @@ const DEFAULT_PENDING_SWEEP_INTERVAL_MS = 30_000;
  * across many workspaces (the sweep fetches sequentially), short enough that a
  * merged pull request or a newly failing check surfaces on cold sidebar rows
  * within a couple of minutes.
+ *
+ * Exported so `tests/main/sweep-cadence-invariant.test.ts` can hold
+ * `CHECK_REGISTRATION_GRACE_MS` above it. That grace is measured from the last
+ * non-empty rollup, so at or below this cadence the first empty rollup an idle
+ * workspace observes has already outlived it.
  */
-const DEFAULT_IDLE_SWEEP_INTERVAL_MS = 120_000;
+export const DEFAULT_IDLE_SWEEP_INTERVAL_MS = 120_000;
 
 /**
  * Failure codes that do not recover on a timer — the `gh` CLI is missing or

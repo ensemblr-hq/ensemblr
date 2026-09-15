@@ -618,9 +618,11 @@ export interface ActiveWorkspacePrStatusRow {
  *
  * `json_remove` drops the three fields that derivation never reads and that
  * carry nearly all of a snapshot's weight, so a tick over many workspaces does
- * not haul every review thread and PR body out of SQLite. `json_valid` guards
- * it because the cache tolerates a malformed row rather than failing the whole
- * listing.
+ * not marshal and parse every review thread and PR body into the main process.
+ * SQLite still reads and parses the whole stored value to compute the result —
+ * the saving is on this side of the boundary, not in the page reads.
+ * `json_valid` guards it because the cache tolerates a malformed row rather than
+ * failing the whole listing.
  * @param options - The open database connection.
  * @returns One row per active workspace.
  */
