@@ -10,9 +10,8 @@ import {
 } from 'lucide-react';
 import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import { TabScroller } from '@/renderer/components/tab-scroller';
 import { Button } from '@/renderer/components/ui/button';
-import { TabScroller } from '@/renderer/components/ui/tab-scroller';
 import {
 	Tabs,
 	TabsContent,

@@ -400,6 +400,10 @@ export default interface Resources {
 		status: {
 			'coming-soon': 'Coming soon';
 		};
+		'tab-scroller': {
+			'scroll-left': 'Scroll tabs left';
+			'scroll-right': 'Scroll tabs right';
+		};
 		thinking: {
 			reasoned: 'Reasoned for {{seconds}}s';
 			reasoning: 'Reasoning… {{seconds}}s';

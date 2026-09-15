@@ -398,6 +398,10 @@
 	"status": {
 		"coming-soon": "Σύντομα διαθέσιμο"
 	},
+	"tab-scroller": {
+		"scroll-left": "Κύλιση καρτελών αριστερά",
+		"scroll-right": "Κύλιση καρτελών δεξιά"
+	},
 	"thinking": {
 		"reasoned": "Σκέφτηκε για {{seconds}} δευτ.",
 		"reasoning": "Σκέφτεται… {{seconds}} δευτ."

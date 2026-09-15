@@ -3,7 +3,7 @@
 import { act, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { TabScroller } from '@/renderer/components/ui/tab-scroller';
+import { TabScroller } from '@/renderer/components/tab-scroller';
 
 const VIEWPORT_LEFT = 0;
 const VIEWPORT_RIGHT = 300;
@@ -134,6 +134,16 @@ function renderStrip(
 
 function spyOnScrollBy(viewport: HTMLElement) {
 	return vi.spyOn(viewport, 'scrollBy').mockImplementation(() => {});
+}
+
+function arrowButton(container: HTMLElement, direction: 'end' | 'start') {
+	const arrow = container.querySelector<HTMLElement>(
+		`[data-slot="tab-scroller-arrow-${direction}"]`,
+	);
+	if (!arrow) {
+		throw new Error(`TabScroller did not render its ${direction} arrow`);
+	}
+	return arrow;
 }
 
 describe('TabScroller', () => {
@@ -275,5 +285,115 @@ describe('TabScroller', () => {
 		});
 
 		expect(thumb.dataset.visible).toBe('false');
+	});
+
+	test('claims neither edge when the strip does not overflow', () => {
+		const { viewport, wrapper } = renderStrip('a');
+		stubScrollMetrics(viewport, { clientWidth: 300, scrollWidth: 300 });
+
+		act(() => {
+			fireEvent.scroll(viewport);
+			vi.advanceTimersByTime(20);
+		});
+
+		expect(wrapper.dataset.overflowStart).toBe('false');
+		expect(wrapper.dataset.overflowEnd).toBe('false');
+	});
+
+	test('claims only the trailing edge while resting at the start', () => {
+		const { viewport, wrapper } = renderStrip('a');
+		stubScrollMetrics(viewport, {
+			clientWidth: 300,
+			scrollLeft: 0,
+			scrollWidth: 600,
+		});
+
+		act(() => {
+			fireEvent.scroll(viewport);
+			vi.advanceTimersByTime(20);
+		});
+
+		expect(wrapper.dataset.overflowStart).toBe('false');
+		expect(wrapper.dataset.overflowEnd).toBe('true');
+	});
+
+	test('claims both edges mid-strip', () => {
+		const { viewport, wrapper } = renderStrip('a');
+		stubScrollMetrics(viewport, {
+			clientWidth: 300,
+			scrollLeft: 150,
+			scrollWidth: 600,
+		});
+
+		act(() => {
+			fireEvent.scroll(viewport);
+			vi.advanceTimersByTime(20);
+		});
+
+		expect(wrapper.dataset.overflowStart).toBe('true');
+		expect(wrapper.dataset.overflowEnd).toBe('true');
+	});
+
+	test('releases the trailing edge once the strip is scrolled flush to its end', () => {
+		const { viewport, wrapper } = renderStrip('a');
+		stubScrollMetrics(viewport, {
+			clientWidth: 300,
+			scrollLeft: 300,
+			scrollWidth: 600,
+		});
+
+		act(() => {
+			fireEvent.scroll(viewport);
+			vi.advanceTimersByTime(20);
+		});
+
+		expect(wrapper.dataset.overflowStart).toBe('true');
+		expect(wrapper.dataset.overflowEnd).toBe('false');
+	});
+
+	test('pages toward the end when the trailing arrow is clicked', () => {
+		const { container, viewport } = renderStrip('a');
+		stubScrollMetrics(viewport, { clientWidth: 300, scrollWidth: 600 });
+		const scrollBy = spyOnScrollBy(viewport);
+
+		fireEvent.click(arrowButton(container, 'end'));
+
+		expect(scrollBy).toHaveBeenCalledWith({ behavior: 'smooth', left: 240 });
+	});
+
+	test('pages toward the start when the leading arrow is clicked', () => {
+		const { container, viewport } = renderStrip('a');
+		stubScrollMetrics(viewport, {
+			clientWidth: 300,
+			scrollLeft: 300,
+			scrollWidth: 600,
+		});
+		const scrollBy = spyOnScrollBy(viewport);
+
+		fireEvent.click(arrowButton(container, 'start'));
+
+		expect(scrollBy).toHaveBeenCalledWith({ behavior: 'smooth', left: -240 });
+	});
+
+	test('hides both arrows from assistive tech until their edge can travel', () => {
+		const { container } = renderStrip('a');
+
+		for (const direction of ['start', 'end'] as const) {
+			const arrow = arrowButton(container, direction);
+			const edge = direction === 'start' ? 'overflow-start' : 'overflow-end';
+
+			expect(arrow.classList).toContain('invisible');
+			expect(
+				arrow.className
+					.split(' ')
+					.filter((utility) => utility.endsWith(':visible')),
+			).toEqual([`group-data-[${edge}=true]/tab-scroller:visible`]);
+		}
+	});
+
+	test('keeps an arrow click from pulling focus off the surface behind it', () => {
+		const { container } = renderStrip('a');
+
+		expect(fireEvent.pointerDown(arrowButton(container, 'end'))).toBe(false);
 	});
 });

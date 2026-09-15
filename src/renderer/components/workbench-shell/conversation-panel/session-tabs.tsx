@@ -12,6 +12,7 @@ import {
 import { Reorder } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { TabScroller } from '@/renderer/components/tab-scroller';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	DropdownMenu,
@@ -19,7 +20,6 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
-import { TabScroller } from '@/renderer/components/ui/tab-scroller';
 import { Tooltip, TooltipTrigger } from '@/renderer/components/ui/tooltip';
 import { useSessionTabOrder } from '@/renderer/hooks/workbench-shell/conversation-panel/use-session-tab-order';
 import { useSessionTabShortcuts } from '@/renderer/hooks/workbench-shell/conversation-panel/use-session-tab-shortcuts';
