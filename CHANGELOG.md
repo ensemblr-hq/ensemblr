@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-09-18
+
+Ensemblr 0.1.19 is a patch release: agents are handed control-tool names their own client can call, turn diffs stop double-counting untracked files, an overflowing tab strip pages with edge arrows, and a pull request no longer reads Ready to merge while its checks are still arriving.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.19) ·
+[`.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.19/Ensemblr-0.1.19-arm64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.19/Ensemblr-0.1.19-x64.AppImage)
+
+### Added
+
+- **An overflowing tab strip shows it overflows, and pages with an arrow at each end.** A strip with tabs past its edge used to give no sign of them and no way to reach them but a trackpad swipe. Each end now fades out while tabs remain beyond it and carries an arrow that pages the strip that way. The edge state is published as `data-overflow-start`/`data-overflow-end` from the pass the overlay scrollbar already runs, so a scroll frame repaints the fade without re-rendering the strip; the fade is a mask over the tabs rather than a gradient overlay, so it needs to know nothing about the surface behind it. A resting arrow is `invisible` rather than transparent, so it leaves the accessibility tree instead of announcing a control that does nothing, and it swallows `pointerdown` so paging does not pull focus out of the composer. The review panel's header adopts the shared `TabScroller`, so the review panel, session tabs, and dock panel strips behave alike. (#614)
+
+### Changed
+
+- **Control-tool names reach each agent spelled for its own client.** Every playbook, directive, tool description, and op result named the control tools in Pi's bare `ensemblr_*` spelling, so a Claude agent read a few hundred names it could not call — it holds `mcp__ensemblr__ensemblr_set_name`, not `ensemblr_set_name`. `namespaceControlToolNames` now rewrites them per caller on the way out: the playbook, per-turn directives, the MCP `instructions` block, every tool description, and op results. Content the app *read* rather than wrote — a diff, a transcript, scrollback, a stored diagram, a Linear issue — is left verbatim, so an agent is never handed a file that disagrees with disk. Spawned prompts and follow-ups are respelled for the recipient's runtime rather than the sender's, which covers peer and review briefs, the Concierge frame, and cross-runtime delegation. A name the app does not serve is left as written, so a misspelling fails as itself. (#612)
+- **The guide is pinned to the published release** — ADR counts, the shared-module count, version references, download URLs, and asset filenames. (#611)
+
+### Fixed
+
+- **A turn's diff no longer reports every earlier untracked file as its own.** A turn checkpoint is captured with `add -A` into a throwaway index, but the diff against it walked the real index, so every untracked file showed up twice — as a deletion and an addition — and leaked into every later turn. Both legs of a turn diff are now tree-to-tree: the live leg snapshots the working tree, `.gitignore` respected, into a tree object through its own throwaway index, leaving the workspace index, HEAD, and refs untouched. A finished chat's last turn is now bounded by the next checkpoint taken anywhere in the workspace, so it stops diffing the live tree and claiming other chats' work; a streaming turn stays live. File chips widen only the labels that would otherwise render two different files — a moved file, two `index.ts` — as the same word. (#613)
+- **A pull request no longer reads Ready to merge while GitHub is still queueing its checks.** GitHub advances a PR's head as soon as it accepts a push and queues that head's checks seconds later; in between, the check rollup is empty and the mergeability verdict still describes the commit that already passed, so the header pill, sidebar row, and Checks panel offered a merge of work nothing had run. An empty rollup shortly after checks were last seen now reads as checking, `mergeStateStatus: UNSTABLE` reads as checking and `BEHIND` as blocking, and every still-unsettled PR — including one that is blocked *and* running checks, the ordinary state of a protected branch — refreshes on the 30-second cadence rather than dropping to 120 seconds. A repository that has never reported a check is never held back. (#615)
+
 ## [0.1.18] - 2026-09-14
 
 Ensemblr 0.1.18 is a patch release: an inline delegation keeps its card for the whole run, and the narrow-window navigation sidebar opens clear of the title bar.
