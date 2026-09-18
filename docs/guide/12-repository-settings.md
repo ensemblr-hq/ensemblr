@@ -195,7 +195,7 @@ setting for this repository.
 
 **Historical spelling.** `branchPrefix` in camelCase is still accepted as an
 alias for `branch_prefix`, so configs written before the snake_case convention
-keep resolving. It is the only camelCase `[git]` key accepted — the other six
+keep resolving. It is the only camelCase `[git]` key accepted — the other five
 must be snake_case.
 
 ```toml

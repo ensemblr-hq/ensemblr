@@ -539,15 +539,15 @@ workspace's unmerged commit.
 1. On a branch cut from current `origin/master`, run
    `npm version <version> --no-git-tag-version`, replacing `<version>` with the
    exact version being cut. Commit only `package.json` and `package-lock.json`,
-   open the version-bump PR, and merge it when the required **Checks** workflow
-   is green. Advisory review services are not a release gate.
+   open the version-bump PR, and merge it once the **Checks** workflow is green
+   — `master` is unprotected, so GitHub will not stop a merge that is red. Advisory review services are not a release gate.
 2. Write the final release body in `NOTES.md`.
 3. Fetch the merged `master`, resolve it to a commit SHA, confirm that tree
    carries the intended package version, and publish the release against that
    immutable target:
 
 ```bash
-version=0.1.18
+version=0.1.19
 tag="v${version}"
 git fetch origin master
 target=$(git rev-parse origin/master)
@@ -610,7 +610,7 @@ returns `output.summary: null`, and the raw logs show only the unexpanded
 script. Every pinned line above derives from one fact, each asset's `name`:
 
 ```bash
-gh release view v0.1.18 --json assets -q '.assets[].name'
+gh release view v0.1.19 --json assets -q '.assets[].name'
 ```
 
 The version string is the tag with `v` stripped; each URL is
@@ -621,9 +621,9 @@ empty or partial asset list is not the signal to start editing — poll until al
 four are there. Then check the URLs actually resolve before opening the PR:
 
 ```bash
-gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.18 \
+gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.19 \
   --jq '.assets[] | "\(.name)\t\(.digest)"'
-gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.18 \
+gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.19 \
   --jq '.assets[].browser_download_url' |
   while IFS= read -r url; do
     curl --fail --location --head --silent --show-error "$url" >/dev/null
@@ -693,10 +693,10 @@ Squirrel.Mac feed the in-app updater reads:
 
 ```json
 {
-  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.18/Ensemblr-darwin-arm64-0.1.18.zip",
-  "name": "0.1.18",
+  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.19/Ensemblr-darwin-arm64-0.1.19.zip",
+  "name": "0.1.19",
   "notes": "…the release body…",
-  "pub_date": "2026-09-14T14:49:37Z"
+  "pub_date": "2026-09-18T09:48:54Z"
 }
 ```
 
