@@ -539,8 +539,8 @@ workspace's unmerged commit.
 1. On a branch cut from current `origin/master`, run
    `npm version <version> --no-git-tag-version`, replacing `<version>` with the
    exact version being cut. Commit only `package.json` and `package-lock.json`,
-   open the version-bump PR, and merge it when the required **Checks** workflow
-   is green. Advisory review services are not a release gate.
+   open the version-bump PR, and merge it once the **Checks** workflow is green
+   — `master` is unprotected, so GitHub will not stop a merge that is red. Advisory review services are not a release gate.
 2. Write the final release body in `NOTES.md`.
 3. Fetch the merged `master`, resolve it to a commit SHA, confirm that tree
    carries the intended package version, and publish the release against that

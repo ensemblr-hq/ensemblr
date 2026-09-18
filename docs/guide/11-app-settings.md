@@ -364,11 +364,14 @@ from leaving it unset.
 
 #### The built-in catalogue
 
-Ensemblr ships a catalogue of 20 variables it already understands. The ones you
+Ensemblr ships a catalogue of 26 variables it already understands. The ones you
 can set yourself appear under **Show documented variables**, marked `Not set`
-until you give one a value — the five reserved `ENSEMBLR_*` variables below are
+until you give one a value — the eleven reserved `ENSEMBLR_*` variables are
 populated automatically and never appear in that list, since there is nothing
-for you to add. Adding a value to a catalogue entry does not change the
+for you to add. Five of them are listed below; the other six, the
+`ENSEMBLR_CONTROL_*` variables, are handed to agents at launch for
+[Ensemblr Control](./09-agent-control.md) and cannot be set from a repository,
+an env file, or a secret layer. Adding a value to a catalogue entry does not change the
 variable's meaning, only its value.
 
 Each entry carries three statuses:
@@ -427,7 +430,6 @@ See [12. Repository settings](./12-repository-settings.md).
 | Delete branch on archive | Delete the local branch when a workspace is archived. The remote branch is untouched — configure that on GitHub. | On / off | Off |
 | Archive on merge | Archive a workspace automatically after its pull request merges. | On / off | Off |
 | Set upstream on plain `git push` | Configure new workspaces so a bare `git push` sets the branch upstream. Turning it off avoids writing git worktree config, at the cost of less reliable PR information until branches have an upstream. | On / off | On |
-| Credit Ensemblr as a commit co-author | Ask agents to end every commit they make with a `Co-authored-by:` trailer for the Ensemblr account. GitHub credits the trailer, so Ensemblr appears alongside you in the repository's contributors. Off leaves your commits with you as the sole author. | On / off | On |
 
 Workspace and branch mechanics are covered in
 [5. Workspaces](./05-workspaces.md); the merge and archive path in

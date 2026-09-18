@@ -180,10 +180,17 @@ request:
 - **Conflicts** — files conflicting with the base branch.
 
 GitHub state is refreshed from GitHub rather than trusted from cache; the panel
-says so when a refresh fails instead of showing you stale green. A workspace with
-a check still running is refreshed every 30 seconds and everything else every two
-minutes, so a build finishing is noticed without polling ten idle workspaces at
-the same rate.
+says so when a refresh fails instead of showing you stale green. A workspace
+whose checks are still running — or have not started yet after a push — is
+refreshed every 30 seconds and everything else every two minutes, so a build
+finishing is noticed without polling ten idle workspaces at the same rate.
+
+A pull request does not read as ready to merge while its checks are still
+coming. GitHub accepts a push seconds before it queues that commit's checks, and
+in between reports an empty check list; Ensemblr treats an empty list within three
+minutes of last seeing checks on that pull request as still checking, and treats
+GitHub's `UNSTABLE` merge state the same way. A repository that has never
+reported a check is never held back.
 
 GitHub computes mergeability lazily and answers "unknown" on the first read after
 the base branch moves. Ensemblr carries the last computed verdict forward for the

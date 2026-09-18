@@ -199,7 +199,10 @@ the slowest of the three rather than their sum. `test` is a matrix over **both**
 platforms is what makes a darwin-only assumption fail in CI rather than in a
 user's AppImage. `lint` and `typecheck` run on Linux alone, because neither
 Biome nor tsc can reach a different verdict on macOS. A tiny `verify` job
-collapses all of them into the single status check branch protection names.
+collapses all of them into a single status check. `master` has no branch
+protection or ruleset, so nothing on GitHub enforces that check: a pull request
+with a failing `verify` can still be merged, and confirming it is green before
+merging is on whoever merges.
 `scan` runs a `react-doctor` scan diffed against `master`, failing on `error`.
 
 A second push to a PR cancels the run it superseded, so pushing three fixups in

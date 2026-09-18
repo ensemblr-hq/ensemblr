@@ -681,19 +681,25 @@ literal token would be readable via `ps` by any process on the machine; Claude
 expands the reference itself.
 
 `src/main/agent-runtime/session/agent-control-wiring.ts` decides who gets this.
-`NATIVE_MCP_PROVIDERS` is `new Set(['claude'])` — declared as a capability rather
-than tested by name, so a third runtime says once whether it brings its own MCP
-client. Pi takes neither the endpoint nor the role playbook, because its bundled
+It asks `usesNativeControlMcp`, which reads `MCP_CLIENT_RUNTIMES` — `new Set(['claude'])`
+in `src/shared/agent-control/control-tool-names.ts`, declared as a capability
+rather than tested by name, so a third runtime says once whether it brings its
+own MCP client. The same set decides which runtimes see the control tools under
+their MCP client's namespace (`mcp__ensemblr__*`) and so have the prose they are
+handed respelled to match. Pi takes neither the endpoint nor the role playbook, because its bundled
 extension *is* its MCP client and reads the same env overlay itself.
 
 **The two surfaces are told apart by `ControlAudience`, never by runtime name.**
-`ControlAudience` (`src/shared/agent-control/awareness.ts`) has exactly three
-fields — `hasChatTab`, `role` (`orchestrator` \| `subagent`), and `delegation`
-(`ensemblr` \| `native`, the mechanism the session was opened under, #277) — and
-the file says why: every axis is a property of the caller rather than of any one
-runtime, so a runtime added later selects its surface by declaring those facts.
-`withheldControlOps` folds all three into one answer, on the same argument each
-time: listing a tool the service would only refuse teaches the model to keep
+`ControlAudience` (`src/shared/agent-control/awareness.ts`) carries `hasChatTab`,
+`role` (`concierge` \| `orchestrator` \| `subagent`), `delegation` (`ensemblr` \|
+`native`, the mechanism the session was opened under, #277), `toolNaming`
+(`bare` \| `mcp`, how the caller's client spells the control tools), the optional
+`depth` and `retired`, and the feature flags it inherits from
+`AwarenessFeatures` — and the file says why: every axis is a property of the
+caller rather than of any one runtime, so a runtime added later selects its
+surface by declaring those facts. `withheldControlOps` folds them into one
+answer (it takes the audience without `toolNaming`, since which ops a caller
+holds is settled before anything renders), on the same argument each time: listing a tool the service would only refuse teaches the model to keep
 reaching for it.
 `AgentSpecies` in `src/main/agent-control/ports.ts` is `'pi' | 'claude' |
 'harness'`, and the gates read `originHasChatTab(origin)` against
