@@ -76,6 +76,23 @@ const ATTACHMENT_PLACEHOLDER =
 const EXTERNAL_PLACEHOLDER = '[external file — inspect this path directly]';
 
 /**
+ * Announces a text file the read refused on size, whether a stored attachment
+ * or an @-mentioned workspace file. The attachment store accepts files far
+ * larger than the read will return, and the inlined body is only an excerpt
+ * anyway, so the agent is pointed at the file instead of the send failing.
+ * @param sizeBytes - The file's on-disk size, when the read reported one.
+ * @returns The placeholder body for the `<attached_file>` block.
+ */
+function oversizePlaceholder(sizeBytes: number | undefined): string {
+	// Pinned to en-US, not the UI language: this text goes into an agent prompt.
+	const size =
+		sizeBytes === undefined
+			? ''
+			: ` (${sizeBytes.toLocaleString('en-US')} bytes)`;
+	return `[file too large to inline${size} — inspect this file directly]`;
+}
+
+/**
  * Wraps one attachment's content in the shared marker, truncated to budget and
  * carrying what the chip showed.
  *
@@ -147,8 +164,9 @@ export function serializeLinkedDirectories(paths: readonly string[]): string {
  * collect into one referenced-folders header — they carry no inline content, so a
  * header apiece would be noise.
  *
- * Throws when a file read fails, so the caller can surface the error to the
- * user before clearing the composer.
+ * Throws when a file read fails for any reason other than size, so the caller
+ * can surface the error to the user before clearing the composer; a text file
+ * too large to read is announced by path instead.
  * @param segments - The draft's text runs and chips, in document order.
  * @param workspaceCwd - Absolute workspace root the relative paths resolve against.
  * @returns The serialized prompt body, or an empty string when the draft is blank.
@@ -278,11 +296,13 @@ async function readAttachmentContents(
 }
 
 /**
- * Reads one attachment's inlined body, or null when it is announced by path
- * instead (a directory, an image, a binary, or a file outside the workspace).
+ * Reads one attachment's inlined body. A file outside the workspace or too
+ * large to read gets its own path-only placeholder; a directory, an image, or a
+ * binary resolves to null and falls back to the generic one.
  * @param attachment - The attachment to resolve.
  * @param workspaceCwd - Absolute workspace root the relative paths resolve against.
- * @returns The body to inline, or null to fall back to a placeholder.
+ * @returns The body to inline — the file's text or a path-only placeholder — or
+ * null to fall back to the generic attachment placeholder.
  */
 async function readAttachmentContent(
 	attachment: ComposerAttachment,
@@ -304,6 +324,9 @@ async function readAttachmentContent(
 		path: attachment.path,
 		workspaceCwd,
 	});
+	if (result.error?.code === 'too-large') {
+		return oversizePlaceholder(result.sizeBytes);
+	}
 	if (result.error) {
 		throw new Error(
 			`Could not attach ${attachment.path}: ${result.error.message}`,
