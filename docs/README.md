@@ -31,7 +31,7 @@ The current build is [`0.1.19`](https://github.com/ensemblr-hq/ensemblr/releases
 - [`adr/`](./adr) — **71** Architecture Decision Records, numbered `0001`–`0072` (`0007` was withdrawn before acceptance), covering the accepted decisions and their supersessions. ADRs are historical records: some cite planning documents that were removed before the public release, and those references are left as written rather than rewritten after the fact.
 - [`ux-conventions.md`](./ux-conventions.md) — the settled workflows, information architecture, visual design, copy, and icon conventions the shell is built to.
 - [`i18n-glossary.md`](./i18n-glossary.md) — the Russian and Greek product vocabulary every translation is held to. The completion contract itself is [`.claude/rules/i18n.md`](../.claude/rules/i18n.md).
-- [`considerations/`](./considerations) — design records and forward-looking notes: the [Ensemblr Control design](./considerations/agent-control-layer.md) and the [orchestration playbook](./considerations/agent-orchestration-playbook.md).
+- [`considerations/`](./considerations) — design records and forward-looking notes: the [Ensemblr Control design](./considerations/agent-control-layer.md) the [orchestration playbook](./considerations/agent-orchestration-playbook.md), and the [Jev decision layer proposal](./considerations/jev-decision-layer.md).
 - [`audits/`](./audits) — dated point-in-time security and performance audits, each with its own findings and a [remediation record](./audits/2026-09-12-security-performance/REMEDIATION.md) of what was fixed, accepted, or left unverified.
 
 ## Repository docs
