@@ -131,6 +131,42 @@ describe('serializeComposerDraft', () => {
 		expect(text).not.toContain('<attached_file path="exports/data.csv"></');
 	});
 
+	test('announces a text file too large to read by path and size instead of failing the send', async () => {
+		readWorkspaceFile.mockResolvedValue({
+			error: {
+				code: 'too-large',
+				message: 'Selected file is too large to preview.',
+			},
+			path: '.context/attachments/ca8749/zip-coverage.csv',
+			sizeBytes: 1_234_567,
+		});
+
+		const text = await serializeComposerDraft({
+			segments: chips(
+				fileAttachment('.context/attachments/ca8749/zip-coverage.csv'),
+			),
+			workspaceCwd: '/repo',
+		});
+
+		expect(text).toBe(
+			'<attached_file path=".context/attachments/ca8749/zip-coverage.csv">\n[file too large to inline (1,234,567 bytes) — inspect this file directly]\n</attached_file>',
+		);
+	});
+
+	test('still fails the send when a text file cannot be read for another reason', async () => {
+		readWorkspaceFile.mockResolvedValue({
+			error: { code: 'not-found', message: 'File not found.' },
+			path: 'notes.md',
+		});
+
+		await expect(
+			serializeComposerDraft({
+				segments: chips(fileAttachment('notes.md')),
+				workspaceCwd: '/repo',
+			}),
+		).rejects.toThrow('Could not attach notes.md: File not found.');
+	});
+
 	test('lists each external file by absolute path with a path-only placeholder', async () => {
 		const text = await serializeComposerDraft({
 			segments: chips(
