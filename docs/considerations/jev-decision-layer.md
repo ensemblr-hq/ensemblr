@@ -1,23 +1,26 @@
 # Jev Decision Layer (Proposal)
 
-> **Status:** Proposal, 2026-09-19. Nothing has been built yet. Building starts only if the
-> Phase 0 spike passes, and the spike needs a TypeSafe early-access API key.
+> **Status:** Rejected after the corrected Phase 0 rerun, 2026-09-20. The original spike
+> misused several Jev primitives and its result is withdrawn. The corrected run materially
+> improved F1, but F2/F3 still do not support production use. None of F1-F5 has been built.
 >
-> **One-line summary:** when the user adds a TypeSafe API key, Ensemblr uses Jev, TypeSafe's
-> fast model that only classifies, for a few narrow, typed decisions around orchestration. One
-> of them, model selection, is behind a toggle. The rest run automatically. Each of them falls
-> back to today's behaviour whenever Jev is missing, slow, or unsure.
+> **One-line summary:** this proposal would have used Jev, TypeSafe's fast classification
+> model, for a few narrow, typed orchestration decisions when the user added a TypeSafe API
+> key. Model selection would have been behind a toggle; the other features would have run
+> automatically and fallen back to today's behaviour whenever Jev was missing, slow, or
+> unsure.
 
 ## What Jev is, and what it is not
 
-Jev (`jev-1.13.0`) is TypeSafe AI's "System One" model. It does not write text. It takes a text
-or JSON `state` plus typed questions and returns typed answers with calibrated probabilities:
+Jev (`jev-latest`; the earlier pinned `jev-1.13.0` is no longer requestable by id) is TypeSafe
+AI's "System One" model. It does not write text. It takes a text or JSON `state` plus typed
+questions and returns typed answers with calibrated probabilities:
 
 | Primitive | Returns | Used here for |
 | --- | --- | --- |
-| Choice | `choice`, `probabilities`, `confidence` | role, question category |
+| Choice | `choice`, `probabilities`, `confidence` | role |
 | Score | `score`, `probabilities`, `confidence` | difficulty, reversibility |
-| Noul | `noul` (probability of yes, 0 to 1) | yes/no report flags, duplicate check |
+| Noul | `noul` (probability of yes, 0 to 1) | question dimensions, report flags, duplicate check |
 
 The limits that shape this design, taken from TypeSafe's own docs:
 
@@ -29,8 +32,10 @@ The limits that shape this design, taken from TypeSafe's own docs:
   hostile".
 - It is most accurate in English. Ensemblr also ships Russian and Greek, and agents reply in
   the app language.
-- Price: $0.042 per million input tokens, output free. Latency is 70–500 ms. Rate limits are
-  1,200 requests/min and 250k tokens/s, and "can change without notice".
+- Price: $0.042 per million input tokens, output free. The docs advertise 70–500 ms latency,
+  but the withdrawn v1 run observed p95 547 ms and a 994 ms maximum; the corrected harness did
+  not retain latency. Rate limits are 1,200 requests/min and 250k tokens/s, and "can change
+  without notice".
 - Launched in early access on 2026-09-15. Zero data retention is enterprise-only.
 
 It follows that Jev never replaces the agent that asks, briefs, or reviews. It answers one
@@ -83,8 +88,9 @@ This is concern-first, like `src/main/infisical/`. The public surface goes throu
   `GET /v1/models`. It has no SDK dependency, the same stance ADR 0051 took for Infisical:
   `@typesafe-ai/sdk` was first published on 2026-09-12 and covers one endpoint. Responses are
   parsed with Zod because they cross a trust boundary. Each call carries an `AbortSignal`
-  timeout, and the model is pinned with `JEV_MODEL = 'jev-1.13.0'` rather than the moving
-  `jev-latest` alias.
+  timeout. Production would request the stable alias returned by `GET /v1/models`, record the
+  concrete model version returned by every response, and stop if one run resolves to mixed
+  versions. An exact version should be pinned only when TypeSafe exposes that id.
 - `typesafe-key-store.ts` keeps the API key in the platform secret store (`src/main/secrets/`:
   Keychain on macOS, `safeStorage` on Linux) with `scope: 'app'` under key
   `typesafe-api-key`. The key never goes into `config.json`.
@@ -185,28 +191,20 @@ levels, and the settings row says so.
 **Hook:** the `askUserQuestion` dispatch in `src/main/agent-control/agent-control-service.ts`,
 before `gateAfkMode`.
 
-**Jev call:** one Choice per question in the questionnaire (at most 4), all in one request.
-The state holds the question and its options. The categories are:
+**Jev call:** one request per question in the questionnaire (at most 4), with five independent
+Nouls sharing state `{ question, options }`:
 
-- `user-preference`: taste or priorities only the user holds
-- `needs-user-authority`: publish, delete, pay, or touch something outside the workspace
-- `answerable-from-context`: the code, docs, or repository conventions settle it
-- `ambiguous-requirement`: the request itself is underspecified
+- `needsUserAuthority`: acting would publish, delete, pay, or exercise other user-only authority
+- `settledByRepository`: code, tests, tracked docs, or repository conventions settle it
+- `isUserPreference`: valid outcomes remain and depend on taste or priorities
+- `needsUserFact`: a private or physical-world fact is missing
+- `isAmbiguousRequirement`: the request itself admits materially different meanings or scopes
 
-**Policy** (a pure function in `src/shared/`, so it can be tested without Jev):
-
-| Mode | Result | Action |
-| --- | --- | --- |
-| Attended | Every question `answerable-from-context` at confidence ≥ 0.85 | Bounce once: return unanswered, telling the agent to decide it and record the assumption. The same question asked again in that session goes through to the user. |
-| Attended | Anything else | Show the questionnaire, as today |
-| AFK | Any question `needs-user-authority` at ≥ 0.6 | A hard-block denial: do the independent parts, stop, report |
-| AFK | Anything else | Today's denial: decide, record the assumption |
-
-The AFK denial is currently a static map in `src/shared/afk-mode/control-ops.ts`, which a
-parity test holds to `src/shared/agent-control/afk-directive.ts`. It becomes a pure function
-of `(op, category | null)`, and the parity test learns the second denial text. The threshold
-for a hard block is deliberately low, because a stop that turns out to be wrong costs less
-than an action taken without authority.
+These dimensions can overlap, so a Choice is the wrong primitive. Code combines the Nouls
+into an action. An attended bounce requires `settledByRepository` above its threshold and all
+four guard Nouls below theirs. AFK hard-blocks only when `needsUserAuthority` clears its own
+threshold. The corrected spike did not find a deployable threshold set, so neither policy is
+currently specified closely enough to build.
 
 ### F3: Report triage (automatic)
 
@@ -214,22 +212,24 @@ than an action taken without authority.
 `src/main/agent-control/agent-control-service.ts` (around lines 3240–3269). The Jev calls for
 all settled children run concurrently.
 
-**Jev call** (state = the child's final message; if it is over budget, send the head and the
-tail). Four Nouls:
+**Jev call** (state = `{ current, previous }`; if a report is over budget, send its head and
+tail). Five independent Nouls inspect `current`:
+
 - Does it leave questions for the orchestrator unanswered?
-- Does it report a check, test, or build that failed or was not run?
-- Does it say the child could not proceed?
-- Does it claim the brief is complete?
+- Does it report an executed check, test, or build that failed?
+- Does it explicitly say a relevant check was not run, skipped, or unavailable?
+- Does it say the child could not complete required work?
+- Does it claim the assigned brief is complete?
 
-When the same child reports again after a `send_follow_up`, a fifth Noul is added, with state
-`{ previous, current }`: "Does the current report repeat findings already in the previous
-one?" This is the check for review rounds circling the same findings. It keeps one previous
-report per child session in memory.
+When the same child reports again after a `send_follow_up`, a sixth Noul asks whether
+`current` repeats `previous` without material new evidence or resolution. This is the check
+for review rounds circling the same findings. It keeps one previous report per child session
+in memory.
 
-**Output:** `WaitedAgent.triage: { openQuestions, checksFailed, blocked, claimsComplete,
-repeatsPrevious? } | null`, plus a one-line `note` when a flag is ≥ 0.8. It is only a note:
-it does not change how waits wake up, and it does not invent signals. Orchestrators are still
-told to read the report.
+**Output:** `WaitedAgent.triage: { openQuestions, checksFailed, checksNotRun, blocked,
+claimsComplete, repeatsPrevious? } | null`, plus a one-line `note` when a flag is ≥ 0.8. It is
+only a note: it does not change how waits wake up, and it does not invent signals.
+Orchestrators are still told to read the report.
 
 ### F4: Linear duplicate check (automatic)
 
@@ -280,54 +280,145 @@ This is what leaves the machine, and the settings row lists it word for word:
 - the title and description of a proposed Linear issue, plus candidate issues (F4)
 - the decision bullets from AFK runs (F5)
 
-It never sends file contents, diffs, terminal output, environment variables, or secrets.
+It does not attach files, diffs, terminal sessions, environment variables, or secrets as
+separate inputs. Briefs and child reports can themselves quote paths, code, diff details, or
+terminal output, however, so the consent copy must disclose that transitive content rather
+than promise it never leaves the machine.
 
 ## Phases and estimates
 
 | Phase | Scope | Estimate |
 | --- | --- | --- |
-| 0 | Spike in `.context/`: replay real briefs, questions, and reports from `agent_session_events`, hand-label about 40 of each, and measure accuracy against confidence. **Go/no-go gate.** | 2–3 h |
+| 0 | Spike in `.context/`: extract 152 briefs, 126 questions, and 190 reports; independently label deterministic samples of 80/126/60+60; measure the predeclared gates. **Go/no-go gate.** | Completed |
 | 1 | Foundation: the `src/main/typesafe/` concern, key store, settings row, IPC, decision log and migration, i18n | ~1 day |
 | 2 | F1 behind the toggle, plus the prose switch in the awareness text | ~1 day |
 | 3 | F2 and F3 | 1–1.5 days |
 | 4 | F4 and F5, including the `setSummary` contract change and the tab surface | ~1.5 days |
 
-Total is about 5 days once the spike passes.
+The implementation was estimated at about 5 days if the spike passed.
 
-### Phase 0 status (2026-09-19)
+### Corrected Phase 0 result (2026-09-20)
 
-The harness was built but not run, because implementation moved to another workspace.
+Phase 0 remains a **no-go for this production proposal**, but not for the reason the first run
+claimed. The first result is withdrawn: it deleted 18 one-line F1 briefs, rounded Score before
+rank correlation, treated overlapping F2 concepts as one Choice, measured the wrong bounce
+predicate and authority threshold, calibrated F3 on an enriched sample at the wrong operating
+point, and had a broken generic-secret redactor.
 
-**Dataset.** The harness read the local event log read-only, with secrets redacted, and pulled:
-- 152 unique spawn briefs, 133 of which name a role
-- 86 `ask_user_question` questions, 78 with the user's actual answer
-- 190 child reports
+The repeatable process, private artifact manifest, exact commands, labelling protocol, and
+future-model comparison rules are in [`jev-spike-runbook.md`](./jev-spike-runbook.md).
 
-A dry run sized the full evaluation at 378 requests, about 380k input tokens and about $0.02.
+The corrected harness preserves brief text, uses independent labels, asks atomic questions with
+structured criteria, batches same-state questions, separates representative and cue-enriched
+F3 strata, and reports raw Score rank, exact-bin ECE, action predicates, class support, and
+actual denominators. Missing support and missing report pairs are unmeasured, never silent
+passes. Its evaluation path runs the leak guard immediately before the network call.
 
-**Gold labels.** Opus 5 wrote the gold labels. Two findings already bear on the design:
+The gates were fixed before the final API run:
 
-- **F2's categories are blurry.** The labeler marked 45 of 86 questions as unsure. Most of the
-  confusion was between `user-preference` and `answerable-from-context`: option descriptions
-  often cite a repository precedent, which makes a question both. Some questions fit no
-  category at all, such as a fact only the user holds or a physical action on another
-  machine. Tighten the taxonomy before relying on it, for example by adding
-  `needs-user-fact`, and score F2 on the labels the labeler was sure of.
-- **F3's sample lacks the rare flags.** 58 of 60 sampled reports claim completion, 2 are
-  blocked and 5 leave open questions. The `checksFailed` wording also caught every "check not
-  run" note. Evaluate on a sample enriched for the rare flags, and split "failed" from "not
-  run".
+- F1 role accuracy and macro-F1 >= 0.85, accepted-decision accuracy at Choice confidence >=
+  0.5 >= 0.95, and raw difficulty Spearman >= 0.50;
+- F3 at threshold 0.8: F1 >= 0.75, precision >= 0.90, and ECE <= 0.10 for every flag; and
+- any required unmeasured dimension makes the overall result no-go.
 
-**What the spike measures.** Besides the labelled checks, F1 is checked against what the
-orchestrator actually chose, needing no hand labels:
-- the role named in the brief, with role words stripped before sending
-- the thinking level the orchestrator picked, compared by rank correlation
+F2 intentionally has no production gate because its observed sample has no certain bounce
+positive. The shared-threshold sweep below is only a one-dimensional diagnostic through a
+five-threshold policy space; it cannot select production thresholds.
 
-A second check sends the recorded questions back to Jev and compares its pick with the answer
-the user actually gave and with the agent's recommended option. That tests whether Jev only
-repeats the recommendation.
+The final run evaluated 80 independently labelled briefs, all 126 F2 questions (86 observed
+questionnaires plus 40 question-shaped fragments harvested from real agent reports as
+counterfactual controls), and 102 unique reports (60 representative, 60 cue-enriched, 18 in
+both) from a 152/126/190 extracted corpus. One clean-room Opus 5 pass labelled the initial
+set; after F3 enrichment was tightened, a second pass preserved retained labels and labelled
+18 new reports. Neither pass saw Jev answers. These are independent AI labels, not human
+ground truth, and were not double-labelled or adjudicated. The F1 pass marked 58 of 80 labels
+uncertain, mostly at coder/builder and difficulty boundaries. F2 retained 103 certain
+rows. The database had no child branch with two completed turns, so `repeatsPrevious` remains
+unmeasured.
 
-## Testing
+The stable `jev-latest` alias was the only non-preview model exposed by `GET /v1/models`; the
+old concrete id could no longer be requested directly. All 308 responses resolved to
+`jev-1.13.0`, however, so the v1-to-v2 difference is not a model-version confound. The run used
+605,621 input and 28,482 output tokens and cost about $0.025 at the documented input price.
+The v2 harness did not record request latency.
+
+#### F1
+
+| Check | Required | Corrected |
+| --- | ---: | ---: |
+| Role accuracy | >= 0.85 | 0.838 (67/80; Wilson 95% CI 0.742–0.903) |
+| Role macro-F1 | >= 0.85 | 0.625 |
+| Accepted-decision accuracy at Choice confidence >= 0.5 | >= 0.95 | 0.880 (66/75) |
+| Accepted-decision coverage | diagnostic | 0.938 (75/80) |
+| Raw difficulty rank correlation | >= 0.50 | 0.811 |
+| Rounded difficulty exact accuracy | diagnostic | 0.650 |
+| Production difficulty action accuracy | diagnostic | 0.638 |
+
+| Role | Support | F1 |
+| --- | ---: | ---: |
+| Sage | 1 | 0.000 |
+| Coder | 16 | 0.609 |
+| Builder | 20 | 0.766 |
+| Grunt | 3 | 0.800 |
+| Explorer | 40 | 0.952 |
+
+This is materially stronger than the invalid first run, but no knife-edge pass is claimed. On
+the 22 labels the Opus labeler considered certain, role accuracy was 0.955 and raw difficulty
+correlation was 0.693; that subset had no Sage example. Jev found all 40 Explorers, 18 of 20
+Builders, and only 7 of 16 Coders. Thirty-nine of the 40 Explorer briefs still contained
+semantic role cues such as “read-only”, “no edits”, or “actionable plan” after the explicit
+role token was withheld, so this measures role recovery from structured briefs rather than
+classification of role-neutral tasks. An earlier unretained run over the same F1 request set
+measured 0.850 role accuracy, 0.814 raw difficulty correlation, and 0.663 rounded difficulty
+accuracy; the retained run measured 0.838, 0.811, and 0.650. That earlier artifact was overwritten, so this variance observation
+is disclosed but is not reproducible and is not gate evidence.
+
+#### F2
+
+The five Nouls are not equally usable. `source` remained offline metadata and was not sent to
+Jev. On the 103 certain rows:
+
+| Noul | Positives | Precision @0.6 | Recall @0.6 | F1 @0.6 | ECE |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Needs user authority | 13 | 0.692 | 0.692 | 0.692 | 0.173 |
+| Settled by repository | 31 | 1.000 | 0.065 | 0.121 | 0.090 |
+| User preference | 65 | 0.773 | 0.785 | 0.779 | 0.070 |
+| Needs user fact | 9 | 0.875 | 0.778 | 0.824 | 0.156 |
+| Ambiguous requirement | 7 | 0.038 | 0.143 | 0.061 | 0.396 |
+
+The diagnostic shared-threshold predicate had 21 labelled positives. At 0.6 it fired twice,
+with precision 0.500 and recall 0.048; at 0.7 and above it never fired. More importantly, all
+21 positives came from counterfactual controls. The 69 certain observed
+`ask_user_question` rows had no positive bounce case, so this production distribution cannot
+measure bounce precision or calibrate separate Noul thresholds. The proposed authority
+threshold of 0.6 also misses the 0.95 recall requirement.
+
+#### F3
+
+The production operating point is 0.8; calibration uses only the 60 representative reports.
+The tightened enriched stratum increased support to 9 check-failure and 7 blocked positives,
+but it is used only for rare-case recall.
+
+| Flag | Representative positives | F1 @0.8 | Precision @0.8 | Recall @0.8 | ECE | Enriched positives | Enriched recall @0.8 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Open questions | 23 | 0.821 | 1.000 | 0.696 | 0.114 | 24 | 0.917 |
+| Checks failed | 6 | 0.444 | 0.667 | 0.333 | 0.123 | 9 | 0.333 |
+| Checks not run | 27 | 0.897 | 0.839 | 0.963 | 0.204 | 37 | 0.973 |
+| Blocked | 2 | 0.000 | no positive predictions | 0.000 | 0.082 | 7 | 0.000 |
+| Claims complete | 57 | 0.519 | 1.000 | 0.351 | 0.440 | 53 | 0.302 |
+| Repeats previous | 0 pairs | unmeasured | unmeasured | unmeasured | unmeasured | 0 pairs | unmeasured |
+
+No F3 flag clears all three requirements. `claimsComplete` is worse than the always-true
+baseline's F1 of 0.974, and `blocked` is worse than the always-true baseline's F1 of 0.065.
+Repetition cannot be assessed from current history.
+
+No TypeSafe service, key storage, decision log, settings UI, or hook should be built from this
+proposal. F4/F5 were not measured; they remain blocked because the shared Phase 0 gate failed,
+not because this spike produced evidence about them. A narrower future spike could revisit F1
+after adjudicating the taxonomy, but automatic question bouncing needs representative
+observed positives and F3 needs real follow-up pairs plus better boundaries.
+
+## Planned testing (not implemented)
 
 - The pure policy functions (F2's table, F1's mapping from difficulty to rung, the F3 and F4
   thresholds) get Vitest tests under `tests/shared/`.
