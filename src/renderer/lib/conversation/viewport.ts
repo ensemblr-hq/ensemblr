@@ -58,7 +58,36 @@ export function wouldFollowNewest(
 	viewport: HTMLElement,
 	scrollTop: number,
 ): boolean {
-	return maxScrollTop(viewport) - scrollTop <= NEAR_BOTTOM_THRESHOLD_PX;
+	return followsNewestAt({
+		clientHeight: viewport.clientHeight,
+		scrollHeight: viewport.scrollHeight,
+		scrollTop,
+	});
+}
+
+/**
+ * Whether a viewport of a given height, parked at a given offset over content of
+ * a given length, would count as following the newest message. Taking the height
+ * as an argument rather than reading it is what lets a resize ask the question
+ * of the height the viewport had *before* it — the one measurement a resize
+ * destroys, and the only one that says whether the user was at the bottom when
+ * the composer grew underneath them.
+ * @param metrics - The three measurements that place a viewport over its content
+ * @returns True when that arrangement sits within the near-bottom threshold of the end.
+ */
+export function followsNewestAt({
+	clientHeight,
+	scrollHeight,
+	scrollTop,
+}: {
+	clientHeight: number;
+	scrollHeight: number;
+	scrollTop: number;
+}): boolean {
+	return (
+		Math.max(0, scrollHeight - clientHeight) - scrollTop <=
+		NEAR_BOTTOM_THRESHOLD_PX
+	);
 }
 
 /**
@@ -190,4 +219,146 @@ export function readScrollOffset(
 		scrollTop: viewport.scrollTop,
 		stuckToBottom: isFollowingNewest(viewport),
 	};
+}
+
+/**
+ * How long after a key press or a wheel notch a viewport move still counts as
+ * that gesture's doing.
+ */
+const USER_INPUT_WINDOW_MS = 300;
+
+/** The `data-slot` Radix's scroll-area root carries for a conversation. */
+export const CONVERSATION_SCROLL_AREA_SLOT = 'conversation-scroll-area';
+
+/**
+ * The input events that mean the user, rather than a streaming turn, is moving
+ * the transcript. `scroll` is deliberately absent: a turn being written fires it
+ * about sixty times a second, so counting it as input would make a viewport look
+ * busy while nobody is touching it.
+ */
+const USER_INPUT_EVENTS = [
+	'wheel',
+	'pointerdown',
+	'keydown',
+	'touchstart',
+] as const;
+
+/** The events that end a drag, wherever the pointer happens to be released. */
+const POINTER_RELEASE_EVENTS = [
+	'pointerup',
+	'pointercancel',
+	'touchend',
+	'touchcancel',
+] as const;
+
+/**
+ * The scroll-area root enclosing a conversation viewport — the box that holds
+ * the scrollbar as well, so a drag on it counts as a gesture on the transcript.
+ * @param viewport - The scrolling element the conversation owns
+ * @returns The enclosing scroll area, or the viewport when it is rendered alone.
+ */
+export function scrollAreaOf(viewport: HTMLElement): HTMLElement {
+	const root = viewport.closest(
+		`[data-slot="${CONVERSATION_SCROLL_AREA_SLOT}"]`,
+	);
+	return root instanceof HTMLElement ? root : viewport;
+}
+
+/**
+ * Call `onInput` for every gesture that means a user is driving the interface,
+ * in the capture phase so nothing along the way can hide one, and passively so
+ * a wheel listener cannot hold up a scroll.
+ * @param target - What to listen on — an element to scope the watch, or `window` to catch input anywhere
+ * @param onInput - Called with each gesture
+ * @returns The teardown, which removes every listener this added.
+ */
+export function observeUserInput(
+	target: EventTarget,
+	onInput: (event: Event) => void,
+): () => void {
+	for (const type of USER_INPUT_EVENTS) {
+		target.addEventListener(type, onInput, { capture: true, passive: true });
+	}
+	return () => {
+		for (const type of USER_INPUT_EVENTS) {
+			target.removeEventListener(type, onInput, { capture: true });
+		}
+	};
+}
+
+/**
+ * Watch a scroll area for the gestures that move a transcript by hand — a wheel,
+ * a scrollbar drag, a key press — so a scroll arriving while one is live can be
+ * told apart from one the library or a resize produced.
+ *
+ * use-stick-to-bottom answers this question in its own `handleScroll`, which
+ * gives up whenever `resizeDifference` is set; a turn being written keeps that
+ * set continuously, so during a stream it never recognises a keyboard scroll or
+ * a scrollbar drag and the user is pulled back to the newest message.
+ * @param root - The scroll area to watch, scrollbar included
+ * @returns Whether a gesture is currently driving the viewport, and the teardown.
+ */
+export function observeUserScrollIntent(root: HTMLElement): {
+	isActive: () => boolean;
+	dispose: () => void;
+} {
+	let pointerHeld = false;
+	let lastInputAt = Number.NEGATIVE_INFINITY;
+
+	/**
+	 * Record a gesture, latching the ones that keep driving the viewport for as
+	 * long as the pointer stays down.
+	 * @param event - The input event that landed in the scroll area
+	 */
+	const noteInput = (event: Event) => {
+		lastInputAt = performance.now();
+		if (event.type === 'pointerdown' || event.type === 'touchstart') {
+			pointerHeld = true;
+		}
+	};
+
+	/** Ends a drag once the pointer comes up, inside the scroll area or outside it. */
+	const releasePointer = () => {
+		pointerHeld = false;
+	};
+
+	const stopWatchingInput = observeUserInput(root, noteInput);
+	for (const type of POINTER_RELEASE_EVENTS) {
+		window.addEventListener(type, releasePointer, true);
+	}
+
+	return {
+		/**
+		 * Whether a gesture is driving the viewport right now.
+		 * @returns True while the pointer is down or a key or wheel just fired.
+		 */
+		isActive: () =>
+			pointerHeld || performance.now() - lastInputAt < USER_INPUT_WINDOW_MS,
+		/** Detaches every listener this tracker attached. */
+		dispose: () => {
+			stopWatchingInput();
+			for (const type of POINTER_RELEASE_EVENTS) {
+				window.removeEventListener(type, releasePointer, true);
+			}
+		},
+	};
+}
+
+/**
+ * Whether the user is holding a text selection inside a viewport. A selection is
+ * a reading position of its own, so scrolling away from one throws away what
+ * they were part way through copying.
+ * @param viewport - The scrolling element
+ * @returns True while a non-empty selection sits inside it.
+ */
+export function hasSelectionInside(viewport: HTMLElement): boolean {
+	const selection = window.getSelection();
+	if (
+		selection === null ||
+		selection.rangeCount === 0 ||
+		selection.isCollapsed
+	) {
+		return false;
+	}
+	return viewport.contains(selection.getRangeAt(0).commonAncestorContainer);
 }

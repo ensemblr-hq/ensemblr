@@ -17,8 +17,11 @@ import {
 import { Button } from '@/renderer/components/ui/button';
 import { ScrollBar } from '@/renderer/components/ui/scroll-area';
 import { useConversationFollowKey } from '@/renderer/hooks/conversation/use-conversation-follow-key';
+import { useConversationIdleFollow } from '@/renderer/hooks/conversation/use-conversation-idle-follow';
 import { useConversationScrollHold } from '@/renderer/hooks/conversation/use-conversation-scroll-hold';
 import { useConversationScrollRestore } from '@/renderer/hooks/conversation/use-conversation-scroll-restore';
+import { useConversationViewportResize } from '@/renderer/hooks/conversation/use-conversation-viewport-resize';
+import { CONVERSATION_SCROLL_AREA_SLOT } from '@/renderer/lib/conversation/viewport';
 import { cn } from '@/renderer/lib/utils';
 
 /** Props for the Conversation wrapper — the underlying StickToBottom props. */
@@ -71,8 +74,18 @@ export const ConversationContent = ({
 		scrollState: context.state,
 		stopScroll: context.stopScroll,
 	});
+	useConversationViewportResize({
+		scrollRef: context.scrollRef,
+		scrollState: context.state,
+		scrollToBottom: context.scrollToBottom,
+	});
 	useConversationFollowKey({
 		followKey,
+		scrollToBottom: context.scrollToBottom,
+	});
+	useConversationIdleFollow({
+		escapedFromLock: context.escapedFromLock,
+		scrollRef: context.scrollRef,
 		scrollToBottom: context.scrollToBottom,
 	});
 	const viewport = useConversationViewportValue(
@@ -84,7 +97,7 @@ export const ConversationContent = ({
 		<ConversationViewportProvider value={viewport}>
 			<ScrollAreaPrimitive.Root
 				className={cn('size-full', scrollClassName)}
-				data-slot='conversation-scroll-area'
+				data-slot={CONVERSATION_SCROLL_AREA_SLOT}
 			>
 				<ScrollAreaPrimitive.Viewport
 					// Radix wraps children in a `display:table; min-width:100%` div that
