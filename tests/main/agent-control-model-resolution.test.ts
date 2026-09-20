@@ -188,6 +188,7 @@ const refusal = async (input: Parameters<typeof spawn>[0]): Promise<string> => {
 		callerConcierge: input.callerConcierge ?? false,
 		callerModel: input.callerModel,
 		callerRuntime: input.callerRuntime,
+		includeHidden: input.includeHidden,
 		model: input.model,
 		parentSessionId: 'parent',
 		planMode: false,

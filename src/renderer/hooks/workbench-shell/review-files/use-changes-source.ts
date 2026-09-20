@@ -9,9 +9,45 @@ import { mapGitStatusToReviewFiles } from '@/renderer/lib/workbench/review-files
 import { changesSourceByWorkspaceAtom } from '@/renderer/state/workspace';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ChangesSource } from '@/renderer/types/workbench-shell';
-import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
+import type {
+	GetWorkspaceGitStatusResult,
+	WorkspaceGitDiffScope,
+	WorkspaceGitFailure,
+} from '@/shared/ipc/contracts/workspace-git';
 
 import { useLatestTurnScope } from './use-latest-turn-scope';
+
+/**
+ * Reports the failure of a branch comparison the "all" view cannot degrade past.
+ *
+ * "All changes" borrows the live model's working-tree rows while its own query
+ * loads, which is what stops rows blinking away on a source switch. Once a
+ * branch comparison has actually answered with an error, borrowing would pass
+ * working-tree edits off as the branch and read as "nothing changed", so the
+ * error has to win instead. A workspace with no base ref resolves to a
+ * working-tree scope rather than a branch one and is untouched by this.
+ * @param source - The change source the user selected.
+ * @param scope - The git scope that source resolved to.
+ * @param statusData - The source-scoped git status query's data.
+ * @param isPlaceholder - Whether that data is the previous source's, kept during a switch.
+ * @returns The branch comparison's failure, or undefined when there is none.
+ */
+function failedBranchComparison({
+	isPlaceholder,
+	scope,
+	source,
+	statusData,
+}: {
+	isPlaceholder: boolean;
+	scope: WorkspaceGitDiffScope;
+	source: ChangesSource;
+	statusData: GetWorkspaceGitStatusResult | undefined;
+}): WorkspaceGitFailure | undefined {
+	if (source.kind !== 'all' || scope.kind !== 'branch' || isPlaceholder) {
+		return undefined;
+	}
+	return statusData?.error;
+}
 
 /**
  * Resolves the active change source to the git diff scope a query needs.
@@ -146,11 +182,8 @@ export function useSetChangesSource(
  * branch and commit views issue an extra git read. Until the source query
  * resolves, the "all" and "uncommitted" views borrow the live model's
  * already-loaded change set so rows don't blink away on every switch or first
- * paint; a commit view has no model equivalent and loads. That borrowing stops
- * once a branch comparison has answered with an error: "all" then reports the
- * error with no rows instead of passing off working-tree edits as the branch.
- * A workspace with no base ref never issues that comparison, so it keeps
- * showing the working-tree set with no error.
+ * paint; a commit view has no model equivalent and loads.
+ * {@link failedBranchComparison} is where that borrowing stops.
  * @param workspace - Workspace whose changes are being reviewed
  * @returns The active source, the files and count it yields, and the source setter
  */
@@ -199,12 +232,12 @@ export function useChangesSource(workspace: WorkspaceShellModel) {
 			: null;
 	const hasLiveModelEquivalent =
 		source.kind === 'all' || source.kind === 'uncommitted';
-	const branchComparisonError =
-		source.kind === 'all' &&
-		scope.kind === 'branch' &&
-		!isSourceStatusPlaceholder
-			? sourceStatusData?.error
-			: undefined;
+	const branchComparisonError = failedBranchComparison({
+		isPlaceholder: isSourceStatusPlaceholder,
+		scope,
+		source,
+		statusData: sourceStatusData,
+	});
 	const useModelChanges =
 		!statusData && hasLiveModelEquivalent && !branchComparisonError;
 

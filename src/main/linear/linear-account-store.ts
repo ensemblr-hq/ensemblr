@@ -173,11 +173,15 @@ export function createLinearAccountStore({
 			deleteSecret(`${REFRESH_TOKEN_KEY_PREFIX}${accountId}`),
 
 		delete: async (accountId) => {
-			await deleteSecret(`${ACCESS_TOKEN_KEY_PREFIX}${accountId}`);
-			await deleteSecret(`${REFRESH_TOKEN_KEY_PREFIX}${accountId}`);
+			// The row is the disconnect marker a concurrent refresh checks, so it goes
+			// first: dropping the secrets first leaves a window where that refresh
+			// still sees a live account and writes credentials the row deletion then
+			// orphans in the platform secret store.
 			database
 				.prepare('DELETE FROM linear_accounts WHERE id = ?')
 				.run(accountId);
+			await deleteSecret(`${ACCESS_TOKEN_KEY_PREFIX}${accountId}`);
+			await deleteSecret(`${REFRESH_TOKEN_KEY_PREFIX}${accountId}`);
 		},
 
 		get: (accountId) => readAccountRow(database, accountId),
