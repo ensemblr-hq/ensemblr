@@ -161,7 +161,13 @@ async function withTemporaryIndex<T>(
 /**
  * Stage the whole working tree into the temporary index and write it out as a
  * tree object. `add -A` includes untracked files and records deletions, while
- * ignored files stay out.
+ * never-tracked ignored files stay out.
+ *
+ * The temporary index starts empty, and `add -A` skips any path an ignore rule
+ * matches. Without seeding it from HEAD first, a file that is tracked and later
+ * gains an ignore rule would be missing from the snapshot, and restoring that
+ * snapshot would delete the file from disk. Seeding keeps every tracked path in
+ * the tree; `add -A` then overlays modifications and deletions on top of it.
  * @param cwd - Workspace directory to stage
  * @param indexEnv - Environment overlay pointing git at the temporary index
  * @returns Hash of the written tree object
@@ -173,6 +179,7 @@ async function writeWorkingTree({
 	cwd: string;
 	indexEnv: Record<string, string>;
 }): Promise<string> {
+	await seedIndexFromHead({ cwd, indexEnv });
 	await runGit({
 		args: ['add', '-A', '--', '.'],
 		cwd,
@@ -184,6 +191,32 @@ async function writeWorkingTree({
 		cwd,
 		env: indexEnv,
 		step: 'write-tree',
+	});
+}
+
+/**
+ * Load HEAD's tree into the temporary index so tracked paths survive `add -A`
+ * even when an ignore rule now matches them. Does nothing on an unborn branch,
+ * where there is no HEAD tree to load.
+ * @param cwd - Workspace directory whose HEAD to load
+ * @param indexEnv - Environment overlay pointing git at the temporary index
+ */
+async function seedIndexFromHead({
+	cwd,
+	indexEnv,
+}: {
+	cwd: string;
+	indexEnv: Record<string, string>;
+}): Promise<void> {
+	const headHash = await resolveHeadCommit(cwd);
+	if (!headHash) {
+		return;
+	}
+	await runGit({
+		args: ['read-tree', headHash],
+		cwd,
+		env: indexEnv,
+		step: 'seed-index',
 	});
 }
 
@@ -214,6 +247,14 @@ export interface GitDiffResult {
 }
 
 /**
+ * Git config passed to `diff` so paths with non-ASCII bytes come back verbatim.
+ * By default git C-quotes them (`"caf\303\251.txt"`) in all three output
+ * sections, and {@link parseCombinedDiff} reads the path as written. Paths with
+ * a tab, newline, `"` or `\` are still quoted; parsing those needs `-z`.
+ */
+const UNQUOTED_PATHS_CONFIG = ['-c', 'core.quotePath=false'] as const;
+
+/**
  * Diffs two tree-ish revisions (commit or tree hashes).
  *
  * One `git diff` carrying all three output families rather than three
@@ -233,7 +274,16 @@ export async function diffTrees({
 	toRev: string;
 }): Promise<GitDiffResult> {
 	const combined = await runGit({
-		args: ['diff', '-M', '--raw', '--numstat', '--patch', fromRev, toRev],
+		args: [
+			...UNQUOTED_PATHS_CONFIG,
+			'diff',
+			'-M',
+			'--raw',
+			'--numstat',
+			'--patch',
+			fromRev,
+			toRev,
+		],
 		cwd,
 		step: 'diff-combined',
 	});
@@ -383,7 +433,7 @@ async function runGit({
 	} catch (error) {
 		const detail = error instanceof Error ? error.message : String(error);
 		throw new GitCheckpointError({
-			message: `git ${args[0]} failed during ${step}: ${detail}`,
+			message: `git failed during ${step}: ${detail}`,
 			step,
 		});
 	}
