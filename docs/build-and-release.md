@@ -1,23 +1,46 @@
 # Build & Release
 
-Ensemblr packages through Electron Forge for two targets: **macOS arm64**, where
-a release build is code-signed with a hardened runtime, notarized, and shipped as
-both a `.dmg` and a `.zip`; and **Linux x86-64**, shipped as an unsigned
-`.AppImage`. This guide covers the build matrix, signing, and the build channels.
-The packaging config lives in `forge.config.ts`. See
+Ensemblr packages through Electron Forge for four targets, one build per
+architecture rather than a universal binary: **macOS arm64** and **macOS x64**,
+where a release build is code-signed with a hardened runtime, notarized, and
+shipped as both a `.dmg` and a `.zip`; **Linux x86-64**, shipped as an unsigned
+`.AppImage`; and **Linux arm64**, which is planned for the release *after* the
+one that introduces the Intel Mac build and is not built yet. This guide covers
+the build matrix, signing, and the build channels. The packaging config lives in
+`forge.config.ts`. See
 [ADR 0056](./adr/0056-ship-a-linux-amd64-appimage.md) for why AppImage, and what
-changes off darwin.
+changes off darwin, and
+[ADR 0074](./adr/0074-ship-four-build-targets-and-select-updates-by-architecture.md)
+for the four-target matrix, why it is per-architecture, and how the release
+sequence is ordered.
+
+| Target | Artifact | Built on | Status |
+| --- | --- | --- | --- |
+| macOS arm64 | `.dmg` + `.zip` | `macos-15` (native) | shipping |
+| macOS x64 | `.dmg` + `.zip` | `macos-15` (cross-built) | this release |
+| Linux x86-64 | `.AppImage` | `ubuntu-latest` | shipping |
+| Linux arm64 | `.appimage.bin` | not built yet | next release, not this one |
 
 ## Prerequisites
 
-- **macOS on Apple silicon** for the `.dmg`/`.zip`; **Linux x86-64** for the
-  `.AppImage`. Neither host cross-builds the other's artifact, which is why CI
-  runs them as separate jobs.
+- **macOS** for the `.dmg`/`.zip`; **Linux** for the `.AppImage`. Neither host
+  cross-builds the other's artifact, which is why CI runs them as separate jobs.
+  Within macOS the architecture *is* cross-buildable — an Apple-silicon host
+  builds the Intel `.dmg`/`.zip` — because Forge passes the target arch down to
+  `@electron/rebuild`, and Xcode's clang targets `x86_64` from an arm64 host.
+  Verified: packaging `--arch=x64` on Apple silicon produces an
+  `out/Ensemblr-darwin-x64` whose executable *and* whose compiled
+  `node-pty/build/Release/pty.node` both report `x86_64` under `lipo -archs`.
+  (`node-pty` also ships `prebuilds/darwin-x64`, but that is not what the
+  packaged app loads — the rebuilt binding is.)
+- **Bun 1.4** (`packageManager` is `bun@1.4.2`; `mise.toml` pins `bun = "1.4"`)
+  and **Node `>=24 <25`**. Bun installs and runs scripts; Node is still the
+  runtime everything else executes on — see [Bun and Node](#bun-and-node).
 - **`mksquashfs`** for the Linux build (`apt install squashfs-tools`). The
   AppImage maker declares it as a required external binary and refuses to run
   without it.
 - **Node `>=24 <25`** — enforced by `scripts/require-node-version.mjs`, which
-  `package`/`make` run first.
+  `preinstall`, `dev`, and `package`/`make` run first.
 - **An authenticated `gh`** — the whole release ritual is `gh release create`,
   and a nightly is dispatched with `gh workflow run`. The runner ships `gh`
   preinstalled, so the workflow's own `gh api` calls — the Homebrew cask bump
@@ -35,23 +58,71 @@ Signing entitlements are in `entitlements.plist` (hardened runtime).
 ## Commands
 
 ```bash
-npm run dev            # run the app in development (electron-forge start)
+bun run dev            # run the app in development (electron-forge start)
 
-npm run package        # build an unpacked .app under out/ (arm64)
-npm run make           # build distributables (.dmg + .zip) under out/make/
-npm run verify:signing # assert what make just produced is signed and notarized
+bun run package        # build an unpacked .app under out/ (host architecture)
+bun run make           # build distributables (.dmg + .zip) under out/make/
+bun run verify:signing # assert what make just produced is signed and notarized
 
-npm run package:linux  # build an unpacked linux-x64 directory under out/
-npm run make:linux     # build the .AppImage under out/make/
+bun run package:linux  # build an unpacked Linux directory under out/ (host architecture)
+bun run make:linux     # build the .AppImage under out/make/
 
-npm run diagnose:linux # report the Linux native-module toolchain and pty.node's linkage
-npm run rebuild:native # compile node-pty in a container by hand (dev/make:linux do it themselves)
+bun run diagnose:linux # report the Linux native-module toolchain and pty.node's linkage
+bun run rebuild:native # compile node-pty in a container by hand (dev/make:linux do it themselves)
 ```
 
 The Linux artifact is never signed, notarized, or stapled — there is no
-equivalent to do — so `verify:signing` is not run against it. Its
-`scripts/verify-signed-artifacts.mjs` only looks for `*-darwin-arm64` output and
-would report the Linux build as missing.
+equivalent to do — so `verify:signing` is not run against it.
+`scripts/verify-signed-artifacts.mjs` looks only for `*-darwin-<arch>` output
+and would report the Linux build as missing.
+
+It verifies **one architecture per run**, named by `--arch=` and defaulting to
+the host's, because a release leg builds one architecture at a time: a leg that
+produced nothing for its own architecture has to fail here rather than pass on
+the other leg's leftovers in `out/`. Beyond the signature, notarization and
+stapling checks it runs `lipo -archs` over the bundle's executable and every
+native binding the app could load, so an Intel leg that packaged an arm64
+binding is caught — a signed, notarized, stapled DMG says nothing about what is
+inside it. Prebuild directories for other targets ship alongside and are
+skipped, since only the binding the app would actually load is evidence.
+
+**No script hardcodes an architecture.** `build`, `package`, `make`,
+`make:linux`, and `package:linux` used to carry `--arch=arm64` or `--arch=x64`;
+they now omit it, so Forge builds for the **host** architecture. Anything that
+needs a specific one passes it explicitly — CI does, for every leg, and a local
+cross-build does too:
+
+```bash
+bun run make --arch=x64   # Intel .dmg/.zip from an Apple-silicon Mac
+```
+
+No `--` separator: unlike npm, Bun appends a run script's arguments directly,
+and it appends them to the **last** command in a `&&` chain — which is
+`electron-forge` in every one of these scripts, so the flag lands where it is
+meant to. A preflight earlier in the same chain does *not* see it, which is why
+`scripts/fetch-appimage-runtime.mjs` reads `ENSEMBLR_TARGET_ARCH` instead.
+
+Before this change a bare `npm run make` on an Intel Mac silently produced an
+arm64 bundle.
+
+### The AppImage runtime is pinned
+
+`@reforged/maker-appimage` defaults its runtime to `runtime-<arch>` from the
+AppImage project's **mutable** `continuous` tag, and accepts whatever comes back
+with an HTTP 200 despite a comment in its types claiming the download is
+checksum-verified. That put an unreviewed third-party binary at the front of
+every AppImage this project shipped.
+
+`scripts/fetch-appimage-runtime.mjs` now runs inside the `make:linux` chain,
+downloads the runtime for the target architecture, and checks it against a
+SHA-256 pinned in that script — plus its ELF `e_machine`, which names the
+failure when a mirror serves the wrong architecture under the right name. It
+caches into the gitignored `.appimage-runtime/` and records the verified path in
+`.appimage-runtime/resolved.json`, which `forge.config.ts` hands to the maker so
+the maker reads the local file instead of reaching for the network. Refreshing a
+runtime means downloading it, reviewing what moved upstream, and updating the
+digest in the same commit — the same discipline as the pinned
+`node:24-bookworm` digest in `scripts/rebuild-native-linux.sh`.
 
 ### The Linux build has to run on Linux
 
@@ -78,15 +149,18 @@ Three ways to get one:
    ```bash
    docker run --rm -it --platform=linux/amd64 \
      -v "$PWD":/src -w /src node:24-bookworm \
-     bash -c 'apt-get update && apt-get install -y squashfs-tools \
-       && npm ci && npm run make:linux'
+     bash -c 'apt-get update && apt-get install -y squashfs-tools unzip \
+       && curl -fsSL https://bun.sh/install | bash \
+       && export PATH="$HOME/.bun/bin:$PATH" \
+       && bun ci && bun run make:linux'
    ```
 
-   `npm ci` clears `node_modules` itself, and that is the point: the host tree
-   holds darwin binaries for every native module, and the reinstall inside the
-   container is what compiles the Linux ones. It also means the host repo comes
-   back with Linux binaries in `node_modules` — run `npm ci` again on the Mac
-   before building there.
+   `node:24-bookworm` ships Node and npm but not Bun, so the command installs
+   Bun first (the installer needs `unzip`). `bun ci` reinstalls `node_modules`
+   from the lockfile, and that is the point: the host tree holds darwin binaries
+   for every native module, and the reinstall inside the container replaces them
+   with Linux ones. It also means the host repo comes back with Linux binaries in
+   `node_modules` — run `bun ci` again on the Mac before building there.
 3. **`ENSEMBLR_ALLOW_CROSS_PLATFORM_LINUX_BUILD=1`**, which downgrades the
    refusal to a warning. It exercises the packaging plumbing — the maker, the
    `.desktop` file, the icons — on a Mac. It must never ship: terminals in the
@@ -95,7 +169,7 @@ Three ways to get one:
 ### Developing on Linux
 
 On a Linux desktop that already has a compiler, there is nothing to know: pin
-Node and run `npm run dev`. On one that has none — which on Linux is a larger
+Node and run `bun run dev`. On one that has none — which on Linux is a larger
 share than it sounds, since every immutable distribution (SteamOS, Silverblue,
 NixOS) ships without one — there is still nothing to know, as long as `podman` or
 `docker` is installed. `dev`, `package:linux`, and `make:linux` all run
@@ -104,8 +178,8 @@ itself rather than telling you to. The rest of this section is what it is doing
 on your behalf, and what to reach for when it cannot.
 
 ```bash
-npm run diagnose:linux   # compiler, make, python3, mksquashfs, pty.node + its linkage
-npm run rebuild:native   # run that same container build by hand
+bun run diagnose:linux   # compiler, make, python3, mksquashfs, pty.node + its linkage
+bun run rebuild:native   # run that same container build by hand
 ```
 
 `diagnose:linux` is the read-only view of the same checks — it never builds, so
@@ -113,12 +187,15 @@ it always describes the tree as it stands. `ENSEMBLR_SKIP_NATIVE_AUTOBUILD=1`
 turns the automatic build back into the old refusal-with-instructions, for an
 environment that would rather not have an image pulled on its behalf.
 
-**Pin Node first.** `.nvmrc`, `mise.toml`, and `engines` all say 24, but nothing
-on PATH enforces it and distro packages are usually something else:
+**Pin Node first.** `.nvmrc`, `mise.toml`, and `engines` all say 24, but a plain
+shell does not necessarily have it on PATH and distro packages are usually
+something else. With mise installed, `mise install` reads `mise.toml` and gives
+you both Node 24 and Bun 1.4, and mise's shims (or its shell activation) put
+them on PATH:
 
 ```bash
-./scripts/with-pinned-node.sh npm run dev        # resolves via mise → nvm → brew node@24
-export PATH="$(brew --prefix node@24)/bin:$PATH" # or put it on PATH yourself
+mise install                                     # Node 24 + Bun 1.4 from mise.toml
+export PATH="$(brew --prefix node@24)/bin:$PATH" # or put Node 24 on PATH yourself
 ```
 
 `dev` **warns** on the wrong major rather than refusing, because Forge rebuilds
@@ -126,12 +203,14 @@ native modules against Electron's own ABI either way — the mismatch degrades t
 dev loop instead of corrupting an artifact. `package`/`make`/`install` still
 refuse outright.
 
-**`node-pty` is the only thing that compiles, and it bites twice.** It publishes
-prebuilds for darwin and win32 only, so on linux-x64 its `install` script falls
-straight through `scripts/prebuild.js` to `node-gyp rebuild` — that is failure
-one, during `npm ci`. Forge then rebuilds it again against Electron's ABI inside
-`start` and `package`, which is failure two, and it surfaces as nothing more
-useful than:
+**`node-pty` is the only thing that compiles, and it compiles once.** It
+publishes prebuilds for darwin and win32 only, so on Linux there is nothing to
+download. `node-pty` is deliberately **not** in `package.json`'s
+`trustedDependencies`, so `bun install` never runs its `install` script — the
+`node-gyp rebuild` that used to fire during `npm ci`, against *Node's* ABI, does
+not happen at all. That leaves the one build that matters: Forge rebuilds it
+against Electron's ABI inside `start` and `package`, and when the host cannot
+compile it surfaces as nothing more useful than:
 
 ```text
 Error: node-gyp failed to rebuild '.../node_modules/node-pty'
@@ -147,11 +226,10 @@ Homebrew-linked one is worse than no binding at all.
 container needs to exist only for the compile:
 
 ```bash
-# Install, when npm ci itself cannot get past node-pty's install script.
-podman run --rm -v "$PWD":/src -w /src node:24-bookworm npm ci
-
-# Then the binding, which is what npm run rebuild:native wraps.
-npm run rebuild:native
+# Install the dependencies on the host, then the binding, which is what
+# bun run rebuild:native wraps.
+bun ci
+bun run rebuild:native
 ```
 
 Both leave their output in the host's `node_modules`, where Forge finds the
@@ -179,8 +257,8 @@ The Deck is the reference Linux host: Wayland, KDE Plasma, fractional scaling, a
 battery, an immutable root, and no package manager to speak of. Everything below
 assumes **Desktop Mode**.
 
-**Toolchain.** Three things are needed, and they do not all come from the same
-place. `npm run diagnose:linux` reports all of them, plus whether `pty.node` is
+**Toolchain.** Four things are needed, and they do not all come from the same
+place. `bun run diagnose:linux` reports all of them, plus whether `pty.node` is
 built and what it links against:
 
 ```text
@@ -216,8 +294,14 @@ node -v   # must print v24.x
 `nvm` works just as well for the Node half if you would rather not go through
 Homebrew; it also installs entirely under `$HOME`.
 
-**A C++ compiler: Homebrew is the wrong tool.** `npm ci` compiles `node-pty` —
-it publishes no linux-x64 prebuild — and node-gyp looks for `g++`/`c++`/`cc` on
+**Bun goes under `$HOME` too.** The official installer
+(`curl -fsSL https://bun.sh/install | bash`) writes to `~/.bun` and touches
+nothing on the read-only root, so it needs no sudo and survives a SteamOS update.
+Add `~/.bun/bin` to PATH. `mise install` is the other route and covers Node and
+Bun in one step.
+
+**A C++ compiler: Homebrew is the wrong tool.** Forge compiles `node-pty` — it
+publishes no linux-x64 prebuild — and node-gyp looks for `g++`/`c++`/`cc` on
 PATH. Homebrew's `gcc` formula installs *versioned* binaries (`g++-16`), so
 node-gyp will not find it and will fall through to the system compiler, or fail
 loudly if there is none. That failure is the good outcome.
@@ -232,12 +316,12 @@ So if `g++` is MISSING above, the shortest way through is not to install one at
 all — the one module that needs it compiles in a throwaway `node:24-bookworm`
 container, and the binding lands in `node_modules` where Forge finds it already
 built. The Deck ships `podman`, so this needs no installation and no sudo
-password, and `npm run dev` does it unprompted the first time it finds the
+password, and `bun run dev` does it unprompted the first time it finds the
 binding missing or stamped for the wrong ABI. Run it by hand when you want to
 replace a binding without waiting for a preflight to notice:
 
 ```bash
-npm run rebuild:native   # ~1 GB image pull the first time, seconds after that
+bun run rebuild:native   # ~1 GB image pull the first time, seconds after that
 ```
 
 Reach for a real toolchain only if you want one on the host anyway:
@@ -250,7 +334,7 @@ sudo pacman-key --init && sudo pacman-key --populate archlinux holo
 sudo pacman -S --needed base-devel python
 ```
 
-Or keep a persistent Debian shell, if you would rather have `npm ci` and the
+Or keep a persistent Debian shell, if you would rather have the install and the
 build tools in one place than reach for a one-shot container each time:
 
 ```bash
@@ -265,7 +349,7 @@ inside it and Node has to be installed in the container too. Compile there, then
 leave: the app itself has to run on the host (see *Developing on Linux* above).
 
 **Whichever route, check what `pty.node` actually linked.** For the tree you are
-developing against, `npm run diagnose:linux` does it and the `dev`/`package:linux`
+developing against, `bun run diagnose:linux` does it and the `dev`/`package:linux`
 guards do it automatically. After a build, check what actually got packaged:
 
 ```bash
@@ -281,13 +365,14 @@ anywhere.
 ```bash
 git clone https://github.com/ensemblr-hq/ensemblr.git && cd ensemblr
 export PATH="$(brew --prefix node@24)/bin:$PATH"
+export PATH="$HOME/.bun/bin:$PATH"
 
-npm ci                  # no compiler? podman run --rm -v "$PWD":/src -w /src node:24-bookworm npm ci
+bun ci                  # installs the tree; node-pty's install script is deliberately not run
 
-npm run dev             # the dev loop — builds node-pty in a container first if it has to
-npm run diagnose:linux  # after that build: confirm pty.node exists and links under /usr
+bun run dev             # the dev loop — builds node-pty in a container first if it has to
+bun run diagnose:linux  # after that build: confirm pty.node exists and links under /usr
 
-npm run package:linux   # unpacked build — needs no mksquashfs
+bun run package:linux   # unpacked build — needs no mksquashfs
 ./out/Ensemblr-linux-x64/Ensemblr
 ```
 
@@ -296,7 +381,7 @@ checklist below except the AppImage wrapper itself, needs no `mksquashfs`, and
 skips the SquashFS pass on every iteration. Once it behaves:
 
 ```bash
-npm run make:linux
+bun run make:linux
 chmod +x out/make/AppImage/x64/*.AppImage
 ./out/make/AppImage/x64/*.AppImage
 ```
@@ -354,7 +439,7 @@ Ensemblr does. The chime is unaffected either way: it is `new Audio()` in the
 renderer, and the notification itself is posted `silent` so no daemon ever
 plays a second tone over it.
 
-`npm run build` is an alias for `npm run package`. All three of `build`,
+`bun run build` is an alias for `bun run package`. All three of `build`,
 `package`, and `make` run `scripts/require-node-version.mjs` first.
 
 `make` and `package` cover the common cases; the channel/skip variants below
@@ -362,17 +447,109 @@ wrap them with environment variables:
 
 | Script | Channel | Signed? | Notes |
 | --- | --- | --- | --- |
-| `npm run make` | release | yes¹ | The shipping build (`dev.ensemblr.app` / "Ensemblr"). |
-| `npm run make:canary` | canary | yes¹ | Dogfood build with its own identity. |
-| `npm run make:dev` | dev | yes¹ | Dogfood build with its own identity. |
-| `npm run make:unsigned` | release | no | `ENSEMBLR_SKIP_SIGN=1` — skip signing/notarization. |
-| `npm run package:dev` | dev | — | Unpacked `.app`, dev channel. |
-| `npm run package:unsigned` | release | no | Unpacked `.app`, signing skipped. |
+| `bun run make` | release | yes¹ | The shipping build (`dev.ensemblr.app` / "Ensemblr"). |
+| `bun run make:canary` | canary | yes¹ | Dogfood build with its own identity. |
+| `bun run make:dev` | dev | yes¹ | Dogfood build with its own identity. |
+| `bun run make:unsigned` | release | no | `ENSEMBLR_SKIP_SIGN=1` — skip signing/notarization. |
+| `bun run package:dev` | dev | — | Unpacked `.app`, dev channel. |
+| `bun run package:unsigned` | release | no | Unpacked `.app`, signing skipped. |
 
 ¹ Signed and notarized **only** when the Apple credentials above are present and
 `ENSEMBLR_SKIP_SIGN` is not set; otherwise the same command produces an
 unsigned build instead of failing — set `ENSEMBLR_REQUIRE_SIGN=1` to turn that
 into an error (see below).
+
+## Bun and Node
+
+Bun is the package manager and script runner. **Node 24 is still the runtime**:
+every `node scripts/*.mjs` in `package.json`, Vite, Forge, Vitest, and the
+`electron --test` suites run on it. Bun does **not** shim itself as `node` — in
+both `bun run <script>` and `preinstall`/`postinstall`, `node` resolves to the
+real Node on PATH and `process.versions.bun` is `undefined`. Root `preinstall`
+and `postinstall` both run under `bun install`, which is what lets
+`scripts/require-node-version.mjs` refuse a wrong Node major at install time.
+
+### Install behaviour
+
+- **`bun ci`** is the frozen install (`bun install --frozen-lockfile`): it fails
+  rather than rewrite `bun.lock`. It is what the workspace setup script and CI
+  run. **`bun install`** may update the lockfile.
+- **Why it is fast.** `.ensemblr/settings.toml` runs setup once per workspace, and
+  every workspace is its own git worktree, so each used to extract 845 packages
+  into a fresh ~1.1 GB `node_modules`. Bun's global cache, with APFS clonefile
+  and hardlinks, turns that into metadata operations: measured on the
+  development machine, `bun install` into an absent `node_modules` with a warm
+  cache took **7.1 s** against the ~26–40 s `npm ci` baseline, and `bun ci` warm
+  took **0.2 s**.
+- **`bun test` is Bun's own test runner, not Vitest.** Use `bun run test` (and
+  `bunx vitest run <file>` for one file). See the Testing Policy in `AGENTS.md`.
+
+### `trustedDependencies`
+
+Bun does not run a dependency's lifecycle scripts unless the package is trusted.
+`package.json` lists `esbuild`, `fs-xattr`, and `macos-alias`. An explicit list
+**replaces** Bun's built-in allowlist rather than extending it, so the list is the
+complete set of packages whose install scripts run.
+
+**`node-pty` is deliberately excluded.** On macOS it uses the `prebuilds/darwin-arm64`
+and `prebuilds/darwin-x64` it ships, and nothing needs to run. On Linux there is no
+prebuild, and the binding has to come from Forge's `@electron/rebuild` against
+*Electron's* ABI. If Bun ran node-pty's install script on Linux it would compile
+against *Node's* ABI instead — the mismatch `scripts/require-linux-toolchain.mjs`
+exists to catch. The three scripts that stay blocked are `node-pty`, `@swc/core`,
+and `core-js-pure`, which are exactly the entries npm's old `allowScripts: false`
+listed.
+
+**Never run `bun pm trust --all` in this repository.** It would add `node-pty` and
+undo the above. `bun pm untrusted` lists what is currently blocked.
+
+### The lockfile is pinned to version 1
+
+`bun.lock` is at `lockfileVersion: 1` and has to stay there. Dependabot-core's Bun
+parser sets `MAX_SUPPORTED_LOCKFILE_VERSION = 1` and *raises* on anything higher,
+so a version-2 lockfile stops dependency PRs arriving without any error in this
+repository. Bun 1.4 raised its own default stamp to 2, so a lockfile regenerated
+from scratch under Bun 1.4 is one Dependabot cannot read.
+`bun run check:lockfile` (part of `bun run check`) fails on a wrong version and on
+a stray binary `bun.lockb`; `bunfig.toml` sets `saveTextLockfile = true` so the
+binary form is never written.
+
+How the current file was produced matters, because the obvious route is a trap.
+A plain `bun install` with no lockfile silently re-resolves the whole graph — in
+the migration it moved 211 packages, including `electron` 44.3.0 → 44.4.3 and
+`lucide-react` 1.43.0 → 1.47.0, and the `lucide-react` move broke a test. The
+sequence that preserved the npm graph exactly (all 1250 packages resolve to the
+versions `package-lock.json` pinned) was:
+
+1. `bun pm migrate` under **Bun 1.4.2**. Bun 1.3.13 fails with
+   `InvalidNPMLockfile` on the npm v3 lockfile, so 1.4.2 is the only version that
+   can read it.
+2. That writes `lockfileVersion: 2`. Stamp it back to `1` by hand.
+3. Run `bun install` under **Bun 1.3.13**, which understands only version 1. It
+   loading the file is what proves the downgrade is valid, and it rewrites the
+   file natively in v1.
+
+Every later install preserves the version it loaded, under either Bun. The pin is
+temporary: raise `SUPPORTED_LOCKFILE_VERSION` in `scripts/check-lockfile-version.mjs`
+in the same change that regenerates the lockfile once dependabot-core moves.
+
+### Why there is no Node wrapper
+
+`scripts/with-pinned-node.sh` is gone. It predates the app's own fix and is
+redundant for everything Ensemblr spawns. `src/main/main.ts` wires
+`createToolchainPathResolver`; `src/main/environment/toolchain-path.ts` captures a
+**login shell's** PATH for the workspace directory, which evaluates that
+directory's `mise.toml` and puts Node 24 and Bun on PATH; and
+`src/main/environment/workspace-environment.ts` injects the result into setup scripts, run
+scripts, and terminals.
+
+**Never set `PATH` in `[environment_variables]`.** The resolver runs only when
+`!('PATH' in env)` — the presence of the *key*, not its truthiness — so any `PATH`
+entry silently switches it off and the original wrong-Node bug returns.
+
+The accepted residual risk: a plain non-login shell *outside* Ensemblr no longer
+self-corrects the way the wrapper made it. It fails loudly on
+`scripts/require-node-version.mjs` instead of quietly running the wrong Node.
 
 ## Signing & notarization
 
@@ -409,14 +586,14 @@ otherwise indistinguishable from one that would not until someone runs
 Gatekeeper against it. With this set, `forge.config.ts` throws before packaging
 and names the prerequisite it lacked. Both CI workflows set it.
 
-**`npm run verify:signing`** (`scripts/verify-signed-artifacts.mjs`) is the
+**`bun run verify:signing`** (`scripts/verify-signed-artifacts.mjs`) is the
 matching check on the artifacts themselves: it walks `out/` and asserts every
 `.app` carries a *Developer ID Application* signature (not an ad-hoc one),
 passes `spctl`, and has a stapled ticket — and the same for each `.dmg`. Each
 `.zip` is extracted with `ditto` and the `.app` inside it checked the same way,
 rather than assuming the zip maker captured the bundle already verified under
 `out/`. An empty `out/` fails, so a skipped build never reads as a pass. Run it
-after `npm run make`; both workflows run it before publishing anything.
+after `bun run make`; both workflows run it before publishing anything.
 
 The `codesign` authority assertion is the load-bearing one, and it is applied to
 the `.dmg` as well as the `.app` on purpose: `stapler validate` passes on an
@@ -479,7 +656,7 @@ per-channel rather than following the product name.
 
 ### The icon ladder
 
-`npm run icon:generate` writes `assets/icons/icon-<size>.png` for every size the
+`bun run icon:generate` writes `assets/icons/icon-<size>.png` for every size the
 freedesktop `hicolor` theme declares in its `index.theme`, and the AppImage
 installs each under `usr/share/icons/hicolor/<size>x<size>/apps/`. Two
 constraints are easy to get wrong and both end in a generic icon:
@@ -501,12 +678,12 @@ holds the icon set to both constraints.
 
 ## Outputs
 
-`npm run make` writes to `out/make/`:
+`bun run make` writes to `out/make/`:
 
 - **`.dmg`** (ULFO format) — the primary distributable.
 - **`.zip`** — a zipped `.app` for auto-update / direct download.
 
-`npm run package` writes the unpacked `.app` to `out/`.
+`bun run package` writes the unpacked `.app` to `out/`.
 
 A third artifact exists only on the release, not in `out/`: both workflows write
 **`update-darwin-arm64.json`** and attach it beside the `.zip`. See
@@ -518,15 +695,17 @@ reaches `@electron/get` **v3** through `@electron/packager`, which fetches
 `SHASUMS256.txt` over `got@11` before the zip, and a reset or server-side 5xx on
 either request stops the build there. `electron`'s own postinstall is not
 affected — it uses `@electron/get` **v5**, which downloads over native `fetch` —
-so `npm install` can succeed on a network where `npm run make` does not. It is
+so `bun install` can succeed on a network where `bun run make` does not. It is
 transient and the download is cached, so retrying usually clears it. See
 [Troubleshooting](./guide/14-troubleshooting.md#make-dies-downloading-electron-shasums256txt-or-http-5xx).
 
 ## Releasing
 
-Releases are built by GitHub Actions, not on a laptop: macOS artifacts on the
-pinned `macos-15` runner and the Linux AppImage on `ubuntu-latest`. The local
-`npm run make` route above stays the escape hatch when CI is down or you need to
+Releases are built by GitHub Actions, not on a laptop: macOS artifacts — both
+architectures — on the pinned `macos-15` runner (the Intel build is cross-built
+there, with `--arch` passed explicitly) and the Linux AppImage on
+`ubuntu-latest`. The local
+`bun run make` route above stays the escape hatch when CI is down or you need to
 bisect a packaging break.
 
 ### Cutting a release
@@ -537,9 +716,10 @@ is load-bearing: the workflow refuses a tag whose version does not match
 workspace's unmerged commit.
 
 1. On a branch cut from current `origin/master`, run
-   `npm version <version> --no-git-tag-version`, replacing `<version>` with the
-   exact version being cut. Commit only `package.json` and `package-lock.json`,
-   open the version-bump PR, and merge it once the **Checks** workflow is green
+   `bun pm version <version> --no-git-tag-version`, replacing `<version>` with
+   the exact version being cut. Commit only `package.json` (the lockfile does
+   not record the root package's version, so `bun.lock` does not change), open
+   the version-bump PR, and merge it once the **Checks** workflow is green
    — `master` is unprotected, so GitHub will not stop a merge that is red. Advisory review services are not a release gate.
 2. Write the final release body in `NOTES.md`.
 3. Fetch the merged `master`, resolve it to a commit SHA, confirm that tree
@@ -566,8 +746,8 @@ the flag from the tag either way.
 That creates the tag and fires `release: published`, which triggers
 [`.github/workflows/release.yml`](../.github/workflows/release.yml): it reuses a
 green **Checks** run for that exact `master` commit or runs the suite itself,
-builds, signs, notarizes, verifies, then attaches the `.dmg` and `.zip` to the
-release you just made and corrects the prerelease flag from the tag (`-alpha` /
+builds, signs, notarizes, verifies, then attaches the `.dmg` and `.zip` for each
+macOS architecture to the release you just made and corrects the prerelease flag from the tag (`-alpha` /
 `-beta` / `-rc` → prerelease, anything else → latest). The Linux job starts only
 after the macOS artifacts pass verification.
 
@@ -595,7 +775,7 @@ release until someone edits them:
 | `README.md` | version line, status sentence, `.dmg` URL |
 | `docs/README.md` | version link, `.dmg` and `.AppImage` URLs |
 | `docs/guide/README.md` | the version this guide describes |
-| `docs/guide/01-install.md` | current-version examples and all three asset URLs |
+| `docs/guide/01-install.md` | current-version examples and every asset URL |
 | `docs/build-and-release.md` | the command and `update-darwin-arm64.json` examples |
 
 **Never string-replace the old version into the new one.** Asset filenames
@@ -617,8 +797,8 @@ The version string is the tag with `v` stripped; each URL is
 `.../releases/download/<tag>/<asset name>`. **The tag lands roughly fifteen
 minutes before the artifacts do**, and the Linux `.AppImage` trails the macOS
 pair by several minutes more, so a `gh release view` showing the tag with an
-empty or partial asset list is not the signal to start editing — poll until all
-four are there. Then check the URLs actually resolve before opening the PR:
+empty or partial asset list is not the signal to start editing — poll until every
+artifact is there. Then check the URLs actually resolve before opening the PR:
 
 ```bash
 gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.19 \
@@ -649,7 +829,8 @@ was worth. See the prompt in that repository's own docs.
 [`.github/workflows/nightly.yml`](../.github/workflows/nightly.yml) builds
 `master` on the **canary** channel and publishes it to a rolling `nightly`
 release whose assets are replaced each run (`Ensemblr-Canary-arm64.dmg`,
-`Ensemblr-Canary-darwin-arm64.zip`, `Ensemblr-Canary-x86_64.AppImage`). It is
+`Ensemblr-Canary-darwin-arm64.zip`, their `x64` counterparts for Intel Macs,
+and `Ensemblr-Canary-x86_64.AppImage`). It is
 change-gated: a cheap Linux job
 compares `master` against the commit the `nightly` tag already points at and
 skips the build entirely when they match, so a quiet week republishes nothing.
@@ -688,8 +869,11 @@ See [ADR 0054](./adr/0054-build-releases-in-ci-and-reserve-the-nightly-tag.md).
 
 ### The update feed document
 
-Both workflows attach **`update-darwin-arm64.json`** to every release. It is the
-Squirrel.Mac feed the in-app updater reads:
+Both workflows attach one feed document per target the release ships, named
+**`update-<platform>-<arch>.json`** — `update-darwin-arm64.json`,
+`update-darwin-x64.json`, `update-linux-x64.json`. The in-app updater reads the one for the
+platform and architecture it is running as. The macOS documents are the
+Squirrel.Mac feed:
 
 ```json
 {
@@ -707,11 +891,20 @@ matters most for the nightly: its tag never moves and its asset names are fixed
 on purpose, so this document is the only thing that changes from one night to the
 next.
 
-**The filename is a contract with `UPDATE_FEED_ASSET_NAME`**
+**The filename shape is a contract with `updateFeedAssetName`**
 (`src/main/updates/release-feed.ts`). Renaming it in one place and not the other
 strands every installed build on its current version — the app reports
 `update-feed-malformed` rather than claiming to be up to date, so the breakage is
 visible, but it is still a breakage.
+
+**`update-darwin-arm64.json` keeps its exact name and shape forever.** It was the
+only document early releases carried, and every already-installed Apple-silicon
+client reads it by that literal name and cannot be patched. The arch-aware
+updater generalizes the name to `update-<platform>-<arch>.json` around it; it
+never moves it. The architecture comes from the runtime's `process.arch`, not
+from Rosetta detection, so an Intel build running under translation keeps
+receiving Intel updates rather than being moved onto arm64 silently. See
+[ADR 0074](./adr/0074-ship-four-build-targets-and-select-updates-by-architecture.md).
 
 A build only ever reads the releases for **its own channel** — the rolling
 `nightly` for canary, the highest-semver `v*` tag for release — and the two
@@ -737,7 +930,7 @@ replaced, GitHub recomputes the digest to match, so both halves move together:
 this is *transport* integrity (the bytes are what GitHub currently serves), not
 *provenance* (that a legitimate maintainer built them). A Linux user is trusting
 GitHub Releases and the accounts that can publish to them, full stop — the same
-trust every `apt`/`brew`/`npm install` already asks for, but stated here because
+trust every `apt`/`brew`/`bun install` already asks for, but stated here because
 macOS visibly asks for more.
 
 What the app *does* verify, inside that trust model: `release-feed.ts` requires
@@ -836,7 +1029,7 @@ has to explain the failure. Set it with:
 gh variable set APPLE_TEAM_ID --body <TEAMID>
 ```
 
-To run `npm run verify:signing` locally, export the same value as
+To run `bun run verify:signing` locally, export the same value as
 `ENSEMBLR_TEAM_ID`; `security find-identity -v -p codesigning` prints it in
 parentheses after your name.
 
@@ -876,7 +1069,7 @@ The packager's `ignore` filter keeps the Vite output plus an explicit allow-list
 (`PACKAGE_KEEP_EXACT` / `PACKAGE_KEEP_PREFIXES` in `forge.config.ts`). Everything
 else under `node_modules` is dropped, because Vite bundles it. Two packages are
 `external` in `vite.main.config.mts` and therefore **must** be on the keep-list or
-the packaged app is broken in a way `npm run dev` never shows:
+the packaged app is broken in a way `bun run dev` never shows:
 
 - **`node-pty`** — a native module resolved from `node_modules` at runtime. Its
   build-time dep `node-addon-api` is kept too (`@electron/rebuild` needs it to
@@ -899,9 +1092,17 @@ drop.
 Adding another unbundled or native dependency means updating **both**
 `external` in the relevant Vite config and the `PACKAGE_KEEP_*` lists.
 
+**The keep-list depends on Bun's hoisted linker.** The filters match flat
+`/node_modules/<pkg>/` paths. Bun's other layout, the isolated linker, builds a
+symlinked `node_modules/.bun/` store that those filters would not match, and the
+packaged app would ship without `node-pty` and the Claude Agent SDK. `bunfig.toml`
+therefore pins `linker = "hoisted"`, even though Bun already defaults to it for a
+project with no workspaces — a future default change must not break the package
+silently.
+
 ## Troubleshooting
 
-- **Stray Dock icon / duplicate instance.** Run `npm run diagnose:dock-flash`
+- **Stray Dock icon / duplicate instance.** Run `bun run diagnose:dock-flash`
   (`scripts/diagnose-dock-flash.mjs`): it lists every `dev.ensemblr.app*` Launch
   Services registration and flags id collisions and dangling entries; add
   `--fix` to unregister dangling ones (live sibling builds are left alone).
@@ -911,29 +1112,32 @@ Adding another unbundled or native dependency means updating **both**
   compiler, and node-pty ships no linux-x64 prebuild. Reaching Forge's error at
   all means the preflight did not repair it, and there are two reasons it would
   not: no `podman` or `docker` to build in — install one and re-run — or
-  `ENSEMBLR_SKIP_NATIVE_AUTOBUILD` is set, in which case `npm run rebuild:native`
-  does that same container build by hand. `npm run diagnose:linux` reports what
+  `ENSEMBLR_SKIP_NATIVE_AUTOBUILD` is set, in which case `bun run rebuild:native`
+  does that same container build by hand. `bun run diagnose:linux` reports what
   is missing and which of the two you are looking at. See *Developing on Linux*.
 - **Terminals dead in a Linux build that worked locally.** `pty.node` was
   compiled against a private prefix — a Homebrew or Nix compiler — and carries
-  an rpath no other machine has. `npm run diagnose:linux` names the offending
-  libraries; `rm -rf node_modules/node-pty/build && npm run rebuild:native`
+  an rpath no other machine has. `bun run diagnose:linux` names the offending
+  libraries; `rm -rf node_modules/node-pty/build && bun run rebuild:native`
   replaces it. The `dev`/`package:linux`/`make:linux` guards refuse it now.
 - **`libnspr4.so: cannot open shared object file`.** Electron is being launched
   inside a container that has no Chromium runtime libraries. Compile in the
   container; run the app on the host.
-- **Node version error at install.** Non-interactive shells (a workspace's
-  `setup`/`run` scripts, CI, hooks) never source the mise/nvm hooks, so they run
-  under whatever Node is on PATH. Prefix the command with
-  `./scripts/with-pinned-node.sh` — it resolves the `.nvmrc` Node via mise, nvm,
-  or Homebrew `node@24` and then execs the command unchanged.
-- **App icon.** Regenerate with `npm run icon:generate`
+- **Node version error at install.** A non-interactive shell never sources the
+  mise/nvm hooks, so it runs under whatever Node is first on PATH. Inside
+  Ensemblr that does not happen — a workspace's `setup`/`run` scripts and
+  terminals get the workspace directory's login-shell PATH, which activates mise
+  (see [Bun and Node](#bun-and-node)). Outside it, put Node 24 on PATH: activate
+  mise, or use its shims directory (`~/.local/share/mise/shims`), or `nvm use`.
+  If a script under Ensemblr still picks the wrong Node, check that
+  `[environment_variables]` in `.ensemblr/settings.toml` does not set `PATH`.
+- **App icon.** Regenerate with `bun run icon:generate`
   (`scripts/generate-app-icon.mjs`).
 - **README wordmark.** `assets/wordmark.gif` is the animated dot-matrix mark at
   the top of the README, generated from the same glyphs as the in-app wordmark —
   a 16s loop at 20fps on GitHub's `#0d1117` page background, so it sits flush in
   the README rather than as a card of the app's own near-black. Regenerate with
-  `npm run wordmark:generate` (`scripts/generate-wordmark-gif.mjs`); it needs
+  `bun run wordmark:generate` (`scripts/generate-wordmark-gif.mjs`); it needs
   ImageMagick on PATH. `LOOP_MS` and `FRAME_COUNT` move together — the GIF delay
   is a whole centisecond, so keep `LOOP_MS / FRAME_COUNT` at a multiple of 10.
 

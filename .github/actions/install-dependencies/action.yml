@@ -1,21 +1,38 @@
 name: Install dependencies
 description: >-
-  Select the Node version .nvmrc pins and install the locked dependency tree.
-  Every check job installs identically, so the steps live here rather than being
-  repeated four times — a change to how CI installs is then one edit, not four.
+  Select the Node version .nvmrc pins, install the Bun version package.json
+  pins, and install the locked dependency tree. Every check job installs
+  identically, so the steps live here rather than being repeated four times — a
+  change to how CI installs is then one edit, not four.
 
 runs:
   using: composite
   steps:
+    # Bun is the package manager, not the runtime: Electron, Forge and Vitest all
+    # run under a real Node 24, so `setup-node` stays and `bun run` only
+    # dispatches scripts to it.
     - uses: actions/setup-node@v7
       with:
         node-version-file: .nvmrc
-        cache: npm
 
-    # `--prefer-offline` reads the tarballs setup-node just restored instead of
-    # revalidating each one against the registry; `--no-audit` and `--no-fund`
-    # drop two network round trips whose output nothing here reads. None of them
-    # changes which versions are installed — `npm ci` still installs exactly the
-    # lockfile.
-    - run: npm ci --prefer-offline --no-audit --no-fund
+    # Third-party, so pinned by commit rather than by tag. No version input: the
+    # action's documented default is to read `packageManager` from package.json,
+    # which keeps the Bun version in one place. (`bun-version-file` is for a
+    # `.bun-version` file, which this repo does not carry.)
+    - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+    # `setup-node`'s `cache:` only knows npm, pnpm and yarn, so Bun's global
+    # cache is restored by hand. Without it every job installs cold. The key is
+    # the lockfile alone: the cache holds tarballs addressed by name and version,
+    # so a stale entry can only cost a download, never install a wrong tree.
+    - uses: actions/cache@v6
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          bun-${{ runner.os }}-${{ runner.arch }}-
+
+    # `bun ci` is `bun install --frozen-lockfile`: it installs exactly bun.lock
+    # and fails if package.json has drifted from it.
+    - run: bun ci
       shell: bash

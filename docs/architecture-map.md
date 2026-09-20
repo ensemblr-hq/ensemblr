@@ -27,7 +27,7 @@ both or fallow will report the new tree as dead code.
 `demo/` is a second Electron entrypoint that renders the real app against
 scripted fixtures for promotional and documentation screenshots (ADR&nbsp;0058).
 Forge is not involved and the packaged build contains none of it; it is reached
-through `npm run dev:demo` and builds to `.demo/`. It imports `src/` read-only
+through `bun run dev:demo` and builds to `.demo/`. It imports `src/` read-only
 and is kept apart from `playground/` in both directions by
 `tests/renderer/demo-isolation.test.ts`.
 

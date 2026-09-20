@@ -6,6 +6,11 @@ Date: 2026-09-07
 
 Accepted
 
+**Touched by [ADR 0074](0074-ship-four-build-targets-and-select-updates-by-architecture.md)
+(2026-09-21).** The swap installs the asset the architecture's feed document names
+rather than the first asset ending in `.appimage`; the verification and atomic
+rename are unchanged.
+
 Amends [ADR 0056](0056-ship-a-linux-amd64-appimage.md), whose "Updates notify,
 they do not install" section is superseded in part. Linux still *may* only
 notify — that is now the fallback rather than the rule.

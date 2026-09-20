@@ -6,6 +6,13 @@ Date: 2026-08-30
 
 Accepted
 
+**Amended by [ADR 0074](0074-ship-four-build-targets-and-select-updates-by-architecture.md)
+(2026-09-21).** The `--arch=arm64` pin on `make`/`package`/`build`, the "Intel macOS
+and arm64 Linux are still not built" line, and the resolver's `.AppImage`-suffix
+asset match are superseded: macOS now builds per architecture, and updates are
+selected by a per-target feed document. Commands written below as `npm run …` are
+`bun run …` after [ADR 0073](0073-move-the-package-manager-from-npm-to-bun.md).
+
 Extends [ADR 0032](0032-channel-scoped-bundle-identity.md): the per-channel
 identity it established gets a Linux counterpart, `APP_LINUX_APP_IDS`, for the
 same reason — a canary must not overwrite the release's launcher entry.

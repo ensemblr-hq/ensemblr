@@ -78,32 +78,71 @@ jobs:
               >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      # Created here, once, rather than by whichever build leg gets there first:
+      # the two macOS legs run in parallel, and both seeing "no release yet" would
+      # race to create it — one `gh release create` then fails on the other's tag
+      # and takes a good build down with it. Every job after this one only ever
+      # uploads into a release that already exists.
+      #
+      # A draft, and a draft holds its tag unpushed until it is published. The
+      # `nightly` tag is what the gate reads, so it moves only in `publish`, once
+      # every asset is attached — moving it here would mark this commit published
+      # while a build could still fail, and the next run would report "no change"
+      # and never retry.
+      - name: Create the rolling nightly draft if it does not exist yet
+        if: >-
+          steps.compare.outputs.changed == 'true' &&
+          (github.event_name == 'schedule' || inputs.publish)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NIGHTLY_SHA: ${{ steps.compare.outputs.sha }}
+          NIGHTLY_VERSION: ${{ steps.compare.outputs.version }}
+        run: |
+          set -euo pipefail
+          if ! gh release view nightly > /dev/null 2>&1; then
+            gh release create nightly --draft --target "$NIGHTLY_SHA" \
+              --title "Ensemblr Nightly $NIGHTLY_VERSION" \
+              --notes "Build in progress." --prerelease
+          fi
+
   build:
     needs: gate
     if: needs.gate.outputs.changed == 'true'
+    # One leg per architecture, both on the same Apple silicon runner: Intel is
+    # cross-built (`--arch=x64`), for the reasons release.yml gives. Not
+    # fail-fast, so a dry run reports both architectures' failures at once.
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x64]
     runs-on: macos-15
     timeout-minutes: 60
-    # No secret is declared at job level: everything here is in scope for `npm
+    # No secret is declared at job level: everything here is in scope for `bun
     # ci`, so a dependency lifecycle script would run with it in the
     # environment. `GH_TOKEN` carries `contents: write`, so it is injected into
     # the one step that shells out to `gh` instead.
+    #
+    # The arm64 names are what already-installed canary builds fetch, so they
+    # must stay byte-identical: `Ensemblr-Canary-arm64.dmg`,
+    # `Ensemblr-Canary-darwin-arm64.zip` and `update-darwin-arm64.json`.
     env:
       NIGHTLY_SHA: ${{ needs.gate.outputs.sha }}
       NIGHTLY_VERSION: ${{ needs.gate.outputs.version }}
-      DMG_NAME: Ensemblr-Canary-arm64.dmg
-      ZIP_NAME: Ensemblr-Canary-darwin-arm64.zip
-      FEED_NAME: update-darwin-arm64.json
+      ARCH: ${{ matrix.arch }}
+      DMG_NAME: Ensemblr-Canary-${{ matrix.arch }}.dmg
+      ZIP_NAME: Ensemblr-Canary-darwin-${{ matrix.arch }}.zip
+      FEED_NAME: update-darwin-${{ matrix.arch }}.json
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.gate.outputs.sha }}
 
-      # Before the version stamp: `npm ci` requires package.json and the lockfile
+      # Before the version stamp: `bun ci` requires package.json and the lockfile
       # to agree, and the stamp deliberately breaks that agreement.
       - uses: ./.github/actions/install-dependencies
 
       - name: Stamp the nightly version
-        run: npm pkg set version="$NIGHTLY_VERSION"
+        run: bun pm pkg set version="$NIGHTLY_VERSION"
 
       - uses: ./.github/actions/apple-signing
         with:
@@ -122,30 +161,35 @@ jobs:
         env:
           ENSEMBLR_BUILD_CHANNEL: canary
           ENSEMBLR_REQUIRE_SIGN: "1"
-        run: npm run make
+        run: bun run make --arch="$ARCH"
 
       - name: Verify every artifact is signed, notarized and stapled
         env:
           ENSEMBLR_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
-        run: npm run verify:signing
+        run: bun run verify:signing --arch="$ARCH"
 
       # Fixed filenames: the canary product name contains a space, and a rolling
       # tag is only worth having if `--clobber` fully replaces yesterday's assets
       # and the download URL stays bookmarkable. Version and commit live in the
       # release body. Stapled tickets are inside the file, so renaming is safe.
+      #
+      # Each artifact is picked by architecture, never "the first one found": an
+      # Intel archive behind the arm64 name would install the wrong binary on
+      # every Apple silicon canary, and nothing would notice.
       - name: Rename artifacts to their stable nightly names
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/nightly"
-          cp "$(find out/make -type f -name '*.dmg' | head -1)" "$RUNNER_TEMP/nightly/$DMG_NAME"
-          cp "$(find out/make -type f -name '*.zip' | head -1)" "$RUNNER_TEMP/nightly/$ZIP_NAME"
+          find out/make -type f \( -name '*.dmg' -o -name '*.zip' \) > "$RUNNER_TEMP/built.txt"
+          cp "$(bash .github/scripts/select-asset.sh "$RUNNER_TEMP/built.txt" "-${ARCH}\.dmg\$")" "$RUNNER_TEMP/nightly/$DMG_NAME"
+          cp "$(bash .github/scripts/select-asset.sh "$RUNNER_TEMP/built.txt" "/[^/]*-darwin-${ARCH}-[^/]*\.zip\$")" "$RUNNER_TEMP/nightly/$ZIP_NAME"
 
       # Squirrel.Mac's feed document, read by the in-app updater
       # (src/main/updates/release-feed.ts). The rolling tag keeps the URL fixed,
       # so this document is the only thing that changes from one nightly to the
       # next — which is exactly why the app reads the version out of it rather
       # than off a tag that never moves. `$FEED_NAME` is a contract with
-      # UPDATE_FEED_ASSET_NAME.
+      # updateFeedAssetName().
       - name: Write the update feed document
         run: |
           set -euo pipefail
@@ -161,20 +205,14 @@ jobs:
       # in the `publish` job, after the AppImage is up too — the tag is what the
       # gate reads, so moving it here would mark this commit published while the
       # Linux leg could still fail, and the next run would report "no change" and
-      # never retry. A first run creates the release as a draft for the same
-      # reason: a draft holds its tag unpushed until it is published.
+      # never retry. The release itself already exists: the `gate` job creates it
+      # as a draft, so the legs never race to.
       - name: Upload the macOS assets to the rolling nightly
         if: ${{ github.event_name == 'schedule' || inputs.publish }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if ! gh release view nightly > /dev/null 2>&1; then
-            gh release create nightly --draft --target "$NIGHTLY_SHA" \
-              --title "Ensemblr Nightly $NIGHTLY_VERSION" \
-              --notes "Build in progress." --prerelease
-          fi
-
           gh release upload nightly \
             "$RUNNER_TEMP/nightly/$DMG_NAME" "$RUNNER_TEMP/nightly/$ZIP_NAME" \
             "$RUNNER_TEMP/nightly/$FEED_NAME" --clobber
@@ -184,7 +222,7 @@ jobs:
         run: |
           set -uo pipefail
           {
-            echo "### Nightly \`$NIGHTLY_VERSION\` (macOS)"
+            echo "### Nightly \`$NIGHTLY_VERSION\` (macOS $ARCH)"
             echo
             echo "- Commit: \`$NIGHTLY_SHA\`"
             if [ "${{ github.event_name == 'schedule' || inputs.publish }}" = "true" ]; then
@@ -205,24 +243,38 @@ jobs:
             rm -f "$APPLE_API_KEY_PATH"
           fi
 
-  # Runs after `build`, not beside it: that job is what creates the rolling
-  # release on a first run, and an upload into a tag that does not exist yet
-  # fails. Nothing here is signed — an AppImage carries no notarization ticket —
-  # so `verify:signing`, which only looks for `*-darwin-arm64` output, is not run.
+  # Runs beside `build` rather than after it: the `gate` job already created the
+  # rolling release, so there is nothing here to wait for. Nothing here is signed
+  # — an AppImage carries no notarization ticket — so `verify:signing`, which
+  # looks only for `*-darwin-<arch>` output, is not run.
   #
   # Gated on the change gate alone, mirroring `build`: a `workflow_dispatch` with
   # `publish` off has to exercise `make:linux` too, or a break in it — a missing
   # icon size, a maker option, mksquashfs — passes every dry run and surfaces at
   # 04:00 UTC. The publish condition sits on the upload step instead.
+  #
+  # x64 ONLY, on purpose. Already-shipped linux-x64 clients pick the first
+  # release asset ending in `.appimage` with no architecture check and cannot be
+  # patched, so an arm64 AppImage on the rolling release would be installed over
+  # a working x64 build. Linux arm64 arrives later under a name that does not end
+  # in `.appimage`, as release.yml explains; do not add it to this matrix first.
   build-linux:
-    needs: [gate, build]
+    needs: gate
     if: needs.gate.outputs.changed == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            appimage: Ensemblr-Canary-x86_64.AppImage
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       NIGHTLY_SHA: ${{ needs.gate.outputs.sha }}
       NIGHTLY_VERSION: ${{ needs.gate.outputs.version }}
-      APPIMAGE_NAME: Ensemblr-Canary-x86_64.AppImage
+      ARCH: ${{ matrix.arch }}
+      APPIMAGE_NAME: ${{ matrix.appimage }}
+      LINUX_FEED_NAME: update-linux-${{ matrix.arch }}.json
     steps:
       - uses: actions/checkout@v7
         with:
@@ -236,41 +288,50 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y squashfs-tools
 
-      # Before the version stamp, for the same reason as the macOS job: `npm ci`
+      # Before the version stamp, for the same reason as the macOS job: `bun ci`
       # requires package.json and the lockfile to agree.
       - uses: ./.github/actions/install-dependencies
 
       - name: Stamp the nightly version
-        run: npm pkg set version="$NIGHTLY_VERSION"
+        run: bun pm pkg set version="$NIGHTLY_VERSION"
 
       - name: Build the canary AppImage
         env:
           ENSEMBLR_BUILD_CHANNEL: canary
-        run: npm run make:linux
+          ENSEMBLR_TARGET_ARCH: ${{ matrix.arch }}
+        run: bun run make:linux --arch="$ARCH"
 
       # Runs on a dry run too, so `publish: false` still proves the maker
       # produced something. Only the upload below is conditional.
       - name: Check the AppImage was produced
         run: |
           set -euo pipefail
-          built=$(find out/make -type f -name '*.AppImage' | head -1)
-          if [ -z "$built" ]; then
-            echo "::error::make:linux produced no .AppImage."
-            exit 1
-          fi
+          find out/make -type f -name '*.AppImage' > "$RUNNER_TEMP/built.txt"
+          built=$(bash .github/scripts/select-asset.sh "$RUNNER_TEMP/built.txt" "-${ARCH}\.AppImage\$")
           cp "$built" "$RUNNER_TEMP/$APPIMAGE_NAME"
 
       # Fixed filename, matching the DMG and ZIP: the rolling tag is only worth
       # having if `--clobber` fully replaces yesterday's asset and the download
-      # URL stays bookmarkable.
-      - name: Attach the AppImage to the rolling nightly
+      # URL stays bookmarkable. The AppImage goes up before its feed document,
+      # so the document never names an asset that is not there yet.
+      - name: Attach the AppImage and its update feed document to the rolling nightly
         if: ${{ github.event_name == 'schedule' || inputs.publish }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           gh release upload nightly "$RUNNER_TEMP/$APPIMAGE_NAME" --clobber
-          echo "Attached \`$APPIMAGE_NAME\` to the rolling nightly." \
+
+          jq -n \
+            --arg url "https://github.com/${GITHUB_REPOSITORY}/releases/download/nightly/${APPIMAGE_NAME}" \
+            --arg name "$NIGHTLY_VERSION" \
+            --arg notes "Automated build of master at ${NIGHTLY_SHA}." \
+            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{url: $url, name: $name, notes: $notes, pub_date: $pub_date}' \
+            > "$RUNNER_TEMP/$LINUX_FEED_NAME"
+          gh release upload nightly "$RUNNER_TEMP/$LINUX_FEED_NAME" --clobber
+
+          echo "Attached \`$APPIMAGE_NAME\` and \`$LINUX_FEED_NAME\` to the rolling nightly." \
             >> "$GITHUB_STEP_SUMMARY"
 
   # The barrier both build jobs publish through. The `nightly` tag is what the

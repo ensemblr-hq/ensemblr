@@ -9,21 +9,42 @@ import type {
 } from '../../shared/ipc/contracts/update';
 
 /**
- * Name of the Squirrel.Mac feed document both release workflows attach to every
- * release, beside the `.zip` it points at. A cross-repo contract with
- * `.github/workflows/release.yml` and `nightly.yml` — renaming it here without
- * renaming it there strands every installed build on its current version.
+ * Name of the per-target feed document both release workflows attach to every
+ * release, beside the artifact it points at. A cross-repo contract with
+ * `.github/workflows/release.yml` and `nightly.yml` — renaming the shape here
+ * without renaming it there strands every installed build on its current
+ * version.
+ *
+ * `updateFeedAssetName('darwin', 'arm64')` must equal `update-darwin-arm64.json`
+ * forever: that was the only document early releases carried, and every
+ * already-installed arm64 Mac client reads it by that exact name.
+ * @param platform - The running platform, e.g. `darwin` or `linux`
+ * @param arch - The running architecture, e.g. `arm64` or `x64`
+ * @returns The feed document's asset name for that target
  */
-export const UPDATE_FEED_ASSET_NAME = 'update-darwin-arm64.json';
+export function updateFeedAssetName(
+	platform: NodeJS.Platform,
+	arch: string,
+): string {
+	return `update-${platform}-${arch}.json`;
+}
 
 /**
- * Suffix of the Linux artifact `release.yml` attaches, lowercased because the
- * comparison is. Linux updates notify rather than install, so this asset is
- * never downloaded by the app — its presence is what proves the release
- * actually shipped something a Linux user can install before the app offers
- * them the version.
+ * Matches any release asset that is a feed document, for any target. A release
+ * that carries a document for some other target is a healthy release that
+ * simply shipped nothing for this one — distinct from a release carrying no
+ * feed document at all, which on darwin is a broken feed.
  */
-const APPIMAGE_ASSET_SUFFIX = '.appimage';
+const FEED_DOCUMENT_NAME = /^update-[a-z0-9]+-[a-z0-9]+\.json$/;
+
+/**
+ * Whether an asset name is a feed document for any target.
+ * @param name - The asset's file name
+ * @returns True when the name has the `update-<platform>-<arch>.json` shape
+ */
+function isFeedDocumentName(name: string): boolean {
+	return FEED_DOCUMENT_NAME.test(name.toLowerCase());
+}
 
 /**
  * Tag the rolling nightly release always carries. Reserved by ADR 0054: a
@@ -157,33 +178,24 @@ export interface ReleaseFeed {
 }
 
 /**
- * Finds the release's `.AppImage`, which is both what proves the release
- * shipped something a Linux user can install and what a Linux build that may
- * install actually downloads. The suffix is matched case-insensitively because
- * the capitalisation of `.AppImage` is a convention rather than a guarantee.
- * @param release - The release to inspect
- * @returns The asset, or null when the release shipped none
- */
-function findAppImageAsset(release: Release): Release['assets'][number] | null {
-	return (
-		release.assets.find((asset) =>
-			asset.name.toLowerCase().endsWith(APPIMAGE_ASSET_SUFFIX),
-		) ?? null
-	);
-}
-
-/**
- * Narrows a release asset to one a Linux build may install, which means one
- * GitHub published a checksum for. Without a digest there is nothing to verify
+ * Resolves the Linux artifact a build may install from the feed document's own
+ * `url`, rather than by guessing at a filename suffix: the feed document names
+ * the exact asset, and matching it back to the release asset list recovers the
+ * digest GitHub published for it. Without a digest there is nothing to verify
  * the download against, and an unverified AppImage must not be written over the
  * running one — so the candidate carries null and the surface links at the
  * release page instead.
- * @param asset - The `.AppImage` asset, when the release shipped one
+ * @param release - The release the feed document belongs to
+ * @param url - The `url` field the feed document points at
  * @returns The installable asset, or null when it is absent or unverifiable
  */
-function toLinuxUpdateAsset(
-	asset: Release['assets'][number] | null,
+function resolveLinuxAsset(
+	release: Release,
+	url: string,
 ): LinuxUpdateAsset | null {
+	const asset = release.assets.find(
+		(entry) => entry.browser_download_url === url,
+	);
 	if (!asset?.digest) {
 		return null;
 	}
@@ -192,6 +204,13 @@ function toLinuxUpdateAsset(
 
 /** Options for {@link createReleaseFeed}. */
 export interface ReleaseFeedOptions {
+	/**
+	 * The running architecture, which pairs with the platform to name the feed
+	 * document this build reads. Runtime `process.arch` by default — never
+	 * `app.runningUnderARM64Translation`, so an Intel build under Rosetta keeps
+	 * getting Intel updates rather than being moved onto arm64 silently.
+	 */
+	arch?: string;
 	/** Injected so tests resolve without a network and the app uses Node's global. */
 	fetchImpl?: typeof fetch;
 	/** The running platform, which decides which release artifact must be present. */
@@ -321,10 +340,12 @@ async function readBoundedText(
  * @returns A resolver whose `resolve` never throws across its boundary
  */
 export function createReleaseFeed({
+	arch = process.arch,
 	fetchImpl = fetch,
 	platform = process.platform,
 	repositorySlug = resolveRepositorySlug(),
 }: ReleaseFeedOptions = {}): ReleaseFeed {
+	const feedAssetName = updateFeedAssetName(platform, arch);
 	const releasesUrl = `https://api.github.com/repos/${repositorySlug}/releases?per_page=${RELEASES_PAGE_SIZE}`;
 	let cachedEtag: string | null = null;
 	let cachedReleases: readonly Release[] | null = null;
@@ -457,19 +478,9 @@ export function createReleaseFeed({
 		if (!release) {
 			return { candidate: null, status: 'ok' };
 		}
-		// Asked before the feed document, so a release that shipped nothing this
-		// platform can install is simply not an update for it — rather than a
-		// release whose missing macOS artifact is reported to a Linux user as a
-		// broken feed.
-		const appImage = findAppImageAsset(release);
-		if (platform === 'linux' && !appImage) {
-			return { candidate: null, status: 'ok' };
-		}
-		const asset = release.assets.find(
-			(entry) => entry.name === UPDATE_FEED_ASSET_NAME,
-		);
+		const asset = release.assets.find((entry) => entry.name === feedAssetName);
 		if (!asset) {
-			return missingFeedDocument(release, platform);
+			return missingFeedDocument(release, platform, feedAssetName);
 		}
 
 		const read = await readFeedDocument(asset.browser_download_url);
@@ -482,7 +493,10 @@ export function createReleaseFeed({
 		return {
 			candidate: {
 				feedUrl: asset.browser_download_url,
-				linuxAsset: platform === 'linux' ? toLinuxUpdateAsset(appImage) : null,
+				linuxAsset:
+					platform === 'linux'
+						? resolveLinuxAsset(release, read.value.url)
+						: null,
 				notes: read.value.notes ?? null,
 				releaseUrl: release.html_url,
 				version: read.value.name,
@@ -495,26 +509,31 @@ export function createReleaseFeed({
 }
 
 /**
- * Answers a release that carries no Squirrel feed document. The document is a
- * macOS artifact and the only place the exact version is written, so darwin —
- * which installs from it — reports a broken feed, while a platform that could
- * only have linked to the release page has one release it cannot name and
- * reports no candidate.
+ * Answers a release that carries no feed document for this target. A release
+ * that carries feed documents for *other* targets is healthy — it simply
+ * shipped nothing for this platform/arch, which is no update rather than a
+ * broken feed. Only a release carrying no feed document at all is broken, and
+ * only on darwin, which cannot fall back to linking at the release page.
  * @param release - The release the document is missing from
  * @param platform - The running platform
- * @returns The errored result on darwin, no candidate elsewhere
+ * @param feedAssetName - The feed document this target looked for
+ * @returns No candidate for a healthy release; the errored result for a broken darwin feed
  */
 function missingFeedDocument(
 	release: Release,
 	platform: NodeJS.Platform,
+	feedAssetName: string,
 ): ReleaseFeedResult {
-	if (platform !== 'darwin') {
+	const carriesOtherFeedDocuments = release.assets.some((asset) =>
+		isFeedDocumentName(asset.name),
+	);
+	if (carriesOtherFeedDocuments || platform !== 'darwin') {
 		return { candidate: null, status: 'ok' };
 	}
 	return errored(
 		fail(
 			'update-feed-malformed',
-			`Release ${release.tag_name} carries no ${UPDATE_FEED_ASSET_NAME}.`,
+			`Release ${release.tag_name} carries no ${feedAssetName}.`,
 		),
 	);
 }

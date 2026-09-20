@@ -61,6 +61,7 @@ export function createAppUpdateService({
 		appImageDirectoryWritable:
 			appImagePath !== null && isWritableDirectory(dirname(appImagePath)),
 		appImagePath,
+		arch: process.arch,
 		channel,
 		inApplicationsFolder: readIsInApplicationsFolder(),
 		packaged: app.isPackaged,

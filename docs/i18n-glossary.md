@@ -8,7 +8,7 @@ the fact.
 Rules of thumb:
 
 - **Do not translate proper nouns.** `Ensemblr`, `Pi`, `Claude Code`, `Codex`,
-  `Linear`, `GitHub`, `git`, `npm` stay as-is in every language.
+  `Linear`, `GitHub`, `git`, `npm`, `Bun` stay as-is in every language.
 - **Do not translate git porcelain.** `commit`, `branch`, `merge`, `rebase`,
   `stash`, `worktree`, `HEAD`, `main`/`master` are borrowed, not localized —
   Russian and Greek developers use the English terms daily and a translation

@@ -10,6 +10,7 @@ function inputs(
 	return {
 		appImageDirectoryWritable: false,
 		appImagePath: null,
+		arch: 'arm64',
 		channel: 'release',
 		inApplicationsFolder: true,
 		packaged: true,
@@ -105,6 +106,58 @@ describe('checkUpdatePreconditions', () => {
 	test('a platform with neither updater refuses', () => {
 		expect(
 			checkUpdatePreconditions(inputs({ platform: 'win32' })),
+		).toMatchObject({
+			capability: 'none',
+			failure: { code: 'update-unsupported-build' },
+		});
+	});
+
+	test('an x64 Mac may install', () => {
+		expect(checkUpdatePreconditions(inputs({ arch: 'x64' }))).toEqual({
+			capability: 'install',
+			failure: null,
+		});
+	});
+
+	test('an x64 Linux build may install', () => {
+		expect(
+			checkUpdatePreconditions(
+				inputs({
+					appImageDirectoryWritable: true,
+					appImagePath: '/home/dev/.local/share/ensemblr/Ensemblr.AppImage',
+					arch: 'x64',
+					platform: 'linux',
+				}),
+			),
+		).toEqual({ capability: 'install', failure: null });
+	});
+
+	test('an architecture Ensemblr ships no build for refuses', () => {
+		expect(checkUpdatePreconditions(inputs({ arch: 'ia32' }))).toMatchObject({
+			capability: 'none',
+			failure: { code: 'update-unsupported-build' },
+		});
+	});
+
+	test('an unsupported architecture refuses on Linux too', () => {
+		expect(
+			checkUpdatePreconditions(
+				inputs({
+					appImageDirectoryWritable: true,
+					appImagePath: '/home/dev/.local/share/ensemblr/Ensemblr.AppImage',
+					arch: 'armv7l',
+					platform: 'linux',
+				}),
+			),
+		).toMatchObject({
+			capability: 'none',
+			failure: { code: 'update-unsupported-build' },
+		});
+	});
+
+	test('an unsupported platform outranks an unsupported architecture', () => {
+		expect(
+			checkUpdatePreconditions(inputs({ arch: 'ia32', platform: 'win32' })),
 		).toMatchObject({
 			capability: 'none',
 			failure: { code: 'update-unsupported-build' },

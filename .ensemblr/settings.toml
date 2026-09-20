@@ -1,56 +1,63 @@
 #:schema ../schemas/settings.schema.json
 
-# Node 24 is pinned by scripts/require-node-version.mjs, so every command goes
-# through the wrapper — non-interactive shells never activate mise on their own.
+# Node 24 is pinned by scripts/require-node-version.mjs. Setup and run scripts
+# spawn through a non-interactive shell that never activates mise on its own,
+# so Ensemblr injects the workspace directory's login-shell PATH instead — that
+# capture evaluates this repo's mise.toml and puts Node 24 and Bun on PATH.
+# Never add PATH to [environment_variables]: the resolver is gated on the key
+# being absent, so configuring one silently disables it and the commands below
+# fall back to whatever Node is first on the app's inherited PATH.
 [scripts]
-setup = "./scripts/with-pinned-node.sh npm ci"
+setup = "bun ci"
 
 # Electron dev server.
 [scripts.run.dev]
-command = "./scripts/with-pinned-node.sh npm run dev"
+command = "bun run dev"
 icon = "play"
 default = true
 available_in = ["local"]
 
 [scripts.run.checks]
-command = "./scripts/with-pinned-node.sh npm run check && ./scripts/with-pinned-node.sh npm run typecheck"
+command = "bun run check && bun run typecheck"
 icon = "list-checks"
 available_in = ["local"]
 
 [scripts.run.test]
-command = "./scripts/with-pinned-node.sh npm test"
+command = "bun run test"
 icon = "test-tube"
 available_in = ["local"]
 
 [scripts.run.playground]
-command = "./scripts/with-pinned-node.sh npm run dev:playground"
+command = "bun run dev:playground"
 icon = "play"
 available_in = ["local"]
 
 # Screenshot host: a second Electron entrypoint rendering the real UI over
 # scripted fixtures. See demo/README.md. Never touches the app's own state.
 [scripts.run.demo]
-command = "./scripts/with-pinned-node.sh npm run dev:demo"
+command = "bun run dev:demo"
 icon = "monitor"
 available_in = ["local"]
 
-# macOS artifact. `make:unsigned` packages --arch=arm64 and `open` is macOS-only,
-# so this one does nothing useful on a Linux host — build `appimage` there.
+# macOS artifact. `make:unsigned` builds for the host architecture and `open`
+# is macOS-only, so this one does nothing useful on a Linux host — build
+# `appimage` there.
 [scripts.run.unsigned]
-command = "./scripts/with-pinned-node.sh npm run make:unsigned && open out"
+command = "bun run make:unsigned && open out"
 icon = "package"
 available_in = ["local"]
 
-# Linux artifact. Needs mksquashfs; `diagnose` reports whether this host has it.
+# Linux artifact, built for the host architecture. Needs mksquashfs;
+# `diagnose` reports whether this host has it.
 [scripts.run.appimage]
-command = "./scripts/with-pinned-node.sh npm run make:linux"
+command = "bun run make:linux"
 icon = "package"
 available_in = ["local"]
 
 # Read-only: compiler, make, python3, mksquashfs, and what pty.node linked
 # against. Never builds, so it always describes the tree as it stands.
 [scripts.run.diagnose]
-command = "./scripts/with-pinned-node.sh npm run diagnose:linux"
+command = "bun run diagnose:linux"
 icon = "microscope"
 available_in = ["local"]
 
@@ -58,6 +65,6 @@ available_in = ["local"]
 # when the binding is missing or stamped for the wrong Electron ABI; this is for
 # replacing one without waiting for a preflight to notice.
 [scripts.run.rebuild-native]
-command = "./scripts/with-pinned-node.sh npm run rebuild:native"
+command = "bun run rebuild:native"
 icon = "hammer"
 available_in = ["local"]

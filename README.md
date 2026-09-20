@@ -20,7 +20,7 @@ belongs to no workspace: it reads across every project you have open, remembers 
 conversations, and never edits your project files — real change is delegated to an orchestrator it spawns into
 the workspace that needs it.
 
-**macOS on Apple silicon, or Linux on x86-64. Bring your own agent CLI — Pi or Claude Code, one is enough.
+**macOS (Apple silicon or Intel), or Linux on x86-64. Bring your own agent CLI — Pi or Claude Code, one is enough.
 `git` and an authenticated `gh` are required.**
 
 No Ensemblr account, no sign-in, no cloud sync, no telemetry. State is a local SQLite database. Secrets
@@ -38,9 +38,12 @@ the app ships no agent binary of its own — it drives the one you installed.
 | Platform | Artifact | Install |
 | --- | --- | --- |
 | macOS, Apple silicon | `.dmg` (signed, notarized, stapled) | `brew install --cask ensemblr-hq/tap/ensemblr` |
+| macOS, Intel | `.dmg` (signed, notarized, stapled) | `brew install --cask ensemblr-hq/tap/ensemblr` |
 | Linux, x86-64 | `.AppImage` | `curl -fsSL https://www.ensemblr.dev/install.sh \| sh` |
 
-Intel Macs and arm64 Linux are not built. Windows is not supported.
+The Intel Mac build starts with the release after `0.1.19`; each Mac architecture gets its own
+`.dmg` rather than one universal binary. arm64 Linux is planned for a later release and is not built
+yet. Windows is not supported.
 
 ---
 
@@ -91,12 +94,12 @@ directory, Ensemblr downloads a newer AppImage, verifies its GitHub-published SH
 and atomically swaps it on restart. A non-AppImage build or one in a read-only directory keeps the
 check-only path and links to the release page.
 
-To build it yourself instead, with Node 24.x:
+To build it yourself instead, with Node 24.x and [Bun](https://bun.sh) 1.4:
 
 ```bash
-npm install
-npm run make          # macOS: .dmg + .zip under out/make/
-npm run make:linux    # Linux: .AppImage under out/make/ (needs squashfs-tools)
+bun install
+bun run make          # macOS, host architecture: .dmg + .zip under out/make/
+bun run make:linux    # Linux: .AppImage under out/make/ (needs squashfs-tools)
 ```
 
 `make:linux` refuses to run anywhere but Linux. `node-pty` ships no linux-x64
@@ -113,7 +116,7 @@ path — prerequisites, channels, unsigned builds, and where Ensemblr keeps its 
 ## Prerequisites
 
 Ensemblr drives CLIs you install and authenticate yourself — it ships no agent binary and holds no provider
-key. On a clean Apple silicon Mac — on Linux, install the same tools with your distribution's package
+key. On a clean Mac — on Linux, install the same tools with your distribution's package
 manager or the upstream scripts below:
 
 ```bash
@@ -447,10 +450,10 @@ Full glossary in [`CONTEXT.md`](./CONTEXT.md); the user-facing tour is
 | Agent control | Loopback HTTP + MCP (`@modelcontextprotocol/sdk`) |
 | Validation | Zod 4 |
 | Storage | SQLite via Node 24's built-in `node:sqlite` |
-| Build | Vite 8, Electron Forge (DMG + ZIP, hardened runtime, arm64) |
+| Build | Vite 8, Electron Forge (DMG + ZIP per architecture, hardened runtime, arm64 and x64) |
 | Testing | Vitest 4 (+ happy-dom) and `electron --test` |
 | Lint / format | Biome 2.5 |
-| Runtime / package manager | Node 24.x (exactly), npm 11 |
+| Runtime / package manager | Node 24.x (exactly), Bun 1.4 |
 
 ---
 

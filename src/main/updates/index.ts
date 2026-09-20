@@ -12,7 +12,7 @@ export type {
 export {
 	createReleaseFeed,
 	resolveRepositorySlug,
-	UPDATE_FEED_ASSET_NAME,
+	updateFeedAssetName,
 } from './release-feed';
 export type {
 	UpdateCapability,

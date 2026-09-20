@@ -16,7 +16,7 @@ const CONSEQUENCE = {
 	install: (current) =>
 		`native modules would be compiled for Node ${current} and fail to load when the build runs.`,
 	dev: (current) =>
-		`Node ${current} is not what the build, CI, or the packaged app run, so tooling that works here may not survive \`npm run make\`.`,
+		`Node ${current} is not what the build, CI, or the packaged app run, so tooling that works here may not survive \`bun run make\`.`,
 };
 
 // `dev` warns rather than exits: Forge rebuilds native modules against Electron's

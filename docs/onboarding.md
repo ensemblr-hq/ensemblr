@@ -5,22 +5,23 @@ overview; this is the runbook.
 
 ## 1. Prerequisites
 
-Ensemblr targets **macOS arm64** (a signed, notarized `.app`) and **Linux x86-64**
-(an unsigned `.AppImage`). There is no Windows path. What differs between the two
+Ensemblr targets **macOS** — Apple silicon (arm64) and Intel (x64), each a signed,
+notarized `.app` — and **Linux x86-64** (an unsigned `.AppImage`); Linux arm64 is
+planned for a later release. There is no Windows path. What differs between the two
 is declared per platform rather than branched inline — the secret store, the
 "Open in…" registry, the battery reader, the window chrome, and updates — so
 developing on either is the same loop.
 
-Linux has one extra setup step, because `node-pty` publishes no linux-x64
+Linux has one extra setup step, because `node-pty` publishes no Linux
 prebuild and has to be compiled: see
 [*Developing on Linux*](./build-and-release.md#developing-on-linux), which also
-covers hosts with no compiler at all. `npm run diagnose:linux` reports where you
+covers hosts with no compiler at all. `bun run diagnose:linux` reports where you
 stand.
 
 | Requirement | Why | Check |
 | --- | --- | --- |
 | **Node 24.x** (exactly) | Native modules compile against the running major | `node -v` |
-| **npm** | The enforced package manager | `npm -v` |
+| **Bun 1.4** | The enforced package manager and script runner — Node stays the runtime | `bun --version` |
 | **git** | Worktrees back every workspace | `git --version` |
 | **Pi CLI** | Agent runtime, spawned in RPC mode | `pi --version` |
 | **Claude Code CLI** | The other agent runtime, driven through `@anthropic-ai/claude-agent-sdk` against *your* binary — Ensemblr ships none | `claude --version` |
@@ -47,8 +48,9 @@ claiming both gates read that one table is stale.
 ### The Node 24 pin is load-bearing
 
 `.nvmrc`, `mise.toml`, and `package.json#engines` all pin Node 24, and
-`scripts/require-node-version.mjs` enforces it at two gates (`preinstall` and
-`build`/`package`/`make`). Ignoring it fails in ways that do not look like a Node
+`scripts/require-node-version.mjs` enforces it at three gates (`preinstall`, `dev`,
+and `build`/`package`/`make`). Bun does not stand in for Node: `node` in a
+`bun run` script and in a lifecycle script is still the real Node on PATH. Ignoring it fails in ways that do not look like a Node
 problem:
 
 - On Node 26, `electron-forge package` **exits 0 and produces no artifacts**.
@@ -56,12 +58,19 @@ problem:
   major, so a later Node 24 `make` dies on a `NODE_MODULE_VERSION` mismatch —
   long after the mistake.
 
-`mise` users get the pin automatically. Otherwise `nvm use` reads `.nvmrc`.
+`mise` users get the pin — Node 24 and Bun 1.4 — with `mise install`, since
+`mise.toml` declares both. Otherwise `nvm use` reads `.nvmrc`, and Bun installs
+from <https://bun.sh> (`curl -fsSL https://bun.sh/install | bash`).
+
+Inside Ensemblr this needs no action: setup scripts, run scripts, and terminals
+get the workspace directory's login-shell PATH, which activates mise. That only
+works while `[environment_variables]` in `.ensemblr/settings.toml` never sets
+`PATH` — see [Bun and Node](./build-and-release.md#bun-and-node).
 
 ## 2. Install
 
 ```bash
-npm install
+bun install
 ```
 
 Two things happen that are worth knowing about:
@@ -71,15 +80,21 @@ Two things happen that are worth knowing about:
   `node-pty`'s prebuilt `spawn-helper` binaries executable. They ship without the
   exec bit; skipping this surfaces much later as an opaque PTY spawn failure.
 
-`.npmrc` sets `legacy-peer-deps=true`. That is deliberate:
-`@electron-forge/plugin-fuses@7` declares a stale peer range (`@electron/fuses@^1`)
-while the repo pins v2. Do not remove it without re-checking the resolution.
+There is no `.npmrc`. `@electron-forge/plugin-fuses@7` declares a stale peer range
+(`@electron/fuses@^1`) while the repo pins v2; Bun tolerates that natively, and
+exactly one `@electron/fuses@2.1.3` resolves.
+
+Use `bun ci` for a clean tree that must match `bun.lock` exactly (it fails rather
+than rewrite the lockfile). Only a small, explicit set of dependencies has its
+install scripts run — `package.json#trustedDependencies` — and `node-pty` is
+deliberately not one of them. Never run `bun pm trust --all`; see
+[Bun and Node](./build-and-release.md#bun-and-node).
 
 ## 3. Run
 
 ```bash
-npm run dev              # Electron app (electron-forge start)
-npm run dev:playground   # component preview harness, no Electron
+bun run dev              # Electron app (electron-forge start)
+bun run dev:playground   # component preview harness, no Electron
 ```
 
 The playground (`playground/`) renders isolated component previews against
@@ -128,14 +143,14 @@ The house style is enforced, not suggested. Before writing code:
 - **No comments inside function bodies.** A comment there means a name is wrong
   or the function is doing too much. The one exception is a non-obvious *why*
   the code cannot express — see [`../.claude/rules/comments.md`](../.claude/rules/comments.md).
-- **Tailwind scale only.** No `w-[13px]`-style px utilities; `npm run check`
+- **Tailwind scale only.** No `w-[13px]`-style px utilities; `bun run check`
   fails on them.
 - **Jotai** is the only app-level store. No Redux, Zustand, Valtio, or a
   hand-rolled global.
 - **Every user-facing string is a catalogue key**, and `ru` and `el` ship filled
   in the same change: `t('<ns>:<surface>.<element>', 'Default English')`, then
-  `npm run i18n:extract` → fill the empty values → `npm run i18n:types` →
-  `npm run i18n:status`. Never hand-edit `locales/en/**`; it is generated from the
+  `bun run i18n:extract` → fill the empty values → `bun run i18n:types` →
+  `bun run i18n:status`. Never hand-edit `locales/en/**`; it is generated from the
   call sites.
 
 ## 6. Running the tests
@@ -143,10 +158,10 @@ The house style is enforced, not suggested. Before writing code:
 Two runners, split by what the test needs:
 
 ```bash
-npm run test              # full Vitest suite (renderer + shared + pure-logic main)
-npx vitest run <file>     # one Vitest file
-npm run test:coverage     # Vitest with Istanbul coverage → coverage/coverage-final.json
-npm run test:db           # a main-process suite (electron --test)
+bun run test              # full Vitest suite (renderer + shared + pure-logic main)
+bunx vitest run <file>     # one Vitest file
+bun run test:coverage     # Vitest with Istanbul coverage → coverage/coverage-final.json
+bun run test:db           # a main-process suite (electron --test)
 ```
 
 **Which runner does my new test use?**
@@ -177,16 +192,16 @@ from `bun:test` — Bun is not the runner and the enforcement hook blocks the CL
 ## 7. Before you push
 
 ```bash
-npm run check       # Biome + the Tailwind class check + i18n lint + hardcoded-string scan
-npm run check:fix   # apply safe fixes (format + import organization)
-npm run typecheck   # every tsconfig project, concurrently
-npm run test
-npm run i18n:status # if you touched a user-facing string — must stay at 100% ru/el
+bun run check       # Biome + the Tailwind class check + i18n lint + hardcoded-string scan
+bun run check:fix   # apply safe fixes (format + import organization)
+bun run typecheck   # every tsconfig project, concurrently
+bun run test
+bun run i18n:status # if you touched a user-facing string — must stay at 100% ru/el
 ```
 
-`npm run typecheck` covers **four** projects — `tsconfig.json`,
+`bun run typecheck` covers **four** projects — `tsconfig.json`,
 `tsconfig.scripts.json`, `tsconfig.tests.json`, `tsconfig.demo.json` — because
-`npx tsx` and Vitest strip types without checking them. A `scripts/*.ts` type
+`bunx tsx` and Vitest strip types without checking them. A `scripts/*.ts` type
 error only surfaces here. `scripts/typecheck.mjs` runs them at once rather than
 chaining them with `&&`: they each `include` `src`, so the serial form
 type-checked the bulk of the program four times in a row.
@@ -235,7 +250,7 @@ changed set, per [`../.claude/rules/code-review.md`](../.claude/rules/code-revie
 | New durable UI state | `src/renderer/state/<concern>/`, re-exported from that folder's `index.ts` |
 | New DB table or column | A numbered migration in `src/main/storage/database.ts`, plus its id in `tests/main/database.test.ts` |
 | New main-process concern | A folder under `src/main/` with an `index.ts`; add it to `src/main/AGENTS.md`. Main-process barrels are deliberately **not** listed in `.fallowrc.jsonc` — they are reachable from `src/main/main.ts`, so a genuinely unused export in one should still surface. Shared and renderer concern barrels *are* listed there |
-| New user-facing string | A `t('<ns>:<key>', 'Default English')` call site, then `npm run i18n:extract` and hand-fill `locales/ru/**` and `locales/el/**`; add the term to `docs/i18n-glossary.md` if it is new |
+| New user-facing string | A `t('<ns>:<key>', 'Default English')` call site, then `bun run i18n:extract` and hand-fill `locales/ru/**` and `locales/el/**`; add the term to `docs/i18n-glossary.md` if it is new |
 | New native menu item | An id in `src/shared/menu-commands.ts` → a label in all three languages in `src/main/menu/menu-strings.ts` → an entry in the relevant `src/main/menu/<name>-menu.ts` → a `useMenuCommand` registration in the renderer surface that owns the action ([ADR 0046](./adr/0046-drive-the-native-menu-bar-from-a-renderer-command-bus.md)) |
 | New agent runtime | A sibling adapter folder under `src/main/` implementing the `src/main/agent-runtime/` contract — never a branch inside `pi-agent/` or `claude-agent/` ([ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md)) |
 | New agent control op | A service first, then a port in `src/main/agent-control/ports.ts` — control never adds capability code of its own |
@@ -243,5 +258,5 @@ changed set, per [`../.claude/rules/code-review.md`](../.claude/rules/code-revie
 | New setup check | `src/shared/ipc/contracts/setup.ts` → `SETUP_CHECK_ORDER` in `src/main/setup/setup-diagnostics.ts` → the implementation under `src/main/setup/` → the check table in `docs/guide/02-requirements.md` |
 | New `.ensemblr/settings.toml` key | The field map in `src/main/config/repository-config.ts` → the reference table in `docs/guide/12-repository-settings.md` |
 | New keyboard shortcut | `SHORTCUTS` in `src/shared/keymap/shortcuts.ts` → the scope table in `docs/guide/13-keyboard-shortcuts.md` |
-| A dependency added, removed, or renamed | `npm run credits:generate`, which rewrites `src/main/menu/credits-manifest.gen.ts` for the native About panel. The packaged app ships no `node_modules` to read a license out of, so the manifest is captured at authoring time; `tests/main/credits-manifest.test.ts` recomputes it and fails on drift |
+| A dependency added, removed, or renamed | `bun run credits:generate`, which rewrites `src/main/menu/credits-manifest.gen.ts` for the native About panel. The packaged app ships no `node_modules` to read a license out of, so the manifest is captured at authoring time; `tests/main/credits-manifest.test.ts` recomputes it and fails on drift |
 | A decision worth recording | The next numbered ADR in `docs/adr/`, and bump the count in all three places it appears: `docs/README.md`, the documentation list in `README.md`, and §4 of this file |

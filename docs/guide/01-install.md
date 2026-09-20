@@ -1,15 +1,20 @@
 # Installing Ensemblr
 
-Ensemblr runs on **macOS with Apple silicon** and on **Linux with x86-64**.
+Ensemblr runs on **macOS with Apple silicon or an Intel processor** and on
+**Linux with x86-64**.
 
 | Platform | Artifact | Signed | Updates itself |
 | --- | --- | --- | --- |
 | macOS, Apple silicon | `.dmg` and `.zip` | Developer ID, notarized, stapled | Yes |
+| macOS, Intel | `.dmg` and `.zip` | Developer ID, notarized, stapled | Yes |
 | Linux, x86-64 | `.AppImage` | No — there is no equivalent | Yes when the AppImage directory is writable; otherwise it links |
 
-Neither host cross-builds the other's artifact, so they are built by two separate
-CI jobs and attached to the same release. There is no Intel Mac build, no arm64
-Linux build, and no Windows build.
+macOS ships one build per architecture rather than a universal binary, so an
+Apple-silicon Mac downloads only arm64 code. **The Intel Mac build first appears
+in the release after `0.1.19`**; the two macOS architectures are built on the same
+runner, and the Linux AppImage on a separate job, all attached to one release.
+There is no arm64 Linux build in this release — it is planned for a later one —
+and no Windows build.
 
 ## Homebrew (macOS)
 
@@ -19,9 +24,10 @@ brew install --cask ensemblr-hq/tap/ensemblr
 
 The [tap](https://github.com/ensemblr-hq/homebrew-tap) tracks the highest
 semantic-versioned release, including tagged prereleases, and never the rolling
-`nightly` build. It declares Apple silicon and macOS Ventura as requirements, so
-`brew` refuses on a machine that cannot run the app rather than installing
-something that will not open.
+`nightly` build. It installs the build that matches your Mac's architecture — Apple
+silicon or Intel — and declares macOS Ventura as a requirement, so `brew` refuses
+on a machine that cannot run the app rather than installing something that will
+not open.
 
 The cask is marked `auto_updates true` because Ensemblr updates itself (see
 [Staying up to date](#staying-up-to-date)), so a plain `brew upgrade` leaves it
@@ -92,6 +98,9 @@ The current build is **`0.1.19`**:
   — the macOS disk image. Open it and drag Ensemblr to `/Applications`.
 - [`Ensemblr-darwin-arm64-0.1.19.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.19/Ensemblr-darwin-arm64-0.1.19.zip)
   — the same `.app`, zipped, if you would rather not mount an image.
+- **Intel Macs:** the release after `0.1.19` carries `Ensemblr-<version>-x64.dmg`
+  and `Ensemblr-darwin-x64-<version>.zip` beside the arm64 pair, under Forge's
+  default names. `0.1.19` itself is Apple-silicon only.
 - [**`Ensemblr-0.1.19-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.19/Ensemblr-0.1.19-x64.AppImage)
   — the Linux build, if you would rather place it yourself than run the
   [install script](#install-script-linux). One file, no installer:
@@ -113,7 +122,7 @@ The current build is **`0.1.19`**:
 There is also a **nightly** build of `master` under the rolling
 [`nightly`](https://github.com/ensemblr-hq/ensemblr/releases/tag/nightly) tag —
 [`Ensemblr-Canary-arm64.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/nightly/Ensemblr-Canary-arm64.dmg)
-and [`Ensemblr-Canary-x86_64.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/nightly/Ensemblr-Canary-x86_64.AppImage).
+(and `Ensemblr-Canary-x64.dmg` for Intel Macs) and [`Ensemblr-Canary-x86_64.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/nightly/Ensemblr-Canary-x86_64.AppImage).
 The macOS one is signed and notarized the same way, but both are untested: they
 install as "Ensemblr Canary" **alongside** a release rather than replacing it,
 and their assets are overwritten each night.
@@ -139,8 +148,10 @@ has to quote one string.
 ## Staying up to date
 
 **On macOS, Ensemblr updates itself.** An installed copy checks GitHub a couple of
-minutes after launch and every four hours after that, downloads a newer build in
-the background, and then offers to restart into it — you choose when. **Settings →
+minutes after launch and every four hours after that, downloads a newer build *for
+its own architecture* in the background — an Apple-silicon install never moves to
+the Intel build, and an Intel install never to arm64 — and then offers to restart
+into it — you choose when. **Settings →
 General** shows the running version and the updater's state, and
 **Ensemblr → Check for Updates…** runs a check on the spot.
 
@@ -189,18 +200,20 @@ Building from source is the other path, and the rest of this page covers it.
 
 | Requirement | Version | Check |
 | --- | --- | --- |
-| macOS on Apple silicon, or Linux on x86-64 | arm64 / x86-64 | `uname -sm` |
+| macOS (Apple silicon or Intel), or Linux on x86-64 | arm64 / x86-64 | `uname -sm` |
 | Node | **exactly 24.x** | `node -v` |
-| npm | 11.17.0 | `npm -v` |
+| Bun | 1.4 (`packageManager` is `bun@1.4.2`) | `bun --version` |
 | git | any recent | `git --version` |
 | `mksquashfs` (Linux only) | any recent | `which mksquashfs` |
 | A C++ toolchain (Linux only) | any recent | `which g++ make python3` |
 
 The Node pin is enforced, not advisory. `package.json` declares
 `engines: ">=24 <25"`, and `.nvmrc` and `mise.toml` both pin 24. A version gate
-runs at two points: on `npm install` (as `preinstall`) and again before
-`package`, `build`, and `make`. If you use `mise`, the pin applies
-automatically; otherwise `nvm use` reads `.nvmrc`.
+runs at three points: on `bun install` (as `preinstall`), before `dev`, and again
+before `package`, `build`, and `make`. Bun manages packages and runs scripts, but
+Node remains the runtime — Bun does not stand in for it. If you use `mise`,
+`mise install` gives you Node 24 and Bun 1.4 together; otherwise `nvm use` reads
+`.nvmrc` and Bun installs from <https://bun.sh>.
 
 Ignoring the pin fails in ways that do not look like a Node problem — see
 [Troubleshooting](./14-troubleshooting.md) for the two symptoms.
@@ -212,35 +225,41 @@ On macOS:
 ```bash
 git clone https://github.com/ensemblr-hq/ensemblr.git
 cd ensemblr
-npm install
-npm run make
+bun install
+bun run make
 open out/make/
 ```
 
-`npm install` does two things worth knowing about beyond fetching packages: it
+`bun install` does two things worth knowing about beyond fetching packages: it
 runs the Node-version gate first, and afterwards it marks `node-pty`'s prebuilt
 `spawn-helper` binaries executable. They ship without the exec bit, and skipping
 that step surfaces much later as a terminal that will not open.
 
-`npm run make` writes distributables to `out/make/`:
+`bun ci` is the stricter form — it installs exactly what `bun.lock` records and
+fails rather than change it. It is what the repository's own workspace setup uses.
+
+`bun run make` builds for **your Mac's architecture**; no script hardcodes one any
+more. Pass `--arch` to build the other: `bun run make --arch=x64` on an
+Apple-silicon Mac produces the Intel `.dmg` and `.zip`. It writes distributables
+to `out/make/`:
 
 - a **`.dmg`** (ULFO format) — the primary distributable
 - a **`.zip`** — a zipped `.app` for direct download
 
 Drag the `.app` out of the `.dmg` into `/Applications` as usual.
 
-If you only want to run the app and not distribute it, `npm run package` writes
+If you only want to run the app and not distribute it, `bun run package` writes
 an unpacked `.app` straight to `out/` and skips the disk-image step.
 
 On Linux:
 
 ```bash
-npm run make:linux
+bun run make:linux
 chmod +x out/make/AppImage/x64/*.AppImage
 ./out/make/AppImage/x64/*.AppImage
 ```
 
-`npm run package:linux` is the faster loop: it produces the unpacked directory,
+`bun run package:linux` is the faster loop: it produces the unpacked directory,
 needs no `mksquashfs`, and skips the SquashFS pass on every iteration.
 
 **`make:linux` refuses to run anywhere but Linux, and that refusal is the
@@ -252,21 +271,22 @@ host's Mach-O `pty.node`: the AppImage builds, launches, and has a dead terminal
 in every tab.
 
 `node-pty` is also the only thing that compiles, which is why a Linux build wants
-a toolchain. **If the host has none — every immutable distribution ships without
-one — nothing needs doing: `npm run dev`, `npm run make:linux`, and
-`npm run package:linux` build that one module themselves**, in a throwaway
+a toolchain. (`bun install` deliberately does not run its install script — Forge
+compiles it against Electron's ABI instead.) **If the host has none — every immutable distribution ships without
+one — nothing needs doing: `bun run dev`, `bun run make:linux`, and
+`bun run package:linux` build that one module themselves**, in a throwaway
 `node:24-bookworm` container, and leave the binding where Forge finds it already
 built. The first such run pulls the image and takes a few minutes; later ones
 find the binding stamped for Electron's ABI and skip straight through. It needs
 `podman` or `docker` and installs nothing on the host, which is what makes it
 safe on an immutable root — no sudo, and it survives the next OS update.
 
-`npm run rebuild:native` runs that same container build by hand, for a binding
+`bun run rebuild:native` runs that same container build by hand, for a binding
 you want to replace without waiting for a preflight to notice. Set
 `ENSEMBLR_SKIP_NATIVE_AUTOBUILD=1` to be refused with instructions instead of
 having an image pulled on your behalf.
 
-`npm run diagnose:linux` reports the toolchain plus what `pty.node` actually
+`bun run diagnose:linux` reports the toolchain plus what `pty.node` actually
 linked against, and never builds anything. A binding whose libraries resolve
 outside `/usr` or `/lib` runs on the machine that built it and nowhere else, so
 the guard refuses it — that one is not repaired automatically, because a
@@ -285,12 +305,12 @@ above already is):
 | `APPLE_API_KEY_ID` | The key id |
 | `APPLE_API_ISSUER` | The issuer id |
 
-Miss any one of them and the same `npm run make` produces an **unsigned** build
+Miss any one of them and the same `bun run make` produces an **unsigned** build
 instead of failing. If you have no Apple developer credentials, be explicit
 about it:
 
 ```bash
-npm run make:unsigned
+bun run make:unsigned
 ```
 
 An unsigned app has a consequence you will hit on first launch: macOS
@@ -314,9 +334,9 @@ right-click path is the one that works.
 
 | Channel | Command | Bundle id | Product name |
 | --- | --- | --- | --- |
-| `release` (default) | `npm run make` | `dev.ensemblr.app` | Ensemblr |
-| `canary` | `npm run make:canary` | `dev.ensemblr.app.canary` | Ensemblr Canary |
-| `dev` | `npm run make:dev` | `dev.ensemblr.app.dev` | Ensemblr Dev |
+| `release` (default) | `bun run make` | `dev.ensemblr.app` | Ensemblr |
+| `canary` | `bun run make:canary` | `dev.ensemblr.app.canary` | Ensemblr Canary |
+| `dev` | `bun run make:dev` | `dev.ensemblr.app.dev` | Ensemblr Dev |
 
 This matters to you, not just to the packager. A bundle id is what macOS Launch
 Services uses to tell one installed app from another. Because the channels do

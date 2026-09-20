@@ -1,7 +1,7 @@
 # Stack
 
 The versions this repo is pinned to, and the constraints that are not obvious
-from `package.json`. Policies for *how* to use the stack (npm, Biome, Jotai,
+from `package.json`. Policies for *how* to use the stack (Bun, Biome, Jotai,
 Tailwind scale, JSDoc) live in `AGENTS.md` — this file is the stack itself.
 
 `package.json` declares the supported ranges; `package-lock.json` records the
@@ -11,12 +11,23 @@ resolved versions. Re-check both before asserting an exact version.
 
 | | |
 | --- | --- |
-| Target | macOS arm64 Ventura+ (`.dmg`/`.zip`) and Linux x64 (`.AppImage`) |
+| Target | macOS Ventura+ on arm64 **and** x64 (`.dmg`/`.zip` each), and Linux x64 (`.AppImage`); Linux arm64 is planned for the release after the one that adds macOS x64 |
 | Shell | Electron 44 (Node 24 runtime), Electron Forge 7 |
 | Node | **exactly 24.x** (`.nvmrc`, `mise.toml`, `engines: >=24 <25`) |
-| Package manager | npm 11.17.0 |
+| Package manager | Bun 1.4.2 (`packageManager`, `mise.toml` `bun = "1.4"`); Node stays the runtime |
 
-**Linux is a first-class target, not a port.** `npm run make:linux` builds the
+**Four targets, one build per architecture — not a universal binary.** darwin-arm64
+and darwin-x64 (the latter cross-built on `macos-15`), linux-x64, and linux-arm64
+(next release). A universal build roughly doubles the download for every
+Apple-silicon user, and `@electron/universal` throws on non-Mach-O files that
+differ between architectures — `node-pty/build/Release/.forge-meta` is exactly
+that. No `package.json` script hardcodes `--arch`, so Forge defaults to the host
+architecture; CI passes `--arch` explicitly on every leg. Update feeds are
+`update-<platform>-<arch>.json`, and `update-darwin-arm64.json` keeps its exact
+name and shape forever because already-installed arm64 Macs read it by that name
+(ADR 0074).
+
+**Linux is a first-class target, not a port.** `bun run make:linux` builds the
 AppImage through `@reforged/maker-appimage` (there is no
 `@electron-forge/maker-appimage`); it declares `mksquashfs` as a required
 external binary, so CI installs `squashfs-tools`. What differs from macOS is
@@ -31,7 +42,10 @@ instead — ADR 0065).
 
 **`node-pty` is the only thing that compiles, and the Linux preflight builds it
 rather than complaining about it.** It publishes prebuilds for darwin and win32
-only, so every Linux host compiles it — and the hosts most likely to run this app
+only, so every Linux host compiles it — and Bun never does it at install time,
+because `node-pty` is deliberately not in `trustedDependencies` (it would compile
+against Node's ABI; the binding has to come from Forge's `@electron/rebuild`
+against Electron's). The hosts most likely to run this app
 (SteamOS, Silverblue, NixOS) ship no compiler at all.
 `scripts/require-linux-toolchain.mjs` runs ahead of `dev`, `package:linux`, and
 `make:linux`; when the binding is missing or stamped for the wrong Electron ABI
@@ -74,7 +88,7 @@ LTS line the Electron 44 runtime embeds.
 **`@types/node` stays on `^24`, tracking the runtime rather than the latest
 release.** Electron 44.3.0 embeds Node 24.20.0, so typing against a newer major makes
 the compiler accept APIs that do not exist at runtime — a green
-`npm run typecheck` then ships a `TypeError`. Dependabot proposes the bump anyway,
+`bun run typecheck` then ships a `TypeError`. Dependabot proposes the bump anyway,
 because it reads `@types/node` as an ordinary devDependency rather than a mirror
 of `engines`; decline it until the embedded Node major moves. The Electron 43 →
 44 bump did not move it — check the release's `node` field before assuming a
@@ -89,9 +103,42 @@ module async and removed it from the renderer — the renderer already uses
 `navigator.clipboard`, and the one main-process call site is in
 `src/main/open-target/open-target-service.ts`.
 
-`.npmrc` sets `legacy-peer-deps=true` because `@electron-forge/plugin-fuses@7`
-declares a stale peer range (`@electron/fuses@^1`) against the v2 this repo pins.
-Leave it.
+**There is no `.npmrc`.** `@electron-forge/plugin-fuses@7` declares a stale peer
+range (`@electron/fuses@^1`) against the v2 this repo pins; npm needed
+`legacy-peer-deps=true` to install past it, whereas Bun tolerates it natively and
+exactly one `@electron/fuses@2.1.3` resolves, so no override is needed either.
+
+**Bun is the package manager, Node is the runtime.** Bun does not shim itself as
+`node`: in `bun run` scripts and in `preinstall`/`postinstall`, `node` is the real
+Node on `PATH` and `process.versions.bun` is `undefined`. Four pieces of install
+configuration are load-bearing, and `docs/build-and-release.md#bun-and-node` has
+the detail for each:
+
+- **`bun.lock` is pinned to `lockfileVersion: 1`.** dependabot-core's
+  `MAX_SUPPORTED_LOCKFILE_VERSION` is 1 and its parser raises above it, so a
+  version-2 file (Bun 1.4's default stamp) stops dependency PRs silently.
+  `scripts/check-lockfile-version.mjs` (`bun run check:lockfile`, wired into
+  `check`) enforces it and refuses a stray `bun.lockb`. The file was produced by
+  `bun pm migrate` under Bun 1.4.2, stamped back to 1 by hand, then loaded under
+  Bun 1.3.13 — the only sequence that kept all 1250 packages on the versions the
+  npm lockfile pinned. A plain `bun install` with no lockfile re-resolves the
+  graph (211 packages moved in the migration).
+- **`bunfig.toml` pins `linker = "hoisted"`.** Forge's `PACKAGE_KEEP_*` filters
+  match flat `/node_modules/<pkg>/` paths; the isolated linker's symlinked
+  `node_modules/.bun/` store would not match, and the packaged app would ship
+  without `node-pty` and the Claude Agent SDK.
+- **`trustedDependencies` is `esbuild`, `fs-xattr`, `macos-alias`.** An explicit
+  list replaces Bun's built-in allowlist. `node-pty`, `@swc/core`, and
+  `core-js-pure` stay blocked — the same three npm's old `allowScripts: false`
+  entries named. Never run `bun pm trust --all`.
+- **Ensemblr supplies the Node pin, not a wrapper script.** `scripts/with-pinned-node.sh`
+  is gone. `createToolchainPathResolver` captures a login shell's `PATH` for the
+  workspace directory (activating mise) and `workspace-environment.ts` injects it
+  into setup scripts, run scripts, and terminals — but only when the environment
+  has **no `PATH` key at all**. Setting `PATH` in `[environment_variables]`, even
+  to an empty string, silently disables the resolver. A plain non-login shell
+  outside Ensemblr no longer self-corrects; it fails loudly on
+  `scripts/require-node-version.mjs`.
 
 **`extract-zip` is aliased in `overrides` to
 `npm:@electron-internal/extract-zip`.** Forge 7 reaches `extract-zip@2.0.1`
@@ -112,7 +159,7 @@ stable.
 - **Vite 8** — app configs: `vite.main.config.mts`, `vite.preload.config.mts`,
   `vite.renderer.config.mts`; playground: `vite.playground.config.mts`; demo:
   `vite.demo-main.config.mts`, `vite.demo.config.mts`.
-- Four tsconfig projects, all checked by `npm run typecheck`: app
+- Four tsconfig projects, all checked by `bun run typecheck`: app
   (`tsconfig.json`), scripts (`tsconfig.scripts.json`), tests
   (`tsconfig.tests.json`), demo (`tsconfig.demo.json`). They each `include`
   `src`, so `scripts/typecheck.mjs` runs them concurrently rather than chaining
@@ -277,20 +324,22 @@ a primitive gets reformatted to house style.
   `bun:test`, Jest, or Mocha.
 - **fallow** (`.fallowrc.jsonc`) and **react-doctor** (`doctor.config.jsonc`) run
   as review diagnostics; CI runs react-doctor against `master`.
-- **i18next-cli** drives `npm run i18n:{extract,types,status,lint}`. `i18n:lint`
-  runs inside `npm run check` and fails the build on hardcoded user-facing
+- **i18next-cli** drives `bun run i18n:{extract,types,status,lint}`. `i18n:lint`
+  runs inside `bun run check` and fails the build on hardcoded user-facing
   strings and on sentences concatenated across translations; suppress a false
   positive with an `i18next-instrument-ignore` directive at the call site.
   `i18n:extract` and `i18n:types` each re-run Biome over what they wrote —
   i18next-cli emits 2-space JSON and Biome formats with tabs, so without that
   the two rewrite each other on every run.
-- `scripts/check-tailwind-classes.mjs` runs inside `npm run check` and fails on
+- `scripts/check-tailwind-classes.mjs` runs inside `bun run check` and fails on
   px-based arbitrary utilities.
 
 ## Adding a dependency
 
-1. `npm install` / `npm install -D` only — `bun`, `pnpm`, and `yarn` are blocked
-   by hooks in `.claude/hooks/enforce-npm.sh` and `.codex/hooks/enforce-npm-package-manager.sh`.
+1. `bun add` / `bun add -d` only — `npm`, `pnpm`, and `yarn` are blocked by hooks
+   in `.claude/hooks/enforce-bun.sh` and `.codex/hooks/enforce-bun-package-manager.sh`.
+   Keep `bun.lock` at `lockfileVersion: 1` (`bun run check:lockfile`), and do not
+   add the package to `trustedDependencies` unless its install script must run.
 2. If it is a native module or must stay unbundled, add it to `external` in the
    relevant Vite config **and** to `PACKAGE_KEEP_*` in `forge.config.ts`.
 3. If fallow cannot see its import edges (CSS-only, or consumed solely from

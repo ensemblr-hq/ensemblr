@@ -394,7 +394,7 @@ Four gates, in order:
      counted from its control origin: a terminal launch of any kind mints one
      workspace-scoped `harness` origin so a CLI the user starts by hand can reach
      the control server, and that origin is never released — counting it would
-     spend the whole allowance on a `npm run dev` somebody opened once, and would
+     spend the whole allowance on a `bun run dev` somebody opened once, and would
      go on doing so after the terminal exited.
 
    A spawn that has cleared the cap but has not opened yet holds a reservation,

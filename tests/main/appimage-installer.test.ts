@@ -39,6 +39,38 @@ function servingFetch(body: string, status = 200): typeof fetch {
 		new Response(status === 200 ? body : null, { status })) as typeof fetch;
 }
 
+/** ELF `e_machine` values for the two architectures Ensemblr ships. */
+const ELF_MACHINE = { arm64: 0xb7, x64: 0x3e } as const;
+
+/**
+ * A minimal 64-bit little-endian ELF header carrying the given `e_machine`, as
+ * a real AppImage begins. Only the first 20 bytes are read, so the rest is
+ * padding.
+ */
+function elfBody(machine: number): Uint8Array<ArrayBuffer> {
+	const buffer = new ArrayBuffer(64);
+	const view = new DataView(buffer);
+	view.setUint8(0, 0x7f);
+	view.setUint8(1, 0x45);
+	view.setUint8(2, 0x4c);
+	view.setUint8(3, 0x46);
+	view.setUint8(4, 2);
+	view.setUint8(5, 1);
+	view.setUint16(16, 2, true);
+	view.setUint16(18, machine, true);
+	return new Uint8Array(buffer);
+}
+
+/** Digest of a byte payload in the `sha256:<hex>` form GitHub publishes. */
+function digestOfBytes(bytes: Uint8Array<ArrayBuffer>): string {
+	return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+/** A fetch that answers every request with one byte payload. */
+function servingBytes(bytes: Uint8Array<ArrayBuffer>): typeof fetch {
+	return (async () => new Response(bytes)) as typeof fetch;
+}
+
 /** Collects what the installer reports, so a test can await the outcome. */
 function recorder() {
 	const errors: { code: UpdateFailureCode | undefined; error: Error }[] = [];
@@ -73,6 +105,7 @@ function recorder() {
 function harness(
 	options: {
 		appImageDirectory?: string;
+		arch?: string;
 		body?: string;
 		fetchImpl?: typeof fetch;
 	} = {},
@@ -85,6 +118,7 @@ function harness(
 	const events = recorder();
 	const installer = createAppImageInstaller({
 		appImagePath,
+		arch: options.arch,
 		env: { XDG_DATA_HOME: join(root, 'xdg') },
 		fetchImpl: options.fetchImpl ?? servingFetch(body),
 		homeDirectory: join(root, 'home'),
@@ -255,6 +289,69 @@ describe('createAppImageInstaller', () => {
 
 		expect(h.installer.applyStaged()).toBe(false);
 		expect(readFileSync(h.appImagePath, 'utf8')).toBe('the running build');
+	});
+});
+
+describe('the downloaded AppImage architecture check', () => {
+	test('stages an AppImage whose ELF machine matches the running arch', async () => {
+		const body = elfBody(ELF_MACHINE.x64);
+		const h = harness({ arch: 'x64', fetchImpl: servingBytes(body) });
+		h.installer.arm(
+			{ digest: digestOfBytes(body), url: 'https://x.invalid/a' },
+			'0.2.0',
+		);
+		await h.events.settled;
+
+		expect(h.events.errors).toEqual([]);
+		expect(h.events.downloaded()).toBe(1);
+		expect(h.installer.applyStaged()).toBe(true);
+	});
+
+	test('rejects a wrong-arch AppImage even when its digest matches', async () => {
+		const body = elfBody(ELF_MACHINE.arm64);
+		const h = harness({ arch: 'x64', fetchImpl: servingBytes(body) });
+		h.installer.arm(
+			{ digest: digestOfBytes(body), url: 'https://x.invalid/a' },
+			'0.2.0',
+		);
+		await h.events.settled;
+
+		expect(h.events.errors[0]?.code).toBe(
+			'update-verification-failed' satisfies UpdateFailureCode,
+		);
+		expect(h.events.downloaded()).toBe(0);
+		expect(h.installer.applyStaged()).toBe(false);
+		expect(readFileSync(h.appImagePath, 'utf8')).toBe('the running build');
+	});
+
+	test('a wrong-arch download leaves no partial file behind', async () => {
+		const body = elfBody(ELF_MACHINE.x64);
+		const h = harness({ arch: 'arm64', fetchImpl: servingBytes(body) });
+		h.installer.arm(
+			{ digest: digestOfBytes(body), url: 'https://x.invalid/a' },
+			'0.2.0',
+		);
+		await h.events.settled;
+
+		const staging = join(
+			root,
+			'apps',
+			`.${APPIMAGE_NAME}.ensemblr-update.part`,
+		);
+		expect(existsSync(staging)).toBe(false);
+	});
+
+	test('an arm64 build accepts an aarch64 AppImage', async () => {
+		const body = elfBody(ELF_MACHINE.arm64);
+		const h = harness({ arch: 'arm64', fetchImpl: servingBytes(body) });
+		h.installer.arm(
+			{ digest: digestOfBytes(body), url: 'https://x.invalid/a' },
+			'0.2.0',
+		);
+		await h.events.settled;
+
+		expect(h.events.errors).toEqual([]);
+		expect(h.installer.applyStaged()).toBe(true);
 	});
 });
 
