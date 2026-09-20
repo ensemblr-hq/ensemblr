@@ -146,7 +146,11 @@ export function useSetChangesSource(
  * branch and commit views issue an extra git read. Until the source query
  * resolves, the "all" and "uncommitted" views borrow the live model's
  * already-loaded change set so rows don't blink away on every switch or first
- * paint; a commit view has no model equivalent and loads.
+ * paint; a commit view has no model equivalent and loads. That borrowing stops
+ * once a branch comparison has answered with an error: "all" then reports the
+ * error with no rows instead of passing off working-tree edits as the branch.
+ * A workspace with no base ref never issues that comparison, so it keeps
+ * showing the working-tree set with no error.
  * @param workspace - Workspace whose changes are being reviewed
  * @returns The active source, the files and count it yields, and the source setter
  */
@@ -176,13 +180,15 @@ export function useChangesSource(workspace: WorkspaceShellModel) {
 		[source, baseRef, latestTurn.scope],
 	);
 
-	const { data: sourceStatusData, isLoading: isSourceStatusLoading } = useQuery(
-		{
-			...workspaceGitStatusQuery(workspace.pathLabel ?? null, scope),
-			enabled: Boolean(workspace.pathLabel) && !turnUnresolved,
-			placeholderData: keepPreviousData,
-		},
-	);
+	const {
+		data: sourceStatusData,
+		isLoading: isSourceStatusLoading,
+		isPlaceholderData: isSourceStatusPlaceholder,
+	} = useQuery({
+		...workspaceGitStatusQuery(workspace.pathLabel ?? null, scope),
+		enabled: Boolean(workspace.pathLabel) && !turnUnresolved,
+		placeholderData: keepPreviousData,
+	});
 	// `keepPreviousData` is what stops rows blinking away on a source switch, but
 	// it also means the previous source's rows are still here while the turn is
 	// unresolved — and showing those under a "Latest turn" heading is the very
@@ -193,7 +199,14 @@ export function useChangesSource(workspace: WorkspaceShellModel) {
 			: null;
 	const hasLiveModelEquivalent =
 		source.kind === 'all' || source.kind === 'uncommitted';
-	const useModelChanges = !statusData && hasLiveModelEquivalent;
+	const branchComparisonError =
+		source.kind === 'all' &&
+		scope.kind === 'branch' &&
+		!isSourceStatusPlaceholder
+			? sourceStatusData?.error
+			: undefined;
+	const useModelChanges =
+		!statusData && hasLiveModelEquivalent && !branchComparisonError;
 
 	const sourceFiles = useMemo(
 		() =>
@@ -229,9 +242,11 @@ export function useChangesSource(workspace: WorkspaceShellModel) {
 		setSource,
 		source,
 		latestTurnLabel: latestTurn.label,
-		sourceError: hasLiveModelEquivalent
-			? workspace.reviewFilesError
-			: sourceStatusData?.error,
+		sourceError:
+			branchComparisonError ??
+			(hasLiveModelEquivalent
+				? workspace.reviewFilesError
+				: sourceStatusData?.error),
 		sourceFiles,
 	};
 }

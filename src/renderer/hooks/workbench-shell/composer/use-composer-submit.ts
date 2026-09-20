@@ -353,13 +353,14 @@ export function useComposerSubmit({
 
 	/**
 	 * Applies a primed agent action: auto-submits it only when the action asked to
-	 * and the composer holds no draft — submitText clears the composer, so
-	 * auto-submitting over a typed draft would silently discard it — otherwise
-	 * seeds the payload after any existing draft for the user to send.
+	 * and the composer holds no draft, typed text or attachment chips alike —
+	 * submitText clears the composer, so auto-submitting over one would silently
+	 * discard it — otherwise seeds the payload after any existing draft for the
+	 * user to send.
 	 */
 	const deliverPrimedAction = useCallback(
 		(payload: string, autoSubmit: boolean) => {
-			const hasDraft = readDraft().text.trim().length > 0;
+			const hasDraft = !isEmptyDraft(readDraft());
 			if (autoSubmit && !hasDraft) {
 				void submitText(textDraft(payload));
 				return;
