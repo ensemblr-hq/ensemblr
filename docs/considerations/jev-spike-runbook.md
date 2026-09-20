@@ -83,10 +83,13 @@ shasum -a 256 \
 2. Put `TYPESAFE_API_KEY` in the ignored root `.env`. Never print it or write it into an
    artifact.
 3. Use the repository-pinned Node runtime.
-4. Confirm every private data/result artifact is mode `0600`. The harness contains no private
-   corpus or secret and may use the repository's normal source-file permissions.
-5. Declare the model, corpus, gold set, action thresholds, gates, and output filename before
-   the API call. Never tune a threshold on the rows later used to claim the gate passed.
+4. Set `umask 077` in the shell before creating any private artifact and keep it active through
+   extraction, evaluation, and report redirection. Confirm every private data/result artifact
+   is mode `0600`. The harness contains no private corpus or secret and may use the
+   repository's normal source-file permissions.
+5. Declare the model, corpus, gold set, action thresholds, gates, and unique output paths before
+   the API call. Refuse an existing path; never overwrite prior evidence or tune a threshold on
+   the rows later used to claim the gate passed.
 
 Run the local checks:
 
@@ -124,11 +127,23 @@ Sampling is deterministic SHA-256 ordering with fixed salts:
 Run:
 
 ```bash
+set -e
+umask 077
+corpus_id="$(date -u +%Y%m%dT%H%M%SZ)-$(
+  ./scripts/with-pinned-node.sh node -e 'console.log(require("node:crypto").randomUUID())'
+)"
+dataset_path=".context/jev/dataset-${corpus_id}.json"
+sample_path=".context/jev/label-sample-${corpus_id}.json"
+if [ -e "$dataset_path" ] || [ -e "$sample_path" ]; then
+  printf 'Refusing to overwrite an existing corpus artifact.\n' >&2
+  exit 1
+fi
 ./scripts/with-pinned-node.sh node .context/jev/harness.mjs extract \
-  --out .context/jev/dataset-v3.json \
-  --sample .context/jev/label-sample-v3.json
+  --out "$dataset_path" \
+  --sample "$sample_path"
 ./scripts/with-pinned-node.sh node .context/jev/harness.mjs dry-run \
-  --dataset .context/jev/dataset-v3.json
+  --dataset "$dataset_path"
+printf 'dataset=%s\nsample=%s\n' "$dataset_path" "$sample_path"
 ```
 
 Review the generated controls manually. They are real report text but not observed
@@ -196,38 +211,55 @@ A one-threshold diagonal sweep is diagnostic only.
 
 ## Model-only rerun
 
-Choose a unique output name before calling the API:
+Choose unique result and report paths before calling the API. This example includes both a UTC
+timestamp and a UUID, rejects collisions, and keeps the restrictive umask active through shell
+redirection:
 
 ```bash
+set -e
+umask 077
+model=jev-latest
+run_id="$(date -u +%Y%m%dT%H%M%SZ)-$(
+  ./scripts/with-pinned-node.sh node -e 'console.log(require("node:crypto").randomUUID())'
+)"
+results_path=".context/jev/results-${model}-${run_id}.json"
+report_path=".context/jev/report-${model}-${run_id}.json"
+report_tmp="${report_path}.tmp"
+if [ -e "$results_path" ] || [ -e "$report_path" ] || [ -e "$report_tmp" ]; then
+  printf 'Refusing to overwrite an existing run artifact.\n' >&2
+  exit 1
+fi
+
 set +e
-env JEV_MODEL=jev-latest \
+env JEV_MODEL="$model" \
   ./scripts/with-pinned-node.sh node --env-file=.env \
   .context/jev/harness.mjs evaluate \
   --dataset .context/jev/dataset-v2.json \
   --gold .context/jev/gold-v2.json \
   --concurrency 12 \
-  --out .context/jev/results-jev-latest-YYYY-MM-DD.json
-status=$?
+  --out "$results_path"
+evaluate_status=$?
 set -e
-if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then exit "$status"; fi
+if [ "$evaluate_status" -ne 0 ] && [ "$evaluate_status" -ne 2 ]; then
+  exit "$evaluate_status"
+fi
+
+set +e
+./scripts/with-pinned-node.sh node .context/jev/harness.mjs report \
+  --results "$results_path" > "$report_tmp"
+report_status=$?
+set -e
+if [ "$report_status" -ne 0 ] && [ "$report_status" -ne 2 ]; then
+  rm -f "$report_tmp"
+  exit "$report_status"
+fi
+mv "$report_tmp" "$report_path"
+chmod 600 "$results_path" "$report_path"
+printf 'results=%s\nreport=%s\n' "$results_path" "$report_path"
 ```
 
 Exit `0` means every required gate passed. Exit `2` means no-go or unmeasured and is an
 expected completed result, not a transport failure.
-
-Export the report:
-
-```bash
-set +e
-./scripts/with-pinned-node.sh node .context/jev/harness.mjs report \
-  --results .context/jev/results-jev-latest-YYYY-MM-DD.json \
-  > .context/jev/report-jev-latest-YYYY-MM-DD.json
-status=$?
-set -e
-if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then exit "$status"; fi
-chmod 600 .context/jev/results-jev-latest-YYYY-MM-DD.json \
-  .context/jev/report-jev-latest-YYYY-MM-DD.json
-```
 
 Repeat the same model run when a gate is near its boundary, always with a unique results path.
 An earlier unretained 2026-09-20 run over the same F1 requests and resolved `jev-1.13.0` build
