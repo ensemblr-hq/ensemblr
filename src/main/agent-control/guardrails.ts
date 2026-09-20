@@ -5,6 +5,13 @@
  * deadlock a lineage. Spawn capacity is reserved synchronously before creation
  * so concurrent requests cannot overshoot it, then refunded only when creation
  * fails.
+ *
+ * Starting a terminal is guarded separately, because a PTY is not delegation:
+ * it spawns nothing and cannot recurse, so what has to be bounded is how many
+ * are open at once and how fast they are opened, neither of which is a lifetime
+ * count. Charging one against the lifetime spawn quota made a terminal an agent
+ * opened and closed an hour ago go on costing it the budget it needed to
+ * delegate.
  */
 import type { DatabaseSync } from 'node:sqlite';
 
@@ -22,6 +29,13 @@ export interface GuardrailConfig {
 	maxSpawnsPerSession: number;
 	maxSpawnsPerMinute: number;
 	/**
+	 * Terminals one root tree may have open at once. Concurrent rather than
+	 * lifetime: the resource is the live PTY and the dock tab it holds, both of
+	 * which a close gives back.
+	 */
+	maxOpenTerminals: number;
+	maxTerminalStartsPerMinute: number;
+	/**
 	 * Messages one session may send up to the Concierge, ever. The loop this
 	 * bounds is Concierge → orchestrator → Concierge: each message can start a
 	 * Concierge turn, and each of those can brief the orchestrator again.
@@ -36,6 +50,8 @@ export const DEFAULT_GUARDRAIL_CONFIG: GuardrailConfig = {
 	maxSpawnDepth: 2,
 	maxSpawnsPerSession: 20,
 	maxSpawnsPerMinute: 10,
+	maxOpenTerminals: 8,
+	maxTerminalStartsPerMinute: 10,
 	maxConciergeMessagesPerSession: 10,
 	maxConciergeMessagesPerMinute: 3,
 	waitTimeoutMs: 300_000,
@@ -43,21 +59,53 @@ export const DEFAULT_GUARDRAIL_CONFIG: GuardrailConfig = {
 
 const RATE_WINDOW_MS = 60_000;
 
+/** A refused guardrail check: a stable denial code plus the reason to report. */
+export type GuardrailDenial = {
+	ok: false;
+	code: AgentControlErrorCode;
+	reason: string;
+};
+
 /** Result of a guardrail check: pass, or a stable denial code plus reason. */
-export type GuardrailResult =
-	| { ok: true }
-	| { ok: false; code: AgentControlErrorCode; reason: string };
+export type GuardrailResult = { ok: true } | GuardrailDenial;
 
 /** Capacity held by one spawn attempt until creation succeeds or fails. */
 export type SpawnReservation =
 	| { ok: true; refund: () => void }
 	| { ok: false; code: AgentControlErrorCode; reason: string };
 
+/**
+ * Capacity held by one terminal start. Unlike a spawn, the budget it is checked
+ * against is *observed* — the terminals that exist — so the reservation has to
+ * survive until the terminal is one of them, and both outcomes have to say so.
+ */
+export type TerminalStartReservation =
+	| GuardrailDenial
+	| {
+			ok: true;
+			/** The terminal exists and the listing counts it now; drop the hold. */
+			settle: () => void;
+			/** Creation failed; drop the hold and hand back the rate capacity. */
+			refund: () => void;
+	  };
+
 /** Guardrail surface consumed by the agent-control service. */
 export interface Guardrails {
 	readonly waitTimeoutMs: number;
 	/** Atomically reserves depth, lifetime, and rate capacity for a spawn attempt. */
 	reserveSpawn: (origin: AgentControlOrigin) => SpawnReservation;
+	/**
+	 * Checks depth and the concurrent-terminal cap, then holds a slot and rate
+	 * capacity for one terminal start. The caller reports the outcome: `settle`
+	 * once the terminal exists (the listing counts it from then on), `refund`
+	 * when creation failed.
+	 * @param origin - Resolved caller identity.
+	 * @param openTerminals - How many terminals this root tree already has open.
+	 */
+	reserveTerminalStart: (
+		origin: AgentControlOrigin,
+		openTerminals: number,
+	) => TerminalStartReservation;
 	/** Quota + rate check for a message to the Concierge; does not mutate counters. */
 	evaluateConciergeMessage: (sessionId: string) => GuardrailResult;
 	/** Record a message to the Concierge once it has actually been delivered. */
@@ -86,6 +134,8 @@ export function createGuardrails(
 	const limits: GuardrailConfig = { ...DEFAULT_GUARDRAIL_CONFIG, ...config };
 	const spawnTimestamps = new Map<string, readonly number[]>();
 	const lifetimeSpawns = new Map<string, number>();
+	const terminalTimestamps = new Map<string, readonly number[]>();
+	const terminalStartsInFlight = new Map<string, number>();
 	const messageTimestamps = new Map<string, readonly number[]>();
 	const lifetimeMessages = new Map<string, number>();
 
@@ -106,8 +156,78 @@ export function createGuardrails(
 		return kept;
 	};
 
+	/**
+	 * Appends one attempt to a rolling log and hands back the undo for it, so a
+	 * creation that fails does not leave its attempt inside the rate window.
+	 * @param log - The per-session timestamp map to charge.
+	 * @param sessionId - The session the attempt belongs to.
+	 * @param at - When the attempt was made.
+	 * @returns The undo for exactly this attempt.
+	 */
+	const chargeRate = (
+		log: Map<string, readonly number[]>,
+		sessionId: string,
+		at: number,
+	): (() => void) => {
+		log.set(sessionId, [...(log.get(sessionId) ?? []), at]);
+		return () => {
+			const timestamps = log.get(sessionId) ?? [];
+			const charged = timestamps.indexOf(at);
+			if (charged < 0) {
+				return;
+			}
+			log.set(sessionId, [
+				...timestamps.slice(0, charged),
+				...timestamps.slice(charged + 1),
+			]);
+		};
+	};
+
+	/**
+	 * Wraps a refund so the caller can invoke it on every failure path without
+	 * having to know whether an earlier one already ran.
+	 * @param refund - The undo to run at most once.
+	 * @returns An idempotent refund.
+	 */
+	const once = (refund: () => void): (() => void) => {
+		let refunded = false;
+		return () => {
+			if (refunded) {
+				return;
+			}
+			refunded = true;
+			refund();
+		};
+	};
+
+	/**
+	 * Resolves the root tree an attempt is charged against, refusing a caller
+	 * that has reached the nesting limit or holds no verified delegation root —
+	 * the precondition every guarded creation op shares.
+	 * @param origin - Resolved caller identity.
+	 * @returns The root tree's session id, or the denial that stops the attempt.
+	 */
+	const resolveChargeableRoot = (
+		origin: AgentControlOrigin,
+	): GuardrailDenial | { ok: true; rootSessionId: string } => {
+		if (origin.rootSessionId !== null && origin.depth < limits.maxSpawnDepth) {
+			return { ok: true, rootSessionId: origin.rootSessionId };
+		}
+		return {
+			ok: false,
+			code: 'denied-depth',
+			reason:
+				origin.rootSessionId === null
+					? 'Spawn denied because this session has no verified delegation root.'
+					: `Spawn depth ${origin.depth} reaches the limit of ${limits.maxSpawnDepth}.`,
+		};
+	};
+
 	const recentSpawns = (sessionId: string): readonly number[] =>
 		withinWindow(spawnTimestamps, sessionId);
+
+	const recentTerminalStarts = (sessionId: string): readonly number[] =>
+		withinWindow(terminalTimestamps, sessionId);
 
 	const recentMessages = (sessionId: string): readonly number[] =>
 		withinWindow(messageTimestamps, sessionId);
@@ -116,17 +236,11 @@ export function createGuardrails(
 		lifetimeSpawns.get(sessionId) ?? 0;
 
 	const reserveSpawn = (origin: AgentControlOrigin): SpawnReservation => {
-		if (origin.depth >= limits.maxSpawnDepth || origin.rootSessionId === null) {
-			return {
-				ok: false,
-				code: 'denied-depth',
-				reason:
-					origin.rootSessionId === null
-						? 'Spawn denied because this session has no verified delegation root.'
-						: `Spawn depth ${origin.depth} reaches the limit of ${limits.maxSpawnDepth}.`,
-			};
+		const charged = resolveChargeableRoot(origin);
+		if (!charged.ok) {
+			return charged;
 		}
-		const rootSessionId = origin.rootSessionId;
+		const rootSessionId = charged.rootSessionId;
 		if (resolveDatabase) {
 			const reservedAt = now();
 			const durable = reserveAgentControlSpawn({
@@ -178,34 +292,83 @@ export function createGuardrails(
 			};
 		}
 		const reservedAt = now();
-		spawnTimestamps.set(rootSessionId, [
-			...(spawnTimestamps.get(rootSessionId) ?? []),
-			reservedAt,
-		]);
+		const uncharge = chargeRate(spawnTimestamps, rootSessionId, reservedAt);
 		lifetimeSpawns.set(rootSessionId, totalSpawns(rootSessionId) + 1);
-		let refunded = false;
 		return {
 			ok: true,
-			refund: () => {
-				if (refunded) {
-					return;
-				}
-				refunded = true;
-				const timestamps = spawnTimestamps.get(rootSessionId) ?? [];
-				const reservationIndex = timestamps.indexOf(reservedAt);
-				if (reservationIndex >= 0) {
-					spawnTimestamps.set(rootSessionId, [
-						...timestamps.slice(0, reservationIndex),
-						...timestamps.slice(reservationIndex + 1),
-					]);
-				}
+			refund: once(() => {
+				uncharge();
 				const remaining = Math.max(0, totalSpawns(rootSessionId) - 1);
 				if (remaining === 0) {
 					lifetimeSpawns.delete(rootSessionId);
 				} else {
 					lifetimeSpawns.set(rootSessionId, remaining);
 				}
-			},
+			}),
+		};
+	};
+
+	/**
+	 * Claims one slot for a start that has not produced a terminal yet, so a
+	 * concurrent start reads the claim rather than the same stale open count.
+	 * @param rootSessionId - Delegation tree the start is charged to.
+	 * @returns The release for exactly this claim.
+	 */
+	const holdTerminalStart = (rootSessionId: string): (() => void) => {
+		terminalStartsInFlight.set(
+			rootSessionId,
+			(terminalStartsInFlight.get(rootSessionId) ?? 0) + 1,
+		);
+		return () => {
+			const held = (terminalStartsInFlight.get(rootSessionId) ?? 0) - 1;
+			if (held > 0) {
+				terminalStartsInFlight.set(rootSessionId, held);
+			} else {
+				terminalStartsInFlight.delete(rootSessionId);
+			}
+		};
+	};
+
+	const reserveTerminalStart = (
+		origin: AgentControlOrigin,
+		openTerminals: number,
+	): TerminalStartReservation => {
+		const charged = resolveChargeableRoot(origin);
+		if (!charged.ok) {
+			return charged;
+		}
+		const claimed =
+			openTerminals + (terminalStartsInFlight.get(charged.rootSessionId) ?? 0);
+		if (claimed >= limits.maxOpenTerminals) {
+			return {
+				ok: false,
+				code: 'denied-quota',
+				reason: `This delegation tree already holds ${claimed} terminals, open or starting right now, which is the limit of ${limits.maxOpenTerminals}. Only what is still open counts against it, so close a spawn terminal you have finished with (\`ensemblr_stop_terminal\` with \`close: true\`) or stop a script you no longer need, and the slot is yours again.`,
+			};
+		}
+		if (
+			recentTerminalStarts(charged.rootSessionId).length >=
+			limits.maxTerminalStartsPerMinute
+		) {
+			return {
+				ok: false,
+				code: 'denied-rate',
+				reason: `Terminal start rate limit of ${limits.maxTerminalStartsPerMinute}/min exceeded.`,
+			};
+		}
+		const release = once(holdTerminalStart(charged.rootSessionId));
+		const uncharge = chargeRate(
+			terminalTimestamps,
+			charged.rootSessionId,
+			now(),
+		);
+		return {
+			ok: true,
+			settle: release,
+			refund: once(() => {
+				release();
+				uncharge();
+			}),
 		};
 	};
 
@@ -260,6 +423,7 @@ export function createGuardrails(
 	return {
 		waitTimeoutMs: limits.waitTimeoutMs,
 		reserveSpawn,
+		reserveTerminalStart,
 		evaluateConciergeMessage,
 		recordConciergeMessage,
 		release,

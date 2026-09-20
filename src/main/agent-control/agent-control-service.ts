@@ -17,6 +17,7 @@ import type {
 	AgentControlResult,
 	AgentControlRole,
 	AgentControlStartedTerminal,
+	AgentControlTerminalInfo,
 	ArchitectureFailureReason,
 	AskUserQuestionArgs,
 	CheckPlanModeToolArgs,
@@ -2603,13 +2604,59 @@ export function createAgentControlService({
 		}
 	};
 
+	/**
+	 * Whether a terminal still costs the tree that started it a slot.
+	 *
+	 * A dock terminal counts for as long as it is listed at all: its tab is in
+	 * the user's dock whether or not its shell is still alive, and the agent can
+	 * take that tab away with `close: true`. A script terminal counts only while
+	 * it runs — the agent cannot close one, and a restart replaces the session
+	 * rather than adding a second, so counting the exited half would have turned
+	 * this cap back into the lifetime quota it replaces.
+	 * @param terminal - One row of the workspace's terminal listing.
+	 * @returns Whether it is charged to whoever started it.
+	 */
+	const stillCosts = (terminal: AgentControlTerminalInfo): boolean =>
+		terminal.status === 'running' || terminal.kind === 'terminal';
+
+	/**
+	 * Counts the terminals this delegation tree still has open in its workspace,
+	 * which is the budget {@link Guardrails.reserveTerminalStart} reads. Derived
+	 * from the live listing every time rather than from a counter: a terminal
+	 * whose tab was closed has already left that listing, so the slot comes back
+	 * whether the agent closed it or the user did, and nothing has to tell us.
+	 * @param workspaceId - Workspace whose terminals to read.
+	 * @param rootSessionId - Delegation tree the count is charged to.
+	 * @returns How many of the tree's terminals are still open.
+	 */
+	const countOpenTerminals = async (
+		workspaceId: string,
+		rootSessionId: string,
+	): Promise<number> => {
+		const listed = await ports.terminals.listTerminals({ workspaceId });
+		return startedTerminals.countOpen({
+			openTerminalIds: new Set(
+				listed.filter(stillCosts).map((open) => open.terminalId),
+			),
+			rootSessionId,
+			workspaceId,
+		});
+	};
+
 	const handleStartTerminal = async (
 		origin: AgentControlOrigin,
 		args: StartTerminalArgs,
 	): Promise<AgentControlResult<unknown>> => {
-		const reserved = reserveSpawnGuard(origin);
-		if (typeof reserved !== 'function') {
-			return reserved;
+		// An unverified caller has no root to charge; the guardrail refuses it on
+		// the fallback exactly as it refuses a spawn, so nothing is ever recorded
+		// against the session id used here.
+		const rootSessionId = origin.rootSessionId ?? origin.sessionId;
+		const reservation = guardrails.reserveTerminalStart(
+			origin,
+			await countOpenTerminals(origin.workspaceId, rootSessionId),
+		);
+		if (!reservation.ok) {
+			return fail(reservation.code, reservation.reason);
 		}
 		let started: Awaited<
 			ReturnType<AgentControlPorts['terminals']['startTerminal']>
@@ -2623,17 +2670,26 @@ export function createAgentControlService({
 				...(args.restart ? { restart: true } : {}),
 			});
 		} catch (error) {
-			reserved();
+			reservation.refund();
 			throw error;
 		}
 		if (!started.ok) {
-			reserved();
+			reservation.refund();
 			return fail(
 				startTerminalErrorCode(started.code),
 				describeStartTerminalRefusal(started.message, started.terminalId),
 			);
 		}
-		startedTerminals.record(origin.sessionId, started.terminalId);
+		// Recording and settling are one step: from here the terminal is in the
+		// listing that `countOpenTerminals` reads, so a hold held any longer would
+		// count it twice.
+		startedTerminals.record({
+			rootSessionId,
+			sessionId: origin.sessionId,
+			terminalId: started.terminalId,
+			workspaceId: origin.workspaceId,
+		});
+		reservation.settle();
 		// A terminal an agent started is one the user is meant to watch, so bring it
 		// forward rather than leaving it behind whichever dock tab was already open.
 		ports.focus.focusDockTab({
