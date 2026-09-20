@@ -26,6 +26,13 @@ const SCROLLED_UP_TO = 600;
 const SCROLLED_DOWN_TO = 1000;
 
 /**
+ * The transcript once a queued follow-up has taken 120px of it — past the
+ * library's 70px near-bottom threshold, so a viewport left where it was would
+ * visibly fall behind the newest message.
+ */
+const SHORTENED_VIEWPORT = CLIENT_HEIGHT - 120;
+
+/**
  * A shrink that leaves the held offset 50px above the new end — inside the
  * library's 70px near-bottom threshold, so it re-arms its lock without the
  * offset ever going out of reach.
@@ -43,6 +50,13 @@ const observers: Array<{ callback: ResizeObserverCallback; targets: Node[] }> =
 
 /** Height the stubbed layout currently reports for the scrolling content. */
 let scrollHeight = INITIAL_SCROLL_HEIGHT;
+
+/**
+ * Height the stubbed layout currently reports for the viewport. A composer that
+ * grows takes height from the transcript above it, which is the one resize
+ * use-stick-to-bottom cannot see.
+ */
+let clientHeight = CLIENT_HEIGHT;
 
 /** The rendered viewport, so a resize can clamp and notify it as a browser would. */
 let viewportElement: HTMLElement | null = null;
@@ -100,6 +114,27 @@ function resizeContentTo(height: number): void {
 				contentRect: { height },
 				target,
 			})) as unknown as ResizeObserverEntry[];
+			observer.callback(entries, {} as ResizeObserver);
+		}
+	});
+}
+
+/**
+ * Shrinks or grows the viewport the way a composer does when a queued follow-up
+ * stacks up under it, and notifies whatever is watching the viewport itself.
+ * @param height - The height the transcript is left with
+ */
+function resizeViewportTo(height: number): void {
+	act(() => {
+		clientHeight = height;
+		clampViewport();
+		for (const observer of observers) {
+			if (!viewportElement || !observer.targets.includes(viewportElement)) {
+				continue;
+			}
+			const entries = [
+				{ contentRect: { height }, target: viewportElement },
+			] as unknown as ResizeObserverEntry[];
 			observer.callback(entries, {} as ResizeObserver);
 		}
 	});
@@ -173,6 +208,19 @@ function wheelUp(element: HTMLElement, deltaY: number): void {
 }
 
 /**
+ * Raises one of the gestures that move a transcript without a wheel — a key
+ * press, a scrollbar drag — so the scroll it produces can be recognised as the
+ * user's while the library's own handler is blind to it.
+ * @param element - What the gesture lands on
+ * @param type - The event to raise
+ */
+function gesture(element: HTMLElement, type: string): void {
+	act(() => {
+		element.dispatchEvent(new Event(type, { bubbles: true }));
+	});
+}
+
+/**
  * Puts the viewport partway up a long transcript and waits for the library to
  * release the stick-to-bottom lock, which it decides on a timeout rather than
  * on the scroll event itself.
@@ -194,6 +242,7 @@ async function settleLock(): Promise<void> {
 
 beforeEach(() => {
 	scrollHeight = INITIAL_SCROLL_HEIGHT;
+	clientHeight = CLIENT_HEIGHT;
 	observers.length = 0;
 	viewportElement = null;
 	getDefaultStore().set(conversationScrollOffsetsAtom, {});
@@ -203,7 +252,7 @@ beforeEach(() => {
 	// clamps it when the content shrinks out from under the offset.
 	Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
 		configurable: true,
-		get: () => CLIENT_HEIGHT,
+		get: () => clientHeight,
 	});
 	Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
 		configurable: true,
@@ -214,7 +263,7 @@ beforeEach(() => {
 		configurable: true,
 		get: () => offset,
 		set: (next: number) => {
-			offset = Math.max(0, Math.min(next, scrollHeight - CLIENT_HEIGHT));
+			offset = Math.max(0, Math.min(next, scrollHeight - clientHeight));
 		},
 	});
 });
@@ -319,6 +368,73 @@ describe('conversation scroll hold', () => {
 		resizeContentTo(2400);
 
 		expect(viewport.scrollTop).toBe(SCROLLED_UP_TO);
+	});
+
+	test('follows the newest message when the composer grows under it', () => {
+		const { viewport } = renderConversation();
+		resizeContentTo(INITIAL_SCROLL_HEIGHT);
+
+		resizeViewportTo(SHORTENED_VIEWPORT);
+
+		expect(
+			INITIAL_SCROLL_HEIGHT - viewport.scrollTop - SHORTENED_VIEWPORT,
+		).toBeLessThanOrEqual(1);
+	});
+
+	test('leaves a scrolled-up transcript alone when the composer grows', async () => {
+		const { viewport } = await renderScrolledUp();
+
+		resizeViewportTo(SHORTENED_VIEWPORT);
+
+		expect(viewport.scrollTop).toBe(SCROLLED_UP_TO);
+	});
+
+	test('releases the lock when a key scrolls the transcript up mid-stream', () => {
+		const { escaped, viewport } = renderConversation();
+		resizeContentTo(INITIAL_SCROLL_HEIGHT);
+
+		gesture(viewport, 'keydown');
+		scrollTo(viewport, SCROLLED_UP_TO);
+
+		expect(escaped()).toBe(true);
+	});
+
+	test('releases the lock when the scrollbar is dragged up mid-stream', () => {
+		const { container, escaped, viewport } = renderConversation();
+		const scrollArea = container.querySelector(
+			'[data-slot="conversation-scroll-area"]',
+		);
+		if (!(scrollArea instanceof HTMLElement)) {
+			throw new Error('conversation scroll area did not render');
+		}
+		resizeContentTo(INITIAL_SCROLL_HEIGHT);
+
+		gesture(scrollArea, 'pointerdown');
+		scrollTo(viewport, SCROLLED_UP_TO);
+
+		expect(escaped()).toBe(true);
+	});
+
+	test('does not read a shrink that clamps the offset as a user scroll', () => {
+		const { escaped, viewport } = renderConversation();
+		resizeContentTo(INITIAL_SCROLL_HEIGHT);
+
+		gesture(viewport, 'pointerdown');
+		resizeContentTo(800);
+
+		expect(escaped()).toBe(false);
+		expect(800 - CLIENT_HEIGHT - viewport.scrollTop).toBeLessThanOrEqual(1);
+	});
+
+	test('leaves the lock armed for a gesture that moves the transcript down', () => {
+		const { escaped, viewport } = renderConversation();
+		resizeContentTo(INITIAL_SCROLL_HEIGHT);
+		scrollTo(viewport, SCROLLED_UP_TO);
+
+		gesture(viewport, 'keydown');
+		scrollTo(viewport, SCROLLED_DOWN_TO);
+
+		expect(escaped()).toBe(false);
 	});
 
 	test('leaves the lock alone when the user scrolled down of their own accord', async () => {
