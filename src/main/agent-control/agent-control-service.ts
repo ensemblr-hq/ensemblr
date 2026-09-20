@@ -2634,10 +2634,13 @@ export function createAgentControlService({
 		rootSessionId: string,
 	): Promise<number> => {
 		const listed = await ports.terminals.listTerminals({ workspaceId });
-		return startedTerminals.countOpen(
+		return startedTerminals.countOpen({
+			openTerminalIds: new Set(
+				listed.filter(stillCosts).map((open) => open.terminalId),
+			),
 			rootSessionId,
-			new Set(listed.filter(stillCosts).map((open) => open.terminalId)),
-		);
+			workspaceId,
+		});
 	};
 
 	const handleStartTerminal = async (
@@ -2655,7 +2658,6 @@ export function createAgentControlService({
 		if (!reservation.ok) {
 			return fail(reservation.code, reservation.reason);
 		}
-		const reserved = reservation.refund;
 		let started: Awaited<
 			ReturnType<AgentControlPorts['terminals']['startTerminal']>
 		>;
@@ -2668,21 +2670,26 @@ export function createAgentControlService({
 				...(args.restart ? { restart: true } : {}),
 			});
 		} catch (error) {
-			reserved();
+			reservation.refund();
 			throw error;
 		}
 		if (!started.ok) {
-			reserved();
+			reservation.refund();
 			return fail(
 				startTerminalErrorCode(started.code),
 				describeStartTerminalRefusal(started.message, started.terminalId),
 			);
 		}
+		// Recording and settling are one step: from here the terminal is in the
+		// listing that `countOpenTerminals` reads, so a hold held any longer would
+		// count it twice.
 		startedTerminals.record({
 			rootSessionId,
 			sessionId: origin.sessionId,
 			terminalId: started.terminalId,
+			workspaceId: origin.workspaceId,
 		});
+		reservation.settle();
 		// A terminal an agent started is one the user is meant to watch, so bring it
 		// forward rather than leaving it behind whichever dock tab was already open.
 		ports.focus.focusDockTab({

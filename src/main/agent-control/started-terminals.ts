@@ -9,17 +9,21 @@
  */
 
 /**
- * How many starts the registry remembers. A start is recorded per terminal
- * rather than per live session, so the map would otherwise grow for the life of
- * the app; the oldest entry is evicted past this, costing at worst a refused
- * close on a terminal opened thousands of terminals ago.
+ * Hard ceiling on remembered starts, kept only as a backstop against a workspace
+ * that is never listed again — an archived one, say, whose records nothing will
+ * ever prune. {@link StartedTerminalRegistry.countOpen} drops a workspace's dead
+ * records every time it reads that workspace, so in an app that keeps starting
+ * terminals the map tracks live ones and this never bites. It matters that it
+ * never bites: evicting a *live* terminal's record would both refuse its owner
+ * the close and silently hand the tree a free slot.
  */
 export const MAX_TRACKED_TERMINALS = 512;
 
-/** Who started one terminal: the session itself, and the tree it belongs to. */
+/** Who started one terminal, and where — the tree, the session, the workspace. */
 interface TerminalOwner {
 	rootSessionId: string;
 	sessionId: string;
+	workspaceId: string;
 }
 
 /** Ownership record consumed by the agent-control service. */
@@ -32,14 +36,20 @@ export interface StartedTerminalRegistry {
 	forget: (terminalId: string) => void;
 	/**
 	 * How many of `openTerminalIds` this delegation tree started, which is the
-	 * budget an open-terminal cap is read against. Derived from the live listing
-	 * rather than from a counter this registry maintains, so a terminal the user
-	 * closed behind the app's back stops counting without anything telling us.
+	 * budget an open-terminal cap is read against, and — in the same pass — drops
+	 * the records of that workspace's terminals the listing no longer reports.
+	 *
+	 * Counting and pruning are one operation because they read the same evidence:
+	 * the live listing is the only thing that knows a terminal is gone, since a
+	 * user closing a tab tells this registry nothing. Pruning is confined to the
+	 * workspace being read for exactly that reason — another workspace's records
+	 * are not absent, they are simply out of frame.
 	 */
-	countOpen: (
-		rootSessionId: string,
-		openTerminalIds: ReadonlySet<string>,
-	) => number;
+	countOpen: (input: {
+		openTerminalIds: ReadonlySet<string>;
+		rootSessionId: string;
+		workspaceId: string;
+	}) => number;
 }
 
 /**
@@ -66,8 +76,8 @@ export function createStartedTerminalRegistry(): StartedTerminalRegistry {
 	};
 
 	return {
-		record: ({ rootSessionId, sessionId, terminalId }) => {
-			startedBy.set(terminalId, { rootSessionId, sessionId });
+		record: ({ rootSessionId, sessionId, terminalId, workspaceId }) => {
+			startedBy.set(terminalId, { rootSessionId, sessionId, workspaceId });
 			evictOldest();
 		},
 		wasStartedBy: (sessionId, terminalId) =>
@@ -75,10 +85,17 @@ export function createStartedTerminalRegistry(): StartedTerminalRegistry {
 		forget: (terminalId) => {
 			startedBy.delete(terminalId);
 		},
-		countOpen: (rootSessionId, openTerminalIds) => {
+		countOpen: ({ openTerminalIds, rootSessionId, workspaceId }) => {
 			let open = 0;
-			for (const terminalId of openTerminalIds) {
-				if (startedBy.get(terminalId)?.rootSessionId === rootSessionId) {
+			for (const [terminalId, owner] of startedBy) {
+				if (owner.workspaceId !== workspaceId) {
+					continue;
+				}
+				if (!openTerminalIds.has(terminalId)) {
+					startedBy.delete(terminalId);
+					continue;
+				}
+				if (owner.rootSessionId === rootSessionId) {
 					open += 1;
 				}
 			}

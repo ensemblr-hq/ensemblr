@@ -368,6 +368,63 @@ describe('guardrails: terminal starts', () => {
 		expect(guardrails.reserveTerminalStart(originAt(0), 0).ok).toBe(true);
 	});
 
+	// The count the cap reads is observed rather than owned — it comes from the
+	// terminals that exist — so a start that has not produced one yet has to be
+	// visible to the next start, or two racing calls both read the same stale
+	// number and sail past the cap.
+	it('counts a start that has not produced its terminal yet', () => {
+		const guardrails = createGuardrails({ maxOpenTerminals: 2 });
+
+		const first = guardrails.reserveTerminalStart(originAt(0), 1);
+		const second = guardrails.reserveTerminalStart(originAt(0), 1);
+
+		expect(first.ok).toBe(true);
+		expect(second.ok).toBe(false);
+		if (!second.ok) {
+			expect(second.code).toBe('denied-quota');
+			expect(second.reason).toContain('open or starting right now');
+		}
+	});
+
+	// Once the terminal exists the listing counts it, so holding the claim any
+	// longer would charge the tree for it twice.
+	it('drops the claim once the terminal exists', () => {
+		const guardrails = createGuardrails({ maxOpenTerminals: 2 });
+
+		const first = guardrails.reserveTerminalStart(originAt(0), 0);
+		if (first.ok) {
+			first.settle();
+		}
+
+		expect(guardrails.reserveTerminalStart(originAt(0), 1).ok).toBe(true);
+	});
+
+	// A start that failed holds nothing: the terminal never joined the listing,
+	// so the claim has to go back as well as the rate capacity.
+	it('drops the claim when the start fails', () => {
+		const guardrails = createGuardrails({ maxOpenTerminals: 1 });
+
+		const failed = guardrails.reserveTerminalStart(originAt(0), 0);
+		if (failed.ok) {
+			failed.refund();
+		}
+
+		expect(guardrails.reserveTerminalStart(originAt(0), 0).ok).toBe(true);
+	});
+
+	// Two trees do not share the claim any more than they share the budget.
+	it('holds a claim against one delegation tree only', () => {
+		const guardrails = createGuardrails({ maxOpenTerminals: 1 });
+
+		guardrails.reserveTerminalStart(originAt(0), 0);
+		const sibling = guardrails.reserveTerminalStart(
+			{ ...originAt(0), rootSessionId: 'other-root', sessionId: 'other-root' },
+			0,
+		);
+
+		expect(sibling.ok).toBe(true);
+	});
+
 	// Terminals are not delegation, but they are still reached through an origin
 	// the app verified, so the depth rule that stops a leaf from spawning stops
 	// it from opening a PTY too.

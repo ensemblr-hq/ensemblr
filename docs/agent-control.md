@@ -154,7 +154,15 @@ Delegation is bounded so a runaway agent cannot fork-bomb the app
   to tell the guardrail a terminal went away: a closed tab has already left that
   listing, which makes a close by the *user* return the slot as reliably as a
   close by the agent. `startedTerminals` supplies which root tree started each
-  one. A dock terminal counts for as long as it is listed, running or not —
+  one, and the same read prunes that workspace's records for terminals the
+  listing no longer reports — which is what keeps its 512-entry eviction cap from
+  ever reaching a *live* terminal, since evicting one would both refuse its owner
+  the close and quietly hand the tree a free slot. Because the count is observed
+  rather than owned, a start that has not produced its terminal yet is held
+  against the cap too (`reserveTerminalStart` returns `settle`/`refund` for the
+  two outcomes); otherwise a manager and its leaves, which share a root tree and
+  run concurrently, would all read the same stale count and sail past it. A dock
+  terminal counts for as long as it is listed, running or not —
   its tab is the thing being held, and `close: true` is what gives it back. A
   script terminal counts only while it runs: the agent cannot close one, and a
   restart replaces the session rather than adding a second, so counting the

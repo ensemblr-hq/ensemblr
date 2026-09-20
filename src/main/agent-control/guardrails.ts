@@ -74,24 +74,38 @@ export type SpawnReservation =
 	| { ok: true; refund: () => void }
 	| { ok: false; code: AgentControlErrorCode; reason: string };
 
+/**
+ * Capacity held by one terminal start. Unlike a spawn, the budget it is checked
+ * against is *observed* — the terminals that exist — so the reservation has to
+ * survive until the terminal is one of them, and both outcomes have to say so.
+ */
+export type TerminalStartReservation =
+	| GuardrailDenial
+	| {
+			ok: true;
+			/** The terminal exists and the listing counts it now; drop the hold. */
+			settle: () => void;
+			/** Creation failed; drop the hold and hand back the rate capacity. */
+			refund: () => void;
+	  };
+
 /** Guardrail surface consumed by the agent-control service. */
 export interface Guardrails {
 	readonly waitTimeoutMs: number;
 	/** Atomically reserves depth, lifetime, and rate capacity for a spawn attempt. */
 	reserveSpawn: (origin: AgentControlOrigin) => SpawnReservation;
 	/**
-	 * Checks depth and the concurrent-terminal cap, then reserves rate capacity
-	 * for one terminal start. The open count is observed rather than reserved —
-	 * it is derived from terminals that exist, so two starts racing each other
-	 * can both read the same number and overshoot the cap by one; the rate limit
-	 * is what bounds a burst.
+	 * Checks depth and the concurrent-terminal cap, then holds a slot and rate
+	 * capacity for one terminal start. The caller reports the outcome: `settle`
+	 * once the terminal exists (the listing counts it from then on), `refund`
+	 * when creation failed.
 	 * @param origin - Resolved caller identity.
 	 * @param openTerminals - How many terminals this root tree already has open.
 	 */
 	reserveTerminalStart: (
 		origin: AgentControlOrigin,
 		openTerminals: number,
-	) => SpawnReservation;
+	) => TerminalStartReservation;
 	/** Quota + rate check for a message to the Concierge; does not mutate counters. */
 	evaluateConciergeMessage: (sessionId: string) => GuardrailResult;
 	/** Record a message to the Concierge once it has actually been delivered. */
@@ -121,6 +135,7 @@ export function createGuardrails(
 	const spawnTimestamps = new Map<string, readonly number[]>();
 	const lifetimeSpawns = new Map<string, number>();
 	const terminalTimestamps = new Map<string, readonly number[]>();
+	const terminalStartsInFlight = new Map<string, number>();
 	const messageTimestamps = new Map<string, readonly number[]>();
 	const lifetimeMessages = new Map<string, number>();
 
@@ -293,19 +308,42 @@ export function createGuardrails(
 		};
 	};
 
+	/**
+	 * Claims one slot for a start that has not produced a terminal yet, so a
+	 * concurrent start reads the claim rather than the same stale open count.
+	 * @param rootSessionId - Delegation tree the start is charged to.
+	 * @returns The release for exactly this claim.
+	 */
+	const holdTerminalStart = (rootSessionId: string): (() => void) => {
+		terminalStartsInFlight.set(
+			rootSessionId,
+			(terminalStartsInFlight.get(rootSessionId) ?? 0) + 1,
+		);
+		return () => {
+			const held = (terminalStartsInFlight.get(rootSessionId) ?? 0) - 1;
+			if (held > 0) {
+				terminalStartsInFlight.set(rootSessionId, held);
+			} else {
+				terminalStartsInFlight.delete(rootSessionId);
+			}
+		};
+	};
+
 	const reserveTerminalStart = (
 		origin: AgentControlOrigin,
 		openTerminals: number,
-	): SpawnReservation => {
+	): TerminalStartReservation => {
 		const charged = resolveChargeableRoot(origin);
 		if (!charged.ok) {
 			return charged;
 		}
-		if (openTerminals >= limits.maxOpenTerminals) {
+		const claimed =
+			openTerminals + (terminalStartsInFlight.get(charged.rootSessionId) ?? 0);
+		if (claimed >= limits.maxOpenTerminals) {
 			return {
 				ok: false,
 				code: 'denied-quota',
-				reason: `This delegation tree already has ${openTerminals} terminals open, which is the limit of ${limits.maxOpenTerminals}. Only what is still open counts against it, so close a spawn terminal you have finished with (\`ensemblr_stop_terminal\` with \`close: true\`) or stop a script you no longer need, and the slot is yours again.`,
+				reason: `This delegation tree already holds ${claimed} terminals, open or starting right now, which is the limit of ${limits.maxOpenTerminals}. Only what is still open counts against it, so close a spawn terminal you have finished with (\`ensemblr_stop_terminal\` with \`close: true\`) or stop a script you no longer need, and the slot is yours again.`,
 			};
 		}
 		if (
@@ -318,11 +356,19 @@ export function createGuardrails(
 				reason: `Terminal start rate limit of ${limits.maxTerminalStartsPerMinute}/min exceeded.`,
 			};
 		}
+		const release = once(holdTerminalStart(charged.rootSessionId));
+		const uncharge = chargeRate(
+			terminalTimestamps,
+			charged.rootSessionId,
+			now(),
+		);
 		return {
 			ok: true,
-			refund: once(
-				chargeRate(terminalTimestamps, charged.rootSessionId, now()),
-			),
+			settle: release,
+			refund: once(() => {
+				release();
+				uncharge();
+			}),
 		};
 	};
 

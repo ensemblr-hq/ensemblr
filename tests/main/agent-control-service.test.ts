@@ -4939,6 +4939,24 @@ describe('agent-control service: open-terminal budget', () => {
 		expect(third.ok).toBe(false);
 	});
 
+	// Three ops can be in flight at once — a manager and its leaves share a root
+	// tree and run concurrently — and the open count they read comes from
+	// terminals that exist. Without a claim on the start itself, all three read
+	// the same zero and sail past a cap of two.
+	it('does not let concurrent starts overshoot the cap', async () => {
+		const ports = makePorts();
+		trackTerminals(ports, 'terminal', 'running');
+		const { service } = setup({ guardrails: { maxOpenTerminals: 2 }, ports });
+
+		const outcomes = await Promise.all([
+			startTerminalAs(service, 'tok-caller'),
+			startTerminalAs(service, 'tok-caller'),
+			startTerminalAs(service, 'tok-caller'),
+		]);
+
+		expect(outcomes.filter((outcome) => outcome.ok)).toHaveLength(2);
+	});
+
 	// The user can close an agent's terminal from the dock, and nothing tells the
 	// control layer that happened. The count is read off the live listing for
 	// exactly this case: the row is gone, so the slot is back.
