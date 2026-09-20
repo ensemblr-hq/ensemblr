@@ -7,7 +7,10 @@ import { useTranslation } from 'react-i18next';
 import { workspaceGitStatusQuery } from '@/renderer/api/ensemblr';
 import { mapGitStatusToReviewFiles } from '@/renderer/lib/workbench/review-files';
 import { changesSourceByWorkspaceAtom } from '@/renderer/state/workspace';
-import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import type {
+	ReviewFileSummary,
+	WorkspaceShellModel,
+} from '@/renderer/types/workbench';
 import type { ChangesSource } from '@/renderer/types/workbench-shell';
 import type {
 	GetWorkspaceGitStatusResult,
@@ -47,6 +50,38 @@ function failedBranchComparison({
 		return undefined;
 	}
 	return statusData?.error;
+}
+
+/**
+ * Picks the rows and count the active source yields: its own git status once
+ * that resolved, the live model's working-tree set while a view is borrowing
+ * it, and an empty set otherwise.
+ * @param statusData - The source-scoped git status, or null when it has not resolved cleanly.
+ * @param useModelChanges - Whether this view may borrow the live model's rows.
+ * @param modelFiles - The live model's working-tree rows.
+ * @param modelCount - The live model's changed-file count.
+ * @returns The file rows to render and the count to label them with.
+ */
+function resolveSourceRows({
+	modelCount,
+	modelFiles,
+	statusData,
+	useModelChanges,
+}: {
+	modelCount: number;
+	modelFiles: ReviewFileSummary[];
+	statusData: GetWorkspaceGitStatusResult | null;
+	useModelChanges: boolean;
+}): { count: number; files: ReviewFileSummary[] } {
+	if (statusData) {
+		return {
+			count: statusData.summary.files,
+			files: mapGitStatusToReviewFiles(statusData.files),
+		};
+	}
+	return useModelChanges
+		? { count: modelCount, files: modelFiles }
+		: { count: 0, files: [] };
 }
 
 /**
@@ -241,22 +276,24 @@ export function useChangesSource(workspace: WorkspaceShellModel) {
 	const useModelChanges =
 		!statusData && hasLiveModelEquivalent && !branchComparisonError;
 
-	const sourceFiles = useMemo(
+	const sourceRows = useMemo(
 		() =>
-			statusData
-				? mapGitStatusToReviewFiles(statusData.files)
-				: useModelChanges
-					? workspace.reviewFiles
-					: [],
-		[statusData, useModelChanges, workspace.reviewFiles],
+			resolveSourceRows({
+				modelCount: workspace.changeSummary.files,
+				modelFiles: workspace.reviewFiles,
+				statusData,
+				useModelChanges,
+			}),
+		[
+			statusData,
+			useModelChanges,
+			workspace.changeSummary.files,
+			workspace.reviewFiles,
+		],
 	);
 
 	return {
-		changesCount: statusData
-			? statusData.summary.files
-			: useModelChanges
-				? workspace.changeSummary.files
-				: 0,
+		changesCount: sourceRows.count,
 		// Only working-tree (uncommitted) files revert cleanly. The live model's
 		// `reviewFiles` is exactly that set, so cross-reference it to decide which
 		// rows expose a Discard action regardless of the active source.
@@ -280,6 +317,6 @@ export function useChangesSource(workspace: WorkspaceShellModel) {
 			(hasLiveModelEquivalent
 				? workspace.reviewFilesError
 				: sourceStatusData?.error),
-		sourceFiles,
+		sourceFiles: sourceRows.files,
 	};
 }
