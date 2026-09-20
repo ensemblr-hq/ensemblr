@@ -7,11 +7,82 @@ import { useTranslation } from 'react-i18next';
 import { workspaceGitStatusQuery } from '@/renderer/api/ensemblr';
 import { mapGitStatusToReviewFiles } from '@/renderer/lib/workbench/review-files';
 import { changesSourceByWorkspaceAtom } from '@/renderer/state/workspace';
-import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import type {
+	ReviewFileSummary,
+	WorkspaceShellModel,
+} from '@/renderer/types/workbench';
 import type { ChangesSource } from '@/renderer/types/workbench-shell';
-import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
+import type {
+	GetWorkspaceGitStatusResult,
+	WorkspaceGitDiffScope,
+	WorkspaceGitFailure,
+} from '@/shared/ipc/contracts/workspace-git';
 
 import { useLatestTurnScope } from './use-latest-turn-scope';
+
+/**
+ * Reports the failure of a branch comparison the "all" view cannot degrade past.
+ *
+ * "All changes" borrows the live model's working-tree rows while its own query
+ * loads, which is what stops rows blinking away on a source switch. Once a
+ * branch comparison has actually answered with an error, borrowing would pass
+ * working-tree edits off as the branch and read as "nothing changed", so the
+ * error has to win instead. A workspace with no base ref resolves to a
+ * working-tree scope rather than a branch one and is untouched by this.
+ * @param source - The change source the user selected.
+ * @param scope - The git scope that source resolved to.
+ * @param statusData - The source-scoped git status query's data.
+ * @param isPlaceholder - Whether that data is the previous source's, kept during a switch.
+ * @returns The branch comparison's failure, or undefined when there is none.
+ */
+function failedBranchComparison({
+	isPlaceholder,
+	scope,
+	source,
+	statusData,
+}: {
+	isPlaceholder: boolean;
+	scope: WorkspaceGitDiffScope;
+	source: ChangesSource;
+	statusData: GetWorkspaceGitStatusResult | undefined;
+}): WorkspaceGitFailure | undefined {
+	if (source.kind !== 'all' || scope.kind !== 'branch' || isPlaceholder) {
+		return undefined;
+	}
+	return statusData?.error;
+}
+
+/**
+ * Picks the rows and count the active source yields: its own git status once
+ * that resolved, the live model's working-tree set while a view is borrowing
+ * it, and an empty set otherwise.
+ * @param statusData - The source-scoped git status, or null when it has not resolved cleanly.
+ * @param useModelChanges - Whether this view may borrow the live model's rows.
+ * @param modelFiles - The live model's working-tree rows.
+ * @param modelCount - The live model's changed-file count.
+ * @returns The file rows to render and the count to label them with.
+ */
+function resolveSourceRows({
+	modelCount,
+	modelFiles,
+	statusData,
+	useModelChanges,
+}: {
+	modelCount: number;
+	modelFiles: ReviewFileSummary[];
+	statusData: GetWorkspaceGitStatusResult | null;
+	useModelChanges: boolean;
+}): { count: number; files: ReviewFileSummary[] } {
+	if (statusData) {
+		return {
+			count: statusData.summary.files,
+			files: mapGitStatusToReviewFiles(statusData.files),
+		};
+	}
+	return useModelChanges
+		? { count: modelCount, files: modelFiles }
+		: { count: 0, files: [] };
+}
 
 /**
  * Resolves the active change source to the git diff scope a query needs.
@@ -147,6 +218,7 @@ export function useSetChangesSource(
  * resolves, the "all" and "uncommitted" views borrow the live model's
  * already-loaded change set so rows don't blink away on every switch or first
  * paint; a commit view has no model equivalent and loads.
+ * {@link failedBranchComparison} is where that borrowing stops.
  * @param workspace - Workspace whose changes are being reviewed
  * @returns The active source, the files and count it yields, and the source setter
  */
@@ -176,13 +248,15 @@ export function useChangesSource(workspace: WorkspaceShellModel) {
 		[source, baseRef, latestTurn.scope],
 	);
 
-	const { data: sourceStatusData, isLoading: isSourceStatusLoading } = useQuery(
-		{
-			...workspaceGitStatusQuery(workspace.pathLabel ?? null, scope),
-			enabled: Boolean(workspace.pathLabel) && !turnUnresolved,
-			placeholderData: keepPreviousData,
-		},
-	);
+	const {
+		data: sourceStatusData,
+		isLoading: isSourceStatusLoading,
+		isPlaceholderData: isSourceStatusPlaceholder,
+	} = useQuery({
+		...workspaceGitStatusQuery(workspace.pathLabel ?? null, scope),
+		enabled: Boolean(workspace.pathLabel) && !turnUnresolved,
+		placeholderData: keepPreviousData,
+	});
 	// `keepPreviousData` is what stops rows blinking away on a source switch, but
 	// it also means the previous source's rows are still here while the turn is
 	// unresolved — and showing those under a "Latest turn" heading is the very
@@ -193,24 +267,33 @@ export function useChangesSource(workspace: WorkspaceShellModel) {
 			: null;
 	const hasLiveModelEquivalent =
 		source.kind === 'all' || source.kind === 'uncommitted';
-	const useModelChanges = !statusData && hasLiveModelEquivalent;
+	const branchComparisonError = failedBranchComparison({
+		isPlaceholder: isSourceStatusPlaceholder,
+		scope,
+		source,
+		statusData: sourceStatusData,
+	});
+	const useModelChanges =
+		!statusData && hasLiveModelEquivalent && !branchComparisonError;
 
-	const sourceFiles = useMemo(
+	const sourceRows = useMemo(
 		() =>
-			statusData
-				? mapGitStatusToReviewFiles(statusData.files)
-				: useModelChanges
-					? workspace.reviewFiles
-					: [],
-		[statusData, useModelChanges, workspace.reviewFiles],
+			resolveSourceRows({
+				modelCount: workspace.changeSummary.files,
+				modelFiles: workspace.reviewFiles,
+				statusData,
+				useModelChanges,
+			}),
+		[
+			statusData,
+			useModelChanges,
+			workspace.changeSummary.files,
+			workspace.reviewFiles,
+		],
 	);
 
 	return {
-		changesCount: statusData
-			? statusData.summary.files
-			: useModelChanges
-				? workspace.changeSummary.files
-				: 0,
+		changesCount: sourceRows.count,
 		// Only working-tree (uncommitted) files revert cleanly. The live model's
 		// `reviewFiles` is exactly that set, so cross-reference it to decide which
 		// rows expose a Discard action regardless of the active source.
@@ -229,9 +312,11 @@ export function useChangesSource(workspace: WorkspaceShellModel) {
 		setSource,
 		source,
 		latestTurnLabel: latestTurn.label,
-		sourceError: hasLiveModelEquivalent
-			? workspace.reviewFilesError
-			: sourceStatusData?.error,
-		sourceFiles,
+		sourceError:
+			branchComparisonError ??
+			(hasLiveModelEquivalent
+				? workspace.reviewFilesError
+				: sourceStatusData?.error),
+		sourceFiles: sourceRows.files,
 	};
 }

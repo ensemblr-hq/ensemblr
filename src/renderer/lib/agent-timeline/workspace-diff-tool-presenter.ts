@@ -12,8 +12,14 @@ import {
 	isRecord,
 	numberValue,
 } from './ensemblr-control-presenter-helpers';
-import { inputOf, pathOf } from './tool-part-fields';
+import { inputOf, outputOf, pathOf } from './tool-part-fields';
 import { fileBadge, languageFor, patchCounts } from './tool-presenter-helpers';
+
+/** Opens the `diff` string of a JSON envelope, wherever a cut-off leaves it. */
+const DIFF_FIELD_OPENING = /"diff"\s*:\s*"/;
+
+/** Characters in a JSON `\uXXXX` escape. */
+const UNICODE_ESCAPE_LENGTH = 6;
 
 /** One changed workspace file as returned by the diff tool's stat response. */
 interface WorkspaceDiffFile {
@@ -260,6 +266,84 @@ function diffPreview(
 }
 
 /**
+ * Reads the string a truncated JSON document was in the middle of, stopping at
+ * its closing quote or before an escape the cut left incomplete.
+ * @param text - JSON text that may end anywhere
+ * @param start - Index of the first character after the string's opening quote
+ * @returns The still-encoded characters the text carries for that string
+ */
+function encodedStringPrefix(text: string, start: number): string {
+	let end = start;
+	while (end < text.length && text[end] !== '"') {
+		if (text[end] !== '\\') {
+			end += 1;
+			continue;
+		}
+		const escapeLength = text[end + 1] === 'u' ? UNICODE_ESCAPE_LENGTH : 2;
+		if (end + escapeLength > text.length) {
+			break;
+		}
+		end += escapeLength;
+	}
+	return text.slice(start, end);
+}
+
+/**
+ * Finds a unified patch in the raw text of a response that did not parse as
+ * JSON: the text itself when it is a bare patch, or the `diff` string of a JSON
+ * envelope cut short by the transport, decoded as far as it reaches.
+ * @param text - The raw output text
+ * @returns The patch text, or null when the text carries no `diff --git` header
+ */
+function recoverPatch(text: string): string | null {
+	const field = text.trimStart().startsWith('{')
+		? DIFF_FIELD_OPENING.exec(text)
+		: null;
+	let patch: string | null = text;
+	if (field !== null) {
+		try {
+			patch = JSON.parse(
+				`"${encodedStringPrefix(text, field.index + field[0].length)}"`,
+			);
+		} catch {
+			patch = null;
+		}
+	}
+	return patch?.includes('diff --git') ? patch : null;
+}
+
+/**
+ * Chooses what the card shows when the diff payload could not be read, so a
+ * truncated or malformed response still surfaces whatever it carried.
+ * @param part - The completed workspace-diff tool call
+ * @param path - Requested file path
+ * @returns A diff of the recoverable patch, the raw text as code, or an empty body
+ */
+function unreadableBody(
+	part: DynamicToolUIPart,
+	path: string | null,
+): ToolBodyDescriptor {
+	const text = outputOf(part)?.text ?? '';
+	const patch = recoverPatch(text);
+	if (patch !== null) {
+		return {
+			kind: 'diff',
+			language: languageFor(path),
+			patch,
+			showFileNames: path === null,
+		};
+	}
+	return text.trim() === ''
+		? { kind: 'empty' }
+		: {
+				code: text,
+				kind: 'code',
+				language: languageFor(null),
+				startLine: null,
+			};
+}
+
+/**
  * Presents a workspace diff response as a patch or a Markdown stat list.
  * @param part - The `ensemblr_get_workspace_diff` tool part to project
  * @returns The row body, counts, and collapsed summary
@@ -272,7 +356,7 @@ export function presentWorkspaceDiff(
 	if (data === null) {
 		return {
 			badge: fileBadge(path),
-			body: { kind: 'empty' },
+			body: unreadableBody(part, path),
 			preview: null,
 			title: i18n.t(
 				'workbench:control-tool.get-workspace-diff.done',

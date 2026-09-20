@@ -88,13 +88,21 @@ export interface LinearIssueCreateInput {
 }
 
 /**
- * Input for `issueUpdate` (all fields optional). `dueDate` accepts `null`
- * because Linear clears the date on an explicit null and ignores an absent key.
+ * Input for `issueUpdate` (all fields optional). `assigneeId`, `cycleId`,
+ * `dueDate`, and `projectId` accept `null` because Linear clears the relation
+ * on an explicit null and ignores an absent key. `priority` clears to `0`, so
+ * it stays a plain number.
  */
 export type LinearIssueUpdateInput = Partial<
-	Omit<LinearIssueCreateInput, 'dueDate'>
+	Omit<
+		LinearIssueCreateInput,
+		'assigneeId' | 'cycleId' | 'dueDate' | 'projectId'
+	>
 > & {
+	assigneeId?: string | null;
+	cycleId?: string | null;
 	dueDate?: string | null;
+	projectId?: string | null;
 };
 
 /** Boundary over the Linear GraphQL API with typed error mapping. */

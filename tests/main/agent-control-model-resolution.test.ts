@@ -137,6 +137,7 @@ const spawn = async (input: {
 	conciergeSession?: CallerSession | null;
 	catalogDefaultModelId?: string;
 	afkMode?: boolean;
+	includeHidden?: boolean;
 	model?: string;
 	models?: typeof CATALOG;
 	piReady?: boolean;
@@ -156,6 +157,7 @@ const spawn = async (input: {
 		callerConcierge: input.callerConcierge ?? false,
 		callerModel: input.callerModel,
 		callerRuntime: input.callerRuntime,
+		includeHidden: input.includeHidden,
 		model: input.model,
 		parentSessionId: 'parent',
 		planMode: input.planMode ?? false,
@@ -186,6 +188,7 @@ const refusal = async (input: Parameters<typeof spawn>[0]): Promise<string> => {
 		callerConcierge: input.callerConcierge ?? false,
 		callerModel: input.callerModel,
 		callerRuntime: input.callerRuntime,
+		includeHidden: input.includeHidden,
 		model: input.model,
 		parentSessionId: 'parent',
 		planMode: false,
@@ -291,6 +294,22 @@ describe('a Pi orchestrator defaults to its own runtime', () => {
 
 		expect(message).toContain(PI_LOCAL_MODEL);
 		expect(message).toContain('No model');
+	});
+
+	// The only caller that sets `includeHidden` is the internal Review spawn, whose
+	// model is the user's own pin rather than a model any agent chose. An agent's
+	// delegated spawn never sets it, which is what keeps the case above refused.
+	it('honours a hidden model when the review spawn opts past the filter', async () => {
+		const request = await spawn({
+			caller: { model: PI_MODEL, thinkingLevel: 'high' },
+			callerRuntime: 'pi',
+			includeHidden: true,
+			model: PI_LOCAL_MODEL,
+			readHiddenModelIds: () => [PI_LOCAL_MODEL],
+		});
+
+		expect(request.model).toBe(PI_LOCAL_MODEL);
+		expect(request.provider).toBe('pi');
 	});
 
 	it('still inherits an active hidden parent model when none is requested', async () => {

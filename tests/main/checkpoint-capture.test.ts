@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -9,7 +15,11 @@ import {
 	checkpointRefFor,
 	createCheckpointCapture,
 } from '../../src/main/checkpoints/checkpoint-service.ts';
-import { captureWorkspaceCheckpoint } from '../../src/main/checkpoints/git-checkpoint.ts';
+import {
+	captureWorkspaceCheckpoint,
+	diffTrees,
+	restoreWorkspaceTo,
+} from '../../src/main/checkpoints/git-checkpoint.ts';
 import {
 	type EnsemblrDatabaseConnection,
 	openEnsemblrDatabase,
@@ -233,6 +243,97 @@ test('capture on a clean workspace records the HEAD tree state', async (t) => {
 		git(fixture.repoDirectory, 'rev-parse', `${result.commitHash}^`),
 		git(fixture.repoDirectory, 'rev-parse', 'HEAD'),
 	);
+});
+
+function captureFixtureCheckpoint(fixture: Fixture) {
+	return captureWorkspaceCheckpoint({
+		cwd: fixture.repoDirectory,
+		message: 'ensemblr checkpoint: test',
+		ref: checkpointRefFor({
+			turnId: fixture.turnId,
+			workspaceId: fixture.workspaceId,
+		}),
+	});
+}
+
+test('capture keeps a tracked file that later gained an ignore rule, and restore does not delete it', async (t) => {
+	const fixture = openFixture(t);
+	const configPath = path.join(fixture.repoDirectory, 'cfg.txt');
+	writeFileSync(configPath, 'committed\n');
+	git(fixture.repoDirectory, 'add', 'cfg.txt');
+	git(fixture.repoDirectory, 'commit', '-m', 'track cfg');
+	writeFileSync(path.join(fixture.repoDirectory, '.gitignore'), 'cfg.txt\n');
+	writeFileSync(configPath, 'modified after ignore\n');
+
+	const { commitHash, treeHash } = await captureFixtureCheckpoint(fixture);
+
+	assert.equal(
+		git(fixture.repoDirectory, 'show', `${treeHash}:cfg.txt`),
+		'modified after ignore',
+	);
+
+	writeFileSync(configPath, 'edited after checkpoint\n');
+	await restoreWorkspaceTo({ commitHash, cwd: fixture.repoDirectory });
+
+	assert.equal(readFileSync(configPath, 'utf8'), 'modified after ignore\n');
+});
+
+test('capture records deletions of tracked files and skips never-tracked ignored files', async (t) => {
+	const fixture = openFixture(t);
+	writeFileSync(path.join(fixture.repoDirectory, 'doomed.txt'), 'doomed\n');
+	git(fixture.repoDirectory, 'add', 'doomed.txt');
+	git(fixture.repoDirectory, 'commit', '-m', 'track doomed');
+	writeFileSync(path.join(fixture.repoDirectory, '.gitignore'), 'ignored/\n');
+	mkdirSync(path.join(fixture.repoDirectory, 'ignored'));
+	writeFileSync(path.join(fixture.repoDirectory, 'ignored', 'dep.js'), 'x\n');
+	rmSync(path.join(fixture.repoDirectory, 'doomed.txt'));
+
+	const { treeHash } = await captureFixtureCheckpoint(fixture);
+
+	const files = git(
+		fixture.repoDirectory,
+		'ls-tree',
+		'-r',
+		'--name-only',
+		treeHash,
+	).split('\n');
+	assert.deepEqual(files, ['.gitignore', 'tracked.txt']);
+});
+
+test('capture works on an unborn branch with no HEAD to seed from', async (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), 'ensemblr-checkpoint-unborn-'));
+	t.after(() => rmSync(root, { force: true, recursive: true }));
+	git(root, 'init', '--initial-branch=main');
+	writeFileSync(path.join(root, 'first.txt'), 'first\n');
+
+	const result = await captureWorkspaceCheckpoint({
+		cwd: root,
+		message: 'ensemblr checkpoint: unborn',
+		ref: 'refs/ensemblr/checkpoints/unborn/capture',
+	});
+
+	assert.equal(result.parentHash, null);
+	assert.equal(git(root, 'show', `${result.treeHash}:first.txt`), 'first');
+});
+
+test('diffTrees reports non-ASCII paths verbatim instead of C-quoted', async (t) => {
+	const { repoDirectory } = openFixture(t);
+	writeFileSync(path.join(repoDirectory, 'café.txt'), 'same content\n');
+	git(repoDirectory, 'add', 'café.txt');
+	git(repoDirectory, 'commit', '-m', 'add cafe');
+	git(repoDirectory, 'mv', 'café.txt', 'crème.txt');
+	git(repoDirectory, 'commit', '-m', 'rename cafe');
+
+	const { files, patch } = await diffTrees({
+		cwd: repoDirectory,
+		fromRev: 'HEAD~1',
+		toRev: 'HEAD',
+	});
+
+	assert.deepEqual(files, [
+		{ additions: 0, deletions: 0, path: 'crème.txt', status: 'renamed' },
+	]);
+	assert.ok(patch.includes('rename to crème.txt'));
 });
 
 test('refuses refs outside the ensemblr checkpoint namespace', async () => {

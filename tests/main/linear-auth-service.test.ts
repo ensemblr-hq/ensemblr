@@ -12,6 +12,7 @@ import {
 	type EnsemblrConfig,
 	type EnsemblrConfigService,
 } from '../../src/main/config/config-loader.ts';
+import { createLinearAccountStore } from '../../src/main/linear/linear-account-store.ts';
 import {
 	createLinearAuthService,
 	LinearAuthError,
@@ -496,6 +497,179 @@ test('getAccessToken: surfaces refresh failures as typed errors', async (t) => {
 	);
 });
 
+/**
+ * Wraps a fetch stub so a refresh-grant token exchange parks until released,
+ * letting a test act between the request leaving and its response arriving.
+ */
+function holdRefreshExchange(fetchStub: ReturnType<typeof createFetchStub>) {
+	let release: () => void = () => undefined;
+	let signalStarted: () => void = () => undefined;
+	const exchangeHeld = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const started = new Promise<void>((resolve) => {
+		signalStarted = resolve;
+	});
+
+	const fetchImpl = (async (
+		input: string | URL | Request,
+		init?: RequestInit,
+	) => {
+		const isRefreshExchange =
+			String(input).includes('/oauth/token') &&
+			String(init?.body ?? '').includes('grant_type=refresh_token');
+
+		if (isRefreshExchange) {
+			signalStarted();
+			await exchangeHeld;
+		}
+
+		return fetchStub.fetchImpl(input, init);
+	}) as typeof fetch;
+
+	return {
+		fetchStub: { calls: fetchStub.calls, fetchImpl },
+		release,
+		started,
+	};
+}
+
+/** Asserts a promise rejects with the typed not-connected auth error. */
+function assertNotConnected(promise: Promise<unknown>): Promise<void> {
+	return assert.rejects(promise, (error: unknown) => {
+		assert.ok(error instanceof LinearAuthError);
+		assert.strictEqual(error.code, 'not-connected');
+		return true;
+	});
+}
+
+test('getAccessToken: a disconnect during the refresh exchange leaves no credentials behind', async (t) => {
+	const held = holdRefreshExchange(createFetchStub({ expiresInSeconds: 30 }));
+	const { databaseService, secretStore, service } = createServiceFixture(t, {
+		fetchStub: held.fetchStub,
+	});
+	const login = await service.startLogin();
+	assert.ok(login.status === 'connected');
+	const accountId = login.account.id;
+
+	const refresh = service.getAccessToken(accountId);
+	const refreshOutcome = assertNotConnected(refresh);
+	await held.started;
+	const result = await service.disconnect(accountId);
+	assert.ok(result.status === 'disconnected');
+	held.release();
+	await refreshOutcome;
+
+	for (const key of [
+		`linear-access-token:${accountId}`,
+		`linear-refresh-token:${accountId}`,
+	]) {
+		assert.strictEqual(await secretStore.read({ key, scope: 'app' }), null);
+	}
+	const database = databaseService.getConnection()?.database;
+	assert.ok(database);
+	assert.strictEqual(
+		database.prepare('SELECT id FROM linear_accounts').all().length,
+		0,
+	);
+	await assertNotConnected(service.getAccessToken(accountId));
+});
+
+test('getAccessToken: a disconnect landing mid-write discards the tokens it raced', async (t) => {
+	const innerStore = createMockSecretStore({ now: () => NOW });
+	let afterAccessTokenWrite: (() => void) | null = null;
+	const secretStore = {
+		...innerStore,
+		update: async (input: Parameters<SecretStore['update']>[0]) => {
+			const written = await innerStore.update(input);
+
+			if (input.key.startsWith('linear-access-token:')) {
+				afterAccessTokenWrite?.();
+			}
+
+			return written;
+		},
+	} as SecretStore;
+	const { databaseService, service } = createServiceFixture(t, {
+		fetchStub: createFetchStub({ expiresInSeconds: 30 }),
+		secretStore,
+	});
+	const login = await service.startLogin();
+	assert.ok(login.status === 'connected');
+	const accountId = login.account.id;
+	const database = databaseService.getConnection()?.database;
+	assert.ok(database);
+	afterAccessTokenWrite = () => {
+		database.prepare('DELETE FROM linear_accounts WHERE id = ?').run(accountId);
+	};
+
+	await assertNotConnected(service.getAccessToken(accountId));
+
+	for (const key of [
+		`linear-access-token:${accountId}`,
+		`linear-refresh-token:${accountId}`,
+	]) {
+		assert.strictEqual(await secretStore.read({ key, scope: 'app' }), null);
+	}
+});
+
+test('getAccessToken: refuses a token that survives without an account row', async (t) => {
+	const { secretStore, service } = createServiceFixture(t);
+	await secretStore.create({
+		key: 'linear-access-token:orphan',
+		scope: 'app',
+		value: 'orphaned-token',
+	});
+
+	await assertNotConnected(service.getAccessToken('orphan'));
+});
+
+test('disconnect: a refresh released while secrets are being cleared leaves nothing behind', async (t) => {
+	const innerStore = createMockSecretStore({ now: () => NOW });
+	let onAccessTokenDelete: (() => Promise<void>) | null = null;
+	const secretStore = {
+		...innerStore,
+		delete: async (lookup: Parameters<SecretStore['delete']>[0]) => {
+			if (lookup.key.startsWith('linear-access-token:')) {
+				await onAccessTokenDelete?.();
+			}
+
+			return innerStore.delete(lookup);
+		},
+	} as SecretStore;
+	const held = holdRefreshExchange(createFetchStub({ expiresInSeconds: 30 }));
+	const { databaseService, service } = createServiceFixture(t, {
+		fetchStub: held.fetchStub,
+		secretStore,
+	});
+	const login = await service.startLogin();
+	assert.ok(login.status === 'connected');
+	const accountId = login.account.id;
+
+	const refreshOutcome = assertNotConnected(service.getAccessToken(accountId));
+	await held.started;
+	onAccessTokenDelete = async () => {
+		onAccessTokenDelete = null;
+		held.release();
+		await refreshOutcome;
+	};
+	const result = await service.disconnect(accountId);
+
+	assert.ok(result.status === 'disconnected');
+	for (const key of [
+		`linear-access-token:${accountId}`,
+		`linear-refresh-token:${accountId}`,
+	]) {
+		assert.strictEqual(await secretStore.read({ key, scope: 'app' }), null);
+	}
+	const database = databaseService.getConnection()?.database;
+	assert.ok(database);
+	assert.strictEqual(
+		database.prepare('SELECT id FROM linear_accounts').all().length,
+		0,
+	);
+});
+
 test('disconnect: revokes, clears secrets, and removes the account row', async (t) => {
 	const { databaseService, fetchStub, secretStore, service } =
 		createServiceFixture(t);
@@ -868,4 +1042,89 @@ test('adoption: a login to a different organization leaves the sentinel alone', 
 	const after = await service.listAccounts();
 
 	assert.strictEqual(after.length, 2);
+});
+
+test('writeTokens: refuses an account with no row as not-connected', async (t) => {
+	const { databaseService, secretStore } = createServiceFixture(t);
+	const database = databaseService.getConnection()?.database;
+	assert.ok(database);
+	const accountStore = createLinearAccountStore({
+		database,
+		now: () => NOW,
+		secretStore,
+	});
+
+	await assertNotConnected(
+		accountStore.writeTokens('missing-account', {
+			accessToken: 'access',
+			refreshToken: 'refresh',
+		}),
+	);
+	assert.strictEqual(
+		await secretStore.read({
+			key: 'linear-access-token:missing-account',
+			scope: 'app',
+		}),
+		null,
+	);
+});
+
+test('writeTokens and delete are serialized per account', async (t) => {
+	const inner = createMockSecretStore({ now: () => NOW });
+	let releaseWrite: () => void = () => undefined;
+	let signalWriting: () => void = () => undefined;
+	let holdAccessTokenReads = false;
+	const writing = new Promise<void>((resolve) => {
+		signalWriting = resolve;
+	});
+	const writeHeld = new Promise<void>((resolve) => {
+		releaseWrite = resolve;
+	});
+	const secretStore = {
+		...inner,
+		read: async (lookup: Parameters<SecretStore['read']>[0]) => {
+			if (
+				holdAccessTokenReads &&
+				lookup.key.startsWith('linear-access-token:')
+			) {
+				holdAccessTokenReads = false;
+				signalWriting();
+				await writeHeld;
+			}
+
+			return inner.read(lookup);
+		},
+	} as SecretStore;
+	const { databaseService, service } = createServiceFixture(t, { secretStore });
+	const login = await service.startLogin();
+	assert.ok(login.status === 'connected');
+	const accountId = login.account.id;
+	const database = databaseService.getConnection()?.database;
+	assert.ok(database);
+	const accountStore = createLinearAccountStore({
+		database,
+		now: () => NOW,
+		secretStore,
+	});
+
+	holdAccessTokenReads = true;
+	const write = accountStore.writeTokens(accountId, {
+		accessToken: 'racing-access',
+		refreshToken: 'racing-refresh',
+	});
+	await writing;
+	const removal = accountStore.delete(accountId);
+	releaseWrite();
+	await Promise.all([write, removal]);
+
+	for (const key of [
+		`linear-access-token:${accountId}`,
+		`linear-refresh-token:${accountId}`,
+	]) {
+		assert.strictEqual(await inner.read({ key, scope: 'app' }), null);
+	}
+	assert.strictEqual(
+		database.prepare('SELECT id FROM linear_accounts').all().length,
+		0,
+	);
 });

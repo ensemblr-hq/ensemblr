@@ -41,129 +41,133 @@ async function waitFor(
 	}
 }
 
-describe('startLinuxRecursiveWatch', () => {
-	let root: string;
-	let handle: LinuxRecursiveWatchHandle | null = null;
-	let changes: (string | null)[] = [];
-	let errors = 0;
+// `defaultStartWatch` reaches `startLinuxRecursiveWatch` only when
+// `process.platform === 'linux'`; every other platform takes `fs.watch(dir,
+// { recursive: true })` directly. Driving this module through FSEvents on macOS
+// therefore asserts a path production never takes there, and it does it against
+// a wall clock: the budget below is sized for inotify's next-loop-turn
+// delivery, while FSEvents coalesces, so a loaded CI runner turns the suite red
+// for a reason unrelated to the diff under test.
+describe.skipIf(process.platform !== 'linux')(
+	'startLinuxRecursiveWatch',
+	() => {
+		let root: string;
+		let handle: LinuxRecursiveWatchHandle | null = null;
+		let changes: (string | null)[] = [];
+		let errors = 0;
 
-	beforeEach(() => {
-		root = mkdtempSync(path.join(tmpdir(), 'ensemblr-watch-'));
-		changes = [];
-		errors = 0;
-	});
-
-	afterEach(() => {
-		handle?.close();
-		handle = null;
-		rmSync(root, { force: true, recursive: true });
-	});
-
-	/** Starts a watch on the temp root, recording changes and errors. */
-	function start(maxDirectories?: number): LinuxRecursiveWatchHandle {
-		handle = startLinuxRecursiveWatch({
-			ignoredDirectoryNames: IGNORED,
-			...(maxDirectories === undefined ? {} : { maxDirectories }),
-			onChange: (changed) => {
-				changes.push(changed);
-			},
-			onError: () => {
-				errors += 1;
-			},
-			root,
+		beforeEach(() => {
+			root = mkdtempSync(path.join(tmpdir(), 'ensemblr-watch-'));
+			changes = [];
+			errors = 0;
 		});
 
-		return handle;
-	}
+		afterEach(() => {
+			handle?.close();
+			handle = null;
+			rmSync(root, { force: true, recursive: true });
+		});
 
-	test('reports a nested change as a path relative to the root', async () => {
-		mkdirSync(path.join(root, 'src', 'renderer'), { recursive: true });
-		start();
-		await sleep(SETTLE_MS);
-		changes = [];
+		/** Starts a watch on the temp root, recording changes and errors. */
+		function start(maxDirectories?: number): LinuxRecursiveWatchHandle {
+			handle = startLinuxRecursiveWatch({
+				ignoredDirectoryNames: IGNORED,
+				...(maxDirectories === undefined ? {} : { maxDirectories }),
+				onChange: (changed) => {
+					changes.push(changed);
+				},
+				onError: () => {
+					errors += 1;
+				},
+				root,
+			});
 
-		writeFileSync(path.join(root, 'src', 'renderer', 'app.ts'), 'x');
-		await waitFor(() =>
-			changes.includes(path.join('src', 'renderer', 'app.ts')),
-		);
+			return handle;
+		}
 
-		expect(changes).toContain(path.join('src', 'renderer', 'app.ts'));
-	});
+		test('reports a nested change as a path relative to the root', async () => {
+			mkdirSync(path.join(root, 'src', 'renderer'), { recursive: true });
+			start();
+			await sleep(SETTLE_MS);
+			changes = [];
 
-	test('never descends into an ignored directory', async () => {
-		mkdirSync(path.join(root, 'node_modules', 'react'), { recursive: true });
-		mkdirSync(path.join(root, '.git', 'objects'), { recursive: true });
-		mkdirSync(path.join(root, 'src'), { recursive: true });
-		start();
-		await sleep(SETTLE_MS);
-		changes = [];
+			writeFileSync(path.join(root, 'src', 'renderer', 'app.ts'), 'x');
+			await waitFor(() =>
+				changes.includes(path.join('src', 'renderer', 'app.ts')),
+			);
 
-		writeFileSync(path.join(root, 'node_modules', 'react', 'index.js'), 'x');
-		writeFileSync(path.join(root, '.git', 'objects', 'pack'), 'x');
-		await sleep(SETTLE_MS);
+			expect(changes).toContain(path.join('src', 'renderer', 'app.ts'));
+		});
 
-		expect(changes).toEqual([]);
-	});
+		test('never descends into an ignored directory', async () => {
+			mkdirSync(path.join(root, 'node_modules', 'react'), { recursive: true });
+			mkdirSync(path.join(root, '.git', 'objects'), { recursive: true });
+			mkdirSync(path.join(root, 'src'), { recursive: true });
+			start();
+			await sleep(SETTLE_MS);
+			changes = [];
 
-	test('watches a directory created after the walk finished', async () => {
-		mkdirSync(path.join(root, 'src'), { recursive: true });
-		start();
-		await sleep(SETTLE_MS);
+			writeFileSync(path.join(root, 'node_modules', 'react', 'index.js'), 'x');
+			writeFileSync(path.join(root, '.git', 'objects', 'pack'), 'x');
+			await sleep(SETTLE_MS);
 
-		mkdirSync(path.join(root, 'src', 'state'), { recursive: true });
-		await sleep(SETTLE_MS);
-		changes = [];
+			expect(changes).toEqual([]);
+		});
 
-		writeFileSync(path.join(root, 'src', 'state', 'atoms.ts'), 'x');
-		await waitFor(() =>
-			changes.includes(path.join('src', 'state', 'atoms.ts')),
-		);
+		test('watches a directory created after the walk finished', async () => {
+			mkdirSync(path.join(root, 'src'), { recursive: true });
+			start();
+			await sleep(SETTLE_MS);
 
-		expect(changes).toContain(path.join('src', 'state', 'atoms.ts'));
-	});
+			mkdirSync(path.join(root, 'src', 'state'), { recursive: true });
+			await sleep(SETTLE_MS);
+			changes = [];
 
-	// A `git checkout` that drops a directory and one that restores it land well
-	// inside the coalesce window, so the re-read sees the name the whole time and
-	// cannot tell the watcher is bound to the deleted inode.
-	test('rewatches a directory removed and recreated in one window', async () => {
-		mkdirSync(path.join(root, 'dist', 'assets'), { recursive: true });
-		start();
-		await sleep(SETTLE_MS);
+			writeFileSync(path.join(root, 'src', 'state', 'atoms.ts'), 'x');
+			await waitFor(() =>
+				changes.includes(path.join('src', 'state', 'atoms.ts')),
+			);
 
-		rmSync(path.join(root, 'dist'), { force: true, recursive: true });
-		mkdirSync(path.join(root, 'dist', 'assets'), { recursive: true });
-		await sleep(SETTLE_MS);
-		changes = [];
+			expect(changes).toContain(path.join('src', 'state', 'atoms.ts'));
+		});
 
-		writeFileSync(path.join(root, 'dist', 'assets', 'app.js'), 'x');
-		await waitFor(() =>
-			changes.includes(path.join('dist', 'assets', 'app.js')),
-		);
+		// A `git checkout` that drops a directory and one that restores it land well
+		// inside the coalesce window, so the re-read sees the name the whole time and
+		// cannot tell the watcher is bound to the deleted inode.
+		test('rewatches a directory removed and recreated in one window', async () => {
+			mkdirSync(path.join(root, 'dist', 'assets'), { recursive: true });
+			start();
+			await sleep(SETTLE_MS);
 
-		expect(changes).toContain(path.join('dist', 'assets', 'app.js'));
-	});
+			rmSync(path.join(root, 'dist'), { force: true, recursive: true });
+			mkdirSync(path.join(root, 'dist', 'assets'), { recursive: true });
+			await sleep(SETTLE_MS);
+			changes = [];
 
-	test('stops reporting once closed', async () => {
-		mkdirSync(path.join(root, 'src'), { recursive: true });
-		start();
-		await sleep(SETTLE_MS);
+			writeFileSync(path.join(root, 'dist', 'assets', 'app.js'), 'x');
+			await waitFor(() =>
+				changes.includes(path.join('dist', 'assets', 'app.js')),
+			);
 
-		handle?.close();
-		handle = null;
-		changes = [];
+			expect(changes).toContain(path.join('dist', 'assets', 'app.js'));
+		});
 
-		writeFileSync(path.join(root, 'src', 'app.ts'), 'x');
-		await sleep(SETTLE_MS);
+		test('stops reporting once closed', async () => {
+			mkdirSync(path.join(root, 'src'), { recursive: true });
+			start();
+			await sleep(SETTLE_MS);
 
-		expect(changes).toEqual([]);
-	});
+			handle?.close();
+			handle = null;
+			changes = [];
 
-	// Only inotify reports the watched directory's own removal. Darwin's
-	// FSEvents-backed `fs.watch` goes quiet instead, and this module never runs
-	// there, so the assertion is Linux's to make.
-	test.skipIf(process.platform !== 'linux')(
-		'reports the root disappearing as an error',
-		async () => {
+			writeFileSync(path.join(root, 'src', 'app.ts'), 'x');
+			await sleep(SETTLE_MS);
+
+			expect(changes).toEqual([]);
+		});
+
+		test('reports the root disappearing as an error', async () => {
 			start();
 			await sleep(SETTLE_MS);
 
@@ -172,31 +176,30 @@ describe('startLinuxRecursiveWatch', () => {
 
 			expect(errors).toBeGreaterThan(0);
 			mkdirSync(root, { recursive: true });
-		},
-	);
+		});
 
-	test('stops adding watches once the cap is reached', async () => {
-		for (let index = 0; index < 6; index += 1) {
-			mkdirSync(path.join(root, `dir-${index}`, 'nested'), { recursive: true });
-		}
-		start(2);
-		await sleep(SETTLE_MS);
-		changes = [];
+		test('stops adding watches once the cap is reached', async () => {
+			for (let index = 0; index < 6; index += 1) {
+				mkdirSync(path.join(root, `dir-${index}`, 'nested'), {
+					recursive: true,
+				});
+			}
+			start(2);
+			await sleep(SETTLE_MS);
+			changes = [];
 
-		for (let index = 0; index < 6; index += 1) {
-			writeFileSync(path.join(root, `dir-${index}`, 'nested', 'f.ts'), 'x');
-		}
-		await sleep(SETTLE_MS);
+			for (let index = 0; index < 6; index += 1) {
+				writeFileSync(path.join(root, `dir-${index}`, 'nested', 'f.ts'), 'x');
+			}
+			await sleep(SETTLE_MS);
 
-		expect(changes).toEqual([]);
-	});
+			expect(changes).toEqual([]);
+		});
 
-	// The regression this guards is invisible behaviourally: `fs.watch` with
-	// `{ recursive: true }` reports the same events, it just registers one
-	// inotify watch per entry to do it. Count them.
-	test.skipIf(process.platform !== 'linux')(
-		'the default workspace watch holds a watch per directory, not per entry',
-		async () => {
+		// The regression this guards is invisible behaviourally: `fs.watch` with
+		// `{ recursive: true }` reports the same events, it just registers one
+		// inotify watch per entry to do it. Count them.
+		test('the default workspace watch holds a watch per directory, not per entry', async () => {
 			mkdirSync(path.join(root, 'src'), { recursive: true });
 			for (let index = 0; index < 50; index += 1) {
 				const packageDir = path.join(root, 'node_modules', `pkg-${index}`);
@@ -221,9 +224,9 @@ describe('startLinuxRecursiveWatch', () => {
 
 			expect(added).toBeLessThanOrEqual(10);
 			expect(notified).toEqual([root]);
-		},
-	);
-});
+		});
+	},
+);
 
 /** Counts the inotify watches this process holds, across every inotify fd. */
 function inotifyWatchCount(): number {

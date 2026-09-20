@@ -34,6 +34,7 @@ import { insertArchiveRecord } from './archive-records.ts';
 import { readContinuedBranches } from './continued-branches.ts';
 import { copyDirectoryTree } from './copy-directory.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
+import { branchWasAdopted, parseMetadata } from './metadata.ts';
 import { pruneWorktree } from './prune-worktree.ts';
 import { hasWorkspaceRepositoryIdentity, isRecord } from './row-guards.ts';
 import type { WorkspaceTeardownService } from './workspace-teardown.ts';
@@ -107,7 +108,7 @@ export function createArchiveWorkspaceService({
 			}
 			const { archivedContextsRoot, database, source, workspacesRoot } = target;
 
-			const branchCleanup = request.branchCleanup === true;
+			const branchCleanup = resolveBranchCleanup(request, source);
 			// Deleting the branch already removes the worktree, and it deliberately
 			// destroys the commits with it — so it takes the discard path below
 			// rather than the prune path, which exists to keep them recoverable.
@@ -408,6 +409,31 @@ function readWorkspace(
 		return null;
 	}
 	return row;
+}
+
+/**
+ * Decides whether this archive may delete the workspace's branches. The request
+ * only opts in — ownership is the main process's to enforce, because the
+ * renderer setting reaches here unchecked and the branch is gone for good.
+ *
+ * The guard covers the continuation chain, not just the branch the workspace
+ * ends on. `continueWorkspaceBranch` moves an adopted workspace onto a branch
+ * the app cut and appends the adopted name to `continuedFromBranches`, and
+ * `appendContinuedBranch` carries the rest of the metadata across — so
+ * `adoptedBranch` stays set, and refusing cleanup for the whole workspace is
+ * what keeps `deleteBranchChain` off the adopted predecessor behind it.
+ * @param request - The incoming archive request.
+ * @param source - The workspace being archived.
+ * @returns True only when the request asked for cleanup and nothing forbids it.
+ */
+function resolveBranchCleanup(
+	request: ArchiveWorkspaceRequest,
+	source: SourceWorkspace,
+): boolean {
+	return (
+		request.branchCleanup === true &&
+		!branchWasAdopted(parseMetadata(source.metadataJson))
+	);
 }
 
 /**

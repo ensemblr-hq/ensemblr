@@ -161,6 +161,50 @@ test('buildUpdateIssueRequest: clears a due date as an explicit null', () => {
 	});
 });
 
+test('buildUpdateIssueRequest: clears the assignee as an explicit null', () => {
+	const issue = createLinearIssueFixture();
+	const fields = { ...createIssueEditorFields(issue), assigneeId: UNSET_FIELD };
+
+	expect(buildUpdateIssueRequest(issue, fields)).toEqual({
+		accountId: 'account-1',
+		id: 'issue-1',
+		input: { assigneeId: null },
+	});
+});
+
+test('buildUpdateIssueRequest: clears the project as an explicit null', () => {
+	const issue = createLinearIssueFixture();
+	const fields = { ...createIssueEditorFields(issue), projectId: UNSET_FIELD };
+
+	expect(buildUpdateIssueRequest(issue, fields)).toEqual({
+		accountId: 'account-1',
+		id: 'issue-1',
+		input: { projectId: null },
+	});
+});
+
+test('buildUpdateIssueRequest: clears the cycle as an explicit null', () => {
+	const issue = createLinearIssueFixture();
+	const fields = { ...createIssueEditorFields(issue), cycleId: UNSET_FIELD };
+
+	expect(buildUpdateIssueRequest(issue, fields)).toEqual({
+		accountId: 'account-1',
+		id: 'issue-1',
+		input: { cycleId: null },
+	});
+});
+
+test('buildUpdateIssueRequest: clears the priority as an explicit zero', () => {
+	const issue = createLinearIssueFixture();
+	const fields = { ...createIssueEditorFields(issue), priority: '0' };
+
+	expect(buildUpdateIssueRequest(issue, fields)).toEqual({
+		accountId: 'account-1',
+		id: 'issue-1',
+		input: { priority: 0 },
+	});
+});
+
 test('buildUpdateIssueRequest: sends a newly picked due date as its date string', () => {
 	const issue = createLinearIssueFixture();
 	const fields = { ...createIssueEditorFields(issue), dueDate: '2026-09-30' };

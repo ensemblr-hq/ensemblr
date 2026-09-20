@@ -160,6 +160,18 @@ function listBranches(repositoryPath: string): string[] {
 		.filter((branch) => branch.length > 0);
 }
 
+function markWorkspaceAdopted(harness: Harness, id: string): void {
+	const database = harness.databaseService.getConnection()
+		?.database as DatabaseSync;
+	const row = database
+		.prepare('SELECT metadata_json FROM workspaces WHERE id = ?')
+		.get(id) as { metadata_json: string };
+	const metadata = { ...JSON.parse(row.metadata_json), adoptedBranch: true };
+	database
+		.prepare('UPDATE workspaces SET metadata_json = ? WHERE id = ?')
+		.run(JSON.stringify(metadata), id);
+}
+
 async function seedWorkspace(harness: Harness, name: string) {
 	const service = createWorkspaceService({
 		databaseService: harness.databaseService,
@@ -468,6 +480,64 @@ test('archiving removes the worktree and keeps the branch', async (t) => {
 	assert.equal(record?.worktree_pruned, 1);
 	assert.equal(typeof record?.pruned_head_commit, 'string');
 	assert.equal(typeof record?.pruned_wip_commit, 'string');
+});
+
+test('an adopted branch survives branchCleanup and takes the recovery-snapshot path', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'adopted-keep');
+	markWorkspaceAdopted(harness, workspace.id);
+	const { service } = makeArchiveService(harness);
+
+	const result = await service.archive({
+		branchCleanup: true,
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.branchCleanup, false);
+	assert.equal(result.workspace?.branchDeleted, false);
+	assert.equal(result.workspace?.worktreePruned, true);
+	assert.equal(existsSync(workspace.path), false);
+	assert.ok(
+		listBranches(harness.repositoryPath).includes(workspace.branchName ?? ''),
+	);
+
+	const record = archiveRecord(
+		harness.databaseService,
+		result.archiveRecordId ?? '',
+	);
+	assert.equal(record?.branch_cleanup, 0);
+	assert.equal(record?.worktree_pruned, 1);
+	assert.equal(typeof record?.pruned_head_commit, 'string');
+	assert.equal(typeof record?.pruned_wip_commit, 'string');
+});
+
+test('an adopted predecessor in a continuation chain is never deleted', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'adopted-chain');
+	markWorkspaceAdopted(harness, workspace.id);
+	const continueService = createContinueWorkspaceBranchService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+	});
+	const continued = await continueService.continueBranch({
+		workspaceId: workspace.id,
+	});
+	assert.equal(continued.branchName, 'adopted-chain-v1');
+
+	const { service } = makeArchiveService(harness);
+	const result = await service.archive({
+		branchCleanup: true,
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.branchDeleted, false);
+	const remaining = listBranches(harness.repositoryPath);
+	for (const branch of ['adopted-chain', 'adopted-chain-v1']) {
+		assert.ok(remaining.includes(branch), `${branch} was deleted`);
+	}
 });
 
 test('branch cleanup takes the discard path rather than pruning', async (t) => {

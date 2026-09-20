@@ -4,7 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { Provider } from 'jotai';
 import type { ReactNode } from 'react';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { useChangesSource } from '@/renderer/hooks/workbench-shell/review-files/use-changes-source';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import {
@@ -16,8 +16,13 @@ import {
 const FROM_REF = 'a'.repeat(40);
 const OLDER_REF = 'c'.repeat(40);
 
-/** Minimal workspace model: the hook reads only these fields. */
-function workspace(): WorkspaceShellModel {
+/**
+ * Minimal workspace model: the hook reads only these fields.
+ * @param overrides - Fields to replace, such as dropping the base ref or seeding the live model's rows
+ */
+function workspace(
+	overrides: Partial<Record<string, unknown>> = {},
+): WorkspaceShellModel {
 	return {
 		changeSummary: { additions: 0, deletions: 0, files: 0 },
 		id: 'ws-1',
@@ -26,8 +31,17 @@ function workspace(): WorkspaceShellModel {
 		landingSummary: { branchSource: { baseBranch: 'master' } },
 		pathLabel: '/tmp/ws',
 		reviewFiles: [],
+		...overrides,
 	} as unknown as WorkspaceShellModel;
 }
+
+/** A row from the live model's working-tree change set. */
+const WORKING_TREE_ROW = {
+	additions: 1,
+	deletions: 0,
+	path: 'uncommitted.ts',
+	status: 'modified',
+};
 
 /** Every diff scope the stub bridge was asked to read, in call order. */
 function scopesRead(calls: readonly [{ scope?: unknown }][]): unknown[] {
@@ -166,5 +180,82 @@ test('the turn source stays in its loading state until checkpoints land', async 
 	});
 	expect(scopesRead(getWorkspaceGitStatus.mock.calls)).not.toContainEqual({
 		kind: 'working-tree',
+	});
+});
+
+describe('the "all" source and a branch comparison that cannot be made', () => {
+	const liveModel = {
+		changeSummary: { additions: 1, deletions: 0, files: 1 },
+		reviewFiles: [WORKING_TREE_ROW],
+	};
+
+	test('a failed branch diff surfaces its error instead of working-tree rows', async () => {
+		const getWorkspaceGitStatus = vi.fn(
+			async (_request: { scope?: unknown }) => ({
+				error: { code: 'command-failed', message: 'bad revision' },
+				files: [],
+				summary: { additions: 0, deletions: 0, files: 0 },
+			}),
+		);
+		installEnsemblrApi({ getWorkspaceGitStatus });
+
+		const { result } = renderHook(
+			() => useChangesSource(workspace(liveModel)),
+			{ wrapper },
+		);
+
+		await waitFor(() => {
+			expect(result.current.sourceError?.code).toBe('command-failed');
+		});
+		expect(result.current.scope).toEqual({
+			baseRef: 'master',
+			kind: 'branch',
+		});
+		expect(result.current.sourceFiles).toEqual([]);
+		expect(result.current.changesCount).toBe(0);
+	});
+
+	test('while the branch diff is still loading, the live model rows stand in with no error', async () => {
+		installEnsemblrApi({
+			getWorkspaceGitStatus: () => new Promise(() => undefined),
+		});
+
+		const { result } = renderHook(
+			() => useChangesSource(workspace(liveModel)),
+			{ wrapper },
+		);
+
+		await waitFor(() => {
+			expect(result.current.sourceFiles).toHaveLength(1);
+		});
+		expect(result.current.sourceError).toBeUndefined();
+		expect(result.current.changesCount).toBe(1);
+	});
+
+	test('a workspace with no base ref still shows its working-tree rows with no error', async () => {
+		const getWorkspaceGitStatus = vi.fn(
+			async (_request: { scope?: unknown }) => ({
+				files: [WORKING_TREE_ROW],
+				summary: { additions: 1, deletions: 0, files: 1 },
+			}),
+		);
+		installEnsemblrApi({ getWorkspaceGitStatus });
+
+		const { result } = renderHook(
+			() => useChangesSource(workspace({ ...liveModel, landingSummary: null })),
+			{ wrapper },
+		);
+
+		await waitFor(() => {
+			expect(scopesRead(getWorkspaceGitStatus.mock.calls)).toContainEqual({
+				kind: 'working-tree',
+			});
+		});
+		await waitFor(() => {
+			expect(result.current.sourceFiles).toHaveLength(1);
+		});
+		expect(result.current.scope).toEqual({ kind: 'working-tree' });
+		expect(result.current.sourceError).toBeUndefined();
+		expect(result.current.changesCount).toBe(1);
 	});
 });

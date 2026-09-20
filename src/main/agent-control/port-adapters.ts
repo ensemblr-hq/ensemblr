@@ -792,8 +792,14 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 	};
 
 	return {
-		listModels: async ({ runtime }): Promise<AgentControlModelList> => {
-			const listing = await deps.spawnModelResolver.listModelsFor(runtime);
+		listModels: async ({
+			runtime,
+			includeHidden,
+		}): Promise<AgentControlModelList> => {
+			const listing = await deps.spawnModelResolver.listModelsFor(
+				runtime,
+				includeHidden,
+			);
 			return {
 				allowedRuntimes: listing.allowedRuntimes,
 				callerRuntime: listing.callerRuntime,
@@ -853,6 +859,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			}
 			const resolution = await deps.spawnModelResolver.resolveForSpawn({
 				caller,
+				includeHidden: request.includeHidden,
 				requestedModelId: model ?? null,
 				requestedThinkingLevel: thinkingLevel ?? null,
 			});

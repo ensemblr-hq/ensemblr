@@ -391,6 +391,12 @@ process.stdin.on('end', shutdown);
 		},
 	);
 
+	// The subject is the kill, not the clock. Reaching the `extension_ui_request`
+	// takes two real node boots — the wrapper's endpoint, then the worker it
+	// waits on over IPC — and a 1s budget lost that race on a loaded macOS
+	// runner, so the generic RPC timeout answered instead of the interaction
+	// diagnosis. The budget is an upper bound rather than a wait: the frame
+	// still resolves as soon as both processes are up.
 	it.skipIf(process.platform === 'win32')(
 		'kills a stubborn descendant of a non-exec wrapper process group',
 		async () => {
@@ -405,7 +411,7 @@ process.stdin.on('end', shutdown);
 					directory,
 					[],
 					{
-						timeoutMs: 1000,
+						timeoutMs: 10_000,
 						killGraceMs: 10,
 						resolveBaseEnv: () => ({
 							PATH: process.env.PATH,
@@ -434,6 +440,7 @@ process.stdin.on('end', shutdown);
 			}
 			expect(aliveAfterPolling).toBe(false);
 		},
+		30_000,
 	);
 
 	it('returns a valid runtime empty catalogue with a null error', async () => {

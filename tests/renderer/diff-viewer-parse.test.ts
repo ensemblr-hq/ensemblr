@@ -32,6 +32,44 @@ index 3333333..4444444 100644
  tail
 `;
 
+const NEW_PATCH = `diff --git a/added.ts b/added.ts
+new file mode 100644
+index 0000000..3333333
+--- /dev/null
++++ b/added.ts
+@@ -0,0 +1,2 @@
++one
++two
+`;
+
+const DELETED_PATCH = `diff --git a/removed.ts b/removed.ts
+deleted file mode 100644
+index 3333333..0000000
+--- a/removed.ts
++++ /dev/null
+@@ -1,2 +0,0 @@
+-one
+-two
+`;
+
+const RENAME_PATCH = `diff --git a/renamed-from.ts b/renamed-to.ts
+similarity index 80%
+rename from renamed-from.ts
+rename to renamed-to.ts
+index 1111111..2222222 100644
+--- a/renamed-from.ts
++++ b/renamed-to.ts
+@@ -1 +1 @@
+-old
++new
+`;
+
+const PURE_RENAME_PATCH = `diff --git a/renamed-from.ts b/renamed-to.ts
+similarity index 100%
+rename from renamed-from.ts
+rename to renamed-to.ts
+`;
+
 describe('parseSingleFileDiff', () => {
 	test('parses a single modify patch into one file with hunks', () => {
 		const file = parseSingleFileDiff(MODIFY_PATCH);
@@ -80,6 +118,41 @@ describe('splitCombinedPatch', () => {
 
 	test('returns an empty list for blank input', () => {
 		expect(splitCombinedPatch('')).toEqual([]);
+	});
+
+	test('keys added, deleted, and renamed files by their real path', () => {
+		const files = splitCombinedPatch(
+			`${NEW_PATCH}${DELETED_PATCH}${RENAME_PATCH}`,
+		);
+		expect(files.map((file) => file.path)).toEqual([
+			'added.ts',
+			'removed.ts',
+			'renamed-to.ts',
+		]);
+	});
+});
+
+describe('parseSingleFileDiff for wholly added and deleted files', () => {
+	test('parses a new file into insert-only hunks', () => {
+		const changes = parseSingleFileDiff(NEW_PATCH)?.hunks.flatMap(
+			(hunk) => hunk.changes,
+		);
+		expect(changes?.map((change) => change.type)).toEqual(['insert', 'insert']);
+		expect(changes?.map(newLineNumberOf)).toEqual([1, 2]);
+	});
+
+	test('parses a deleted file into delete-only hunks', () => {
+		const changes = parseSingleFileDiff(DELETED_PATCH)?.hunks.flatMap(
+			(hunk) => hunk.changes,
+		);
+		expect(changes?.map((change) => change.type)).toEqual(['delete', 'delete']);
+		expect(changes?.map(oldLineNumberOf)).toEqual([1, 2]);
+	});
+
+	test('parses a pure rename into a file with no hunks', () => {
+		const file = parseSingleFileDiff(PURE_RENAME_PATCH);
+		expect(file?.hunks).toEqual([]);
+		expect(file?.newPath).toBe('renamed-to.ts');
 	});
 });
 

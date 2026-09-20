@@ -88,14 +88,25 @@ export interface SpawnModelResolver {
 	/**
 	 * The models a caller may spawn on under the user's current runtime policy. A
 	 * null runtime cannot be narrowed, so it gets every runtime and must pick.
+	 * @param runtime - The runtime to narrow to, or null to leave every runtime's in.
+	 * @param includeHidden - Whether to keep models the user hid from delegated
+	 *   spawns. Off for every delegation path; on only to resolve the user's own
+	 *   Review pin, which visibility does not govern.
 	 */
 	listModelsFor: (
 		runtime: AgentProviderId | null,
+		includeHidden?: boolean,
 	) => Promise<SpawnModelListing>;
 	resolveForSpawn: (input: {
 		caller: SpawnCallerIdentity;
 		requestedModelId: string | null;
 		requestedThinkingLevel: string | null;
+		/**
+		 * Whether a hidden model may be honoured. Off for every delegation path, so
+		 * an agent naming a hidden model is still refused; on only for the user's own
+		 * Review pin, which hiding a model does not unset.
+		 */
+		includeHidden?: boolean;
 	}) => Promise<SpawnModelResolution>;
 }
 
@@ -483,11 +494,11 @@ export function createSpawnModelResolver({
 	};
 
 	return {
-		listModelsFor: async (callerRuntime) => {
-			const snapshot = withoutHiddenModels(
-				await readCatalog(catalog),
-				readHiddenModelIds(),
-			);
+		listModelsFor: async (callerRuntime, includeHidden = false) => {
+			const catalogSnapshot = await readCatalog(catalog);
+			const snapshot = includeHidden
+				? catalogSnapshot
+				: withoutHiddenModels(catalogSnapshot, readHiddenModelIds());
 			const crossRuntimeDelegationEnabled = readCrossRuntimeDelegationEnabled();
 			return {
 				allowedRuntimes: allowedRuntimesFor(
@@ -509,12 +520,14 @@ export function createSpawnModelResolver({
 			caller,
 			requestedModelId,
 			requestedThinkingLevel,
+			includeHidden = false,
 		}) => {
 			const snapshot = await readCatalog(catalog);
-			const availableSnapshot = withoutHiddenModels(
-				snapshot,
-				readHiddenModelIds(),
-			);
+			// The Review pin is the one model a user chose explicitly rather than
+			// delegated to, so hiding it from spawn menus must not also refuse it here.
+			const availableSnapshot = includeHidden
+				? snapshot
+				: withoutHiddenModels(snapshot, readHiddenModelIds());
 			if (requestedModelId) {
 				return resolveRequested({
 					allowCrossRuntime: readCrossRuntimeDelegationEnabled(),

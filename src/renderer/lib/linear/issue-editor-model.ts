@@ -131,8 +131,10 @@ export function buildCreateIssueRequest(
 
 /**
  * Maps editor fields to an `issueUpdate` request containing only fields that
- * differ from the original issue. A cleared due date is sent as `null`, which is
- * how Linear distinguishes "unset this" from "leave it alone". Returns `null`
+ * differ from the original issue. A cleared assignee, project, cycle, or due
+ * date is sent as an explicit `null`, which is how Linear distinguishes "unset
+ * this" from "leave it alone" (an absent key). Priority clears to `0` rather
+ * than null, because that is how Linear stores "no priority". Returns `null`
  * when nothing changed.
  */
 export function buildUpdateIssueRequest(
@@ -157,25 +159,18 @@ export function buildUpdateIssueRequest(
 		input.stateId = fields.stateId;
 	}
 
-	if (
-		fields.assigneeId !== originalFields.assigneeId &&
-		fields.assigneeId !== UNSET_FIELD
-	) {
-		input.assigneeId = fields.assigneeId;
+	if (fields.assigneeId !== originalFields.assigneeId) {
+		input.assigneeId =
+			fields.assigneeId === UNSET_FIELD ? null : fields.assigneeId;
 	}
 
-	if (
-		fields.projectId !== originalFields.projectId &&
-		fields.projectId !== UNSET_FIELD
-	) {
-		input.projectId = fields.projectId;
+	if (fields.projectId !== originalFields.projectId) {
+		input.projectId =
+			fields.projectId === UNSET_FIELD ? null : fields.projectId;
 	}
 
-	if (
-		fields.cycleId !== originalFields.cycleId &&
-		fields.cycleId !== UNSET_FIELD
-	) {
-		input.cycleId = fields.cycleId;
+	if (fields.cycleId !== originalFields.cycleId) {
+		input.cycleId = fields.cycleId === UNSET_FIELD ? null : fields.cycleId;
 	}
 
 	if (

@@ -279,14 +279,20 @@ export interface CreateLinearIssueRequest extends LinearIssueFieldsInput {
 }
 
 /**
- * Fields an update may change. `dueDate` widens to `null` because clearing a
- * date is a distinct intent from leaving it alone, which an absent key means.
+ * Fields an update may change. `assigneeId`, `cycleId`, `dueDate`, and
+ * `projectId` widen to `null` because clearing one of them is a distinct intent
+ * from leaving it alone, which an absent key means. `priority` stays a plain
+ * number: Linear stores "no priority" as `0`, so clearing it is the value `0`
+ * rather than a null.
  */
 export type LinearIssueUpdateFieldsInput = Omit<
 	LinearIssueFieldsInput,
-	'dueDate'
+	'assigneeId' | 'cycleId' | 'dueDate' | 'projectId'
 > & {
+	assigneeId?: string | null;
+	cycleId?: string | null;
 	dueDate?: string | null;
+	projectId?: string | null;
 	teamId?: string;
 	title?: string;
 };

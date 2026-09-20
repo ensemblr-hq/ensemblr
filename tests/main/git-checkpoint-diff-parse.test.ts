@@ -48,6 +48,25 @@ describe('parseCombinedDiff', () => {
 		expect(renamed?.path).toBe('new-name.txt');
 	});
 
+	test('reads a non-ASCII rename as its destination path and status', () => {
+		const nonAscii = [
+			':100644 100644 587be6b 587be6b R100\tcafé.txt\tcrème.txt',
+			'0\t0\tcafé.txt => crème.txt',
+			'',
+			'diff --git a/café.txt b/crème.txt',
+			'similarity index 100%',
+			'rename from café.txt',
+			'rename to crème.txt',
+		].join('\n');
+
+		const parsed = parseCombinedDiff(nonAscii);
+
+		expect(parsed.files).toEqual([
+			{ additions: 0, deletions: 0, path: 'crème.txt', status: 'renamed' },
+		]);
+		expect(parsed.patch).toContain('rename to crème.txt');
+	});
+
 	test('keeps the patch whole, from the first header to the last line', () => {
 		const { patch } = parseCombinedDiff(COMBINED);
 

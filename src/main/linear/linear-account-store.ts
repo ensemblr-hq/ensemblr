@@ -7,6 +7,7 @@ import type {
 	LinearConnectionState,
 } from '../../shared/ipc/contracts/linear';
 import type { SecretStore } from '../secrets';
+import { LinearAuthError } from './linear-auth-error.ts';
 
 /**
  * Secret-store key prefixes for per-account tokens. The suffix is the account
@@ -80,6 +81,12 @@ export interface LinearAccountStore {
 	 * rather than adding a second one.
 	 */
 	upsertIdentity: (identity: LinearAccountIdentity) => LinearAccountRecord;
+	/**
+	 * Stores the token pair, rejecting an account id that has no row with a
+	 * `not-connected` {@link LinearAuthError}. The code matters as much as the
+	 * refusal: `refreshAccessToken` records a plain `Error` as `refresh-failed`,
+	 * which would report a disconnected account as a failing refresh.
+	 */
 	writeTokens: (
 		accountId: string,
 		tokens: LinearAccountTokens,
@@ -107,6 +114,9 @@ export function createLinearAccountStore({
 	now = () => new Date(),
 	secretStore,
 }: CreateLinearAccountStoreOptions): LinearAccountStore {
+	/** Tail of each account's queued credential work, keyed by account id. */
+	const credentialQueues = new Map<string, Promise<unknown>>();
+
 	/**
 	 * Reads one secret, treating an unavailable backend as an absent value so a
 	 * disconnect or a status read never fails on the Keychain.
@@ -167,17 +177,62 @@ export function createLinearAccountStore({
 		}
 	}
 
+	/**
+	 * Runs one account's credential work to completion before the next such work
+	 * for that account begins.
+	 *
+	 * Every credential mutation here is check-then-act across an await:
+	 * `writeTokens` reads the row and then writes two secrets, each of which
+	 * reads before it creates or updates; `delete` drops the row and then removes
+	 * both secrets. Left to interleave, a write that already passed its checks
+	 * resumes after the disconnect beside it has finished and recreates a secret
+	 * it had removed, so the credential outlives the account it belonged to.
+	 * Serializing per account makes each sequence atomic against the others.
+	 *
+	 * Queued work is chained onto a never-rejecting tail so one failure cannot
+	 * strand the account's queue, and the tail is dropped once it is the last
+	 * one, which keeps the map to the accounts currently doing work.
+	 * @param accountId - Account whose credential work is being queued.
+	 * @param operation - Credential work to run once that account is free.
+	 * @returns Whatever the operation resolved or rejected with.
+	 */
+	function queueCredentialWork<T>(
+		accountId: string,
+		operation: () => Promise<T>,
+	): Promise<T> {
+		const previous = credentialQueues.get(accountId) ?? Promise.resolve();
+		const result = previous.then(operation);
+		const settled = result.then(
+			() => undefined,
+			() => undefined,
+		);
+		credentialQueues.set(accountId, settled);
+		void settled.then(() => {
+			if (credentialQueues.get(accountId) === settled) {
+				credentialQueues.delete(accountId);
+			}
+		});
+
+		return result;
+	}
+
 	return {
 		clearRefreshToken: (accountId) =>
-			deleteSecret(`${REFRESH_TOKEN_KEY_PREFIX}${accountId}`),
+			queueCredentialWork(accountId, () =>
+				deleteSecret(`${REFRESH_TOKEN_KEY_PREFIX}${accountId}`),
+			),
 
-		delete: async (accountId) => {
-			await deleteSecret(`${ACCESS_TOKEN_KEY_PREFIX}${accountId}`);
-			await deleteSecret(`${REFRESH_TOKEN_KEY_PREFIX}${accountId}`);
-			database
-				.prepare('DELETE FROM linear_accounts WHERE id = ?')
-				.run(accountId);
-		},
+		delete: (accountId) =>
+			queueCredentialWork(accountId, async () => {
+				// The row is also the disconnect marker every other guard tests, so it
+				// goes before the secrets: a caller that read it as live must not be
+				// told the account still exists once this has begun.
+				database
+					.prepare('DELETE FROM linear_accounts WHERE id = ?')
+					.run(accountId);
+				await deleteSecret(`${ACCESS_TOKEN_KEY_PREFIX}${accountId}`);
+				await deleteSecret(`${REFRESH_TOKEN_KEY_PREFIX}${accountId}`);
+			}),
 
 		get: (accountId) => readAccountRow(database, accountId),
 
@@ -277,21 +332,29 @@ export function createLinearAccountStore({
 			return saved;
 		},
 
-		writeTokens: async (accountId, { accessToken, refreshToken }) => {
-			await writeSecret(
-				`${ACCESS_TOKEN_KEY_PREFIX}${accountId}`,
-				`Linear access token (${accountId})`,
-				accessToken,
-			);
+		writeTokens: (accountId, { accessToken, refreshToken }) =>
+			queueCredentialWork(accountId, async () => {
+				if (!readAccountRow(database, accountId)) {
+					throw new LinearAuthError(
+						'not-connected',
+						'This Linear account is not connected. Sign in from integration settings.',
+					);
+				}
 
-			if (refreshToken) {
 				await writeSecret(
-					`${REFRESH_TOKEN_KEY_PREFIX}${accountId}`,
-					`Linear refresh token (${accountId})`,
-					refreshToken,
+					`${ACCESS_TOKEN_KEY_PREFIX}${accountId}`,
+					`Linear access token (${accountId})`,
+					accessToken,
 				);
-			}
-		},
+
+				if (refreshToken) {
+					await writeSecret(
+						`${REFRESH_TOKEN_KEY_PREFIX}${accountId}`,
+						`Linear refresh token (${accountId})`,
+						refreshToken,
+					);
+				}
+			}),
 	};
 }
 

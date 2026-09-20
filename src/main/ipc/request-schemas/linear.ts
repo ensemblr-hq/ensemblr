@@ -77,7 +77,10 @@ export const updateLinearIssueRequestSchema = z.object({
 	id: z.string().min(1),
 	input: z.object({
 		...linearIssueFieldsShape,
+		assigneeId: z.string().min(1).nullable().optional(),
+		cycleId: z.string().min(1).nullable().optional(),
 		dueDate: z.string().nullable().optional(),
+		projectId: z.string().min(1).nullable().optional(),
 		teamId: z.string().min(1).optional(),
 		title: z.string().min(1).optional(),
 	}),

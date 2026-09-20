@@ -236,6 +236,17 @@ export function createLinearAuthService({
 	}
 
 	/**
+	 * Build the typed failure for an account that is unknown or was disconnected.
+	 * @returns The not-connected auth error
+	 */
+	function notConnectedError(): LinearAuthError {
+		return new LinearAuthError(
+			'not-connected',
+			'This Linear account is not connected. Sign in from integration settings.',
+		);
+	}
+
+	/**
 	 * Report whether an access token is expired, applying a clock-skew margin.
 	 * @param expiresAt - ISO expiry timestamp, or null when the token never expires
 	 * @returns True when the token is at or past its skew-adjusted expiry
@@ -428,6 +439,45 @@ export function createLinearAuthService({
 	}
 
 	/**
+	 * Persist a refreshed token set only while its account still exists, so a
+	 * disconnect that landed during the token exchange cannot be undone by it.
+	 * Tokens that arrive for a vanished account are discarded, and any secret a
+	 * concurrent disconnect raced past is removed again.
+	 * @param store - Account store the refresh is writing to
+	 * @param accountId - Account the tokens were issued for
+	 * @param tokens - Token set returned by the refresh exchange
+	 */
+	async function persistRefreshedTokens(
+		store: LinearAccountStore,
+		accountId: string,
+		tokens: TokenResponse,
+	): Promise<void> {
+		// disconnect() cannot cancel an exchange already in flight, so the account
+		// may be gone by now; checked again after the write for the same reason.
+		if (!store.get(accountId)) {
+			throw notConnectedError();
+		}
+
+		await store.writeTokens(accountId, tokens);
+
+		if (!store.get(accountId)) {
+			await store.delete(accountId);
+			throw notConnectedError();
+		}
+
+		store.recordGrant(accountId, {
+			canRefresh:
+				tokens.refreshToken !== null ||
+				store.get(accountId)?.canRefresh === true,
+			expiresAt: tokens.expiresAt,
+			scopes:
+				tokens.scopes.length > 0
+					? tokens.scopes
+					: (store.get(accountId)?.scopes ?? []),
+		});
+	}
+
+	/**
 	 * Exchange one account's refresh token for a new access token and update its
 	 * stored tokens and grant metadata.
 	 * @param accountId - Account whose grant is being refreshed
@@ -464,17 +514,7 @@ export function createLinearAuthService({
 				refresh_token: refreshToken,
 			});
 
-			await store.writeTokens(accountId, tokens);
-			store.recordGrant(accountId, {
-				canRefresh:
-					tokens.refreshToken !== null ||
-					store.get(accountId)?.canRefresh === true,
-				expiresAt: tokens.expiresAt,
-				scopes:
-					tokens.scopes.length > 0
-						? tokens.scopes
-						: (store.get(accountId)?.scopes ?? []),
-			});
+			await persistRefreshedTokens(store, accountId, tokens);
 
 			return tokens.accessToken;
 		} catch (error) {
@@ -630,16 +670,16 @@ export function createLinearAuthService({
 
 		getAccessToken: async (accountId) => {
 			const store = await getAdoptedStore();
-			const accessToken = await store.readAccessToken(accountId);
+			const account = store.get(accountId);
+			const accessToken = account
+				? await store.readAccessToken(accountId)
+				: null;
 
-			if (!accessToken) {
-				throw new LinearAuthError(
-					'not-connected',
-					'This Linear account is not connected. Sign in from integration settings.',
-				);
+			if (!account || !accessToken) {
+				throw notConnectedError();
 			}
 
-			if (!isExpired(store.get(accountId)?.expiresAt ?? null)) {
+			if (!isExpired(account.expiresAt)) {
 				return accessToken;
 			}
 
