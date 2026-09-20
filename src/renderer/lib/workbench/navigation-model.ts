@@ -51,6 +51,167 @@ export function mapRepositoriesToProjects(
 	);
 }
 
+/** Cached content signature and object reference for one workspace's model. */
+interface WorkspaceModelCacheEntry {
+	model: WorkspaceShellModel;
+	signature: string;
+}
+
+/** Cached content signature and object reference for one project shell model. */
+interface ProjectModelCacheEntry {
+	project: ProjectShellModel;
+	signature: string;
+}
+
+/**
+ * The reference-preserving state {@link reconcileNavigationProjectIdentity}
+ * carries between polls: the last returned array plus per-id signatures for the
+ * projects and workspaces inside it.
+ */
+export interface NavigationProjectIdentityCache {
+	array: ProjectShellModel[] | null;
+	projects: Map<string, ProjectModelCacheEntry>;
+	workspaces: Map<string, WorkspaceModelCacheEntry>;
+}
+
+/** Builds the empty identity cache the first reconcile pass reads. */
+export function createNavigationProjectIdentityCache(): NavigationProjectIdentityCache {
+	return { array: null, projects: new Map(), workspaces: new Map() };
+}
+
+/**
+ * Content signature for a workspace shell model, excluding `pullRequest.syncedAt`.
+ *
+ * The PR-status sweeper advances `syncedAt` on every write it makes, including
+ * sweeps that observe no change, so a signature carrying it would differ on
+ * essentially every 15s navigation poll and defeat the reconcile. Every other
+ * field the row renders — the checks summary, the PR status/label/number/state,
+ * the branch-sync git-status row, and the source and landing summaries — is
+ * derived from source fields the sweeper only rewrites on a real change, so
+ * dropping `syncedAt` alone is safe: a status that actually changed rebuilds the
+ * model with a fresh `syncedAt`, and a frozen `syncedAt` therefore only ever
+ * accompanies content byte-for-byte identical to the observation it was recorded
+ * with — which is exactly when `useLivePullRequestModel`'s freshness comparison
+ * cannot be swayed by the timestamp either way.
+ * @param model - The mapped workspace shell model to fingerprint.
+ * @returns A stable JSON signature the reconcile compares across polls.
+ */
+export function computeWorkspaceModelSignature(
+	model: WorkspaceShellModel,
+): string {
+	return JSON.stringify(model, (key, value) =>
+		key === 'syncedAt' ? undefined : value,
+	);
+}
+
+/**
+ * Rebuilds a freshly-mapped navigation project tree so any workspace, project,
+ * or the array itself keeps its previous object reference when its rendered
+ * content is unchanged.
+ *
+ * `mapRepositoriesToProjects` allocates a whole new tree on every navigation
+ * poll, and the poll fires every 15s. Handing that new tree straight to the
+ * shell re-renders every sidebar row on a poll that moved nothing but a
+ * `syncedAt` stamp. Keying reuse on {@link computeWorkspaceModelSignature}
+ * restores the reference stability the shell's selection-persistence guard and
+ * the sidebar rows already depend on, without relocating the stamp the two
+ * PR-status sources are ordered by.
+ * @param projects - The freshly-mapped project tree for this poll.
+ * @param cache - The identity cache the previous reconcile returned.
+ * @returns The reference-stabilized tree and the cache the next reconcile reads.
+ */
+export function reconcileNavigationProjectIdentity(
+	projects: ProjectShellModel[],
+	cache: NavigationProjectIdentityCache,
+): {
+	cache: NavigationProjectIdentityCache;
+	projects: ProjectShellModel[];
+} {
+	const nextWorkspaces = new Map<string, WorkspaceModelCacheEntry>();
+	const nextProjects = new Map<string, ProjectModelCacheEntry>();
+
+	const reconciledProjects = projects.map((project) => {
+		let anyWorkspaceReused = false;
+		const workspaces = project.workspaces.map((model) => {
+			const signature = computeWorkspaceModelSignature(model);
+			const cached = cache.workspaces.get(model.id);
+			const hit = cached !== undefined && cached.signature === signature;
+			const stable = hit ? cached.model : model;
+			nextWorkspaces.set(model.id, { model: stable, signature });
+			if (stable !== model) {
+				anyWorkspaceReused = true;
+			}
+			return stable;
+		});
+
+		const signature = computeProjectContentSignature(project);
+		const cachedProject = cache.projects.get(project.id);
+		const canReuseProject =
+			cachedProject !== undefined &&
+			cachedProject.signature === signature &&
+			sameReferences(cachedProject.project.workspaces, workspaces);
+		const stableProject = canReuseProject
+			? cachedProject.project
+			: anyWorkspaceReused
+				? { ...project, workspaces }
+				: project;
+		nextProjects.set(project.id, { project: stableProject, signature });
+		return stableProject;
+	});
+
+	const stableArray = reuseProjectArrayIfUnchanged(
+		cache.array,
+		reconciledProjects,
+	);
+	return {
+		cache: {
+			array: stableArray,
+			projects: nextProjects,
+			workspaces: nextWorkspaces,
+		},
+		projects: stableArray,
+	};
+}
+
+/** Content signature for a project's own fields, excluding its workspaces. */
+function computeProjectContentSignature(project: ProjectShellModel): string {
+	return JSON.stringify({
+		id: project.id,
+		name: project.name,
+		owner: project.owner,
+		pathLabel: project.pathLabel,
+	});
+}
+
+/**
+ * Reports whether two arrays hold the same object references in the same order.
+ *
+ * Reuse is keyed on identity rather than on length because a reconciled entry
+ * is the cached object only when its signature matched, so a positional
+ * comparison also rules out a reorder and a same-size membership swap — both of
+ * which a length check would wave through and freeze into a stale tree.
+ * @param previous - The array the previous reconcile returned.
+ * @param next - The array this reconcile built.
+ * @returns True when the previous array can stand in for the next one.
+ */
+function sameReferences<T>(
+	previous: readonly T[],
+	next: readonly T[],
+): boolean {
+	return (
+		previous.length === next.length &&
+		previous.every((entry, index) => entry === next[index])
+	);
+}
+
+/** Returns the previous array when it is element-for-element identical to the next. */
+function reuseProjectArrayIfUnchanged(
+	previous: ProjectShellModel[] | null,
+	next: ProjectShellModel[],
+): ProjectShellModel[] {
+	return previous && sameReferences(previous, next) ? previous : next;
+}
+
 /**
  * Picks the navigation snapshot to render, preferring fresh query data over a
  * previously-cached snapshot.

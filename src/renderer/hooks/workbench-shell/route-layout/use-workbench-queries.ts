@@ -4,7 +4,7 @@ import {
 	useQuery,
 	useQueryClient,
 } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -19,9 +19,11 @@ import {
 import {
 	applyWorkspaceChangeSummaries,
 	collectWorkspaceChangeSummaryUpdates,
+	createNavigationProjectIdentityCache,
 	getNavigationWorkspaceChangeSummaryTargets,
 	getRenderableNavigationSnapshot,
 	mapRepositoriesToProjects,
+	reconcileNavigationProjectIdentity,
 } from '@/renderer/lib/workbench';
 import type { WorkbenchShellData } from '@/renderer/types/workbench';
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
@@ -105,6 +107,24 @@ export function useWorkbenchQueries({
 			hasPreloadBridge ? mapRepositoriesToProjects(navigationRepositories) : [],
 		[hasPreloadBridge, navigationRepositories, i18n.language],
 	);
+	// The PR sweeper's `syncedAt` churn hands `mapRepositoriesToProjects` a fresh
+	// tree every 15s poll; reconciling it by content signature keeps the reference
+	// identity the shell depends on. The cache is written after commit to stay pure.
+	const navigationIdentityCacheRef = useRef(
+		createNavigationProjectIdentityCache(),
+	);
+	const { cache: nextNavigationIdentityCache, projects: stableBaseProjects } =
+		useMemo(
+			() =>
+				reconcileNavigationProjectIdentity(
+					baseProjects,
+					navigationIdentityCacheRef.current,
+				),
+			[baseProjects],
+		);
+	useEffect(() => {
+		navigationIdentityCacheRef.current = nextNavigationIdentityCache;
+	}, [nextNavigationIdentityCache]);
 	const workspaceChangeSummaryTargets = useMemo(
 		() => getNavigationWorkspaceChangeSummaryTargets(navigationRepositories),
 		[navigationRepositories],
@@ -117,13 +137,13 @@ export function useWorkbenchQueries({
 	const combineWorkspaceChangeSummaries = useCallback(
 		(results: Parameters<typeof collectWorkspaceChangeSummaryUpdates>[0]) =>
 			applyWorkspaceChangeSummaries(
-				baseProjects,
+				stableBaseProjects,
 				collectWorkspaceChangeSummaryUpdates(
 					results,
 					workspaceChangeSummaryTargets,
 				),
 			),
-		[baseProjects, workspaceChangeSummaryTargets],
+		[stableBaseProjects, workspaceChangeSummaryTargets],
 	);
 	const projects = useQueries({
 		combine: combineWorkspaceChangeSummaries,
