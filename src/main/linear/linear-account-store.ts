@@ -7,6 +7,7 @@ import type {
 	LinearConnectionState,
 } from '../../shared/ipc/contracts/linear';
 import type { SecretStore } from '../secrets';
+import { LinearAuthError } from './linear-auth-error.ts';
 
 /**
  * Secret-store key prefixes for per-account tokens. The suffix is the account
@@ -80,7 +81,12 @@ export interface LinearAccountStore {
 	 * rather than adding a second one.
 	 */
 	upsertIdentity: (identity: LinearAccountIdentity) => LinearAccountRecord;
-	/** Stores the token pair, rejecting an account id that has no row. */
+	/**
+	 * Stores the token pair, rejecting an account id that has no row with a
+	 * `not-connected` {@link LinearAuthError}. The code matters as much as the
+	 * refusal: `refreshAccessToken` records a plain `Error` as `refresh-failed`,
+	 * which would report a disconnected account as a failing refresh.
+	 */
 	writeTokens: (
 		accountId: string,
 		tokens: LinearAccountTokens,
@@ -284,8 +290,9 @@ export function createLinearAccountStore({
 
 		writeTokens: async (accountId, { accessToken, refreshToken }) => {
 			if (!readAccountRow(database, accountId)) {
-				throw new Error(
-					'Linear tokens cannot be stored for an account that does not exist.',
+				throw new LinearAuthError(
+					'not-connected',
+					'This Linear account is not connected. Sign in from integration settings.',
 				);
 			}
 

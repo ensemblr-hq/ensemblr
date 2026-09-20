@@ -12,6 +12,7 @@ import {
 	type EnsemblrConfig,
 	type EnsemblrConfigService,
 } from '../../src/main/config/config-loader.ts';
+import { createLinearAccountStore } from '../../src/main/linear/linear-account-store.ts';
 import {
 	createLinearAuthService,
 	LinearAuthError,
@@ -1041,4 +1042,29 @@ test('adoption: a login to a different organization leaves the sentinel alone', 
 	const after = await service.listAccounts();
 
 	assert.strictEqual(after.length, 2);
+});
+
+test('writeTokens: refuses an account with no row as not-connected', async (t) => {
+	const { databaseService, secretStore } = createServiceFixture(t);
+	const database = databaseService.getConnection()?.database;
+	assert.ok(database);
+	const accountStore = createLinearAccountStore({
+		database,
+		now: () => NOW,
+		secretStore,
+	});
+
+	await assertNotConnected(
+		accountStore.writeTokens('missing-account', {
+			accessToken: 'access',
+			refreshToken: 'refresh',
+		}),
+	);
+	assert.strictEqual(
+		await secretStore.read({
+			key: 'linear-access-token:missing-account',
+			scope: 'app',
+		}),
+		null,
+	);
 });
