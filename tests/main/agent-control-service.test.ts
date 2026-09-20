@@ -2570,8 +2570,8 @@ describe('agent-control service: delegation', () => {
 	});
 
 	// A wrong guess is cheap to make and cheap to correct, so it must not cost a
-	// spawn: the retry that names the right script has to still fit the quota.
-	it('does not spend the spawn budget on a script that never launched', async () => {
+	// start: the retry that names the right script has to still fit the budget.
+	it('does not spend the terminal budget on a script that never launched', async () => {
 		const ports = makePorts();
 		vi.mocked(ports.terminals.startTerminal).mockResolvedValueOnce({
 			ok: false,
@@ -2580,7 +2580,7 @@ describe('agent-control service: delegation', () => {
 		});
 		const { service } = setup({
 			ports,
-			guardrails: { maxSpawnsPerSession: 1 },
+			guardrails: { maxTerminalStartsPerMinute: 1 },
 		});
 		const guessed = await service.invoke({
 			op: 'startTerminal',
@@ -4803,5 +4803,195 @@ describe('agent-control service: reporting context usage', () => {
 		});
 
 		expect(result).toMatchObject({ code: 'not-found', ok: false });
+	});
+});
+
+describe('agent-control service: open-terminal budget', () => {
+	/**
+	 * Hands every start a fresh id and reports each one back through
+	 * `listTerminals` with the given kind and status, which is how the service
+	 * learns how many of the caller's terminals are still open.
+	 */
+	const trackTerminals = (
+		ports: AgentControlPorts,
+		kind: 'terminal' | 'run-script',
+		status: 'running' | 'exited',
+	) => {
+		let opened = 0;
+		vi.mocked(ports.terminals.startTerminal).mockImplementation(async () => {
+			opened += 1;
+			return { ok: true, shell: '/bin/zsh', terminalId: `term-${opened}` };
+		});
+		vi.mocked(ports.terminals.listTerminals).mockImplementation(async () =>
+			Array.from({ length: opened }, (_unused, index) => ({
+				foregroundCommand: null,
+				kind,
+				scriptName: null,
+				shell: '/bin/zsh',
+				status,
+				terminalId: `term-${index + 1}`,
+				workspaceId: 'ws',
+			})),
+		);
+	};
+
+	// A PTY spawns nothing and cannot recurse, so it is not delegation and must
+	// not cost the budget an agent delegates with. It used to: one terminal and
+	// the tree below could no longer open a sub-agent at all.
+	it('leaves the delegation budget alone when a terminal is opened', async () => {
+		const ports = makePorts();
+		const { service } = setup({
+			guardrails: { maxSpawnsPerSession: 1 },
+			ports,
+		});
+
+		await startTerminalAs(service, 'tok-caller');
+		const spawned = await service.invoke({
+			op: 'spawnChatTab',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(spawned.ok).toBe(true);
+	});
+
+	// The reported bug, end to end: an agent that opens a terminal, finishes with
+	// it, and closes it used to spend a slot it never got back, so the twenty-first
+	// cycle of an ordinary day's work was refused as a fork-bomb.
+	it('never exhausts a budget on terminals that were closed again', async () => {
+		const ports = makePorts();
+		trackTerminals(ports, 'terminal', 'running');
+		const { service } = setup({
+			guardrails: { maxTerminalStartsPerMinute: 100 },
+			ports,
+		});
+
+		const outcomes: boolean[] = [];
+		for (let cycle = 1; cycle <= 30; cycle += 1) {
+			const started = await startTerminalAs(service, 'tok-caller');
+			outcomes.push(started.ok);
+			await service.invoke({
+				op: 'stopTerminal',
+				token: 'tok-caller',
+				rawArgs: { terminalId: `term-${cycle}`, close: true },
+			});
+		}
+
+		expect(outcomes.filter((ok) => ok)).toHaveLength(30);
+	});
+
+	it('refuses a start once the caller holds its limit of running terminals', async () => {
+		const ports = makePorts();
+		trackTerminals(ports, 'terminal', 'running');
+		const { service } = setup({ guardrails: { maxOpenTerminals: 2 }, ports });
+
+		await startTerminalAs(service, 'tok-caller');
+		await startTerminalAs(service, 'tok-caller');
+		const third = await startTerminalAs(service, 'tok-caller');
+
+		expect(third.ok).toBe(false);
+		if (!third.ok) {
+			expect(third.code).toBe('denied-quota');
+			expect(third.error).toContain('Only what is still open counts');
+		}
+	});
+
+	// A run script the agent restarted leaves its old session listed as exited,
+	// and the agent cannot close one. Counting those would have made the cap a
+	// lifetime quota by another name.
+	it('stops counting a script terminal whose process has exited', async () => {
+		const ports = makePorts();
+		trackTerminals(ports, 'run-script', 'exited');
+		const { service } = setup({ guardrails: { maxOpenTerminals: 2 }, ports });
+
+		await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run', scriptName: 'dev' },
+		});
+		await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run', scriptName: 'dev' },
+		});
+		const third = await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run', scriptName: 'dev' },
+		});
+
+		expect(third.ok).toBe(true);
+	});
+
+	// The opposite case, and the reason the two are told apart: a spawn terminal
+	// whose shell exited still holds a tab in the user's dock, and the agent can
+	// take it away. Letting those go uncounted would leave an overnight run free
+	// to litter the dock with dead tabs.
+	it('keeps counting a dock terminal whose shell has exited', async () => {
+		const ports = makePorts();
+		trackTerminals(ports, 'terminal', 'exited');
+		const { service } = setup({ guardrails: { maxOpenTerminals: 2 }, ports });
+
+		await startTerminalAs(service, 'tok-caller');
+		await startTerminalAs(service, 'tok-caller');
+		const third = await startTerminalAs(service, 'tok-caller');
+
+		expect(third.ok).toBe(false);
+	});
+
+	// The user can close an agent's terminal from the dock, and nothing tells the
+	// control layer that happened. The count is read off the live listing for
+	// exactly this case: the row is gone, so the slot is back.
+	it('returns a slot when the user closes the terminal behind the app', async () => {
+		const ports = makePorts();
+		const open = new Set(['term-1', 'term-2']);
+		let opened = 0;
+		vi.mocked(ports.terminals.startTerminal).mockImplementation(async () => {
+			opened += 1;
+			return { ok: true, shell: '/bin/zsh', terminalId: `term-${opened}` };
+		});
+		vi.mocked(ports.terminals.listTerminals).mockImplementation(async () =>
+			[...open].map((terminalId) => ({
+				foregroundCommand: null,
+				kind: 'terminal',
+				scriptName: null,
+				shell: '/bin/zsh',
+				status: 'running',
+				terminalId,
+				workspaceId: 'ws',
+			})),
+		);
+		const { service } = setup({ guardrails: { maxOpenTerminals: 2 }, ports });
+
+		await startTerminalAs(service, 'tok-caller');
+		await startTerminalAs(service, 'tok-caller');
+		const refused = await startTerminalAs(service, 'tok-caller');
+		open.delete('term-1');
+		const afterUserClosedOne = await startTerminalAs(service, 'tok-caller');
+
+		expect(refused.ok).toBe(false);
+		expect(afterUserClosedOne.ok).toBe(true);
+	});
+
+	// The user's own terminals are not the agent's budget, and neither are a
+	// sibling tree's — the cap follows the delegation tree that opened them.
+	it('counts only the terminals this delegation tree started', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.terminals.listTerminals).mockResolvedValue(
+			['users-own', 'users-other', 'users-third'].map((terminalId) => ({
+				foregroundCommand: null,
+				kind: 'terminal',
+				scriptName: null,
+				shell: '/bin/zsh',
+				status: 'running',
+				terminalId,
+				workspaceId: 'ws',
+			})),
+		);
+		const { service } = setup({ guardrails: { maxOpenTerminals: 1 }, ports });
+
+		const started = await startTerminalAs(service, 'tok-caller');
+
+		expect(started.ok).toBe(true);
 	});
 });

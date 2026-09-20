@@ -147,6 +147,23 @@ Delegation is bounded so a runaway agent cannot fork-bomb the app
   a workspace id never changes and the ledger is append-only, so the lifetime
   budget would otherwise have become a permanent cap on the whole history of a
   workspace's terminals.
+- **Starting a terminal is guarded separately and is not a spawn.** A PTY spawns
+  nothing and cannot recurse, so what is bounded is **8 terminals open at once**
+  per root tree and **10 starts per minute** (rolling) — never a lifetime count.
+  The open count is derived from `listTerminals` on every attempt, so nothing has
+  to tell the guardrail a terminal went away: a closed tab has already left that
+  listing, which makes a close by the *user* return the slot as reliably as a
+  close by the agent. `startedTerminals` supplies which root tree started each
+  one. A dock terminal counts for as long as it is listed, running or not —
+  its tab is the thing being held, and `close: true` is what gives it back. A
+  script terminal counts only while it runs: the agent cannot close one, and a
+  restart replaces the session rather than adding a second, so counting the
+  exited half would have made this a lifetime quota under another name. Charging
+  terminals to the spawn ledger instead was the same bug the `appRunId` above
+  fixes one level down: an agent that opened and closed a dozen terminals over a
+  long session found the budget it needed to *delegate* already spent, and was
+  refused with a fork-bomb message. Depth is still checked, so a depth-2 leaf
+  cannot start a terminal.
 - **Plan Mode and AFK Mode are inherited** — a descendant receives the caller's
   mode snapshot. A depth-1 planning manager may fan out read-only leaves; the
   inherited depth-2 policy prevents further recursion.
