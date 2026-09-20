@@ -1068,3 +1068,63 @@ test('writeTokens: refuses an account with no row as not-connected', async (t) =
 		null,
 	);
 });
+
+test('writeTokens and delete are serialized per account', async (t) => {
+	const inner = createMockSecretStore({ now: () => NOW });
+	let releaseWrite: () => void = () => undefined;
+	let signalWriting: () => void = () => undefined;
+	let holdAccessTokenReads = false;
+	const writing = new Promise<void>((resolve) => {
+		signalWriting = resolve;
+	});
+	const writeHeld = new Promise<void>((resolve) => {
+		releaseWrite = resolve;
+	});
+	const secretStore = {
+		...inner,
+		read: async (lookup: Parameters<SecretStore['read']>[0]) => {
+			if (
+				holdAccessTokenReads &&
+				lookup.key.startsWith('linear-access-token:')
+			) {
+				holdAccessTokenReads = false;
+				signalWriting();
+				await writeHeld;
+			}
+
+			return inner.read(lookup);
+		},
+	} as SecretStore;
+	const { databaseService, service } = createServiceFixture(t, { secretStore });
+	const login = await service.startLogin();
+	assert.ok(login.status === 'connected');
+	const accountId = login.account.id;
+	const database = databaseService.getConnection()?.database;
+	assert.ok(database);
+	const accountStore = createLinearAccountStore({
+		database,
+		now: () => NOW,
+		secretStore,
+	});
+
+	holdAccessTokenReads = true;
+	const write = accountStore.writeTokens(accountId, {
+		accessToken: 'racing-access',
+		refreshToken: 'racing-refresh',
+	});
+	await writing;
+	const removal = accountStore.delete(accountId);
+	releaseWrite();
+	await Promise.all([write, removal]);
+
+	for (const key of [
+		`linear-access-token:${accountId}`,
+		`linear-refresh-token:${accountId}`,
+	]) {
+		assert.strictEqual(await inner.read({ key, scope: 'app' }), null);
+	}
+	assert.strictEqual(
+		database.prepare('SELECT id FROM linear_accounts').all().length,
+		0,
+	);
+});
