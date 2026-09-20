@@ -21,7 +21,7 @@ import {
 } from '../storage/repositories/workspace-repository.ts';
 import { withTransaction } from '../storage/tx.ts';
 import { firstLine } from './first-line.ts';
-import { parseMetadata } from './metadata.ts';
+import { branchWasAdopted, parseMetadata } from './metadata.ts';
 import { toSlug } from './slug.ts';
 import { validateGitRef } from './validate-git-ref.ts';
 import { validateWorkspaceName as validateWorkspaceNameShared } from './workspace-validation.ts';
@@ -543,17 +543,6 @@ function updateWorkspaceRow({
 			timestamp,
 		});
 	});
-}
-
-/**
- * Reports whether the workspace took over a branch that already existed rather
- * than cutting its own. Such a branch predates the workspace and usually backs a
- * pull request, so renaming the workspace must leave the git branch alone.
- * @param metadata - The workspace's parsed metadata blob.
- * @returns True when the branch was adopted.
- */
-function branchWasAdopted(metadata: Record<string, unknown>): boolean {
-	return metadata.adoptedBranch === true;
 }
 
 /**

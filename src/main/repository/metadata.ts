@@ -19,3 +19,14 @@ export function parseMetadata(
 		return {};
 	}
 }
+
+/**
+ * Reports whether the workspace took over a branch that already existed rather
+ * than cutting its own. Such a branch predates the workspace and usually backs a
+ * pull request, so rename and archive must leave the git branch alone.
+ * @param metadata - The workspace's parsed metadata blob.
+ * @returns True when the branch was adopted.
+ */
+export function branchWasAdopted(metadata: Record<string, unknown>): boolean {
+	return metadata.adoptedBranch === true;
+}
