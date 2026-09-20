@@ -80,6 +80,7 @@ export interface LinearAccountStore {
 	 * rather than adding a second one.
 	 */
 	upsertIdentity: (identity: LinearAccountIdentity) => LinearAccountRecord;
+	/** Stores the token pair, rejecting an account id that has no row. */
 	writeTokens: (
 		accountId: string,
 		tokens: LinearAccountTokens,
@@ -278,6 +279,12 @@ export function createLinearAccountStore({
 		},
 
 		writeTokens: async (accountId, { accessToken, refreshToken }) => {
+			if (!readAccountRow(database, accountId)) {
+				throw new Error(
+					'Linear tokens cannot be stored for an account that does not exist.',
+				);
+			}
+
 			await writeSecret(
 				`${ACCESS_TOKEN_KEY_PREFIX}${accountId}`,
 				`Linear access token (${accountId})`,
