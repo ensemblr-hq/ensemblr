@@ -127,6 +127,18 @@ const ALLOWED = [
 	'date -dyesterday',
 	'date -r1700000000',
 	'date -v-1d',
+	// The same value letters spelled with a space consume the token after them,
+	// so what follows is the flag's value rather than a clock-setting operand.
+	'date -d yesterday',
+	'date -r 1700000000',
+	'date --date=yesterday',
+	'date --reference /tmp/stamp',
+	'date -u -Iseconds',
+	// BSD `-j` parses the operand and prints it instead of setting the clock,
+	// which is how macOS spells date arithmetic. Both the separate and the
+	// clustered spelling disarm the operand that follows.
+	'date -j -f %Y-%m-%d 2020-01-01 +%s',
+	'date -jf %Y-%m-%d 2020-01-01 +%s',
 	// `--type fx` is not a filetype fd accepts, so this runs nothing at all —
 	// `-t` swallowing the `x` is what `fd -tx` needs to stay readable.
 	'fd -tfx rm',
@@ -197,6 +209,16 @@ const DENIED = [
 	// `date -s` sets the system clock rather than reading it.
 	'date -s "2020-01-01"',
 	'date --set 2020-01-01',
+	// BSD `date` sets the clock from a bare positional with no flag at all, so
+	// the operand has to be screened as well as the flag. Only `+FORMAT` reads.
+	'date 010100002026',
+	'date -u 010100002026',
+	'date -- 010100002026',
+	// getopt stops at the first operand, so a `-j` after one is another operand
+	// rather than the flag that would have disarmed it.
+	'date 010100002026 -j',
+	// Without `-j`, BSD `-f` parses the operand and then sets the clock from it.
+	'date -f %Y-%m-%d 2020-01-01',
 	// A target that merely starts with the null sink is a file like any other.
 	'cat a >/dev/nullx',
 	'cat a 2>/dev/nullx',

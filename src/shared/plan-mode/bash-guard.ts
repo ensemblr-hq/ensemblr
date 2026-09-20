@@ -229,6 +229,27 @@ const UNIQ_VALUE_FLAGS: ReadonlySet<string> = new Set([
 	'-w',
 ]);
 
+/**
+ * Short `date` letters that consume the following token as their value. `-I` is
+ * deliberately absent: its timespec is only ever attached (`-Iseconds`), so
+ * counting it here would swallow the operand that follows a bare `-I`.
+ */
+const DATE_VALUE_LETTERS: ReadonlySet<string> = new Set([
+	'd',
+	'f',
+	'r',
+	's',
+	'v',
+]);
+
+/** Long `date` flags that consume the token after them rather than an operand. */
+const DATE_VALUE_FLAGS: ReadonlySet<string> = new Set([
+	'--date',
+	'--file',
+	'--reference',
+	'--set',
+]);
+
 const ASSIGNMENT_PREFIX = /^([A-Za-z_][A-Za-z0-9_]*)=/;
 
 /**
@@ -566,6 +587,89 @@ function evaluateUniq(args: readonly string[]): BashGuardVerdict {
 		: { ok: true };
 }
 
+/**
+ * Reports whether a `date` option token takes the following token as its value.
+ * A long flag spelled `--flag=value` and a short flag carrying an attached value
+ * (`-r1700000000`) both hold their own, so only the bare spellings consume a
+ * second token.
+ * @param token - One option token from a `date` invocation.
+ * @returns True when the next token is this option's value rather than an operand.
+ */
+function consumesNextDateToken(token: string): boolean {
+	if (token.startsWith('--')) {
+		return DATE_VALUE_FLAGS.has(token);
+	}
+	const letters = token.slice(1);
+	for (let index = 0; index < letters.length; index += 1) {
+		if (DATE_VALUE_LETTERS.has(letters[index] ?? '')) {
+			return index === letters.length - 1;
+		}
+	}
+	return false;
+}
+
+/**
+ * Reports whether a `date` option token carries BSD's `-j`, which parses its
+ * operand and prints it instead of setting the clock. The scan stops at the
+ * first value letter so a `j` inside an attached value — `date -djanuary` — is
+ * read as the value it is.
+ * @param token - One option token from a `date` invocation.
+ * @returns True when this token disarms the operand.
+ */
+function isDateParseOnly(token: string): boolean {
+	for (const letter of shortFlagLetters(token)) {
+		if (letter === 'j') {
+			return true;
+		}
+		if (DATE_VALUE_LETTERS.has(letter)) {
+			return false;
+		}
+	}
+	return false;
+}
+
+/**
+ * Classifies a `date` invocation, whose bare positional operand sets the system
+ * clock on BSD `date` with no flag involved: `date 010100002026` parses and
+ * reaches `clock_settime`. `FLAG_GUARDED_COMMANDS` already screens the `-s` and
+ * `--set` spelling of the same capability, and this closes the spelling that
+ * carries no flag to name.
+ *
+ * Only a `+FORMAT` operand reads, so every other surviving operand is denied.
+ * BSD's `-j` is the exception it documents: it parses the operand and prints it
+ * rather than setting the clock, and `date -j -f '%Y-%m-%d' 2020-01-01 +%s` is
+ * an ordinary read.
+ * @param args - Tokens after the `date` head word.
+ * @returns Allowed while every operand is a `+FORMAT` string or `-j` disarms it.
+ */
+function evaluateDate(args: readonly string[]): BashGuardVerdict {
+	let optionsEnded = false;
+	let parseOnly = false;
+	let index = 0;
+	while (index < args.length) {
+		const token = args[index] ?? '';
+		if (!optionsEnded && token === '--') {
+			optionsEnded = true;
+			index += 1;
+			continue;
+		}
+		if (optionsEnded || !token.startsWith('-') || token === '-') {
+			if (!parseOnly && !token.startsWith('+')) {
+				return deny(
+					'`date <operand>` sets the system clock, and only a `+FORMAT` operand reads it',
+				);
+			}
+			index += 1;
+			continue;
+		}
+		if (isDateParseOnly(token)) {
+			parseOnly = true;
+		}
+		index += consumesNextDateToken(token) ? 2 : 1;
+	}
+	return { ok: true };
+}
+
 /** The tokens at `git`'s subcommand, or the global flag that disqualified it. */
 type GitGlobals = { rest: readonly string[] } | { violation: string };
 
@@ -829,6 +933,9 @@ function evaluateSegment(segment: readonly string[]): BashGuardVerdict {
 		return evaluateUniq(args);
 	}
 	const guarded = evaluateFlagGuard(head, args);
+	if (head === 'date') {
+		return guarded ?? evaluateDate(args);
+	}
 	if (guarded) {
 		return guarded;
 	}
