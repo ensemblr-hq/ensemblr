@@ -1,12 +1,13 @@
 # Jev Decision Layer (Proposal)
 
-> **Status:** Proposal, 2026-09-19. Nothing has been built yet. Building starts only if the
-> Phase 0 spike passes, and the spike needs a TypeSafe early-access API key.
+> **Status:** Rejected after Phase 0, 2026-09-20. The measured spike failed every go/no-go
+> gate. None of F1-F5 has been built.
 >
-> **One-line summary:** when the user adds a TypeSafe API key, Ensemblr uses Jev, TypeSafe's
-> fast model that only classifies, for a few narrow, typed decisions around orchestration. One
-> of them, model selection, is behind a toggle. The rest run automatically. Each of them falls
-> back to today's behaviour whenever Jev is missing, slow, or unsure.
+> **One-line summary:** this proposal would have used Jev, TypeSafe's fast classification
+> model, for a few narrow, typed orchestration decisions when the user added a TypeSafe API
+> key. Model selection would have been behind a toggle; the other features would have run
+> automatically and fallen back to today's behaviour whenever Jev was missing, slow, or
+> unsure.
 
 ## What Jev is, and what it is not
 
@@ -292,42 +293,58 @@ It never sends file contents, diffs, terminal output, environment variables, or 
 | 3 | F2 and F3 | 1–1.5 days |
 | 4 | F4 and F5, including the `setSummary` contract change and the tab surface | ~1.5 days |
 
-Total is about 5 days once the spike passes.
+The implementation was estimated at about 5 days if the spike passed.
 
-### Phase 0 status (2026-09-19)
+### Phase 0 result (2026-09-20)
 
-The harness was built but not run, because implementation moved to another workspace.
+Phase 0 is a **no-go**. Production implementation stopped at this gate.
 
-**Dataset.** The harness read the local event log read-only, with secrets redacted, and pulled:
-- 152 unique spawn briefs, 133 of which name a role
-- 86 `ask_user_question` questions, 78 with the user's actual answer
-- 190 child reports
+The rebuilt harness read the local event log in read-only mode and redacted secrets before
+writing or sending any text. It extracted the proposed 152 spawn briefs, 86
+`ask_user_question` questions, and 190 child reports. The evaluation used all briefs and
+questions plus 60 reports enriched for uncommon flags. Opus 5 labelled the question and
+report samples independently. The disposable harness, redacted dataset, labels, and raw
+results remain under the ignored `.context/jev/` directory.
 
-A dry run sized the full evaluation at 378 requests, about 380k input tokens and about $0.02.
+The run made 298 requests to pinned model `jev-1.13.0`. It used 424,380 input tokens and
+22,562 output tokens, costing about $0.018. Median latency was 301 ms; p95 was 547 ms, and the
+slowest request took 994 ms.
 
-**Gold labels.** Opus 5 wrote the gold labels. Two findings already bear on the design:
+| Check | Required | Measured |
+| --- | ---: | ---: |
+| F1 role accuracy | >= 0.85 | 0.586 |
+| F1 role macro-F1 | >= 0.85 | 0.469 |
+| F1 high-confidence precision | >= 0.95 | 0.689 |
+| F1 difficulty rank correlation | >= 0.50 | 0.497 |
+| F2 certain-label macro-F1 | >= 0.80 | 0.433 |
+| F2 automatic-bounce precision | >= 0.95 | 0.167 |
+| F2 authority recall at 0.60 | >= 0.95 | 0.267 |
 
-- **F2's categories are blurry.** The labeler marked 45 of 86 questions as unsure. Most of the
-  confusion was between `user-preference` and `answerable-from-context`: option descriptions
-  often cite a repository precedent, which makes a question both. Some questions fit no
-  category at all, such as a fact only the user holds or a physical action on another
-  machine. Tighten the taxonomy before relying on it, for example by adding
-  `needs-user-fact`, and score F2 on the labels the labeler was sure of.
-- **F3's sample lacks the rare flags.** 58 of 60 sampled reports claim completion, 2 are
-  blocked and 5 leave open questions. The `checksFailed` wording also caught every "check not
-  run" note. Evaluate on a sample enriched for the rare flags, and split "failed" from "not
-  run".
+F2 also had a dataset problem: 29 of 86 labels were uncertain, and none of the certain labels
+was `answerable-from-context`. Jev nevertheless chose that category for 23 certain examples,
+which accounts for much of the poor bounce precision. The sample cannot establish a safe
+threshold for the automatic bounce.
 
-**What the spike measures.** Besides the labelled checks, F1 is checked against what the
-orchestrator actually chose, needing no hand labels:
-- the role named in the brief, with role words stripped before sending
-- the thinking level the orchestrator picked, compared by rank correlation
+F3 failed its per-flag gate too:
 
-A second check sends the recorded questions back to Jev and compares its pick with the answer
-the user actually gave and with the agent's recommended option. That tests whether Jev only
-repeats the recommendation.
+| Flag | F1 | Precision | Recall | ECE |
+| --- | ---: | ---: | ---: | ---: |
+| Open questions | 0.742 | 0.605 | 0.958 | 0.208 |
+| Checks failed | 0.778 | 0.778 | 0.778 | 0.063 |
+| Checks not run | 0.842 | 0.857 | 0.828 | 0.114 |
+| Blocked | 0.333 | 1.000 | 0.200 | 0.044 |
+| Claims complete | 0.681 | 1.000 | 0.517 | 0.558 |
 
-## Testing
+All 60 sampled reports claimed completion, and none had a previous report, so the sample could
+not test `claimsComplete` as a discriminating label or test `repeatsPrevious` at all. The
+remaining flags still missed the required F1, precision, or calibration bounds.
+
+No TypeSafe service, key storage, decision log, settings UI, or F1-F5 hook should be built from
+this proposal. A revisit needs a new design, a representative F2 set containing certain
+`answerable-from-context` examples, report pairs for the repetition check, and a fresh spike
+against a newer model or materially different questions.
+
+## Planned testing (not implemented)
 
 - The pure policy functions (F2's table, F1's mapping from difficulty to rung, the F3 and F4
   thresholds) get Vitest tests under `tests/shared/`.
