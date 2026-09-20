@@ -67,6 +67,7 @@ interface PortOptions {
 	catalog?: Record<string, CatalogRow[]>;
 	composeBrief?: ReturnType<typeof vi.fn>;
 	confirm: ReturnType<typeof vi.fn>;
+	hidden?: readonly string[];
 	planning?: boolean;
 	startConversation: ReturnType<typeof vi.fn>;
 	terminals?: { kind: string; status: string; terminalId: string }[];
@@ -98,12 +99,23 @@ const makePorts = (options: PortOptions): AgentControlPorts =>
 			getStatus: vi.fn().mockResolvedValue(null),
 			hasFinalMessage: vi.fn().mockResolvedValue(false),
 			isSpawnedSubAgent: vi.fn().mockResolvedValue(false),
-			listModels: vi.fn(({ runtime }: { runtime: string | null }) =>
-				Promise.resolve({
-					defaultModelId: 'm',
-					models: modelsFor(options.catalog ?? CATALOG, runtime),
+			listModels: vi.fn(
+				({
+					includeHidden,
 					runtime,
-				}),
+				}: {
+					includeHidden?: boolean;
+					runtime: string | null;
+				}) => {
+					const hidden = new Set(options.hidden ?? []);
+					return Promise.resolve({
+						defaultModelId: 'm',
+						models: modelsFor(options.catalog ?? CATALOG, runtime).filter(
+							(row) => includeHidden === true || !hidden.has(row.id),
+						),
+						runtime,
+					});
+				},
 			),
 			readTranscript: vi.fn(),
 			resolveConversationWorkspace: vi.fn().mockResolvedValue('ws'),
@@ -329,6 +341,25 @@ describe('agent-control startReview', () => {
 		});
 		expect(message).toContain('Claude Code');
 		expect(message).toContain('Say so in your report');
+	});
+
+	// Hiding a model governs what agents may be delegated to, not the model the
+	// user explicitly chose for reviews. A pin the user later hides is still their
+	// pin, so the review opens on it — carrying `includeHidden` past the spawn's
+	// hidden-model filter — rather than silently downgrading to the caller's model.
+	it('honours a pinned review model the user has since hidden', async () => {
+		const { service, startConversation } = setup({ hidden: ['claude-opus-5'] });
+
+		const { message } = succeeded(await startReview(service));
+
+		expect(startConversation.mock.calls[0][0]).toMatchObject({
+			callerRuntime: null,
+			includeHidden: true,
+			model: 'claude-opus-5',
+			thinkingLevel: 'high',
+		});
+		expect(message).toContain('Claude Code');
+		expect(message).not.toContain("no longer in this app's catalogue");
 	});
 
 	// The runtime is withheld whenever a pin resolved, because the check it feeds

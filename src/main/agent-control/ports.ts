@@ -305,13 +305,25 @@ export interface ConversationPort {
 		 * questionnaire in a tab nobody is watching.
 		 */
 		afkMode: boolean;
+		/**
+		 * Whether an explicit `model` may be a hidden one. Off for every delegation
+		 * route — a spawning agent cannot reach a hidden model by naming it — and set
+		 * only by the internal Review spawn, whose model is the user's own pin rather
+		 * than a model any agent chose.
+		 */
+		includeHidden?: boolean;
 	}) => Promise<StartConversationOutcome>;
 	/**
 	 * Lists the models the caller may spawn a child on — its own runtime's, or
 	 * every runtime's when the caller has none the app can name.
+	 *
+	 * `includeHidden` keeps models the user hid from delegated spawns and defaults
+	 * off: only the internal Review-pin lookup sets it, so an agent's own
+	 * `listModels` never sees a hidden model.
 	 */
 	listModels: (input: {
 		runtime: AgentProviderId | null;
+		includeHidden?: boolean;
 	}) => Promise<AgentControlModelList>;
 	sendFollowUp: (input: {
 		agentSessionId: string;

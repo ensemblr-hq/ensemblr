@@ -1971,9 +1971,14 @@ export function createAgentControlService({
 	 * one catalogue build — `list()` is rebuilt per call rather than cached, and it
 	 * shells out to `pi --list-models` to do it, so a search that asked per runtime
 	 * paid for the same merged catalogue twice.
+	 *
+	 * `includeHidden` covers the same ground on the visibility axis: hiding a model
+	 * governs what agents may be delegated to, not the model the user explicitly
+	 * chose for reviews, so the lookup keeps a hidden pin rather than dropping it
+	 * and silently downgrading the review onto the caller's own model.
 	 * @param requested - The model the brief carried, or null when it carried none.
 	 * @returns The catalogue row, or null when no model is pinned or the
-	 *   catalogue no longer carries the pinned one.
+	 *   catalogue no longer carries the pinned one at all.
 	 */
 	const reviewModelRow = async (
 		requested: string | null,
@@ -1982,7 +1987,7 @@ export function createAgentControlService({
 			return null;
 		}
 		const listing = await ports.conversations
-			.listModels({ runtime: null })
+			.listModels({ includeHidden: true, runtime: null })
 			.catch(() => null);
 		return listing?.models.find((model) => model.id === requested) ?? null;
 	};
@@ -2112,6 +2117,9 @@ export function createAgentControlService({
 				// the model is the user's rather than the caller's to have chosen.
 				callerRuntime: pinned ? null : originRuntime(origin),
 				callerSpecies: origin.species,
+				// A pinned review model the user has since hidden is still their pin;
+				// let the spawn honour it where an agent naming a hidden model is refused.
+				includeHidden: pinned !== null,
 				model: pinned?.id,
 				parentSessionId: origin.sessionId,
 				planMode: false,
@@ -2187,8 +2195,10 @@ export function createAgentControlService({
 	 * The review runs on the model and thinking level the user configured for
 	 * reviews, wherever those live — {@link reviewModelRow} resolves the pin across
 	 * both runtimes and the spawn withholds the caller's own runtime so it can open
-	 * there. A caller on one runtime routinely opens a review on the other, and
-	 * only a pin the catalogue has lost falls back to the caller's own model.
+	 * there. A caller on one runtime routinely opens a review on the other. Hiding
+	 * that model does not unset the pin: the lookup and the spawn both carry
+	 * `includeHidden`, so a hidden pin is still honoured, and only a pin the
+	 * catalogue no longer carries at all falls back to the caller's own model.
 	 *
 	 * The Concierge and a spawned sub-agent are refused it by
 	 * {@link CONCIERGE_BLOCKED_OPS} and {@link SUBAGENT_BLOCKED_OPS}: neither has
