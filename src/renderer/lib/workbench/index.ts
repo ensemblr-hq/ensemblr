@@ -33,14 +33,10 @@ export {
 	resolveLinkedIssueSeed,
 } from './linked-issue-composer-seed';
 export {
-	computeWorkspaceModelSignature,
-	createNavigationProjectIdentityCache,
 	createPlaceholderSession,
 	getRenderableNavigationSnapshot,
 	mapNavigationSnapshotToProjects,
 	mapRepositoriesToProjects,
-	type NavigationProjectIdentityCache,
-	reconcileNavigationProjectIdentity,
 } from './navigation-model';
 export {
 	findWorkspaceNavigationSelection,

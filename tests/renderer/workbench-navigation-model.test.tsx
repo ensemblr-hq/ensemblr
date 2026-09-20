@@ -21,13 +21,10 @@ function withQueryClient(node: ReactNode): ReactNode {
 import {
 	applyWorkspaceChangeSummaries,
 	collectWorkspaceChangeSummaryUpdates,
-	computeWorkspaceModelSignature,
-	createNavigationProjectIdentityCache,
 	getNavigationWorkspaceChangeSummaryTargets,
 	getRenderableNavigationSnapshot,
 	mapNavigationSnapshotToProjects,
 	mapRepositoriesToProjects,
-	reconcileNavigationProjectIdentity,
 	resolveWorkspaceNavigationRenderState,
 	resolveWorkspaceNavigationSelection,
 	resolveWorkspaceRouteParams,
@@ -37,7 +34,6 @@ import type {
 	RepositoryWorkspaceNavigationSnapshot,
 	RepositoryWorkspaceNavigationWorkspace,
 } from '../../src/shared/ipc';
-import type { WorkspacePrPresentation } from '../../src/shared/ipc/contracts/repository-navigation';
 
 const navigationSnapshot: RepositoryWorkspaceNavigationSnapshot = {
 	generatedAt: '2026-06-06T00:00:00.000Z',
@@ -771,179 +767,4 @@ test('renders live navigation records and true empty repository state', () => {
 	expect(emptyMarkup).toContain('Repositories');
 	expect(emptyMarkup).not.toContain('0 repos');
 	expect(emptyMarkup).not.toContain('0 workspaces');
-});
-
-/** Builds a compact PR presentation for a navigation workspace row. */
-function prPresentation(
-	overrides: Partial<WorkspacePrPresentation> = {},
-): WorkspacePrPresentation {
-	return {
-		branchSync: null,
-		number: 7,
-		status: 'checking',
-		syncedAt: '2026-06-06T00:00:00.000Z',
-		...overrides,
-	};
-}
-
-/** A two-repo snapshot whose repo-1 workspace carries the given PR presentation. */
-function snapshotWithPresentation(
-	presentation: WorkspacePrPresentation,
-): RepositoryWorkspaceNavigationSnapshot {
-	return withRepositoryOneWorkspaces([
-		{
-			archivedAt: null,
-			baseBranch: 'master',
-			branchName: 'octocat/eng-120',
-			createdAt: '2026-06-06T00:00:00.000Z',
-			id: 'workspace-1',
-			metadata: {},
-			name: 'ENG-120 Sidebar nav',
-			path: '/Users/alice/Ensemblr/workspaces/ensemblr/eng-120',
-			pullRequest: presentation,
-			repositoryId: 'repo-1',
-			slug: 'eng-120',
-			updatedAt: '2026-06-06T00:00:00.000Z',
-		},
-	]);
-}
-
-test('drops only syncedAt from the workspace model signature', () => {
-	const [t1] =
-		mapRepositoriesToProjects(
-			snapshotWithPresentation(
-				prPresentation({ syncedAt: '2026-06-06T00:00:00.000Z' }),
-			).repositories,
-		)[0]?.workspaces ?? [];
-	const [t2] =
-		mapRepositoriesToProjects(
-			snapshotWithPresentation(
-				prPresentation({ syncedAt: '2026-06-06T09:99:99.000Z' }),
-			).repositories,
-		)[0]?.workspaces ?? [];
-	const [statusChanged] =
-		mapRepositoriesToProjects(
-			snapshotWithPresentation(prPresentation({ status: 'ready' }))
-				.repositories,
-		)[0]?.workspaces ?? [];
-
-	expect(t1).toBeDefined();
-	expect(computeWorkspaceModelSignature(t1 as WorkspaceShellModel)).toBe(
-		computeWorkspaceModelSignature(t2 as WorkspaceShellModel),
-	);
-	expect(computeWorkspaceModelSignature(t1 as WorkspaceShellModel)).not.toBe(
-		computeWorkspaceModelSignature(statusChanged as WorkspaceShellModel),
-	);
-});
-
-test('keeps every reference across a poll that moved only syncedAt', () => {
-	const poll1 = mapRepositoriesToProjects(
-		snapshotWithPresentation(
-			prPresentation({ syncedAt: '2026-06-06T00:00:00.000Z' }),
-		).repositories,
-	);
-	const first = reconcileNavigationProjectIdentity(
-		poll1,
-		createNavigationProjectIdentityCache(),
-	);
-
-	const poll2 = mapRepositoriesToProjects(
-		snapshotWithPresentation(
-			prPresentation({ syncedAt: '2026-06-06T12:00:00.000Z' }),
-		).repositories,
-	);
-	const second = reconcileNavigationProjectIdentity(poll2, first.cache);
-
-	expect(poll2).not.toBe(poll1);
-	expect(second.projects).toBe(first.projects);
-	expect(second.projects[0]).toBe(first.projects[0]);
-	expect(second.projects[0]?.workspaces[0]).toBe(
-		first.projects[0]?.workspaces[0],
-	);
-	expect(second.projects[1]?.workspaces[0]).toBe(
-		first.projects[1]?.workspaces[0],
-	);
-});
-
-test('produces a fresh reference when a rendered PR field changed', () => {
-	const first = reconcileNavigationProjectIdentity(
-		mapRepositoriesToProjects(
-			snapshotWithPresentation(prPresentation({ status: 'checking' }))
-				.repositories,
-		),
-		createNavigationProjectIdentityCache(),
-	);
-	const second = reconcileNavigationProjectIdentity(
-		mapRepositoriesToProjects(
-			snapshotWithPresentation(prPresentation({ status: 'ready' }))
-				.repositories,
-		),
-		first.cache,
-	);
-
-	expect(second.projects).not.toBe(first.projects);
-	expect(second.projects[0]).not.toBe(first.projects[0]);
-	expect(second.projects[0]?.workspaces[0]).not.toBe(
-		first.projects[0]?.workspaces[0],
-	);
-	expect(second.projects[1]).toBe(first.projects[1]);
-});
-
-test('isolates a fresh reference to the one workspace whose content changed', () => {
-	const base = snapshotWithPresentation(prPresentation({ status: 'checking' }));
-	const first = reconcileNavigationProjectIdentity(
-		mapRepositoriesToProjects(base.repositories),
-		createNavigationProjectIdentityCache(),
-	);
-
-	const changedRepoTwo: RepositoryWorkspaceNavigationSnapshot = {
-		...base,
-		repositories: base.repositories.map((repository) =>
-			repository.id === 'repo-2'
-				? {
-						...repository,
-						workspaces: repository.workspaces.map((workspace) => ({
-							...workspace,
-							name: 'Renamed draft',
-						})),
-					}
-				: repository,
-		),
-	};
-	const second = reconcileNavigationProjectIdentity(
-		mapRepositoriesToProjects(changedRepoTwo.repositories),
-		first.cache,
-	);
-
-	expect(second.projects).not.toBe(first.projects);
-	expect(second.projects[0]).toBe(first.projects[0]);
-	expect(second.projects[0]?.workspaces[0]).toBe(
-		first.projects[0]?.workspaces[0],
-	);
-	expect(second.projects[1]).not.toBe(first.projects[1]);
-	expect(second.projects[1]?.workspaces[0]).not.toBe(
-		first.projects[1]?.workspaces[0],
-	);
-});
-
-test('remaps every reference when a translated row field changed', () => {
-	const first = reconcileNavigationProjectIdentity(
-		mapRepositoriesToProjects(navigationSnapshot.repositories),
-		createNavigationProjectIdentityCache(),
-	);
-	const retranslated = first.projects.map((project) => ({
-		...project,
-		workspaces: project.workspaces.map((workspace) => ({
-			...workspace,
-			sourceSummary: `${workspace.sourceSummary} (ru)`,
-		})),
-	}));
-	const second = reconcileNavigationProjectIdentity(retranslated, first.cache);
-
-	expect(second.projects[0]?.workspaces[0]).not.toBe(
-		first.projects[0]?.workspaces[0],
-	);
-	expect(second.projects[1]?.workspaces[0]).not.toBe(
-		first.projects[1]?.workspaces[0],
-	);
 });
