@@ -9,6 +9,7 @@ import { ProviderCheckRow } from '@/renderer/components/settings/agent-providers
 import { ProviderExecutableRow } from '@/renderer/components/settings/agent-providers/provider-executable-row';
 import { ProviderSettingsFileRow } from '@/renderer/components/settings/agent-providers/provider-settings-file-row';
 import { ProviderUsagePanel } from '@/renderer/components/settings/agent-providers/provider-usage-panel';
+import { ReadOnlyToolsRow } from '@/renderer/components/settings/agent-providers/read-only-tools-row';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsLoadingState } from '@/renderer/components/settings/settings-async-state';
 import { StatusBadge } from '@/renderer/components/status-badge';
@@ -162,6 +163,8 @@ export function ProviderTabPanel({
 			) : null}
 
 			{descriptor.id === 'claude' ? <ClaudeSubagentModeRow /> : null}
+
+			<ReadOnlyToolsRow provider={descriptor.id} />
 
 			<ProviderExecutableRow descriptor={descriptor} />
 

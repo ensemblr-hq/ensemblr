@@ -192,6 +192,9 @@ export const ensemblrQueryKeys = {
 			provider,
 			cwd,
 		] as const,
+	/** Query key for the tools one agent runtime's sessions reported since launch. */
+	agentProviderTools: (provider: AgentProviderId) =>
+		[...ensemblrQueryKeys.all, 'agent-provider-tools', provider] as const,
 	/** Query key for one agent runtime's readiness snapshot. */
 	agentProviderReadiness: (provider: AgentProviderId) =>
 		[...ensemblrQueryKeys.all, 'agent-provider-readiness', provider] as const,

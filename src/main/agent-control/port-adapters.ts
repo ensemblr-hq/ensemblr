@@ -116,6 +116,7 @@ import {
 	type StopTerminalOutcome,
 	type TabPort,
 	type TerminalPort,
+	type ToolTrustPort,
 	type WorkspaceCreationPort,
 	type WorkspacePort,
 } from './ports.ts';
@@ -159,6 +160,8 @@ export interface PortAdapterDeps {
 	appSettingsService: AppSettingsService;
 	/** Notifies renderer and main-process consumers after a control write. */
 	onAppSettingsUpdated?: (settings: AppSettings) => void;
+	/** The user's read-only tool lists and the inventory they are offered from. */
+	toolTrust: ToolTrustPort;
 	workspaceGitService: WorkspaceGitService;
 	reviewService: ReviewService;
 	/**
@@ -1773,6 +1776,7 @@ export function createAgentControlPorts(
 		reviewLaunch: deps.reviewLaunch,
 		planMode: deps.planMode,
 		afkMode: deps.afkMode,
+		toolTrust: deps.toolTrust,
 		...(deps.conciergePorts ?? {}),
 	};
 }

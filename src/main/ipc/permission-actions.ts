@@ -214,6 +214,7 @@ export const IPC_PERMISSION_ACTIONS = {
 	getAgentProviderReadiness: null,
 	listAgentProviderMcpServers: null,
 	listAgentProviderSlashCommands: null,
+	listAgentProviderTools: null,
 	openAgentProviderSettingsFile: null,
 	setAgentProviderExecutablePath: 'app-settings-change',
 	selectAgentProviderExecutable: null,

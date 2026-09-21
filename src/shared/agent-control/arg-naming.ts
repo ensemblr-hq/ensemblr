@@ -134,6 +134,8 @@ export const CANONICAL_ARG_KEYS = {
 	title:
 		'Human-readable label of a UI surface or an artifact — a chat tab, a plan, a summary, a tracker issue. Never `name`.',
 	tool: 'Name of the built-in tool a guarded call is about to use.',
+	tools:
+		'Every tool a session holds, as its runtime reports them: name, source, and description.',
 	turnId: 'Identifier of the conversation turn a tab is opened on.',
 	userRequested:
 		'Whether the user asked for this action in so many words, lifting a gate that otherwise only opens once.',

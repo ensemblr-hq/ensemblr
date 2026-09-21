@@ -18,10 +18,14 @@ import {
 } from './streamed-reasoning.ts';
 import { toolResultDetails } from './tool-result-details.ts';
 
-/** What the runtime told us about itself once its session was up. */
+/**
+ * What the runtime told us about itself once its session was up. `tools` is
+ * every tool name the session holds, MCP tools included, as `init` lists them.
+ */
 export interface SdkSessionDiscovery {
 	model: AgentModelMetadata | null;
 	sessionId: string;
+	tools: readonly string[];
 }
 
 /** Options for {@link createSdkMessageNormalizer}. */
@@ -167,6 +171,7 @@ export function createSdkMessageNormalizer({
 			onDiscovery?.({
 				model: readModelMetadata(message.model),
 				sessionId: message.session_id,
+				tools: readToolNames(message.tools),
 			});
 			// `init` can land after the opening prompt was already queued, and only
 			// a session still waiting for its first prompt should be called idle.
@@ -705,6 +710,20 @@ function readTokenCount(value: unknown): number {
  */
 function readString(value: unknown): string | null {
 	return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/**
+ * Reads the tool names an `init` frame lists, dropping anything that is not a
+ * non-empty string rather than trusting the frame's shape.
+ * @param value - The frame's raw `tools` field.
+ * @returns The names, in the order the runtime listed them.
+ */
+function readToolNames(value: unknown): readonly string[] {
+	return Array.isArray(value)
+		? value.filter(
+				(name): name is string => typeof name === 'string' && name.length > 0,
+			)
+		: [];
 }
 
 /**

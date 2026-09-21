@@ -11,11 +11,19 @@
 import { isEnsemblrControlTool } from '../agent-control.ts';
 import { isReadOnlyBashCommand } from './bash-guard.ts';
 import { planModeBlockReason } from './block-reason.ts';
+import {
+	isVouchedByUser,
+	KNOWN_READ_ONLY_EXTENSION_TOOLS,
+} from './tool-trust.ts';
 
-/** The tool call being classified: its name, plus the command for `bash`. */
+/**
+ * The tool call being classified: its name, the command for `bash`, and the
+ * tools the user vouches for as read-only on the calling runtime.
+ */
 export interface PlanModeToolRequest {
 	tool: string;
 	command?: string;
+	trustedTools?: ReadonlySet<string>;
 }
 
 /** Whether a tool call may proceed, and why not when it may not. */
@@ -44,8 +52,9 @@ export const PLAN_MODE_GUARDED_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Pi's read-only built-in tools, the only names cleared without a policy of
- * their own.
+ * Pi's read-only built-in tools, cleared without a policy of their own. The
+ * known read-only extension tools and the user's own list clear beside them;
+ * see `tool-trust.ts`.
  *
  * This is Pi's whole non-mutating built-in set as of 0.85: its tool modules
  * declare `bash`, `edit`, `find`, `grep`, `ls`, `powershell`, `read` and
@@ -80,30 +89,36 @@ function blocked(cause: string): PlanModeToolVerdict {
  * rather than a prefix test, because a harness reaching those tools over MCP
  * sees every one of them namespaced by the server that serves them.
  * @param tool - The tool name being classified.
- * @returns True for a read-only built-in or an Ensemblr control tool.
+ * @returns True for a read-only built-in, a known read-only extension tool, or an Ensemblr control tool.
  */
 function runsUntouchedWhilePlanning(tool: string): boolean {
-	return PLAN_MODE_READ_ONLY_TOOLS.has(tool) || isEnsemblrControlTool(tool);
+	return (
+		PLAN_MODE_READ_ONLY_TOOLS.has(tool) ||
+		KNOWN_READ_ONLY_EXTENSION_TOOLS.has(tool) ||
+		isEnsemblrControlTool(tool)
+	);
 }
 
 /**
  * Classifies a tool call against Plan Mode policy: `write` and `edit` are always
- * blocked, `bash` is restricted to read-only commands, Pi's read-only built-ins
- * and Ensemblr's own control tools run untouched, and **anything else is
- * blocked**.
+ * blocked, `bash` is restricted to read-only commands, Pi's read-only built-ins,
+ * the known read-only extension tools, Ensemblr's own control tools, and the
+ * tools the user vouches for run untouched, and **anything else is blocked**.
  *
  * Deny by default, for the reason the bash classifier is an allowlist. The tool
  * set a Pi session holds is open: the user can install another extension or
  * point Pi at an MCP server, and a write tool arriving that way would otherwise
  * be the one call no policy ever saw. A false block costs the agent a turn and
  * a reason it can read; a false allow edits the repository Plan Mode exists to
- * hold still.
- * @param request - The tool name and, for `bash`, the command it would run.
+ * hold still. The user's own list is consulted last, so it clears a tool this
+ * module has no opinion about and never overturns the write or `bash` verdict.
+ * @param request - The tool name, for `bash` the command it would run, and the user's trusted tools.
  * @returns Whether the call is blocked, with a reason when it is.
  */
 export function evaluatePlanModeTool({
 	command,
 	tool,
+	trustedTools,
 }: PlanModeToolRequest): PlanModeToolVerdict {
 	if (tool === 'write' || tool === 'edit') {
 		return blocked(
@@ -116,10 +131,10 @@ export function evaluatePlanModeTool({
 			? { blocked: false }
 			: blocked(`this \`bash\` command is not read-only: ${verdict.reason}`);
 	}
-	if (runsUntouchedWhilePlanning(tool)) {
+	if (runsUntouchedWhilePlanning(tool) || isVouchedByUser(tool, trustedTools)) {
 		return { blocked: false };
 	}
 	return blocked(
-		`\`${tool}\` is not a tool Plan Mode knows to be read-only, so it is refused rather than guessed at — a tool from an MCP server or another extension can write files just as \`write\` does. Read with \`read\`, \`grep\`, \`find\` and \`ls\`, and put the rest in the plan`,
+		`\`${tool}\` is not a tool Plan Mode knows to be read-only, so it is refused rather than guessed at — a tool from an MCP server or another extension can write files just as \`write\` does. Read with \`read\`, \`grep\`, \`find\` and \`ls\`, and put the rest in the plan; if this tool comes from an extension or an MCP server and the user knows it cannot change anything, they can trust it under Settings → Providers → Read-only tools`,
 	);
 }

@@ -211,6 +211,22 @@
 							"enum": ["ensemblr", "native"],
 							"default": "ensemblr",
 							"description": "Which delegation mechanism a first-class Claude Code chat holds. `ensemblr` spawns visible chat tabs through the control tools and denies Claude's own sub-agent tool; `native` does the reverse. Pi has no native sub-agent mechanism and ignores this."
+						},
+						"piReadOnlyTools": {
+							"type": "array",
+							"default": [],
+							"description": "Extra Pi tools you trust as read-only, such as an extension's search tool. Plan Mode and the Concierge refuse every tool Ensemblr cannot vouch for; a name listed here is let through on your word. It never lifts the rules for `bash`, `edit` or `write`, and `powershell` and `pi-mcp-adapter`'s `mcp` and `mcpScript` dispatchers are never trusted. Agents can read this list but cannot change it.",
+							"items": {
+								"type": "string"
+							}
+						},
+						"claudeReadOnlyTools": {
+							"type": "array",
+							"default": [],
+							"description": "Extra Claude Code tools you trust as read-only. Only MCP tools count, named `mcp__<server>__<tool>`; Claude Code's own tools are Ensemblr's to classify, and any other name here is ignored. Plan Mode and the Concierge refuse every tool Ensemblr cannot vouch for; a name listed here is let through on your word. Agents can read this list but cannot change it.",
+							"items": {
+								"type": "string"
+							}
 						}
 					}
 				},

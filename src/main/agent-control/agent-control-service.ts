@@ -58,6 +58,7 @@ import type {
 	ReadTerminalOutputArgs,
 	ReadTerminalOutputResult,
 	RecallMemoryArgs,
+	ReportToolInventoryArgs,
 	ResolveDiffCommentsArgs,
 	SendFollowUpArgs,
 	SetBranchNameArgs,
@@ -3484,33 +3485,74 @@ export function createAgentControlService({
 	};
 
 	/**
-	 * Classifies an intercepted tool call against Plan Mode policy. A session
-	 * that is not planning allows everything, so the extension can ask without
-	 * first knowing whether the toggle is still on.
+	 * Classifies an intercepted tool call against Plan Mode or Concierge policy,
+	 * with the user's trusted tools for the caller's runtime. A session that is
+	 * not planning allows everything, so the extension can ask without first
+	 * knowing whether the toggle is still on. A refusal of a tool the user has
+	 * not vouched for is recorded, so the Settings list can badge it.
 	 * @param origin - Resolved caller identity.
-	 * @param args - The tool name and, for `bash`, its command.
+	 * @param args - The tool name, for `bash` its command, and for a write its path.
 	 * @returns Whether the call is blocked, with the reason when it is.
 	 */
 	const handleCheckPlanModeTool = (
 		origin: AgentControlOrigin,
 		args: CheckPlanModeToolArgs,
 	): AgentControlResult<unknown> => {
+		const runtime = originRuntime(origin);
+		const trustedTools = runtime
+			? ports.toolTrust?.trustedTools(runtime)
+			: undefined;
+		const verdict = classifyGuardedTool(origin, { ...args, trustedTools });
+		if (verdict.blocked && runtime && !trustedTools?.has(args.tool)) {
+			ports.toolTrust?.recordRefusal(runtime, args.tool);
+		}
+		return ok(verdict);
+	};
+
+	/**
+	 * Answers one intercepted tool call with whichever policy governs the
+	 * caller: the Concierge's, Plan Mode's, or none.
+	 * @param origin - Resolved caller identity.
+	 * @param request - The tool call, plus the tools the user trusts on the caller's runtime.
+	 * @returns Whether the call is blocked, with the reason when it is.
+	 */
+	const classifyGuardedTool = (
+		origin: AgentControlOrigin,
+		request: CheckPlanModeToolArgs & { trustedTools?: ReadonlySet<string> },
+	): { blocked: boolean; reason?: string } => {
 		// The Concierge's policy is permanent rather than a mode it can leave, and
 		// it is stricter than Plan Mode on writes and identical on bash, so it
 		// answers alone rather than being layered under a planning check that would
 		// never be true for a Concierge anyway.
 		if (origin.concierge) {
 			const conciergeHome = ports.concierge?.homePath();
-			return ok(
-				conciergeHome
-					? evaluateConciergeTool({ ...args, conciergeHome })
-					: { blocked: true, reason: 'The Concierge home is unavailable.' },
-			);
+			return conciergeHome
+				? evaluateConciergeTool({ ...request, conciergeHome })
+				: { blocked: true, reason: 'The Concierge home is unavailable.' };
 		}
-		if (!isPlanning(origin)) {
-			return ok({ blocked: false });
+		return isPlanning(origin)
+			? evaluatePlanModeTool(request)
+			: { blocked: false };
+	};
+
+	/**
+	 * Merges the calling session's tool list into its runtime's inventory, which
+	 * is what the Settings list offers the user to vouch for. A caller whose
+	 * runtime the app cannot name reports nowhere: a list it could not attribute
+	 * would be offered under the wrong runtime's tab.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The tools the session holds.
+	 * @returns How many tools were received.
+	 */
+	const handleReportToolInventory = (
+		origin: AgentControlOrigin,
+		args: ReportToolInventoryArgs,
+	): AgentControlResult<unknown> => {
+		const runtime = originRuntime(origin);
+		if (runtime) {
+			ports.toolTrust?.recordInventory(runtime, args.tools);
 		}
-		return ok(evaluatePlanModeTool(args));
+		return ok({ received: args.tools.length });
 	};
 
 	/**
@@ -3763,6 +3805,8 @@ export function createAgentControlService({
 			handleAskUserQuestion(origin, args as AskUserQuestionArgs, signal),
 		checkPlanModeTool: ({ args, origin }) =>
 			handleCheckPlanModeTool(origin, args as CheckPlanModeToolArgs),
+		reportToolInventory: ({ args, origin }) =>
+			handleReportToolInventory(origin, args as ReportToolInventoryArgs),
 		closeTab: ({ args, origin }) =>
 			handleCloseTab(origin, args as CloseTabArgs),
 		exitPlanMode: ({ args, origin }) =>

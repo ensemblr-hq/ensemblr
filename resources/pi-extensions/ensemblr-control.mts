@@ -1060,6 +1060,106 @@ function restoreDelegationBarrier(ctx: {
 }
 
 /**
+ * Bounds one inventory report is held to. The app refuses a whole report when a
+ * single entry breaks one, so the extension clamps rather than trusting every
+ * extension's names to fit. MUST match `REPORT_TOOL_INVENTORY_LIMITS` in
+ * `src/shared/agent-control/contracts.ts` (this file cannot import from `src/`
+ * at runtime); a parity test enforces it. The description is cut shorter than
+ * its bound because the Settings list shows one line of it.
+ */
+const INVENTORY_LIMITS = {
+	maxDescriptionLength: 300,
+	maxNameLength: 200,
+	maxSourceLength: 500,
+	maxTools: 1000,
+} as const;
+
+/** One tool as `reportToolInventory` carries it. */
+interface InventoryTool {
+	description: string | null;
+	name: string;
+	source: string | null;
+}
+
+/**
+ * Reads one entry of `getAllTools` as the inventory carries it: the name, the
+ * package that registered it, and its description's first line, each cut to
+ * the report's bounds. A name too long to report is dropped rather than cut,
+ * because a cut name would be one no tool call ever carries.
+ * @param tool - One entry `getAllTools` returned.
+ * @returns The entry, or null when it has no usable name.
+ */
+function toInventoryTool(tool: unknown): InventoryTool | null {
+	const entry = recordOf(tool);
+	const { name } = entry;
+	if (
+		typeof name !== 'string' ||
+		name.length === 0 ||
+		name.length > INVENTORY_LIMITS.maxNameLength
+	) {
+		return null;
+	}
+	const source = recordOf(entry.sourceInfo).source;
+	const description =
+		typeof entry.description === 'string'
+			? (entry.description.split('\n', 1)[0] ?? '').trim()
+			: '';
+	return {
+		description:
+			description.length > 0
+				? description.slice(0, INVENTORY_LIMITS.maxDescriptionLength)
+				: null,
+		name,
+		source:
+			typeof source === 'string'
+				? source.slice(0, INVENTORY_LIMITS.maxSourceLength)
+				: null,
+	};
+}
+
+/**
+ * Describes the tools this session holds, for the list Settings offers the
+ * user to vouch for as read-only. `getAllTools` arrived in a later Pi than the
+ * oldest this extension supports, so its absence reads as an empty list.
+ * @param pi - The Pi extension API.
+ * @returns One entry per reportable tool, at most as many as one report carries.
+ */
+function describeSessionTools(pi: ExtensionAPI): InventoryTool[] {
+	const { getAllTools } = pi as { getAllTools?: () => unknown };
+	const tools = typeof getAllTools === 'function' ? getAllTools.call(pi) : [];
+	if (!Array.isArray(tools)) {
+		return [];
+	}
+	return tools
+		.map(toInventoryTool)
+		.filter((tool): tool is InventoryTool => tool !== null)
+		.slice(0, INVENTORY_LIMITS.maxTools);
+}
+
+/**
+ * Builds the reporter that hands the session's tool list to the app whenever it
+ * changes. Asked per turn rather than once, because an MCP adapter can register
+ * tools after the session starts; the last list the app accepted is remembered
+ * so an unchanged one is not resent every turn.
+ * @param pi - The Pi extension API.
+ * @returns The reporter to run on each turn.
+ */
+function createToolInventoryReporter(pi: ExtensionAPI): () => Promise<void> {
+	let reported = '';
+	return async () => {
+		const tools = describeSessionTools(pi);
+		const signature = JSON.stringify(tools);
+		if (tools.length === 0 || signature === reported) {
+			return;
+		}
+		const result = await invoke('reportToolInventory', { tools }, undefined);
+		if (result.ok) {
+			reported = signature;
+		}
+	};
+}
+
+/**
  * Ensemblr Control extension entry point. Registers one tool per control op.
  * @param pi - The Pi extension API.
  */
@@ -1167,6 +1267,13 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			);
 		});
 	}
+
+	// Not awaited: the inventory only feeds a Settings list, so a slow control
+	// channel must not hold the turn that is about to start.
+	const reportToolInventory = createToolInventoryReporter(pi);
+	pi.on('before_agent_start', () => {
+		void reportToolInventory();
+	});
 
 	pi.on('before_agent_start', async (event) => {
 		const {

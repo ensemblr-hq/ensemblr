@@ -49,6 +49,10 @@ import {
 	steerClaudeThinking,
 	toClaudeEffortLevel,
 } from './claude-thinking.ts';
+import {
+	type ClaudeToolTrust,
+	describeClaudeTools,
+} from './claude-tool-trust.ts';
 import { readPlanUsage } from './claude-usage.ts';
 import { createPromptQueue } from './prompt-queue.ts';
 import { createSdkMessageNormalizer } from './sdk-message-normalizer.ts';
@@ -111,6 +115,13 @@ export interface CreateClaudeAgentAdapterOptions {
 		agentSessionId: string;
 		cwd: string;
 	}) => string | null;
+	/**
+	 * The user's read-only tool list for Claude Code and the sinks feeding the
+	 * Settings list. The Concierge gate and the Plan Mode hook read the list per
+	 * tool call; every session reports the tools its `init` lists. Absent, the
+	 * guards clear only their built-in lists.
+	 */
+	toolTrust?: ClaudeToolTrust;
 }
 
 /**
@@ -141,6 +152,7 @@ export function createClaudeAgentAdapter(
 	const canUseTool = options.canUseTool;
 	const readPluginDirectories = options.readPluginDirectories ?? (() => []);
 	const resolveConciergeHome = options.resolveConciergeHome ?? (() => null);
+	const toolTrust = options.toolTrust;
 
 	const openSessions = new Set<AgentAdapterSession>();
 
@@ -160,6 +172,7 @@ export function createClaudeAgentAdapter(
 				onPlanSubmitted,
 				pluginDirectories: readPluginDirectories(),
 				queryFn,
+				toolTrust,
 				turnIdFactory,
 			});
 			openSessions.add(session);
@@ -192,6 +205,7 @@ function createClaudeSession({
 	onPlanSubmitted,
 	pluginDirectories,
 	queryFn,
+	toolTrust,
 	turnIdFactory,
 }: {
 	baseEnv: NodeJS.ProcessEnv;
@@ -203,6 +217,7 @@ function createClaudeSession({
 	onPlanSubmitted?: CreateClaudeAgentAdapterOptions['onPlanSubmitted'];
 	pluginDirectories: readonly string[];
 	queryFn: typeof query;
+	toolTrust?: ClaudeToolTrust;
 	turnIdFactory: () => string;
 }): AgentAdapterSession {
 	const listeners = new Set<AgentEventListener>();
@@ -287,8 +302,9 @@ function createClaudeSession({
 
 	const normalizer = createSdkMessageNormalizer({
 		now,
-		onDiscovery: ({ model, sessionId }) => {
+		onDiscovery: ({ model, sessionId, tools }) => {
 			patchMetadata({ model: model ?? metadata.model, sessionId });
+			toolTrust?.recordInventory(describeClaudeTools(tools));
 		},
 	});
 
@@ -518,6 +534,7 @@ function createClaudeSession({
 					stderr = `${stderr}${chunk}`.slice(-STDERR_RING_BYTES);
 				},
 				pluginDirectories,
+				toolTrust,
 			}),
 			prompt: promptQueue.stream,
 		});
@@ -765,6 +782,7 @@ function buildQueryOptions({
 	isUnattended,
 	onStderr,
 	pluginDirectories,
+	toolTrust,
 }: {
 	baseEnv: NodeJS.ProcessEnv;
 	canUseTool?: ClaudeCanUseTool;
@@ -776,11 +794,13 @@ function buildQueryOptions({
 	isUnattended: () => boolean;
 	onStderr: (chunk: string) => void;
 	pluginDirectories: readonly string[];
+	/** The user's read-only tool list, for the Concierge gate and the Plan Mode hook. */
+	toolTrust?: ClaudeToolTrust;
 }): Options {
 	const { metadata, request } = input;
 	const mode = request.permissionMode ?? DEFAULT_PERMISSION_MODE;
 	const concierge = conciergeHome
-		? createConciergeSessionGate(conciergeHome)
+		? createConciergeSessionGate(conciergeHome, toolTrust)
 		: null;
 	const permission =
 		concierge?.permission ??
@@ -821,8 +841,11 @@ function buildQueryOptions({
 		// pre-approves, and only over the control tools the other two already wave
 		// past, so its allow cannot overturn one of their refusals.
 		hooks: withAfkHooks(
-			withPlanModeHooks(concierge?.hooks, isPlanning, () =>
-				withholdsControlTools({ mode, planning: isPlanning() }),
+			withPlanModeHooks(
+				concierge?.hooks,
+				isPlanning,
+				() => withholdsControlTools({ mode, planning: isPlanning() }),
+				toolTrust?.trustedTools,
 			),
 			isUnattended,
 		),

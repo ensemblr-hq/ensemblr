@@ -45,6 +45,7 @@ import type {
 	ReadConversationArgs,
 	ReadConversationResult,
 	RecallMemoryResult,
+	ReportToolInventoryArgs,
 	ResolveDiffCommentsResult,
 	SessionBriefNaming,
 	SetBranchNameResult,
@@ -914,6 +915,21 @@ export interface ArchitecturePort {
 	}) => Promise<UpdateArchitectureDiagramOutcome>;
 }
 
+/**
+ * The user's word on which extra tools Plan Mode and the Concierge may call on
+ * each runtime, and the inventory the Settings list offers those tools from.
+ * `trustedTools` is read per call, so a change in Settings reaches the next tool
+ * call rather than the next session.
+ */
+export interface ToolTrustPort {
+	trustedTools: (provider: AgentProviderId) => ReadonlySet<string>;
+	recordInventory: (
+		provider: AgentProviderId,
+		tools: ReportToolInventoryArgs['tools'],
+	) => void;
+	recordRefusal: (provider: AgentProviderId, tool: string) => void;
+}
+
 /** All collaborators the agent-control service composes. */
 export interface AgentControlPorts {
 	appSettings: AppSettingsPort;
@@ -936,6 +952,11 @@ export interface AgentControlPorts {
 	concierge?: ConciergePort;
 	/** Absent when no architecture service is wired; the op is then refused. */
 	architecture?: ArchitecturePort;
+	/**
+	 * Absent when no settings are wired: the guards then clear only their own
+	 * built-in lists, and a reported inventory goes nowhere.
+	 */
+	toolTrust?: ToolTrustPort;
 	diff: DiffPort;
 	review: ReviewPort;
 	reviewLaunch: ReviewLaunchPort;

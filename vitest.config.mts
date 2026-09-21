@@ -109,6 +109,7 @@ export default defineConfig({
 						'tests/main/concierge-spawn-mode.test.ts',
 						'tests/main/concierge-spawn-role.test.ts',
 						'tests/main/concierge-tool-policy.test.ts',
+						'tests/main/tool-trust.test.ts',
 						'tests/main/dictation-service.test.ts',
 						'tests/main/project-listing.test.ts',
 						'tests/main/renderer-storage-mirror.test.ts',

@@ -445,6 +445,18 @@ describe('the Concierge guard denies a tool it cannot vouch for', () => {
 		expect(verdict(tool)).toEqual({ blocked: false });
 	});
 
+	// Pi has no web tool of its own; `pi-web-access` supplies it. Refusing these
+	// left a Pi Concierge unable to answer "is there a build for X?" while a
+	// Claude Concierge answered it with `WebSearch`.
+	test.each([
+		'web_search',
+		'fetch_content',
+		'get_search_content',
+		'source_check',
+	])('clears the web-access tool %s', (tool) => {
+		expect(verdict(tool)).toEqual({ blocked: false });
+	});
+
 	// Claude Code renamed six built-ins, and which name arrives depends on which
 	// `claude` binary is on PATH. Listing one spelling of a pair left a Concierge
 	// on a current binary refused its own delegation tool.

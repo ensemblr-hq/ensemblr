@@ -35,11 +35,15 @@
  * `read-only` one keeps them blocked by its own mode and regains the reads, the
  * question, and the exit.
  *
- * Nothing else is widened. The sibling guards refuse tools this one never names,
- * so an allow here cannot overturn one of theirs, and `approval-required` is
- * excluded by `withholdsControlTools` — there the same routing ends at the
- * user's own approval card rather than at a refusal, and clearing the tool would
- * spend the gate that mode exists to provide.
+ * The one other widening is the user's own: a tool they listed as read-only
+ * under Settings → Providers is cleared on the same terms while planning, because
+ * the CLI withholds an MCP tool it cannot read exactly as it withholds ours. That
+ * list never names a tool a sibling guard refuses — `toTrustedToolSet` strips
+ * every name a policy already answers for — so an allow here still cannot
+ * overturn one of theirs, and `approval-required` is excluded by
+ * `withholdsControlTools` — there the same routing ends at the user's own
+ * approval card rather than at a refusal, and clearing the tool would spend the
+ * gate that mode exists to provide.
  */
 import type {
 	HookCallbackMatcher,
@@ -48,7 +52,10 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk';
 
 import { isEnsemblrControlTool } from '../../shared/agent-control.ts';
-import { isReadOnlyBashCommand } from '../../shared/plan-mode.ts';
+import {
+	isReadOnlyBashCommand,
+	isVouchedByUser,
+} from '../../shared/plan-mode.ts';
 
 /**
  * Claude Code's file-mutating tools, under the capitalized names its SDK uses.
@@ -98,6 +105,10 @@ export interface ClaudePlanModeVerdict {
 const CONTROL_TOOL_ALLOWANCE =
 	'Ensemblr control tools are gated at the control server, which answers for each op by the caller’s role and by whether the chat is planning.';
 
+/** What a pre-approved user-trusted tool records as its reason, for the same log. */
+const TRUSTED_TOOL_ALLOWANCE =
+	'The user listed this tool as read-only under Settings → Providers → Read-only tools.';
+
 /**
  * Classifies one Claude tool call against Plan Mode policy.
  *
@@ -108,24 +119,27 @@ const CONTROL_TOOL_ALLOWANCE =
  * it holds too tightly, not to re-implement it. Anything else passes to the
  * mode's own judgement.
  *
- * `clearsControlTools` is required rather than defaulted because the classifier
- * cannot derive it: whether a control tool needs clearing is a fact about the
+ * `clearsWithheldTools` is required rather than defaulted because the classifier
+ * cannot derive it: whether a withheld tool needs clearing is a fact about the
  * workspace's permission mode, which only the caller holds. Passing `false`
  * leaves the tool to the CLI, which is the right answer wherever the CLI can
  * raise an approval card for it.
- * @param clearsControlTools - Whether the CLI is withholding the control tools with nothing able to approve them.
+ * @param clearsWithheldTools - Whether the CLI is withholding the tools it cannot read as read-only with nothing able to approve them.
  * @param toolInput - The tool call's raw input object.
  * @param toolName - The SDK tool name being called.
+ * @param trustedTools - The tools the user vouches for as read-only on Claude Code.
  * @returns The decision, with a reason on everything but a pass.
  */
 export function evaluateClaudePlanModeTool({
-	clearsControlTools,
+	clearsWithheldTools,
 	toolInput,
 	toolName,
+	trustedTools,
 }: {
-	clearsControlTools: boolean;
+	clearsWithheldTools: boolean;
 	toolInput: Record<string, unknown>;
 	toolName: string;
+	trustedTools?: ReadonlySet<string>;
 }): ClaudePlanModeVerdict {
 	if (PLAN_MODE_WRITE_TOOLS.has(toolName)) {
 		return {
@@ -136,12 +150,14 @@ export function evaluateClaudePlanModeTool({
 		};
 	}
 	if (isEnsemblrControlTool(toolName)) {
-		return clearsControlTools
+		return clearsWithheldTools
 			? { decision: 'allow', reason: CONTROL_TOOL_ALLOWANCE }
 			: { decision: 'pass' };
 	}
 	if (toolName !== CLAUDE_SHELL_TOOL) {
-		return { decision: 'pass' };
+		return clearsWithheldTools && isVouchedByUser(toolName, trustedTools)
+			? { decision: 'allow', reason: TRUSTED_TOOL_ALLOWANCE }
+			: { decision: 'pass' };
 	}
 	const command = toolInput.command;
 	const verdict = isReadOnlyBashCommand(
@@ -176,14 +192,17 @@ function decide(
 
 /**
  * Builds the `PreToolUse` matcher that refuses a write while the chat is
- * planning, and clears a control tool whenever the CLI is withholding one.
+ * planning, clears a control tool whenever the CLI is withholding one, and
+ * clears a user-trusted tool the CLI is withholding while the chat plans.
  * @param isPlanning - Reads the session's live Plan Mode flag at tool-call time.
  * @param withholdsControlTools - Reads whether the CLI is withholding the control tools with nothing able to approve them.
+ * @param readTrustedTools - Reads the user's read-only tool list for Claude Code at tool-call time.
  * @returns The matcher to register under `PreToolUse`.
  */
 function createPlanModePreToolUseHook(
 	isPlanning: () => boolean,
 	withholdsControlTools: () => boolean,
+	readTrustedTools: (() => ReadonlySet<string>) | undefined,
 ): HookCallbackMatcher {
 	return {
 		hooks: [
@@ -191,16 +210,17 @@ function createPlanModePreToolUseHook(
 				if (input.hook_event_name !== 'PreToolUse') {
 					return {};
 				}
-				const clearsControlTools = withholdsControlTools();
+				const clearsWithheldTools = withholdsControlTools();
 				const clearsThisCall =
-					clearsControlTools && isEnsemblrControlTool(input.tool_name);
+					clearsWithheldTools && isEnsemblrControlTool(input.tool_name);
 				if (!isPlanning() && !clearsThisCall) {
 					return {};
 				}
 				const verdict = evaluateClaudePlanModeTool({
-					clearsControlTools,
+					clearsWithheldTools,
 					toolInput: (input.tool_input ?? {}) as Record<string, unknown>,
 					toolName: input.tool_name,
+					trustedTools: readTrustedTools?.(),
 				});
 				return verdict.decision === 'pass'
 					? {}
@@ -217,8 +237,9 @@ function createPlanModePreToolUseHook(
  * a session can be planning, unattended and a Concierge at once, and a deny from
  * any of them stands. This is the only one that also pre-approves, and what it
  * pre-approves is disjoint from what the other two refuse — the AFK hook names
- * Claude's native `AskUserQuestion` and the Concierge's clears every control
- * tool already — so the last decision written cannot overturn one of theirs.
+ * Claude's native `AskUserQuestion`, which no user trust can name, and the
+ * Concierge's clears every control tool and every user-trusted tool already —
+ * so the last decision written cannot overturn one of theirs.
  * The two readers are not the same question, which is why the caller answers the
  * second one: the refusals follow the chat's own Plan Mode flag, while the
  * clearance follows the workspace's permission mode as well —
@@ -228,18 +249,24 @@ function createPlanModePreToolUseHook(
  * @param base - Hooks the session's other surfaces registered, if any.
  * @param isPlanning - Reads the session's live Plan Mode flag at tool-call time.
  * @param withholdsControlTools - Reads whether the CLI is withholding the control tools with nothing able to approve them; defaults to the Plan Mode flag.
+ * @param readTrustedTools - Reads the user's read-only tool list for Claude Code; absent, no user-trusted tool is cleared.
  * @returns The combined hook map to hand the SDK.
  */
 export function withPlanModeHooks(
 	base: ClaudeHookMap | undefined,
 	isPlanning: () => boolean,
 	withholdsControlTools: () => boolean = isPlanning,
+	readTrustedTools?: () => ReadonlySet<string>,
 ): ClaudeHookMap {
 	return {
 		...base,
 		PreToolUse: [
 			...(base?.PreToolUse ?? []),
-			createPlanModePreToolUseHook(isPlanning, withholdsControlTools),
+			createPlanModePreToolUseHook(
+				isPlanning,
+				withholdsControlTools,
+				readTrustedTools,
+			),
 		],
 	};
 }

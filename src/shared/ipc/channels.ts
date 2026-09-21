@@ -197,6 +197,7 @@ export const IPC_CHANNELS = {
 	getAgentProviderReadiness: 'ensemblr:get-agent-provider-readiness',
 	listAgentProviderMcpServers: 'ensemblr:list-agent-provider-mcp-servers',
 	listAgentProviderSlashCommands: 'ensemblr:list-agent-provider-slash-commands',
+	listAgentProviderTools: 'ensemblr:list-agent-provider-tools',
 	openAgentProviderSettingsFile: 'ensemblr:open-agent-provider-settings-file',
 	setAgentProviderExecutablePath: 'ensemblr:set-agent-provider-executable-path',
 	selectAgentProviderExecutable: 'ensemblr:select-agent-provider-executable',

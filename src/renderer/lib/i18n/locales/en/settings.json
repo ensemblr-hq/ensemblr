@@ -554,6 +554,27 @@
 			"missing": "nothing — no executable resolved",
 			"path": "the executable found on PATH"
 		},
+		"read-only-tools": {
+			"add": "Add",
+			"add-aria": "Tool name to trust",
+			"add-placeholder": "Tool name",
+			"description": "Plan Mode and the Concierge refuse tools Ensemblr cannot vouch for. Trust a tool here only if it cannot change files, run commands, or act on your accounts.",
+			"empty": "No extra tools found.",
+			"error": {
+				"duplicate": "{{name}} is already trusted.",
+				"empty": "Enter a tool name.",
+				"has-policy": "Ensemblr already has a rule for {{name}}, so it cannot be trusted here.",
+				"not-mcp": "On Claude Code only MCP tools can be trusted, named mcp__server__tool.",
+				"too-long": "Tool names are at most {{max}} characters long."
+			},
+			"label": "Read-only tools",
+			"load-failed": "Ensemblr could not read this runtime’s tools.",
+			"not-applied": "Ignored: Ensemblr decides about this tool itself.",
+			"not-reported": "Start a conversation on this runtime to list the extra tools it holds.",
+			"not-seen": "Not seen since launch",
+			"refused": "Refused",
+			"trust-aria": "Trust {{name}} as read-only"
+		},
 		"rerun-checks": "Re-run checks",
 		"rerunning-checks": "Re-running checks…",
 		"runtime": {

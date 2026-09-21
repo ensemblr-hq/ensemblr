@@ -11,9 +11,13 @@ import type {
 	AgentProviderReadinessWire,
 	ListAgentProviderMcpServersResult,
 	ListAgentProviderSlashCommandsResult,
+	ListAgentProviderToolsResult,
 	OpenAgentProviderSettingsFileResult,
 } from '../../../shared/ipc/contracts/agent-provider';
-import type { AgentProviderService } from '../../agent-providers';
+import type {
+	AgentProviderService,
+	ToolTrustService,
+} from '../../agent-providers';
 import type { OpenTargetService } from '../../open-target';
 import {
 	agentProviderRequestSchema,
@@ -29,19 +33,21 @@ const EMPTY_SETTINGS_FILE_CONTENT = '{}\n';
 
 /**
  * Registers the provider-parameterized IPC handlers: readiness probing, the MCP
- * roster, the slash command catalogue, executable overrides, and opening a
- * runtime's own settings file. Every channel validates its `provider` against
- * the shared registry first — an unknown id is rejected, never coerced to a
- * default, which is what keeps a Claude Code chat from being served Pi's
- * commands.
- * @param options - The provider service and the "Open in" target registry.
+ * roster, the slash command catalogue, the tools a user could vouch for,
+ * executable overrides, and opening a runtime's own settings file. Every channel
+ * validates its `provider` against the shared registry first — an unknown id is
+ * rejected, never coerced to a default, which is what keeps a Claude Code chat
+ * from being served Pi's commands.
+ * @param options - The provider service, the tool-trust service, and the "Open in" target registry.
  */
 export function registerAgentProviderHandlers({
 	agentProviderService,
 	openTargetService,
+	toolTrustService,
 }: {
 	agentProviderService: AgentProviderService;
 	openTargetService: OpenTargetService;
+	toolTrustService: ToolTrustService;
 }): void {
 	ipcMain.handle(
 		IPC_CHANNELS.getAgentProviderReadiness,
@@ -75,6 +81,15 @@ export function registerAgentProviderHandlers({
 				listAgentProviderSlashCommandsRequestSchema.parse(request);
 
 			return agentProviderService.listSlashCommands(provider, cwd);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.listAgentProviderTools,
+		async (_event, request: unknown): Promise<ListAgentProviderToolsResult> => {
+			const { provider } = agentProviderRequestSchema.parse(request);
+
+			return toolTrustService.listTools(provider);
 		},
 	);
 
