@@ -5,6 +5,7 @@ import type { AfkModeRegistry } from '../afk-mode';
 import type {
 	AgentModelCatalogService,
 	AgentProviderService,
+	ToolTrustService,
 } from '../agent-providers';
 import type { AgentSessionService } from '../agent-runtime';
 import type { ActiveChatStore } from '../agent-runtime/active-chat-store.ts';
@@ -194,6 +195,7 @@ interface RegisterIpcHandlersOptions {
 	settingsPublicationService: SettingsPublicationService;
 	settingsResolutionService: EnsemblrConfigResolutionService;
 	terminalService: TerminalService;
+	toolTrustService: ToolTrustService;
 	unarchiveWorkspaceService: UnarchiveWorkspaceService;
 	updateService: UpdateService;
 	workspaceFilesWatcher: WorkspaceFilesWatcher;
@@ -268,6 +270,7 @@ export function registerIpcHandlers({
 	settingsResolutionService,
 	sharedRootAdoptionService,
 	terminalService,
+	toolTrustService,
 	updateService,
 	unarchiveWorkspaceService,
 	workspaceFilesWatcher,
@@ -344,6 +347,7 @@ export function registerIpcHandlers({
 			registerAgentProviderHandlers({
 				agentProviderService,
 				openTargetService,
+				toolTrustService,
 			});
 			registerAgentSessionHandlers({
 				agentModelCatalog,

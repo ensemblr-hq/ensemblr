@@ -12,6 +12,7 @@ import type {
 	AwarenessFeatures,
 } from '../../src/shared/agent-control.ts';
 import {
+	AGENT_CONTROL_OPS,
 	ARCHITECTURE_DIAGRAM_OPS,
 	ASK_USER_QUESTION_LIMITS,
 	CONCIERGE_ONLY_OPS,
@@ -28,6 +29,7 @@ import {
 	planModeManagerSubagentAwareness,
 	planModeOrchestratorAwareness,
 	planModeSubagentAwareness,
+	REPORT_TOOL_INVENTORY_LIMITS,
 	roleForDepth,
 	SESSION_BRIEF_NUDGE_HEADER,
 	SUBAGENT_UNUSABLE_OPS,
@@ -972,6 +974,43 @@ describe('agent-control AWARENESS parity', () => {
 		expect(source).toMatch(/path: input\?\.path \?\? input\?\.file_path,/);
 		expect(source).toMatch(
 			/invoke\(\s*'checkPlanModeTool',\s*\{\s*command: input\?\.command,\s*path:/,
+		);
+	});
+
+	// The Settings list offers only what a runtime reported, so an extension that
+	// stopped reporting — or reported under a name the app does not serve — would
+	// leave the user a list that never fills.
+	it('reports the session’s tools through the op the app serves', () => {
+		const source = readExtensionSource();
+
+		expect(AGENT_CONTROL_OPS).toContain('reportToolInventory');
+		expect(source).toMatch(/invoke\('reportToolInventory', \{ tools \}/);
+		expect(source).toMatch(
+			/pi\.on\('before_agent_start', \(\) => \{\s*void reportToolInventory\(\);/,
+		);
+	});
+
+	// The app refuses the whole report when one entry breaks a bound, so a
+	// clamp looser than the schema loses every report the session sends.
+	it('clamps the inventory to bounds no looser than the app enforces', () => {
+		const block = /const INVENTORY_LIMITS = \{([^}]*)\}/.exec(
+			readExtensionSource(),
+		)?.[1];
+		const embedded = Object.fromEntries(
+			[...(block ?? '').matchAll(/(\w+): ([\d_]+)/g)].map(([, key, value]) => [
+				key,
+				Number(value?.replaceAll('_', '')),
+			]),
+		);
+
+		expect(Object.keys(embedded).sort()).toEqual(
+			Object.keys(REPORT_TOOL_INVENTORY_LIMITS).sort(),
+		);
+		for (const [key, bound] of Object.entries(REPORT_TOOL_INVENTORY_LIMITS)) {
+			expect(embedded[key], key).toBeLessThanOrEqual(bound);
+		}
+		expect(embedded.maxNameLength).toBe(
+			REPORT_TOOL_INVENTORY_LIMITS.maxNameLength,
 		);
 	});
 

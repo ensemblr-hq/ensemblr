@@ -76,6 +76,7 @@ export const AGENT_CONTROL_OPS = [
 	'askUserQuestion',
 	'getSessionBrief',
 	'checkPlanModeTool',
+	'reportToolInventory',
 	'exitPlanMode',
 ] as const;
 
@@ -1019,6 +1020,34 @@ export interface CheckPlanModeToolArgs {
 	 * rule, so the path is the whole question there.
 	 */
 	path?: string;
+}
+
+/**
+ * Bounds on one `reportToolInventory` call. Generous, because a Pi session with
+ * a few MCP servers attached holds hundreds of tools, but finite, because the
+ * report arrives on every turn and a runaway one should cost a refusal rather
+ * than memory.
+ */
+export const REPORT_TOOL_INVENTORY_LIMITS = {
+	maxDescriptionLength: 1000,
+	maxNameLength: 200,
+	maxSourceLength: 500,
+	maxTools: 1000,
+} as const;
+
+/**
+ * Args for `reportToolInventory`: every tool the calling session holds, as its
+ * runtime reports them. Feeds the list Settings offers the user to vouch for as
+ * read-only; it changes no policy by itself.
+ */
+export interface ReportToolInventoryArgs {
+	tools: {
+		/** First line of the tool's description, when it has one. */
+		description: string | null;
+		name: string;
+		/** What registered the tool, such as the Pi package it came from. */
+		source: string | null;
+	}[];
 }
 
 /**

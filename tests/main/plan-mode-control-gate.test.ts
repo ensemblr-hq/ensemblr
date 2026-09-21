@@ -109,6 +109,7 @@ const setup = (options: {
 	subAgent?: boolean;
 	subAgentDepth?: 1 | 2;
 	planningTargets?: readonly string[];
+	toolTrust?: AgentControlPorts['toolTrust'];
 }) => {
 	const depth = options.subAgentDepth ?? (options.subAgent ? 1 : 0);
 	const tokens =
@@ -145,12 +146,15 @@ const setup = (options: {
 		workspaceCwd: '/ws',
 		workspaceId: 'ws',
 	});
-	const ports = makePorts(
-		new Set([
-			...(options.planning ? [PLANNING_SESSION] : []),
-			...(options.planningTargets ?? []),
-		]),
-	);
+	const ports: AgentControlPorts = {
+		...makePorts(
+			new Set([
+				...(options.planning ? [PLANNING_SESSION] : []),
+				...(options.planningTargets ?? []),
+			]),
+		),
+		toolTrust: options.toolTrust,
+	};
 	const service = createAgentControlService({
 		guardrails: createGuardrails(),
 		originRegistry: registry,
@@ -483,6 +487,89 @@ describe('plan mode: checkPlanModeTool', () => {
 		});
 
 		expect(result).toMatchObject({ data: { blocked: false }, ok: true });
+	});
+
+	it('clears a tool the user trusts on the caller’s runtime', async () => {
+		const toolTrust = {
+			recordInventory: vi.fn(),
+			recordRefusal: vi.fn(),
+			trustedTools: vi.fn(() => new Set(['exa_search'])),
+		};
+		const { service } = setup({ planning: true, toolTrust });
+
+		const result = await invoke(service, 'checkPlanModeTool', {
+			tool: 'exa_search',
+		});
+
+		expect(result).toMatchObject({ data: { blocked: false }, ok: true });
+		expect(toolTrust.trustedTools).toHaveBeenCalledWith('pi');
+		expect(toolTrust.recordRefusal).not.toHaveBeenCalled();
+	});
+
+	it('notes a refusal the user could have prevented', async () => {
+		const toolTrust = {
+			recordInventory: vi.fn(),
+			recordRefusal: vi.fn(),
+			trustedTools: vi.fn(() => new Set<string>()),
+		};
+		const { service } = setup({ planning: true, toolTrust });
+
+		const result = await invoke(service, 'checkPlanModeTool', {
+			tool: 'mystery_tool',
+		});
+
+		expect(result).toMatchObject({ data: { blocked: true }, ok: true });
+		expect(toolTrust.recordRefusal).toHaveBeenCalledWith('pi', 'mystery_tool');
+	});
+});
+
+describe('reportToolInventory', () => {
+	const tools = [
+		{ description: 'Searches Exa', name: 'exa_search', source: 'npm:pi-exa' },
+	];
+
+	it('records a Pi session’s tools under its runtime', async () => {
+		const toolTrust = {
+			recordInventory: vi.fn(),
+			recordRefusal: vi.fn(),
+			trustedTools: vi.fn(() => new Set<string>()),
+		};
+		const { service } = setup({ planning: false, toolTrust });
+
+		const result = await invoke(service, 'reportToolInventory', { tools });
+
+		expect(result).toMatchObject({ data: { received: 1 }, ok: true });
+		expect(toolTrust.recordInventory).toHaveBeenCalledWith('pi', tools);
+	});
+
+	// A harness's origin is shared by every terminal in the workspace, so the app
+	// cannot say which runtime a list came from and would file it under the wrong
+	// tab.
+	it('files nothing for a caller whose runtime the app cannot name', async () => {
+		const toolTrust = {
+			recordInventory: vi.fn(),
+			recordRefusal: vi.fn(),
+			trustedTools: vi.fn(() => new Set<string>()),
+		};
+		const { service } = setup({
+			planning: false,
+			species: 'harness',
+			toolTrust,
+		});
+
+		await invoke(service, 'reportToolInventory', { tools });
+
+		expect(toolTrust.recordInventory).not.toHaveBeenCalled();
+	});
+
+	it('refuses a report past its bounds', async () => {
+		const { service } = setup({ planning: false });
+
+		const result = await invoke(service, 'reportToolInventory', {
+			tools: [{ description: null, name: 'x'.repeat(201), source: null }],
+		});
+
+		expect(result.ok).toBe(false);
 	});
 });
 

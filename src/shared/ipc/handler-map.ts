@@ -33,6 +33,7 @@ import type {
 	ListAgentProviderMcpServersResult,
 	ListAgentProviderSlashCommandsRequest,
 	ListAgentProviderSlashCommandsResult,
+	ListAgentProviderToolsResult,
 	OpenAgentProviderSettingsFileRequest,
 	OpenAgentProviderSettingsFileResult,
 	SetAgentProviderExecutablePathRequest,
@@ -643,6 +644,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.listAgentProviderSlashCommands]: IpcHandlerEntry<
 		ListAgentProviderSlashCommandsRequest,
 		ListAgentProviderSlashCommandsResult
+	>;
+	[IPC_CHANNELS.listAgentProviderTools]: IpcHandlerEntry<
+		AgentProviderRequest,
+		ListAgentProviderToolsResult
 	>;
 	[IPC_CHANNELS.selectAgentProviderExecutable]: IpcHandlerEntry<
 		AgentProviderRequest,

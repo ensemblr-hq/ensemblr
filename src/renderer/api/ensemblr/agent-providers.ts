@@ -171,6 +171,30 @@ export function agentProviderSlashCommandsQuery(
 }
 
 /**
+ * Query options for the tools one agent runtime's sessions reported since the
+ * app launched. The answer lives in main's memory and costs no child process,
+ * so it is always treated as stale and refetched when the window regains focus,
+ * which is when a session started elsewhere would have filled it.
+ * @param provider - Agent runtime whose tool inventory to read.
+ * @returns Query options for the tool inventory.
+ */
+export function agentProviderToolsQuery(provider: AgentProviderId) {
+	return queryOptions({
+		queryFn: () =>
+			profileElectronIpcCall(
+				{
+					channel: IPC_CHANNELS.listAgentProviderTools,
+					usesDatabase: false,
+				},
+				() => getEnsemblrApi().listAgentProviderTools({ provider }),
+			),
+		queryKey: ensemblrQueryKeys.agentProviderTools(provider),
+		refetchOnWindowFocus: 'always',
+		staleTime: 0,
+	});
+}
+
+/**
  * Query options for one agent runtime's executable override snapshot.
  * @param provider - Agent runtime whose executable to read.
  * @returns Query options for the executable path snapshot.

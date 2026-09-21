@@ -466,6 +466,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 			invoke('listAgentProviderMcpServers', request),
 		listAgentProviderSlashCommands: (request) =>
 			invoke('listAgentProviderSlashCommands', request),
+		listAgentProviderTools: (request) =>
+			invoke('listAgentProviderTools', request),
 		getAgentProviderExecutablePath: (request) =>
 			invoke('getAgentProviderExecutablePath', request),
 		setAgentProviderExecutablePath: (request) =>

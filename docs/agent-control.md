@@ -1175,13 +1175,23 @@ read-only and returns an actionable plan.
 
 ### Not served over MCP
 
-`getSessionBrief` and `checkPlanModeTool` are control ops with no entry in
-`TOOL_DEFS`. They are the Pi extension's own per-turn hooks — the extension pulls
-the upkeep block over `getSessionBrief` on `before_agent_start` and asks
-`checkPlanModeTool` whether a built-in tool call is allowed while planning — so
-nothing reaches them over MCP. A first-class runtime driven over MCP has its
-system prompt fixed at session open and receives the same upkeep block through
-`resolveTurnPreamble` instead.
+`getSessionBrief`, `checkPlanModeTool` and `reportToolInventory` are control ops
+with no entry in `TOOL_DEFS`. They are the Pi extension's own per-turn hooks —
+the extension pulls the upkeep block over `getSessionBrief` on
+`before_agent_start`, asks `checkPlanModeTool` whether a tool call is allowed
+while planning or for the Concierge, and hands over the tools its session holds
+through `reportToolInventory` whenever that list changes — so nothing reaches
+them over MCP. A first-class runtime driven over MCP has its system prompt fixed
+at session open and receives the same upkeep block through
+`resolveTurnPreamble` instead; Claude Code's tool list reaches the same
+inventory from the SDK's `init` message.
+
+`checkPlanModeTool` also consults the user's read-only tool list for the
+caller's runtime — `providers.piReadOnlyTools` or
+`providers.claudeReadOnlyTools`, edited under Settings → Providers — after the
+write and shell policies have answered, so the list clears a tool neither policy
+knows and never overturns a write or `bash` verdict. The agent-control settings
+patch refuses both lists: they widen the caller's own tool policy.
 
 The brief carries a second per-turn block, `planRefinement`, for a session whose
 submitted plan is still in front of the user. That is the Refine turn: the user's

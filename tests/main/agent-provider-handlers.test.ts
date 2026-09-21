@@ -26,6 +26,18 @@ const { createAgentProviderService } = await import(
 const { registerAgentProviderHandlers } = await import(
 	'../../src/main/ipc/handlers/agent-provider.ts'
 );
+const { createToolTrustService } = await import(
+	'../../src/main/agent-providers/tool-trust.ts'
+);
+
+const toolTrustService = createToolTrustService(() => ({
+	claudeReadOnlyTools: [],
+	claudeSubagentMode: 'ensemblr',
+	piReadOnlyTools: [],
+}));
+toolTrustService.recordInventory('pi', [
+	{ description: 'Search the web', name: 'web_lookup', source: 'npm:demo' },
+]);
 
 let homeDirectory: string;
 let openedTargets: { targetId: string; workspacePath: string }[];
@@ -168,6 +180,7 @@ beforeEach(() => {
 			},
 		}),
 		openTargetService,
+		toolTrustService,
 	});
 });
 
@@ -175,11 +188,12 @@ afterEach(() => {
 	rmSync(homeDirectory, { force: true, recursive: true });
 });
 
-test('registers exactly the eight parameterized provider channels', () => {
+test('registers exactly the nine parameterized provider channels', () => {
 	expect(handle.mock.calls.map(([channel]) => channel)).toEqual([
 		'ensemblr:get-agent-provider-readiness',
 		'ensemblr:list-agent-provider-mcp-servers',
 		'ensemblr:list-agent-provider-slash-commands',
+		'ensemblr:list-agent-provider-tools',
 		'ensemblr:get-agent-provider-executable-path',
 		'ensemblr:set-agent-provider-executable-path',
 		'ensemblr:clear-agent-provider-executable-path',
@@ -259,6 +273,28 @@ test('slash commands route to the runtime registered for that provider', async (
 	});
 });
 
+test('the tool list routes to the inventory the addressed runtime reported', async () => {
+	const pi = await invoke('ensemblr:list-agent-provider-tools', {
+		provider: 'pi',
+	});
+	const claude = await invoke('ensemblr:list-agent-provider-tools', {
+		provider: 'claude',
+	});
+
+	expect(pi).toEqual({
+		reported: true,
+		tools: [
+			{
+				description: 'Search the web',
+				name: 'web_lookup',
+				refused: false,
+				source: 'npm:demo',
+			},
+		],
+	});
+	expect(claude).toEqual({ reported: false, tools: [] });
+});
+
 test('slash commands reject a request with no workspace directory', async () => {
 	await expect(
 		invoke('ensemblr:list-agent-provider-slash-commands', {
@@ -282,6 +318,7 @@ test('the MCP roster rejects a request with no workspace directory', async () =>
 test('every channel rejects an unknown provider id', async () => {
 	const channels = [
 		'ensemblr:get-agent-provider-readiness',
+		'ensemblr:list-agent-provider-tools',
 		'ensemblr:get-agent-provider-executable-path',
 		'ensemblr:clear-agent-provider-executable-path',
 		'ensemblr:select-agent-provider-executable',

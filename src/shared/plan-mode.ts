@@ -20,11 +20,13 @@ export type {
 	ConciergeToolVerdict,
 } from './plan-mode/concierge-guard.ts';
 export {
+	acceptsUserTrust,
 	CONCIERGE_GUARDED_TOOLS,
 	CONCIERGE_SHELL_TOOLS,
 	CONCIERGE_WRITE_TOOLS,
 	evaluateConciergeTool,
 	pathStaysInConciergeHome,
+	toTrustedToolSet,
 } from './plan-mode/concierge-guard.ts';
 export {
 	PLAN_MODE_CONDITIONAL_OPS,
@@ -41,3 +43,7 @@ export {
 	evaluatePlanModeTool,
 	PLAN_MODE_GUARDED_TOOLS,
 } from './plan-mode/tool-guard.ts';
+export {
+	CLAUDE_MCP_TOOL_NAME,
+	isVouchedByUser,
+} from './plan-mode/tool-trust.ts';

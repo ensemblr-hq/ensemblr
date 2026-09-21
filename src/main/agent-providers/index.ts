@@ -1,7 +1,8 @@
 // Module boundary:
 //   `agent-providers/` — the provider-parameterized settings surface. It owns
-//   executable discovery/override persistence and readiness probing for every
-//   agent runtime behind one shared interface, so Pi and Claude Code are
+//   executable discovery/override persistence, readiness probing, and the tools
+//   each runtime's Plan Mode and Concierge may call on the user's word, for
+//   every agent runtime behind one shared interface, so Pi and Claude Code are
 //   siblings rather than one routed through the other's vocabulary.
 //
 // Pi's probe adapts `pi-runtime`'s `PiReadinessService`; Claude's talks to the
@@ -42,3 +43,5 @@ export {
 	acceptableThinkingLevels,
 	createSpawnModelResolver,
 } from './spawn-model-resolver';
+export type { ReportedTool, ToolTrustService } from './tool-trust';
+export { createToolTrustService } from './tool-trust';

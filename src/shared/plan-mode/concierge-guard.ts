@@ -10,8 +10,18 @@
  * of a security-sensitive classifier — so both belong in `shared/` behind the
  * control server.
  */
-import { isEnsemblrControlTool } from '../agent-control.ts';
+import {
+	isEnsemblrControlTool,
+	REPORT_TOOL_INVENTORY_LIMITS,
+} from '../agent-control.ts';
+import type { AgentProviderId } from '../agent-provider.ts';
 import { isReadOnlyBashCommand } from './bash-guard.ts';
+import {
+	hasTrustableName,
+	isVouchedByUser,
+	KNOWN_READ_ONLY_EXTENSION_TOOLS,
+	NEVER_TRUSTED_TOOLS,
+} from './tool-trust.ts';
 
 /** A tool call being classified: its name, its target path, and its command. */
 export interface ConciergeToolRequest {
@@ -22,6 +32,8 @@ export interface ConciergeToolRequest {
 	/** Target path, for `write`/`edit`. */
 	path?: string;
 	tool: string;
+	/** Tools the user vouches for as read-only on the calling runtime. */
+	trustedTools?: ReadonlySet<string>;
 }
 
 /** Whether a Concierge tool call may proceed, and why not when it may not. */
@@ -130,24 +142,6 @@ const CONCIERGE_READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * The web tools a Pi Concierge holds, cleared so it can research the way a
- * Claude Concierge already does with `WebSearch` and `WebFetch`.
- *
- * Pi ships no web tool of its own; these are the default names `pi-web-access`
- * registers. None of them can reach a workspace: search results and fetched
- * pages land in Pi's own cache, and a cloned GitHub repository or an extracted
- * PDF lands in a temp directory the call has no parameter to move. A user who
- * renames them in `pi-web-access`'s config gets the default denial back, which
- * is the direction a name-based policy has to fail in.
- */
-const CONCIERGE_WEB_ACCESS_TOOLS: ReadonlySet<string> = new Set([
-	'fetch_content',
-	'get_search_content',
-	'source_check',
-	'web_search',
-]);
-
-/**
  * Reports whether a tool needs no Concierge opinion of its own.
  *
  * Ensemblr's own control tools clear here because they are gated somewhere
@@ -157,13 +151,62 @@ const CONCIERGE_WEB_ACCESS_TOOLS: ReadonlySet<string> = new Set([
  * test, because a Concierge on Claude Code reaches those tools over MCP and sees
  * every one of them namespaced.
  * @param tool - The tool name being classified.
- * @returns True for a known read-only built-in, a web-access tool, or an Ensemblr control tool.
+ * @returns True for a known read-only built-in, a known read-only extension tool, or an Ensemblr control tool.
  */
 function runsUntouched(tool: string): boolean {
 	return (
 		CONCIERGE_READ_ONLY_TOOLS.has(tool) ||
-		CONCIERGE_WEB_ACCESS_TOOLS.has(tool) ||
+		KNOWN_READ_ONLY_EXTENSION_TOOLS.has(tool) ||
 		isEnsemblrControlTool(tool)
+	);
+}
+
+/**
+ * Reports whether a tool is one the user may vouch for as read-only on a
+ * runtime: a name of a kind that runtime leaves to the user, no longer than a
+ * tool name the control surface accepts, that no policy already answers for,
+ * and not one no trust can clear.
+ *
+ * The Settings list offers exactly these, and main drops anything else from a
+ * hand-edited config, a reported inventory, or a refusal before it is kept. The
+ * Concierge's sets answer for Plan Mode's names too, because they are the
+ * superset: they spell both runtimes' built-ins, and Plan Mode's four reads and
+ * three guarded tools are among them.
+ * @param tool - The tool name being classified.
+ * @param runtime - The runtime the tool belongs to.
+ * @returns True when a user's trust would change how the tool is answered.
+ */
+export function acceptsUserTrust(
+	tool: string,
+	runtime: AgentProviderId,
+): boolean {
+	return (
+		tool.length > 0 &&
+		tool.length <= REPORT_TOOL_INVENTORY_LIMITS.maxNameLength &&
+		hasTrustableName(tool, runtime) &&
+		!CONCIERGE_GUARDED_TOOLS.has(tool) &&
+		!NEVER_TRUSTED_TOOLS.has(tool) &&
+		!runsUntouched(tool)
+	);
+}
+
+/**
+ * Turns a user's saved list into the set a guard consults, trimmed and stripped
+ * of every name {@link acceptsUserTrust} refuses. A hand-edited `bash`,
+ * `powershell`, or Claude `Monitor` therefore never reaches a guard, rather than
+ * relying on each guard's own ordering to outrank it.
+ * @param names - The names as saved in app settings.
+ * @param runtime - The runtime the list belongs to.
+ * @returns The names a guard may clear on the user's word.
+ */
+export function toTrustedToolSet(
+	names: readonly string[],
+	runtime: AgentProviderId,
+): ReadonlySet<string> {
+	return new Set(
+		names
+			.map((name) => name.trim())
+			.filter((name) => acceptsUserTrust(name, runtime)),
 	);
 }
 
@@ -272,8 +315,8 @@ function blocked(cause: string): ConciergeToolVerdict {
 /**
  * Classifies a Concierge tool call: a file write is allowed only inside the
  * Concierge home, `bash` is restricted to read-only commands, the known
- * read-only built-ins, Pi's web-access tools, and Ensemblr's own control tools
- * run untouched, and **anything else is blocked**.
+ * read-only built-ins and extension tools, Ensemblr's own control tools, and the
+ * tools the user vouches for run untouched, and **anything else is blocked**.
  *
  * Deny by default, for the reason the Plan Mode tool guard is. The tool set a
  * session holds is open — the user can install another extension or point a
@@ -283,7 +326,10 @@ function blocked(cause: string): ConciergeToolVerdict {
  * MCP `write_file` reached a Concierge that is meant to be read-only outside its
  * own folder. A false block costs a turn and a reason the model can read; a
  * false allow writes into a workspace the Concierge deliberately cannot reach.
- * @param request - The tool name, the path it targets, the command it would run, and the home.
+ * The user's own list is the one widening, and it is consulted last, so it can
+ * clear a tool this module has no opinion about but never overturn a write or
+ * shell verdict.
+ * @param request - The tool name, the path it targets, the command it would run, the home, and the user's trusted tools.
  * @returns Whether the call is blocked, with a reason when it is.
  */
 export function evaluateConciergeTool({
@@ -291,6 +337,7 @@ export function evaluateConciergeTool({
 	command,
 	path,
 	tool,
+	trustedTools,
 }: ConciergeToolRequest): ConciergeToolVerdict {
 	if (CONCIERGE_WRITE_TOOLS.has(tool)) {
 		if (!path) {
@@ -312,11 +359,11 @@ export function evaluateConciergeTool({
 				);
 	}
 
-	if (runsUntouched(tool)) {
+	if (runsUntouched(tool) || isVouchedByUser(tool, trustedTools)) {
 		return { blocked: false };
 	}
 
 	return blocked(
-		`\`${tool}\` is not a tool this app knows to be read-only, so it is refused rather than guessed at — a tool from an MCP server or another extension can write files and run commands just as \`write\` and \`bash\` do.`,
+		`\`${tool}\` is not a tool this app knows to be read-only, so it is refused rather than guessed at — a tool from an MCP server or another extension can write files and run commands just as \`write\` and \`bash\` do. If it comes from an extension or an MCP server and the user knows it cannot change anything, they can trust it under Settings → Providers → Read-only tools.`,
 	);
 }

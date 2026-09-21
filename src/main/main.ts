@@ -75,6 +75,7 @@ import {
 	createClaudeReadinessProbe,
 	createPiReadinessProbe,
 	createSpawnModelResolver,
+	createToolTrustService,
 } from './agent-providers';
 import {
 	type AgentExecutableSnapshot,
@@ -384,6 +385,13 @@ const configService = createEnsemblrConfigService(
 );
 const appSettingsService = createAppSettingsService(
 	isDev ? { configPath: devConfigPath } : {},
+);
+/**
+ * Which extra tools Plan Mode and the Concierge may call on the user's word, per
+ * runtime, and the tool inventory the Settings list offers them from.
+ */
+const toolTrustService = createToolTrustService(
+	() => appSettingsService.read().providers,
 );
 let onAppSettingsUpdated: ((settings: AppSettings) => void) | undefined;
 const databaseService = createEnsemblrDatabaseService(
@@ -822,6 +830,15 @@ const claudeAgentAdapter = createClaudeAgentAdapter({
 	}),
 	readPluginDirectories: () => readAgentSkillBundle().pluginDirectories,
 	resolveBaseEnv: resolveAgentSpawnEnv,
+	toolTrust: {
+		/** Reads the user's Claude Code read-only tool list per tool call. */
+		trustedTools: () => toolTrustService.trustedTools('claude'),
+		/** Feeds the tools a session's `init` lists into the Settings inventory. */
+		recordInventory: (tools) =>
+			toolTrustService.recordInventory('claude', tools),
+		/** Notes a Concierge refusal so the Settings list can badge the tool. */
+		recordRefusal: (tool) => toolTrustService.recordRefusal('claude', tool),
+	},
 });
 /**
  * Path to the `claude` binary a Claude session or model listing should run, or
@@ -1573,6 +1590,7 @@ agentControlService = createAgentControlService({
 		augmentHarnessCommand,
 		conciergePorts,
 		boardStatusStore,
+		toolTrust: toolTrustService,
 		reviewLaunch: reviewLaunchCoordinator.port,
 		/** Broadcasts an agent-refined diagram so an open diagram tab refreshes. */
 		broadcastArchitectureChanged: (payload) =>
@@ -2014,6 +2032,7 @@ app.whenReady().then(() => {
 		settingsResolutionService,
 		sharedRootAdoptionService,
 		terminalService,
+		toolTrustService,
 		unarchiveWorkspaceService,
 		updateService,
 		workspaceFilesWatcher,

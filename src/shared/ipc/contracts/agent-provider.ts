@@ -253,6 +253,34 @@ export interface AgentProviderRequest {
 	provider: AgentProviderId;
 }
 
+/**
+ * One tool a runtime's sessions reported holding, as the read-only tools
+ * setting offers it. Only names a user could vouch for are listed: the runtime's
+ * own built-ins and the tools with a policy of their own are left out, and on
+ * Claude Code that leaves only MCP tools. `source` names what registered the
+ * tool — a Pi package spec such as `npm:pi-web-access`, or the MCP server behind
+ * a Claude Code tool — and is null for a tool known only because a guard refused
+ * it. `refused` is true once the Concierge, or Plan Mode on Pi, has refused the
+ * tool since the app launched; Claude Code's own plan mode refuses a tool inside
+ * the CLI, where the app never sees it.
+ */
+export interface AgentProviderToolWire {
+	description: string | null;
+	name: string;
+	refused: boolean;
+	source: string | null;
+}
+
+/**
+ * The tools one runtime's sessions reported since launch. The inventory lives
+ * in memory, so `reported` is false until a session of that runtime has started
+ * and an empty list then means "not known yet" rather than "none installed".
+ */
+export interface ListAgentProviderToolsResult {
+	reported: boolean;
+	tools: readonly AgentProviderToolWire[];
+}
+
 /** Request setting an explicit executable override for one agent runtime. */
 export interface SetAgentProviderExecutablePathRequest {
 	path: string;
@@ -293,6 +321,9 @@ export interface AgentProviderApi {
 	listAgentProviderSlashCommands: (
 		request: ListAgentProviderSlashCommandsRequest,
 	) => Promise<ListAgentProviderSlashCommandsResult>;
+	listAgentProviderTools: (
+		request: AgentProviderRequest,
+	) => Promise<ListAgentProviderToolsResult>;
 	openAgentProviderSettingsFile: (
 		request: OpenAgentProviderSettingsFileRequest,
 	) => Promise<OpenAgentProviderSettingsFileResult>;

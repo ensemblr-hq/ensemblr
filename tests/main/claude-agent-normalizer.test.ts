@@ -64,6 +64,21 @@ function initMessage(overrides: Record<string, unknown> = {}): unknown {
 	};
 }
 
+// The tool list feeds the read-only tools inventory in Settings, and `init` is
+// the only frame that carries it; anything but a non-empty string is dropped
+// rather than trusted.
+test('init reports the tools the session holds', () => {
+	const { discoveries, normalize } = createNormalizer();
+
+	normalize(
+		initMessage({
+			tools: ['Read', 'mcp__exa__web_search_exa', '', 7, null],
+		}),
+	);
+
+	assert.deepEqual(discoveries[0]?.tools, ['Read', 'mcp__exa__web_search_exa']);
+});
+
 function messagePayloads(
 	events: readonly AgentEvent[],
 ): readonly { kind: string }[] {
@@ -81,6 +96,7 @@ test('init reports the resolved session id and model, then settles to idle', () 
 		{
 			model: { id: 'claude-opus-5', provider: 'anthropic' },
 			sessionId: 'sdk-session-1',
+			tools: [],
 		},
 	]);
 	assert.deepEqual(events, [

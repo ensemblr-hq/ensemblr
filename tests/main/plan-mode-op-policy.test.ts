@@ -32,6 +32,7 @@ const EXPECTED_DENIALS: Record<
 	addDiffComments: [],
 	askUserQuestion: ['subagent'],
 	checkPlanModeTool: [],
+	reportToolInventory: [],
 	closeTab: [],
 	getDiffComments: [],
 	recallMemory: [],

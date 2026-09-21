@@ -329,7 +329,12 @@ describe('appSettingsControlPatchSchema', () => {
 		} = DEFAULT_APP_SETTINGS;
 		const { automaticUpdates: _automaticUpdates, ...general } =
 			projection.general;
-		const writable = { ...projection, general };
+		const {
+			claudeReadOnlyTools: _claudeReadOnlyTools,
+			piReadOnlyTools: _piReadOnlyTools,
+			...providers
+		} = projection.providers;
+		const writable = { ...projection, general, providers };
 		const parsed = appSettingsControlPatchSchema.safeParse(writable);
 
 		expect(parsed.success).toBe(true);
@@ -357,6 +362,27 @@ describe('appSettingsControlPatchSchema', () => {
 				general: { automaticUpdates: false },
 			}).success,
 		).toBe(false);
+	});
+
+	// The two lists decide which tools Plan Mode and the Concierge refuse, so a
+	// Concierge that could write them could grant itself a writer — unattended,
+	// with no dialog in the way.
+	test('rejects the read-only tool lists that widen an agent’s own policy', () => {
+		expect(
+			appSettingsControlPatchSchema.safeParse({
+				providers: { piReadOnlyTools: ['write_file'] },
+			}).success,
+		).toBe(false);
+		expect(
+			appSettingsControlPatchSchema.safeParse({
+				providers: { claudeReadOnlyTools: ['mcp__fs__write_file'] },
+			}).success,
+		).toBe(false);
+		expect(
+			appSettingsControlPatchSchema.safeParse({
+				providers: { claudeSubagentMode: 'native' },
+			}).success,
+		).toBe(true);
 	});
 
 	test('accepts only editable sections and rejects unknown or invalid values', () => {

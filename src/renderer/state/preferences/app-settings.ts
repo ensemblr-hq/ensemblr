@@ -182,6 +182,21 @@ export const claudeSubagentModeAtom = settingAtom(
 	'claudeSubagentMode',
 );
 
+/**
+ * Extra tools the user vouches for as read-only on Pi, so Plan Mode and the
+ * Concierge call them instead of refusing. Each name is one tool as the runtime
+ * reports it; main drops any name that already has a policy of its own.
+ */
+export const piReadOnlyToolsAtom = settingAtom('providers', 'piReadOnlyTools');
+/**
+ * Extra tools the user vouches for as read-only on Claude Code, spelled the way
+ * the runtime reports them (an MCP tool is `mcp__<server>__<tool>`).
+ */
+export const claudeReadOnlyToolsAtom = settingAtom(
+	'providers',
+	'claudeReadOnlyTools',
+);
+
 // ─── Git (user defaults) ────────────────────────────────────────────────────────
 // Atom names stay friendly; the backing keys mirror the repo-resolution keys so
 // the same values feed `resolveSettings` as the `user-default` source.

@@ -63,9 +63,14 @@ const modelSettingsSchema = z.object({
 // picks which delegation mechanism a first-class Claude Code chat holds: `ensemblr`
 // spawns visible chat tabs through the control tools and denies Claude's own
 // sub-agent tool, `native` does the reverse. Pi has no native sub-agent mechanism
-// and ignores the setting.
+// and ignores the setting. `piReadOnlyTools` and `claudeReadOnlyTools` are the
+// user's word on which extra tools Plan Mode and the Concierge may call on that
+// runtime; the agent-control patch refuses both, because they widen the caller's
+// own tool policy.
 const providerSettingsSchema = z.object({
 	claudeSubagentMode: z.enum(SUBAGENT_MECHANISMS).catch('ensemblr'),
+	piReadOnlyTools: z.array(z.string()).catch([]),
+	claudeReadOnlyTools: z.array(z.string()).catch([]),
 });
 
 // Git user-scope defaults. Field names mirror the repository-resolution keys
@@ -240,19 +245,26 @@ export const appSettingsPatchSchema = z.object({
 /**
  * Section-scoped patch accepted by the agent-control settings operations.
  *
- * Narrower than {@link AppSettingsPatch} by two deliberate omissions, both of
+ * Narrower than {@link AppSettingsPatch} by three deliberate omissions, each of
  * which an agent could otherwise set on the user's behalf with real
  * consequences. `dictation` carries `baseUrl`, the endpoint the user's stored
  * transcription key is posted to with every recorded clip — a preference in
  * shape, a credential destination in fact. `general.automaticUpdates` decides
- * whether a patched release ever installs. Neither belongs to a supervising
- * agent, and an unattended Concierge writes app settings without a dialog.
+ * whether a patched release ever installs. The two read-only tool lists under
+ * `providers` decide which tools Plan Mode and the Concierge refuse, so a
+ * Concierge that could patch them could grant itself a writer. None belongs to
+ * a supervising agent, and an unattended Concierge writes app settings without
+ * a dialog.
  */
 export type AppSettingsControlPatch = Omit<
 	AppSettingsPatch,
-	'dictation' | 'general' | 'onboarding'
+	'dictation' | 'general' | 'onboarding' | 'providers'
 > & {
 	general?: Omit<Partial<GeneralSettings>, 'automaticUpdates'>;
+	providers?: Omit<
+		Partial<ProviderSettings>,
+		'claudeReadOnlyTools' | 'piReadOnlyTools'
+	>;
 };
 
 /** Strict agent-control validator; unlike the IPC parser it rejects unknown keys and invalid values. */
