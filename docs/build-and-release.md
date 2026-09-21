@@ -17,9 +17,9 @@ sequence is ordered.
 | Target | Artifact | Built on | Status |
 | --- | --- | --- | --- |
 | macOS arm64 | `.dmg` + `.zip` | `macos-15` (native) | shipping |
-| macOS x64 | `.dmg` + `.zip` | `macos-15` (cross-built) | this release |
+| macOS x64 | `.dmg` + `.zip` | `macos-15` (cross-built) | shipping (since 0.1.20) |
 | Linux x86-64 | `.AppImage` | `ubuntu-latest` | shipping |
-| Linux arm64 | `.appimage.bin` | not built yet | next release, not this one |
+| Linux arm64 | `.appimage.bin` | not built yet | planned for the release after 0.1.20 |
 
 ## Prerequisites
 
@@ -738,13 +738,23 @@ workspace's unmerged commit.
    immutable target:
 
 ```bash
-version=0.1.19
+version=0.1.20
 tag="v${version}"
 git fetch origin master
 target=$(git rev-parse origin/master)
 git show "${target}:package.json" | grep -F "\"version\": \"${version}\""
-gh release create "$tag" --target "$target" --notes-file NOTES.md
+gh release create "$tag" --target "$target" --title "Ensemblr ${tag}" --notes-file NOTES.md
 ```
+
+`--title` matters: without it GitHub titles the release with the bare tag, and
+every earlier release is titled `Ensemblr vX.Y.Z`.
+
+Merging the version-bump PR starts a **Checks** run on the squash-merge commit
+itself, and `already-verified` looks for a *green* run on the exact commit the
+tag points at. Creating the release while that push run is still going finds
+none, so `verify` re-runs the whole suite (about five minutes) before `build`
+can start. Wait for the run on `master` to finish first if you want the fast
+path — `gh run list --commit "$target"` shows it.
 
 Do not pass the literal `origin/master` as `--target`: GitHub rejects a
 remote-tracking ref (`HTTP 422: Release.target_commitish is invalid`). A bare
@@ -783,10 +793,10 @@ release until someone edits them:
 
 | File | What is pinned |
 | --- | --- |
-| `README.md` | version line, status sentence, `.dmg` URL |
-| `docs/README.md` | version link, `.dmg` and `.AppImage` URLs |
+| `README.md` | version line, status sentence, both `.dmg` URLs (arm64 and x64) |
+| `docs/README.md` | version link, both `.dmg` URLs, `.AppImage` URL |
 | `docs/guide/README.md` | the version this guide describes |
-| `docs/guide/01-install.md` | current-version examples and every asset URL |
+| `docs/guide/01-install.md` | current-version examples and every asset URL, both architectures |
 | `docs/build-and-release.md` | the command and `update-darwin-arm64.json` examples |
 
 **Never string-replace the old version into the new one.** Asset filenames
@@ -801,7 +811,7 @@ returns `output.summary: null`, and the raw logs show only the unexpanded
 script. Every pinned line above derives from one fact, each asset's `name`:
 
 ```bash
-gh release view v0.1.19 --json assets -q '.assets[].name'
+gh release view v0.1.20 --json assets -q '.assets[].name'
 ```
 
 The version string is the tag with `v` stripped; each URL is
@@ -812,9 +822,9 @@ empty or partial asset list is not the signal to start editing — poll until ev
 artifact is there. Then check the URLs actually resolve before opening the PR:
 
 ```bash
-gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.19 \
+gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.20 \
   --jq '.assets[] | "\(.name)\t\(.digest)"'
-gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.19 \
+gh api repos/ensemblr-hq/ensemblr/releases/tags/v0.1.20 \
   --jq '.assets[].browser_download_url' |
   while IFS= read -r url; do
     curl --fail --location --head --silent --show-error "$url" >/dev/null
@@ -888,8 +898,8 @@ Squirrel.Mac feed:
 
 ```json
 {
-  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.19/Ensemblr-darwin-arm64-0.1.19.zip",
-  "name": "0.1.19",
+  "url": "https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.20/Ensemblr-darwin-arm64-0.1.20.zip",
+  "name": "0.1.20",
   "notes": "…the release body…",
   "pub_date": "2026-09-18T09:48:54Z"
 }

@@ -10,8 +10,8 @@ Ensemblr runs on **macOS with Apple silicon or an Intel processor** and on
 | Linux, x86-64 | `.AppImage` | No — there is no equivalent | Yes when the AppImage directory is writable; otherwise it links |
 
 macOS ships one build per architecture rather than a universal binary, so an
-Apple-silicon Mac downloads only arm64 code. **The Intel Mac build first appears
-in the release after `0.1.19`**; the two macOS architectures are built on the same
+Apple-silicon Mac downloads only arm64 code. **The Intel Mac build first shipped
+in `0.1.20`**; the two macOS architectures are built on the same
 runner, and the Linux AppImage on a separate job, all attached to one release.
 There is no arm64 Linux build in this release — it is planned for a later one —
 and no Windows build.
@@ -66,7 +66,7 @@ Nothing needs root and nothing is written outside `$HOME`:
 
 | Option | Does |
 | --- | --- |
-| `--version <tag>` | install a specific release, e.g. `--version v0.1.19` |
+| `--version <tag>` | install a specific release, e.g. `--version v0.1.20` |
 | `--nightly` | install the rolling canary build, **alongside** a release |
 | `--dir <path>` | where the AppImage goes |
 | `--no-desktop` | skip the launcher entry and the icons |
@@ -92,16 +92,16 @@ same file. `--check` exits `10` when there is something to install, distinct fro
 
 ## Download
 
-The current build is **`0.1.19`**:
+The current build is **`0.1.20`**:
 
-- [**`Ensemblr-0.1.19-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.19/Ensemblr-0.1.19-arm64.dmg)
-  — the macOS disk image. Open it and drag Ensemblr to `/Applications`.
-- [`Ensemblr-darwin-arm64-0.1.19.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.19/Ensemblr-darwin-arm64-0.1.19.zip)
+- [**`Ensemblr-0.1.20-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.20/Ensemblr-0.1.20-arm64.dmg)
+  — the macOS disk image for Apple silicon. Open it and drag Ensemblr to `/Applications`.
+- [`Ensemblr-darwin-arm64-0.1.20.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.20/Ensemblr-darwin-arm64-0.1.20.zip)
   — the same `.app`, zipped, if you would rather not mount an image.
-- **Intel Macs:** the release after `0.1.19` carries `Ensemblr-<version>-x64.dmg`
-  and `Ensemblr-darwin-x64-<version>.zip` beside the arm64 pair, under Forge's
-  default names. `0.1.19` itself is Apple-silicon only.
-- [**`Ensemblr-0.1.19-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.19/Ensemblr-0.1.19-x64.AppImage)
+- [**`Ensemblr-0.1.20-x64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.20/Ensemblr-0.1.20-x64.dmg)
+  and [`Ensemblr-darwin-x64-0.1.20.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.20/Ensemblr-darwin-x64-0.1.20.zip)
+  — the same pair for Intel Macs. `0.1.19` and earlier are Apple-silicon only.
+- [**`Ensemblr-0.1.20-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.20/Ensemblr-0.1.20-x64.AppImage)
   — the Linux build, if you would rather place it yourself than run the
   [install script](#install-script-linux). One file, no installer:
 
@@ -140,7 +140,7 @@ it against the checksum on the release page if you want a check, or let the
 [install script](#install-script-linux) do it for you. Either way this is
 **pre-1.0** software, with breaking changes expected before 1.0.
 
-The app reports the full version, any prerelease suffix included — `0.1.19` in
+The app reports the full version, any prerelease suffix included — `0.1.20` in
 **Settings → General**, and on macOS in the bundle's
 `CFBundleShortVersionString`. It matches the release tag, so a bug report only
 has to quote one string.

@@ -20,7 +20,7 @@ You need three things on the machine:
 | **gh**, authenticated | Branch, pull request, review, and merge workflows shell out to the GitHub CLI. |
 | **`pi` or `claude`** | At least one agent runtime. Either one alone is enough — see [The either-or gate](#the-either-or-gate). |
 
-Plus macOS Ventura or later (Apple silicon, or Intel from the release after `0.1.19`), or Linux on x86-64. Everything
+Plus macOS Ventura or later (Apple silicon or Intel), or Linux on x86-64. Everything
 else on this page Ensemblr either provides, creates, or treats as optional.
 
 ## The checks
