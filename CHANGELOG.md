@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-09-21
+
+Ensemblr 0.1.20 is the first release to ship an Intel Mac build alongside Apple silicon, with an updater that selects its download by architecture, a package manager moved to Bun, and a backlog of chat, checkpoint, Linear, and attachment fixes.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.20) ·
+[`.dmg` (Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.20/Ensemblr-0.1.20-arm64.dmg) ·
+[`.dmg` (Intel)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.20/Ensemblr-0.1.20-x64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.20/Ensemblr-0.1.20-x64.AppImage)
+
 ### Added
 
 - **An Intel Mac build.** macOS now ships one signed, notarized `.dmg` and `.zip` per architecture — arm64 as before, plus x64, cross-built on the same `macos-15` runner — rather than a universal binary, so an Apple-silicon Mac still downloads only arm64 code. No `package.json` script hardcodes `--arch` any more (`build`, `package`, `make`, `make:linux`, `package:linux`); Forge builds for the host architecture and CI passes `--arch` explicitly on every leg. Linux arm64 is planned for the release after this one. [ADR 0074](./docs/adr/0074-ship-four-build-targets-and-select-updates-by-architecture.md).

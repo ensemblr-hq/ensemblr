@@ -126,8 +126,7 @@ its `update-darwin-x64.json` cannot disturb.
 
 ## Consequences
 
-- macOS users on Intel hardware have a supported build starting with the release
-  after `0.1.19`; each Mac downloads only its own architecture's code.
+- macOS users on Intel hardware have a supported build starting with `0.1.20`; each Mac downloads only its own architecture's code.
 - Every feed-name consumer (the updater, both release workflows, the docs) keys
   on `update-<platform>-<arch>.json`. Renaming the shape on one side strands
   clients on their current version, so it is a cross-repo contract in the way

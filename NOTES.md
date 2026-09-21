@@ -1,30 +1,40 @@
-# Ensemblr v0.1.19
+# Ensemblr v0.1.20
 
-Ensemblr 0.1.19 is a patch release: agents are handed control-tool names their own client can call, turn diffs stop double-counting untracked files, an overflowing tab strip pages with edge arrows, and a pull request no longer reads Ready to merge while its checks are still arriving.
+Ensemblr 0.1.20 ships an Intel Mac build alongside Apple silicon, makes the updater pick the download for its own architecture, moves the package manager to Bun, and clears a backlog of fixes across chat scrolling, checkpoints, Linear, and attachments.
 
 ### Highlights
 
-* **Control-tool names reach each agent spelled for its own client.** Every playbook, directive, tool description, and op result named the control tools in Pi's bare `ensemblr_*` spelling, because Pi's extension is where they are registered unwrapped — so a Claude agent, which holds `mcp__ensemblr__ensemblr_set_name` and nothing called `ensemblr_set_name`, read a few hundred names it could not call, and called one anyway. `namespaceControlToolNames` now rewrites them per caller on the way out, idempotently, across the playbook, the per-turn directives, the MCP `instructions` block, every tool description, and op results. Content the app *read* rather than wrote — a diff, a transcript, scrollback, a stored diagram, a Linear issue — stays verbatim, since rewriting it would hand an agent a file that disagrees with disk. Spawned prompts and follow-ups are respelled for the recipient's runtime rather than the sender's, covering peer and review briefs, the Concierge frame, and ordinary cross-runtime delegation. A name the app does not serve is left as written, so a misspelling fails as itself rather than looking served. (#612)
-* **A turn's diff no longer reports every earlier untracked file as its own.** A turn checkpoint is captured with `add -A` into a throwaway index, but `git diff <checkpoint>` walked the real one, so each untracked file was counted twice — once as a deletion, once as an addition — and leaked into every later turn's diff. Both legs are now tree-to-tree: the live leg writes the working tree, `.gitignore` respected, into a tree object through its own throwaway index, with the workspace index, HEAD, and refs untouched. A finished chat's last turn is bounded by the next checkpoint taken anywhere in the workspace, so it stops diffing the live tree forever and reporting other chats' work as its own; a streaming turn stays live. File chips widen only the labels that would otherwise name two different files with the same word. (#613)
-* **An overflowing tab strip shows it, and pages with an arrow at each end.** Each end of the strip fades while tabs remain beyond it and carries an arrow that pages that way; the review panel's header now uses the shared `TabScroller`, so all three strips behave alike. The fade is a mask over the tabs rather than an overlay, so it works on any surface, and a resting arrow is `invisible` rather than transparent, so a strip does not announce two controls that do nothing. (#614)
-* **A pull request no longer reads Ready to merge while GitHub is still queueing its checks.** GitHub advances a PR's head the moment it accepts a push and queues the head's checks seconds later; in that gap the rollup is empty and the mergeability verdict still describes the commit that passed. An empty rollup soon after checks were last seen now reads as checking, `mergeStateStatus: UNSTABLE` reads as checking and `BEHIND` as blocking, and every PR with anything still in flight — including one both blocked and running checks, the normal state on a protected branch — refreshes every 30 seconds instead of 120. A repository that has never reported a check is never held back. (#615)
+* **An Intel Mac build.** macOS now ships one signed, notarized `.dmg` and `.zip` per architecture — `arm64` as before, plus `x64` — rather than a universal binary, so an Apple-silicon Mac still downloads only arm64 code. Linux x64 stays an `.AppImage`; Linux arm64 is planned for the release after this one. ([ADR 0074](https://github.com/ensemblr-hq/ensemblr/blob/v0.1.20/docs/adr/0074-ship-four-build-targets-and-select-updates-by-architecture.md))
+* **The updater selects by architecture.** Each release carries one feed document per target, `update-<platform>-<arch>.json`, and a build reads the one for its own platform and `process.arch` — an Intel install never moves to arm64, or the reverse. `update-darwin-arm64.json` keeps its exact name and shape for builds already installed.
+* **A chat follows the newest message until you scroll away from it, and only then.** A growing composer no longer slides the newest message under it, reaching for PageUp or the scrollbar mid-stream no longer pulls you back down, and an abandoned scroll position expires after 60 s of inactivity. (#628)
+* **Archiving a workspace that adopted an existing branch no longer deletes that branch.** (#627)
+* **A turn checkpoint no longer deletes a tracked file that later gained an ignore rule.** (#627)
+* **Clearing a Linear assignee, project, or cycle now clears it.** (#627)
+* **Terminals no longer spend a delegation spawn.** Long-running orchestrators stop being refused with `Root-tree spawn quota of 20 exhausted`; terminals take their own guard of 8 open per tree and 10 starts per minute. (#626)
+* **Oversize text attachments are announced by path instead of failing the send.** (#623)
+* **Security:** Plan Mode denies BSD `date`'s bare clock-setting operand (#627), and a Linear disconnect can no longer be raced into keeping its credentials (#627).
+* **The package manager is Bun again**, so workspace setup is fast: `bun ci` warm measured 0.2 s. Node 24 remains the runtime. ([ADR 0073](https://github.com/ensemblr-hq/ensemblr/blob/v0.1.20/docs/adr/0073-move-the-package-manager-from-npm-to-bun.md))
+
+See the [changelog](https://github.com/ensemblr-hq/ensemblr/blob/v0.1.20/CHANGELOG.md) for every change.
 
 ### Install
 
-macOS:
+macOS (Apple silicon and Intel):
 
 ```sh
 brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
-Linux:
+Or download the `.dmg` for your Mac: `Ensemblr-0.1.20-arm64.dmg` (Apple silicon) or `Ensemblr-0.1.20-x64.dmg` (Intel).
+
+Linux (x64):
 
 ```sh
 curl -fsSL https://www.ensemblr.dev/install.sh | sh
 ```
 
-The `.dmg` is signed with a Developer ID certificate, hardened-runtime, notarized by Apple and stapled, so it opens without a Gatekeeper prompt and validates offline. The Linux installer needs no root, writes nothing outside `$HOME`, verifies the download against the digest GitHub publishes, and keeps a manifest so `--uninstall` removes exactly what it added. Re-running it is an update.
+Both `.dmg` files are signed with a Developer ID certificate, hardened-runtime, notarized by Apple and stapled, so they open without a Gatekeeper prompt and validate offline. The Linux installer needs no root, writes nothing outside `$HOME`, verifies the download against the digest GitHub publishes, and keeps a manifest so `--uninstall` removes exactly what it added. Re-running it is an update.
 
 ---
 
-*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.1.18...v0.1.19>
+*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.1.19...v0.1.20>
