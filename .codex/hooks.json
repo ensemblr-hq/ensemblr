@@ -7,7 +7,7 @@
 					{
 						"type": "command",
 						"command": "bash -lc 'repo=$(git rev-parse --show-toplevel 2>/dev/null || pwd); bash \"$repo/.codex/hooks/enforce-bun-package-manager.sh\"'",
-						"statusMessage": "Enforcing npm package manager"
+						"statusMessage": "Enforcing Bun package manager"
 					}
 				]
 			}
