@@ -29,7 +29,7 @@ afterEach(() => {
 });
 
 /** Digest of a body in the `sha256:<hex>` form GitHub publishes. */
-function digestOf(body: string): string {
+function digestOf(body: string | Uint8Array<ArrayBuffer>): string {
 	return `sha256:${createHash('sha256').update(body).digest('hex')}`;
 }
 
@@ -106,7 +106,7 @@ function harness(
 	options: {
 		appImageDirectory?: string;
 		arch?: string;
-		body?: string;
+		body?: Uint8Array<ArrayBuffer>;
 		fetchImpl?: typeof fetch;
 	} = {},
 ) {
@@ -114,13 +114,19 @@ function harness(
 	mkdirSync(appImageDirectory, { recursive: true });
 	const appImagePath = join(appImageDirectory, APPIMAGE_NAME);
 	writeFileSync(appImagePath, 'the running build');
-	const body = options.body ?? 'the new build';
+	const body =
+		options.body ??
+		elfBody(
+			(options.arch ?? process.arch) === 'arm64'
+				? ELF_MACHINE.arm64
+				: ELF_MACHINE.x64,
+		);
 	const events = recorder();
 	const installer = createAppImageInstaller({
 		appImagePath,
 		arch: options.arch,
 		env: { XDG_DATA_HOME: join(root, 'xdg') },
-		fetchImpl: options.fetchImpl ?? servingFetch(body),
+		fetchImpl: options.fetchImpl ?? servingBytes(body),
 		homeDirectory: join(root, 'home'),
 	});
 	installer.on(events.handlers);
@@ -150,7 +156,7 @@ describe('createAppImageInstaller', () => {
 		await h.events.settled;
 
 		expect(h.installer.applyStaged()).toBe(true);
-		expect(readFileSync(h.appImagePath, 'utf8')).toBe('the new build');
+		expect(readFileSync(h.appImagePath)).toEqual(Buffer.from(h.body));
 	});
 
 	test('the swapped-in AppImage stays executable', async () => {
@@ -320,6 +326,40 @@ describe('the downloaded AppImage architecture check', () => {
 			'update-verification-failed' satisfies UpdateFailureCode,
 		);
 		expect(h.events.downloaded()).toBe(0);
+		expect(h.installer.applyStaged()).toBe(false);
+		expect(readFileSync(h.appImagePath, 'utf8')).toBe('the running build');
+	});
+
+	test('rejects a non-ELF download even when its digest matches', async () => {
+		const body = new TextEncoder().encode(
+			'This is not an ELF AppImage download.',
+		);
+		const h = harness({ arch: 'x64', body });
+		h.installer.arm(
+			{ digest: digestOf(body), url: 'https://x.invalid/a' },
+			'0.2.0',
+		);
+		await h.events.settled;
+
+		expect(h.events.errors[0]?.code).toBe(
+			'update-verification-failed' satisfies UpdateFailureCode,
+		);
+		expect(h.installer.applyStaged()).toBe(false);
+		expect(readFileSync(h.appImagePath, 'utf8')).toBe('the running build');
+	});
+
+	test('rejects a truncated ELF download even when its digest matches', async () => {
+		const body = new Uint8Array([0x7f, 0x45, 0x4c, 0x46]);
+		const h = harness({ arch: 'x64', body });
+		h.installer.arm(
+			{ digest: digestOf(body), url: 'https://x.invalid/a' },
+			'0.2.0',
+		);
+		await h.events.settled;
+
+		expect(h.events.errors[0]?.code).toBe(
+			'update-verification-failed' satisfies UpdateFailureCode,
+		);
 		expect(h.installer.applyStaged()).toBe(false);
 		expect(readFileSync(h.appImagePath, 'utf8')).toBe('the running build');
 	});

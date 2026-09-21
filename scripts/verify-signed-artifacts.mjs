@@ -124,14 +124,14 @@ function verifyBinaryArch(binaryPath, arch) {
 
 /**
  * Assert an app bundle's own executable and every native binding it can load
- * were built for the expected architecture. Prebuild directories for other
- * targets ship alongside and are skipped: only the binding the app would
- * actually load is evidence.
+ * were built for the expected architecture. Foreign prebuilds and
+ * electron-rebuild's `node-pty/bin` compatibility copies are skipped because
+ * node-pty's loader never selects them.
  * @param appPath - Absolute path to the `.app` bundle
  * @param arch - Architecture the bundle is supposed to be
  * @returns One message per failed assertion
  */
-function verifyBundleArch(appPath, arch) {
+export function verifyBundleArch(appPath, arch) {
 	const machO = join(appPath, 'Contents', 'MacOS');
 	const executables = existsSync(machO)
 		? readdirSync(machO).map((name) => join(machO, name))
@@ -142,6 +142,7 @@ function verifyBundleArch(appPath, arch) {
 				.filter((entry) => entry.isFile() && entry.name.endsWith('.node'))
 				.map((entry) => join(entry.parentPath, entry.name))
 				.filter((path) => {
+					if (/\/node_modules\/node-pty\/bin\//.test(path)) return false;
 					const prebuild = path.match(/\/prebuilds\/([^/]+)\//);
 					return prebuild === null || prebuild[1] === `darwin-${arch}`;
 				})
@@ -358,4 +359,6 @@ function main() {
 // `process.exitCode`, not `process.exit()`: Node's stdout is asynchronous for a
 // pipe on macOS, so exiting outright can discard the queued failure detail —
 // on the one platform this ever runs on, and exactly when it is needed.
-process.exitCode = main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+	process.exitCode = main();
+}

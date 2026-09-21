@@ -293,15 +293,18 @@ function findNativeBindings(root: string): string[] {
 }
 
 /**
- * Whether a binding sits in a prebuild directory for some other target.
- * `node-pty` ships a `prebuilds/<platform>-<arch>/` directory per target and
- * they are all packaged, so only the one the app can actually load is evidence
- * of anything.
+ * Whether a binding sits in a location node-pty cannot load for this target.
+ * Its loader checks build output and matching prebuilds, never electron-rebuild's
+ * `bin/<platform>-<arch>-<abi>` compatibility copy.
  * @param bindingPath - Absolute path to a compiled `.node` binding
  * @param target - The `platform-arch` pair being packaged
- * @returns True when the binding belongs to a different target's prebuild
+ * @returns True when the binding cannot be selected by node-pty
  */
-function isForeignPrebuild(bindingPath: string, target: string): boolean {
+function isUnloadedNodePtyBinding(
+	bindingPath: string,
+	target: string,
+): boolean {
+	if (/\/node_modules\/node-pty\/bin\//.test(bindingPath)) return true;
 	const prebuild = bindingPath.match(/\/prebuilds\/([^/]+)\//);
 	return prebuild !== null && prebuild[1] !== target;
 }
@@ -324,7 +327,7 @@ function assertBindingsMatchArch(
 
 	for (const outputPath of outputPaths) {
 		for (const binding of findNativeBindings(outputPath)) {
-			if (isForeignPrebuild(binding, target)) continue;
+			if (isUnloadedNodePtyBinding(binding, target)) continue;
 			const actual = readBindingArch(binding);
 			if (actual === null || actual === 'universal') continue;
 			checked += 1;
@@ -367,10 +370,17 @@ function resolvedAppImageRuntime(): string | undefined {
 		new URL('./.appimage-runtime/resolved.json', import.meta.url),
 	);
 	if (!existsSync(manifest)) return undefined;
-	const { runtime } = JSON.parse(readFileSync(manifest, 'utf8'));
-	return typeof runtime === 'string' && existsSync(runtime)
-		? runtime
-		: undefined;
+	try {
+		const { runtime } = JSON.parse(readFileSync(manifest, 'utf8'));
+		return typeof runtime === 'string' && existsSync(runtime)
+			? runtime
+			: undefined;
+	} catch (error) {
+		throw new Error(
+			`Could not read verified AppImage runtime manifest ${manifest}.`,
+			{ cause: error },
+		);
+	}
 }
 
 const config: ForgeConfig = {

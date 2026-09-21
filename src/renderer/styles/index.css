@@ -807,6 +807,12 @@
 		inset-block-start: var(--ensemblr-window-chrome-inset-top);
 	}
 
+	.native-toolbar {
+		background: var(--ensemblr-toolbar);
+		backdrop-filter: blur(18px) saturate(1.3);
+		block-size: var(--ensemblr-toolbar-height);
+	}
+
 	/* A toolbar inside a sheet is overlay chrome rather than the window's title
 	   bar, so dragging its empty space must not drag the window out from under
 	   the sheet. The navigation sidebar's sheet needs naming separately here for
@@ -817,12 +823,6 @@
 	[data-slot="sheet-content"] .native-toolbar,
 	:where([data-slot="sidebar"][data-mobile="true"]) .window-chrome-spacer {
 		-webkit-app-region: no-drag;
-	}
-
-	.native-toolbar {
-		background: var(--ensemblr-toolbar);
-		backdrop-filter: blur(18px) saturate(1.3);
-		block-size: var(--ensemblr-toolbar-height);
 	}
 
 	/* Ensemblr's own title bar, drawn only where it owns the window controls. It
@@ -1015,18 +1015,18 @@
 		padding-inline-start: var(--ensemblr-window-chrome-safe-start);
 	}
 
-	[data-slot="sidebar"][data-state="collapsed"]
-		~ [data-slot="sidebar-inset"]
-		.sidebar-collapsed-trigger {
-		display: inline-flex;
-	}
-
 	/* Where Ensemblr draws its own title bar the nav sidebar has no title-bar
 	   strip of its own — the wordmark is up in the title bar, which would leave
 	   that strip carrying nothing but this trigger. So the toolbar's copy is the
 	   only one, and it stays out whether the sidebar is open or shut rather than
 	   appearing only once there is no other way back. */
 	html.app-window-controls .sidebar-collapsed-trigger {
+		display: inline-flex;
+	}
+
+	[data-slot="sidebar"][data-state="collapsed"]
+		~ [data-slot="sidebar-inset"]
+		.sidebar-collapsed-trigger {
 		display: inline-flex;
 	}
 

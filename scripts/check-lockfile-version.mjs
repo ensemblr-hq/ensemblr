@@ -15,12 +15,14 @@
 // dependabot-core bundles and will rise. Raise SUPPORTED_LOCKFILE_VERSION here
 // in the same change that regenerates the lockfile.
 import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SUPPORTED_LOCKFILE_VERSION = 1;
 
-const lockfile = fileURLToPath(new URL('../bun.lock', import.meta.url));
-const binaryLockfile = fileURLToPath(new URL('../bun.lockb', import.meta.url));
+const moduleDirectory = dirname(fileURLToPath(import.meta.url));
+const lockfile = resolve(moduleDirectory, '../bun.lock');
+const binaryLockfile = resolve(moduleDirectory, '../bun.lockb');
 
 /**
  * Reads the `lockfileVersion` out of a text lockfile's header. `bun.lock` is

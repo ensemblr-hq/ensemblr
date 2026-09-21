@@ -257,11 +257,15 @@ export function createAppImageInstaller({
 				handlers?.onError(asError(error));
 				return;
 			}
-			if (
-				expectedMachine !== undefined &&
-				machine !== null &&
-				machine !== expectedMachine
-			) {
+			if (machine === null) {
+				removeQuietly(partialPath);
+				handlers?.onError(
+					new Error('The download is not a complete ELF AppImage.'),
+					'update-verification-failed',
+				);
+				return;
+			}
+			if (expectedMachine !== undefined && machine !== expectedMachine) {
 				removeQuietly(partialPath);
 				handlers?.onError(
 					new Error(
@@ -345,9 +349,9 @@ export function createAppImageInstaller({
 
 /**
  * Reads the `e_machine` field from a file's ELF header. Returns null when the
- * file is too short or does not open with the ELF magic — a real AppImage
- * always does, so a null here means the download is not one the arch check can
- * speak to, and the caller lets it pass rather than inventing a mismatch.
+ * file is too short or does not open with the ELF magic. A real AppImage always
+ * has a complete ELF header, so the caller rejects null as an unverifiable
+ * download before staging it.
  * @param path - The downloaded file to inspect
  * @returns The little-endian `e_machine` value, or null when the file is not ELF
  */

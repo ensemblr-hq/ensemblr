@@ -1,21 +1,37 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+
+/**
+ * Migrates Forge's single-file preload output onto Rolldown's supported option.
+ *
+ * Forge merges `inlineDynamicImports: true` after loading this file, so a normal
+ * config override cannot remove the deprecated key. Vite's config hook receives
+ * that merged object and permits mutation when deep merging cannot express the
+ * change.
+ * @returns A Vite plugin that preserves Forge's single-file preload bundle.
+ */
+function migrateForgePreloadCodeSplitting(): Plugin {
+	return {
+		name: 'ensemblr-forge-preload-code-splitting',
+		/**
+		 * Replaces Forge's deprecated output option after its config merge.
+		 * @param config - The merged Vite configuration.
+		 */
+		config(config) {
+			const output = config.build?.rolldownOptions?.output;
+			if (
+				!output ||
+				Array.isArray(output) ||
+				output.inlineDynamicImports !== true
+			) {
+				return;
+			}
+
+			delete output.inlineDynamicImports;
+			output.codeSplitting = false;
+		},
+	};
+}
 
 export default defineConfig({
-	build: {
-		rollupOptions: {
-			// `@electron-forge/plugin-vite@7.11.2` (currently the latest) forces
-			// `output.inlineDynamicImports: true` for the single-file preload bundle,
-			// which Vite 8 / Rollup 4 deprecated in favor of `codeSplitting: false`.
-			// The plugin merges our config last, but `mergeConfig` can only override
-			// keys — never delete the one it set — so we cannot swap the option here.
-			// Suppress only that one deprecation and forward every other warning.
-			// Remove once the plugin migrates off `inlineDynamicImports`.
-			onwarn(warning, defaultHandler) {
-				if (warning.message.includes('inlineDynamicImports')) {
-					return;
-				}
-				defaultHandler(warning);
-			},
-		},
-	},
+	plugins: [migrateForgePreloadCodeSplitting()],
 });

@@ -17,7 +17,7 @@ import {
 	rmSync,
 	writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const RUNTIME_TAG = 'continuous';
@@ -80,9 +80,8 @@ function appImageRuntimePath(appImageArch) {
  * @param runtimePath - Absolute path to the verified runtime binary
  */
 function recordResolvedRuntime(runtimePath) {
-	const repoRoot = fileURLToPath(new URL('..', import.meta.url));
-	const manifest = join(repoRoot, '.appimage-runtime', 'resolved.json');
-	mkdirSync(join(manifest, '..'), { recursive: true });
+	const manifest = join(dirname(runtimePath), 'resolved.json');
+	mkdirSync(dirname(manifest), { recursive: true });
 	writeFileSync(manifest, `${JSON.stringify({ runtime: runtimePath })}\n`);
 }
 
@@ -111,20 +110,26 @@ function describeMismatch(bytes, runtime) {
 /**
  * Downloads and verifies the AppImage runtime for the requested architecture,
  * skipping the network when a verified copy is already cached.
+ * @param options - Optional target, cache path, downloader, and runtime pins
  * @returns Process exit code: 0 when a verified runtime is in place
  */
-async function main() {
-	const arch = readArch();
-	const runtime = RUNTIMES.get(arch);
+export async function main({
+	arch = readArch(),
+	destination: destinationOverride,
+	download = fetch,
+	resolveDestination = appImageRuntimePath,
+	runtimes = RUNTIMES,
+} = {}) {
+	const runtime = runtimes.get(arch);
 
 	if (!runtime) {
 		console.error(
-			`✖ No pinned AppImage runtime for --arch=${arch}. Known: ${[...RUNTIMES.keys()].join(', ')}.`,
+			`✖ No pinned AppImage runtime for --arch=${arch}. Known: ${[...runtimes.keys()].join(', ')}.`,
 		);
 		return 1;
 	}
 
-	const destination = appImageRuntimePath(runtime.name);
+	const destination = destinationOverride ?? resolveDestination(runtime.name);
 
 	if (existsSync(destination)) {
 		const problem = describeMismatch(readFileSync(destination), runtime);
@@ -136,7 +141,7 @@ async function main() {
 	}
 
 	const url = `${RUNTIME_MIRROR}/${RUNTIME_TAG}/runtime-${runtime.name}`;
-	const response = await fetch(url);
+	const response = await download(url);
 
 	if (!response.ok) {
 		console.error(`✖ ${url} returned HTTP ${response.status}.`);
