@@ -130,6 +130,24 @@ const CONCIERGE_READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * The web tools a Pi Concierge holds, cleared so it can research the way a
+ * Claude Concierge already does with `WebSearch` and `WebFetch`.
+ *
+ * Pi ships no web tool of its own; these are the default names `pi-web-access`
+ * registers. None of them can reach a workspace: search results and fetched
+ * pages land in Pi's own cache, and a cloned GitHub repository or an extracted
+ * PDF lands in a temp directory the call has no parameter to move. A user who
+ * renames them in `pi-web-access`'s config gets the default denial back, which
+ * is the direction a name-based policy has to fail in.
+ */
+const CONCIERGE_WEB_ACCESS_TOOLS: ReadonlySet<string> = new Set([
+	'fetch_content',
+	'get_search_content',
+	'source_check',
+	'web_search',
+]);
+
+/**
  * Reports whether a tool needs no Concierge opinion of its own.
  *
  * Ensemblr's own control tools clear here because they are gated somewhere
@@ -139,10 +157,14 @@ const CONCIERGE_READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
  * test, because a Concierge on Claude Code reaches those tools over MCP and sees
  * every one of them namespaced.
  * @param tool - The tool name being classified.
- * @returns True for a known read-only built-in or an Ensemblr control tool.
+ * @returns True for a known read-only built-in, a web-access tool, or an Ensemblr control tool.
  */
 function runsUntouched(tool: string): boolean {
-	return CONCIERGE_READ_ONLY_TOOLS.has(tool) || isEnsemblrControlTool(tool);
+	return (
+		CONCIERGE_READ_ONLY_TOOLS.has(tool) ||
+		CONCIERGE_WEB_ACCESS_TOOLS.has(tool) ||
+		isEnsemblrControlTool(tool)
+	);
 }
 
 /**
@@ -250,8 +272,8 @@ function blocked(cause: string): ConciergeToolVerdict {
 /**
  * Classifies a Concierge tool call: a file write is allowed only inside the
  * Concierge home, `bash` is restricted to read-only commands, the known
- * read-only built-ins and Ensemblr's own control tools run untouched, and
- * **anything else is blocked**.
+ * read-only built-ins, Pi's web-access tools, and Ensemblr's own control tools
+ * run untouched, and **anything else is blocked**.
  *
  * Deny by default, for the reason the Plan Mode tool guard is. The tool set a
  * session holds is open — the user can install another extension or point a
