@@ -132,13 +132,23 @@ bun run make
 
 Non-interactive shells — CI, a git hook, a plain `sh -c` — never source the mise
 or nvm hooks, so they run under whatever Node is on `PATH`. A workspace `setup`
-script, run script, or terminal started by Ensemblr is not one of those: the app
-captures the workspace directory's login-shell `PATH`, which activates mise, and
-injects it. That capture is switched off when `[environment_variables]` in
-`.ensemblr/settings.toml` sets `PATH` at all, so if a script under Ensemblr still
-picks the wrong Node, look there first. Elsewhere, put Node 24 on `PATH` (mise
-shims, `nvm use`) — a wrong major fails loudly at
-`scripts/require-node-version.mjs` rather than building quietly.
+script, run script, or terminal started by Ensemblr gets the workspace
+directory's login-shell `PATH` instead, and that capture does activate mise —
+but it only puts Node 24 *on* the `PATH`, not necessarily *first*. If a startup
+file prepends Homebrew after `mise activate` (`brew shellenv` below it is the
+common order), Homebrew's Node stays in front and the install fails with
+`Node 24 required to install, but running Node 26`. It is the same for
+`bun install` and `bun ci`: Bun hands lifecycle scripts whichever `node` leads
+`PATH`.
+
+This repository's setup and run scripts go through
+`scripts/with-pinned-node.sh`, which puts the pinned Node first, so they are not
+affected. In your own terminal, `command -v node` shows which one wins; move
+`brew shellenv` above `mise activate` in your startup file to fix it for good.
+The capture is also switched off entirely when `[environment_variables]` in
+`.ensemblr/settings.toml` sets `PATH` at all, so look there too. Either way a
+wrong major fails loudly at `scripts/require-node-version.mjs` rather than
+building quietly.
 
 ## Terminals and agents
 

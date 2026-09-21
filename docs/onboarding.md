@@ -62,10 +62,13 @@ problem:
 `mise.toml` declares both. Otherwise `nvm use` reads `.nvmrc`, and Bun installs
 from <https://bun.sh> (`curl -fsSL https://bun.sh/install | bash`).
 
-Inside Ensemblr this needs no action: setup scripts, run scripts, and terminals
-get the workspace directory's login-shell PATH, which activates mise. That only
-works while `[environment_variables]` in `.ensemblr/settings.toml` never sets
-`PATH` — see [Bun and Node](./build-and-release.md#bun-and-node).
+Inside Ensemblr the setup and run scripts need no action: they go through
+`scripts/with-pinned-node.sh`, which puts Node 24 first on `PATH` even when your
+shell startup leaves Homebrew's Node in front of mise's — see
+[Why the Node wrapper stays](./build-and-release.md#why-the-node-wrapper-stays).
+In a terminal, check `command -v node`; if it is Homebrew's while mise is active,
+move `brew shellenv` above `mise activate` in your shell startup file. Never set
+`PATH` in `[environment_variables]` in `.ensemblr/settings.toml`.
 
 ## 2. Install
 

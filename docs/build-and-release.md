@@ -533,23 +533,34 @@ Every later install preserves the version it loaded, under either Bun. The pin i
 temporary: raise `SUPPORTED_LOCKFILE_VERSION` in `scripts/check-lockfile-version.mjs`
 in the same change that regenerates the lockfile once dependabot-core moves.
 
-### Why there is no Node wrapper
+### Why the Node wrapper stays
 
-`scripts/with-pinned-node.sh` is gone. It predates the app's own fix and is
-redundant for everything Ensemblr spawns. `src/main/main.ts` wires
-`createToolchainPathResolver`; `src/main/environment/toolchain-path.ts` captures a
-**login shell's** PATH for the workspace directory, which evaluates that
-directory's `mise.toml` and puts Node 24 and Bun on PATH; and
-`src/main/environment/workspace-environment.ts` injects the result into setup scripts, run
-scripts, and terminals.
+Every setup and run script in `.ensemblr/settings.toml` goes through
+`scripts/with-pinned-node.sh`, which puts the Node pinned in `.nvmrc` **first**
+on `PATH` and then hands the command over.
+
+It looks redundant, and the Bun migration deleted it on that belief.
+`src/main/main.ts` wires `createToolchainPathResolver`;
+`src/main/environment/toolchain-path.ts` captures a **login shell's** `PATH` for
+the workspace directory by running `$SHELL -lic`, which does activate mise; and
+`src/main/environment/workspace-environment.ts` injects the result into setup
+scripts, run scripts, and terminals. So mise's Node 24 *is* on the captured
+`PATH` — but on is not first. A startup file that prepends Homebrew **after**
+activating mise — `eval (brew shellenv fish)` below `mise activate fish`, which
+is the common order — leaves `/opt/homebrew/bin` ahead of it, and mise's hook
+re-applies only when it detects a change, so nothing moves it back. Measured on
+such a setup, the captured `PATH` opened with `/opt/homebrew/bin:/opt/homebrew/sbin`,
+`node` resolved to Homebrew's 26.9.0, and the setup script's `bun ci` died on the
+preinstall guard. Bun is not the variable: it hands lifecycle scripts whatever
+`node` leads `PATH`, identically for `bun install` and `bun ci`.
+
+The wrapper is a no-op when the right Node already leads `PATH`, so it costs
+nothing on a machine whose startup order is the other way round. It can go once
+the capture itself puts the workspace-pinned toolchain first.
 
 **Never set `PATH` in `[environment_variables]`.** The resolver runs only when
 `!('PATH' in env)` — the presence of the *key*, not its truthiness — so any `PATH`
-entry silently switches it off and the original wrong-Node bug returns.
-
-The accepted residual risk: a plain non-login shell *outside* Ensemblr no longer
-self-corrects the way the wrapper made it. It fails loudly on
-`scripts/require-node-version.mjs` instead of quietly running the wrong Node.
+entry silently switches it off, and Bun may not be on `PATH` at all.
 
 ## Signing & notarization
 
@@ -1123,13 +1134,14 @@ silently.
 - **`libnspr4.so: cannot open shared object file`.** Electron is being launched
   inside a container that has no Chromium runtime libraries. Compile in the
   container; run the app on the host.
-- **Node version error at install.** A non-interactive shell never sources the
-  mise/nvm hooks, so it runs under whatever Node is first on PATH. Inside
-  Ensemblr that does not happen — a workspace's `setup`/`run` scripts and
-  terminals get the workspace directory's login-shell PATH, which activates mise
-  (see [Bun and Node](#bun-and-node)). Outside it, put Node 24 on PATH: activate
-  mise, or use its shims directory (`~/.local/share/mise/shims`), or `nvm use`.
-  If a script under Ensemblr still picks the wrong Node, check that
+- **Node version error at install.** Bun hands lifecycle scripts whatever `node`
+  leads `PATH`, for `bun install` and `bun ci` alike, so the guard is reporting
+  the shell's `PATH` order, not a Bun difference. Inside Ensemblr, run it the way
+  the setup script does — `./scripts/with-pinned-node.sh bun ci` — which puts
+  Node 24 first (see [Why the Node wrapper stays](#why-the-node-wrapper-stays)).
+  In your own shell, check `command -v node`: if it is Homebrew's while mise is
+  active, a startup file is prepending Homebrew after `mise activate` — move
+  `brew shellenv` above it so mise's paths end up in front. Also check that
   `[environment_variables]` in `.ensemblr/settings.toml` does not set `PATH`.
 - **App icon.** Regenerate with `bun run icon:generate`
   (`scripts/generate-app-icon.mjs`).

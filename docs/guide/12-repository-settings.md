@@ -366,35 +366,35 @@ full run-script list, including the demo host and Linux build/diagnostic scripts
 ```toml
 #:schema ../schemas/settings.schema.json
 
-# Node 24 is pinned by scripts/require-node-version.mjs. Setup and run scripts
-# spawn through a non-interactive shell that never activates mise on its own,
-# so Ensemblr injects the workspace directory's login-shell PATH instead — that
-# capture evaluates this repo's mise.toml and puts Node 24 and Bun on PATH.
+# Node 24 is pinned by scripts/require-node-version.mjs, so every command goes
+# through the wrapper. Ensemblr does inject the workspace directory's login-shell
+# PATH, and that capture activates mise — but a startup file that prepends
+# Homebrew after activating mise leaves Homebrew's Node ahead of Node 24, so
+# on PATH is not the same as first on PATH. See scripts/with-pinned-node.sh.
 # Never add PATH to [environment_variables]: the resolver is gated on the key
-# being absent, so configuring one silently disables it and the commands below
-# fall back to whatever Node is first on the app's inherited PATH.
+# being absent, so configuring one silently disables it.
 [scripts]
-setup = "bun ci"
+setup = "./scripts/with-pinned-node.sh bun ci"
 
 # Electron dev server.
 [scripts.run.dev]
-command = "bun run dev"
+command = "./scripts/with-pinned-node.sh bun run dev"
 icon = "play"
 default = true
 available_in = ["local"]
 
 [scripts.run.checks]
-command = "bun run check && bun run typecheck"
+command = "./scripts/with-pinned-node.sh bun run check && ./scripts/with-pinned-node.sh bun run typecheck"
 icon = "list-checks"
 available_in = ["local"]
 
 [scripts.run.test]
-command = "bun run test"
+command = "./scripts/with-pinned-node.sh bun run test"
 icon = "test-tube"
 available_in = ["local"]
 
 [scripts.run.playground]
-command = "bun run dev:playground"
+command = "./scripts/with-pinned-node.sh bun run dev:playground"
 icon = "play"
 available_in = ["local"]
 
@@ -402,17 +402,18 @@ available_in = ["local"]
 # is macOS-only, so this one does nothing useful on a Linux host — build
 # `appimage` there.
 [scripts.run.unsigned]
-command = "bun run make:unsigned && open out"
+command = "./scripts/with-pinned-node.sh bun run make:unsigned && open out"
 icon = "package"
 available_in = ["local"]
 ```
 
 Reading it line by line:
 
-- **`[scripts] setup`** — every new workspace runs `bun ci` on creation. It is a
-  frozen install from `bun.lock`, and because Bun keeps a global package cache
-  and clones from it, a fresh worktree's `node_modules` costs seconds rather than
-  a full extraction. No `archive` script, so nothing runs on the way out.
+- **`[scripts] setup`** — every new workspace runs `bun ci` on creation,
+  through the Node-pinning wrapper. It is a frozen install from `bun.lock`, and
+  because Bun keeps a global package cache and clones from it, a fresh
+  worktree's `node_modules` costs seconds rather than a full extraction. No
+  `archive` script, so nothing runs on the way out.
 - **No `run_mode`**, so it falls back to `concurrent`: several workspaces can run
   their dev server at the same time, each on its own `ENSEMBLR_PORT`.
 - **No `auto_run_after_setup`**, so it falls back to `false`: after `bun ci`
@@ -431,15 +432,18 @@ Reading it line by line:
 - **Every script declares `available_in = ["local"]`** — explicit rather than
   omitted. Same effect here, since `local` is the only environment Ensemblr
   launches, but it documents intent.
-- **The comment above `[scripts]`** explains why no command is wrapped in a
+- **The comment above `[scripts]`** explains why every command is wrapped in a
   Node-pinning script. Ensemblr captures a **login shell's** `PATH` for the
-  workspace directory — which evaluates `mise.toml` and puts Node 24 and Bun on
-  it — and injects it into setup scripts, run scripts, and terminals. The
-  capture runs only when `[environment_variables]` does *not* define `PATH`: the
-  presence of the key, even set to an empty string, switches it off, and the
-  commands then run under whatever Node the app inherited. So never set `PATH`
-  there. The comment does not survive a save from the Scripts pane; the leading
-  `#:schema` directive does.
+  workspace directory — which activates mise — and injects it into setup
+  scripts, run scripts, and terminals. But mise's Node being *on* that `PATH` is
+  not it being *first*: a shell startup file that prepends Homebrew after
+  `mise activate` leaves Homebrew's Node in front, and the install's preinstall
+  guard then refuses it. The wrapper puts the pinned Node first and is a no-op
+  when it already is. The capture itself runs only when
+  `[environment_variables]` does *not* define `PATH`: the presence of the key,
+  even set to an empty string, switches it off. So never set `PATH` there. The
+  comment does not survive a save from the Scripts pane; the leading `#:schema`
+  directive does.
 - **No `[git]`, `[prompts]`, `environment_variables`, or
   `file_include_globs`** — those all fall through to personal settings, then to
   user defaults. `file_include_globs` therefore resolves to its built-in

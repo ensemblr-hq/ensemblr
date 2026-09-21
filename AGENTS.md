@@ -45,6 +45,7 @@ This repository enforces Bun for JavaScript and TypeScript package management. B
 - `package.json#trustedDependencies` is the complete list of packages whose install scripts run (an explicit list replaces Bun's built-in allowlist). `node-pty` is deliberately absent — on Linux its binding must be built by Forge against Electron's ABI, not by Bun against Node's. **Never run `bun pm trust --all`.**
 - The local Codex hook `.codex/hooks/enforce-bun-package-manager.sh` (plus the Claude hook `.claude/hooks/enforce-bun.sh`) block direct `npm`, `npx`, `pnpm`, `pnpx`, `yarn`, `yarnpkg`, and matching `corepack` package-manager calls.
 - Never set `PATH` in `.ensemblr/settings.toml`'s `[environment_variables]`. Ensemblr injects the workspace directory's login-shell `PATH` (which activates mise, putting Node 24 and Bun on it) only when no `PATH` key is present, so defining one — even empty — silently disables the resolver.
+- Keep every setup and run script behind `scripts/with-pinned-node.sh`. The injected `PATH` has mise's Node 24 *on* it but not necessarily *first* — a shell startup that prepends Homebrew after `mise activate` leaves Node 26 in front, and `bun ci` then dies on the preinstall guard. Bun hands lifecycle scripts whichever `node` leads `PATH`, for `bun install` and `bun ci` alike.
 
 ## Biome Policy
 

@@ -110,23 +110,32 @@ entries npm's `allowScripts: false` listed. **`bun pm trust --all` must never be
 run in this repository.** It also retires "failure one" of the old Linux story,
 the `node-gyp rebuild` that fired during `npm ci`.
 
-### No `.npmrc`, no wrapper
+### No `.npmrc`; the Node wrapper stays
 
 `.npmrc` is removed. Its `legacy-peer-deps=true` existed for
 `@electron-forge/plugin-fuses@7`'s stale `@electron/fuses@^1` peer range; Bun
 tolerates that natively, and exactly one `@electron/fuses@2.1.3` resolves, so no
 override replaces it.
 
-`scripts/with-pinned-node.sh` is removed. It predates the app's own fix and is
-redundant for everything Ensemblr spawns: `src/main/main.ts` wires
-`createToolchainPathResolver`, `src/main/environment/toolchain-path.ts` captures a
-**login shell's** `PATH` for the workspace directory (which evaluates that
-directory's `mise.toml` and so puts Node 24 and Bun on it), and
-`src/main/environment/workspace-environment.ts` injects it into setup scripts, run scripts,
-and terminals. The gate is `if (resolveToolchainPath && !('PATH' in env))` — the
+`scripts/with-pinned-node.sh` stays, and every setup and run script in
+`.ensemblr/settings.toml` still goes through it. The first cut of this decision
+deleted it as redundant: `src/main/main.ts` wires `createToolchainPathResolver`,
+`src/main/environment/toolchain-path.ts` captures a **login shell's** `PATH` for
+the workspace directory with `$SHELL -lic`, and
+`src/main/environment/workspace-environment.ts` injects it into setup scripts, run
+scripts, and terminals. That capture does activate mise — but it only puts
+Node 24 *on* the `PATH`, not *first*. A startup file that prepends Homebrew
+after `mise activate` (`eval (brew shellenv fish)` below it, the common order)
+leaves `/opt/homebrew/bin` in front, and mise's hook re-applies only when it
+detects a change. The plan gated the deletion on a new workspace's setup
+resolving Node 24; it resolved Homebrew's 26.9.0 and `bun ci` died on the
+preinstall guard, so the deletion was reverted as the plan prescribed. The
+wrapper is a no-op wherever the right Node already leads `PATH`.
+
+The resolver's gate is `if (resolveToolchainPath && !('PATH' in env))` — the
 presence of a `PATH` **key**, not its truthiness. Setting `PATH` in
-`[environment_variables]`, even to an empty string, silently switches the
-resolver off and the original wrong-Node bug returns. It must never be set there.
+`[environment_variables]`, even to an empty string, silently switches it off. It
+must never be set there.
 
 `mise.toml` gains `bun = "1.4"` beside `node = "24"`.
 
@@ -144,12 +153,12 @@ blocked `bun` now block `npm`, `npx`, `pnpm`, `pnpx`, `yarn`, and matching
 
 - A new workspace's dependency install falls from ~26–40 s to seconds on a warm
   cache, and to a metadata operation on a repeat.
-- `bun.lock` is the lockfile of record. `package-lock.json`, `.npmrc`, and
-  `scripts/with-pinned-node.sh` are deleted; `AGENTS.md`, `CONTRIBUTING.md`,
-  `.claude/rules/stack.md`, and the guides describe Bun.
-- **Accepted residual risk:** a plain non-login shell *outside* Ensemblr no longer
-  self-corrects to Node 24 the way the wrapper made it. It fails loudly on
-  `scripts/require-node-version.mjs` instead of quietly running the wrong Node.
+- `bun.lock` is the lockfile of record. `package-lock.json` and `.npmrc` are
+  deleted; `AGENTS.md`, `CONTRIBUTING.md`, `.claude/rules/stack.md`, and the
+  guides describe Bun.
+- `scripts/with-pinned-node.sh` survives the migration unchanged in behaviour.
+  Removing it is a separate decision, and it waits on the login-shell capture
+  putting the workspace-pinned toolchain *first* rather than merely present.
 - Regenerating `bun.lock` is a deliberate act with a procedure, not a routine
   `rm` and reinstall. Anyone who does it under Bun 1.4 ships a version-2 file and
   silently stops Dependabot; `bun run check:lockfile` catches that before merge.

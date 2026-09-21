@@ -131,14 +131,18 @@ the detail for each:
   list replaces Bun's built-in allowlist. `node-pty`, `@swc/core`, and
   `core-js-pure` stay blocked — the same three npm's old `allowScripts: false`
   entries named. Never run `bun pm trust --all`.
-- **Ensemblr supplies the Node pin, not a wrapper script.** `scripts/with-pinned-node.sh`
-  is gone. `createToolchainPathResolver` captures a login shell's `PATH` for the
-  workspace directory (activating mise) and `workspace-environment.ts` injects it
-  into setup scripts, run scripts, and terminals — but only when the environment
-  has **no `PATH` key at all**. Setting `PATH` in `[environment_variables]`, even
-  to an empty string, silently disables the resolver. A plain non-login shell
-  outside Ensemblr no longer self-corrects; it fails loudly on
-  `scripts/require-node-version.mjs`.
+- **Every setup and run script goes through `scripts/with-pinned-node.sh`.**
+  `createToolchainPathResolver` does capture a login shell's `PATH` for the
+  workspace directory (activating mise), and `workspace-environment.ts` injects it
+  into setup scripts, run scripts, and terminals — but mise's Node 24 being *on*
+  that `PATH` is not it being *first*. A startup file that prepends Homebrew
+  after `mise activate` (`brew shellenv` below it, the common order) leaves
+  Homebrew's Node 26 in front, and mise's hook re-applies only on a detected
+  change. The Bun migration deleted the wrapper as redundant and every
+  workspace's `bun ci` then died on the preinstall guard; do not delete it again
+  until the capture itself puts the pinned toolchain first. The resolver still
+  runs only when the environment has **no `PATH` key at all** — setting `PATH` in
+  `[environment_variables]`, even to an empty string, silently disables it.
 
 **`extract-zip` is aliased in `overrides` to
 `npm:@electron-internal/extract-zip`.** Forge 7 reaches `extract-zip@2.0.1`
