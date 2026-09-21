@@ -11,6 +11,15 @@ import { fileURLToPath } from 'node:url';
 
 const DEVELOPER_ID_AUTHORITY = 'Developer ID Application';
 
+// Forge's architecture names on the left, what `lipo -archs` prints on the
+// right. Release legs build one architecture at a time and upload by an
+// architecture-anchored pattern, so this script has to verify the same one leg
+// rather than whatever is left in `out/`.
+const SUPPORTED_ARCHES = new Map([
+	['arm64', 'arm64'],
+	['x64', 'x86_64'],
+]);
+
 // `Authority=Developer ID Application: <Name> (<TEAMID>)` — matching only the
 // authority string (above) accepts *any* Developer ID certificate from *any*
 // Apple developer account, not just this project's. `ENSEMBLR_TEAM_ID`, set by
@@ -35,16 +44,35 @@ function run(command, args) {
 }
 
 /**
- * Locate the packaged `.app` bundles, whose directory name carries the
- * channel's product name (`Ensemblr.app`, `Ensemblr Canary.app`).
- * @param outDir - Path to the Forge `out/` directory
- * @returns Absolute paths to every packaged app bundle
+ * Read the architecture whose artifacts this run must verify. A release leg
+ * builds one architecture at a time, so scanning `out/` for whatever happens to
+ * be there would let a leg pass on the other leg's leftovers.
+ * @returns The Forge architecture name to verify
  */
-function findAppBundles(outDir) {
+function readExpectedArch() {
+	const flag = process.argv.find((argument) => argument.startsWith('--arch='));
+	const arch = flag ? flag.slice('--arch='.length) : process.arch;
+	if (!SUPPORTED_ARCHES.has(arch)) {
+		console.error(
+			`✖ Unsupported --arch=${arch}. Expected one of: ${[...SUPPORTED_ARCHES.keys()].join(', ')}.`,
+		);
+		process.exit(1);
+	}
+	return arch;
+}
+
+/**
+ * Locate the packaged `.app` bundles for one architecture, whose directory name
+ * carries the channel's product name (`Ensemblr.app`, `Ensemblr Canary.app`).
+ * @param outDir - Path to the Forge `out/` directory
+ * @param arch - Architecture whose package directory to read
+ * @returns Absolute paths to every packaged app bundle for that architecture
+ */
+function findAppBundles(outDir, arch) {
 	if (!existsSync(outDir)) return [];
 	return readdirSync(outDir, { withFileTypes: true })
 		.filter(
-			(entry) => entry.isDirectory() && entry.name.endsWith('-darwin-arm64'),
+			(entry) => entry.isDirectory() && entry.name.endsWith(`-darwin-${arch}`),
 		)
 		.flatMap((entry) => {
 			const packageDir = join(outDir, entry.name);
@@ -55,16 +83,81 @@ function findAppBundles(outDir) {
 }
 
 /**
- * Collect every distributable under `out/make` carrying the given extension.
+ * Collect the distributables under `out/make` whose path matches an
+ * architecture-anchored pattern. The pattern is the same shape the release
+ * workflow uses to pick what it uploads, so the two cannot disagree about which
+ * file belongs to which leg.
  * @param makeDir - Path to the Forge `out/make/` directory
- * @param extension - File extension to match, including the leading dot
+ * @param pattern - Expression matched against each artifact's full path
  * @returns Absolute paths to the matching artifacts
  */
-function findArtifacts(makeDir, extension) {
+function findArtifacts(makeDir, pattern) {
 	if (!existsSync(makeDir)) return [];
 	return readdirSync(makeDir, { withFileTypes: true, recursive: true })
-		.filter((entry) => entry.isFile() && entry.name.endsWith(extension))
-		.map((entry) => join(entry.parentPath, entry.name));
+		.filter((entry) => entry.isFile())
+		.map((entry) => join(entry.parentPath, entry.name))
+		.filter((path) => pattern.test(path));
+}
+
+/**
+ * Assert a Mach-O file was built for the expected architecture. A DMG that is
+ * signed, notarized and stapled says nothing about what is inside it, so an
+ * Intel leg that packaged an arm64 binding would pass every other check here.
+ * @param binaryPath - Absolute path to a Mach-O executable or `.node` binding
+ * @param arch - Architecture the artifact is supposed to be
+ * @returns One message when the architecture does not match; empty otherwise
+ */
+function verifyBinaryArch(binaryPath, arch) {
+	const expected = SUPPORTED_ARCHES.get(arch);
+	const slices = run('lipo', ['-archs', binaryPath]);
+	if (!slices.ok) {
+		return [`lipo could not read ${binaryPath}:\n${slices.output}`];
+	}
+	const found = slices.output.split(/\s+/).filter(Boolean);
+	if (!found.includes(expected)) {
+		return [
+			`${binaryPath} holds [${found.join(', ')}], expected ${expected} (--arch=${arch}).`,
+		];
+	}
+	return [];
+}
+
+/**
+ * Assert an app bundle's own executable and every native binding it can load
+ * were built for the expected architecture. Foreign prebuilds and
+ * electron-rebuild's `node-pty/bin` compatibility copies are skipped because
+ * node-pty's loader never selects them.
+ * @param appPath - Absolute path to the `.app` bundle
+ * @param arch - Architecture the bundle is supposed to be
+ * @returns One message per failed assertion
+ */
+export function verifyBundleArch(appPath, arch) {
+	const machO = join(appPath, 'Contents', 'MacOS');
+	const executables = existsSync(machO)
+		? readdirSync(machO).map((name) => join(machO, name))
+		: [];
+	const unpacked = join(appPath, 'Contents', 'Resources', 'app.asar.unpacked');
+	const bindings = existsSync(unpacked)
+		? readdirSync(unpacked, { withFileTypes: true, recursive: true })
+				.filter((entry) => entry.isFile() && entry.name.endsWith('.node'))
+				.map((entry) => join(entry.parentPath, entry.name))
+				.filter((path) => {
+					if (/\/node_modules\/node-pty\/bin\//.test(path)) return false;
+					const prebuild = path.match(/\/prebuilds\/([^/]+)\//);
+					return prebuild === null || prebuild[1] === `darwin-${arch}`;
+				})
+		: [];
+
+	if (executables.length === 0) return [`${appPath} holds no executable.`];
+	if (bindings.length === 0) {
+		return [
+			`${appPath} carries no loadable native binding; node-pty should be packaged, so the terminal would not work in this build.`,
+		];
+	}
+
+	return [...executables, ...bindings].flatMap((path) =>
+		verifyBinaryArch(path, arch),
+	);
 }
 
 /**
@@ -121,10 +214,14 @@ function verifyTeamId(codesignOutput, artifactPath) {
  * Assert a packaged app is signed by a Developer ID certificate, accepted by
  * Gatekeeper, and carries a stapled notarization ticket.
  * @param appPath - Absolute path to the `.app` bundle
+ * @param arch - Architecture the bundle is supposed to be
  * @returns One message per failed assertion
  */
-function verifyAppBundle(appPath) {
-	const failures = [...verifyDeveloperIdSignature(appPath)];
+function verifyAppBundle(appPath, arch) {
+	const failures = [
+		...verifyDeveloperIdSignature(appPath),
+		...verifyBundleArch(appPath, arch),
+	];
 	const integrity = run('codesign', [
 		'--verify',
 		'--strict',
@@ -169,9 +266,10 @@ function verifyDiskImage(dmgPath) {
  * not have to assume of a third-party maker. `ditto` rather than `unzip`: it is
  * Apple's tool for distribution archives and preserves what a signature needs.
  * @param zipPath - Absolute path to the `.zip` artifact
+ * @param arch - Architecture the archived bundle is supposed to be
  * @returns One message per failed assertion
  */
-function verifyArchive(zipPath) {
+function verifyArchive(zipPath, arch) {
 	const extractRoot = mkdtempSync(join(tmpdir(), 'ensemblr-verify-'));
 	try {
 		const extraction = run('ditto', ['-x', '-k', zipPath, extractRoot]);
@@ -182,7 +280,7 @@ function verifyArchive(zipPath) {
 			.filter((name) => name.endsWith('.app'))
 			.map((name) => join(extractRoot, name));
 		if (bundles.length === 0) return ['the archive holds no .app bundle.'];
-		return bundles.flatMap((bundle) => verifyAppBundle(bundle));
+		return bundles.flatMap((bundle) => verifyAppBundle(bundle, arch));
 	} finally {
 		rmSync(extractRoot, { recursive: true, force: true });
 	}
@@ -208,12 +306,16 @@ function collectFailures(paths, verify) {
  * @returns Process exit code: 0 when every artifact verified
  */
 function main() {
+	const arch = readExpectedArch();
 	const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 	const outDir = join(repoRoot, 'out');
 	const makeDir = join(outDir, 'make');
-	const appBundles = findAppBundles(outDir);
-	const diskImages = findArtifacts(makeDir, '.dmg');
-	const archives = findArtifacts(makeDir, '.zip');
+	const appBundles = findAppBundles(outDir, arch);
+	const diskImages = findArtifacts(makeDir, new RegExp(`-${arch}\\.dmg$`));
+	const archives = findArtifacts(
+		makeDir,
+		new RegExp(`/[^/]*-darwin-${arch}-[^/]*\\.zip$`),
+	);
 
 	if (
 		appBundles.length === 0 ||
@@ -222,7 +324,9 @@ function main() {
 	) {
 		console.error(
 			[
-				'✖ Nothing to verify — run `npm run make` first.',
+				`✖ Nothing to verify for ${arch} — run \`bun run make --arch=${arch}\` first.`,
+				'  A release leg that produced no artifact for its own architecture',
+				"  must fail here rather than pass on another leg's output.",
 				`  .app bundles: ${appBundles.length}`,
 				`  .dmg: ${diskImages.length}`,
 				`  .zip: ${archives.length}`,
@@ -232,9 +336,9 @@ function main() {
 	}
 
 	const problems = [
-		...collectFailures(appBundles, verifyAppBundle),
+		...collectFailures(appBundles, (path) => verifyAppBundle(path, arch)),
 		...collectFailures(diskImages, verifyDiskImage),
-		...collectFailures(archives, verifyArchive),
+		...collectFailures(archives, (path) => verifyArchive(path, arch)),
 	];
 
 	if (problems.length > 0) {
@@ -244,7 +348,7 @@ function main() {
 	}
 
 	console.log(
-		`✓ Signed, notarized and stapled: ${appBundles.length} app bundle(s), ${diskImages.length} disk image(s), ${archives.length} archive(s).`,
+		`✓ Signed, notarized, stapled and ${arch}: ${appBundles.length} app bundle(s), ${diskImages.length} disk image(s), ${archives.length} archive(s).`,
 	);
 	for (const path of [...appBundles, ...diskImages, ...archives]) {
 		console.log(`  ${path}`);
@@ -255,4 +359,6 @@ function main() {
 // `process.exitCode`, not `process.exit()`: Node's stdout is asynchronous for a
 // pipe on macOS, so exiting outright can discard the queued failure detail —
 // on the one platform this ever runs on, and exactly when it is needed.
-process.exitCode = main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+	process.exitCode = main();
+}

@@ -233,7 +233,7 @@ non-string value produces a diagnostic and also leaves the default in place.
 
 ```toml
 [scripts]
-setup = "npm ci"
+setup = "bun ci"
 archive = "rm -rf node_modules"
 run_mode = "nonconcurrent"
 auto_run_after_setup = true
@@ -306,7 +306,7 @@ Before named run scripts, a repository declared one command:
 
 ```toml
 [scripts]
-run = "npm run dev"
+run = "bun run dev"
 ```
 
 That form still works. It is upgraded into a single implicit script:
@@ -367,60 +367,83 @@ full run-script list, including the demo host and Linux build/diagnostic scripts
 #:schema ../schemas/settings.schema.json
 
 # Node 24 is pinned by scripts/require-node-version.mjs, so every command goes
-# through the wrapper — non-interactive shells never activate mise on their own.
+# through the wrapper. Ensemblr does inject the workspace directory's login-shell
+# PATH, and that capture activates mise — but a startup file that prepends
+# Homebrew after activating mise leaves Homebrew's Node ahead of Node 24, so
+# on PATH is not the same as first on PATH. See scripts/with-pinned-node.sh.
+# Never add PATH to [environment_variables]: the resolver is gated on the key
+# being absent, so configuring one silently disables it.
 [scripts]
-setup = "./scripts/with-pinned-node.sh npm ci"
+setup = "./scripts/with-pinned-node.sh bun ci"
 
 # Electron dev server.
 [scripts.run.dev]
-command = "./scripts/with-pinned-node.sh npm run dev"
+command = "./scripts/with-pinned-node.sh bun run dev"
 icon = "play"
 default = true
 available_in = ["local"]
 
 [scripts.run.checks]
-command = "./scripts/with-pinned-node.sh npm run check && ./scripts/with-pinned-node.sh npm run typecheck"
+command = "./scripts/with-pinned-node.sh bun run check && ./scripts/with-pinned-node.sh bun run typecheck"
 icon = "list-checks"
 available_in = ["local"]
 
 [scripts.run.test]
-command = "./scripts/with-pinned-node.sh npm test"
+command = "./scripts/with-pinned-node.sh bun run test"
 icon = "test-tube"
 available_in = ["local"]
 
 [scripts.run.playground]
-command = "./scripts/with-pinned-node.sh npm run dev:playground"
+command = "./scripts/with-pinned-node.sh bun run dev:playground"
 icon = "play"
 available_in = ["local"]
 
+# macOS artifact. `make:unsigned` builds for the host architecture and `open`
+# is macOS-only, so this one does nothing useful on a Linux host — build
+# `appimage` there.
 [scripts.run.unsigned]
-command = "./scripts/with-pinned-node.sh npm run make:unsigned && open out"
+command = "./scripts/with-pinned-node.sh bun run make:unsigned && open out"
 icon = "package"
 available_in = ["local"]
 ```
 
 Reading it line by line:
 
-- **`[scripts] setup`** — every new workspace runs `npm ci` through the pinned
-  Node wrapper on creation. No `archive` script, so nothing runs on the way out.
+- **`[scripts] setup`** — every new workspace runs `bun ci` on creation,
+  through the Node-pinning wrapper. It is a frozen install from `bun.lock`, and
+  because Bun keeps a global package cache and clones from it, a fresh
+  worktree's `node_modules` costs seconds rather than a full extraction. No
+  `archive` script, so nothing runs on the way out.
 - **No `run_mode`**, so it falls back to `concurrent`: several workspaces can run
   their dev server at the same time, each on its own `ENSEMBLR_PORT`.
-- **No `auto_run_after_setup`**, so it falls back to `false`: after `npm ci`
+- **No `auto_run_after_setup`**, so it falls back to `false`: after `bun ci`
   finishes, nothing starts on its own.
 - **The named run scripts shown here** appear in declaration order in the Run
   menu: Dev, Checks, Test, Playground, Unsigned. The full file adds more entries.
 - **`[scripts.run.dev]` carries `default = true`** — it is what `⌘R` and the
   Run button start. No other table sets `default`, so there is no conflict to
   resolve.
+- **The `unsigned` script carries a comment** that is worth keeping in a real
+  file: `make:unsigned` builds for the host architecture, and `open` exists only
+  on macOS.
 - **Icons** are drawn from the curated set: `play` for the two servers,
   `list-checks` for the lint/typecheck pair, `test-tube` for the suite, and
   `package` for the build.
 - **Every script declares `available_in = ["local"]`** — explicit rather than
   omitted. Same effect here, since `local` is the only environment Ensemblr
   launches, but it documents intent.
-- **The comment above `[scripts]`** explains why every command is wrapped
-  rather than calling `npm` directly. It does not survive a save from the
-  Scripts pane; the leading `#:schema` directive does.
+- **The comment above `[scripts]`** explains why every command is wrapped in a
+  Node-pinning script. Ensemblr captures a **login shell's** `PATH` for the
+  workspace directory — which activates mise — and injects it into setup
+  scripts, run scripts, and terminals. But mise's Node being *on* that `PATH` is
+  not it being *first*: a shell startup file that prepends Homebrew after
+  `mise activate` leaves Homebrew's Node in front, and the install's preinstall
+  guard then refuses it. The wrapper puts the pinned Node first and is a no-op
+  when it already is. The capture itself runs only when
+  `[environment_variables]` does *not* define `PATH`: the presence of the key,
+  even set to an empty string, switches it off. So never set `PATH` there. The
+  comment does not survive a save from the Scripts pane; the leading `#:schema`
+  directive does.
 - **No `[git]`, `[prompts]`, `environment_variables`, or
   `file_include_globs`** — those all fall through to personal settings, then to
   user defaults. `file_include_globs` therefore resolves to its built-in

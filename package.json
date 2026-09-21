@@ -13,17 +13,23 @@
 	},
 	"main": ".vite/build/main.js",
 	"private": true,
-	"packageManager": "npm@11.17.0",
+	"packageManager": "bun@1.4.2",
 	"engines": {
 		"node": ">=24 <25"
 	},
+	"trustedDependencies": [
+		"esbuild",
+		"fs-xattr",
+		"macos-alias"
+	],
 	"scripts": {
 		"preinstall": "node scripts/require-node-version.mjs --stage=install",
 		"dev": "node scripts/require-node-version.mjs --stage=dev && node scripts/require-linux-toolchain.mjs && electron-forge start",
 		"dev:demo": "node scripts/require-node-version.mjs --stage=dev && node scripts/run-demo.mjs",
 		"dev:playground": "vite --config vite.playground.config.mts",
-		"start": "npm run dev",
-		"check": "biome check . && npm run check:tailwind && npm run check:strings && npm run i18n:lint",
+		"start": "bun run dev",
+		"check": "biome check . && bun run check:tailwind && bun run check:strings && bun run check:lockfile && bun run i18n:lint",
+		"check:lockfile": "node scripts/check-lockfile-version.mjs",
 		"check:strings": "node scripts/check-hardcoded-strings.mjs",
 		"credits:generate": "node scripts/generate-credits.mjs && biome check --write src/main/menu/credits-manifest.gen.ts",
 		"check:tailwind": "node scripts/check-tailwind-classes.mjs",
@@ -93,21 +99,21 @@
 		"test:linear": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/linear-oauth.test.ts tests/main/linear-oauth-callback-server.test.ts tests/main/linear-auth-service.test.ts tests/main/linear-client.test.ts tests/main/linear-store.test.ts tests/main/linear-service.test.ts tests/main/workspace-create-linked-issue.test.ts",
 		"test:linear-renderer": "vitest run tests/renderer/linear-issue-view.test.ts tests/renderer/linear-issue-editor.test.ts tests/renderer/workspace-linked-issue-landing.test.ts",
 		"typecheck": "node scripts/typecheck.mjs",
-		"build": "node scripts/require-node-version.mjs && electron-forge package --arch=arm64",
-		"package": "node scripts/require-node-version.mjs && electron-forge package --arch=arm64",
-		"make": "node scripts/require-node-version.mjs && electron-forge make --arch=arm64",
-		"make:canary": "ENSEMBLR_BUILD_CHANNEL=canary npm run make",
-		"make:dev": "ENSEMBLR_BUILD_CHANNEL=dev npm run make",
-		"make:unsigned": "ENSEMBLR_SKIP_SIGN=1 npm run make",
-		"make:linux": "node scripts/require-node-version.mjs && node scripts/require-linux-host.mjs && node scripts/require-linux-toolchain.mjs && electron-forge make --platform=linux --arch=x64",
-		"package:linux": "node scripts/require-node-version.mjs && node scripts/require-linux-host.mjs && node scripts/require-linux-toolchain.mjs && electron-forge package --platform=linux --arch=x64",
+		"build": "node scripts/require-node-version.mjs && electron-forge package",
+		"package": "node scripts/require-node-version.mjs && electron-forge package",
+		"make": "node scripts/require-node-version.mjs && electron-forge make",
+		"make:canary": "ENSEMBLR_BUILD_CHANNEL=canary bun run make",
+		"make:dev": "ENSEMBLR_BUILD_CHANNEL=dev bun run make",
+		"make:unsigned": "ENSEMBLR_SKIP_SIGN=1 bun run make",
+		"make:linux": "node scripts/require-node-version.mjs && node scripts/require-linux-host.mjs && node scripts/require-linux-toolchain.mjs && node scripts/fetch-appimage-runtime.mjs && electron-forge make --platform=linux",
+		"package:linux": "node scripts/require-node-version.mjs && node scripts/require-linux-host.mjs && node scripts/require-linux-toolchain.mjs && electron-forge package --platform=linux",
 		"rebuild:native": "./scripts/rebuild-native-linux.sh",
-		"package:dev": "ENSEMBLR_BUILD_CHANNEL=dev npm run package",
-		"package:unsigned": "ENSEMBLR_SKIP_SIGN=1 npm run package",
+		"package:dev": "ENSEMBLR_BUILD_CHANNEL=dev bun run package",
+		"package:unsigned": "ENSEMBLR_SKIP_SIGN=1 bun run package",
 		"verify:signing": "node scripts/verify-signed-artifacts.mjs",
 		"diagnose:dock-flash": "node scripts/diagnose-dock-flash.mjs",
 		"diagnose:linux": "node scripts/require-linux-toolchain.mjs --report",
-		"doctor": "npx react-doctor@latest",
+		"doctor": "bunx react-doctor@latest",
 		"postinstall": "node scripts/fix-node-pty-permissions.mjs"
 	},
 	"keywords": [
@@ -214,13 +220,5 @@
 		"shiki": "$shiki",
 		"tar": "^7.5.19",
 		"tmp": "^0.2.7"
-	},
-	"allowScripts": {
-		"esbuild@0.28.1": true,
-		"fs-xattr@0.3.1": true,
-		"macos-alias@0.2.12": true,
-		"@swc/core": false,
-		"core-js-pure": false,
-		"node-pty": false
 	}
 }

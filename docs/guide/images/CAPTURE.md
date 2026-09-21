@@ -6,8 +6,8 @@ staged by hand any more; it is a scenario file, so re-taking the whole set after
 a UI change is a loop rather than an afternoon.
 
 ```sh
-npm run dev:demo -- --shoot --scenario=<id>     # one shot into out/demo/<id>.png
-npm run dev:demo -- --scenario=<id>             # open it and compose by eye; ⌘D for the toolbar
+bun run dev:demo --shoot --scenario=<id>     # one shot into out/demo/<id>.png
+bun run dev:demo --scenario=<id>             # open it and compose by eye; ⌘D for the toolbar
 ```
 
 See [`demo/README.md`](../../../demo/README.md) for how to write a scenario and
@@ -70,7 +70,7 @@ processed differently.
 
 ## The list
 
-Every shot below is `npm run dev:demo -- --shoot --scenario=<scenario>` followed
+Every shot below is `bun run dev:demo --shoot --scenario=<scenario>` followed
 by the two commands above.
 
 | File | Scenario | Page | What it must show |
@@ -132,7 +132,7 @@ mean their PNGs have been published.
 `webContents.capturePage()`. Those files are useful for DOM and layout checks,
 but contain content only: no macOS traffic lights, rounded native frame, or
 window shadow. Do not publish or describe them as finished desktop screenshots.
-The documented `npm run dev:demo -- --shoot --scenario=<id>` path uses
+The documented `bun run dev:demo --shoot --scenario=<id>` path uses
 `/usr/sbin/screencapture` and is the only path that verifies native chrome. If
 macOS screen-recording permission is unavailable, it exits with an error after
 the capture timeout rather than silently substituting a content-only image.

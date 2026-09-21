@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
-# Repository setup and run scripts execute in a non-interactive shell, which
-# never sources the mise/nvm shell hooks, so `npm ci` there runs under whatever
-# Node is first on
-# PATH — Homebrew's Node 26 — which the preinstall guard rejects, and which
-# would otherwise compile macos-alias/fs-xattr for the wrong ABI. Put the Node
-# pinned in .nvmrc on PATH first, then hand the command over. Falls through to
-# the caller unchanged when no version manager is available, so the repo's own
-# guard prints its fix instructions instead of a "command not found".
+# Put the Node pinned in .nvmrc first on PATH, then hand the command over.
+# Setup and run scripts need this even though Ensemblr injects a login-shell
+# PATH that has already activated mise: *having* mise's Node on PATH is not the
+# same as having it *first*. A startup file that prepends Homebrew after
+# activating mise — `eval (brew shellenv)` below `mise activate`, the common
+# order — leaves Homebrew's Node 26 ahead of it, and mise's hook re-applies only
+# when it detects a change, so the captured PATH keeps the wrong one. `bun ci`
+# then hands that Node to every lifecycle script: the preinstall guard rejects
+# it, and it would otherwise compile macos-alias/fs-xattr for the wrong ABI.
+#
+# This was deleted once, on the belief that the login-shell capture made it
+# redundant, and every workspace's setup script failed on the next run. Keep it
+# until the capture itself puts the pinned toolchain first.
+#
+# Falls through to the caller unchanged when no version manager is available, so
+# the repo's own guard prints its fix instructions instead of "command not found".
 set -euo pipefail
 
 if [ "$#" -eq 0 ]; then
@@ -44,7 +52,7 @@ if command -v mise >/dev/null 2>&1; then
 	fi
 	# `mise exec` appends its tool bin dir *after* the inherited PATH entries, so
 	# Homebrew's node still wins for any child that re-resolves it — which is
-	# exactly what npm's lifecycle scripts do. Prepend the dir ourselves.
+	# exactly what Bun's lifecycle scripts do. Prepend the dir ourselves.
 	if [ -n "$mise_root" ] && bin_dir_is_pinned "$mise_root/bin"; then
 		run_with_bin_dir "$mise_root/bin" "$@"
 	fi

@@ -6,6 +6,11 @@ Date: 2026-08-18
 
 Accepted
 
+**Amended by [ADR 0074](0074-ship-four-build-targets-and-select-updates-by-architecture.md)
+(2026-09-21).** The one feed document, `update-darwin-arm64.json`, becomes one
+document per target named `update-<platform>-<arch>.json`; the arm64 macOS name and
+shape are frozen because installed clients read it by that name.
+
 Builds on [ADR 0054](0054-build-releases-in-ci-and-reserve-the-nightly-tag.md),
 whose tag scheme — `v<semver>` is a release, the literal `nightly` is the
 nightly, nothing else publishes — is the contract this reads. Extends

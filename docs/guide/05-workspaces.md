@@ -112,7 +112,7 @@ agreed on a list gets that list.
 ## Setup scripts on creation
 
 If the project declares `[scripts] setup`, it runs when the workspace opens —
-`npm install`, `bundle install`, whatever gets the tree ready.
+`bun install`, `bundle install`, whatever gets the tree ready.
 
 It does not run every time. Ensemblr fingerprints the resolved setup command
 together with the contents of every dependency lockfile it finds (npm, yarn,

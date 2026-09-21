@@ -4,6 +4,11 @@ This runbook reproduces the Jev decision-layer spike against a newer Jev model. 
 [`jev-decision-layer.md`](./jev-decision-layer.md) first: that proposal defines the features,
 boundaries, and current no-go decision.
 
+> **Note (2026-09-21):** the `./scripts/with-pinned-node.sh` prefix on the commands below is
+> still correct after the move to Bun — the wrapper stays, because Ensemblr's login-shell
+> `PATH` can carry mise's Node 24 behind Homebrew's. See
+> [ADR 0073](../adr/0073-move-the-package-manager-from-npm-to-bun.md).
+
 The durable artifact is this method, not the private corpus. Spawn briefs, questionnaires, and
 child reports may contain repository paths, code snippets, or terminal output, so the dataset,
 labels, and raw responses stay ignored under `.context/jev/` with mode `0600`. Never commit or

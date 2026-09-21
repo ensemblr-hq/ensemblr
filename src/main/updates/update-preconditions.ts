@@ -16,6 +16,11 @@ export interface UpdatePreconditionInputs {
 	 * decides it, not permission on the file.
 	 */
 	appImageDirectoryWritable: boolean;
+	/**
+	 * The running architecture, from `process.arch`. Ensemblr ships builds for
+	 * `x64` and `arm64` only, so anything else has no release to update from.
+	 */
+	arch: string;
 	/** The channel this build was cut on. */
 	channel: BuildChannel;
 	/** Whether the `.app` lives in `/Applications`, per `app.isInApplicationsFolder()`. */
@@ -55,6 +60,7 @@ export interface UpdatePreconditionResult {
 export function checkUpdatePreconditions({
 	appImageDirectoryWritable,
 	appImagePath,
+	arch,
 	channel,
 	inApplicationsFolder,
 	packaged,
@@ -64,6 +70,12 @@ export function checkUpdatePreconditions({
 		return refused(
 			'update-unsupported-build',
 			`In-app updates are unavailable on ${platform}.`,
+		);
+	}
+	if (arch !== 'x64' && arch !== 'arm64') {
+		return refused(
+			'update-unsupported-build',
+			`In-app updates are unavailable on the ${arch} architecture.`,
 		);
 	}
 	if (!packaged) {

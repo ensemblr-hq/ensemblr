@@ -34,6 +34,24 @@ const DOWNLOAD_TIMEOUT_MS = 30 * 60 * 1000;
 const EXECUTABLE_MODE = 0o755;
 
 /**
+ * ELF `e_machine` values for the architectures Ensemblr ships an AppImage for,
+ * keyed by `process.arch`. The downloaded file's header is read against the
+ * running arch's value so a wrong-arch build — which GitHub's digest cannot
+ * catch, since it proves integrity rather than architecture — is refused before
+ * it replaces the running one and stops the app from launching.
+ */
+const ELF_MACHINE_BY_ARCH: Record<string, number> = {
+	arm64: 0xb7,
+	x64: 0x3e,
+};
+
+/** Bytes an ELF file opens with: `0x7f` then `E`, `L`, `F`. */
+const ELF_MAGIC = [0x7f, 0x45, 0x4c, 0x46] as const;
+
+/** Bytes of the ELF header up to and including `e_machine` at offset 18. */
+const ELF_HEADER_BYTES = 20;
+
+/**
  * Directory `install.sh` installs into, relative to the XDG data root. The app
  * only ever *rewrites* the manifest it finds there, so this is a place to look
  * rather than one to create.
@@ -47,6 +65,11 @@ const INSTALL_MANIFEST_FILENAME = '.version';
 export interface AppImageInstallerOptions {
 	/** Absolute path of the running `.AppImage`, from `process.env.APPIMAGE`. */
 	appImagePath: string;
+	/**
+	 * The running architecture, from `process.arch`. The downloaded AppImage's
+	 * ELF header is checked against it. Injected for tests.
+	 */
+	arch?: string;
 	/** Process environment, read for the XDG data root. Injected for tests. */
 	env?: NodeJS.ProcessEnv;
 	/** Injected so tests resolve without a network and the app uses Node's global. */
@@ -100,6 +123,7 @@ export interface AppImageInstaller {
  */
 export function createAppImageInstaller({
 	appImagePath,
+	arch = process.arch,
 	env = process.env,
 	fetchImpl = fetch,
 	homeDirectory = process.env.HOME ?? '',
@@ -224,6 +248,34 @@ export function createAppImageInstaller({
 				return;
 			}
 
+			const expectedMachine = ELF_MACHINE_BY_ARCH[arch];
+			let machine: number | null;
+			try {
+				machine = await readElfMachine(partialPath);
+			} catch (error) {
+				removeQuietly(partialPath);
+				handlers?.onError(asError(error));
+				return;
+			}
+			if (machine === null) {
+				removeQuietly(partialPath);
+				handlers?.onError(
+					new Error('The download is not a complete ELF AppImage.'),
+					'update-verification-failed',
+				);
+				return;
+			}
+			if (expectedMachine !== undefined && machine !== expectedMachine) {
+				removeQuietly(partialPath);
+				handlers?.onError(
+					new Error(
+						`The download is an ELF for machine 0x${machine.toString(16)}, not this build's ${arch}.`,
+					),
+					'update-verification-failed',
+				);
+				return;
+			}
+
 			try {
 				chmodSync(partialPath, EXECUTABLE_MODE);
 				renameSync(partialPath, stagedPath);
@@ -293,6 +345,31 @@ export function createAppImageInstaller({
 			handlers = next;
 		},
 	};
+}
+
+/**
+ * Reads the `e_machine` field from a file's ELF header. Returns null when the
+ * file is too short or does not open with the ELF magic. A real AppImage always
+ * has a complete ELF header, so the caller rejects null as an unverifiable
+ * download before staging it.
+ * @param path - The downloaded file to inspect
+ * @returns The little-endian `e_machine` value, or null when the file is not ELF
+ */
+async function readElfMachine(path: string): Promise<number | null> {
+	const handle = await open(path, 'r');
+	try {
+		const header = Buffer.alloc(ELF_HEADER_BYTES);
+		const { bytesRead } = await handle.read(header, 0, ELF_HEADER_BYTES, 0);
+		if (bytesRead < ELF_HEADER_BYTES) {
+			return null;
+		}
+		if (ELF_MAGIC.some((byte, index) => header[index] !== byte)) {
+			return null;
+		}
+		return header.readUInt16LE(18);
+	} finally {
+		await handle.close();
+	}
 }
 
 /**

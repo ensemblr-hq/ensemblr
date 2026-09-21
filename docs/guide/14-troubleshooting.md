@@ -34,7 +34,7 @@ later from **Settings → Diagnostics → Setup wizard → Re-run wizard**.
 **Cause.** The build is unsigned, so it carries no notarization ticket and
 Gatekeeper refuses it. Nothing is damaged. A build is signed and notarized only
 when `APPLE_API_KEY_PATH`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER` are all
-present at build time; miss one and the same `npm run make` produces an unsigned
+present at build time; miss one and the same `bun run make` produces an unsigned
 app rather than failing.
 
 **Fix.** Right-click (or Control-click) `Ensemblr.app` in Finder, choose
@@ -44,7 +44,7 @@ choice — the right-click path is the one that works.
 
 ## Building
 
-### `npm run make` exits 0 and `out/` is empty
+### `bun run make` exits 0 and `out/` is empty
 
 **Cause.** You are on the wrong Node major. Under Node 26, `electron-forge
 package` exits successfully and produces no artifacts.
@@ -54,13 +54,13 @@ package` exits successfully and produces no artifacts.
 ```bash
 node -v          # must report v24.x
 nvm use          # reads .nvmrc — or `mise install`, if you use mise
-npm run make
+bun run make
 ```
 
 Ensemblr pins Node 24 in `.nvmrc`, `mise.toml`, and `package.json` (`engines:
-">=24 <25"`), and gates both `npm install` and the build commands on it. If the
+">=24 <25"`), and gates both `bun install` and the build commands on it. If the
 gate did not fire, something is invoking Forge directly rather than through the
-npm script.
+`package.json` script.
 
 **If `node -v` already reports v24.x, this is not your problem** — read the next
 entry, which produces the same empty `out/` for a different reason.
@@ -77,13 +77,13 @@ The reason it is specific to `make` and `package` is a version split in one
 dependency. Two copies of `@electron/get` are installed: `electron`'s own
 postinstall uses **v5**, which downloads over native `fetch`, while Forge reaches
 **v3** through `@electron/packager`, and v3 downloads over `got@11`. So
-`npm install` fetching Electron succeeds on the same network where `npm run make`
+`bun install` fetching Electron succeeds on the same network where `bun run make`
 fetching Electron does not.
 
 **Fix.** It is transient, so retry first:
 
 ```bash
-npm run make
+bun run make
 ```
 
 For a GitHub Actions release where another platform job already succeeded,
@@ -117,7 +117,7 @@ majors will not help.
 
 ### `NODE_MODULE_VERSION` mismatch during `make`
 
-**Cause.** You ran `npm install` under a different Node major than the one you
+**Cause.** You ran `bun install` under a different Node major than the one you
 are building with. `macos-alias` and `fs-xattr` compiled against that major, and
 the mismatch only surfaces later, at packaging time — long after the mistake.
 
@@ -126,14 +126,29 @@ the mismatch only surfaces later, at packaging time — long after the mistake.
 ```bash
 nvm use
 rm -rf node_modules
-npm install
-npm run make
+bun install
+bun run make
 ```
 
-Non-interactive shells — a workspace `setup` script, CI, a git hook — never
-source the mise or nvm hooks, so they run under whatever Node is on `PATH`.
-Prefix those with `./scripts/with-pinned-node.sh`, which resolves the pinned Node
-and then execs your command unchanged.
+Non-interactive shells — CI, a git hook, a plain `sh -c` — never source the mise
+or nvm hooks, so they run under whatever Node is on `PATH`. A workspace `setup`
+script, run script, or terminal started by Ensemblr gets the workspace
+directory's login-shell `PATH` instead, and that capture does activate mise —
+but it only puts Node 24 *on* the `PATH`, not necessarily *first*. If a startup
+file prepends Homebrew after `mise activate` (`brew shellenv` below it is the
+common order), Homebrew's Node stays in front and the install fails with
+`Node 24 required to install, but running Node 26`. It is the same for
+`bun install` and `bun ci`: Bun hands lifecycle scripts whichever `node` leads
+`PATH`.
+
+This repository's setup and run scripts go through
+`scripts/with-pinned-node.sh`, which puts the pinned Node first, so they are not
+affected. In your own terminal, `command -v node` shows which one wins; move
+`brew shellenv` above `mise activate` in your startup file to fix it for good.
+The capture is also switched off entirely when `[environment_variables]` in
+`.ensemblr/settings.toml` sets `PATH` at all, so look there too. Either way a
+wrong major fails loudly at `scripts/require-node-version.mjs` rather than
+building quietly.
 
 ## Terminals and agents
 
@@ -143,7 +158,7 @@ and then execs your command unchanged.
 bit. A non-executable helper surfaces as an opaque PTY spawn failure rather than
 a permissions error.
 
-**Fix.** Re-run `npm install`, which marks them executable as a `postinstall`
+**Fix.** Re-run `bun install`, which marks them executable as a `postinstall`
 step. To confirm it took, `ls -l node_modules/node-pty/prebuilds/*/spawn-helper`
 — each should be mode `755`.
 

@@ -114,18 +114,33 @@ jobs:
       && needs.already-verified.result == 'success'
       && needs.verify.result != 'failure'
       && needs.verify.result != 'cancelled' }}
+    # One leg per architecture, both on the same Apple silicon runner: Intel is
+    # cross-built (`--arch=x64`). A native Intel runner would buy nothing but a
+    # second migration — `macos-13` is retired and `macos-15-intel` sunsets in
+    # August 2027. Not fail-fast: cancelling the other leg mid-notarization would
+    # throw away minutes of a round trip to Apple for a failure that is not its.
+    #
+    # Each leg attaches only its own architecture's assets, and every name
+    # carries the architecture, so the two never write the same asset. Nothing
+    # that must happen once per release lives here — `finalize` owns that, after
+    # it has checked that both legs delivered.
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x64]
     # Pinned rather than macos-latest: an image bump must not silently change the
     # signing and notarization toolchain under a release.
     runs-on: macos-15
     # Notarization is a round trip to Apple and routinely takes several minutes
     # per artifact.
     timeout-minutes: 60
-    # No secret is declared at job level: everything here is in scope for `npm
+    # No secret is declared at job level: everything here is in scope for `bun
     # ci`, so a dependency lifecycle script would run with it in the
     # environment. `GH_TOKEN` carries `contents: write`, so it is injected into
     # each step that shells out to `gh` instead.
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      ARCH: ${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -167,15 +182,17 @@ jobs:
           api-key-id: ${{ secrets.APPLE_API_KEY_ID }}
           api-issuer: ${{ secrets.APPLE_API_ISSUER }}
 
+      # Forge defaults to the host architecture, so `--arch` is what makes the x64
+      # leg an Intel build rather than a second arm64 one.
       - name: Build the signed, notarized distributables
         env:
           ENSEMBLR_REQUIRE_SIGN: "1"
-        run: npm run make
+        run: bun run make --arch="$ARCH"
 
       - name: Verify every artifact is signed, notarized and stapled
         env:
           ENSEMBLR_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
-        run: npm run verify:signing
+        run: bun run verify:signing --arch="$ARCH"
 
       - name: Attach the distributables to the release
         env:
@@ -184,23 +201,30 @@ jobs:
           set -euo pipefail
           find out/make -type f \( -name '*.dmg' -o -name '*.zip' \) \
             > "$RUNNER_TEMP/assets.txt"
-          tr '\n' '\0' < "$RUNNER_TEMP/assets.txt" \
-            | xargs -0 gh release upload "$TAG" --clobber
+          dmg=$(bash .github/scripts/select-asset.sh "$RUNNER_TEMP/assets.txt" "-${ARCH}\.dmg\$")
+          zip=$(bash .github/scripts/select-asset.sh "$RUNNER_TEMP/assets.txt" "/[^/]*-darwin-${ARCH}-[^/]*\.zip\$")
+          gh release upload "$TAG" "$dmg" "$zip" --clobber
 
       # Squirrel.Mac's feed document, read by the in-app updater
       # (src/main/updates/release-feed.ts). Two things make it worth a separate
       # asset rather than deriving the same facts in the app: it names the exact
       # version, so nothing has to parse a tag or a release body, and it points
       # at the `.zip` — Squirrel installs a zipped `.app` and cannot read a DMG.
-      # The filename is a contract with UPDATE_FEED_ASSET_NAME; renaming one
+      # The filename is a contract with updateFeedAssetName(); renaming one
       # without the other strands every installed build on its current version.
+      # `update-darwin-arm64.json` in particular keeps its exact name and shape
+      # for good, because builds already installed read it by that name.
+      #
+      # The zip is picked by architecture, never "the first zip": one Intel
+      # archive behind the arm64 document would install the wrong binary on every
+      # Apple silicon Mac, and nothing in the app would notice.
       - name: Attach the update feed document
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          zip=$(basename "$(grep '\.zip$' "$RUNNER_TEMP/assets.txt" | head -1)")
-          feed="$RUNNER_TEMP/update-darwin-arm64.json"
+          zip=$(basename "$(bash .github/scripts/select-asset.sh "$RUNNER_TEMP/assets.txt" "/[^/]*-darwin-${ARCH}-[^/]*\.zip\$")")
+          feed="$RUNNER_TEMP/update-darwin-${ARCH}.json"
           jq -n \
             --arg url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${zip}" \
             --arg name "${TAG#v}" \
@@ -209,6 +233,90 @@ jobs:
             '{url: $url, name: $name, notes: $notes, pub_date: $pub_date}' \
             > "$feed"
           gh release upload "$TAG" "$feed" --clobber
+
+      - name: Remove signing material
+        if: always()
+        run: |
+          set -uo pipefail
+          if [ -n "${ENSEMBLR_SIGNING_KEYCHAIN:-}" ]; then
+            security delete-keychain "$ENSEMBLR_SIGNING_KEYCHAIN" || true
+          fi
+          if [ -n "${APPLE_API_KEY_PATH:-}" ]; then
+            rm -f "$APPLE_API_KEY_PATH"
+          fi
+
+  # Everything that must happen once per release rather than once per
+  # architecture: the prerelease flag, the Homebrew cask and the README summary.
+  # Each used to be a step at the end of `build`, which is only correct while
+  # `build` is one job — with a matrix, the leg that finishes first would flip
+  # the release public and bump the cask before the other one had delivered.
+  #
+  # Needs `build` alone. `build` is skipped for the reserved `nightly` tag and
+  # whenever `verify` fails, and a skipped or failed dependency skips this job
+  # too, so it carries no guard of its own.
+  #
+  # macOS, not Linux: the cask edit below uses BSD `sed -i ''`.
+  finalize:
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 15
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      # By design the app shows no error for a release that lacks its feed
+      # document — it reports "up to date". So an architecture whose leg was
+      # skipped, half-uploaded or retried into a different release would be
+      # stranded on its current version without anyone being told, and this is
+      # the last place anything can notice. The feed is read back rather than
+      # only listed: the document must name a zip built for its own architecture
+      # and that zip must actually be on the release, which is what a wrong pick
+      # would break.
+      #
+      # Keep the architecture list in step with the `build` matrix.
+      - name: Check every architecture delivered before publishing anything
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          version="${TAG#v}"
+          gh release view "$TAG" --json assets -q '.assets[].name' > "$RUNNER_TEMP/release-assets.txt"
+
+          failures=0
+          for arch in arm64 x64; do
+            feed="update-darwin-${arch}.json"
+            dmg="Ensemblr-${version}-${arch}.dmg"
+
+            if ! grep -qxF "$dmg" "$RUNNER_TEMP/release-assets.txt"; then
+              echo "::error::$TAG has no $dmg."
+              failures=$((failures + 1))
+            fi
+
+            if ! grep -qxF "$feed" "$RUNNER_TEMP/release-assets.txt"; then
+              echo "::error::$TAG has no $feed, so ${arch} Macs would silently stay on their current version."
+              failures=$((failures + 1))
+              continue
+            fi
+
+            url=$(gh release download "$TAG" --pattern "$feed" --output - | jq -r '.url // empty') || url=""
+            zip="${url##*/}"
+            case "$zip" in
+              *-darwin-${arch}-*.zip) ;;
+              *)
+                echo "::error::$feed points at '${url:-nothing}', which is not an archive built for ${arch}."
+                failures=$((failures + 1))
+                continue ;;
+            esac
+            if ! grep -qxF "$zip" "$RUNNER_TEMP/release-assets.txt"; then
+              echo "::error::$feed points at $zip, which $TAG does not carry."
+              failures=$((failures + 1))
+            fi
+          done
+
+          if [ "$failures" -ne 0 ]; then
+            echo "::error::$failures check(s) failed; leaving $TAG as it is. Re-run the failed build leg."
+            exit 1
+          fi
 
       - name: Set the prerelease flag from the tag
         env:
@@ -220,13 +328,42 @@ jobs:
             *) gh release edit "$TAG" --prerelease=false --latest ;;
           esac
 
+      # The README's version line and .dmg links stay hand-edited; the asset
+      # names are read off the release rather than guessed.
+      - name: Summarise the manual README edit
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          base="https://github.com/${GITHUB_REPOSITORY}/releases"
+          {
+            echo "### Published \`$TAG\`"
+            echo
+            echo "Attached:"
+            while IFS= read -r asset; do echo "- \`$asset\`"; done \
+              < "$RUNNER_TEMP/release-assets.txt"
+            echo
+            echo "README still needs these lines by hand, and its platform table row for macOS no longer says Apple silicon only:"
+            echo
+            echo '```markdown'
+            echo "- **Version:** [\`$version\`]($base/tag/$TAG) (pre-1.0, polish stage)"
+            echo "**Download Ensemblr $version (.dmg): [Apple silicon]($base/download/$TAG/Ensemblr-${version}-arm64.dmg) · [Intel]($base/download/$TAG/Ensemblr-${version}-x64.dmg)** — open it and drag Ensemblr to Applications."
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # Bumps ensemblr-hq/homebrew-tap so `brew install --cask
       # ensemblr-hq/tap/ensemblr` tracks the release without a hand edit
-      # (THE-197). Three things worth knowing:
+      # (THE-197). Four things worth knowing:
       #
-      # - The sha256 is read off the asset's `digest`, which GitHub computes over
-      #   what it actually stored. Re-hashing a local copy would only prove the
-      #   upload round-tripped.
+      # - The cask must already be in the two-architecture shape that
+      #   docs/homebrew-cask-two-arch.md records — `arch arm:/intel:`, a
+      #   two-line `sha256 arm:/intel:` and a `url` interpolating `#{arch}`. This
+      #   step edits those lines and nothing else, and refuses any other shape
+      #   rather than guess: a `sed` that matched nothing would push a commit
+      #   that changes nothing and leave the tap on the old version. The tap has
+      #   to be migrated before the first release that ships an x64 DMG.
+      # - Both sha256 values are read off each asset's `digest`, which GitHub
+      #   computes over what it actually stored. Re-hashing a local copy would
+      #   only prove the upload round-tripped.
       # - The commit goes through the Contents API rather than a clone, so the
       #   token never reaches a git remote or `git config`.
       # - `release` only. A `workflow_dispatch` rebuild of an older tag must not
@@ -256,104 +393,109 @@ jobs:
           fi
 
           version="${TAG#v}"
-          dmg="Ensemblr-${version}-arm64.dmg"
-          digest=$(GH_TOKEN="$RELEASE_TOKEN" gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" \
-            --jq ".assets[] | select(.name == \"${dmg}\") | .digest")
-          sha="${digest#sha256:}"
-          if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{64}$'; then
-            echo "::error::No usable sha256 digest for $dmg (got '${digest:-nothing}')."
-            exit 1
-          fi
+
+          digest_of() {
+            local name="$1" digest sha
+            digest=$(GH_TOKEN="$RELEASE_TOKEN" gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" \
+              --jq ".assets[] | select(.name == \"${name}\") | .digest")
+            sha="${digest#sha256:}"
+            if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{64}$'; then
+              echo "::error::No usable sha256 digest for $name (got '${digest:-nothing}')." >&2
+              return 1
+            fi
+            printf '%s' "$sha"
+          }
+          sha_arm=$(digest_of "Ensemblr-${version}-arm64.dmg")
+          sha_intel=$(digest_of "Ensemblr-${version}-x64.dmg")
 
           export GH_TOKEN="$TAP_TOKEN"
+          cask="$RUNNER_TEMP/ensemblr.rb"
           gh api "repos/${TAP_REPOSITORY}/contents/${CASK_PATH}" > "$RUNNER_TEMP/cask.json"
           blob=$(jq -r .sha "$RUNNER_TEMP/cask.json")
-          jq -r .content "$RUNNER_TEMP/cask.json" | base64 --decode > "$RUNNER_TEMP/ensemblr.rb"
+          jq -r .content "$RUNNER_TEMP/cask.json" | base64 --decode > "$cask"
 
-          if grep -q "^  version \"${version}\"$" "$RUNNER_TEMP/ensemblr.rb"; then
-            echo "Cask is already at $version; nothing to push." >> "$GITHUB_STEP_SUMMARY"
+          two_arch_shape=(
+            '^  arch arm: "arm64", intel: "x64"$'
+            '^  version "[^"]*"$'
+            '^  sha256 arm:   "[0-9a-f]{64}",$'
+            '^         intel: "[0-9a-f]{64}"$'
+            '^  url .*#\{arch\}'
+          )
+          for line in "${two_arch_shape[@]}"; do
+            if ! grep -Eq -- "$line" "$cask"; then
+              echo "::error::${CASK_PATH} in ${TAP_REPOSITORY} is not in the two-architecture shape (no line matching ${line}). Migrate it as docs/homebrew-cask-two-arch.md describes, then re-run this job."
+              exit 1
+            fi
+          done
+
+          cp "$cask" "$RUNNER_TEMP/ensemblr.rb.orig"
+          sed -E -i '' \
+            -e "s|^(  version )\"[^\"]*\"$|\1\"${version}\"|" \
+            -e "s|^(  sha256 arm:   )\"[0-9a-f]{64}\",$|\1\"${sha_arm}\",|" \
+            -e "s|^(         intel: )\"[0-9a-f]{64}\"$|\1\"${sha_intel}\"|" \
+            "$cask"
+
+          if cmp -s "$cask" "$RUNNER_TEMP/ensemblr.rb.orig"; then
+            echo "Cask is already at $version with these checksums; nothing to push." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          sed -i '' \
-            -e "s|^  version \".*\"$|  version \"${version}\"|" \
-            -e "s|^  sha256 \".*\"$|  sha256 \"${sha}\"|" \
-            "$RUNNER_TEMP/ensemblr.rb"
-
-          # Both lines must have moved. A silent no-op sed would otherwise push a
-          # commit that changes nothing and leave the tap on the old version.
-          grep -q "^  version \"${version}\"$" "$RUNNER_TEMP/ensemblr.rb"
-          grep -q "^  sha256 \"${sha}\"$" "$RUNNER_TEMP/ensemblr.rb"
+          # All three lines must have moved. A partial edit would otherwise push
+          # a cask whose two architectures disagree about the version.
+          grep -qxF "  version \"${version}\"" "$cask"
+          grep -qxF "  sha256 arm:   \"${sha_arm}\"," "$cask"
+          grep -qxF "         intel: \"${sha_intel}\"" "$cask"
 
           gh api --method PUT "repos/${TAP_REPOSITORY}/contents/${CASK_PATH}" \
             -f "message=ensemblr ${version}" \
-            -f "content=$(base64 < "$RUNNER_TEMP/ensemblr.rb" | tr -d '\n')" \
+            -f "content=$(base64 < "$cask" | tr -d '\n')" \
             -f "sha=${blob}" \
             --silent
 
           echo "Bumped \`${TAP_REPOSITORY}\` to \`${version}\`." >> "$GITHUB_STEP_SUMMARY"
 
-      # The README's version line and .dmg link stay hand-edited; the exact asset
-      # name is only known once make has run, so print it rather than guess.
-      - name: Summarise the manual README edit
-        run: |
-          set -euo pipefail
-          version="${TAG#v}"
-          dmg=$(basename "$(grep '\.dmg$' "$RUNNER_TEMP/assets.txt" | head -1)")
-          base="https://github.com/${GITHUB_REPOSITORY}/releases"
-          {
-            echo "### Published \`$TAG\`"
-            echo
-            echo "Attached:"
-            while IFS= read -r asset; do echo "- \`$(basename "$asset")\`"; done \
-              < "$RUNNER_TEMP/assets.txt"
-            echo
-            echo "README still needs these two lines by hand:"
-            echo
-            echo '```markdown'
-            echo "- **Version:** [\`$version\`]($base/tag/$TAG) (pre-1.0, polish stage)"
-            echo "**[Download Ensemblr $version (.dmg, Apple silicon)]($base/download/$TAG/$dmg)** — open it and drag Ensemblr to Applications."
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Remove signing material
-        if: always()
-        run: |
-          set -uo pipefail
-          if [ -n "${ENSEMBLR_SIGNING_KEYCHAIN:-}" ]; then
-            security delete-keychain "$ENSEMBLR_SIGNING_KEYCHAIN" || true
-          fi
-          if [ -n "${APPLE_API_KEY_PATH:-}" ]; then
-            rm -f "$APPLE_API_KEY_PATH"
-          fi
-
   # A separate job rather than a matrix leg on `build`: nothing here is signed,
-  # notarized or stapled, `verify:signing` only looks for `*-darwin-arm64`
-  # output, and the Apple signing action has no business running on a Linux
-  # runner. It attaches to the same release, and `release-feed.ts` requires the
-  # `.AppImage` to be present before it offers a Linux user the version.
+  # notarized or stapled, `verify:signing` looks only for `*-darwin-<arch>` output,
+  # and the Apple signing action has no business running on a Linux runner. It
+  # attaches to the same release, and `release-feed.ts` requires the `.AppImage`
+  # to be present before it offers a Linux user the version.
   #
-  # After `build`, not beside it. `release-feed.ts` offers a Linux user any
-  # release carrying an `.AppImage`, and looks the darwin feed document up before
-  # that gate — so a release that got the AppImage while notarization failed
-  # would push Linux users at a version macOS users cannot install, and hand them
-  # a hard error on the one release they could actually run. A failure here still
-  # leaves the macOS release whole; the reverse must not happen. It also inherits
-  # `build`'s "release exists and is published" guard this way, so it can no
-  # longer attach to a draft.
+  # After `finalize`, not beside `build`. `release-feed.ts` offers a Linux user
+  # any release carrying an `.AppImage`, and looks the darwin feed document up
+  # before that gate — so a release that got the AppImage while notarization
+  # failed would push Linux users at a version macOS users cannot install, and
+  # hand them a hard error on the one release they could actually run. A failure
+  # here still leaves the macOS release whole; the reverse must not happen.
+  # `finalize` succeeding is what proves both Mac architectures delivered, and it
+  # also inherits `build`'s "release exists and is published" guard, so this can
+  # no longer attach to a draft.
+  #
+  # x64 ONLY, and that is a constraint, not a gap. Every already-shipped
+  # linux-x64 client picks the first release asset whose name ends in
+  # `.appimage` and checks no architecture, and those clients cannot be patched.
+  # An arm64 AppImage on a release would be offered to them and installed over a
+  # working x64 build. Linux arm64 therefore lands in a *later* release under a
+  # name that deliberately does not end in `.appimage` —
+  # `Ensemblr-<version>-linux-arm64.appimage.bin` — which those clients never
+  # match. Do not add `arm64` to the matrix before that release.
   build-linux:
     # Same `always()` shape as `build`, for the same reason — `verify` is
-    # skipped on an already-checked commit. Gating on `build` having actually
+    # skipped on an already-checked commit. Gating on `finalize` having actually
     # succeeded is what preserves the ordering the comment above describes.
-    needs: [already-verified, verify, build]
+    needs: [already-verified, verify, build, finalize]
     if: >-
       ${{ always()
       && !startsWith(github.event.release.tag_name, 'nightly')
-      && needs.build.result == 'success' }}
+      && needs.finalize.result == 'success' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      ARCH: ${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -379,23 +521,34 @@ jobs:
           fi
 
       - name: Build the AppImage
-        run: npm run make:linux
+        env:
+          ENSEMBLR_TARGET_ARCH: ${{ matrix.arch }}
+        run: bun run make:linux --arch="$ARCH"
 
-      - name: Attach the AppImage to the release
+      # The AppImage goes up before its feed document, so the document never
+      # names an asset that is not there yet.
+      - name: Attach the AppImage and its update feed document to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           find out/make -type f -name '*.AppImage' > "$RUNNER_TEMP/linux-assets.txt"
-          if [ ! -s "$RUNNER_TEMP/linux-assets.txt" ]; then
-            echo "::error::make:linux produced no .AppImage."
-            exit 1
-          fi
-          tr '\n' '\0' < "$RUNNER_TEMP/linux-assets.txt" \
-            | xargs -0 gh release upload "$TAG" --clobber
+          appimage=$(bash .github/scripts/select-asset.sh "$RUNNER_TEMP/linux-assets.txt" "-${ARCH}\.AppImage\$")
+          gh release upload "$TAG" "$appimage" --clobber
+
+          feed="$RUNNER_TEMP/update-linux-${ARCH}.json"
+          jq -n \
+            --arg url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/$(basename "$appimage")" \
+            --arg name "${TAG#v}" \
+            --arg notes "$(gh release view "$TAG" --json body -q .body)" \
+            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{url: $url, name: $name, notes: $notes, pub_date: $pub_date}' \
+            > "$feed"
+          gh release upload "$TAG" "$feed" --clobber
+
           {
             echo "### Linux artifacts for \`$TAG\`"
             echo
-            while IFS= read -r asset; do echo "- \`$(basename "$asset")\`"; done \
-              < "$RUNNER_TEMP/linux-assets.txt"
+            echo "- \`$(basename "$appimage")\`"
+            echo "- \`$(basename "$feed")\`"
           } >> "$GITHUB_STEP_SUMMARY"

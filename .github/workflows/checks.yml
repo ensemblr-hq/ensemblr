@@ -40,9 +40,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/install-dependencies
       - name: Biome, Tailwind scale, i18n lint, hardcoded strings
-        run: npm run check
+        run: bun run check
 
-  # `npm run typecheck` runs the four tsconfig projects concurrently
+  # `bun run typecheck` runs the four tsconfig projects concurrently
   # (scripts/typecheck.mjs). They each `include` `src`, so chaining them with
   # `&&` type-checked the bulk of the program four times in a row.
   typecheck:
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/install-dependencies
       - name: Type check
-        run: npm run typecheck
+        run: bun run typecheck
 
   # Both platforms Ensemblr ships for. The keymap suites resolve `mod` to ⌘ on
   # darwin and Ctrl elsewhere and assert whichever the runner is, so the Linux
@@ -66,11 +66,11 @@ jobs:
   # one of them drew the handful of filesystem-watcher suites that take seconds
   # apiece. A third shard costs nothing extra on the clock and spreads that tail.
   #
-  # Not four or more, for two reasons. `npm ci` is a fixed ~26s (~40s on macOS)
-  # that every shard pays, so the marginal gain shrinks fast; and GitHub caps
-  # concurrent macOS runners far lower than Linux ones, so a wide macOS fan-out
-  # starts queueing against any second run in flight — which costs more wall
-  # clock than it saves.
+  # Not four or more, for two reasons. The install is a fixed cost that every
+  # shard pays (`node-pty` alone compiles on Linux), so the marginal gain shrinks
+  # fast; and GitHub caps concurrent macOS runners far lower than Linux ones, so
+  # a wide macOS fan-out starts queueing against any second run in flight —
+  # which costs more wall clock than it saves.
   test:
     strategy:
       fail-fast: false
@@ -83,7 +83,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/install-dependencies
       - name: Vitest (shard ${{ matrix.shard }} of 3)
-        run: npm run test -- --shard=${{ matrix.shard }}/3
+        run: bun run test --shard=${{ matrix.shard }}/3
 
   scan:
     # `inputs` is null on push/pull_request, so those keep running the scan; only

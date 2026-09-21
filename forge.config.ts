@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import { execFile } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { MakerDMG } from '@electron-forge/maker-dmg';
@@ -243,6 +245,144 @@ const macDistributionConfig = notarizationEnabled
 		}
 	: {};
 
+// Nothing in Forge or the AppImage maker checks that a packaged native binding
+// was actually built for the architecture being packaged, so a cross-build that
+// quietly reused the host's binding ships an app that installs, launches, and
+// then cannot open a terminal. Read the architecture out of each binary's own
+// header rather than shelling out to `lipo`, which does not exist on the Linux
+// legs and would make this check macOS-only.
+const MACHO_CPU_TYPES = new Map([
+	[0x01000007, 'x64'],
+	[0x0100000c, 'arm64'],
+]);
+const ELF_MACHINES = new Map([
+	[0x3e, 'x64'],
+	[0xb7, 'arm64'],
+]);
+
+/**
+ * Reads the architecture a compiled binding was built for out of its own header.
+ * @param bindingPath - Absolute path to a compiled `.node` binding
+ * @returns The Forge architecture name, `universal` for a fat Mach-O, or null
+ * when the file is neither Mach-O nor ELF
+ */
+function readBindingArch(bindingPath: string): string | null {
+	const header = readFileSync(bindingPath).subarray(0, 64);
+	if (header.length < 20) return null;
+	if (header.readUInt32BE(0) === 0xcafebabe) return 'universal';
+	const machoMagic = header.readUInt32LE(0);
+	if (machoMagic === 0xfeedfacf || machoMagic === 0xfeedface) {
+		return MACHO_CPU_TYPES.get(header.readUInt32LE(4)) ?? null;
+	}
+	if (header.subarray(0, 4).toString('latin1') === '\x7fELF') {
+		return ELF_MACHINES.get(header.readUInt16LE(18)) ?? null;
+	}
+	return null;
+}
+
+/**
+ * Collects every compiled native binding inside one Forge package output.
+ * @param root - Absolute path to a Forge package output directory
+ * @returns Absolute paths to every `.node` file beneath it
+ */
+function findNativeBindings(root: string): string[] {
+	if (!existsSync(root)) return [];
+	return readdirSync(root, { withFileTypes: true, recursive: true })
+		.filter((entry) => entry.isFile() && entry.name.endsWith('.node'))
+		.map((entry) => join(entry.parentPath, entry.name));
+}
+
+/**
+ * Whether a binding sits in a location node-pty cannot load for this target.
+ * Its loader checks build output and matching prebuilds, never electron-rebuild's
+ * `bin/<platform>-<arch>-<abi>` compatibility copy.
+ * @param bindingPath - Absolute path to a compiled `.node` binding
+ * @param target - The `platform-arch` pair being packaged
+ * @returns True when the binding cannot be selected by node-pty
+ */
+function isUnloadedNodePtyBinding(
+	bindingPath: string,
+	target: string,
+): boolean {
+	if (/\/node_modules\/node-pty\/bin\//.test(bindingPath)) return true;
+	const prebuild = bindingPath.match(/\/prebuilds\/([^/]+)\//);
+	return prebuild !== null && prebuild[1] !== target;
+}
+
+/**
+ * Fails the package step when a binding the packaged app would load was built
+ * for an architecture other than the one Forge was asked to package.
+ * @param outputPaths - Directories Forge wrote this package into
+ * @param platform - Platform Forge packaged for
+ * @param arch - Architecture Forge packaged for
+ */
+function assertBindingsMatchArch(
+	outputPaths: string[],
+	platform: string,
+	arch: string,
+): void {
+	const target = `${platform}-${arch}`;
+	const mismatches: string[] = [];
+	let checked = 0;
+
+	for (const outputPath of outputPaths) {
+		for (const binding of findNativeBindings(outputPath)) {
+			if (isUnloadedNodePtyBinding(binding, target)) continue;
+			const actual = readBindingArch(binding);
+			if (actual === null || actual === 'universal') continue;
+			checked += 1;
+			if (actual !== arch) mismatches.push(`${binding} is ${actual}`);
+		}
+	}
+
+	if (mismatches.length > 0) {
+		throw new Error(
+			[
+				`Packaged for ${target}, but ${mismatches.length} native binding(s) were built for another architecture:`,
+				...mismatches,
+			].join('\n  '),
+		);
+	}
+
+	if (checked === 0) {
+		throw new Error(
+			`Packaged for ${target}, but the package carries no loadable native binding. node-pty is kept by PACKAGE_KEEP_PREFIXES, so an empty result means the terminal would not work in this build.`,
+		);
+	}
+
+	console.log(
+		`✓ ${checked} native binding(s) in the ${target} package are ${arch}.`,
+	);
+}
+
+/**
+ * The AppImage runtime `scripts/fetch-appimage-runtime.mjs` verified for this
+ * build. The maker otherwise downloads `runtime-<arch>` from the mutable
+ * `continuous` tag and accepts anything that comes back with an HTTP 200, which
+ * puts an unreviewed third-party binary at the front of every shipped AppImage.
+ * The preflight runs immediately before Forge in the `make:linux` chain, so the
+ * manifest is absent only on a macOS build, where no AppImage is made.
+ * @returns Absolute path to the verified runtime, or undefined when none was
+ * resolved
+ */
+function resolvedAppImageRuntime(): string | undefined {
+	const manifest = fileURLToPath(
+		new URL('./.appimage-runtime/resolved.json', import.meta.url),
+	);
+	if (!existsSync(manifest)) return undefined;
+	try {
+		const { runtime } = JSON.parse(readFileSync(manifest, 'utf8'));
+		return typeof runtime === 'string' && existsSync(runtime)
+			? runtime
+			: undefined;
+	} catch (error) {
+		throw new Error(
+			`Could not read verified AppImage runtime manifest ${manifest}.`,
+			{ cause: error },
+		);
+	}
+}
+
 const config: ForgeConfig = {
 	packagerConfig: {
 		// node-pty's native addon execs a sibling `spawn-helper` binary (macOS) via
@@ -300,6 +440,22 @@ const config: ForgeConfig = {
 	rebuildConfig: {},
 	hooks: {
 		/**
+		 * Assert the packaged native bindings were built for the architecture
+		 * being packaged. Forge cross-builds by passing the target arch down to
+		 * `@electron/rebuild`, but nothing downstream verifies the result, so a
+		 * cross-build that fell back to the host's binding would package silently.
+		 * @param _config - Resolved Forge configuration (unused)
+		 * @param packageResult - The platform, architecture and output directories
+		 * of the package that just completed
+		 */
+		postPackage: async (_config, packageResult) => {
+			assertBindingsMatchArch(
+				packageResult.outputPaths,
+				packageResult.platform,
+				packageResult.arch,
+			);
+		},
+		/**
 		 * Notarize and staple every DMG artifact after `make`, extending the
 		 * notarization ticket from the packaged app to the DMG container so the
 		 * shipped disk image passes Gatekeeper without a network round-trip. No-op
@@ -354,6 +510,7 @@ const config: ForgeConfig = {
 					// the same change that wires a handler.
 					name: APP_LINUX_APP_IDS[buildChannel],
 					productName: APP_NAMES[buildChannel],
+					runtime: resolvedAppImageRuntime(),
 				},
 			},
 			['linux'],

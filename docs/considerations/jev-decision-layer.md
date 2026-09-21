@@ -427,7 +427,7 @@ observed positives and F3 needs real follow-up pairs plus better boundaries.
 - `tests/main/published-schemas.test.ts` (settings key), `tests/main/database.test.ts`
   (migration), and the AFK tests `tests/shared/afk-directive.test.ts` and
   `tests/main/afk-mode-control-gate.test.ts`.
-- `npm run check`, `npm run typecheck`, and `npm run i18n:status`.
+- `bun run check`, `bun run typecheck`, and `bun run i18n:status`.
 
 ## Settled decisions
 

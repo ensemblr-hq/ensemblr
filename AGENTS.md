@@ -26,40 +26,45 @@ Scaffold provenance guardrail:
 
 - Do not hand-author generated app structure from memory when an official generator exists.
 - Run the official generator in `.context/` or another disposable directory first, then copy or adapt from that generated output.
-- If the generator conflicts with npm, hooks, existing files, or other repo policy, stop and explain the conflict before choosing a workaround.
+- If the generator conflicts with Bun, hooks, existing files, or other repo policy, stop and explain the conflict before choosing a workaround.
 - Record scaffold provenance in the final response or a tracked audit note: documentation source, exact generator command, generated files used, and every intentional deviation.
 - Treat manually added package names, versions, config keys, templates, or generated-file structure as invalid unless they are directly backed by current official docs, generator output, or an explicit user decision.
 
 ## Package Manager Policy
 
-This repository enforces npm for JavaScript and TypeScript package management.
+This repository enforces Bun for JavaScript and TypeScript package management. Bun installs packages and runs `package.json` scripts; **Node 24 remains the runtime** (see `.claude/rules/stack.md`), and Bun does not shim itself as `node`.
 
-- Use `npm install` instead of `bun install`, `pnpm install`, or `yarn install`.
-- Use `npm run <script>` instead of `bun run <script>`, `pnpm run <script>`, or `yarn run <script>`.
-- Use `npx <package>` instead of `bunx`, `pnpx`, or `yarn dlx`.
-- Use `npm install <package>` and `npm uninstall <package>` for dependency changes.
-- Do not create `bun.lock`, `pnpm-lock.yaml`, or `yarn.lock`.
-- When creating or updating `package.json`, set `packageManager` to an npm version and keep `package-lock.json` as the lockfile.
-- The local Codex hook `.codex/hooks/enforce-npm-package-manager.sh` (plus the Claude hook `.claude/hooks/enforce-npm.sh`) block direct `bun`, `bunx`, `pnpm`, `pnpx`, `yarn`, `yarnpkg`, and matching `corepack` package-manager calls.
+- Use `bun install` instead of `npm install`, `pnpm install`, or `yarn install`. Use `bun ci` for a frozen install that must match `bun.lock` exactly — it is what the workspace setup script runs.
+- Use `bun run <script>` instead of `npm run <script>`, `pnpm run <script>`, or `yarn run <script>`.
+- Use `bunx <package>` instead of `npx`, `pnpx`, or `yarn dlx`.
+- Use `bun add <package>` (`bun add -d` for a dev dependency) and `bun remove <package>` for dependency changes.
+- Do not create `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, or the binary `bun.lockb`. `bun.lock` (text) is the lockfile of record, and `bunfig.toml` sets `saveTextLockfile = true`.
+- `bun.lock` stays at `lockfileVersion: 1`. Dependabot-core's Bun parser raises on a higher version, so dependency PRs would stop arriving. Bun 1.4 stamps 2 on a lockfile regenerated from scratch, so never delete `bun.lock` and reinstall to "refresh" it. `bun run check:lockfile` (part of `bun run check`) enforces this; `docs/build-and-release.md#bun-and-node` records how the current file was produced and why a plain `bun install` without a lockfile silently re-resolves the whole graph.
+- When creating or updating `package.json`, set `packageManager` to a Bun version (`bun@1.4.2`).
+- `bunfig.toml` pins `linker = "hoisted"` because Forge's `PACKAGE_KEEP_*` filters match flat `node_modules/<pkg>/` paths. Do not switch to the isolated linker.
+- `package.json#trustedDependencies` is the complete list of packages whose install scripts run (an explicit list replaces Bun's built-in allowlist). `node-pty` is deliberately absent — on Linux its binding must be built by Forge against Electron's ABI, not by Bun against Node's. **Never run `bun pm trust --all`.**
+- The local Codex hook `.codex/hooks/enforce-bun-package-manager.sh` (plus the Claude hook `.claude/hooks/enforce-bun.sh`) block direct `npm`, `npx`, `pnpm`, `pnpx`, `yarn`, `yarnpkg`, and matching `corepack` package-manager calls.
+- Never set `PATH` in `.ensemblr/settings.toml`'s `[environment_variables]`. Ensemblr injects the workspace directory's login-shell `PATH` (which activates mise, putting Node 24 and Bun on it) only when no `PATH` key is present, so defining one — even empty — silently disables the resolver.
+- Keep every setup and run script behind `scripts/with-pinned-node.sh`. The injected `PATH` has mise's Node 24 *on* it but not necessarily *first* — a shell startup that prepends Homebrew after `mise activate` leaves Node 26 in front, and `bun ci` then dies on the preinstall guard. Bun hands lifecycle scripts whichever `node` leads `PATH`, for `bun install` and `bun ci` alike.
 
 ## Biome Policy
 
 This repository uses Biome instead of ESLint and Prettier.
 
-- Run `npm run check` before finishing changes that touch JavaScript, TypeScript, JSX, TSX, CSS, or JSON.
-- Use `npm run check:fix` to apply safe Biome fixes, including formatting and import organization.
-- Keep `npm run typecheck` as a separate verification step for TypeScript type errors. It checks four projects — the app (`tsconfig.json`), dev scripts (`tsconfig.scripts.json`), tests (`tsconfig.tests.json`), and demo mode (`tsconfig.demo.json`) — so `.ts` files under `scripts/` and `tests/` are type-checked even though `npx tsx`/`node` and Vitest run them without checking. `scripts/typecheck.mjs` runs the four concurrently and names whichever failed; add a new project there rather than chaining another `tsc` call.
+- Run `bun run check` before finishing changes that touch JavaScript, TypeScript, JSX, TSX, CSS, or JSON.
+- Use `bun run check:fix` to apply safe Biome fixes, including formatting and import organization.
+- Keep `bun run typecheck` as a separate verification step for TypeScript type errors. It checks four projects — the app (`tsconfig.json`), dev scripts (`tsconfig.scripts.json`), tests (`tsconfig.tests.json`), and demo mode (`tsconfig.demo.json`) — so `.ts` files under `scripts/` and `tests/` are type-checked even though `bunx tsx`/`node` and Vitest run them without checking. `scripts/typecheck.mjs` runs the four concurrently and names whichever failed; add a new project there rather than chaining another `tsc` call.
 - Do not add ESLint or Prettier configuration unless the user explicitly asks for it.
 
 ## Testing Policy
 
-Vitest is the mandated test runner for renderer and shared tests. npm is the package manager — Bun is no longer used (the enforcement hook blocks it), and the runner is Vitest, never `bun test`.
+Vitest is the mandated test runner for renderer and shared tests. Bun is the package manager, but **`bun test` is Bun's own test runner, not Vitest** — never run it here. Use `bun run test`, which invokes Vitest through the `test` script.
 
 - Renderer tests (`tests/renderer/**`) and shared tests (`tests/shared/**`) run under Vitest. Do not import from `bun:test`. Do not add Jest, Mocha, or any other runner.
-- npm manages packages: install test tooling with `npm install -D` and run Vitest with `npx vitest` (for example `npx vitest run`, or a focused `npx vitest run <file>`). Do not use `bun`/`bunx`/`pnpm`/`yarn`.
+- Bun manages packages: install test tooling with `bun add -d` and run Vitest with `bunx vitest` (for example `bunx vitest run`, or a focused `bunx vitest run <file>`). Do not use `npm`/`npx`/`pnpm`/`yarn`.
 - Vitest config lives in `vitest.config.mts`. The default `environment` is `node` so platform-sensitive pure-logic tests (keymap, etc.) keep the real `navigator`/`process`. DOM component tests opt into happy-dom per file with a `// @vitest-environment happy-dom` docblock — never register a DOM globally.
 - DOM harness: `tests/renderer/support/dom.tsx` exposes `renderWithProviders` and the `window.ensemblr` stub helpers; jest-dom matchers are registered globally in `tests/renderer/support/vitest.setup.ts`. `@testing-library/react` auto-unmounts after each test because `globals: true`.
-- Coverage is native Istanbul: run `npx vitest run --coverage` (provider `istanbul`) to emit `coverage/coverage-final.json`, which `fallow audit --coverage <file> --coverage_root <repo root>` reads directly. There is no lcov→istanbul bridge; do not reintroduce one.
+- Coverage is native Istanbul: run `bunx vitest run --coverage` (provider `istanbul`) to emit `coverage/coverage-final.json`, which `fallow audit --coverage <file> --coverage_root <repo root>` reads directly. There is no lcov→istanbul bridge; do not reintroduce one.
 - Mocks use Vitest: `vi.fn()` for spies, `vi.spyOn()` for method spies, and `vi.mock()` (hoisted; use `vi.hoisted()` for factory-referenced variables) for module mocks. Do not use `mock()`/`mock.module()`.
 - Main-process tests (`tests/main/**`) stay on their `electron --test` scripts — they need the Electron runtime and are not run by Vitest.
 
@@ -81,7 +86,7 @@ Vitest is the mandated test runner for renderer and shared tests. npm is the pac
 - Use canonical Tailwind classes before arbitrary values. For example, use `text-xs` instead of `text-[0.75rem]`, `rounded-2xl` instead of `rounded-[0.375rem]`, and `rounded-sm` instead of `rounded-[0.125rem]`.
 - If a value is not available as a canonical Tailwind class, use rem-based arbitrary values instead of px-based arbitrary values, especially for typography: use `text-[0.8125rem]` instead of `text-[13px]`.
 - Prefer semantic or existing tokenized utilities over new arbitrary values when the design system already exposes the needed value.
-- `npm run check` runs `scripts/check-tailwind-classes.mjs`, which fails on square-bracket pixel utilities and known non-canonical arbitrary classes. It scans `src/renderer` only (`.css`, `.js`, `.jsx`, `.ts`, `.tsx`), so `playground/` is not covered. Update that script when adding another canonical class equivalence that agents should preserve.
+- `bun run check` runs `scripts/check-tailwind-classes.mjs`, which fails on square-bracket pixel utilities and known non-canonical arbitrary classes. It scans `src/renderer` only (`.css`, `.js`, `.jsx`, `.ts`, `.tsx`), so `playground/` is not covered. Update that script when adding another canonical class equivalence that agents should preserve.
 
 ## Localization Policy
 
@@ -89,7 +94,7 @@ The app ships in English, Russian, and Greek. A change that adds or edits a user
 
 - Every user-facing string a change adds ships with `ru` and `el` filled in the same change. No key introduced by a change may be left empty in `src/renderer/lib/i18n/locales/ru/*.json` or `src/renderer/lib/i18n/locales/el/*.json`.
 - A surface that is not translated yet becomes the change's responsibility once the change touches it: migrate its hardcoded literals to keys and fill the missing `ru`/`el` values for that file. The obligation is bounded by the files touched — do not add to the backlog, and do not treat unrelated debt as in scope.
-- `locales/en/**` is generated from the `t('key', 'Default English')` call sites by `npm run i18n:extract` and is never hand-edited; `locales/ru/**` and `locales/el/**` are hand-filled against that skeleton. Run `npm run i18n:extract`, fill the new empty values, then `npm run i18n:types`, and confirm with `npm run i18n:status`. `npm run check` runs `i18n:lint`.
+- `locales/en/**` is generated from the `t('key', 'Default English')` call sites by `bun run i18n:extract` and is never hand-edited; `locales/ru/**` and `locales/el/**` are hand-filled against that skeleton. Run `bun run i18n:extract`, fill the new empty values, then `bun run i18n:types`, and confirm with `bun run i18n:status`. `bun run check` runs `i18n:lint`.
 - Fix the term in `docs/i18n-glossary.md` before translating, and add the row in the same change when a term has none.
 - `src/shared/` and `src/main/` return locale-neutral codes rather than English labels, so adding a code there is a user-facing change: the renderer mapper needs its `t()` case and that key needs `ru` and `el`. A surface main draws itself keeps a const table instead — `src/main/menu/menu-strings.ts` for the menu bar, `src/main/agent-runtime/notification-strings.ts` for desktop notifications, `src/main/app/quit-guard-strings.ts` for the quit confirmation, `src/main/linear/linear-callback-page-strings.ts` for the browser page Linear's OAuth redirect lands on — and a new key adds all three languages there.
 - See @.claude/rules/i18n.md for the full contract: what counts as a user-facing surface, plural categories per locale, interpolation placeholders, agent-facing prose (which is steered by `buildLanguageDirective`, not translated), and when an `i18next-instrument-ignore` directive is legitimate.

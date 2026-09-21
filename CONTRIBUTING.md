@@ -20,12 +20,12 @@ and no DCO sign-off.
 first PR, and which test runner a new test belongs to. [`docs/architecture-map.md`](./docs/architecture-map.md)
 is the directory-level index of which subtree owns which concern.
 
-The short version: macOS on Apple silicon or Linux on x86-64, Node **exactly 24.x**, npm.
+The short version: macOS (Apple silicon or Intel) or Linux on x86-64, Node **exactly 24.x**, Bun 1.4 (Node stays the runtime; `mise install` sets up both).
 
 ```bash
-npm install          # postinstall fixes node-pty native-module permissions
-npm run dev          # the app
-npm run dev:playground   # the component preview harness, Vite only
+bun install          # postinstall fixes node-pty native-module permissions
+bun run dev          # the app
+bun run dev:playground   # the component preview harness, Vite only
 ```
 
 ## The gates
@@ -42,14 +42,14 @@ Pushing again to a PR cancels the run it superseded, so a fixup does not queue b
 read.
 
 ```bash
-npm run check       # Biome + Tailwind class check + i18n lint + hardcoded-string scan
-npm run typecheck   # all four tsconfig projects, concurrently (scripts/typecheck.mjs)
-npm run test        # Vitest: renderer, shared, and pure-logic main suites
-npm run doctor      # react-doctor diagnostics
+bun run check       # Biome + Tailwind class check + i18n lint + hardcoded-string scan
+bun run typecheck   # all four tsconfig projects, concurrently (scripts/typecheck.mjs)
+bun run test        # Vitest: renderer, shared, and pure-logic main suites
+bun run doctor      # react-doctor diagnostics
 ```
 
-The `electron --test` suites (`npm run test:db`, `test:workspace`, `test:github`, `test:linear`,
-`test:agent-runtime`, …) need the Electron runtime and are not part of `npm run test` — so they are the one
+The `electron --test` suites (`bun run test:db`, `test:workspace`, `test:github`, `test:linear`,
+`test:agent-runtime`, …) need the Electron runtime and are not part of `bun run test` — so they are the one
 set CI does not run either. Run the ones your change touches. `package.json` has the full list.
 
 ## House rules
@@ -57,10 +57,10 @@ set CI does not run either. Run the ones your change touches. `package.json` has
 The binding policies live in [`AGENTS.md`](./AGENTS.md) and [`.claude/rules/`](./.claude/rules) — those
 files are normative and this section is a pointer, not a second copy.
 
-- **npm only.** No `bun.lock`, `pnpm-lock.yaml`, or `yarn.lock`; hooks block the other package managers.
+- **Bun only.** No `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, or binary `bun.lockb`; hooks block the other package managers. `bun.lock` stays at `lockfileVersion: 1` (`bun run check:lockfile`), and never run `bun pm trust --all`. Use `bun run test` — plain `bun test` is Bun's own runner, not Vitest.
 - **Biome** is the only linter and formatter. No ESLint, no Prettier.
 - **Jotai** is the only app-level state solution.
-- **Tailwind scale**, not px-based arbitrary utilities — `w-[13px]` fails `npm run check`.
+- **Tailwind scale**, not px-based arbitrary utilities — `w-[13px]` fails `bun run check`.
 - **JSDoc on every function**, and no comments inside function bodies. See
   [`.claude/rules/jsdoc.md`](./.claude/rules/jsdoc.md) and [`.claude/rules/comments.md`](./.claude/rules/comments.md).
 - **Each `src/*` subtree has its own scoped `AGENTS.md`**, and it overrides the root file. `src/main` is
@@ -74,9 +74,9 @@ files are normative and this section is a pointer, not a second copy.
 ### Two rules that are easy to miss
 
 - **A new user-facing string ships translated.** Add the `t('ns:key', 'Default English')` call site, run
-  `npm run i18n:extract`, then hand-fill the new empty values in `src/renderer/lib/i18n/locales/ru/**`
+  `bun run i18n:extract`, then hand-fill the new empty values in `src/renderer/lib/i18n/locales/ru/**`
   **and** `src/renderer/lib/i18n/locales/el/**`. `locales/en/**` is generated — never hand-edit it. Check
-  with `npm run i18n:status`. The full contract is [`.claude/rules/i18n.md`](./.claude/rules/i18n.md).
+  with `bun run i18n:status`. The full contract is [`.claude/rules/i18n.md`](./.claude/rules/i18n.md).
 - **A new database migration registers its id in the test.** Migrations in
   `src/main/storage/database.ts` are numbered and append-only, and every id is asserted in
   `tests/main/database.test.ts`. Add to both in the same change, and never edit an existing migration.
@@ -101,7 +101,7 @@ src/
                 terminal, pi-rpc, menu-commands
 
 resources/      Shipped Pi extensions (pi-extensions/ensemblr-control.mts)
-playground/     Vite-only component preview harness (npm run dev:playground)
+playground/     Vite-only component preview harness (bun run dev:playground)
 docs/           Guide, ADRs, runtime references — see docs/README.md
 tests/          main/ · renderer/ · shared/ · fixtures/
 scripts/        Build and maintenance scripts

@@ -7,10 +7,10 @@ Closes #
 ## Checklist
 
 - [ ] The change was discussed in an issue first
-- [ ] `npm run check` passes
-- [ ] `npm run typecheck` passes
-- [ ] `npm run test` passes, plus any `electron --test` suite this change touches
-- [ ] New user-facing strings have `ru` and `el` filled (`npm run i18n:status`)
+- [ ] `bun run check` passes
+- [ ] `bun run typecheck` passes
+- [ ] `bun run test` passes, plus any `electron --test` suite this change touches
+- [ ] New user-facing strings have `ru` and `el` filled (`bun run i18n:status`)
 - [ ] A new migration id is registered in `tests/main/database.test.ts`
 - [ ] A contract or cross-cutting decision has an ADR under `docs/adr/`
 - [ ] Screenshots for UI changes

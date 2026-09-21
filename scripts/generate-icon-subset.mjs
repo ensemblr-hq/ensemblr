@@ -241,7 +241,7 @@ ${entries}
  * `credits:generate` and `i18n:extract` are each chased with a formatter.
  */
 function formatOutput() {
-	spawnSync('npx', ['biome', 'check', '--write', OUTPUT], {
+	spawnSync('bunx', ['biome', 'check', '--write', OUTPUT], {
 		cwd: ROOT,
 		stdio: 'inherit',
 	});

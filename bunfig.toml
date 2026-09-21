@@ -1,0 +1,14 @@
+[install]
+
+# Forge's PACKAGE_KEEP_* filters in forge.config.ts match flat
+# `/node_modules/<pkg>/` paths. Bun's isolated linker builds a symlinked
+# `node_modules/.bun/` store instead, which those filters would not match, so
+# the packaged app would ship without node-pty and the Claude Agent SDK. Bun
+# already defaults to "hoisted" for a workspace-free project, but pin it so a
+# future default change cannot break the package silently.
+linker = "hoisted"
+
+# Dependabot only parses the text lockfile. Bun 1.2+ writes bun.lock by
+# default; pin it so a binary bun.lockb can never appear and stop dependency
+# PRs without an error.
+saveTextLockfile = true

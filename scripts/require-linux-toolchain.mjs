@@ -14,7 +14,7 @@
 // survives local testing and breaks every terminal in the shipped AppImage.
 // Read the linkage back and refuse a binding that is not host-portable.
 //
-// The third is the one a bare `existsSync` misses. `npm ci` inside a Node
+// The third is the one a bare `existsSync` misses. `bun ci` inside a Node
 // container compiles node-pty against *Node's* ABI and writes no `.forge-meta`,
 // so the file exists and links against nothing but `/lib`. Forge then finds no
 // meta it recognises, shells out to node-gyp on the host anyway, and dies with
@@ -188,7 +188,7 @@ function findUnportableLinks(linkage) {
 }
 
 /**
- * Prints the toolchain state as a table, for `npm run diagnose:linux`. The
+ * Prints the toolchain state as a table, for `bun run diagnose:linux`. The
  * Electron row is the one that matters when a `NODE_MODULE_VERSION` mismatch is
  * being chased: the rebuild targets Electron's ABI, never the host Node's.
  * @param compiler - The resolved compiler, or null.
@@ -299,7 +299,7 @@ function containerFixLines(runtime) {
 
 	if (runtime) {
 		return [
-			'    • npm run rebuild:native   — build it in a throwaway Debian container',
+			'    • bun run rebuild:native   — build it in a throwaway Debian container',
 			`                                 via the ${runtime} already installed here`,
 		];
 	}
@@ -307,7 +307,7 @@ function containerFixLines(runtime) {
 	return [
 		'    • install podman or docker, then re-run — this builds node-pty in a',
 		'      throwaway Debian container on its own, installing nothing on the host',
-		'      (npm run rebuild:native does the same thing by hand)',
+		'      (bun run rebuild:native does the same thing by hand)',
 	];
 }
 
@@ -324,7 +324,7 @@ function refuseWithoutToolchain(state, missing, runtime) {
 		[
 			'',
 			`✖ node-pty is ${state}, and this host cannot build it: ${missing.join(', ')} missing.`,
-			'  node-pty ships no linux-x64 prebuild, so Forge compiles it from source —',
+			'  node-pty ships no Linux prebuild at all, so Forge compiles it from source —',
 			'  it will fail with a bare "node-gyp failed to rebuild".',
 			'',
 			'  Fix (pick one):',
@@ -367,7 +367,7 @@ function refuseUnportableBinding(unportable) {
 			'  AppImage while working perfectly in local testing. This is what pointing',
 			'  CXX at a Homebrew or Nix compiler produces.',
 			'',
-			'  Fix: rm -rf node_modules/node-pty/build && npm run rebuild:native',
+			'  Fix: rm -rf node_modules/node-pty/build && bun run rebuild:native',
 			'',
 		].join('\n'),
 	);

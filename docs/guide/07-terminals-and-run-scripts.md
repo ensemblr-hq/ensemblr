@@ -96,7 +96,7 @@ because the runtime overwrites it anyway.
 is allocated one port from a dedicated range (41000–41999), chosen
 deterministically from the workspace id and persisted, so it stays the same
 across restarts and never collides with a sibling workspace running the same dev
-server. A run script written as `PORT=$ENSEMBLR_PORT npm run dev` lets four
+server. A run script written as `PORT=$ENSEMBLR_PORT bun run dev` lets four
 workspaces of one repository serve at once.
 
 `ENSEMBLR_DEFAULT_BRANCH` is the only one that can be missing: if no base branch

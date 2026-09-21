@@ -4,7 +4,7 @@ How to install, set up, and use Ensemblr. If you want to *work on* Ensemblr
 rather than use it, start at [`../onboarding.md`](../onboarding.md) and
 [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) instead.
 
-Ensemblr runs on macOS with Apple silicon and on Linux with x86-64. You bring
+Ensemblr runs on macOS (Apple silicon, and Intel from the release after `0.1.19`) and on Linux with x86-64. You bring
 your own agent CLI — Pi or Claude Code, one is enough — plus `git` and an
 authenticated `gh`. It is pre-1.0, and this guide describes version
 [`0.1.19`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.19).

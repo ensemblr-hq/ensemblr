@@ -4,7 +4,11 @@ Date: 2026-07-15
 
 ## Status
 
-Accepted
+Superseded by [0073](./0073-move-the-package-manager-from-npm-to-bun.md) (2026-09-21).
+The repository is back on Bun as package manager and script runner, with Node 24
+still the runtime. The Node pin, the Vitest test split, and the `node-pty` ABI
+handling below survive; the choice of npm, `package-lock.json`, `.npmrc`, and the
+hook policy that blocked `bun` do not.
 
 Sibling to [0031](0031-strip-launch-context-env-and-single-instance-lock.md) and
 [0032](0032-channel-scoped-bundle-identity.md), which the same migration commit

@@ -10,8 +10,10 @@ Ensemblr resolves the Pi executable through the Pi executable service
 (`resolvePiExecutable` in `src/main/pi-runtime/pi-executable.ts`) — an npm-global
 install, Homebrew, or an explicitly configured path — never a hardcoded
 location. The original 2026-06-11 capture predates the Bun→npm migration
-([ADR 0038](../adr/0038-migrate-package-manager-bun-to-npm.md)); read the current
-install with `npm ls -g @earendil-works/pi-coding-agent`:
+([ADR 0038](../adr/0038-migrate-package-manager-bun-to-npm.md), itself superseded by
+[ADR 0073](../adr/0073-move-the-package-manager-from-npm-to-bun.md)); Pi is still
+installed globally through npm regardless of the repository's package manager, so
+read the current install with `npm ls -g @earendil-works/pi-coding-agent`:
 
 - `docs/rpc.md` — primary RPC mode documentation (cited below as `rpc.md`)
 - `dist/modes/rpc/rpc-mode.js` — RPC mode implementation

@@ -1,5 +1,5 @@
 // `electron-forge --platform=linux` cross-packages almost everything from macOS:
-// it downloads the linux-x64 Electron and the shell really is an ELF binary. The
+// it downloads the Linux Electron for the target architecture and the shell really is an ELF binary. The
 // one thing it cannot do is build a native module for a foreign platform.
 //
 // `node-pty` publishes prebuilds for darwin and win32 only, so Linux has to
@@ -66,7 +66,7 @@ console.error(
 	[
 		'',
 		`✖ A Linux package must be built on Linux, but this is ${process.platform}.`,
-		'  node-pty ships no linux-x64 prebuild, and @electron/rebuild cannot compile',
+		'  node-pty ships no Linux prebuild at all, and @electron/rebuild cannot compile',
 		'  one from here — Forge reports success and packages the host binary, so the',
 		'  AppImage would launch with every terminal broken.',
 		'',

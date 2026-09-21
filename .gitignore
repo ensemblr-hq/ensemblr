@@ -17,3 +17,6 @@ assets/avatar.png
 !.env.example
 *.p8
 *.p12
+
+# Verified AppImage runtime, fetched by scripts/fetch-appimage-runtime.mjs.
+.appimage-runtime/

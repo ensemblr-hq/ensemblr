@@ -27,7 +27,7 @@ MODULE=node_modules/node-pty
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 
 if [ "$(uname -s)" != "Linux" ]; then
-	echo "✖ rebuild-native-linux.sh builds a linux-x64 binding, but this is $(uname -s)." >&2
+	echo "✖ rebuild-native-linux.sh builds a Linux binding for this host's architecture, but this is $(uname -s)." >&2
 	echo "  Running it here would overwrite the host's own node-pty binding with one" >&2
 	echo "  this machine cannot load. Build the Linux artifact on Linux or in CI." >&2
 	exit 1
@@ -49,7 +49,7 @@ else
 fi
 
 if [ ! -d "$repo_root/node_modules/@electron/rebuild" ]; then
-	echo "✖ node_modules is missing @electron/rebuild — run npm ci first." >&2
+	echo "✖ node_modules is missing @electron/rebuild — run bun ci first." >&2
 	exit 1
 fi
 
@@ -76,7 +76,7 @@ fi
 
 # Rootless podman maps container root to the invoking user, so the output is
 # already owned correctly; rootful docker leaves it owned by root instead. That
-# is a failure, not a warning: the next `npm ci` on the host dies with EACCES on
+# is a failure, not a warning: the next `bun ci` on the host dies with EACCES on
 # a path nothing connects back to this step.
 #
 # Passing `--user` to the run would prevent it on rootful docker and break it
@@ -88,10 +88,10 @@ if [ "$owner" != "$(id -u)" ]; then
 	echo "" >&2
 	echo "✖ $MODULE/build is owned by uid $owner, not you ($(id -u))." >&2
 	echo "  Your container runtime runs as root, so the build output is unwritable" >&2
-	echo "  and the next npm ci will fail with EACCES. Fix with:" >&2
+	echo "  and the next bun ci will fail with EACCES. Fix with:" >&2
 	echo "    sudo chown -R $(id -u):$(id -g) $MODULE/build" >&2
 	echo "" >&2
-	echo "  Then re-run: npm run diagnose:linux" >&2
+	echo "  Then re-run: bun run diagnose:linux" >&2
 	echo "" >&2
 	exit 1
 fi
