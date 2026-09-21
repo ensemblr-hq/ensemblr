@@ -1,10 +1,10 @@
 // Type-check every TypeScript project concurrently.
 //
-// The four projects each `include` `src`, so chaining them with `&&` re-checks
-// the bulk of the program four times in a row. They are independent, so running
-// them at once collapses four serial passes into one wall-clock pass. Output is
-// buffered per project and flushed on completion, because four interleaved tsc
-// streams are unreadable.
+// The app projects each `include` `src`, so chaining them with `&&` re-checks
+// the bulk of the program several times in a row. They are independent, so
+// running them at once collapses the serial passes into one wall-clock pass.
+// Output is buffered per project and flushed on completion, because interleaved
+// tsc streams are unreadable.
 
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -19,6 +19,7 @@ const PROJECTS = [
 	{ label: 'scripts', project: 'tsconfig.scripts.json' },
 	{ label: 'tests', project: 'tsconfig.tests.json' },
 	{ label: 'demo', project: 'tsconfig.demo.json' },
+	{ label: 'ui', project: 'packages/ui/tsconfig.json' },
 ];
 
 /**
@@ -29,7 +30,7 @@ function resolveTypescriptBinary() {
 	const binary = path.join(repositoryRoot, 'node_modules', '.bin', 'tsc');
 	if (!existsSync(binary)) {
 		throw new Error(
-			`typecheck: ${binary} is missing. Run \`npm ci\` before type-checking.`,
+			`typecheck: ${binary} is missing. Run \`bun ci\` before type-checking.`,
 		);
 	}
 	return binary;

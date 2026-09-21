@@ -1,5 +1,8 @@
-import { cn } from '@/renderer/lib/utils';
+import type * as React from 'react';
 
+import { cn } from './class-names';
+
+/** Renders a theme-aware placeholder while content is loading. */
 function Skeleton({ className, ...props }: React.ComponentProps<'div'>) {
 	return (
 		<div

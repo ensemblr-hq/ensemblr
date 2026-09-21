@@ -11,10 +11,12 @@ describe('credits manifest', () => {
 		expect(CREDITS_PACKAGES).toEqual(buildCreditsManifest());
 	});
 
-	test('credits every direct dependency exactly once', () => {
-		const names = CREDITS_PACKAGES.map((entry) => entry.name);
+	test('credits every external direct dependency exactly once', () => {
+		const generated: Array<{ name: string }> = buildCreditsManifest();
+		const names = generated.map((entry) => entry.name);
 		expect(new Set(names).size).toBe(names.length);
 		expect(names.length).toBeGreaterThan(0);
+		expect(names).not.toContain('@ensemblr/ui');
 	});
 
 	test('every entry carries a license and an https project link', () => {

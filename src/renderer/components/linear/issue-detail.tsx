@@ -1,3 +1,4 @@
+import { Skeleton } from '@ensemblr/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ArrowLeftIcon, RefreshCwIcon } from 'lucide-react';
@@ -8,7 +9,6 @@ import { linearIssueQuery, refreshLinearIssue } from '@/renderer/api/ensemblr';
 import { ChatMessageText } from '@/renderer/components/chat-message-text';
 import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
-import { Skeleton } from '@/renderer/components/ui/skeleton';
 import { useLinearRefresh } from '@/renderer/hooks/linear/use-linear-refresh';
 import { describeLinearFailure } from '@/renderer/lib/linear';
 import { formatRelativeTimestamp } from '@/renderer/lib/workbench/relative-time';

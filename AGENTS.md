@@ -38,6 +38,7 @@ This repository enforces Bun for JavaScript and TypeScript package management. B
 - Use `bun run <script>` instead of `npm run <script>`, `pnpm run <script>`, or `yarn run <script>`.
 - Use `bunx <package>` instead of `npx`, `pnpx`, or `yarn dlx`.
 - Use `bun add <package>` (`bun add -d` for a dev dependency) and `bun remove <package>` for dependency changes.
+- The Electron desktop package intentionally remains at the repository root. Put future deployable applications under `apps/*` and runtime-neutral shared packages under `packages/*`; connect internal packages with `workspace:*`.
 - Do not create `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, or the binary `bun.lockb`. `bun.lock` (text) is the lockfile of record, and `bunfig.toml` sets `saveTextLockfile = true`.
 - `bun.lock` stays at `lockfileVersion: 1`. Dependabot-core's Bun parser raises on a higher version, so dependency PRs would stop arriving. Bun 1.4 stamps 2 on a lockfile regenerated from scratch, so never delete `bun.lock` and reinstall to "refresh" it. `bun run check:lockfile` (part of `bun run check`) enforces this; `docs/build-and-release.md#bun-and-node` records how the current file was produced and why a plain `bun install` without a lockfile silently re-resolves the whole graph.
 - When creating or updating `package.json`, set `packageManager` to a Bun version (`bun@1.4.2`).
@@ -53,7 +54,7 @@ This repository uses Biome instead of ESLint and Prettier.
 
 - Run `bun run check` before finishing changes that touch JavaScript, TypeScript, JSX, TSX, CSS, or JSON.
 - Use `bun run check:fix` to apply safe Biome fixes, including formatting and import organization.
-- Keep `bun run typecheck` as a separate verification step for TypeScript type errors. It checks four projects — the app (`tsconfig.json`), dev scripts (`tsconfig.scripts.json`), tests (`tsconfig.tests.json`), and demo mode (`tsconfig.demo.json`) — so `.ts` files under `scripts/` and `tests/` are type-checked even though `bunx tsx`/`node` and Vitest run them without checking. `scripts/typecheck.mjs` runs the four concurrently and names whichever failed; add a new project there rather than chaining another `tsc` call.
+- Keep `bun run typecheck` as a separate verification step for TypeScript type errors. It checks five projects — the app (`tsconfig.json`), dev scripts (`tsconfig.scripts.json`), tests (`tsconfig.tests.json`), demo mode (`tsconfig.demo.json`), and shared UI (`packages/ui/tsconfig.json`) — so `.ts` files under `scripts/`, `tests/`, and workspace packages are type-checked even when their runtime tools do not check types. `scripts/typecheck.mjs` runs the projects concurrently and names whichever failed; add a new project there rather than chaining another `tsc` call.
 - Do not add ESLint or Prettier configuration unless the user explicitly asks for it.
 
 ## Testing Policy
@@ -86,7 +87,7 @@ Vitest is the mandated test runner for renderer and shared tests. Bun is the pac
 - Use canonical Tailwind classes before arbitrary values. For example, use `text-xs` instead of `text-[0.75rem]`, `rounded-2xl` instead of `rounded-[0.375rem]`, and `rounded-sm` instead of `rounded-[0.125rem]`.
 - If a value is not available as a canonical Tailwind class, use rem-based arbitrary values instead of px-based arbitrary values, especially for typography: use `text-[0.8125rem]` instead of `text-[13px]`.
 - Prefer semantic or existing tokenized utilities over new arbitrary values when the design system already exposes the needed value.
-- `bun run check` runs `scripts/check-tailwind-classes.mjs`, which fails on square-bracket pixel utilities and known non-canonical arbitrary classes. It scans `src/renderer` only (`.css`, `.js`, `.jsx`, `.ts`, `.tsx`), so `playground/` is not covered. Update that script when adding another canonical class equivalence that agents should preserve.
+- `bun run check` runs `scripts/check-tailwind-classes.mjs`, which fails on square-bracket pixel utilities and known non-canonical arbitrary classes. It scans `src/renderer` and `packages/ui/src` (`.css`, `.js`, `.jsx`, `.ts`, `.tsx`), while `playground/` is not covered. Update that script when adding another canonical class equivalence that agents should preserve.
 
 ## Localization Policy
 

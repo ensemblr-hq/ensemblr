@@ -9,6 +9,7 @@ out/
 .playwright-cli/
 .playwright-mcp/
 .fallow/
+.vitest/
 .pi-capture-sandbox/
 coverage/
 assets/avatar.png

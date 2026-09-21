@@ -44,6 +44,7 @@
 		"src/renderer/state/*/index.ts",
 		"src/renderer/lib/*/index.ts",
 		"src/renderer/types/*/index.ts",
-		"src/renderer/components/**/index.ts"
+		"src/renderer/components/**/index.ts",
+		"packages/ui/src/index.ts"
 	]
 }
