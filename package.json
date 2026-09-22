@@ -202,7 +202,7 @@
 		"@vitejs/plugin-react": "6.1.1",
 		"@vitest/coverage-istanbul": "^5.0.1",
 		"dotenv": "^18.0.0",
-		"electron": "^44.3.0",
+		"electron": "^44.4.3",
 		"happy-dom": "^20.14.5",
 		"i18next-cli": "^1.74.1",
 		"node-abi": "^4.35.0",
