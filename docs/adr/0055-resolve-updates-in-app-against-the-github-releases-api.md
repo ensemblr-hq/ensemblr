@@ -11,6 +11,11 @@ Accepted
 document per target named `update-<platform>-<arch>.json`; the arm64 macOS name and
 shape are frozen because installed clients read it by that name.
 
+**Amended by [ADR 0076](0076-stand-the-in-app-updater-down-on-a-homebrew-owned-install.md)
+(2026-09-22).** A copy Homebrew installed is detected at launch and never
+updated in-app, whatever `automaticUpdates` says. The Homebrew case of the
+switch described below no longer depends on the user flipping it.
+
 Builds on [ADR 0054](0054-build-releases-in-ci-and-reserve-the-nightly-tag.md),
 whose tag scheme — `v<semver>` is a release, the literal `nightly` is the
 nightly, nothing else publishes — is the contract this reads. Extends

@@ -160,6 +160,28 @@ describe('SoftwareUpdateRows', () => {
 		expect(screen.getByRole('button')).toBeDisabled();
 	});
 
+	test('a Homebrew-installed copy names the brew command instead of offering a check', () => {
+		renderRow(
+			snapshot({
+				failure: {
+					code: 'update-managed-by-homebrew' satisfies UpdateFailureCode,
+					message:
+						'Homebrew installed this copy (cask "ensemblr"), so Homebrew updates it.',
+				},
+				state: 'unsupported',
+			}),
+		);
+
+		expect(
+			screen.getByText(
+				'This copy of Ensemblr was installed with Homebrew, so Homebrew, not Ensemblr, keeps it up to date. To get the latest version, run brew upgrade --cask ensemblr.',
+			),
+		).toBeInTheDocument();
+		expect(
+			screen.getByRole('button', { name: 'Check for updates' }),
+		).toBeDisabled();
+	});
+
 	test('the preference stays settable on a build that can never update', () => {
 		renderRow(
 			snapshot({

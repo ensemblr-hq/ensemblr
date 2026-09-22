@@ -378,6 +378,7 @@
 		"update-feed-rate-limited": "Το GitHub περιορίζει τη συχνότητα των ελέγχων ενημέρωσης. Το Ensemblr θα δοκιμάσει ξανά αργότερα.",
 		"update-feed-unreachable": "Το Ensemblr δεν μπόρεσε να συνδεθεί με το GitHub για έλεγχο ενημερώσεων.",
 		"update-install-failed": "Το Ensemblr δεν μπόρεσε να επανεκκινήσει για την εγκατάσταση της ενημέρωσης.",
+		"update-managed-by-homebrew": "Αυτό το αντίγραφο του Ensemblr εγκαταστάθηκε μέσω Homebrew, οπότε το ενημερώνει το Homebrew και όχι το ίδιο το Ensemblr. Για την πιο πρόσφατη έκδοση, εκτελέστε {{command}}.",
 		"update-not-in-applications": "Το Ensemblr ενημερώνεται μόνο από τον φάκελο «Εφαρμογές». Μετακινήστε το εκεί και ανοίξτε το ξανά.",
 		"update-unsupported-build": "Αυτή η έκδοση δεν μπορεί να ενημερωθεί.",
 		"update-verification-failed": "Η ληφθείσα ενημέρωση δεν ταίριαζε με το άθροισμα ελέγχου που δημοσίευσε το GitHub, οπότε απορρίφθηκε.",

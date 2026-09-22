@@ -12,6 +12,7 @@ function inputs(
 		appImagePath: null,
 		arch: 'arm64',
 		channel: 'release',
+		homebrewCask: null,
 		inApplicationsFolder: true,
 		packaged: true,
 		platform: 'darwin',
@@ -171,6 +172,34 @@ describe('checkUpdatePreconditions', () => {
 			capability: 'none',
 			failure: { code: 'update-not-in-applications' },
 		});
+	});
+
+	test('a copy Homebrew installed leaves every update to Homebrew', () => {
+		expect(
+			checkUpdatePreconditions(inputs({ homebrewCask: 'ensemblr' })),
+		).toMatchObject({
+			capability: 'none',
+			failure: {
+				code: 'update-managed-by-homebrew',
+				message: expect.stringContaining('brew upgrade --cask ensemblr'),
+			},
+		});
+	});
+
+	test('Homebrew ownership outranks being outside /Applications', () => {
+		const result = checkUpdatePreconditions(
+			inputs({ homebrewCask: 'ensemblr', inApplicationsFolder: false }),
+		);
+
+		expect(result.failure?.code).toBe('update-managed-by-homebrew');
+	});
+
+	test('a Linux build ignores Homebrew, which has no casks there', () => {
+		expect(
+			checkUpdatePreconditions(
+				inputs({ homebrewCask: 'ensemblr', platform: 'linux' }),
+			),
+		).toEqual({ capability: 'check-only', failure: null });
 	});
 
 	test('being unpackaged outranks being outside /Applications', () => {

@@ -78,6 +78,12 @@ export type AppFailureCode =
 	| WriteWorkspaceImageAttachmentFailureCode;
 
 /**
+ * The command a Homebrew-installed copy updates itself with, named by the
+ * official tap's cask. Main's own message carries the token it actually found.
+ */
+const HOMEBREW_UPGRADE_COMMAND = 'brew upgrade --cask ensemblr';
+
+/**
  * The headline each code renders as. A `Record` over the union rather than a
  * `switch`, so a code added in main or shared is a missing-key compile error
  * here instead of an English sentence leaking into a translated surface.
@@ -900,6 +906,12 @@ export const APP_FAILURE_TEXT: Record<
 		t(
 			'errors:failure.update-install-failed',
 			'Ensemblr could not restart into the update.',
+		),
+	'update-managed-by-homebrew': (t) =>
+		t(
+			'errors:failure.update-managed-by-homebrew',
+			'This copy of Ensemblr was installed with Homebrew, so Homebrew, not Ensemblr, keeps it up to date. To get the latest version, run {{command}}.',
+			{ command: HOMEBREW_UPGRADE_COMMAND },
 		),
 	'update-not-in-applications': (t) =>
 		t(
