@@ -119,6 +119,7 @@ export function checkUpdatePreconditions({
 		return refused(
 			'update-managed-by-homebrew',
 			`Homebrew installed this copy (cask "${homebrewCask}"), so Homebrew updates it: brew upgrade --cask ${homebrewCask}.`,
+			{ homebrewCask },
 		);
 	}
 	// Squirrel replaces the whole bundle in place, which a read-only DMG mount
@@ -137,11 +138,13 @@ export function checkUpdatePreconditions({
  * Builds the refusal shape, so every branch above reads as one line.
  * @param code - The failure category
  * @param message - English prose for the support bundle; the renderer translates the code
+ * @param details - Structured data the renderer's text for this code interpolates
  * @returns A `none` capability carrying that failure
  */
 function refused(
 	code: UpdateFailure['code'],
 	message: string,
+	details: Pick<UpdateFailure, 'homebrewCask'> = {},
 ): UpdatePreconditionResult {
-	return { capability: 'none', failure: { code, message } };
+	return { capability: 'none', failure: { code, message, ...details } };
 }

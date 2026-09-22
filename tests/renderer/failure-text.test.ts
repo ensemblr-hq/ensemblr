@@ -31,6 +31,25 @@ describe('failureText', () => {
 		expect(failureText(t, null)).toBeNull();
 		expect(failureText(t, undefined)).toBeNull();
 	});
+
+	test('names the cask main reported in the Homebrew headline', () => {
+		expect(
+			failureText(t, {
+				code: 'update-managed-by-homebrew',
+				homebrewCask: 'ensemblr-fork',
+				message: 'Homebrew installed this copy (cask "ensemblr-fork").',
+			}),
+		).toContain('brew upgrade --cask ensemblr-fork.');
+	});
+
+	test('falls back to the official cask when the Homebrew failure names none', () => {
+		expect(
+			failureText(t, {
+				code: 'update-managed-by-homebrew',
+				message: 'Homebrew installed this copy.',
+			}),
+		).toContain('brew upgrade --cask ensemblr.');
+	});
 });
 
 describe('failureDetail', () => {

@@ -165,6 +165,7 @@ describe('SoftwareUpdateRows', () => {
 			snapshot({
 				failure: {
 					code: 'update-managed-by-homebrew' satisfies UpdateFailureCode,
+					homebrewCask: 'ensemblr',
 					message:
 						'Homebrew installed this copy (cask "ensemblr"), so Homebrew updates it.',
 				},
@@ -180,6 +181,24 @@ describe('SoftwareUpdateRows', () => {
 		expect(
 			screen.getByRole('button', { name: 'Check for updates' }),
 		).toBeDisabled();
+	});
+
+	test('a copy from a renamed cask is told to upgrade that cask, not the official one', () => {
+		renderRow(
+			snapshot({
+				failure: {
+					code: 'update-managed-by-homebrew' satisfies UpdateFailureCode,
+					homebrewCask: 'ensemblr-fork',
+					message:
+						'Homebrew installed this copy (cask "ensemblr-fork"), so Homebrew updates it.',
+				},
+				state: 'unsupported',
+			}),
+		);
+
+		expect(
+			screen.getByText(/run brew upgrade --cask ensemblr-fork\.$/),
+		).toBeInTheDocument();
 	});
 
 	test('the preference stays settable on a build that can never update', () => {

@@ -1,15 +1,19 @@
 import type { TFunction } from 'i18next';
 
-import { APP_FAILURE_TEXT, type AppFailureCode } from './codes';
+import {
+	APP_FAILURE_TEXT,
+	type AppFailureCode,
+	type FailureTextParams,
+} from './codes';
 
 export type { AppFailureCode } from './codes';
 
 /**
  * The shape every main-process diagnostic and failure shares: a stable code the
  * renderer translates, and the English sentence main built for the support
- * bundle.
+ * bundle, plus whatever structured data the translated headline interpolates.
  */
-export interface CodedFailure {
+export interface CodedFailure extends FailureTextParams {
 	code: string;
 	message: string;
 	/**
@@ -36,7 +40,7 @@ export function failureText(
 		return null;
 	}
 	const authored = APP_FAILURE_TEXT[failure.code as AppFailureCode];
-	return authored ? authored(t) : failure.message;
+	return authored ? authored(t, failure) : failure.message;
 }
 
 /**

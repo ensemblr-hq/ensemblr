@@ -73,7 +73,9 @@ translated reason with the command, and so does the menu's check.
   `/usr/local/Caskroom` for a link that resolves to the running bundle and
   returns its token. It matches the link target, not the name `ensemblr`, so a
   renamed or forked cask still counts. Only Homebrew creates those links, so it
-  cannot match a copy Homebrew did not install.
+  cannot match a copy Homebrew did not install. The token rides on the failure
+  as `homebrewCask`, so the command the renderer names upgrades the cask that
+  actually owns the copy.
 - **It outranks the `/Applications` check.** Moving a Homebrew copy would not
   change who owns it. So `update-managed-by-homebrew` is reported before
   `update-not-in-applications`, and only on darwin. Linux has no casks.

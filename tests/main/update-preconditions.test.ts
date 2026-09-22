@@ -181,6 +181,7 @@ describe('checkUpdatePreconditions', () => {
 			capability: 'none',
 			failure: {
 				code: 'update-managed-by-homebrew',
+				homebrewCask: 'ensemblr',
 				message: expect.stringContaining('brew upgrade --cask ensemblr'),
 			},
 		});
