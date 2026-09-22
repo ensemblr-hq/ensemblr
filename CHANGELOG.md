@@ -9,9 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.21] - 2026-09-22
+
+Ensemblr 0.1.21 lets a user trust individual read-only tools for Plan Mode and the Concierge, and stops the in-app updater from fighting a Homebrew-owned install.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.21) ·
+[`.dmg` (Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.21/Ensemblr-0.1.21-arm64.dmg) ·
+[`.dmg` (Intel)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.21/Ensemblr-0.1.21-x64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.21/Ensemblr-0.1.21-x64.AppImage)
+
+### Added
+
+- **A user can trust individual read-only tools for Plan Mode and the Concierge.** Both guards refuse every tool the app cannot vouch for as read-only, which left a Pi user's own extensions refused with no way out. `providers.piReadOnlyTools` / `providers.claudeReadOnlyTools`, edited under Settings → Providers → Read-only tools, are consulted by both guards after their write and shell rules; the agent-control settings patch refuses to let a Concierge grant itself a writer through either list. Pi's `web_search`/`web_fetch` from `pi-web-access` are cleared by default for both guards, since their results and fetched pages land in Pi's own cache or a temp directory and cannot reach a workspace. [ADR 0075](./docs/adr/0075-let-the-user-vouch-for-read-only-tools.md). (#638)
+
+### Changed
+
+- **Dependencies moved to current patches** — Electron 44.3.0 → 44.4.3, `@tanstack/react-router` 1.170.33 → 1.170.38, `lucide-react` 1.43.0 → 1.47.0, the Lexical group, and a dev-dependencies group of five. (#631, #632, #633, #634, #635)
+
 ### Fixed
 
 - **A Homebrew install no longer ends up "damaged" after a restart.** The in-app updater and Homebrew both wrote the same `/Applications/Ensemblr.app`: Squirrel's ShipIt replaced the bundle with one unpacked from the release `.zip`, whose root folder is dated 1980, and Homebrew's `upgrade` and `reinstall` keep that folder and only swap what is inside it. After a later restart, macOS refused the app as damaged, and `brew reinstall` could not fix it because it kept the same folder. The updater now recognizes a copy Homebrew installed, from the link Homebrew leaves in its Caskroom, and does not update it at all. Settings → General names the `brew upgrade --cask` command for the cask it found (`ensemblr` from the official tap) in its place. To recover an install that is already damaged, delete `/Applications/Ensemblr.app` and then run `brew reinstall --cask ensemblr`. [ADR 0076](./docs/adr/0076-stand-the-in-app-updater-down-on-a-homebrew-owned-install.md). (#641)
+- **The v0.1.21 release run originally shipped macOS-only.** The `finalize` job had no `always()` guard, and GitHub's default `success()` job condition walks the whole transitive dependency chain rather than just direct `needs` — so the fast release path's legitimate `verify` skip skipped `finalize` too, taking the Linux `build-linux` job down with it since it gates on `finalize`. `finalize` now carries the same `always()` guard `build` and `build-linux` already had. (#643)
 
 ## [0.1.20] - 2026-09-21
 

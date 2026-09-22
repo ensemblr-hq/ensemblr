@@ -29,15 +29,24 @@ silicon or Intel — and declares macOS Ventura as a requirement, so `brew` refu
 on a machine that cannot run the app rather than installing something that will
 not open.
 
-The cask is marked `auto_updates true` because Ensemblr updates itself (see
-[Staying up to date](#staying-up-to-date)), so a plain `brew upgrade` leaves it
-alone — two updaters writing the same bundle is how an install gets corrupted.
-To hand the job to Homebrew instead, turn **Settings → General → Update Ensemblr
-automatically** off and upgrade explicitly:
+The cask used to be marked `auto_updates true`, on the assumption that a plain
+`brew upgrade` should leave a self-updating app alone. But `--greedy`, a named
+`brew upgrade --cask ensemblr`, and `brew reinstall` all ignore that flag, and
+two updaters writing the same bundle — Homebrew's cask install and the in-app
+updater's Squirrel-driven replace — is what corrupted an install and left
+macOS refusing it as damaged after a restart. The flag is gone from the tap as
+of Ensemblr 0.1.21. Instead, the app itself detects a Homebrew-owned copy and
+never updates it in-app (see [ADR
+0076](https://github.com/ensemblr-hq/ensemblr/blob/master/docs/adr/0076-stand-the-in-app-updater-down-on-a-homebrew-owned-install.md)):
+Settings → General names the command to run in its place, which is the same
+one that always worked for a Homebrew install:
 
 ```bash
-brew upgrade --cask --greedy ensemblr
+brew upgrade --cask ensemblr
 ```
+
+If an install is already stuck reading "damaged" from before this fix,
+delete `/Applications/Ensemblr.app` and run `brew reinstall --cask ensemblr`.
 
 ## Install script (Linux)
 
@@ -66,7 +75,7 @@ Nothing needs root and nothing is written outside `$HOME`:
 
 | Option | Does |
 | --- | --- |
-| `--version <tag>` | install a specific release, e.g. `--version v0.1.20` |
+| `--version <tag>` | install a specific release, e.g. `--version v0.1.21` |
 | `--nightly` | install the rolling canary build, **alongside** a release |
 | `--dir <path>` | where the AppImage goes |
 | `--no-desktop` | skip the launcher entry and the icons |
@@ -92,16 +101,16 @@ same file. `--check` exits `10` when there is something to install, distinct fro
 
 ## Download
 
-The current build is **`0.1.20`**:
+The current build is **`0.1.21`**:
 
-- [**`Ensemblr-0.1.20-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.20/Ensemblr-0.1.20-arm64.dmg)
+- [**`Ensemblr-0.1.21-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.21/Ensemblr-0.1.21-arm64.dmg)
   — the macOS disk image for Apple silicon. Open it and drag Ensemblr to `/Applications`.
-- [`Ensemblr-darwin-arm64-0.1.20.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.20/Ensemblr-darwin-arm64-0.1.20.zip)
+- [`Ensemblr-darwin-arm64-0.1.21.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.21/Ensemblr-darwin-arm64-0.1.21.zip)
   — the same `.app`, zipped, if you would rather not mount an image.
-- [**`Ensemblr-0.1.20-x64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.20/Ensemblr-0.1.20-x64.dmg)
-  and [`Ensemblr-darwin-x64-0.1.20.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.20/Ensemblr-darwin-x64-0.1.20.zip)
+- [**`Ensemblr-0.1.21-x64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.21/Ensemblr-0.1.21-x64.dmg)
+  and [`Ensemblr-darwin-x64-0.1.21.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.21/Ensemblr-darwin-x64-0.1.21.zip)
   — the same pair for Intel Macs. `0.1.19` and earlier are Apple-silicon only.
-- [**`Ensemblr-0.1.20-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.20/Ensemblr-0.1.20-x64.AppImage)
+- [**`Ensemblr-0.1.21-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.21/Ensemblr-0.1.21-x64.AppImage)
   — the Linux build, if you would rather place it yourself than run the
   [install script](#install-script-linux). One file, no installer:
 
@@ -140,7 +149,7 @@ it against the checksum on the release page if you want a check, or let the
 [install script](#install-script-linux) do it for you. Either way this is
 **pre-1.0** software, with breaking changes expected before 1.0.
 
-The app reports the full version, any prerelease suffix included — `0.1.20` in
+The app reports the full version, any prerelease suffix included — `0.1.21` in
 **Settings → General**, and on macOS in the bundle's
 `CFBundleShortVersionString`. It matches the release tag, so a bug report only
 has to quote one string.
