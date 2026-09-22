@@ -257,7 +257,16 @@ jobs:
   #
   # macOS, not Linux: the cask edit below uses BSD `sed -i ''`.
   finalize:
+    # Same `always()` shape as `build` and `build-linux` — GitHub's default
+    # `success()` job condition checks the whole transitive dependency chain,
+    # not just direct `needs`, so `verify` reading `skipped` on the fast path
+    # (already-verified) skipped this job too even though `build` succeeded,
+    # taking `build-linux` down with it since it gates on `finalize`.
     needs: build
+    if: >-
+      ${{ always()
+      && !startsWith(github.event.release.tag_name, 'nightly')
+      && needs.build.result == 'success' }}
     runs-on: macos-15
     timeout-minutes: 15
     env:
