@@ -11,6 +11,7 @@ export type UpdateFailureCode =
 	| 'update-feed-rate-limited'
 	| 'update-feed-unreachable'
 	| 'update-install-failed'
+	| 'update-managed-by-homebrew'
 	| 'update-not-in-applications'
 	| 'update-unsupported-build'
 	| 'update-verification-failed';
@@ -18,6 +19,11 @@ export type UpdateFailureCode =
 /** Typed failure envelope carried on an errored update status. */
 export interface UpdateFailure {
 	code: UpdateFailureCode;
+	/**
+	 * Token of the Homebrew cask that owns this copy, so the renderer can name
+	 * the command that updates it. Set only with `update-managed-by-homebrew`.
+	 */
+	homebrewCask?: string;
 	message: string;
 }
 

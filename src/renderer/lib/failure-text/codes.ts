@@ -78,17 +78,40 @@ export type AppFailureCode =
 	| WriteWorkspaceImageAttachmentFailureCode;
 
 /**
+ * Structured data a failure carries beside its code for the headline to
+ * interpolate. Each field is set only with the codes whose text names it.
+ */
+export interface FailureTextParams {
+	/** Token of the Homebrew cask that owns this copy, with `update-managed-by-homebrew`. */
+	homebrewCask?: string;
+}
+
+/** The official tap's cask token, for a Homebrew failure that names none. */
+const OFFICIAL_HOMEBREW_CASK = 'ensemblr';
+
+/**
+ * The command that updates a Homebrew-installed copy, naming the cask main
+ * found it under so a renamed or forked cask is not told to upgrade another.
+ * @param cask - Token of the owning cask, when main reported one
+ * @returns The `brew` command line to show
+ */
+function homebrewUpgradeCommand(cask: string | undefined): string {
+	return `brew upgrade --cask ${cask ?? OFFICIAL_HOMEBREW_CASK}`;
+}
+
+/**
  * The headline each code renders as. A `Record` over the union rather than a
  * `switch`, so a code added in main or shared is a missing-key compile error
  * here instead of an English sentence leaking into a translated surface.
  *
  * The text says what went wrong, not which path it happened to; main's own
  * message keeps the runtime specifics and the diagnostic rows show it beneath
- * this line.
+ * this line. A headline that needs runtime data reads it from
+ * {@link FailureTextParams}, never from that English message.
  */
 export const APP_FAILURE_TEXT: Record<
 	AppFailureCode,
-	(t: TFunction) => string
+	(t: TFunction, params: FailureTextParams) => string
 > = {
 	'archive-aborted-by-hook': (t) =>
 		t(
@@ -900,6 +923,12 @@ export const APP_FAILURE_TEXT: Record<
 		t(
 			'errors:failure.update-install-failed',
 			'Ensemblr could not restart into the update.',
+		),
+	'update-managed-by-homebrew': (t, { homebrewCask }) =>
+		t(
+			'errors:failure.update-managed-by-homebrew',
+			'This copy of Ensemblr was installed with Homebrew, so Homebrew, not Ensemblr, keeps it up to date. To get the latest version, run {{command}}.',
+			{ command: homebrewUpgradeCommand(homebrewCask) },
 		),
 	'update-not-in-applications': (t) =>
 		t(

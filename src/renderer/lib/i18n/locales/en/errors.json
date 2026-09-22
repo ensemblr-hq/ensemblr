@@ -378,6 +378,7 @@
 		"update-feed-rate-limited": "GitHub is rate-limiting update checks. Ensemblr will try again later.",
 		"update-feed-unreachable": "Ensemblr could not reach GitHub to check for updates.",
 		"update-install-failed": "Ensemblr could not restart into the update.",
+		"update-managed-by-homebrew": "This copy of Ensemblr was installed with Homebrew, so Homebrew, not Ensemblr, keeps it up to date. To get the latest version, run {{command}}.",
 		"update-not-in-applications": "Ensemblr updates itself only from the Applications folder. Move it there and reopen it.",
 		"update-unsupported-build": "This build cannot update itself.",
 		"update-verification-failed": "The downloaded update did not match the checksum GitHub published for it, so it was discarded.",

@@ -131,6 +131,7 @@ export default defineConfig({
 						'tests/main/session-summary-writer.test.ts',
 						'tests/main/launch-env.test.ts',
 						'tests/main/appimage-installer.test.ts',
+						'tests/main/homebrew-cask.test.ts',
 						'tests/main/release-feed.test.ts',
 						'tests/main/update-feed-workflow-contract.test.ts',
 						'tests/main/update-preconditions.test.ts',

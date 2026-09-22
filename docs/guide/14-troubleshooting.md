@@ -42,6 +42,30 @@ app rather than failing.
 later launches work normally. Double-clicking the first time does not offer that
 choice — the right-click path is the one that works.
 
+### "Ensemblr is damaged" after a restart, on a Homebrew install
+
+**Cause.** The in-app updater and Homebrew both wrote the same
+`/Applications/Ensemblr.app`. The updater replaces the whole bundle with one
+unpacked from the release `.zip`, and Finder shows that bundle's folder as
+created in 1980. `brew upgrade` and `brew reinstall` swap new contents into the
+existing folder but keep the folder itself. After a restart, macOS can refuse the
+result as damaged. It keeps refusing through every `brew reinstall`, because the
+folder stays.
+
+**Fix.** In Finder, move `Ensemblr.app` from Applications to the Trash, then
+reinstall:
+
+```bash
+brew reinstall --cask ensemblr
+```
+
+The bundle holds no settings, workspaces, or history, so nothing is lost. After
+that, let only Homebrew update this copy. On 0.1.20, turn **Settings → General
+→ Update Ensemblr automatically** off and upgrade with
+`brew upgrade --cask ensemblr`. Releases after 0.1.20 detect a Homebrew copy and
+turn the in-app updater off themselves
+([ADR 0076](../adr/0076-stand-the-in-app-updater-down-on-a-homebrew-owned-install.md)).
+
 ## Building
 
 ### `bun run make` exits 0 and `out/` is empty

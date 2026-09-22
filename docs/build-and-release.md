@@ -998,7 +998,7 @@ mistake to anyone who did not hit the underlying constraint:
 | Stanza | Why |
 | --- | --- |
 | `depends_on macos: :ventura` | Electron 44's floor, per the `44-x-y` branch README — Electron 44 removed macOS 12 support, so the `:monterey` this stanza carried under Electron 43 now offers the build to machines that cannot run it. Homebrew deprecated the `">= :ventura"` string form; `brew style` rewrites it. Re-read the branch README on every Electron major: the floor moves without a release note. |
-| `auto_updates true` | The in-app updater owns the bundle. `brew upgrade` therefore skips it, and only `--greedy` overrides that. Two updaters writing one bundle is how an install gets corrupted. |
+| `auto_updates true` | **Stale; remove it from the tap.** It was added because the in-app updater owned the bundle and a plain `brew upgrade` should skip it. But `--greedy`, a named `brew upgrade --cask ensemblr`, and `brew reinstall` all ignore it, and two updaters writing one bundle left an install that Gatekeeper refused as damaged after a restart. Since [ADR 0076](./adr/0076-stand-the-in-app-updater-down-on-a-homebrew-owned-install.md), the app detects a Homebrew-owned copy and never updates it in-app, so this stanza now just hides Ensemblr from `brew outdated`. |
 | a custom `:github_releases` livecheck | The block accepts tagged prereleases but keys off a leading `v`, which excludes the rolling `nightly` tag and keeps the cask on the highest semver release. |
 | `zap trash:` without the root directory | The root (`~/Ensemblr` by default) holds cloned repositories and worktrees. A `zap` that took it would delete the user's work. |
 
@@ -1169,6 +1169,7 @@ silently.
 - [ADR 0055](./adr/0055-resolve-updates-in-app-against-the-github-releases-api.md) — why the in-app updater resolves its own feed, and why `update.electronjs.org` cannot serve either channel.
 - [ADR 0056](./adr/0056-ship-a-linux-amd64-appimage.md) — why the Linux artifact is an AppImage, and why its window controls are app-drawn. Its updates-never-install rule is amended by ADR 0065 below.
 - [ADR 0065](./adr/0065-install-linux-updates-in-app-by-swapping-the-appimage.md) — why a Linux build now stages a checksum-verified AppImage and swaps it in on restart, and when it still only links at the release page.
+- [ADR 0076](./adr/0076-stand-the-in-app-updater-down-on-a-homebrew-owned-install.md) — why a copy Homebrew installed is never updated in-app, and how to recover an install macOS calls damaged.
 - [ADR 0031](./adr/0031-strip-launch-context-env-and-single-instance-lock.md), [ADR 0032](./adr/0032-channel-scoped-bundle-identity.md) — the Dock-flash fixes.
 - [ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) — why the Claude binary is not packaged.
 - [`../.claude/rules/stack.md`](../.claude/rules/stack.md) — the pinned versions, the two `external` packages, and the `legacy-peer-deps` constraint.

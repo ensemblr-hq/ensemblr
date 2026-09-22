@@ -1,5 +1,5 @@
 import { accessSync, constants } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { app, autoUpdater } from 'electron';
 import { resolveBuildChannel } from '../../shared/build-channel';
 import type { UpdateStatusSnapshot } from '../../shared/ipc/contracts/update';
@@ -8,6 +8,7 @@ import {
 	type AppImageInstaller,
 	createAppImageInstaller,
 } from './appimage-installer';
+import { findHomebrewCask } from './homebrew-cask';
 import { createReleaseFeed } from './release-feed';
 import { checkUpdatePreconditions } from './update-preconditions';
 import {
@@ -63,6 +64,7 @@ export function createAppUpdateService({
 		appImagePath,
 		arch: process.arch,
 		channel,
+		homebrewCask: readHomebrewCask(),
 		inApplicationsFolder: readIsInApplicationsFolder(),
 		packaged: app.isPackaged,
 		platform: process.platform,
@@ -157,6 +159,20 @@ function isWritableDirectory(directory: string): boolean {
 	} catch {
 		return false;
 	}
+}
+
+/**
+ * Names the Homebrew cask that installed the running bundle, which sits three
+ * levels above the executable (`<App>.app/Contents/MacOS/<exe>`). Skipped off
+ * darwin, where there are no casks, and on an unpackaged build, whose
+ * executable is Electron's own rather than a bundle anything installed.
+ * @returns The owning cask's token, or null
+ */
+function readHomebrewCask(): string | null {
+	if (process.platform !== 'darwin' || !app.isPackaged) {
+		return null;
+	}
+	return findHomebrewCask(resolve(app.getPath('exe'), '..', '..', '..'));
 }
 
 /**

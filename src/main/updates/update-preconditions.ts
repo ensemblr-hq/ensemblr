@@ -23,6 +23,11 @@ export interface UpdatePreconditionInputs {
 	arch: string;
 	/** The channel this build was cut on. */
 	channel: BuildChannel;
+	/**
+	 * Token of the Homebrew cask that installed this `.app`, or null when
+	 * Homebrew did not. Only read on darwin, where casks exist.
+	 */
+	homebrewCask: string | null;
 	/** Whether the `.app` lives in `/Applications`, per `app.isInApplicationsFolder()`. */
 	inApplicationsFolder: boolean;
 	/** Whether this is a packaged build, per `app.isPackaged`. */
@@ -51,9 +56,9 @@ export interface UpdatePreconditionResult {
  * Decides how far this build may take an update, naming the reason when it may
  * take none.
  *
- * Every refusal here is permanent for the life of the process — none of the
- * four inputs can change while the app runs — so the updater reports it once
- * and stops checking rather than failing on every tick.
+ * Every refusal here is permanent for the life of the process — the inputs are
+ * read once at launch, and none of them changes while the app runs — so the
+ * updater reports it once and stops checking rather than failing on every tick.
  * @param inputs - Facts about the running build
  * @returns The capability, plus a coded failure when it is `none`
  */
@@ -62,6 +67,7 @@ export function checkUpdatePreconditions({
 	appImagePath,
 	arch,
 	channel,
+	homebrewCask,
 	inApplicationsFolder,
 	packaged,
 	platform,
@@ -106,6 +112,16 @@ export function checkUpdatePreconditions({
 			failure: null,
 		};
 	}
+	// Homebrew upgrades by swapping the contents of the existing `.app`, so a
+	// bundle Squirrel also replaced can end up one Gatekeeper refuses as damaged
+	// (ADR 0076). Moving it would not change who owns it, so this comes first.
+	if (homebrewCask !== null) {
+		return refused(
+			'update-managed-by-homebrew',
+			`Homebrew installed this copy (cask "${homebrewCask}"), so Homebrew updates it: brew upgrade --cask ${homebrewCask}.`,
+			{ homebrewCask },
+		);
+	}
 	// Squirrel replaces the whole bundle in place, which a read-only DMG mount
 	// cannot support. Failing here names the fix; failing later looks like a
 	// broken updater.
@@ -122,11 +138,13 @@ export function checkUpdatePreconditions({
  * Builds the refusal shape, so every branch above reads as one line.
  * @param code - The failure category
  * @param message - English prose for the support bundle; the renderer translates the code
+ * @param details - Structured data the renderer's text for this code interpolates
  * @returns A `none` capability carrying that failure
  */
 function refused(
 	code: UpdateFailure['code'],
 	message: string,
+	details: Pick<UpdateFailure, 'homebrewCask'> = {},
 ): UpdatePreconditionResult {
-	return { capability: 'none', failure: { code, message } };
+	return { capability: 'none', failure: { code, message, ...details } };
 }
