@@ -379,11 +379,15 @@ the presentation work:
   `Sonnet`), which reads as ambiguous, so `claude-opus-5[1m]` renders as
   `Opus 5`.
 - Appends `PINNED_MODELS` — releases Claude Code accepts as an explicit `--model`
-  id but does not advertise (Fable 5.1, Opus 4.8, Opus 4.7, Sonnet 4.6) — deduped
-  by release key against any alias that already covers them. Fable is pinned
-  rather than advertised because `supportedModels()` lists only the moving
-  aliases, and the newest line is exactly the one a chat most often wants to
-  name outright.
+  id but does not advertise (Fable 5.1, Opus 5, Opus 4.8, Opus 4.7, Sonnet 4.6) —
+  deduped by release key against any alias that already covers them. Fable was
+  pinned rather than advertised because `supportedModels()` listed only the
+  moving aliases, and the newest line is exactly the one a chat most often wants
+  to name outright; Claude Code 2.1.280 now advertises it as
+  `claude-fable-5-1[1m]`, and the dedupe hides the pin there. An alias that
+  moves on to a new release takes the old one out of `supportedModels()`, so the
+  release it left needs a pinned row or it vanishes from the picker — Opus 5 was
+  added when `opus[1m]` moved to Opus 5.5.
 - Orders by `FAMILY_ORDER = ['fable', 'opus', 'sonnet', 'haiku']`, then newest
   version first.
 - Stamps every row with vendor `claude-code` and `agentProvider: 'claude'`;

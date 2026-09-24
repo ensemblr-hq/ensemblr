@@ -191,10 +191,69 @@ describe('the Claude catalog appends the pinned releases', () => {
 
 		expect(models.map((model) => model.id)).toEqual([
 			'claude-fable-5-1',
+			'claude-opus-5',
 			'opus[1m]',
 			'claude-opus-4-7',
 			'sonnet',
 		]);
+	});
+});
+
+/** What Claude Code 2.1.280 reports once the Opus alias has moved on to 5.5. */
+const OPUS_5_5_ROWS: readonly ModelInfo[] = [
+	modelInfo({
+		displayName: 'Default (recommended)',
+		resolvedModel: 'claude-opus-5-5[1m]',
+		value: 'default',
+	}),
+	modelInfo({
+		displayName: 'Opus (1M context)',
+		resolvedModel: 'claude-opus-5-5[1m]',
+		value: 'opus[1m]',
+	}),
+	modelInfo({
+		displayName: 'Fable',
+		resolvedModel: 'claude-fable-5-1',
+		value: 'claude-fable-5-1[1m]',
+	}),
+	modelInfo({
+		displayName: 'Sonnet',
+		resolvedModel: 'claude-sonnet-5',
+		value: 'sonnet',
+	}),
+	modelInfo({
+		displayName: 'Haiku',
+		resolvedModel: 'claude-haiku-4-5-20251001',
+		value: 'haiku',
+	}),
+];
+
+describe('the Claude catalog keeps a release the alias has moved away from', () => {
+	it('lists Opus 5 under its own id once the alias resolves to Opus 5.5', () => {
+		expect(
+			presentClaudeModels(OPUS_5_5_ROWS).map((model) => [
+				model.id,
+				model.displayName,
+			]),
+		).toEqual([
+			['claude-fable-5-1[1m]', 'Fable 5.1'],
+			['opus[1m]', 'Opus 5.5'],
+			['claude-opus-5', 'Opus 5'],
+			['claude-opus-4-8', 'Opus 4.8'],
+			['claude-opus-4-7', 'Opus 4.7'],
+			['sonnet', 'Sonnet 5'],
+			['claude-sonnet-4-6', 'Sonnet 4.6'],
+			['haiku', 'Haiku 4.5'],
+		]);
+	});
+
+	it('keeps one Opus 5 row while the alias still resolves to it', () => {
+		const models = presentClaudeModels(ALIAS_ROWS);
+
+		expect(
+			models.filter((model) => model.displayName === 'Opus 5'),
+		).toHaveLength(1);
+		expect(models.map((model) => model.id)).not.toContain('claude-opus-5');
 	});
 });
 
