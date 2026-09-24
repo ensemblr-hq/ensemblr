@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.22] - 2026-09-24
+
+Ensemblr 0.1.22 fixes Opus 5 disappearing from the Claude model picker.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.22) ·
+[`.dmg` (Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.22/Ensemblr-0.1.22-arm64.dmg) ·
+[`.dmg` (Intel)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.22/Ensemblr-0.1.22-x64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.22/Ensemblr-0.1.22-x64.AppImage)
+
+### Fixed
+
+- **Opus 5 is back in the Claude model picker.** Claude Code 2.1.280 resolves the `opus[1m]` alias to `claude-opus-5-5[1m]`, so the picker row that used to read "Opus 5" now correctly reads "Opus 5.5" — but `supportedModels()` no longer lists Opus 5 at all, and `PINNED_MODELS` had no row for it, so Opus 5 disappeared from the picker even though the API still serves `claude-opus-5`. `claude-opus-5` is now pinned as "Opus 5"; the release-key dedupe still hides the pin on an older binary whose alias resolves to Opus 5, so no account sees two Opus 5 rows. (#645)
+
 ## [0.1.21] - 2026-09-22
 
 Ensemblr 0.1.21 lets a user trust individual read-only tools for Plan Mode and the Concierge, and stops the in-app updater from fighting a Homebrew-owned install.
