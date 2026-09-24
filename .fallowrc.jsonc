@@ -8,12 +8,12 @@
 		"src/preload/preload.ts",
 		"src/renderer/main.tsx",
 		"forge.config.ts",
-		// Read by the `i18n:*` npm scripts (i18next-cli), not imported by src.
+		// Read by the `i18n:*` package scripts (i18next-cli), not imported by src.
 		"i18next.config.ts",
 		"vite.main.config.mts",
 		"vite.preload.config.mts",
 		"vite.renderer.config.mts",
-		// Dev-only preview harness, served by `npm run dev:playground`. The config
+		// Dev-only preview harness, served by `bun run dev:playground`. The config
 		// reaches playground/index.html through a `/playground/` redirect string,
 		// which is not a resolvable import edge, so the module the page loads is
 		// named directly the same way src/renderer/main.tsx is above.
@@ -28,7 +28,7 @@
 		// Vitest runs renderer tests directly; treat each file as an entry so
 		// fallow doesn't flag them as unused.
 		"tests/**/*.test.{ts,tsx}",
-		// Dev tooling scripts run directly via `node` (.mjs) or `npx tsx` (.ts);
+		// Dev tooling scripts run directly via `node` (.mjs) or `bunx tsx` (.ts);
 		// treat each as an entry so fallow doesn't flag them as unused files.
 		"scripts/**/*.{mjs,ts}",
 		// Pi extensions are loaded at runtime by the Pi child via
@@ -60,7 +60,8 @@
 		"src/renderer/state/*/index.ts",
 		"src/renderer/lib/*/index.ts",
 		"src/renderer/types/*/index.ts",
-		"src/renderer/components/**/index.ts"
+		"src/renderer/components/**/index.ts",
+		"packages/ui/src/index.ts"
 	],
 
 	"ignorePatterns": [
@@ -71,7 +72,7 @@
 		".demo/**",
 		// Demo mode is a screenshot harness, not part of the product: a separate
 		// Electron entrypoint that renders the shipped renderer against scripted
-		// fixtures, launched by `npm run dev:demo` rather than by Forge. Nothing
+		// fixtures, launched by `bun run dev:demo` rather than by Forge. Nothing
 		// under src/ imports it and the packaged app carries none of it, which
 		// `tests/renderer/demo-isolation.test.ts` enforces in both directions.
 		// Analysing it as first-party is therefore all noise: a scenario is a
@@ -111,7 +112,7 @@
 	// reads those as production imports and wants them moved to `dependencies`,
 	// but they are build-time only — Vite/PostCSS compiles the CSS at build, so
 	// devDependencies is correct and the renderer bundle needs none at runtime.
-	// i18next-cli is invoked only through the `i18n:*` npm scripts, so there is
+	// i18next-cli is invoked only through the `i18n:*` package scripts, so there is
 	// no import edge for fallow to follow.
 	// node-abi is required at build time by scripts/require-linux-toolchain.mjs,
 	// which resolves the ABI @electron/rebuild stamps into node-pty's
@@ -174,7 +175,7 @@
 		// coverage fallow estimates the coverage term from export references and
 		// the cubed factor dominates — an 11-line function with cyclomatic 5 lands
 		// on the complexity list purely for looking untested. Point at the Istanbul
-		// report `npx vitest run --coverage` writes so the scores are measured
+		// report `bunx vitest run --coverage` writes so the scores are measured
 		// instead. Absent (a fresh clone that has not run coverage yet) fallow
 		// falls back to the estimate and still exits 0, so this is safe to commit.
 		"coverage": "coverage/coverage-final.json",

@@ -13,6 +13,7 @@
 			"!.agents/skills/ai-elements/scripts",
 			"!.claude",
 			"!.demo",
+			"!.vitest",
 			"!src/components/ui",
 			"!src/hooks/ui",
 			"!src/renderer/fixtures/pi-captures",

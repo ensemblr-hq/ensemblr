@@ -10,6 +10,19 @@ Each `src` subtree also carries a scoped `AGENTS.md`
 [preload](../src/preload/AGENTS.md) · [shared](../src/shared/AGENTS.md)) with the
 binding rules for that boundary. Those files are normative; this one is a map.
 
+## Repository packages
+
+The repository is a Bun workspaces monorepo. The Electron desktop package stays
+at the root because Forge, native-module packaging, release automation, and the
+runtime configs all use that package as their working directory. New deployable
+applications belong under `apps/*`; runtime-neutral libraries belong under
+`packages/*` and are linked with `workspace:*`.
+
+`packages/ui` owns React primitives that can run in both desktop and web
+renderers. It must not import Electron APIs, `window.ensemblr`, desktop Jotai
+state, or `src/shared` IPC contracts. The consuming renderer supplies semantic
+theme tokens and registers the package as a Tailwind source.
+
 ## Entry points
 
 | Runtime | Entry | Bundled by |
@@ -17,6 +30,7 @@ binding rules for that boundary. Those files are normative; this one is a map.
 | Main process (Node) | `src/main/main.ts` | `vite.main.config.mts` |
 | Preload (context-isolated) | `src/preload/preload.ts` | `vite.preload.config.mts` |
 | Renderer (React) | `src/renderer/main.tsx` → `#root` | `vite.renderer.config.mts` |
+| Shared UI package | `packages/ui/src/index.ts` | Consuming application |
 | Dev preview harness | `playground/main.tsx` | `vite.playground.config.mts` |
 | Demo mode (screenshot capture) | `demo/demo-main.ts` + `demo/demo-preload.ts` → `demo/main.tsx` | `vite.demo-main.config.mts`, `vite.demo.config.mts` |
 

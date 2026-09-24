@@ -1,3 +1,4 @@
+import { Skeleton } from '@ensemblr/ui';
 import { Icon } from '@iconify/react';
 import type { TFunction } from 'i18next';
 import { FolderGitIcon, GitBranchIcon, MessageSquareIcon } from 'lucide-react';
@@ -9,7 +10,6 @@ import {
 	PopoverContent,
 } from '@/renderer/components/ui/popover';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
-import { Skeleton } from '@/renderer/components/ui/skeleton';
 import { WorkspaceFileIcon } from '@/renderer/components/workbench-shell/review-files/workspace-file-icon';
 import { getWorkspaceFileIconNameForPath } from '@/renderer/lib/workbench';
 import type {

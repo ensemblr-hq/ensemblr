@@ -43,7 +43,7 @@ read.
 
 ```bash
 bun run check       # Biome + Tailwind class check + i18n lint + hardcoded-string scan
-bun run typecheck   # all four tsconfig projects, concurrently (scripts/typecheck.mjs)
+bun run typecheck   # all five tsconfig projects, concurrently (scripts/typecheck.mjs)
 bun run test        # Vitest: renderer, shared, and pure-logic main suites
 bun run doctor      # react-doctor diagnostics
 ```
@@ -100,6 +100,8 @@ src/
                 agent-control, harness registry (agents.ts), scripts, plan-mode, keymap,
                 terminal, pi-rpc, menu-commands
 
+packages/ui/    Runtime-neutral React primitives shared through @ensemblr/ui
+apps/           Future deployable applications; the desktop app stays at the root
 resources/      Shipped Pi extensions (pi-extensions/ensemblr-control.mts)
 playground/     Vite-only component preview harness (bun run dev:playground)
 docs/           Guide, ADRs, runtime references — see docs/README.md

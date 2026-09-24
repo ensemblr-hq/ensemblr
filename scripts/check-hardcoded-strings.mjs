@@ -20,7 +20,10 @@ import { fileURLToPath } from 'node:url';
 import { findingsForFile } from './hardcoded-strings-scan.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const SCAN_ROOT = join(ROOT, 'src', 'renderer');
+const SCAN_ROOTS = [
+	join(ROOT, 'src', 'renderer'),
+	join(ROOT, 'packages', 'ui', 'src'),
+];
 
 /** Trees the localization policy exempts, matched against the repo-relative path. */
 const EXCLUDED_PATHS = [
@@ -86,7 +89,7 @@ function sourcesUnder(entry, absolute) {
 }
 
 /**
- * Recursively collects the renderer's TypeScript sources, skipping excluded trees.
+ * Recursively collects user-interface TypeScript sources, skipping excluded trees.
  * @param dir - Directory to walk
  * @returns Absolute paths of every file to check
  */
@@ -101,12 +104,14 @@ function collectSourceFiles(dir) {
 	return found;
 }
 
-const findings = collectSourceFiles(SCAN_ROOT).flatMap((absolute) => {
-	const repoPath = toRepoPath(absolute);
-	return AGENT_FACING_PATHS.includes(repoPath)
-		? []
-		: findingsForFile(repoPath, readFileSync(absolute, 'utf8'));
-});
+const findings = SCAN_ROOTS.flatMap((root) => collectSourceFiles(root)).flatMap(
+	(absolute) => {
+		const repoPath = toRepoPath(absolute);
+		return AGENT_FACING_PATHS.includes(repoPath)
+			? []
+			: findingsForFile(repoPath, readFileSync(absolute, 'utf8'));
+	},
+);
 
 if (findings.length > 0) {
 	console.error(

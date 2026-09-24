@@ -1,3 +1,4 @@
+import { Skeleton } from '@ensemblr/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
@@ -10,7 +11,6 @@ import {
 	linearMetadataQuery,
 	refreshLinearIssues,
 } from '@/renderer/api/ensemblr';
-import { Skeleton } from '@/renderer/components/ui/skeleton';
 import { useLinearRefresh } from '@/renderer/hooks/linear/use-linear-refresh';
 import { useDebouncedValue } from '@/renderer/hooks/use-debounced-value';
 import {

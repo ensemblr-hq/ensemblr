@@ -9,6 +9,7 @@
         "@atlaskit/pragmatic-drag-and-drop": "^3.1.0",
         "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.2.0",
         "@base-ui/react": "^1.8.0",
+        "@ensemblr/ui": "workspace:*",
         "@iconify/react": "^6.0.2",
         "@lexical/react": "^0.51.0",
         "@modelcontextprotocol/sdk": "^1.30.0",
@@ -88,6 +89,17 @@
         "typescript": "^7.0.2",
         "vite": "^8.3.0",
         "vitest": "^5.0.1",
+      },
+    },
+    "packages/ui": {
+      "name": "@ensemblr/ui",
+      "version": "0.0.0",
+      "dependencies": {
+        "clsx": "^2.1.1",
+        "tailwind-merge": "^3.7.0",
+      },
+      "peerDependencies": {
+        "react": "^19.3.0",
       },
     },
   },
@@ -298,6 +310,8 @@
     "@electron/universal": ["@electron/universal@2.0.3", "", { "dependencies": { "@electron/asar": "^3.3.1", "@malept/cross-spawn-promise": "^2.0.0", "debug": "^4.3.1", "dir-compare": "^4.2.0", "fs-extra": "^11.1.1", "minimatch": "^9.0.3", "plist": "^3.1.0" } }, ""],
 
     "@electron/windows-sign": ["@electron/windows-sign@1.2.2", "", { "dependencies": { "cross-dirname": "^0.1.0", "debug": "^4.3.4", "fs-extra": "^11.1.1", "minimist": "^1.2.8", "postject": "^1.0.0-alpha.6" }, "bin": { "electron-windows-sign": "bin/electron-windows-sign.js" } }, ""],
+
+    "@ensemblr/ui": ["@ensemblr/ui@workspace:packages/ui"],
 
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.28.1", "", { "os": "aix", "cpu": "ppc64" }, "sha512-Svl7tq8k/08+p6CXPpRjQ1fKX+1odH/BQbb48fV6fj3CWHhsoIOoY87w1oHXm0qEpkIK3ZfVgp0hed3XBXzXMQ=="],
 

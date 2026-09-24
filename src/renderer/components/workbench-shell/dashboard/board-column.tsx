@@ -1,9 +1,9 @@
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { Skeleton } from '@ensemblr/ui';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
-import { Skeleton } from '@/renderer/components/ui/skeleton';
 import { cn } from '@/renderer/lib/utils';
 import {
 	BOARD_STATUS_PRESENTATION,

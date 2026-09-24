@@ -1,3 +1,4 @@
+import { Skeleton } from '@ensemblr/ui';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { useAtom } from 'jotai';
 import { PanelLeftIcon } from 'lucide-react';
@@ -14,7 +15,6 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from '@/renderer/components/ui/sheet';
-import { Skeleton } from '@/renderer/components/ui/skeleton';
 import {
 	Tooltip,
 	TooltipContent,
