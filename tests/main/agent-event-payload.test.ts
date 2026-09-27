@@ -12,6 +12,55 @@ import type { AgentEvent } from '../../src/main/agent-runtime/agent-types.ts';
 const AT = '2026-08-15T12:00:00.000Z';
 
 describe('eventPayload', () => {
+	it('keeps the class a runtime tagged and the credential names it reported', () => {
+		const event: AgentEvent = {
+			at: AT,
+			error: {
+				code: 'adapter-failure',
+				credentialEnvVars: ['ANTHROPIC_API_KEY'],
+				failureClass: 'account-restricted',
+				message: 'The Claude API rejected the credentials Claude Code sent.',
+				recoverable: false,
+			},
+			type: 'error',
+		};
+
+		expect(eventPayload(event)).toEqual({
+			error: {
+				code: 'adapter-failure',
+				credentialEnvVars: ['ANTHROPIC_API_KEY'],
+				detail: null,
+				failureClass: 'account-restricted',
+				message: 'The Claude API rejected the credentials Claude Code sent.',
+				recoverable: false,
+				resetsAt: null,
+			},
+			kind: 'error',
+		});
+	});
+
+	it('classifies an untagged error from its prose and carries no credential names', () => {
+		const event: AgentEvent = {
+			at: AT,
+			error: {
+				code: 'adapter-failure',
+				message: '401 Unauthorized',
+				recoverable: false,
+			},
+			type: 'error',
+		};
+
+		const payload = eventPayload(event);
+
+		expect(payload).toMatchObject({
+			error: { failureClass: 'credentials' },
+			kind: 'error',
+		});
+		expect(
+			payload.kind === 'error' && 'credentialEnvVars' in payload.error,
+		).toBe(false);
+	});
+
 	it('carries a plan-limit window through unchanged', () => {
 		const event: AgentEvent = {
 			at: AT,

@@ -31,12 +31,14 @@ export type AgentFailureIcon =
 	| 'gauge'
 	| 'key-round'
 	| 'layers'
+	| 'package-x'
 	| 'power-off'
 	| 'scissors'
 	| 'server-crash'
 	| 'shield-alert'
 	| 'terminal'
 	| 'triangle-alert'
+	| 'user-lock'
 	| 'wifi-off';
 
 /** Everything the timeline needs to draw one designed failure row. */
@@ -63,6 +65,13 @@ type FailurePresentation = Pick<
 const FAILURE_PRESENTATION: Readonly<
 	Record<AgentFailureClass, FailurePresentation>
 > = {
+	// Settings leads because switching to another account or key there is the
+	// one fix inside Ensemblr; the hold itself is lifted on the provider's side.
+	'account-restricted': {
+		actions: ['open-provider-settings', 'retry'],
+		icon: 'user-lock',
+		severity: 'danger',
+	},
 	'context-overflow': {
 		actions: ['fork'],
 		icon: 'layers',
@@ -71,6 +80,13 @@ const FAILURE_PRESENTATION: Readonly<
 	credentials: {
 		actions: ['open-provider-settings', 'retry'],
 		icon: 'key-round',
+		severity: 'danger',
+	},
+	// No Continue: the runtime would ask for the same missing model again. Retry
+	// re-sends with whatever model the composer holds once another is picked.
+	'model-unavailable': {
+		actions: ['retry', 'open-provider-settings'],
+		icon: 'package-x',
 		severity: 'danger',
 	},
 	network: {
@@ -149,12 +165,22 @@ const FAILURE_PRESENTATION: Readonly<
 const FAILURE_TITLE: Readonly<
 	Record<AgentFailureClass, (t: TFunction) => string>
 > = {
+	'account-restricted': (t) =>
+		t(
+			'errors:agent-failure.account-restricted.title',
+			'The provider has restricted this account',
+		),
 	'context-overflow': (t) =>
 		t('errors:agent-failure.context-overflow.title', 'This chat is too long'),
 	credentials: (t) =>
 		t(
 			'errors:agent-failure.credentials.title',
 			'The provider rejected your credentials',
+		),
+	'model-unavailable': (t) =>
+		t(
+			'errors:agent-failure.model-unavailable.title',
+			'The model is not available',
 		),
 	network: (t) =>
 		t('errors:agent-failure.network.title', 'Could not reach the provider'),
@@ -212,6 +238,11 @@ const FAILURE_TITLE: Readonly<
 const FAILURE_BODY: Readonly<
 	Record<AgentFailureClass, (t: TFunction, resetsAt: string | null) => string>
 > = {
+	'account-restricted': (t) =>
+		t(
+			'errors:agent-failure.account-restricted.body',
+			'The account is on hold or needs verification, so the provider will not serve it. Resolve it with the provider or switch accounts in settings, then send the turn again.',
+		),
 	'context-overflow': (t) =>
 		t(
 			'errors:agent-failure.context-overflow.body',
@@ -221,6 +252,11 @@ const FAILURE_BODY: Readonly<
 		t(
 			'errors:agent-failure.credentials.body',
 			'Sign in again or update this runtime’s API key, then send the turn again.',
+		),
+	'model-unavailable': (t) =>
+		t(
+			'errors:agent-failure.model-unavailable.body',
+			'The provider does not offer the model this chat uses, or not to this account. Pick another model, then send the turn again.',
 		),
 	network: (t) =>
 		t(
@@ -292,6 +328,31 @@ const FAILURE_BODY: Readonly<
 			'The agent could not start in this workspace’s folder. Check that the folder still exists.',
 		),
 };
+
+/**
+ * Names the credential variables a rejected runtime was started with. A stale
+ * one outranks the saved login and shows up on no settings screen, so without
+ * this the row sends the reader to sign in again to no effect.
+ * @param t - Translator bound to the active language
+ * @param names - Variable names the runtime reported, never their values
+ * @returns The hint, or null when the runtime named none
+ */
+export function describeCredentialEnvVars(
+	t: TFunction,
+	names: readonly string[] | undefined,
+): string | null {
+	if (!names?.length) {
+		return null;
+	}
+	return t('errors:agent-failure.credentials.env-hint', {
+		count: names.length,
+		defaultValue_one:
+			'This runtime was started with {{vars, list}} set, and it signs in with that variable instead of your saved login. Remove the variable or fix its value, then start a new chat. If your shell profile sets it, restart Ensemblr first.',
+		defaultValue_other:
+			'This runtime was started with {{vars, list}} set, and it signs in with those variables instead of your saved login. Remove them or fix their values, then start a new chat. If your shell profile sets them, restart Ensemblr first.',
+		vars: names,
+	});
+}
 
 /**
  * Builds the designed presentation of one failure class: the headline, the

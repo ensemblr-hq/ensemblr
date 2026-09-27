@@ -3,6 +3,7 @@ import type {
 	SDKAssistantMessageError,
 } from '@anthropic-ai/claude-agent-sdk';
 
+import type { AgentFailureClass } from '../../shared/agent-failure.ts';
 import type { AgentError } from '../agent-runtime/agent-types.ts';
 
 /**
@@ -30,36 +31,70 @@ const UNRECOVERABLE_RETRY_LIMIT = 2;
  */
 const UNRECOVERABLE_STATUSES: ReadonlySet<number> = new Set([401, 403, 404]);
 
-/** Cause sentence for rejected credentials, also used for a bare 401 or 403. */
-const AUTHENTICATION_CAUSE =
-	'The Claude API rejected the credentials Claude Code sent (authentication failed).';
-
-/** Cause sentence for a bare 404 whose cause the runtime did not name. */
-const NOT_FOUND_CAUSE =
-	'The Claude API could not find the model or endpoint Claude Code asked for.';
-
 /**
- * The runtime's own sentence for each retry cause that waiting cannot fix. The
- * wording is load-bearing: `classifyAgentFailure` reads it to pick the designed
- * row, so the credential causes say "credentials" or "authentication", billing
- * says "billing", and none of them uses a word another probe claims first.
+ * How one futile retry cause reads: the runtime's English sentence, kept for the
+ * row's disclosure and support bundles, and the class the row is designed for.
  */
-const UNRECOVERABLE_CAUSES: Readonly<
-	Partial<Record<SDKAssistantMessageError, string>>
-> = {
-	account_on_hold: 'The Claude account behind these credentials is on hold.',
-	authentication_failed: AUTHENTICATION_CAUSE,
-	billing_error: 'The Claude API reported a billing problem with this account.',
-	cloud_credential_error:
-		'The cloud provider rejected the credentials Claude Code sent.',
-	model_not_found: 'The Claude API does not know the model this chat uses.',
-	oauth_org_not_allowed:
-		'The organization behind this OAuth login does not allow Claude Code.',
-	verification_required:
-		'The Claude account behind these credentials needs verification.',
+interface FutileRetryCause {
+	failureClass: AgentFailureClass;
+	sentence: string;
+}
+
+/** Rejected credentials, also used for a bare 401 or 403. */
+const AUTHENTICATION_CAUSE: FutileRetryCause = {
+	failureClass: 'credentials',
+	sentence:
+		'The Claude API rejected the credentials Claude Code sent (authentication failed).',
 };
 
-/** Said after every cause, so the row explains why the spinner stopped early. */
+/** A bare 404 whose cause the runtime did not name. */
+const NOT_FOUND_CAUSE: FutileRetryCause = {
+	failureClass: 'model-unavailable',
+	sentence:
+		'The Claude API could not find the model or endpoint Claude Code asked for.',
+};
+
+/**
+ * Every retry cause that waiting cannot fix. The class is set here rather than
+ * read back out of the sentence, because the runtime named the cause
+ * structurally and the row it earns should not hang on wording.
+ *
+ * A billing failure keeps the `rate-limit` row the taxonomy gives every other
+ * spending wall: its Settings action is where the plan is checked, and once the
+ * account is paid up Continue picks the stopped turn back up.
+ */
+const UNRECOVERABLE_CAUSES: Readonly<
+	Partial<Record<SDKAssistantMessageError, FutileRetryCause>>
+> = {
+	account_on_hold: {
+		failureClass: 'account-restricted',
+		sentence: 'The Claude account behind these credentials is on hold.',
+	},
+	authentication_failed: AUTHENTICATION_CAUSE,
+	billing_error: {
+		failureClass: 'rate-limit',
+		sentence: 'The Claude API reported a billing problem with this account.',
+	},
+	cloud_credential_error: {
+		failureClass: 'credentials',
+		sentence: 'The cloud provider rejected the credentials Claude Code sent.',
+	},
+	model_not_found: {
+		failureClass: 'model-unavailable',
+		sentence: 'The Claude API does not know the model this chat uses.',
+	},
+	oauth_org_not_allowed: {
+		failureClass: 'credentials',
+		sentence:
+			'The organization behind this OAuth login does not allow Claude Code.',
+	},
+	verification_required: {
+		failureClass: 'account-restricted',
+		sentence: 'The Claude account behind these credentials needs verification.',
+	},
+};
+
+/** Said after every cause, so the disclosure explains why the spinner stopped early. */
 const STOPPED_SUFFIX = 'Retrying will not fix this, so the turn was stopped.';
 
 /** The fields of an `api_retry` frame the watch reads. */
@@ -69,18 +104,22 @@ type ApiRetryFrame = Pick<
 >;
 
 /**
- * Counts the runtime's retries of one request and says when they are futile.
- * One instance per session; the normalizer resets it whenever a response gets
- * through, so only an unbroken run of rejections counts.
+ * Counts the runtime's retries within one turn and says when they are futile.
+ * One instance per session; once it stops a turn it stays quiet until the next
+ * turn re-arms it, so the cause is reported once however many frames follow.
  */
 export interface ApiRetryWatch {
+	/** Whether the watch has stopped the current turn. */
+	hasStopped: () => boolean;
+	/** Forgets the run of rejections because a response got through; a stop already made still holds. */
+	noteResponse: () => void;
 	/**
 	 * Records one retry frame.
-	 * @returns The fatal error that stops the turn, or null while retrying can still help.
+	 * @returns The fatal error the first time the run proves futile; null while retrying can still help and for every frame after the stop.
 	 */
 	observe: (frame: ApiRetryFrame) => AgentError | null;
-	/** Forgets the current run of rejections. */
-	reset: () => void;
+	/** Re-arms the watch for a new turn, forgetting both the rejections and the stop. */
+	rearm: () => void;
 }
 
 /**
@@ -91,16 +130,24 @@ export interface ApiRetryWatch {
  * and reports each attempt only as an `api_retry` frame. For an overloaded
  * server that wait is worth it; for a rejected key it only keeps the chat
  * spinning for minutes before the same rejection lands as the answer.
- * @param credentialEnvVars - Credential variables set in the runtime's environment, named in the hint an authentication failure carries.
+ * @param credentialEnvVars - Credential variables set in the runtime's environment, named by an authentication failure.
  * @returns A watch bound to one session.
  */
 export function createApiRetryWatch(
 	credentialEnvVars: readonly string[],
 ): ApiRetryWatch {
 	let rejections = 0;
+	let stopped = false;
 
 	return {
+		hasStopped: () => stopped,
+		noteResponse: () => {
+			rejections = 0;
+		},
 		observe: (frame) => {
+			if (stopped) {
+				return null;
+			}
 			if (!isUnrecoverable(frame)) {
 				rejections = 0;
 				return null;
@@ -109,11 +156,12 @@ export function createApiRetryWatch(
 			if (rejections < UNRECOVERABLE_RETRY_LIMIT) {
 				return null;
 			}
-			rejections = 0;
+			stopped = true;
 			return toFatalError(frame, credentialEnvVars);
 		},
-		reset: () => {
+		rearm: () => {
 			rejections = 0;
+			stopped = false;
 		},
 	};
 }
@@ -145,11 +193,11 @@ function isUnrecoverable(frame: ApiRetryFrame): boolean {
 }
 
 /**
- * Looks up the sentence for a retry cause the runtime reported.
+ * Looks up a retry cause the runtime reported.
  * @param error - The frame's `error` field.
- * @returns The cause sentence, or null for a cause that may clear on its own.
+ * @returns The cause, or null for one that may clear on its own.
  */
-function readCause(error: unknown): string | null {
+function readCause(error: unknown): FutileRetryCause | null {
 	if (
 		typeof error !== 'string' ||
 		!Object.hasOwn(UNRECOVERABLE_CAUSES, error)
@@ -160,12 +208,12 @@ function readCause(error: unknown): string | null {
 }
 
 /**
- * Picks the headline for a cause the runtime did not name structurally, from
- * the HTTP status alone.
+ * Picks the cause for a failure the runtime did not name structurally, from the
+ * HTTP status alone.
  * @param status - The frame's HTTP status.
- * @returns The cause sentence for that status.
+ * @returns The cause for that status.
  */
-function causeFromStatus(status: number | null): string {
+function causeFromStatus(status: number | null): FutileRetryCause {
 	return status === 404 ? NOT_FOUND_CAUSE : AUTHENTICATION_CAUSE;
 }
 
@@ -180,24 +228,12 @@ function isAuthenticationFailure(frame: ApiRetryFrame): boolean {
 }
 
 /**
- * Explains which credential variables Claude Code was started with, because
- * the runtime prefers them over the login the user believes it is using.
- * @param names - Credential variables set in the runtime's environment.
- * @returns The hint paragraph, or null when none is set.
- */
-function credentialHint(names: readonly string[]): string | null {
-	if (names.length === 0) {
-		return null;
-	}
-	const subject = names.join(' and ');
-	const verb = names.length === 1 ? 'is' : 'are';
-	const pronoun = names.length === 1 ? 'it' : 'them';
-	return `${subject} ${verb} set in the environment Ensemblr started Claude Code with, and Claude Code authenticates with ${pronoun} instead of the login \`claude /login\` stores. Remove ${pronoun} or set a valid value, then start a new chat. If the variable comes from your login environment, restart Ensemblr first.`;
-}
-
-/**
- * Builds the fatal error for a run of futile retries: the cause as the runtime's
- * sentence, and the frame's own fields plus any credential hint as detail.
+ * Builds the fatal error for a run of futile retries. Fatal rather than
+ * recoverable because the timeline surfaces fatal errors only, and this row is
+ * the point: without it the chat spins through the backoff and shows nothing.
+ *
+ * The credential variables travel as names for the renderer to explain in the
+ * reader's language, rather than as an English paragraph in the detail.
  * @param frame - The retry frame that tripped the watch.
  * @param credentialEnvVars - Credential variables set in the runtime's environment.
  * @returns The error the timeline renders as a failure row.
@@ -211,14 +247,14 @@ function toFatalError(
 		frame.error_status === null
 			? 'no HTTP response'
 			: `HTTP ${frame.error_status}`;
-	const attempt = `Claude API error: ${String(frame.error)} (${status}), retry ${frame.attempt} of ${frame.max_retries}.`;
-	const hint = isAuthenticationFailure(frame)
-		? credentialHint(credentialEnvVars)
-		: null;
+	const namesCredentials =
+		isAuthenticationFailure(frame) && credentialEnvVars.length > 0;
 	return {
 		code: 'adapter-failure',
-		detail: [attempt, hint].filter(Boolean).join('\n\n'),
-		message: `${cause} ${STOPPED_SUFFIX}`,
+		detail: `Claude API error: ${String(frame.error)} (${status}), retry ${frame.attempt} of ${frame.max_retries}.`,
+		failureClass: cause.failureClass,
+		message: `${cause.sentence} ${STOPPED_SUFFIX}`,
 		recoverable: false,
+		...(namesCredentials ? { credentialEnvVars: [...credentialEnvVars] } : {}),
 	};
 }

@@ -278,6 +278,64 @@ describe('RuntimeErrorRow', () => {
 		expect(screen.queryByText(/^Resets/)).toBeNull();
 	});
 
+	test('names the credential variables outranking the saved login in the row itself', () => {
+		render(
+			<RuntimeErrorRow
+				failure={{
+					credentialEnvVars: ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'],
+					failureClass: 'credentials',
+					message: 'Rejected.',
+				}}
+				handlers={ALL_HANDLERS}
+			/>,
+		);
+
+		const hint = screen.getByText(/started with .* set/);
+		expect(hint).toHaveAttribute('data-role', 'credential-hint');
+		expect(hint.textContent).toContain(
+			'ANTHROPIC_API_KEY and CLAUDE_CODE_OAUTH_TOKEN',
+		);
+		expect(hint.textContent).toContain('those variables');
+	});
+
+	test('shows no credential hint when the runtime named no variable', () => {
+		const { container } = render(
+			<RuntimeErrorRow
+				failure={{ failureClass: 'credentials', message: 'Rejected.' }}
+				handlers={ALL_HANDLERS}
+			/>,
+		);
+
+		expect(container.querySelector('[data-role="credential-hint"]')).toBeNull();
+	});
+
+	test('offers settings rather than Continue on a restricted account or a missing model', () => {
+		const { unmount } = render(
+			<RuntimeErrorRow
+				failure={{ failureClass: 'account-restricted', message: 'On hold.' }}
+				handlers={ALL_HANDLERS}
+			/>,
+		);
+
+		expect(
+			screen.getByText('The provider has restricted this account'),
+		).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Open settings' })).toBeVisible();
+		expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
+		unmount();
+
+		render(
+			<RuntimeErrorRow
+				failure={{ failureClass: 'model-unavailable', message: 'No model.' }}
+				handlers={ALL_HANDLERS}
+			/>,
+		);
+
+		expect(screen.getByText('The model is not available')).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Send again' })).toBeVisible();
+		expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
+	});
+
 	test('leaves a class with no workable recovery without a button row', () => {
 		render(
 			<RuntimeErrorRow

@@ -1,6 +1,6 @@
 import type { Query, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { describe, expect, it, vi } from 'vitest';
-
+import { eventPayload } from '../../src/main/agent-runtime/agent-session-persistence.ts';
 import type {
 	AgentAdapterSession,
 	AgentError,
@@ -13,12 +13,12 @@ import {
 } from '../../src/main/claude-agent/api-retry-failure.ts';
 import { createClaudeAgentAdapter } from '../../src/main/claude-agent/claude-agent-adapter.ts';
 import { createSdkMessageNormalizer } from '../../src/main/claude-agent/sdk-message-normalizer.ts';
-import { classifyAgentFailure } from '../../src/shared/agent-failure.ts';
 import { CONTEXT_USAGE } from './helpers/claude-context-usage.ts';
 
 const SESSION_ID = 'agent-session-retry';
 const WORKSPACE_CWD = '/tmp/ensemblr/retry/ws';
 const SECRET_KEY = 'sk-ant-not-a-real-key-0000';
+const AT = '2026-09-27T12:00:00.000Z';
 
 interface RetryFrameInput {
 	attempt?: number;
@@ -117,7 +117,7 @@ describe('api retry watch', () => {
 		expect(second?.code).toBe('adapter-failure');
 		expect(second?.detail).toContain('HTTP 401');
 		expect(second?.detail).toContain('retry 2 of 10');
-		expect(classifyAgentFailure(second as AgentError)).toBe('credentials');
+		expect(second?.failureClass).toBe('credentials');
 	});
 
 	it('never stops on causes that waiting can clear', () => {
@@ -147,11 +147,11 @@ describe('api retry watch', () => {
 		expect(results).toEqual([null, null, null]);
 	});
 
-	it('restarts the count on reset, which the normalizer calls when a response gets through', () => {
+	it('restarts the count when a response gets through', () => {
 		const watch = createApiRetryWatch([]);
 
 		observeAll(watch, [{ error: 'authentication_failed', error_status: 401 }]);
-		watch.reset();
+		watch.noteResponse();
 		const [afterReset] = observeAll(watch, [
 			{ error: 'authentication_failed', error_status: 401 },
 		]);
@@ -167,7 +167,7 @@ describe('api retry watch', () => {
 			{ error: 'unknown', error_status: 401 },
 		]);
 
-		expect(classifyAgentFailure(second as AgentError)).toBe('credentials');
+		expect(second?.failureClass).toBe('credentials');
 	});
 
 	it('leaves a 400 to the runtime, whose retry after a context overflow is the repair', () => {
@@ -191,18 +191,18 @@ describe('api retry watch', () => {
 		]);
 
 		expect(second?.message).toMatch(/model or endpoint/);
-		expect(second?.detail).not.toContain('ANTHROPIC_API_KEY');
-		expect(classifyAgentFailure(second as AgentError)).toBe('unknown');
+		expect(second?.credentialEnvVars).toBeUndefined();
+		expect(second?.failureClass).toBe('model-unavailable');
 	});
 
 	it.each([
 		['oauth_org_not_allowed', 403, 'credentials'],
-		['account_on_hold', 403, 'credentials'],
-		['verification_required', 403, 'credentials'],
+		['account_on_hold', 403, 'account-restricted'],
+		['verification_required', 403, 'account-restricted'],
 		['cloud_credential_error', null, 'credentials'],
 		['billing_error', 400, 'rate-limit'],
-		['model_not_found', 404, 'unknown'],
-	] as const)('classifies %s as %s', (error, status, expected) => {
+		['model_not_found', 404, 'model-unavailable'],
+	] as const)('tags %s as %s', (error, status, expected) => {
 		const watch = createApiRetryWatch([]);
 
 		const [, second] = observeAll(watch, [
@@ -211,7 +211,10 @@ describe('api retry watch', () => {
 		]);
 
 		expect(second).not.toBeNull();
-		expect(classifyAgentFailure(second as AgentError)).toBe(expected);
+		expect(second?.failureClass).toBe(expected);
+		expect(
+			eventPayload({ at: AT, error: second as AgentError, type: 'error' }),
+		).toMatchObject({ error: { failureClass: expected } });
 	});
 
 	it('names a credential variable in the environment on an authentication failure', () => {
@@ -222,8 +225,9 @@ describe('api retry watch', () => {
 			{ error: 'authentication_failed', error_status: 401 },
 		]);
 
-		expect(second?.detail).toMatch(/ANTHROPIC_API_KEY is set/);
-		expect(classifyAgentFailure(second as AgentError)).toBe('credentials');
+		expect(second?.credentialEnvVars).toEqual(['ANTHROPIC_API_KEY']);
+		expect(second?.detail).not.toContain('ANTHROPIC_API_KEY');
+		expect(second?.failureClass).toBe('credentials');
 	});
 
 	it('leaves the credential hint off a failure that is not about authentication', () => {
@@ -234,7 +238,36 @@ describe('api retry watch', () => {
 			{ error: 'billing_error', error_status: 400 },
 		]);
 
-		expect(second?.detail).not.toContain('ANTHROPIC_API_KEY');
+		expect(second?.credentialEnvVars).toBeUndefined();
+	});
+
+	it('stays quiet after the stop, even past a response, until the next turn re-arms it', () => {
+		const watch = createApiRetryWatch([]);
+		const rejection = { error: 'authentication_failed', error_status: 401 };
+
+		const [, stop, afterStop] = observeAll(watch, [
+			rejection,
+			rejection,
+			rejection,
+		]);
+		watch.noteResponse();
+		const [afterResponse, secondAfterResponse] = observeAll(watch, [
+			rejection,
+			rejection,
+		]);
+
+		expect(stop).not.toBeNull();
+		expect([afterStop, afterResponse, secondAfterResponse]).toEqual([
+			null,
+			null,
+			null,
+		]);
+		expect(watch.hasStopped()).toBe(true);
+
+		watch.rearm();
+		const [, rearmed] = observeAll(watch, [rejection, rejection]);
+
+		expect(rearmed).not.toBeNull();
 	});
 });
 
@@ -298,7 +331,7 @@ describe('normalizer api_retry handling', () => {
 		const errors = errorsOf(events);
 		expect(errors).toHaveLength(1);
 		expect(errors[0]?.recoverable).toBe(false);
-		expect(errors[0]?.detail).toContain('ANTHROPIC_API_KEY');
+		expect(errors[0]?.credentialEnvVars).toEqual(['ANTHROPIC_API_KEY']);
 		expect(stops()).toBe(1);
 	});
 
@@ -324,6 +357,69 @@ describe('normalizer api_retry handling', () => {
 
 		expect(errorsOf(events)).toEqual([]);
 		expect(statusesOf(events)).toEqual(['idle']);
+	});
+
+	it('keeps the stop through a steer and a late response, so the result adds no second row', () => {
+		const { normalizer, stops } = createNormalizer();
+		normalizer.beginTurn();
+		normalizer.normalize(
+			retryFrame({
+				attempt: 1,
+				error: 'authentication_failed',
+				error_status: 401,
+			}),
+		);
+		normalizer.normalize(
+			retryFrame({
+				attempt: 2,
+				error: 'authentication_failed',
+				error_status: 401,
+			}),
+		);
+
+		normalizer.beginTurn();
+		normalizer.normalize(textDelta());
+		const events = [
+			retryFrame({
+				attempt: 3,
+				error: 'authentication_failed',
+				error_status: 401,
+			}),
+			retryFrame({
+				attempt: 4,
+				error: 'authentication_failed',
+				error_status: 401,
+			}),
+			interruptedResult(),
+		].flatMap((frame) => normalizer.normalize(frame));
+
+		expect(errorsOf(events)).toEqual([]);
+		expect(statusesOf(events)).toEqual(['idle']);
+		expect(stops()).toBe(1);
+	});
+
+	it('keeps counting through a steer sent during the backoff', () => {
+		const { normalizer, stops } = createNormalizer();
+		normalizer.beginTurn();
+		normalizer.normalize(
+			retryFrame({
+				attempt: 1,
+				error: 'authentication_failed',
+				error_status: 401,
+			}),
+		);
+
+		normalizer.beginTurn();
+		const events = normalizer.normalize(
+			retryFrame({
+				attempt: 2,
+				error: 'authentication_failed',
+				error_status: 401,
+			}),
+		);
+
+		expect(errorsOf(events)).toHaveLength(1);
+		expect(stops()).toBe(1);
 	});
 
 	it('still reports an ordinary failed result on a turn it did not stop', () => {
@@ -526,11 +622,51 @@ describe('claude adapter futile retry loop', () => {
 
 			const errors = errorsOf(events);
 			expect(errors).toHaveLength(1);
-			expect(classifyAgentFailure(errors[0] as AgentError)).toBe('credentials');
-			expect(errors[0]?.detail).toContain('ANTHROPIC_API_KEY');
+			expect(errors[0]?.failureClass).toBe('credentials');
+			expect(errors[0]?.credentialEnvVars).toEqual(['ANTHROPIC_API_KEY']);
 			expect(JSON.stringify(events)).not.toContain(SECRET_KEY);
 			expect(scripted.interrupts()).toBe(1);
 			expect(events.some((event) => event.type === 'shutdown')).toBe(false);
+		} finally {
+			await adapter.shutdown();
+		}
+	});
+
+	it('keeps a steer sent after the stop from adding a second failure row', async () => {
+		let releaseInterrupt: () => void = () => undefined;
+		const scripted = createScriptedQuery(
+			(push) =>
+				new Promise<void>((resolve) => {
+					releaseInterrupt = () => {
+						push(interruptedResult());
+						resolve();
+					};
+				}),
+		);
+		const { adapter, events, session } = await openSession(scripted);
+		try {
+			await session.submit({ prompt: 'hello' });
+			scripted.push(
+				retryFrame({
+					attempt: 1,
+					error: 'authentication_failed',
+					error_status: 401,
+				}),
+			);
+			scripted.push(
+				retryFrame({
+					attempt: 2,
+					error: 'authentication_failed',
+					error_status: 401,
+				}),
+			);
+			await vi.waitFor(() => expect(errorsOf(events)).toHaveLength(1));
+
+			await session.submit({ prompt: 'hello?', streamingBehavior: 'steer' });
+			releaseInterrupt();
+
+			await vi.waitFor(() => expect(statusesOf(events).at(-1)).toBe('idle'));
+			expect(errorsOf(events)).toHaveLength(1);
 		} finally {
 			await adapter.shutdown();
 		}

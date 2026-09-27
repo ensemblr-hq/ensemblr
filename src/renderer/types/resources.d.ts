@@ -479,13 +479,23 @@ export default interface Resources {
 			};
 		};
 		'agent-failure': {
+			'account-restricted': {
+				body: 'The account is on hold or needs verification, so the provider will not serve it. Resolve it with the provider or switch accounts in settings, then send the turn again.';
+				title: 'The provider has restricted this account';
+			};
 			'context-overflow': {
 				body: 'The turn no longer fits in the model’s context window. Fork the chat to carry a summary into a fresh one.';
 				title: 'This chat is too long';
 			};
 			credentials: {
 				body: 'Sign in again or update this runtime’s API key, then send the turn again.';
+				'env-hint_one': 'This runtime was started with {{vars, list}} set, and it signs in with that variable instead of your saved login. Remove the variable or fix its value, then start a new chat. If your shell profile sets it, restart Ensemblr first.';
+				'env-hint_other': 'This runtime was started with {{vars, list}} set, and it signs in with those variables instead of your saved login. Remove them or fix their values, then start a new chat. If your shell profile sets them, restart Ensemblr first.';
 				title: 'The provider rejected your credentials';
+			};
+			'model-unavailable': {
+				body: 'The provider does not offer the model this chat uses, or not to this account. Pick another model, then send the turn again.';
+				title: 'The model is not available';
 			};
 			network: {
 				body: 'The connection dropped before the turn finished. Check that you are online, then try again.';

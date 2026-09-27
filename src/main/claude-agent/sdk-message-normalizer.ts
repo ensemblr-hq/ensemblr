@@ -76,9 +76,10 @@ export interface SdkMessageNormalizer {
 	 * Opens a turn the instant its prompt is queued, rather than waiting for the
 	 * runtime's first message. Claude takes seconds to reach that message, and
 	 * the timeline's working indicator and turn timer both key off the `status`
-	 * event, so without this the chat looks idle for the whole gap. A new prompt
-	 * also re-arms the retry watch, so a turn stopped for futile retries never
-	 * mutes the next one's failure.
+	 * event, so without this the chat looks idle for the whole gap. A prompt that
+	 * opens a turn re-arms the retry watch; a steer or follow-up into the running
+	 * turn leaves it alone, so it neither restarts the count nor lets the stopped
+	 * turn's interrupted result add a second failure row.
 	 */
 	beginTurn: () => readonly AgentEvent[];
 	/** Status events that settle an open turn the runtime never closed with a `result`. */
@@ -117,7 +118,6 @@ export function createSdkMessageNormalizer({
 	let mainModel: string | null = null;
 	let reported: AgentContextUsage | null = null;
 	let exhaustedResetsAt: string | null = null;
-	let stoppedTurn = false;
 	const reasoningByThread = createStreamedReasoningByThread();
 	const retryWatch = createApiRetryWatch(credentialEnvVars);
 
@@ -217,37 +217,14 @@ export function createSdkMessageNormalizer({
 			];
 		}
 
-		if (message.subtype === 'api_retry') {
-			return handleApiRetry(message);
+		const futileRetry =
+			message.subtype === 'api_retry' ? retryWatch.observe(message) : null;
+		if (futileRetry) {
+			onUnrecoverableRetry?.();
+			return [{ at: at(), error: futileRetry, type: 'error' }];
 		}
 
 		return [];
-	};
-
-	/**
-	 * Stops a turn the runtime is retrying in vain, reporting the cause once.
-	 *
-	 * Fatal rather than recoverable because the timeline surfaces fatal errors
-	 * only, and this row is the whole point: without it the chat spins through
-	 * the runtime's backoff and shows nothing. Frames that land while the
-	 * interrupt is still reaching the runtime are dropped, so the cause is said
-	 * once.
-	 * @param message - The `api_retry` SDK message.
-	 * @returns The lone failure, or nothing while retrying can still help.
-	 */
-	const handleApiRetry = (
-		message: Extract<SDKMessage, { subtype: 'api_retry' }>,
-	): readonly AgentEvent[] => {
-		if (stoppedTurn) {
-			return [];
-		}
-		const error = retryWatch.observe(message);
-		if (!error) {
-			return [];
-		}
-		stoppedTurn = true;
-		onUnrecoverableRetry?.();
-		return [{ at: at(), error, type: 'error' }];
 	};
 
 	/**
@@ -267,7 +244,7 @@ export function createSdkMessageNormalizer({
 	const handleAssistant = (
 		message: Extract<SDKMessage, { type: 'assistant' }>,
 	): readonly AgentEvent[] => {
-		retryWatch.reset();
+		retryWatch.noteResponse();
 		const notice =
 			readString(message.parent_tool_use_id) === null
 				? readLimitNotice(message)
@@ -331,7 +308,7 @@ export function createSdkMessageNormalizer({
 
 		// A turn the retry watch stopped already has its failure row, and the
 		// interrupt that stopped it is what makes this result an error.
-		if (message.subtype !== 'success' && !stoppedTurn) {
+		if (message.subtype !== 'success' && !retryWatch.hasStopped()) {
 			events.push({
 				at: at(),
 				error: {
@@ -344,8 +321,7 @@ export function createSdkMessageNormalizer({
 			});
 		}
 
-		stoppedTurn = false;
-		retryWatch.reset();
+		retryWatch.rearm();
 		events.push(...transitionTo('idle'));
 		return events;
 	};
@@ -380,8 +356,9 @@ export function createSdkMessageNormalizer({
 
 	return {
 		beginTurn: () => {
-			stoppedTurn = false;
-			retryWatch.reset();
+			if (status !== 'streaming') {
+				retryWatch.rearm();
+			}
 			return transitionTo('streaming');
 		},
 		observeContextUsage: (usage) => {
@@ -397,7 +374,7 @@ export function createSdkMessageNormalizer({
 				case 'system':
 					return handleSystem(message);
 				case 'stream_event':
-					retryWatch.reset();
+					retryWatch.noteResponse();
 					return normalizeStreamEvent(message, messageEvent, reasoningByThread);
 				case 'assistant':
 					return handleAssistant(message);

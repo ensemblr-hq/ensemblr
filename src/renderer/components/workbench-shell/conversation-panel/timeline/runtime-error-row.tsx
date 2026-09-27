@@ -7,6 +7,7 @@ import {
 	KeyRoundIcon,
 	LayersIcon,
 	type LucideIcon,
+	PackageXIcon,
 	PlayIcon,
 	PowerOffIcon,
 	RotateCcwIcon,
@@ -18,6 +19,7 @@ import {
 	SquarePenIcon,
 	TerminalIcon,
 	TriangleAlertIcon,
+	UserLockIcon,
 	WifiOffIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -58,12 +60,14 @@ const FAILURE_ICONS: Readonly<Record<AgentFailureIcon, LucideIcon>> = {
 	gauge: GaugeIcon,
 	'key-round': KeyRoundIcon,
 	layers: LayersIcon,
+	'package-x': PackageXIcon,
 	'power-off': PowerOffIcon,
 	scissors: ScissorsIcon,
 	'server-crash': ServerCrashIcon,
 	'shield-alert': ShieldAlertIcon,
 	terminal: TerminalIcon,
 	'triangle-alert': TriangleAlertIcon,
+	'user-lock': UserLockIcon,
 	'wifi-off': WifiOffIcon,
 };
 
@@ -138,6 +142,14 @@ export function RuntimeErrorRow({
 						<ResetBadge resetsAt={readout.resetsAt} />
 					</div>
 					<p className='text-muted-foreground text-xs'>{readout.body}</p>
+					{readout.credentialHint ? (
+						<p
+							className='text-muted-foreground text-xs'
+							data-role='credential-hint'
+						>
+							{readout.credentialHint}
+						</p>
+					) : null}
 				</div>
 			</div>
 

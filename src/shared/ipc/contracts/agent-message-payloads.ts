@@ -23,9 +23,14 @@ export type AgentEventStreamWire = 'protocol' | 'stderr';
  *
  * `resetsAt` is the ISO instant a self-clearing failure lifts, carried only when
  * the runtime reported one structurally rather than in prose.
+ *
+ * `credentialEnvVars` names — never values — the credential variables a runtime
+ * rejected for authentication was started with, so the renderer can say in the
+ * reader's language which one is outranking the saved login.
  */
 export interface AgentWireError {
 	code?: string;
+	credentialEnvVars?: readonly string[];
 	detail?: string | null;
 	failureClass?: AgentFailureClass;
 	message: string;
