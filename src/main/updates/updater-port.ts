@@ -17,6 +17,9 @@ import {
 	type UpdateService,
 } from './update-service';
 
+/** Where Nix keeps every package it installs; read-only to everything but Nix. */
+const NIX_STORE_PREFIX = '/nix/store/';
+
 /** Options for {@link createAppUpdateService}. */
 export interface AppUpdateServiceOptions {
 	/** Pushes each new snapshot to the renderer. */
@@ -66,6 +69,7 @@ export function createAppUpdateService({
 		channel,
 		homebrewCask: readHomebrewCask(),
 		inApplicationsFolder: readIsInApplicationsFolder(),
+		managedByNix: readManagedByNix(),
 		packaged: app.isPackaged,
 		platform: process.platform,
 	});
@@ -173,6 +177,16 @@ function readHomebrewCask(): string | null {
 		return null;
 	}
 	return findHomebrewCask(resolve(app.getPath('exe'), '..', '..', '..'));
+}
+
+/**
+ * Reports whether the running executable lives in the Nix store, where a flake
+ * or nixpkgs install puts it and where nothing but Nix may write. An unpackaged
+ * build is Electron's own executable from `node_modules`, so it never counts.
+ * @returns True when Nix owns this copy
+ */
+function readManagedByNix(): boolean {
+	return app.isPackaged && app.getPath('exe').startsWith(NIX_STORE_PREFIX);
 }
 
 /**

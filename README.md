@@ -40,6 +40,7 @@ the app ships no agent binary of its own — it drives the one you installed.
 | macOS, Apple silicon | `.dmg` (signed, notarized, stapled) | `brew install --cask ensemblr-hq/tap/ensemblr` |
 | macOS, Intel | `.dmg` (signed, notarized, stapled) | `brew install --cask ensemblr-hq/tap/ensemblr` |
 | Linux, x86-64 | `.AppImage` | `curl -fsSL https://www.ensemblr.dev/install.sh \| sh` |
+| Linux, x86-64 (Nix) | flake | `nix run github:ensemblr-hq/ensemblr` (`#master` builds from source) |
 
 Each Mac architecture gets its own `.dmg` rather than one universal binary; the Intel build first shipped
 in `0.1.20`. arm64 Linux is planned for a later release and is not built
@@ -93,6 +94,11 @@ a container, or a kernel with no FUSE at all — run it with `--appimage-extract
 directory, Ensemblr downloads a newer AppImage, verifies its GitHub-published SHA-256 digest, stages it,
 and atomically swaps it on restart. A non-AppImage build or one in a read-only directory keeps the
 check-only path and links to the release page.
+
+On **NixOS**, the repository is a flake: `nix run github:ensemblr-hq/ensemblr` runs the release, patched
+to run natively, and `nix run github:ensemblr-hq/ensemblr#master` compiles the newest commit. Both install
+as `ensemblr`, so a system carries one of them. Nix updates them, never the app itself — see
+[the install guide](./docs/guide/01-install.md#nix-nixos).
 
 To build it yourself instead, with Node 24.x and [Bun](https://bun.sh) 1.4:
 

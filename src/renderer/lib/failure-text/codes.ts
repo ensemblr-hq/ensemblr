@@ -930,6 +930,11 @@ export const APP_FAILURE_TEXT: Record<
 			'This copy of Ensemblr was installed with Homebrew, so Homebrew, not Ensemblr, keeps it up to date. To get the latest version, run {{command}}.',
 			{ command: homebrewUpgradeCommand(homebrewCask) },
 		),
+	'update-managed-by-nix': (t) =>
+		t(
+			'errors:failure.update-managed-by-nix',
+			'This copy of Ensemblr was installed with Nix, so Nix, not Ensemblr, keeps it up to date. To get the latest version, update the flake or channel it comes from and rebuild.',
+		),
 	'update-not-in-applications': (t) =>
 		t(
 			'errors:failure.update-not-in-applications',

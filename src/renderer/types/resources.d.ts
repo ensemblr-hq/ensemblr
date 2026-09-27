@@ -863,6 +863,7 @@ export default interface Resources {
 			'update-feed-unreachable': 'Ensemblr could not reach GitHub to check for updates.';
 			'update-install-failed': 'Ensemblr could not restart into the update.';
 			'update-managed-by-homebrew': 'This copy of Ensemblr was installed with Homebrew, so Homebrew, not Ensemblr, keeps it up to date. To get the latest version, run {{command}}.';
+			'update-managed-by-nix': 'This copy of Ensemblr was installed with Nix, so Nix, not Ensemblr, keeps it up to date. To get the latest version, update the flake or channel it comes from and rebuild.';
 			'update-not-in-applications': 'Ensemblr updates itself only from the Applications folder. Move it there and reopen it.';
 			'update-unsupported-build': 'This build cannot update itself.';
 			'update-verification-failed': 'The downloaded update did not match the checksum GitHub published for it, so it was discarded.';
