@@ -291,6 +291,7 @@ export default defineConfig({
 						'tests/main/agent-event-admission.test.ts',
 						'tests/main/agent-event-tail.test.ts',
 						'tests/main/claude-streamed-reasoning.test.ts',
+						'tests/main/claude-api-retry.test.ts',
 						'tests/main/repository-issue-assignees.test.ts',
 					],
 				},
