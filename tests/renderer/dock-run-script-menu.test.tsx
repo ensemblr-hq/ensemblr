@@ -111,6 +111,18 @@ test('menu items never wrap their label', async () => {
 	}
 });
 
+test('the menu sizes to its labels rather than the chevron trigger', async () => {
+	renderActions();
+
+	await userEvent.click(
+		screen.getByRole('button', { name: 'Choose run script' }),
+	);
+
+	const menu = screen.getByRole('menu');
+	expect(menu).toHaveClass('w-auto');
+	expect(menu).not.toHaveClass('w-(--radix-dropdown-menu-trigger-width)');
+});
+
 test('the run button carries the shortcut hint', () => {
 	renderActions();
 
