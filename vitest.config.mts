@@ -161,6 +161,7 @@ export default defineConfig({
 						'tests/main/media-permissions-policy.test.ts',
 						'tests/main/app-settings-service.test.ts',
 						'tests/main/published-schemas.test.ts',
+						'tests/main/forge-electron-zip.test.ts',
 						'tests/main/forge-fuses.test.ts',
 						'tests/main/forge-linux-maker.test.ts',
 						'tests/main/forge-native-bindings.test.ts',
