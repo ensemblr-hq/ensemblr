@@ -53,10 +53,13 @@ let
   };
 
   # A fixed-output path depends only on its name and hash, so a stale hash
-  # would silently reuse the old node_modules. Naming it after the lockfile
-  # forces a fetch, and with it a hash mismatch, whenever bun.lock moves.
+  # would silently reuse the old node_modules. Naming it after the lockfile and
+  # the Bun that installs it forces a fetch, and with it a hash mismatch,
+  # whenever either moves.
   lockDigest = builtins.substring 0 16 (
-    builtins.hashString "sha256" (builtins.readFile ../bun.lock + builtins.readFile ../bunfig.toml)
+    builtins.hashString "sha256" (
+      bunPin.version + builtins.readFile ../bun.lock + builtins.readFile ../bunfig.toml
+    )
   );
 
   deps = stdenvNoCC.mkDerivation {

@@ -22,13 +22,14 @@ usage() {
 }
 
 # Applies a jq filter to pins.json in place, tab-indented the way Biome wants it.
+# The filter finishes before the file is opened, and writing through the existing
+# file keeps its mode, where a mktemp file moved over it would leave it 0600.
 write_pins() {
 	local filter=$1
 	shift
 	local next
-	next=$(mktemp)
-	jq --tab "$@" "$filter" "$pins" >"$next"
-	mv "$next" "$pins"
+	next=$(jq --tab "$@" "$filter" "$pins")
+	printf '%s\n' "$next" >"$pins"
 }
 
 # Converts a GitHub asset digest (`sha256:<hex>`) to the SRI form Nix takes.
@@ -75,27 +76,34 @@ pin_bun() {
 	echo "Pinned Bun $version."
 }
 
+# Puts the deps pin back and drops the build log. Runs on every exit while the
+# placeholder is in pins.json, so an error or an interrupt never leaves it there.
+restore_deps_pin() {
+	write_pins '.deps[$system] = $hash' --arg system "$SYSTEM" --arg hash "$deps_previous"
+	rm -f "$deps_log"
+}
+
 pin_deps() {
-	local previous
-	previous=$(jq -r --arg system "$SYSTEM" '.deps[$system]' "$pins")
+	deps_previous=$(jq -r --arg system "$SYSTEM" '.deps[$system]' "$pins")
+	deps_log=$(mktemp)
+	trap restore_deps_pin EXIT
 	write_pins '.deps[$system] = $hash' --arg system "$SYSTEM" --arg hash "$FAKE_HASH"
 
-	local log
-	log=$(mktemp)
-	if nix build "$root#packages.$SYSTEM.master.deps" --no-link 2>"$log"; then
-		write_pins '.deps[$system] = $hash' --arg system "$SYSTEM" --arg hash "$previous"
+	if nix build "$root#packages.$SYSTEM.master.deps" --no-link 2>"$deps_log"; then
 		echo "The placeholder hash built, which should be impossible; left the pin as it was." >&2
 		exit 1
 	fi
 
 	local hash
-	hash=$(grep -oE 'got: +sha256-[A-Za-z0-9+/]+=*' "$log" | awk '{print $2}' | tail -n1)
+	hash=$(sed -nE 's/.*got: +(sha256-[A-Za-z0-9+/]+=*).*/\1/p' "$deps_log" | tail -n1)
 	if [[ -z $hash ]]; then
-		write_pins '.deps[$system] = $hash' --arg system "$SYSTEM" --arg hash "$previous"
-		cat "$log" >&2
+		cat "$deps_log" >&2
 		echo "The deps build failed before reporting a hash; left the pin as it was." >&2
 		exit 1
 	fi
+
+	trap - EXIT
+	rm -f "$deps_log"
 	write_pins '.deps[$system] = $hash' --arg system "$SYSTEM" --arg hash "$hash"
 	echo "Pinned the $SYSTEM deps to $hash."
 }

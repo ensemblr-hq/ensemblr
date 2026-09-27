@@ -61,9 +61,9 @@ That derivation has three safeguards:
 
 - **Bun is pinned** to the version `packageManager` names, so the hash does not
   depend on the consumer's nixpkgs.
-- **Its name carries a digest of `bun.lock`.** A lockfile change therefore forces
-  a fetch and a hash mismatch, and can never silently reuse the old
-  `node_modules`.
+- **Its name carries a digest of `bun.lock` and the pinned Bun version.** A
+  lockfile or Bun change therefore forces a fetch and a hash mismatch, and can
+  never silently reuse the old `node_modules`.
 - **`node-pty` is compiled against Electron's headers before Forge runs.** Its
   build intermediates are then stripped. The `.forge-meta` the compile writes
   makes Forge's own rebuild skip the module. Without that, node-gyp's Makefiles
@@ -85,7 +85,11 @@ copy does update.
 
 - **The deps hash goes stale on every `bun.lock` change**, which in practice
   means the weekly Dependabot batch. `nix/update-pins.sh deps` recomputes it. A
-  stale hash fails the master build loudly and prints the right one.
+  stale hash fails the master build loudly and prints the right one. The
+  `nix-deps` job in Checks builds the deps on every PR that touches the lockfile
+  or the flake, so a stale pin fails `verify` rather than reaching master. The
+  cost is that each such PR, Dependabot's included, needs a re-pin on its branch
+  before `verify` goes green.
 - **The release pin moves with each release.** `nix/update-pins.sh release`
   reads the asset digest GitHub publishes and runs in the same PR that re-pins
   the install docs. `nix/pins.json` is one of the version-pinned files.

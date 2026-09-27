@@ -1048,9 +1048,9 @@ things: the `node_modules` tree that `bun install --frozen-lockfile
 
 - **Bun is pinned** in `nix/pins.json` to the version `packageManager` names, so
   the hash does not move when a consumer's nixpkgs ships a different Bun.
-- **The derivation's name carries a digest of `bun.lock`.** A fixed-output path
-  otherwise depends only on its hash, so a stale hash would silently reuse the
-  old `node_modules`.
+- **The derivation's name carries a digest of `bun.lock` and the pinned Bun
+  version.** A fixed-output path otherwise depends only on its hash, so a stale
+  hash would silently reuse the old `node_modules`.
 - **`forge.config.ts` points packager at the zip** through
   `ENSEMBLR_ELECTRON_ZIP_DIR`, which is unset everywhere else.
 - **`npm_config_nodedir` hands node-gyp the headers.**
@@ -1064,9 +1064,13 @@ dependency derivation into every installed closure. `disallowedReferences`
 fails the build if that ever regresses.
 
 **The deps hash goes stale whenever `bun.lock` changes**, which in practice means
-the weekly Dependabot batch. The master build then fails and prints the hash it
-got. Refresh the pins with the script, which needs `git`, `jq`, `nix`, and for
-`release` an authenticated `gh`:
+the weekly Dependabot batch. The `nix-deps` job in Checks flags that on the PR,
+before it reaches master. On every PR whose diff touches `bun.lock`, `bunfig.toml`,
+`flake.nix`, `flake.lock`, or `nix/`, it builds `master.deps` against
+`nix/pins.json`. A stale pin fails the job, and with it `verify`, and the job
+summary names the hash to pin. A Dependabot PR therefore stays red until someone
+re-pins on its branch. Refresh the pins with the script, which needs `git`, `jq`,
+`nix`, and for `release` an authenticated `gh`:
 
 ```bash
 nix/update-pins.sh deps               # after any bun.lock change

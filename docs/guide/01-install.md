@@ -142,8 +142,10 @@ does. Later builds reuse the dependencies until `bun.lock` changes.
 `master` that moves to the newest commit on the branch the input tracks. For
 `release` it moves to whatever release the repository has pinned, which follows
 each release shortly after it is published. A copy running from the Nix store
-never updates itself: **Settings → General** says so rather than offering a
-download it could not install.
+never updates itself. From the release after 0.1.22, **Settings → General** says
+so rather than offering a download it could not install. The 0.1.22 build that
+`release` wraps today predates that: it still checks for a new version, and only
+links to its release page.
 
 Unlike an AppImage wrapped in an FHS sandbox (`appimageTools.wrapType2`), both
 variants run directly on the host, so `sudo` works in Ensemblr's terminals.

@@ -216,8 +216,10 @@ the slowest of the three rather than their sum. `test` is a matrix over **both**
 `macos-latest` and `ubuntu-latest`, each split into three shards — running on both
 platforms is what makes a darwin-only assumption fail in CI rather than in a
 user's AppImage. `lint` and `typecheck` run on Linux alone, because neither
-Biome nor tsc can reach a different verdict on macOS. A tiny `verify` job
-collapses all of them into a single status check. `master` has no branch
+Biome nor tsc can reach a different verdict on macOS. `nix-deps` builds the Nix
+flake's pinned dependencies, but only on a PR that touches `bun.lock`, the flake,
+or `nix/` (see [the Nix flake](./build-and-release.md#the-nix-flake)). A tiny
+`verify` job collapses all of them into a single status check. `master` has no branch
 protection or ruleset, so nothing on GitHub enforces that check: a pull request
 with a failing `verify` can still be merged, and confirming it is green before
 merging is on whoever merges.
