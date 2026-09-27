@@ -11,10 +11,14 @@
  * waiting out.
  */
 export type AgentFailureClass =
+	/** The provider will not serve the account: on hold, or awaiting verification. */
+	| 'account-restricted'
 	/** The turn no longer fits the model's context window. */
 	| 'context-overflow'
 	/** Auth rejected: expired login, missing or invalid API key. */
 	| 'credentials'
+	/** The provider does not offer the chat's model, or not to this account. */
+	| 'model-unavailable'
 	/** The provider was unreachable — DNS, refused connection, dropped socket. */
 	| 'network'
 	/** The provider's own servers failed: 5xx, overloaded, service unavailable. */
@@ -52,8 +56,10 @@ const CLASS_ORDER: Readonly<Record<AgentFailureClass, null>> = {
 	'provider-refused': null,
 	'rate-limit': null,
 	credentials: null,
+	'account-restricted': null,
 	network: null,
 	'context-overflow': null,
+	'model-unavailable': null,
 	'runtime-missing': null,
 	'runtime-crashed': null,
 	'workspace-invalid': null,

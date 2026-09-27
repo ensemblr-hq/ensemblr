@@ -1,9 +1,10 @@
 /**
  * Turns a runtime failure into the designed, translated row the agent timeline
  * shows. The sibling of `lib/failure-text/`, for the one boundary that could not
- * use it: agent errors arrive as prose a provider wrote, so the class is derived
- * from that prose rather than chosen by main, and the runtime's own sentence is
- * demoted to disclosed detail instead of being the headline.
+ * use it: agent errors mostly arrive as prose a provider wrote, so the class is
+ * usually derived from that prose rather than chosen by the runtime, and the
+ * runtime's own sentence is demoted to disclosed detail instead of being the
+ * headline.
  */
 
 import type { TFunction } from 'i18next';
@@ -17,6 +18,7 @@ import type { AgentWireError } from '@/shared/ipc/contracts/agent-session';
 import {
 	type AgentFailureDescription,
 	describeAgentFailureClass,
+	describeCredentialEnvVars,
 } from './descriptions.ts';
 
 export type {
@@ -28,6 +30,8 @@ export type {
 
 /** A failure's designed presentation plus the raw runtime text behind it. */
 export interface AgentFailureReadout extends AgentFailureDescription {
+	/** Which credential variables outrank the saved login, in the reader's language, or null. */
+	credentialHint: string | null;
 	failureClass: AgentFailureClass;
 	/** Runtime detail worth disclosing under the row, or null when it adds nothing. */
 	detail: string | null;
@@ -69,6 +73,7 @@ export function describeAgentFailure(
 	const resetsAt = error.resetsAt ?? null;
 	return {
 		...describeAgentFailureClass(t, failureClass, resetsAt),
+		credentialHint: describeCredentialEnvVars(t, error.credentialEnvVars),
 		detail: detail && detail !== raw ? detail : null,
 		failureClass,
 		raw,

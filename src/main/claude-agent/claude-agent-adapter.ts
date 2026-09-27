@@ -27,6 +27,7 @@ import type {
 	AgentSubmitRequest,
 } from '../agent-runtime/agent-types.ts';
 import { stripLaunchContextEnv } from '../environment/launch-env.ts';
+import { readCredentialEnvVars } from './api-retry-failure.ts';
 import { withAfkAutoApproval, withAfkHooks } from './claude-afk-mode.ts';
 import { createConciergeSessionGate } from './claude-concierge-guard.ts';
 import { resolveSystemPromptAppend } from './claude-edit-tool-directive.ts';
@@ -300,13 +301,35 @@ function createClaudeSession({
 		onClosed(session);
 	};
 
+	const env = stripLaunchContextEnv({ ...baseEnv, ...input.metadata.env });
+
 	const normalizer = createSdkMessageNormalizer({
+		credentialEnvVars: readCredentialEnvVars(env),
 		now,
 		onDiscovery: ({ model, sessionId, tools }) => {
 			patchMetadata({ model: model ?? metadata.model, sessionId });
 			toolTrust?.recordInventory(describeClaudeTools(tools));
 		},
+		onUnrecoverableRetry: () => interruptFutileTurn(),
 	});
+
+	/**
+	 * Stops a turn the runtime is retrying in vain, leaving the session open for
+	 * the next prompt. The interrupted turn's own `result` settles it; the settle
+	 * here covers an interrupt that never reached the runtime, since a turn left
+	 * open would keep the spinner the failure row was meant to replace.
+	 */
+	const interruptFutileTurn = (): void => {
+		activeQuery?.interrupt().catch((cause: unknown) => {
+			console.warn('[claude-agent] could not interrupt a futile retry loop.', {
+				cause: cause instanceof Error ? cause.message : String(cause),
+				sessionId: agentSessionId,
+			});
+			for (const event of normalizer.settleTurn()) {
+				emit(event);
+			}
+		});
+	};
 
 	const controlToken = input.request.controlMcp?.token ?? null;
 
@@ -524,9 +547,9 @@ function createClaudeSession({
 	try {
 		activeQuery = queryFn({
 			options: buildQueryOptions({
-				baseEnv,
 				canUseTool: approval?.canUseTool,
 				conciergeHome,
+				env,
 				input,
 				isPlanning: () => planning,
 				isUnattended: () => unattended,
@@ -770,13 +793,13 @@ async function applyTurnSelection({
  * Maps the provider-neutral session request onto the SDK's `Options`. This is
  * the Claude counterpart of `buildPiSessionArgs`: every runtime-specific name
  * lives here and nowhere above the adapter seam.
- * @param input - Session inputs plus the base env, the stderr sink, and the shipped plugin root.
+ * @param input - Session inputs plus the assembled env, the stderr sink, and the shipped plugin root.
  * @returns The options for the opening `query()` call.
  */
 function buildQueryOptions({
-	baseEnv,
 	canUseTool,
 	conciergeHome,
+	env,
 	input,
 	isPlanning,
 	isUnattended,
@@ -784,9 +807,10 @@ function buildQueryOptions({
 	pluginDirectories,
 	toolTrust,
 }: {
-	baseEnv: NodeJS.ProcessEnv;
 	canUseTool?: ClaudeCanUseTool;
 	conciergeHome: string | null;
+	/** The session's environment, already merged and stripped of launch context. */
+	env: NodeJS.ProcessEnv;
 	input: AgentAdapterCreateSessionInput;
 	/** Reads the session's live Plan Mode flag, for the hook that refuses writes. */
 	isPlanning: () => boolean;
@@ -849,7 +873,7 @@ function buildQueryOptions({
 			),
 			isUnattended,
 		),
-		env: stripLaunchContextEnv({ ...baseEnv, ...metadata.env }),
+		env,
 		// Without this the SDK forwards only a subagent's tool_use/tool_result
 		// blocks, so a `Task` card would nest tool rows with none of the prose that
 		// explains them.

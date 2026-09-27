@@ -9,6 +9,7 @@ import type {
 	AgentModelMetadata,
 	AgentSessionStatus,
 } from '../agent-runtime/agent-types.ts';
+import { createApiRetryWatch } from './api-retry-failure.ts';
 import { toPlanLimit, toSessionCost } from './claude-usage.ts';
 import { readLimitNotice } from './limit-notice.ts';
 import { isRecord, readBlocks } from './sdk-content-blocks.ts';
@@ -30,6 +31,11 @@ export interface SdkSessionDiscovery {
 
 /** Options for {@link createSdkMessageNormalizer}. */
 export interface CreateSdkMessageNormalizerOptions {
+	/**
+	 * Names of the credential variables set in the runtime's environment, which
+	 * an authentication failure names as the likeliest cause.
+	 */
+	credentialEnvVars?: readonly string[];
 	now?: () => Date;
 	/**
 	 * Called when the runtime reports its resolved session id and model. The
@@ -37,6 +43,12 @@ export interface CreateSdkMessageNormalizerOptions {
 	 * `metadata` event rather than the normalizer synthesising a partial one.
 	 */
 	onDiscovery?: (discovery: SdkSessionDiscovery) => void;
+	/**
+	 * Called once the runtime is retrying a request no retry can fix. The
+	 * normalizer has already reported the failure; the adapter owns the query,
+	 * so it is the one that interrupts the turn.
+	 */
+	onUnrecoverableRetry?: () => void;
 }
 
 /**
@@ -64,7 +76,10 @@ export interface SdkMessageNormalizer {
 	 * Opens a turn the instant its prompt is queued, rather than waiting for the
 	 * runtime's first message. Claude takes seconds to reach that message, and
 	 * the timeline's working indicator and turn timer both key off the `status`
-	 * event, so without this the chat looks idle for the whole gap.
+	 * event, so without this the chat looks idle for the whole gap. A prompt that
+	 * opens a turn re-arms the retry watch; a steer or follow-up into the running
+	 * turn leaves it alone, so it neither restarts the count nor lets the stopped
+	 * turn's interrupted result add a second failure row.
 	 */
 	beginTurn: () => readonly AgentEvent[];
 	/** Status events that settle an open turn the runtime never closed with a `result`. */
@@ -84,13 +99,17 @@ export interface SdkMessageNormalizer {
  * closes the turn. SDK message types Ensemblr does not model — hook chatter,
  * task notifications, rate-limit pings — are dropped rather than forwarded as
  * `unknown`: Pi emits a handful of frame types, the SDK emits dozens, and each
- * would otherwise surface as a system notice on the timeline.
- * @param options - Clock override and the discovery callback.
+ * would otherwise surface as a system notice on the timeline. The one retry
+ * frame that is read is an `api_retry` naming a cause no retry can fix, which
+ * becomes a fatal error instead of minutes of silent backoff.
+ * @param options - Clock override, credential variable names, and the discovery and retry callbacks.
  * @returns A normalizer bound to one session's streaming state.
  */
 export function createSdkMessageNormalizer({
+	credentialEnvVars = [],
 	now = () => new Date(),
 	onDiscovery,
+	onUnrecoverableRetry,
 }: CreateSdkMessageNormalizerOptions = {}): SdkMessageNormalizer {
 	let status: AgentSessionStatus = 'starting';
 	let turnId: string | null = null;
@@ -100,6 +119,7 @@ export function createSdkMessageNormalizer({
 	let reported: AgentContextUsage | null = null;
 	let exhaustedResetsAt: string | null = null;
 	const reasoningByThread = createStreamedReasoningByThread();
+	const retryWatch = createApiRetryWatch(credentialEnvVars);
 
 	const at = (): string => now().toISOString();
 
@@ -197,6 +217,13 @@ export function createSdkMessageNormalizer({
 			];
 		}
 
+		const futileRetry =
+			message.subtype === 'api_retry' ? retryWatch.observe(message) : null;
+		if (futileRetry) {
+			onUnrecoverableRetry?.();
+			return [{ at: at(), error: futileRetry, type: 'error' }];
+		}
+
 		return [];
 	};
 
@@ -217,6 +244,7 @@ export function createSdkMessageNormalizer({
 	const handleAssistant = (
 		message: Extract<SDKMessage, { type: 'assistant' }>,
 	): readonly AgentEvent[] => {
+		retryWatch.noteResponse();
 		const notice =
 			readString(message.parent_tool_use_id) === null
 				? readLimitNotice(message)
@@ -278,7 +306,9 @@ export function createSdkMessageNormalizer({
 			});
 		}
 
-		if (message.subtype !== 'success') {
+		// A turn the retry watch stopped already has its failure row, and the
+		// interrupt that stopped it is what makes this result an error.
+		if (message.subtype !== 'success' && !retryWatch.hasStopped()) {
 			events.push({
 				at: at(),
 				error: {
@@ -291,6 +321,7 @@ export function createSdkMessageNormalizer({
 			});
 		}
 
+		retryWatch.rearm();
 		events.push(...transitionTo('idle'));
 		return events;
 	};
@@ -324,7 +355,12 @@ export function createSdkMessageNormalizer({
 	};
 
 	return {
-		beginTurn: () => transitionTo('streaming'),
+		beginTurn: () => {
+			if (status !== 'streaming') {
+				retryWatch.rearm();
+			}
+			return transitionTo('streaming');
+		},
 		observeContextUsage: (usage) => {
 			if (reported) {
 				return [];
@@ -338,6 +374,7 @@ export function createSdkMessageNormalizer({
 				case 'system':
 					return handleSystem(message);
 				case 'stream_event':
+					retryWatch.noteResponse();
 					return normalizeStreamEvent(message, messageEvent, reasoningByThread);
 				case 'assistant':
 					return handleAssistant(message);

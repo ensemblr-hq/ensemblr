@@ -36,10 +36,14 @@ export function eventPayload(event: AgentEvent): AgentPersistedEnvelope {
 				error: {
 					code: event.error.code,
 					detail: event.error.detail ?? null,
-					failureClass: classifyAgentFailure(event.error),
+					failureClass:
+						event.error.failureClass ?? classifyAgentFailure(event.error),
 					message: event.error.message,
 					recoverable: event.error.recoverable,
 					resetsAt: event.error.resetsAt ?? null,
+					...(event.error.credentialEnvVars?.length
+						? { credentialEnvVars: [...event.error.credentialEnvVars] }
+						: {}),
 				},
 				kind: 'error',
 			};

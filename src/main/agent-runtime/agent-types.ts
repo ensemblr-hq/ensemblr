@@ -1,4 +1,5 @@
 import type { SubagentMechanism } from '../../shared/agent-control';
+import type { AgentFailureClass } from '../../shared/agent-failure';
 import type { AgentProviderId } from '../../shared/agent-provider';
 import type {
 	AgentBackgroundTaskWire,
@@ -40,7 +41,19 @@ export type AgentErrorCode =
 /** Boundary-level error attached to events or thrown from API methods. */
 export interface AgentError {
 	code: AgentErrorCode;
+	/**
+	 * Names, never values, of the credential variables the runtime was started
+	 * with, set only on an authentication failure. The renderer explains them in
+	 * the reader's language, since a stale one outranks the user's saved login.
+	 */
+	credentialEnvVars?: readonly string[];
 	detail?: string;
+	/**
+	 * The class a runtime that named the cause structurally already knows.
+	 * Persistence prefers it over re-reading the message, so the row does not
+	 * depend on the wording of a sentence the runtime assembled itself.
+	 */
+	failureClass?: AgentFailureClass;
 	message: string;
 	recoverable: boolean;
 	/**

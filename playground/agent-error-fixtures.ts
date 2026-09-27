@@ -6,7 +6,9 @@ import type { AgentWireError } from '@/shared/ipc/contracts/agent-session';
  *
  * Every string here is a real shape an agent runtime emits — the observed
  * mid-response truncation from THE-198 first — so the scene exercises the
- * classifier rather than hand-picking a class and confirming its own copy.
+ * classifier rather than hand-picking a class and confirming its own copy. The
+ * exception is a failure a runtime tags structurally, such as Claude's futile
+ * retry stop, which carries its `failureClass` exactly as the persisted row does.
  */
 export interface AgentErrorFixture {
 	error: AgentWireError;
@@ -76,6 +78,41 @@ export const AGENT_ERROR_FIXTURES: readonly AgentErrorFixture[] = [
 			recoverable: false,
 		},
 		label: 'credentials',
+	},
+	{
+		error: {
+			code: 'adapter-failure',
+			credentialEnvVars: ['ANTHROPIC_API_KEY'],
+			detail:
+				'Claude API error: authentication_failed (HTTP 401), retry 2 of 10.',
+			failureClass: 'credentials',
+			message:
+				'The Claude API rejected the credentials Claude Code sent (authentication failed). Retrying will not fix this, so the turn was stopped.',
+			recoverable: false,
+		},
+		label: 'credentials (stale env var)',
+	},
+	{
+		error: {
+			code: 'adapter-failure',
+			detail: 'Claude API error: account_on_hold (HTTP 403), retry 2 of 10.',
+			failureClass: 'account-restricted',
+			message:
+				'The Claude account behind these credentials is on hold. Retrying will not fix this, so the turn was stopped.',
+			recoverable: false,
+		},
+		label: 'account on hold',
+	},
+	{
+		error: {
+			code: 'adapter-failure',
+			detail: 'Claude API error: model_not_found (HTTP 404), retry 2 of 10.',
+			failureClass: 'model-unavailable',
+			message:
+				'The Claude API does not know the model this chat uses. Retrying will not fix this, so the turn was stopped.',
+			recoverable: false,
+		},
+		label: 'model not found',
 	},
 	{
 		error: {
