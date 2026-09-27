@@ -165,7 +165,7 @@ function RunScriptControl({
 						<ChevronDownIcon className='size-3' />
 					</Button>
 				</DropdownMenuTrigger>
-				<DropdownMenuContent align='end'>
+				<DropdownMenuContent align='end' className='w-auto'>
 					{scripts.map((script) => (
 						<DropdownMenuItem
 							className='whitespace-nowrap'
@@ -292,9 +292,10 @@ function OpenPreviewSplit({
 						<ChevronDownIcon className='size-3' />
 					</Button>
 				</DropdownMenuTrigger>
-				<DropdownMenuContent align='end'>
+				<DropdownMenuContent align='end' className='w-auto'>
 					{options.map((option) => (
 						<DropdownMenuItem
+							className='whitespace-nowrap'
 							key={`${option.name}:${option.url}`}
 							onSelect={() => onOpen(option.url)}
 						>
