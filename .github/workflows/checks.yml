@@ -119,12 +119,59 @@ jobs:
           scope: changed
           blocking: error
 
+  # The flake's `master` output installs node_modules through one fixed-output
+  # derivation whose hash is pinned in nix/pins.json, and every bun.lock change
+  # moves it. Building it here keeps a lockfile change from reaching master
+  # without its pin, which would break `nix run …#master` until someone re-pinned.
+  # The job runs on every PR so `verify` always sees a result, but only fetches
+  # (about 1.2 GB) when the diff touches what the derivation is built from.
+  nix-deps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Depth 2 reaches the PR merge commit's first parent, so the diff below is
+      # exactly what the PR changes.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Detect a lockfile or flake change
+        id: changes
+        if: github.event_name == 'pull_request'
+        run: |
+          if ! git diff --quiet HEAD^1 HEAD -- bun.lock bunfig.toml flake.nix flake.lock nix; then
+            echo "deps=true" >>"$GITHUB_OUTPUT"
+          fi
+
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        if: steps.changes.outputs.deps == 'true'
+
+      - name: Build master.deps against nix/pins.json
+        if: steps.changes.outputs.deps == 'true'
+        run: |
+          if nix build .#master.deps --no-link 2>build.log; then
+            exit 0
+          fi
+          cat build.log >&2
+          got=$(sed -nE 's/.*got: +(sha256-[A-Za-z0-9+/]+=*).*/\1/p' build.log | tail -n1)
+          if [ -n "$got" ]; then
+            echo "::error file=nix/pins.json::The Nix deps pin is stale. Run nix/update-pins.sh deps on this branch, or set deps.x86_64-linux to $got."
+            cat >>"$GITHUB_STEP_SUMMARY" <<EOF
+          ### The Nix deps pin is stale
+
+          Run \`nix/update-pins.sh deps\` on this branch, or set \`deps.x86_64-linux\` in \`nix/pins.json\` to:
+
+          \`$got\`
+          EOF
+          fi
+          exit 1
+
   # One status check named `verify`, whatever the jobs above grow to. The branch
   # ruleset lives in repository settings rather than in this tree, so a required
   # context can only be kept by keeping the name — renaming or dropping this job
   # would leave every PR blocked on a check that is never reported again.
   verify:
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test, nix-deps]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -135,7 +182,7 @@ jobs:
       - name: Fail unless every check passed
         if: >-
           needs.lint.result != 'success' || needs.typecheck.result != 'success'
-          || needs.test.result != 'success'
+          || needs.test.result != 'success' || needs.nix-deps.result != 'success'
         run: |
-          echo "::error::lint=${{ needs.lint.result }} typecheck=${{ needs.typecheck.result }} test=${{ needs.test.result }}"
+          echo "::error::lint=${{ needs.lint.result }} typecheck=${{ needs.typecheck.result }} test=${{ needs.test.result }} nix-deps=${{ needs.nix-deps.result }}"
           exit 1

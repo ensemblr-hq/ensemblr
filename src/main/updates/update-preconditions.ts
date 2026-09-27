@@ -30,6 +30,12 @@ export interface UpdatePreconditionInputs {
 	homebrewCask: string | null;
 	/** Whether the `.app` lives in `/Applications`, per `app.isInApplicationsFolder()`. */
 	inApplicationsFolder: boolean;
+	/**
+	 * Whether the running executable lives in the Nix store, which only Nix
+	 * writes to. Read on every platform: a flake or nixpkgs install is the same
+	 * read-only copy wherever it runs.
+	 */
+	managedByNix: boolean;
 	/** Whether this is a packaged build, per `app.isPackaged`. */
 	packaged: boolean;
 	/** The platform, which decides both the installer and whether there is one. */
@@ -69,6 +75,7 @@ export function checkUpdatePreconditions({
 	channel,
 	homebrewCask,
 	inApplicationsFolder,
+	managedByNix,
 	packaged,
 	platform,
 }: UpdatePreconditionInputs): UpdatePreconditionResult {
@@ -88,6 +95,14 @@ export function checkUpdatePreconditions({
 		return refused(
 			'update-unsupported-build',
 			'A development build updates by rebuilding it, not through the updater.',
+		);
+	}
+	// A new version is a new store path, so a Nix copy only moves with its flake or
+	// channel (ADR 0077). Ahead of every later reason: it names how this one updates.
+	if (managedByNix) {
+		return refused(
+			'update-managed-by-nix',
+			'Nix installed this copy, so Nix updates it: update the flake or channel it comes from and rebuild.',
 		);
 	}
 	// `make:dev` is a local dogfood build with no published releases behind it,

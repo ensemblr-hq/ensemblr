@@ -12,6 +12,7 @@ export type UpdateFailureCode =
 	| 'update-feed-unreachable'
 	| 'update-install-failed'
 	| 'update-managed-by-homebrew'
+	| 'update-managed-by-nix'
 	| 'update-not-in-applications'
 	| 'update-unsupported-build'
 	| 'update-verification-failed';

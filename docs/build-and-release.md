@@ -786,10 +786,11 @@ does not bump Homebrew because that side effect belongs to the original
 The workflow refuses to build when `package.json`'s `version` does not match the
 tag with `v` stripped, or when the release is still a draft.
 
-**Five version-pinned files stay hand-edited, and the version-bump commit
+**Six version-pinned files stay hand-edited, and the version-bump commit
 touches none of them.** The root README carries three current-release mentions;
-the other four files live under `docs/` and quietly point at the previous
-release until someone edits them:
+four more files live under `docs/` and quietly point at the previous release
+until someone edits them. The sixth, `nix/pins.json`, is written by a script
+rather than by hand:
 
 | File | What is pinned |
 | --- | --- |
@@ -798,6 +799,7 @@ release until someone edits them:
 | `docs/guide/README.md` | the version this guide describes |
 | `docs/guide/01-install.md` | current-version examples and every asset URL, both architectures |
 | `docs/build-and-release.md` | the command and `update-darwin-arm64.json` examples |
+| `nix/pins.json` | the flake's `release` variant: version, AppImage name, and hash — run `nix/update-pins.sh release` once the AppImage is attached |
 
 **Never string-replace the old version into the new one.** Asset filenames
 change shape between releases — `0.1.0` dropped the `-beta.N` segment, so
@@ -1009,6 +1011,84 @@ one check, `github_prerelease_version`, so an intentionally shipped
 `-alpha` / `-beta` / `-rc` cask can pass; stable releases do not depend on that
 exception.
 
+### The Nix flake
+
+`flake.nix` offers Ensemblr to NixOS as two variants of one app. Both install as
+`ensemblr` with the release identity (`APP_LINUX_APP_IDS.release`), so a system
+carries one or the other:
+
+```bash
+nix run github:ensemblr-hq/ensemblr           # release (the default)
+nix run github:ensemblr-hq/ensemblr#master    # compiled from master
+```
+
+- **`release`** (`nix/release.nix`) takes the AppImage pinned in
+  `nix/pins.json`, unpacks it with `appimageTools.extract`, and hands it to
+  `nix/electron-app.nix`. That derivation patches every ELF file against nixpkgs
+  libraries, links the host's Vulkan loader, wraps the binary with the GTK
+  environment, and installs the desktop entry and icon ladder.
+  `appimageTools.wrapType2` is deliberately not used. It runs the app under
+  bubblewrap, which sets `no_new_privs`, and `sudo` then fails in every terminal
+  Ensemblr opens.
+- **`master`** (`nix/master.nix`) compiles the flake's own commit. The version is
+  stamped `<version>-master.<date>.g<rev>`, the same shape as the nightly's.
+  The build runs `electron-forge package --platform=linux` exactly as CI does,
+  then goes through the same `electron-app.nix`. It cannot run `bun run
+  package:linux`, because `require-linux-toolchain.mjs` refuses a binding linked
+  into the Nix store and reaches for podman.
+- **`overlays.default`** adds `pkgs.ensemblr` (release) and
+  `pkgs.ensemblr-master`.
+
+**The sandbox has no network, so the master build takes everything it would
+download from one fixed-output derivation**, `master.deps`. It holds three
+things: the `node_modules` tree that `bun install --frozen-lockfile
+--ignore-scripts --os=linux --cpu=x64` produces, the Electron zip that
+`bun.lock` resolves to, and that Electron's headers. The per-platform
+`claude-agent-sdk-*` binaries are removed, because Forge never packages them.
+
+- **Bun is pinned** in `nix/pins.json` to the version `packageManager` names, so
+  the hash does not move when a consumer's nixpkgs ships a different Bun.
+- **The derivation's name carries a digest of `bun.lock` and the pinned Bun
+  version.** A fixed-output path otherwise depends only on its hash, so a stale
+  hash would silently reuse the old `node_modules`.
+- **`forge.config.ts` points packager at the zip** through
+  `ENSEMBLR_ELECTRON_ZIP_DIR`, which is unset everywhere else.
+- **`npm_config_nodedir` hands node-gyp the headers.**
+
+**`node-pty` is compiled before Forge runs, not by it.** `@electron/rebuild`
+builds it against the pinned headers and writes `build/Release/.forge-meta`.
+The build then strips node-gyp's Makefiles and objects, and Forge's own rebuild
+skips the module because the meta already matches. Those Makefiles carry paths
+to the compiler and to `master.deps`. Left in `app.asar`, they would pull the
+dependency derivation into every installed closure. `disallowedReferences`
+fails the build if that ever regresses.
+
+**The deps hash goes stale whenever `bun.lock` changes**, which in practice means
+the weekly Dependabot batch. The `nix-deps` job in Checks flags that on the PR,
+before it reaches master. On every PR whose diff touches `bun.lock`, `bunfig.toml`,
+`flake.nix`, `flake.lock`, or `nix/`, it builds `master.deps` against
+`nix/pins.json`. A stale pin fails the job, and with it `verify`, and the job
+summary names the hash to pin. A Dependabot PR therefore stays red until someone
+re-pins on its branch. Refresh the pins with the script, which needs `git`, `jq`,
+`nix`, and for `release` an authenticated `gh`:
+
+```bash
+nix/update-pins.sh deps               # after any bun.lock change
+nix/update-pins.sh release [vX.Y.Z]   # after a release's AppImage is attached
+nix/update-pins.sh bun                # after packageManager moves
+```
+
+`release` reads the digest GitHub publishes for the `-x64.AppImage` asset, the
+same trust root the in-app updater and the install script use, so nothing is
+downloaded to pin it. It defaults to `releases/latest`, which skips
+prereleases and with them the rolling `nightly`.
+
+**A copy running from `/nix/store/` never updates itself.** The updater reports
+`update-managed-by-nix` instead, and Settings says to update the flake or channel
+and rebuild ([ADR 0077](./adr/0077-ship-a-nix-flake-and-stand-the-updater-down-in-the-nix-store.md)).
+The `release` variant gets that from the first release that carries it. The
+AppImage it wraps runs whatever updater its own release shipped.
+
 ### Repository secrets
 
 Both workflows import signing material through
@@ -1170,6 +1250,7 @@ silently.
 - [ADR 0056](./adr/0056-ship-a-linux-amd64-appimage.md) — why the Linux artifact is an AppImage, and why its window controls are app-drawn. Its updates-never-install rule is amended by ADR 0065 below.
 - [ADR 0065](./adr/0065-install-linux-updates-in-app-by-swapping-the-appimage.md) — why a Linux build now stages a checksum-verified AppImage and swaps it in on restart, and when it still only links at the release page.
 - [ADR 0076](./adr/0076-stand-the-in-app-updater-down-on-a-homebrew-owned-install.md) — why a copy Homebrew installed is never updated in-app, and how to recover an install macOS calls damaged.
+- [ADR 0077](./adr/0077-ship-a-nix-flake-and-stand-the-updater-down-in-the-nix-store.md) — why the flake patches the AppImage instead of sandboxing it, why `master` is a real Forge package, and why a Nix-store copy never updates in-app.
 - [ADR 0031](./adr/0031-strip-launch-context-env-and-single-instance-lock.md), [ADR 0032](./adr/0032-channel-scoped-bundle-identity.md) — the Dock-flash fixes.
 - [ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) — why the Claude binary is not packaged.
 - [`../.claude/rules/stack.md`](../.claude/rules/stack.md) — the pinned versions, the two `external` packages, and the `legacy-peer-deps` constraint.

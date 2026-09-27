@@ -42,6 +42,15 @@ describe('failureText', () => {
 		).toContain('brew upgrade --cask ensemblr-fork.');
 	});
 
+	test('tells a Nix-installed copy to update through Nix', () => {
+		expect(
+			failureText(t, {
+				code: 'update-managed-by-nix',
+				message: 'Nix installed this copy.',
+			}),
+		).toContain('installed with Nix');
+	});
+
 	test('falls back to the official cask when the Homebrew failure names none', () => {
 		expect(
 			failureText(t, {

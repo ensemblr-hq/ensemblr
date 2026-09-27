@@ -196,6 +196,11 @@ if (unmetSigningPrerequisites.length > 0) {
 const signingIdentity =
 	process.env.APPLE_SIGNING_IDENTITY ?? 'Developer ID Application';
 
+// A Nix build has no network, so `nix/master.nix` points packager at the
+// Electron zip its fixed-output derivation already fetched. Everywhere else it
+// is unset and packager downloads the zip itself, as it always has.
+const electronZipDir = process.env.ENSEMBLR_ELECTRON_ZIP_DIR || undefined;
+
 /**
  * Sign a DMG, notarize it with Apple's notary service, and staple the returned
  * ticket, so Gatekeeper validates the disk image offline on first open. The
@@ -398,6 +403,7 @@ const config: ForgeConfig = {
 			unpack: '**/node_modules/node-pty/build/Release/spawn-helper',
 		},
 		...macDistributionConfig,
+		electronZipDir,
 		// Per-channel bundle id so dogfood builds never share the release's
 		// LaunchServices registration (the Dock-flash root cause). See ADR 0032.
 		appBundleId: APP_BUNDLE_IDS[buildChannel],

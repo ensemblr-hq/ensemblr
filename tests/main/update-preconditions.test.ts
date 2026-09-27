@@ -14,6 +14,7 @@ function inputs(
 		channel: 'release',
 		homebrewCask: null,
 		inApplicationsFolder: true,
+		managedByNix: false,
 		packaged: true,
 		platform: 'darwin',
 		...overrides,
@@ -201,6 +202,59 @@ describe('checkUpdatePreconditions', () => {
 				inputs({ homebrewCask: 'ensemblr', platform: 'linux' }),
 			),
 		).toEqual({ capability: 'check-only', failure: null });
+	});
+
+	test('a copy in the Nix store leaves every update to Nix', () => {
+		expect(
+			checkUpdatePreconditions(
+				inputs({ managedByNix: true, platform: 'linux' }),
+			),
+		).toMatchObject({
+			capability: 'none',
+			failure: {
+				code: 'update-managed-by-nix',
+				message: expect.stringContaining('Nix updates it'),
+			},
+		});
+	});
+
+	test('Nix ownership holds on darwin too', () => {
+		expect(
+			checkUpdatePreconditions(inputs({ managedByNix: true })).failure?.code,
+		).toBe('update-managed-by-nix');
+	});
+
+	test('Nix ownership outranks a writable AppImage path', () => {
+		const result = checkUpdatePreconditions(
+			inputs({
+				appImageDirectoryWritable: true,
+				appImagePath: '/home/me/Applications/Ensemblr.AppImage',
+				managedByNix: true,
+				platform: 'linux',
+			}),
+		);
+
+		expect(result.failure?.code).toBe('update-managed-by-nix');
+	});
+
+	test('Nix ownership outranks the dev channel and Homebrew', () => {
+		expect(
+			checkUpdatePreconditions(
+				inputs({
+					channel: 'dev',
+					homebrewCask: 'ensemblr',
+					managedByNix: true,
+				}),
+			).failure?.code,
+		).toBe('update-managed-by-nix');
+	});
+
+	test('being unpackaged outranks being in the Nix store', () => {
+		const result = checkUpdatePreconditions(
+			inputs({ managedByNix: true, packaged: false }),
+		);
+
+		expect(result.failure?.code).toBe('update-unsupported-build');
 	});
 
 	test('being unpackaged outranks being outside /Applications', () => {
