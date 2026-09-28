@@ -21,6 +21,8 @@ import {
 	attachPastedText,
 	getTransferItems,
 	hasTransferItems,
+	type TransferItems,
+	transferItemsFromFiles,
 } from '@/renderer/lib/workbench/composer-attachments';
 import { serializeComposerDraft } from '@/renderer/lib/workbench/mention-payload';
 import {
@@ -162,9 +164,9 @@ export function useConciergeComposerDraft({
 	);
 
 	const attachFiles = useCallback(
-		async (files: readonly File[], folders: readonly File[] = []) => {
+		async (items: TransferItems) => {
 			setAttachmentError(null);
-			const result = await attachPastedFiles(files, cwd, folders);
+			const result = await attachPastedFiles(items, cwd);
 			if (result.error) {
 				setAttachmentError(result.error);
 			}
@@ -251,7 +253,7 @@ export function useConciergeComposerDraft({
 			// Cleared so picking the same file twice in a row still fires a change.
 			event.target.value = '';
 			if (files.length > 0) {
-				void attachFiles(files);
+				void attachFiles(transferItemsFromFiles(files));
 			}
 		},
 		[attachFiles],
@@ -315,7 +317,7 @@ export function useConciergeComposerDraft({
 		(data: DataTransfer): boolean => {
 			const items = getTransferItems(data);
 			if (hasTransferItems(items)) {
-				void attachFiles(items.files, items.folders);
+				void attachFiles(items);
 				return true;
 			}
 			const pasted = data.getData('text/plain');
@@ -339,7 +341,7 @@ export function useConciergeComposerDraft({
 			if (!hasTransferItems(items)) {
 				return false;
 			}
-			void attachFiles(items.files, items.folders);
+			void attachFiles(items);
 			return true;
 		},
 		[attachFiles],

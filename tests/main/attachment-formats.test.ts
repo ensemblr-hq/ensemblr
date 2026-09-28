@@ -31,6 +31,12 @@ const MP4_BYTES = Buffer.concat([
 	Buffer.from([0x00, 0x00, 0x02, 0x00]),
 	Buffer.from('isomiso2'),
 ]);
+const MOV_BYTES = Buffer.concat([
+	Buffer.from([0x00, 0x00, 0x00, 0x14]),
+	Buffer.from('ftypqt  '),
+	Buffer.from([0x00, 0x00, 0x02, 0x00]),
+	Buffer.from('qt  '),
+]);
 
 afterEach(() => {
 	while (tempDirs.length > 0) {
@@ -122,11 +128,25 @@ describe('image attachments', () => {
 		expect(result.file?.path).toBe(storedPath(bytes, 'pasted-image.txt'));
 	});
 
-	test('drops an image extension the bytes disprove', async () => {
+	test('names a "GIF" whose bytes are really an MP4 after the container it is', async () => {
 		const result = await attachImage(MP4_BYTES, 'image/gif', 'clip.gif');
 
 		expect(result.error).toBeUndefined();
-		expect(result.file?.path).toBe(storedPath(MP4_BYTES, 'clip.bin'));
+		expect(result.file?.path).toBe(storedPath(MP4_BYTES, 'clip.mp4'));
+	});
+
+	test('names a "GIF" whose bytes are really a QuickTime movie as a .mov', async () => {
+		const result = await attachImage(MOV_BYTES, 'image/gif', 'clip.gif');
+
+		expect(result.file?.path).toBe(storedPath(MOV_BYTES, 'clip.mov'));
+	});
+
+	test('drops an image extension the bytes disprove when they carry no known format', async () => {
+		const bytes = Buffer.from([0x00, 0x01, 0x02, 0x03, 0xfe, 0xff, 0x00, 0x7f]);
+		const result = await attachImage(bytes, 'image/gif', 'clip.gif');
+
+		expect(result.error).toBeUndefined();
+		expect(result.file?.path).toBe(storedPath(bytes, 'clip.bin'));
 	});
 });
 
@@ -155,6 +175,26 @@ describe('file attachments', () => {
 		const result = await attachFile(bytes, 'notes.md');
 
 		expect(result.file?.path).toBe(storedPath(bytes, 'notes.md'));
+	});
+
+	test('stores extensionless text that starts like a BMP as text', async () => {
+		const bytes = Buffer.from('BM note\n');
+		const result = await attachFile(bytes, 'NOTES');
+
+		expect(result.file?.path).toBe(storedPath(bytes, 'notes.txt'));
+	});
+
+	test('stores text saved under an image extension as text', async () => {
+		const bytes = Buffer.from('BM is also how this note starts\n');
+		const result = await attachFile(bytes, 'readme.gif');
+
+		expect(result.file?.path).toBe(storedPath(bytes, 'readme.txt'));
+	});
+
+	test('names an extensionless MP4 after its container', async () => {
+		const result = await attachFile(MP4_BYTES, 'clipboard');
+
+		expect(result.file?.path).toBe(storedPath(MP4_BYTES, 'clipboard.mp4'));
 	});
 
 	test('stores an empty file', async () => {

@@ -95,7 +95,8 @@ export function registerWorkspaceFilesHandlers({
 			try {
 				const request = writeWorkspaceImageAttachmentRequestSchema.parse(raw);
 				return listWorkspaceFilesService.writeImageAttachment(request);
-			} catch {
+			} catch (cause) {
+				console.warn('[workspace-files] image attachment rejected.', cause);
 				return {
 					error: {
 						code: 'invalid-image',
@@ -114,7 +115,8 @@ export function registerWorkspaceFilesHandlers({
 			try {
 				const request = writeWorkspaceFileAttachmentRequestSchema.parse(raw);
 				return listWorkspaceFilesService.writeFileAttachment(request);
-			} catch {
+			} catch (cause) {
+				console.warn('[workspace-files] file attachment rejected.', cause);
 				return {
 					error: {
 						code: 'invalid-attachment',

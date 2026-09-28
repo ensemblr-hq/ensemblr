@@ -34,6 +34,7 @@ import {
 	MAX_CONTEXT_IMAGE_BYTES,
 	signatureKeyForExtension,
 	sniffImageSignature,
+	sniffVideoContainer,
 } from './workspace-images.ts';
 import {
 	hasErrorCode,
@@ -520,8 +521,9 @@ function cleanExtension(ext: string): string {
  * Resolves the extension a pasted file is stored under, so the name never
  * contradicts the bytes behind it. A declared extension the bytes confirm is
  * kept. One that names a raster format the bytes disprove is replaced by the
- * format they do carry, or dropped when they carry none — a WebP saved as
- * `.gif` would otherwise render as broken and be handed to an agent as a GIF.
+ * image format or video container they do carry, or dropped when they carry
+ * neither — a WebP or MP4 saved as `.gif` would otherwise render as broken and
+ * be handed to an agent as a GIF.
  * An extension naming some other type (`.pdf`, `.heic`) is kept as written,
  * and an extensionless payload is sniffed, so text (Dockerfile, LICENSE) is
  * saved as `txt` and inlined downstream rather than announced as `bin`.
@@ -546,7 +548,10 @@ function resolveAttachmentExtension({
 	}
 	const isText = bytesLookLikeText(buffer);
 	const maySniff = claimsImage || declaredSignature !== null || !declared;
-	const sniffed = maySniff && !isText ? sniffImageSignature(buffer) : null;
+	const sniffed =
+		maySniff && !isText
+			? (sniffImageSignature(buffer) ?? sniffVideoContainer(buffer))
+			: null;
 	if (sniffed) {
 		return sniffed;
 	}

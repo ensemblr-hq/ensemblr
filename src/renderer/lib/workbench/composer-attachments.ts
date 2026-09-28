@@ -165,43 +165,62 @@ export function isReferenceAttachment(
 }
 
 /**
- * The files and folders a clipboard or drag payload carries, kept apart because
- * a folder has no bytes to store.
+ * What a clipboard or drag payload carries: every entry in the order it arrived,
+ * so the chips land in the order the user dropped them, with the folders among
+ * them marked because a folder has no bytes to store.
  */
 export interface TransferItems {
-	files: readonly File[];
-	folders: readonly File[];
+	entries: readonly File[];
+	folders: ReadonlySet<File>;
 }
+
+/** The folder set of a payload known to carry none. */
+const NO_FOLDERS: ReadonlySet<File> = new Set();
 
 /**
  * Extracts every file and folder from a browser clipboard or drag payload. A
  * dropped folder arrives as a `File` too, but one whose bytes cannot be read, so
- * it is told apart by its entry rather than discovered by a failed read.
+ * it is told apart by its entry rather than discovered by a failed read. A
+ * payload with no items falls back to its bare file list, which carries no
+ * entries to tell a folder by; a folder there fails its read and is reported as
+ * a file that could not be read.
  * @param data - The clipboard or drag payload.
- * @returns The payload's files and folders, each in the order they arrived.
+ * @returns The payload's entries in arrival order, with its folders marked.
  */
 export function getTransferItems(data: DataTransfer): TransferItems {
-	const files: File[] = [];
-	const folders: File[] = [];
+	const entries: File[] = [];
+	const folders = new Set<File>();
 	for (const item of Array.from(data.items)) {
 		const file = item.kind === 'file' ? item.getAsFile() : null;
 		if (file) {
-			(isFolderItem(item) ? folders : files).push(file);
+			entries.push(file);
+			if (isFolderItem(item)) {
+				folders.add(file);
+			}
 		}
 	}
-	if (files.length > 0 || folders.length > 0) {
-		return { files, folders };
+	if (entries.length > 0) {
+		return { entries, folders };
 	}
-	return { files: Array.from(data.files), folders: [] };
+	return { entries: Array.from(data.files), folders: NO_FOLDERS };
 }
 
 /**
  * Whether a clipboard or drag payload carries anything to attach.
- * @param items - The payload's files and folders.
- * @returns True when it holds at least one of either.
+ * @param items - The payload's entries.
+ * @returns True when it holds at least one file or folder.
  */
-export function hasTransferItems({ files, folders }: TransferItems): boolean {
-	return files.length > 0 || folders.length > 0;
+export function hasTransferItems({ entries }: TransferItems): boolean {
+	return entries.length > 0;
+}
+
+/**
+ * Wraps a plain file list, such as a file picker's, as a payload with no folders.
+ * @param files - The picked files.
+ * @returns The files as transfer items.
+ */
+export function transferItemsFromFiles(files: readonly File[]): TransferItems {
+	return { entries: files, folders: NO_FOLDERS };
 }
 
 /**
@@ -288,7 +307,7 @@ function readFileAsBase64(file: File): Promise<string> {
 			resolve(result.slice(separatorIndex + 1));
 		});
 		reader.addEventListener('error', () => {
-			reject(reader.error ?? new Error(readFailureMessage()));
+			reject(new Error(readFailureMessage()));
 		});
 		reader.readAsDataURL(file);
 	});
@@ -548,98 +567,96 @@ export async function attachReviewComment({
 }
 
 /**
- * Persists pasted/dropped files into the workspace's content-addressed
- * attachment store; files too large to copy are referenced by absolute path when
- * one is resolvable, otherwise copied as a fallback. Dropped folders become
- * folder chips when they sit inside the workspace. Files saved before a failure
- * are still returned alongside the error so partial success is preserved.
- * @param files - The pasted or dropped files to persist.
- * @param workspaceCwd - Absolute workspace root the files belong to.
- * @param folders - Folders dropped alongside the files, if any.
+ * Attaches pasted/dropped entries in the order they arrived, so the chips read
+ * in the order the user dropped them. Files are stored in the workspace's
+ * content-addressed attachment store, or referenced by absolute path when too
+ * large to copy and one is resolvable; folders inside the workspace become
+ * folder chips. The first file that fails stops the run so its error names the
+ * file the user is looking at rather than the last of a cascade; everything
+ * attached before it is still returned.
+ * @param items - The pasted or dropped entries, with their folders marked.
+ * @param workspaceCwd - Absolute workspace root the entries belong to.
  * @returns The attachments that landed, plus the first failure message if any.
  */
 export async function attachPastedFiles(
-	files: readonly File[],
-	workspaceCwd: string,
-	folders: readonly File[] = [],
-): Promise<AttachPastedFilesResult> {
-	const stored = await storePastedFiles(files, workspaceCwd);
-	const referenced = attachDroppedFolders(folders, workspaceCwd);
-	return {
-		attachments: [...stored.attachments, ...referenced.attachments],
-		error: stored.error ?? referenced.error,
-	};
-}
-
-/**
- * Stores each file in turn, stopping at the first failure so the error names
- * the file the user is looking at rather than the last of a cascade.
- * @param files - The pasted or dropped files to persist.
- * @param workspaceCwd - Absolute workspace root the files belong to.
- * @returns The attachments that landed, plus the failure message if one stopped it.
- */
-async function storePastedFiles(
-	files: readonly File[],
+	{ entries, folders }: TransferItems,
 	workspaceCwd: string,
 ): Promise<AttachPastedFilesResult> {
 	const attachments: ComposerAttachment[] = [];
-	let error: string | null = null;
+	let folderError: string | null = null;
 	try {
-		for (const file of files) {
-			if (file.size > SMALL_FILE_MAX_BYTES) {
-				const absolutePath = getPathForFile(file);
-				if (absolutePath) {
-					attachments.push({
-						absolutePath,
-						id: `external:${absolutePath}`,
-						kind: 'external-file',
-						label: file.name || basename(absolutePath),
-						sizeBytes: file.size,
-					});
-					continue;
-				}
+		for (const entry of entries) {
+			if (!folders.has(entry)) {
+				attachments.push(await attachFile(entry, workspaceCwd));
+				continue;
 			}
-			const saved = await saveCopy(file, workspaceCwd);
-			attachments.push(workspaceFileAttachment(toWorkspaceFileSummary(saved)));
+			const outcome = attachDroppedFolder(entry, workspaceCwd);
+			if ('attachment' in outcome) {
+				attachments.push(outcome.attachment);
+			} else {
+				folderError ??= outcome.error;
+			}
 		}
 	} catch (cause) {
-		error = cause instanceof Error ? cause.message : saveFailureMessage();
+		const fileError =
+			cause instanceof Error ? cause.message : saveFailureMessage();
+		return { attachments, error: fileError };
 	}
-	return { attachments, error };
+	return { attachments, error: folderError };
 }
 
 /**
- * Turns dropped folders into folder chips. A folder inside the workspace is
+ * Attaches one pasted or dropped file: referenced by absolute path when it is
+ * too large to copy and has one, otherwise copied into the attachment store.
+ * @param file - The file to attach.
+ * @param workspaceCwd - Absolute workspace root a copy is stored under.
+ * @returns The file's chip.
+ */
+async function attachFile(
+	file: File,
+	workspaceCwd: string,
+): Promise<ComposerAttachment> {
+	const absolutePath =
+		file.size > SMALL_FILE_MAX_BYTES ? getPathForFile(file) : null;
+	if (absolutePath) {
+		return {
+			absolutePath,
+			id: `external:${absolutePath}`,
+			kind: 'external-file',
+			label: file.name || basename(absolutePath),
+			sizeBytes: file.size,
+		};
+	}
+	const saved = await saveCopy(file, workspaceCwd);
+	return workspaceFileAttachment(toWorkspaceFileSummary(saved));
+}
+
+/**
+ * Turns a dropped folder into a folder chip. A folder inside the workspace is
  * referenced by its workspace-relative path, exactly as an @-mentioned folder
  * is; one outside it has no chip to become, so it is named in the error instead
  * of being read as a file and failing.
- * @param folders - The dropped folders.
- * @param workspaceCwd - Absolute workspace root the chips' paths resolve against.
- * @returns The folder chips, plus a message for the first folder left out.
+ * @param folder - The dropped folder.
+ * @param workspaceCwd - Absolute workspace root the chip's path resolves against.
+ * @returns The folder chip, or the message naming a folder outside the workspace.
  */
-function attachDroppedFolders(
-	folders: readonly File[],
+function attachDroppedFolder(
+	folder: File,
 	workspaceCwd: string,
-): AttachPastedFilesResult {
-	const attachments: ComposerAttachment[] = [];
-	let error: string | null = null;
-	for (const folder of folders) {
-		const absolutePath = getPathForFile(folder);
-		const relativePath = workspaceRelativePath(absolutePath, workspaceCwd);
-		const name = folder.name || basename(absolutePath);
-		if (relativePath) {
-			attachments.push(
-				workspaceFileAttachment({
-					kind: 'directory',
-					name,
-					path: relativePath,
-				}),
-			);
-		} else {
-			error ??= folderOutsideWorkspaceMessage(name);
-		}
+): { attachment: ComposerAttachment } | { error: string } {
+	const absolutePath = getPathForFile(folder);
+	const relativePath = workspaceRelativePath(absolutePath, workspaceCwd);
+	const name = folder.name || basename(absolutePath);
+	if (!relativePath) {
+		return { error: folderOutsideWorkspaceMessage(name) };
 	}
-	return { attachments, error };
+	return {
+		attachment: workspaceFileAttachment({
+			kind: 'directory',
+			name,
+			path: relativePath,
+		}),
+	};
 }
 
 /**

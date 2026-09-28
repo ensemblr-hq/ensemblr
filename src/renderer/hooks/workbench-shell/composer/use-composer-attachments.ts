@@ -16,6 +16,7 @@ import {
 	getTransferItems,
 	hasTransferItems,
 	type TransferItems,
+	transferItemsFromFiles,
 } from '@/renderer/lib/workbench/composer-attachments';
 import {
 	composerAttachmentsAtomFamily,
@@ -88,9 +89,9 @@ export function useComposerAttachments({
 	}, [attachmentInbox, editorRef]);
 
 	const handlePastedFiles = useCallback(
-		async ({ files, folders }: TransferItems) => {
+		async (items: TransferItems) => {
 			setAttachmentError(null);
-			const result = await attachPastedFiles(files, workspaceCwd, folders);
+			const result = await attachPastedFiles(items, workspaceCwd);
 			if (result.error) {
 				setAttachmentError(result.error);
 			}
@@ -200,7 +201,7 @@ export function useComposerAttachments({
 			const files =
 				canIngestSelection && event.target.files ? [...event.target.files] : [];
 			if (files.length > 0) {
-				void handlePastedFiles({ files, folders: [] });
+				void handlePastedFiles(transferItemsFromFiles(files));
 			}
 			event.target.value = '';
 		},

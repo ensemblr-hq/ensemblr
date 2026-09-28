@@ -4,7 +4,8 @@
  * after the format its bytes really carry) and the file preview (deciding what
  * to embed bytes as when their extension lies, and budgeting the read) need the
  * same answers, so they live here rather than on either side where the two
- * could drift apart.
+ * could drift apart. The video containers a mislabeled "GIF" often really is
+ * are recognized here too, from the same `ftyp` box reader.
  */
 
 import path from 'node:path';
@@ -85,6 +86,34 @@ const IMAGE_SIGNATURES_BY_EXTENSION: Readonly<Record<string, ImageSignature>> =
 		},
 	};
 
+/**
+ * The `ftyp` brands each video container the attachment store names a copy
+ * after is recognized by. A "GIF" saved off a site that serves video is usually
+ * one of these. QuickTime comes first because a `.mov` can list MP4 brands
+ * among its compatible ones, while an MP4 does not list `qt  `.
+ */
+const VIDEO_BRANDS_BY_EXTENSION: readonly (readonly [
+	string,
+	readonly string[],
+])[] = [
+	['mov', ['qt  ']],
+	[
+		'mp4',
+		[
+			'avc1',
+			'dash',
+			'iso2',
+			'iso4',
+			'iso5',
+			'iso6',
+			'isom',
+			'M4V ',
+			'mp41',
+			'mp42',
+		],
+	],
+];
+
 /** Extension spellings that validate against another extension's signature. */
 const SIGNATURE_EXTENSION_ALIASES: Readonly<Record<string, string>> = {
 	jpeg: 'jpg',
@@ -112,7 +141,8 @@ function signatureExtensionForPreview(filePath: string): string | null {
 
 /**
  * Resolves the signature key a bare file extension validates against, folding
- * alternative spellings the way {@link signatureExtensionForPreview} does.
+ * alternative spellings such as `jpeg` and `tif` onto the key that owns their
+ * magic bytes.
  * @param extension - Extension without its dot, in any case.
  * @returns The signature key, or null when the extension has no known signature.
  */
@@ -138,6 +168,21 @@ export function sniffImageSignature(buffer: Buffer): string | null {
 			imageSignatureMatches(buffer, extension),
 		) ?? null
 	);
+}
+
+/**
+ * Names the video container a payload's `ftyp` box declares, so a clip saved as
+ * `.gif` is stored as the MP4 or QuickTime file it really is rather than as an
+ * opaque `.bin`. Only the attachment store asks: the preview embeds no video.
+ * @param buffer - Decoded file bytes.
+ * @returns The container's extension, or null when no known brand is declared.
+ */
+export function sniffVideoContainer(buffer: Buffer): string | null {
+	const declared = isobmffBrands(buffer);
+	const match = VIDEO_BRANDS_BY_EXTENSION.find(([, brands]) =>
+		brands.some((brand) => declared.has(brand)),
+	);
+	return match ? match[0] : null;
 }
 
 /**

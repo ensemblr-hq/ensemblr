@@ -49,7 +49,10 @@ both write paths:
 - A declared extension that the bytes confirm is kept.
 - A declared raster extension (from the name, or from the MIME type on the image
   path) that the bytes disprove is replaced by the format `sniffImageSignature`
-  finds. When nothing is found, the extension is dropped for `txt` or `bin`.
+  finds. Failing that, `sniffVideoContainer` reads the `ftyp` brands for an MP4
+  or QuickTime movie, since a "GIF" saved from a site that serves video is
+  usually one; it is stored as `.mp4` or `.mov`, and the preview does not embed
+  it. When nothing is found, the extension is dropped for `txt` or `bin`.
 - An extension with no known signature (`.pdf`, `.heic`, `.md`) is kept as
   written. Sniffing it could rename a text file that starts with `BM` to `.bmp`.
 - Sniffing runs only on binary payloads, for the same reason.
@@ -63,10 +66,15 @@ failure code's translated headline through `failureText`. Main's own words follo
 only when `failureDetail` finds runtime detail in them, such as the OS error
 behind a failed write.
 
-`getTransferItems` separates dropped folders by their `webkitGetAsEntry()`
-entry. A folder inside the workspace becomes the same folder chip an @-mention
-gives. A folder outside the workspace is named in a message that points at
-**Link directory**.
+`getTransferItems` marks dropped folders by their `webkitGetAsEntry()` entry and
+keeps every entry in the order it arrived, so a mixed drop lands as chips in the
+order the user dropped it — [0047](0047-model-composer-attachments-as-one-ordered-list-in-a-lexical-draft.md)'s
+one ordered list. A folder inside the workspace becomes the same folder chip an
+@-mention gives. A folder outside the workspace is named in a message that
+points at **Link directory**. A payload that carries no items falls back to its
+bare file list, which has no entries to tell a folder by; a folder there fails
+its read and is reported, translated, as a file that could not be read rather
+than as the raw `FileReader` error.
 
 The preview embeds images and PDFs up to `MAX_PREVIEW_EMBED_BYTES` (50 MB). This
 is the attachment store's hard ceiling, so the preview can show any file the
@@ -94,3 +102,9 @@ chip already did.
   stored name.
 - Previewing a 50 MB image holds about 67 MB of base64 in main and in the
   renderer's query cache until it is evicted.
+- The same ceiling applies to images a markdown file embeds, because
+  `use-markdown-image-source.ts` reads them through the same `readWorkspaceFile`.
+  A README that references ten 20 MB GIFs now renders them instead of showing
+  "too large", and holds about 270 MB of base64 while they stay cached.
+- A clip stored as `.mp4` or `.mov` gets a chip but no preview. The agent sees
+  its real container instead of an opaque `.bin`.
