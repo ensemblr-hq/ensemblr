@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.23] - 2026-09-28
+
+Ensemblr 0.1.23 ships Ensemblr as a Nix flake, lets a setup or run script ask for your password, accepts any file dropped on the composer, and stops Claude turns that spin on a rejected credential.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.23) ·
+[`.dmg` (Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.23/Ensemblr-0.1.23-arm64.dmg) ·
+[`.dmg` (Intel)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.23/Ensemblr-0.1.23-x64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.23/Ensemblr-0.1.23-x64.AppImage)
+
+### Added
+
+- **Ensemblr is packaged as a Nix flake**, and the in-app updater stands down inside the Nix store. [ADR 0077](./docs/adr/0077-ship-a-nix-flake-and-stand-the-updater-down-in-the-nix-store.md). (#654)
+- **A setup or run script can ask for a password.** Main watches script output for a password prompt and the dock floats a masked field over the Setup or Run pane; the input goes straight to the PTY and is never kept. (#657)
+- **Real app icons in the Linux open-in menu**, resolved through the freedesktop Icon Theme spec. (#660)
+- **Agent turns end on Checks** after opening a pull request or leaving review comments. (#659)
+- **Nix files, `flake.lock`, `nix/` folders, LICENSE, NOTICE and other extension-less files get proper icons.** (#664, #661)
+
+### Changed
+
+- **Dependabot updates batched**, `zod` deduped, Nix deps re-pinned. (#655)
+
+### Fixed
+
+- **Any file can be attached to the composer.** A stored attachment is named after the format its bytes carry, empty files are stored, dropped folders become chips, and images and PDFs preview up to 50 MB. [ADR 0079](./docs/adr/0079-name-an-attachment-after-its-bytes-instead-of-refusing-it.md). (#662)
+- **Claude turns stop retrying a rejected credential.** An authentication-class `api_retry` cause stops the turn on the second consecutive frame instead of spinning for minutes. (#653)
+- **Unfocused workspaces with uncommitted work no longer show ready-to-merge.** (#663)
+- **The Linear sidebar label lines up with the other rows**, and **the dock Run and Preview dropdowns size to their labels.** (#658, #656)
+
 ## [0.1.22] - 2026-09-24
 
 Ensemblr 0.1.22 fixes Opus 5 disappearing from the Claude model picker.
