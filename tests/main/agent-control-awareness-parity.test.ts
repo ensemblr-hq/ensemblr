@@ -482,6 +482,32 @@ describe('agent-control AWARENESS parity', () => {
 		);
 	});
 
+	// The app pulls Checks once per comment pass and never after a pull request,
+	// and any later focus call moves the user off it, so the root whose reader is
+	// the user is the one told where the turn ends.
+	it('ends a root turn on Checks after a pull request or review comments', () => {
+		for (const playbook of [
+			ORCHESTRATOR_AWARENESS,
+			NATIVE_ORCHESTRATOR_AWARENESS,
+			HARNESS_AWARENESS,
+		]) {
+			expect(playbook).toContain('End the turn on the Checks panel');
+			expect(playbook).toContain('you opened a pull request');
+			expect(playbook).toContain('review comments were left on the diff');
+			expect(playbook).toContain('`panel: "checks"` your last focus call');
+		}
+		for (const playbook of [MANAGER_SUBAGENT_AWARENESS, SUBAGENT_AWARENESS]) {
+			expect(playbook).not.toContain('End the turn on the Checks panel');
+		}
+	});
+
+	it('asks every role for Checks back after comments instead of forbidding the focus call', () => {
+		for (const playbook of playbooksFor(ALL_ON)) {
+			expect(playbook).toContain('a turn that left comments ends on Checks');
+			expect(playbook).not.toContain('never spend an `ensemblr_focus_panel`');
+		}
+	});
+
 	// A brief that names only the topic leaves the child to invent its own
 	// deliverable, which is how a fan-out came back with an unrequested 9KB
 	// markdown file nobody asked for and nobody diffed.

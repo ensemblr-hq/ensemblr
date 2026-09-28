@@ -145,7 +145,9 @@ When an agent files or resolves comments, Ensemblr **brings the Checks tab
 forward** — the roll-up that answers "what did the agent just leave me, and what
 is still open", rather than six files to scroll. The pull is coalesced per
 workspace, so a pass that files ten comments pulls focus once however long it
-runs, and a resolve batch that closed nothing pulls nothing.
+runs, and a resolve batch that closed nothing pulls nothing. Agents are also told
+to end a turn on Checks when it left review comments or opened a pull request (or
+pushed to the open one), so that is where you land when the turn finishes.
 
 Agents can read your comments, leave their own, and resolve the ones they
 addressed, through Ensemblr Control — see

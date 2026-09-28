@@ -268,12 +268,13 @@ export function makeDiffPort(deps: ReviewPortDeps): DiffPort {
  * Renders the acknowledgement an agent reads after filing comments, naming
  * where they landed so it does not go looking for a second call to publish them.
  * The panel it names is the one the app has just moved the user to, so the
- * message and the app agree about where the user is standing.
+ * message and the app agree about where the user is standing — and it asks for
+ * Checks back at the end of the turn, because a later focus call moves them off.
  * @param count - How many comments were saved.
  * @returns The message returned alongside the new comment ids.
  */
 function filedMessage(count: number): string {
-	return `Filed ${count} review comment(s) on this workspace's diff, labelled as yours. The user reads them in the Checks panel, which lists every outstanding comment, and Ensemblr has already taken them there — do not spend an \`ensemblr_focus_panel\` call on it. Each comment also sits inline on its own line in Changes.`;
+	return `Filed ${count} review comment(s) on this workspace's diff, labelled as yours. The user reads them in the Checks panel, which lists every outstanding comment, and Ensemblr has already taken them there, so this call needs no \`ensemblr_focus_panel\` of its own — but if you focus anything else before the turn ends, finish back on Checks. Each comment also sits inline on its own line in Changes.`;
 }
 
 /**
