@@ -76,6 +76,7 @@ const fileIconByName: Record<string, string> = {
 	maintainers: 'file-type-text',
 	makefile: 'file-type-makefile',
 	'package.json': 'file-type-npm',
+	'package.resolved': 'file-type-swift',
 	procfile: 'file-type-procfile',
 	rakefile: 'file-type-rake',
 	readme: 'file-type-text',

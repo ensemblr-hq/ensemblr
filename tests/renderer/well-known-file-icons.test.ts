@@ -128,6 +128,16 @@ describe('Nix files', () => {
 	);
 });
 
+describe('Swift package files', () => {
+	it.each([
+		['Package.swift', 'file-type-swift'],
+		['Package.resolved', 'file-type-swift'],
+		['package.json', 'file-type-npm'],
+	])('maps %s to %s', (name, icon) => {
+		expect(iconFor(name)).toBe(`vscode-icons:${icon}`);
+	});
+});
+
 describe('folder icons', () => {
 	it.each([
 		['docs', 'folder-type-docs'],
