@@ -411,6 +411,8 @@ describe('review port', () => {
 		expect(result.added).toBe(2);
 		expect(result.commentIds).toEqual(['c-1', 'c-2']);
 		expect(result.message).toContain('Checks panel');
+		expect(result.message).toContain('finish back on Checks');
+		expect(result.message).not.toContain('do not spend');
 	});
 
 	// The result promises the user can see the comments; the renderer only
@@ -441,6 +443,8 @@ describe('review port: resolving comments', () => {
 
 		expect(result.resolved).toBe(2);
 		expect(result.resolvedIds).toEqual(['c-1', 'c-2']);
+		expect(result.message).toContain('finish back on Checks');
+		expect(result.message).not.toContain('do not spend');
 		expect(saveComment).toHaveBeenCalledWith({
 			id: 'c-1',
 			status: 'resolved',

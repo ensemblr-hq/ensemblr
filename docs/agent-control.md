@@ -1554,6 +1554,20 @@ focus-stealing: one yank per pass, at the moment the pass has something to show.
 resolve batch that closed nothing pulls no focus at all — the same condition the
 cache-invalidation broadcast is gated on.
 
+**The playbooks carry the other half: a turn ends on Checks.** The port pulls
+focus at the moment of the op, but it cannot see what the agent focuses after it,
+and nothing pulls Checks after the agent opens a pull request. So every root
+playbook (`CHECKS_LANDING` in `src/shared/agent-control/awareness.ts`) asks the
+agent to make `ensemblr_focus_panel` with `panel: "checks"` its last focus call
+in a turn that opened or pushed to a pull request or left review comments. The
+review bullet every role shares says only that a comment op needs no focus call
+of its own, so children and plans carry no end-of-turn rule; the filed and
+resolved acknowledgements ask for Checks back if the agent focuses anything
+else before its turn ends. The AFK delivery loop's step 5 repeats the root rule
+once the pull request is opened or updated.
+This is prose rather than enforcement because the port has no signal for "the
+turn is ending"; the one-yank-per-pass rule above is unchanged.
+
 **Three of the four survive both gates.** The two reads are reads, allowed in
 every permission mode. `addDiffComments` and `resolveDiffComments` are writes and
 follow the mode like any other. Plan Mode leaves the reads and `addDiffComments`

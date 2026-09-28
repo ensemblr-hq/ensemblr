@@ -236,6 +236,19 @@ describe('afk delivery loop', () => {
 		);
 	});
 
+	it('sends the returning user to Checks once the pull request is open', () => {
+		for (const guidance of [directive, nativeDirective]) {
+			const opened = guidance.indexOf('and open the pull request.');
+			const landing = guidance.indexOf(
+				'Opened or updated, then bring the Checks panel forward',
+			);
+			expect(opened).toBeGreaterThan(-1);
+			expect(landing).toBeGreaterThan(opened);
+			expect(guidance).toContain('`panel: "checks"`');
+		}
+		expect(subagentDirective).not.toContain('Checks panel');
+	});
+
 	it('separates a hard block from an ordinary uncertainty', () => {
 		expect(directive).toContain('hard block');
 		expect(directive).toContain('Being unsure is not a hard block');

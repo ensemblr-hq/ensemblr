@@ -268,19 +268,22 @@ export function makeDiffPort(deps: ReviewPortDeps): DiffPort {
  * Renders the acknowledgement an agent reads after filing comments, naming
  * where they landed so it does not go looking for a second call to publish them.
  * The panel it names is the one the app has just moved the user to, so the
- * message and the app agree about where the user is standing.
+ * message and the app agree about where the user is standing — and it asks for
+ * Checks back at the end of the turn, because a later focus call moves them off.
  * @param count - How many comments were saved.
  * @returns The message returned alongside the new comment ids.
  */
 function filedMessage(count: number): string {
-	return `Filed ${count} review comment(s) on this workspace's diff, labelled as yours. The user reads them in the Checks panel, which lists every outstanding comment, and Ensemblr has already taken them there — do not spend an \`ensemblr_focus_panel\` call on it. Each comment also sits inline on its own line in Changes.`;
+	return `Filed ${count} review comment(s) on this workspace's diff, labelled as yours. The user reads them in the Checks panel, which lists every outstanding comment, and Ensemblr has already taken them there, so this call needs no \`ensemblr_focus_panel\` of its own — but if you focus anything else before the turn ends, finish back on Checks. Each comment also sits inline on its own line in Changes.`;
 }
 
 /**
  * Renders the acknowledgement an agent reads after resolving. A batch that
  * matched nothing is reported as the no-op it is rather than an error, because
  * re-running the cleanup step after a restart lands here and an error would
- * teach a model to stop doing the bookkeeping at all.
+ * teach a model to stop doing the bookkeeping at all. Like the filed
+ * acknowledgement it asks for Checks back rather than forbidding a focus call,
+ * because a resolve pass is usually followed by a push the turn must end on.
  * @param result - The partitioned outcome of the batch.
  * @returns The message returned alongside the buckets.
  */
@@ -294,7 +297,7 @@ function resolvedMessage(
 	const trailing = result.notFound.length
 		? ` ${result.notFound.length} id(s) matched no open comment on this workspace and were skipped.`
 		: '';
-	return `Resolved ${result.resolved} review comment(s); the user sees them close in the Checks panel, where Ensemblr has already taken them — do not spend an \`ensemblr_focus_panel\` call on it. Say in your reply which comments you left open and why.${trailing}`;
+	return `Resolved ${result.resolved} review comment(s); the user sees them close in the Checks panel, where Ensemblr has already taken them, so this call needs no \`ensemblr_focus_panel\` of its own — but if you focus anything else before the turn ends, finish back on Checks. Say in your reply which comments you left open and why.${trailing}`;
 }
 
 /**

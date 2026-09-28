@@ -122,7 +122,11 @@ origin, so a comment you wrote never reads as one the user wrote.
 inline on its line in Changes, and in the Checks roll-up that answers what a pass
 left open — and the list is what someone handed six findings actually wants.
 Ensemblr brings Checks forward itself after a comment op, once per batch rather
-than once per call, so never spend an `ensemblr_focus_panel` call on it.
+than once per call, so the op needs no `ensemblr_focus_panel` call of its own.
+It cannot see what you focus afterwards, though, so a root orchestrator ends a
+turn that left comments on Checks: if you brought a tab, terminal, or another
+panel forward since, finish with `ensemblr_focus_panel` and `panel: "checks"`.
+A sub-agent leaves that landing to the root it reports to.
 
 **Resolve only what you actually fixed, in the turn you fixed it.** An open
 comment is a live claim that the finding still stands, so a queue of comments
@@ -175,6 +179,11 @@ from a branch that looks ready.
 
 When a change is backed by a tracker issue, put that issue's identifier in the
 branch name, the commits, and the PR title.
+
+**Once you have opened the pull request, or pushed to the one already open, end
+the turn on Checks** (`ensemblr_focus_panel` with `panel: "checks"`). Checks
+shows the pull request's status, its CI runs, and its review comments, and
+nothing in the app brings it forward after a pull request on its own.
 
 ## Permission modes and approvals
 

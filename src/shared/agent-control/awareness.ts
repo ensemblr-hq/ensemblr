@@ -153,9 +153,12 @@ Keeping your own tab legible is your job, not the user's, and it is bookkeeping 
  * It names Checks rather than Changes as where comments are read, and says the
  * app moves the user there, because both are true: the roll-up is the view that
  * answers what a pass left open, and the port pulls focus to it so no model has
- * to remember to.
+ * to remember to. It stops at "no focus call of its own" rather than forbidding
+ * one: ending the turn on Checks is {@link CHECKS_LANDING}'s job, held by the
+ * roots alone, so a child or a plan is not handed an end-of-turn rule for a
+ * user it does not answer to.
  */
-const REVIEW_INVENTORY_READS = `- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads as a list in the Checks panel. Ensemblr brings Checks forward itself after a comment op — once per batch, not once per call — so never spend an \`ensemblr_focus_panel\` call on it.`;
+const REVIEW_INVENTORY_READS = `- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads as a list in the Checks panel. Ensemblr brings Checks forward itself after a comment op — once per batch, not once per call — so the op needs no \`ensemblr_focus_panel\` call of its own.`;
 
 /**
  * The full review bullet, for every role outside Plan Mode. Plan Mode gets
@@ -623,6 +626,17 @@ ${APPROVAL_ETIQUETTE}`;
 const ORCHESTRATOR_ANSWER_LAST = `Your last message is your answer to the user, and it is the last thing you produce this turn. Finish every tool call before you write it — the work, the bookkeeping (\`ensemblr_set_summary\`), the cleanup (\`ensemblr_close_tab\`), the focusing — because the app shows a turn as one collapsed activity row plus the prose that follows the final call. Prose you write and then follow with another tool call is filed as working commentary and folded into that row, so a report written mid-turn is one the user has to go digging for. Everything the user needs has to be IN that final message — never a pointer to work earlier in the turn ("full report above", "as summarised", "see my findings"), because the folded-away copy is all they get. Produce nothing after it.`;
 
 /**
+ * Where a root leaves the user when its turn produced something Checks shows: a
+ * pull request, or review comments. Held by the three workspace root playbooks —
+ * Pi, native, and harness — because a root is the role whose reader is the user
+ * standing in that workspace, and because the app covers only half of it:
+ * `review-focus.ts` pulls Checks once per comment pass, nothing pulls it after
+ * a pull request, and any focus call the agent makes afterwards moves the user
+ * away from both.
+ */
+const CHECKS_LANDING = `End the turn on the Checks panel when it leaves the user something to read there: you opened a pull request or pushed to the one already open, or review comments were left on the diff this turn — by you or by a child you spawned. Checks is where the pull request's status, its CI runs, and the comment roll-up live, so make \`ensemblr_focus_panel\` with \`panel: "checks"\` your last focus call, before your final message. Ensemblr pulls Checks forward on its own after a comment op, but only once per pass and never after a pull request, and any tab, terminal, or panel you focus afterwards takes the user away again. A turn that did neither leaves the panel where the user put it.`;
+
+/**
  * Playbook for a root orchestrator: delegate for useful parallelism or context
  * preservation, including trivial Grunt work, then block on the wait loop.
  *
@@ -645,6 +659,8 @@ ${peerOrchestratorGuidance(features.tuiHarnesses)}
 ${DELEGATION_DECISION_GUIDANCE}
 
 ${ORCHESTRATOR_ANSWER_LAST}
+
+${CHECKS_LANDING}
 
 Split the work before you split the agents. A child cold-starts with nothing but its brief, so every fact two children both need is a repository read paid for twice — and that re-derivation is what makes a fan-out cost more context than doing the work inline. When the workstreams share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and put the findings with full paths into every brief. Fan out cold only where the work is genuinely disjoint.
 
@@ -703,6 +719,8 @@ export const nativeOrchestratorAwareness = (
 ${DELEGATION_DECISION_GUIDANCE}
 
 ${ORCHESTRATOR_ANSWER_LAST}
+
+${CHECKS_LANDING}
 
 Delegation runs through YOUR OWN runtime's sub-agent tool in this mode, chosen by the user in Settings → Providers. Ensemblr's chat-tab spawn tools — \`ensemblr_start_conversation\`, \`ensemblr_spawn_chat_tab\`, \`ensemblr_send_follow_up\`, \`ensemblr_wait_for_agents\`, \`ensemblr_list_models\` — are absent from your list rather than merely discouraged, so do not go hunting for them and do not tell the user to spawn a tab by hand. Your children run inside this conversation and report back to you directly; the app never sees them as tabs of their own. \`ensemblr_start_review\` is absent too, for a different reason: the review it opens is a conversation you would have to wait on and steer, and the two tools for that are the ones above — so when a change wants a second reader, spawn one through your own mechanism and brief it to review the branch diff. ${NATIVE_DELEGATION_ROLE_GUIDANCE}
 
@@ -815,6 +833,8 @@ ${TERMINAL_DISCIPLINE}
 ${LINEAR_FOLLOW_THROUGH}
 
 ${REVIEW_FOLLOW_THROUGH}
+
+${CHECKS_LANDING}
 
 ${peerOrchestratorGuidance(features.tuiHarnesses)}
 
