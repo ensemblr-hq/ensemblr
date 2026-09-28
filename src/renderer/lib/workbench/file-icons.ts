@@ -5,6 +5,7 @@ import { ICON_SUBSET } from './icon-subset.gen';
 
 const iconPrefix = 'vscode-icons';
 
+/** Lowercased directory names that decide their own folder icon. */
 const folderIconByName: Record<string, string> = {
 	'.claude': 'folder-type-claude',
 	'.git': 'folder-type-git',
@@ -17,22 +18,107 @@ const folderIconByName: Record<string, string> = {
 	tests: 'folder-type-test',
 };
 
+/**
+ * Whole file names, lowercased, that decide their own icon. This is where a
+ * repository's extension-less files — build files, ownership files, plain-text
+ * docs, and dotfiles with no extension of their own — get a glyph.
+ */
 const fileIconByName: Record<string, string> = {
+	'.browserslistrc': 'file-type-browserslist',
+	'.dockerignore': 'file-type-docker',
+	'.editorconfig': 'file-type-editorconfig',
+	'.env': 'file-type-dotenv',
+	'.envrc': 'file-type-direnv',
+	'.eslintignore': 'file-type-eslint',
+	'.eslintrc': 'file-type-eslint',
 	'.git': 'file-type-git',
+	'.git-blame-ignore-revs': 'file-type-git',
+	'.gitattributes': 'file-type-git',
+	'.gitconfig': 'file-type-git',
 	'.gitignore': 'file-type-git',
 	'.gitkeep': 'file-type-git',
+	'.gitmodules': 'file-type-git',
+	'.justfile': 'file-type-just',
+	'.mailmap': 'file-type-git',
+	'.node-version': 'file-type-node',
+	'.npmignore': 'file-type-npm',
 	'.npmrc': 'file-type-npm',
 	'.nvmrc': 'file-type-node',
-	AGENTS: 'file-type-agents',
-	'AGENTS.md': 'file-type-agents',
+	'.prettierignore': 'file-type-prettier',
+	'.prettierrc': 'file-type-prettier',
+	'.python-version': 'file-type-pyenv',
+	'.ruby-version': 'file-type-ruby',
+	'.yarnrc': 'file-type-yarn',
+	agents: 'file-type-agents',
+	'agents.md': 'file-type-agents',
+	authors: 'file-type-text',
 	'biome.json': 'file-type-biome',
+	brewfile: 'file-type-brew',
 	'bun.lock': 'file-type-bun',
+	changelog: 'file-type-text',
+	changes: 'file-type-text',
+	'cmakelists.txt': 'file-type-cmake',
+	codeowners: 'file-type-codeowners',
 	'components.json': 'file-type-json',
-	CONTEXT: 'file-type-markdown',
-	'CONTEXT.md': 'file-type-markdown',
+	containerfile: 'file-type-docker',
+	context: 'file-type-markdown',
+	'context.md': 'file-type-markdown',
+	contributors: 'file-type-text',
+	dockerfile: 'file-type-docker',
 	'forge.config.ts': 'file-type-config',
+	gemfile: 'file-type-ruby',
+	'gemfile.lock': 'file-type-ruby',
+	gnumakefile: 'file-type-makefile',
+	history: 'file-type-text',
+	justfile: 'file-type-just',
+	maintainers: 'file-type-text',
+	makefile: 'file-type-makefile',
 	'package.json': 'file-type-npm',
+	procfile: 'file-type-procfile',
+	rakefile: 'file-type-rake',
+	readme: 'file-type-text',
+	todo: 'file-type-todo',
+	vagrantfile: 'file-type-vagrant',
+	version: 'file-type-text',
 };
+
+/**
+ * Lowercased name prefixes whose every variant shares the family icon:
+ * `.env.local` is still dotenv, `Dockerfile.dev` is still a Dockerfile.
+ */
+const fileIconByNamePrefix: Record<string, string> = {
+	'.env.': 'file-type-dotenv',
+	'containerfile.': 'file-type-docker',
+	'dockerfile.': 'file-type-docker',
+};
+
+/** The name-prefix families as pairs, so resolving a file does not rebuild them. */
+const FILE_ICON_NAME_PREFIXES: readonly (readonly [string, string])[] =
+	Object.entries(fileIconByNamePrefix);
+
+/**
+ * Lowercased stems of legal documents, which keep their icon whether they ship
+ * bare or as `.md`/`.txt` — `LICENSE`, `LICENSE.md` and `NOTICE.txt` alike. A
+ * stem may carry its own dotted suffix, as GNU's `COPYING.LESSER` does.
+ */
+const fileIconByDocumentStem: Record<string, string> = {
+	copying: 'file-type-license',
+	'copying.lesser': 'file-type-license',
+	'copying.lib': 'file-type-license',
+	copyright: 'file-type-license',
+	licence: 'file-type-license',
+	license: 'file-type-license',
+	'license-apache': 'file-type-license',
+	'license-apache-2.0': 'file-type-license',
+	'license-mit': 'file-type-license',
+	'license.apache': 'file-type-license',
+	'license.mit': 'file-type-license',
+	notice: 'file-type-license',
+	unlicense: 'file-type-unlicense',
+};
+
+/** Extensions a legal document may carry on top of its stem. */
+const DOCUMENT_EXTENSIONS: ReadonlySet<string> = new Set(['md', 'txt']);
 
 const fileIconByExtension: Record<string, string> = {
 	avif: 'file-type-image',
@@ -40,11 +126,13 @@ const fileIconByExtension: Record<string, string> = {
 	bmp: 'file-type-image',
 	c: 'file-type-c',
 	cjs: 'file-type-js',
+	cmake: 'file-type-cmake',
 	cpp: 'file-type-cpp',
 	cs: 'file-type-csharp',
 	css: 'file-type-css',
 	csv: 'file-type-excel',
 	doc: 'file-type-word',
+	dockerfile: 'file-type-docker',
 	docx: 'file-type-word',
 	entitlements: 'file-type-xml',
 	fish: 'file-type-shell',
@@ -71,6 +159,7 @@ const fileIconByExtension: Record<string, string> = {
 	md: 'file-type-markdown',
 	mdx: 'file-type-mdx',
 	mjs: 'file-type-js',
+	mk: 'file-type-makefile',
 	mm: 'file-type-objectivecpp',
 	mts: 'file-type-typescript',
 	odt: 'file-type-word',
@@ -116,9 +205,6 @@ const DEFAULT_FILE_ICON = 'default-file';
 /** Icon a directory falls back to when its name matches no rule. */
 const DEFAULT_FOLDER_ICON = 'default-folder';
 
-/** Icon for `.env` and its per-environment variants, matched by prefix. */
-const DOTENV_ICON = 'file-type-dotenv';
-
 /**
  * Every bare vscode-icons name this module can produce, including the derived
  * open-folder variants. `tests/renderer/icon-collections.test.ts` asserts each
@@ -129,8 +215,9 @@ export const WORKSPACE_FILE_ICON_NAMES: readonly string[] = [
 	...new Set([
 		DEFAULT_FILE_ICON,
 		DEFAULT_FOLDER_ICON,
-		DOTENV_ICON,
 		...Object.values(fileIconByName),
+		...Object.values(fileIconByNamePrefix),
+		...Object.values(fileIconByDocumentStem),
 		...Object.values(fileIconByExtension),
 		...Object.values(folderIconByName),
 	]),
@@ -161,7 +248,9 @@ export function getWorkspaceFileIconName(
 	}
 
 	if (file.kind === 'directory') {
-		const baseIcon = folderIconByName[file.name] ?? DEFAULT_FOLDER_ICON;
+		const baseIcon =
+			lookupIcon(folderIconByName, file.name.toLowerCase()) ??
+			DEFAULT_FOLDER_ICON;
 		const openIcon = `${baseIcon}-opened`;
 		const iconName =
 			options?.isExpanded && folderIconExists(openIcon) ? openIcon : baseIcon;
@@ -169,16 +258,70 @@ export function getWorkspaceFileIconName(
 		return `${iconPrefix}:${iconName}`;
 	}
 
-	if (file.name === '.env' || file.name.startsWith('.env.')) {
-		return `${iconPrefix}:${DOTENV_ICON}`;
-	}
+	return `${iconPrefix}:${getFileIconName(file.name.toLowerCase())}`;
+}
 
-	const iconName =
-		fileIconByName[file.name] ??
-		fileIconByExtension[getFileExtension(file.name)] ??
-		DEFAULT_FILE_ICON;
+/**
+ * Resolves a file's bare vscode-icons name, trying the most specific rule
+ * first: the whole name, a name-prefix family, a legal-document stem, then
+ * the extension.
+ * @param name - The file name, lowercased.
+ * @returns A bare vscode-icons name, or the default file glyph.
+ */
+function getFileIconName(name: string): string {
+	const extension = getFileExtension(name);
 
-	return `${iconPrefix}:${iconName}`;
+	return (
+		lookupIcon(fileIconByName, name) ??
+		getFileIconNameByPrefix(name) ??
+		getDocumentIconName(name, extension) ??
+		lookupIcon(fileIconByExtension, extension) ??
+		DEFAULT_FILE_ICON
+	);
+}
+
+/**
+ * Reads an icon table by its own keys only, so a file or folder named
+ * `constructor` or `__proto__` misses rather than resolving to an
+ * `Object.prototype` member.
+ * @param table - One of this module's icon tables.
+ * @param key - The name, stem, or extension to look up.
+ * @returns The mapped icon, or undefined when the table has no such key.
+ */
+function lookupIcon(
+	table: Record<string, string>,
+	key: string,
+): string | undefined {
+	return Object.hasOwn(table, key) ? table[key] : undefined;
+}
+
+/**
+ * Finds the family icon for a name that extends a known prefix.
+ * @param name - The file name, lowercased.
+ * @returns The family's icon, or undefined when no prefix matches.
+ */
+function getFileIconNameByPrefix(name: string): string | undefined {
+	return FILE_ICON_NAME_PREFIXES.find(([prefix]) =>
+		name.startsWith(prefix),
+	)?.[1];
+}
+
+/**
+ * Finds the icon for a legal document such as `LICENSE`, `NOTICE.md` or
+ * `COPYING.LESSER`: the name, less a trailing `.md`/`.txt`, must be a known
+ * stem, so `license.ts` is left to its extension.
+ * @param name - The file name, lowercased.
+ * @param extension - The name's extension, without the leading dot.
+ * @returns The document's icon, or undefined when the name is not one.
+ */
+function getDocumentIconName(
+	name: string,
+	extension: string,
+): string | undefined {
+	const stem = DOCUMENT_EXTENSIONS.has(extension)
+		? name.slice(0, -(extension.length + 1))
+		: name;
+	return lookupIcon(fileIconByDocumentStem, stem);
 }
 
 /**
