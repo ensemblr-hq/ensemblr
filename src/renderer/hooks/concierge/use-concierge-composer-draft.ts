@@ -19,6 +19,8 @@ import { mentionReplacementRange } from '@/renderer/lib/workbench/composer';
 import {
 	attachPastedFiles,
 	attachPastedText,
+	getTransferItems,
+	hasTransferItems,
 } from '@/renderer/lib/workbench/composer-attachments';
 import { serializeComposerDraft } from '@/renderer/lib/workbench/mention-payload';
 import {
@@ -160,9 +162,9 @@ export function useConciergeComposerDraft({
 	);
 
 	const attachFiles = useCallback(
-		async (files: readonly File[]) => {
+		async (files: readonly File[], folders: readonly File[] = []) => {
 			setAttachmentError(null);
-			const result = await attachPastedFiles(files, cwd);
+			const result = await attachPastedFiles(files, cwd, folders);
 			if (result.error) {
 				setAttachmentError(result.error);
 			}
@@ -311,9 +313,9 @@ export function useConciergeComposerDraft({
 
 	const consumePastedTransfer = useCallback(
 		(data: DataTransfer): boolean => {
-			const files = Array.from(data.files ?? []);
-			if (files.length > 0) {
-				void attachFiles(files);
+			const items = getTransferItems(data);
+			if (hasTransferItems(items)) {
+				void attachFiles(items.files, items.folders);
 				return true;
 			}
 			const pasted = data.getData('text/plain');
@@ -333,11 +335,11 @@ export function useConciergeComposerDraft({
 
 	const consumeDroppedTransfer = useCallback(
 		(data: DataTransfer): boolean => {
-			const files = Array.from(data.files ?? []);
-			if (files.length === 0) {
+			const items = getTransferItems(data);
+			if (!hasTransferItems(items)) {
 				return false;
 			}
-			void attachFiles(files);
+			void attachFiles(items.files, items.folders);
 			return true;
 		},
 		[attachFiles],

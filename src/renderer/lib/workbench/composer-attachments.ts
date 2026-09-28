@@ -3,6 +3,11 @@ import {
 	writeWorkspaceFileAttachment,
 	writeWorkspaceImageAttachment,
 } from '@/renderer/api/ensemblr-queries';
+import {
+	type CodedFailure,
+	failureDetail,
+	failureText,
+} from '@/renderer/lib/failure-text';
 import { i18n } from '@/renderer/lib/i18n';
 import { terminalSelectionFilename } from '@/renderer/lib/workbench/attachment-filename';
 import {
@@ -113,13 +118,14 @@ function pastedTextAttachment(
 }
 
 /**
- * The workspace-relative path a chip can open in the file preview, or null when
- * the file preview is not where the chip should go. A directory has no file to
- * read, an oversize external file was left outside the workspace (which the main
- * process refuses to read), and a review comment opens its own preview panel
- * rather than the markdown document it was written to.
+ * The path a chip can open in the file preview, or null when the file preview is
+ * not where the chip should go. A directory has no file to read, and a review
+ * comment opens its own preview panel rather than the markdown document it was
+ * written to. An oversize file left outside the workspace previews by its
+ * absolute path, which the preview reads the same way it reads a file an agent
+ * wrote outside the workspace — that is how a large GIF gets shown at all.
  * @param attachment - The attachment behind the chip.
- * @returns The repo-relative path to preview, or null.
+ * @returns The repo-relative or absolute path to preview, or null.
  */
 export function attachmentPreviewPath(
 	attachment: ComposerAttachment,
@@ -131,6 +137,8 @@ export function attachmentPreviewPath(
 		case 'pasted-text':
 		case 'workspace-file':
 			return attachment.path;
+		case 'external-file':
+			return attachment.absolutePath;
 		default:
 			return null;
 	}
@@ -156,22 +164,53 @@ export function isReferenceAttachment(
 	return 'reference' in attachment;
 }
 
-/** Extracts every file from a browser clipboard or drag payload. */
-export function getTransferFiles(data: DataTransfer): readonly File[] {
+/**
+ * The files and folders a clipboard or drag payload carries, kept apart because
+ * a folder has no bytes to store.
+ */
+export interface TransferItems {
+	files: readonly File[];
+	folders: readonly File[];
+}
+
+/**
+ * Extracts every file and folder from a browser clipboard or drag payload. A
+ * dropped folder arrives as a `File` too, but one whose bytes cannot be read, so
+ * it is told apart by its entry rather than discovered by a failed read.
+ * @param data - The clipboard or drag payload.
+ * @returns The payload's files and folders, each in the order they arrived.
+ */
+export function getTransferItems(data: DataTransfer): TransferItems {
 	const files: File[] = [];
+	const folders: File[] = [];
 	for (const item of Array.from(data.items)) {
-		if (item.kind !== 'file') {
-			continue;
-		}
-		const file = item.getAsFile();
+		const file = item.kind === 'file' ? item.getAsFile() : null;
 		if (file) {
-			files.push(file);
+			(isFolderItem(item) ? folders : files).push(file);
 		}
 	}
-	if (files.length > 0) {
-		return files;
+	if (files.length > 0 || folders.length > 0) {
+		return { files, folders };
 	}
-	return Array.from(data.files);
+	return { files: Array.from(data.files), folders: [] };
+}
+
+/**
+ * Whether a clipboard or drag payload carries anything to attach.
+ * @param items - The payload's files and folders.
+ * @returns True when it holds at least one of either.
+ */
+export function hasTransferItems({ files, folders }: TransferItems): boolean {
+	return files.length > 0 || folders.length > 0;
+}
+
+/**
+ * Whether a transfer item is a folder rather than a file.
+ * @param item - One entry of a clipboard or drag payload.
+ * @returns True when the item's entry is a directory.
+ */
+function isFolderItem(item: DataTransferItem): boolean {
+	return item.webkitGetAsEntry?.()?.isDirectory === true;
 }
 
 /**
@@ -194,6 +233,34 @@ function saveFailureMessage(): string {
 		'errors:attachment.save-failed.message',
 		'Pasted file could not be saved.',
 	);
+}
+
+/**
+ * The message shown when a dropped folder lives outside the workspace, where a
+ * folder chip has nothing to point at.
+ * @param name - The folder's name.
+ * @returns The message in the active language.
+ */
+function folderOutsideWorkspaceMessage(name: string): string {
+	return i18n.t(
+		'errors:attachment.folder-outside-workspace.message',
+		'{{name}} is a folder outside this workspace. Use Link directory to give the agent access to it.',
+		{ name },
+	);
+}
+
+/**
+ * The message shown when the main process refused to store a file: the coded
+ * headline in the active language, followed by main's own words only when they
+ * carry runtime detail the headline cannot, such as the OS error behind a
+ * failed write.
+ * @param failure - The coded failure main reported.
+ * @returns The message to show.
+ */
+function attachmentFailureMessage(failure: CodedFailure): string {
+	const headline = failureText(i18n.t, failure) ?? saveFailureMessage();
+	const detail = failureDetail(i18n.t, failure);
+	return detail ? `${headline} ${detail}` : headline;
 }
 
 /** Reads a browser File as the base64 body of a data URL. */
@@ -248,11 +315,13 @@ function toWorkspaceFileSummary(
 
 /**
  * True when a file should be persisted through the raster-image write path: a
- * small image the main process can validate by magic bytes (SVG and other
- * non-raster image types fall through to the file path so they are inlined).
+ * small, non-empty image the main process names after the format its bytes
+ * carry. SVG is markup and falls through to the file path so it is inlined, and
+ * an empty file does too, since the file path is the one that stores it.
  */
 function shouldWriteAsImage(file: File): boolean {
 	return (
+		file.size > 0 &&
 		file.size <= SMALL_FILE_MAX_BYTES &&
 		file.type.startsWith(IMAGE_MIME_PREFIX) &&
 		!NON_RASTER_IMAGE_TYPES.has(file.type)
@@ -288,7 +357,11 @@ async function saveCopy(
 				workspaceCwd,
 			});
 	if (result.error || !result.file) {
-		throw new Error(result.error?.message ?? saveFailureMessage());
+		throw new Error(
+			result.error
+				? attachmentFailureMessage(result.error)
+				: saveFailureMessage(),
+		);
 	}
 	return result.file;
 }
@@ -477,13 +550,35 @@ export async function attachReviewComment({
 /**
  * Persists pasted/dropped files into the workspace's content-addressed
  * attachment store; files too large to copy are referenced by absolute path when
- * one is resolvable, otherwise copied as a fallback. Files saved before a failure
+ * one is resolvable, otherwise copied as a fallback. Dropped folders become
+ * folder chips when they sit inside the workspace. Files saved before a failure
  * are still returned alongside the error so partial success is preserved.
  * @param files - The pasted or dropped files to persist.
  * @param workspaceCwd - Absolute workspace root the files belong to.
+ * @param folders - Folders dropped alongside the files, if any.
  * @returns The attachments that landed, plus the first failure message if any.
  */
 export async function attachPastedFiles(
+	files: readonly File[],
+	workspaceCwd: string,
+	folders: readonly File[] = [],
+): Promise<AttachPastedFilesResult> {
+	const stored = await storePastedFiles(files, workspaceCwd);
+	const referenced = attachDroppedFolders(folders, workspaceCwd);
+	return {
+		attachments: [...stored.attachments, ...referenced.attachments],
+		error: stored.error ?? referenced.error,
+	};
+}
+
+/**
+ * Stores each file in turn, stopping at the first failure so the error names
+ * the file the user is looking at rather than the last of a cascade.
+ * @param files - The pasted or dropped files to persist.
+ * @param workspaceCwd - Absolute workspace root the files belong to.
+ * @returns The attachments that landed, plus the failure message if one stopped it.
+ */
+async function storePastedFiles(
 	files: readonly File[],
 	workspaceCwd: string,
 ): Promise<AttachPastedFilesResult> {
@@ -511,4 +606,61 @@ export async function attachPastedFiles(
 		error = cause instanceof Error ? cause.message : saveFailureMessage();
 	}
 	return { attachments, error };
+}
+
+/**
+ * Turns dropped folders into folder chips. A folder inside the workspace is
+ * referenced by its workspace-relative path, exactly as an @-mentioned folder
+ * is; one outside it has no chip to become, so it is named in the error instead
+ * of being read as a file and failing.
+ * @param folders - The dropped folders.
+ * @param workspaceCwd - Absolute workspace root the chips' paths resolve against.
+ * @returns The folder chips, plus a message for the first folder left out.
+ */
+function attachDroppedFolders(
+	folders: readonly File[],
+	workspaceCwd: string,
+): AttachPastedFilesResult {
+	const attachments: ComposerAttachment[] = [];
+	let error: string | null = null;
+	for (const folder of folders) {
+		const absolutePath = getPathForFile(folder);
+		const relativePath = workspaceRelativePath(absolutePath, workspaceCwd);
+		const name = folder.name || basename(absolutePath);
+		if (relativePath) {
+			attachments.push(
+				workspaceFileAttachment({
+					kind: 'directory',
+					name,
+					path: relativePath,
+				}),
+			);
+		} else {
+			error ??= folderOutsideWorkspaceMessage(name);
+		}
+	}
+	return { attachments, error };
+}
+
+/**
+ * Re-expresses an absolute path relative to the workspace root.
+ * @param absolutePath - Absolute path of a dropped item, or empty when unknown.
+ * @param workspaceCwd - Absolute workspace root.
+ * @returns The workspace-relative path, `.` for the root itself, or null when
+ *   the path is unknown or lies outside the workspace.
+ */
+function workspaceRelativePath(
+	absolutePath: string,
+	workspaceCwd: string,
+): string | null {
+	const root = workspaceCwd.replace(/\/+$/, '');
+	if (!absolutePath || !root) {
+		return null;
+	}
+	if (absolutePath === root) {
+		return '.';
+	}
+	return absolutePath.startsWith(`${root}/`)
+		? absolutePath.slice(root.length + 1)
+		: null;
 }

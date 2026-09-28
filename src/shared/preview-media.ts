@@ -55,9 +55,23 @@ function fileNameExtension(filePath: string): string {
  * @returns The image MIME type, or null when the extension is not previewable.
  */
 export function previewImageMimeTypeForPath(filePath: string): string | null {
-	return (
-		PREVIEW_IMAGE_MIME_TYPE_BY_EXTENSION[fileNameExtension(filePath)] ?? null
-	);
+	return previewImageMimeTypeForExtension(fileNameExtension(filePath));
+}
+
+/**
+ * Resolve the browser-previewable image MIME type for a bare extension — the
+ * lookup a caller needs when the format came from sniffing the bytes rather
+ * than from the file's name.
+ * @param extension - Extension without its dot, in any case.
+ * @returns The image MIME type, or null when the extension is not previewable.
+ */
+export function previewImageMimeTypeForExtension(
+	extension: string,
+): string | null {
+	const lowered = extension.toLowerCase();
+	return Object.hasOwn(PREVIEW_IMAGE_MIME_TYPE_BY_EXTENSION, lowered)
+		? (PREVIEW_IMAGE_MIME_TYPE_BY_EXTENSION[lowered] ?? null)
+		: null;
 }
 
 /**

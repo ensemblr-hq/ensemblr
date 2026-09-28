@@ -13,7 +13,9 @@ import type { ComposerEditorHandle } from '@/renderer/components/workbench-shell
 import {
 	attachPastedFiles,
 	attachPastedText,
-	getTransferFiles,
+	getTransferItems,
+	hasTransferItems,
+	type TransferItems,
 } from '@/renderer/lib/workbench/composer-attachments';
 import {
 	composerAttachmentsAtomFamily,
@@ -86,9 +88,9 @@ export function useComposerAttachments({
 	}, [attachmentInbox, editorRef]);
 
 	const handlePastedFiles = useCallback(
-		async (files: readonly File[]) => {
+		async ({ files, folders }: TransferItems) => {
 			setAttachmentError(null);
-			const result = await attachPastedFiles(files, workspaceCwd);
+			const result = await attachPastedFiles(files, workspaceCwd, folders);
 			if (result.error) {
 				setAttachmentError(result.error);
 			}
@@ -127,9 +129,9 @@ export function useComposerAttachments({
 			if (disabled) {
 				return true;
 			}
-			const files = getTransferFiles(data);
-			if (files.length > 0) {
-				void handlePastedFiles(files);
+			const items = getTransferItems(data);
+			if (hasTransferItems(items)) {
+				void handlePastedFiles(items);
 				return true;
 			}
 			if (!autoConvertLong) {
@@ -155,11 +157,11 @@ export function useComposerAttachments({
 			if (disabled) {
 				return true;
 			}
-			const files = getTransferFiles(data);
-			if (files.length === 0) {
+			const items = getTransferItems(data);
+			if (!hasTransferItems(items)) {
 				return false;
 			}
-			void handlePastedFiles(files);
+			void handlePastedFiles(items);
 			return true;
 		},
 		[disabled, handlePastedFiles],
@@ -198,7 +200,7 @@ export function useComposerAttachments({
 			const files =
 				canIngestSelection && event.target.files ? [...event.target.files] : [];
 			if (files.length > 0) {
-				void handlePastedFiles(files);
+				void handlePastedFiles({ files, folders: [] });
 			}
 			event.target.value = '';
 		},

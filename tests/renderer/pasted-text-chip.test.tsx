@@ -196,7 +196,7 @@ describe('attachmentPreviewPath', () => {
 		).toBe('.context/attachments/cc22dd/github-issue-42.md');
 	});
 
-	it('gives nothing for a directory or a file left outside the workspace', () => {
+	it('gives nothing for a directory and the absolute path for a file left outside the workspace', () => {
 		expect(
 			attachmentPreviewPath({
 				id: 'wsdir:src',
@@ -213,7 +213,7 @@ describe('attachmentPreviewPath', () => {
 				label: 'huge.zip',
 				sizeBytes: 20_000_000,
 			}),
-		).toBeNull();
+		).toBe('/Users/me/Downloads/huge.zip');
 	});
 });
 

@@ -1,18 +1,32 @@
 /**
- * What the workspace accepts as a raster image: the size ceiling and the
- * magic-byte signatures. Both the attachment store (validating a pasted payload
- * before persisting it) and the file preview (refusing to render bytes whose
- * extension lies, and budgeting the read) need the same answers, so they live
- * here rather than on either side where the two could drift apart.
+ * What the workspace recognizes as a raster image: the size ceilings and the
+ * magic-byte signatures. Both the attachment store (naming a pasted payload
+ * after the format its bytes really carry) and the file preview (deciding what
+ * to embed bytes as when their extension lies, and budgeting the read) need the
+ * same answers, so they live here rather than on either side where the two
+ * could drift apart.
  */
 
 import path from 'node:path';
 
-/**
- * Ceiling for image bytes held in memory — the cap on a pasted image the store
- * will persist, and on a workspace image the preview will decode.
- */
+import {
+	bytesLookLikeText,
+	PREVIEW_PDF_MIME_TYPE,
+	pdfBytesLookValid,
+	previewImageMimeTypeForExtension,
+} from '../../shared/preview-media.ts';
+
+/** Ceiling on a pasted image the attachment store will persist. */
 export const MAX_CONTEXT_IMAGE_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Ceiling on an image or PDF the file preview reads to embed. Wider than the
+ * paste cap because the composer references a file past that cap by path, and
+ * an animated GIF or a screen recording routinely is one; it matches the
+ * attachment store's hard ceiling, so anything the composer can hold, the
+ * preview can show.
+ */
+export const MAX_PREVIEW_EMBED_BYTES = 50 * 1024 * 1024;
 
 /** Safe file extension to persist for each accepted image MIME type. */
 const IMAGE_EXTENSION_BY_MIME_TYPE: Readonly<Record<string, string>> = {
@@ -92,16 +106,44 @@ export function extensionForImageMimeType(mimeType: string): string | null {
  * @param filePath - Repo-relative path of the file being previewed.
  * @returns The signature key, or null when the extension has no known signature.
  */
-export function signatureExtensionForPreview(filePath: string): string | null {
-	const extension = path.extname(filePath).slice(1).toLowerCase();
-	const normalized = SIGNATURE_EXTENSION_ALIASES[extension] ?? extension;
-	return normalized in IMAGE_SIGNATURES_BY_EXTENSION ? normalized : null;
+function signatureExtensionForPreview(filePath: string): string | null {
+	return signatureKeyForExtension(path.extname(filePath).slice(1));
+}
+
+/**
+ * Resolves the signature key a bare file extension validates against, folding
+ * alternative spellings the way {@link signatureExtensionForPreview} does.
+ * @param extension - Extension without its dot, in any case.
+ * @returns The signature key, or null when the extension has no known signature.
+ */
+export function signatureKeyForExtension(extension: string): string | null {
+	const lowered = extension.toLowerCase();
+	const normalized = SIGNATURE_EXTENSION_ALIASES[lowered] ?? lowered;
+	return Object.hasOwn(IMAGE_SIGNATURES_BY_EXTENSION, normalized)
+		? normalized
+		: null;
+}
+
+/**
+ * Names the raster format a payload's leading bytes carry, whatever its name or
+ * declared type claims — a "GIF" saved off a site that serves WebP, a `.png`
+ * that is really a JPEG. Callers gate this on the payload being binary: the BMP
+ * signature is two printable bytes, so a text file could otherwise match it.
+ * @param buffer - Decoded file bytes.
+ * @returns The signature key, or null when no known signature matches.
+ */
+export function sniffImageSignature(buffer: Buffer): string | null {
+	return (
+		Object.keys(IMAGE_SIGNATURES_BY_EXTENSION).find((extension) =>
+			imageSignatureMatches(buffer, extension),
+		) ?? null
+	);
 }
 
 /**
  * Confirms decoded bytes begin with a magic signature valid for the declared
- * extension, so a mislabeled non-image cannot be persisted as one and then
- * announced to the agent as an inspectable image.
+ * extension, so a mislabeled payload is never persisted under an image
+ * extension its bytes disprove and then announced to the agent as that image.
  * @param buffer - Decoded image bytes.
  * @param extension - Signature key returned by one of the resolvers above.
  * @returns True when the leading bytes match the declared format.
@@ -200,4 +242,56 @@ function bytesMatchAt(
  */
 function asciiBytes(tag: string): readonly number[] {
 	return [...tag].map((character) => character.charCodeAt(0));
+}
+
+/**
+ * Resolves the MIME type to embed a preview's bytes under. The type the
+ * extension declares wins when the bytes confirm it; otherwise an image whose
+ * bytes are some other browser-renderable format — a WebP saved as `.gif`, a
+ * JPEG saved as `.png` — is embedded as what it really is rather than refused.
+ * A `.pdf` that is not a PDF stays refused: there is no second format to try.
+ * @param buffer - Decoded file contents.
+ * @param filePath - Path whose extension declared the type.
+ * @param declaredMimeType - The preview MIME type the extension declared.
+ * @returns The MIME type to embed under, or null when the bytes are not embeddable.
+ */
+export function embeddableMimeType(
+	buffer: Buffer,
+	filePath: string,
+	declaredMimeType: string,
+): string | null {
+	if (previewBytesLookValid(buffer, filePath, declaredMimeType)) {
+		return declaredMimeType;
+	}
+	if (declaredMimeType === PREVIEW_PDF_MIME_TYPE || bytesLookLikeText(buffer)) {
+		return null;
+	}
+	const sniffed = sniffImageSignature(buffer);
+	return sniffed ? previewImageMimeTypeForExtension(sniffed) : null;
+}
+
+/**
+ * Confirms a preview file's leading bytes match the type its extension declares,
+ * so a mislabeled text or binary file falls back to the source view instead of a
+ * broken `<img>` or an embedded viewer fed something that is not a document.
+ * Extensions without a known prefix signature (e.g. the AVIF container) are
+ * allowed through unvalidated.
+ * @param buffer - Decoded file contents.
+ * @param filePath - Workspace-relative file path whose extension declares the type.
+ * @param mimeType - The preview MIME type resolved for that extension.
+ * @returns True when the bytes are consistent with the declared type.
+ */
+function previewBytesLookValid(
+	buffer: Buffer,
+	filePath: string,
+	mimeType: string,
+): boolean {
+	if (mimeType === PREVIEW_PDF_MIME_TYPE) {
+		return pdfBytesLookValid(buffer);
+	}
+	const extension = signatureExtensionForPreview(filePath);
+	if (!extension) {
+		return true;
+	}
+	return imageSignatureMatches(buffer, extension);
 }

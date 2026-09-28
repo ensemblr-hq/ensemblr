@@ -881,26 +881,18 @@ describe('createListWorkspaceFilesService.writeImageAttachment', () => {
 		expect(readFileSync(path.join(cwd, file.path))).toEqual(bytes);
 	});
 
-	test('rejects non-image clipboard payloads', async () => {
+	test('stores a non-image clipboard payload as the text it is', async () => {
+		const bytes = Buffer.from('not an image');
 		const result = await workspaceFilesService().writeImageAttachment({
-			contentBase64: Buffer.from('not an image').toString('base64'),
+			contentBase64: bytes.toString('base64'),
 			mimeType: 'text/plain',
 			workspaceCwd: seedRepo(),
 		});
 
-		expect(result.error?.code).toBe('invalid-image');
-		expect(result.file).toBeUndefined();
-	});
-
-	test('rejects bytes whose signature does not match the declared image type', async () => {
-		const result = await workspaceFilesService().writeImageAttachment({
-			contentBase64: Buffer.from('definitely not a png').toString('base64'),
-			mimeType: 'image/png',
-			workspaceCwd: seedRepo(),
-		});
-
-		expect(result.error?.code).toBe('invalid-image');
-		expect(result.file).toBeUndefined();
+		expect(result.error).toBeUndefined();
+		expect(result.file?.path).toBe(
+			`.context/attachments/${sha256Prefix(bytes)}/pasted-image.txt`,
+		);
 	});
 
 	test('accepts a WEBP payload carrying the WEBP fourcc', async () => {
@@ -942,7 +934,7 @@ describe('createListWorkspaceFilesService.writeImageAttachment', () => {
 		);
 	});
 
-	test('rejects an ISOBMFF payload whose brand is not AVIF', async () => {
+	test('does not store an ISOBMFF payload whose brand is not AVIF as an AVIF', async () => {
 		const bytes = Buffer.concat([
 			Buffer.from([0x00, 0x00, 0x00, 0x1c]),
 			Buffer.from('ftypheic'),
@@ -954,11 +946,13 @@ describe('createListWorkspaceFilesService.writeImageAttachment', () => {
 			workspaceCwd: seedRepo(),
 		});
 
-		expect(result.error?.code).toBe('invalid-image');
-		expect(result.file).toBeUndefined();
+		expect(result.error).toBeUndefined();
+		expect(result.file?.path).toBe(
+			`.context/attachments/${sha256Prefix(bytes)}/pasted-image.bin`,
+		);
 	});
 
-	test('rejects a HEIC listing only HEIF brands as compatible', async () => {
+	test('does not store a HEIC listing only HEIF brands as an AVIF', async () => {
 		const bytes = Buffer.concat([
 			Buffer.from([0x00, 0x00, 0x00, 0x1c]),
 			Buffer.from('ftypmif1'),
@@ -971,11 +965,13 @@ describe('createListWorkspaceFilesService.writeImageAttachment', () => {
 			workspaceCwd: seedRepo(),
 		});
 
-		expect(result.error?.code).toBe('invalid-image');
-		expect(result.file).toBeUndefined();
+		expect(result.error).toBeUndefined();
+		expect(result.file?.path).toBe(
+			`.context/attachments/${sha256Prefix(bytes)}/pasted-image.bin`,
+		);
 	});
 
-	test('rejects a truncated ftyp box that carries no brand list', async () => {
+	test('does not store a truncated ftyp box as an AVIF', async () => {
 		const bytes = Buffer.concat([
 			Buffer.from([0x00, 0x00, 0x00, 0x1c]),
 			Buffer.from('ftypav'),
@@ -986,8 +982,10 @@ describe('createListWorkspaceFilesService.writeImageAttachment', () => {
 			workspaceCwd: seedRepo(),
 		});
 
-		expect(result.error?.code).toBe('invalid-image');
-		expect(result.file).toBeUndefined();
+		expect(result.error).toBeUndefined();
+		expect(result.file?.path).toBe(
+			`.context/attachments/${sha256Prefix(bytes)}/pasted-image.bin`,
+		);
 	});
 
 	test('accepts an icon under either MIME spelling browsers report', async () => {
@@ -1007,7 +1005,7 @@ describe('createListWorkspaceFilesService.writeImageAttachment', () => {
 		}
 	});
 
-	test('rejects a RIFF payload that is not WEBP (e.g. a WAV mislabeled as webp)', async () => {
+	test('does not store a RIFF payload that is not WEBP (e.g. a WAV mislabeled as webp) as a WebP', async () => {
 		const wavBytes = Buffer.concat([
 			Buffer.from('RIFF'),
 			Buffer.from([0x24, 0x00, 0x00, 0x00]),
@@ -1019,8 +1017,10 @@ describe('createListWorkspaceFilesService.writeImageAttachment', () => {
 			workspaceCwd: seedRepo(),
 		});
 
-		expect(result.error?.code).toBe('invalid-image');
-		expect(result.file).toBeUndefined();
+		expect(result.error).toBeUndefined();
+		expect(result.file?.path).toBe(
+			`.context/attachments/${sha256Prefix(wavBytes)}/pasted-image.bin`,
+		);
 	});
 
 	test('rejects images larger than the attachment size limit', async () => {
