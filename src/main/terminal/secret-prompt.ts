@@ -41,3 +41,40 @@ export function detectSecretPrompt(tail: string): string | null {
 
 	return SECRET_PROMPT_PATTERN.test(currentLine) ? currentLine : null;
 }
+
+/**
+ * What an echoed password answer reads as once masked. Fixed rather than one
+ * character per character, so the mask does not give away the answer's length.
+ */
+const ECHOED_SECRET_MASK = '********';
+
+/**
+ * Masks the copy of a just-given password that a program reading with echo on
+ * prints back — `read -p` without `-s`, say. The echo lands on the answer's own
+ * line, ahead of the line break its Enter echoes as, so only the text before
+ * the chunk's first line break is touched and the output after it is left
+ * exactly as the program wrote it.
+ * @param chunk - A chunk of raw PTY output that arrived after the answer was written.
+ * @param answer - The password answer, without its Enter.
+ * @returns The chunk with the answer masked on its line, and whether that line has ended so the watch can stop.
+ */
+export function maskEchoedSecret(
+	chunk: string,
+	answer: string,
+): { chunk: string; lineEnded: boolean } {
+	const lineEnd = chunk.indexOf('\n');
+
+	if (lineEnd === -1) {
+		return {
+			chunk: chunk.replaceAll(answer, ECHOED_SECRET_MASK),
+			lineEnded: false,
+		};
+	}
+
+	return {
+		chunk:
+			chunk.slice(0, lineEnd).replaceAll(answer, ECHOED_SECRET_MASK) +
+			chunk.slice(lineEnd),
+		lineEnded: true,
+	};
+}

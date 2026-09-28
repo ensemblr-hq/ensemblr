@@ -97,3 +97,26 @@ test('shows no password field while the script is not asking for one', () => {
 
 	expect(screen.queryByLabelText('Password')).toBeNull();
 });
+
+// A half-typed draft meant for one prompt must not be sent to the next one.
+test('drops a half-typed password when the prompt changes', async () => {
+	const user = userEvent.setup();
+	const panel = (secretPrompt: string) => (
+		<RunScriptOutputPanel
+			activeRunScriptName='dev'
+			onOpenSetupScripts={vi.fn()}
+			onRunScript={vi.fn()}
+			script={{ secretPrompt, status: 'running', terminalId: 't1' }}
+			tabLabel='Run'
+			workspaceCwd='/repo'
+		/>
+	);
+	const { rerender } = renderWithProviders(
+		panel('[sudo] password for philipp:'),
+	);
+
+	await user.type(screen.getByLabelText('Password'), 'hunter2');
+	rerender(panel("Enter passphrase for key '/home/philipp/.ssh/id_ed25519':"));
+
+	expect(screen.getByLabelText('Password')).toHaveValue('');
+});

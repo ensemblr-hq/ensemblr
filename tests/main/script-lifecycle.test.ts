@@ -168,6 +168,7 @@ function createTerminalServiceFake({
 	let counter = 0;
 
 	const terminalService: TerminalService = {
+		answerSecretPrompt: () => false,
 		close: (terminalId) => {
 			killedIds.push(terminalId);
 			sessions.delete(terminalId);

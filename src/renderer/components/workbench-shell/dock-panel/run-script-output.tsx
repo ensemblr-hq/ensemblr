@@ -71,6 +71,7 @@ export function RunScriptOutputPanel({
 			/>
 			{script.secretPrompt ? (
 				<SecretPromptBar
+					key={`${script.terminalId}:${script.secretPrompt}`}
 					prompt={script.secretPrompt}
 					terminalId={script.terminalId}
 				/>

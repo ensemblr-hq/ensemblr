@@ -3,6 +3,7 @@ import { expect, test } from 'vitest';
 import {
 	activeChatContextSchema,
 	addInfisicalAccountRequestSchema,
+	answerTerminalSecretPromptRequestSchema,
 	getWorkspaceFileDiffRequestSchema,
 	getWorkspaceGitStatusRequestSchema,
 	infisicalLinkScopeRequestSchema,
@@ -452,4 +453,29 @@ test.each([
 			workspaceCwd: '/tmp/ws',
 		}),
 	).toThrow();
+});
+
+test('answerTerminalSecretPromptRequestSchema accepts a one-line answer', () => {
+	expect(
+		answerTerminalSecretPromptRequestSchema.safeParse({
+			answer: 'hunter2',
+			terminalId: 'setup-1',
+		}).success,
+	).toBe(true);
+});
+
+// Main appends the one Enter the prompt reads, so a second line break would
+// hand the rest of the answer to whatever reads stdin after the prompt.
+test.each([
+	['an empty answer', ''],
+	['a line feed', 'hunter2\nrm -rf ~'],
+	['a carriage return', 'hunter2\r'],
+	['an answer past the cap', 'x'.repeat(1025)],
+])('answerTerminalSecretPromptRequestSchema refuses %s', (_label, answer) => {
+	expect(
+		answerTerminalSecretPromptRequestSchema.safeParse({
+			answer,
+			terminalId: 'setup-1',
+		}).success,
+	).toBe(false);
 });

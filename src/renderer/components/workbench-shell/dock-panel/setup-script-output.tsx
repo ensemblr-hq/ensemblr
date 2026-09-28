@@ -59,6 +59,7 @@ export function SetupScriptOutputPanel({
 			/>
 			{script.secretPrompt ? (
 				<SecretPromptBar
+					key={`${script.terminalId}:${script.secretPrompt}`}
 					prompt={script.secretPrompt}
 					terminalId={script.terminalId}
 				/>

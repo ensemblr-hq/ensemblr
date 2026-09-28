@@ -8,10 +8,11 @@ import { Input } from '@/renderer/components/ui/input';
 /**
  * Masked field floated over a Setup or Run pane while its script is blocked on
  * a password prompt. Those panes refuse keyboard input, so this is the one way
- * to answer `sudo`: the value goes straight to the script's PTY followed by
- * Enter, and is cleared from the field the moment it is sent. It never takes
- * focus on its own — a chat draft typed into it by accident would be handed to
- * the script as a password.
+ * to answer `sudo`: main writes the value and Enter to the script only while
+ * the prompt is still live, and the field clears the moment it is sent. It
+ * never takes focus on its own — a chat draft typed into it by accident would
+ * be handed to the script as a password. Callers key it by terminal and
+ * prompt, so a half-typed draft never carries over to a different prompt.
  */
 export function SecretPromptBar({
 	prompt,
@@ -24,25 +25,36 @@ export function SecretPromptBar({
 	const { t } = useTranslation();
 	const [secret, setSecret] = useState('');
 	const [sendFailed, setSendFailed] = useState(false);
+	const isEmpty = secret.length === 0;
 
 	/**
 	 * Hands the typed password to the script and clears the field, reporting a
-	 * failed send inline so the user knows to answer again.
+	 * send main refused or could not deliver inline so the user knows to answer
+	 * again. An empty field sends nothing, since a bare Enter counts as a wrong
+	 * password.
 	 * @param event - The form submission, whose default navigation is suppressed.
 	 */
 	const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
+
+		if (isEmpty) {
+			return;
+		}
+
 		const answer = secret;
 		setSecret('');
 		setSendFailed(false);
 		Promise.resolve(
-			window.ensemblr?.writeTerminalSession({
-				data: `${answer}\r`,
-				terminalId,
-			}),
-		).catch(() => {
-			setSendFailed(true);
-		});
+			window.ensemblr?.answerTerminalSecretPrompt({ answer, terminalId }),
+		)
+			.then((result) => {
+				if (!result?.answered) {
+					setSendFailed(true);
+				}
+			})
+			.catch(() => {
+				setSendFailed(true);
+			});
 	};
 
 	return (
@@ -72,7 +84,7 @@ export function SecretPromptBar({
 					type='password'
 					value={secret}
 				/>
-				<Button size='sm' type='submit'>
+				<Button disabled={isEmpty} size='sm' type='submit'>
 					{t('workbench:secret-prompt.send', 'Send')}
 				</Button>
 			</div>

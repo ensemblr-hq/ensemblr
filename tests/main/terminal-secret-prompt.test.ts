@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { detectSecretPrompt } from '../../src/main/terminal/secret-prompt.ts';
+import {
+	detectSecretPrompt,
+	maskEchoedSecret,
+} from '../../src/main/terminal/secret-prompt.ts';
 
 const ESC = String.fromCharCode(27);
 
@@ -56,5 +59,36 @@ describe('detectSecretPrompt', () => {
 
 	it('ignores a line too long to be a prompt', () => {
 		expect(detectSecretPrompt(`${'x'.repeat(250)} password:`)).toBeNull();
+	});
+});
+
+// A program that reads the answer with echo on prints it straight back, which
+// would put the password into scrollback and the on-disk log.
+describe('maskEchoedSecret', () => {
+	it('masks the echoed answer on its own line and ends the watch', () => {
+		expect(maskEchoedSecret('hunter2\r\n', 'hunter2')).toEqual({
+			chunk: '********\r\n',
+			lineEnded: true,
+		});
+	});
+
+	it('keeps watching while the answer line has not ended yet', () => {
+		expect(maskEchoedSecret('hunter2', 'hunter2')).toEqual({
+			chunk: '********',
+			lineEnded: false,
+		});
+	});
+
+	it('leaves the output after the answer line exactly as written', () => {
+		expect(maskEchoedSecret('\r\nconnected as hunter2\r\n', 'hunter2')).toEqual(
+			{ chunk: '\r\nconnected as hunter2\r\n', lineEnded: true },
+		);
+	});
+
+	it('ends the watch on the bare line break a silent read prints', () => {
+		expect(maskEchoedSecret('\r\n', 'hunter2')).toEqual({
+			chunk: '\r\n',
+			lineEnded: true,
+		});
 	});
 });

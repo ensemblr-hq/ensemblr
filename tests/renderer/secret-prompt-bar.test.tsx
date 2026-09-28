@@ -17,18 +17,18 @@ afterEach(() => {
 	clearEnsemblrApi();
 });
 
-/** Renders the bar over a stub bridge whose terminal write the test controls. */
+/** Renders the bar over a stub bridge whose prompt answer the test controls. */
 function renderBar(
-	writeTerminalSession = vi.fn().mockResolvedValue(undefined),
+	answerTerminalSecretPrompt = vi.fn().mockResolvedValue({ answered: true }),
 ) {
-	installEnsemblrApi({ writeTerminalSession });
+	installEnsemblrApi({ answerTerminalSecretPrompt });
 	renderWithProviders(
 		<SecretPromptBar
 			prompt='[sudo] password for philipp:'
 			terminalId='setup-1'
 		/>,
 	);
-	return { writeTerminalSession };
+	return { answerTerminalSecretPrompt };
 }
 
 test('shows the prompt the script printed beside a masked field', () => {
@@ -46,19 +46,44 @@ test('never takes focus on its own', () => {
 	expect(screen.getByLabelText('Password')).not.toHaveFocus();
 });
 
-test('sends the password with Enter to the script and clears the field', async () => {
+test('answers the prompt with the typed password and clears the field', async () => {
 	const user = userEvent.setup();
-	const { writeTerminalSession } = renderBar();
+	const { answerTerminalSecretPrompt } = renderBar();
 	const field = screen.getByLabelText('Password');
 
 	await user.type(field, 'hunter2{Enter}');
 
-	expect(writeTerminalSession).toHaveBeenCalledTimes(1);
-	expect(writeTerminalSession).toHaveBeenCalledWith({
-		data: 'hunter2\r',
+	expect(answerTerminalSecretPrompt).toHaveBeenCalledTimes(1);
+	expect(answerTerminalSecretPrompt).toHaveBeenCalledWith({
+		answer: 'hunter2',
 		terminalId: 'setup-1',
 	});
 	expect(field).toHaveValue('');
+	expect(screen.queryByRole('alert')).toBeNull();
+});
+
+// sudo counts a bare Enter as a wrong password, and a quick second Enter lands
+// on a field the first one already emptied.
+test('sends nothing while the field is empty', async () => {
+	const user = userEvent.setup();
+	const { answerTerminalSecretPrompt } = renderBar();
+
+	await user.type(screen.getByLabelText('Password'), 'hunter2{Enter}{Enter}');
+
+	expect(answerTerminalSecretPrompt).toHaveBeenCalledTimes(1);
+	expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+});
+
+test('says so when the script was no longer waiting for the answer', async () => {
+	const user = userEvent.setup();
+	renderBar(vi.fn().mockResolvedValue({ answered: false }));
+
+	await user.type(screen.getByLabelText('Password'), 'hunter2{Enter}');
+
+	expect(await screen.findByRole('alert')).toHaveTextContent(
+		'Could not reach the script. Try again.',
+	);
+	expect(screen.getByLabelText('Password')).toHaveValue('');
 });
 
 test('says so when the password could not reach the script', async () => {

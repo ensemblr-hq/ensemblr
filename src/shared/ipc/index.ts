@@ -398,6 +398,8 @@ export type {
 } from './contracts/shared-root-adoption';
 export type { InitialShellSnapshot } from './contracts/shell-snapshot';
 export type {
+	AnswerTerminalSecretPromptRequest,
+	AnswerTerminalSecretPromptResult,
 	CreateTerminalSessionRequest,
 	CreateTerminalSessionResult,
 	KillTerminalRequest,

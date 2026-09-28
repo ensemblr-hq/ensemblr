@@ -202,6 +202,8 @@ import type { SetupDiagnosticsSnapshot } from './contracts/setup';
 import type { SharedRootAdoptionSnapshot } from './contracts/shared-root-adoption';
 import type { InitialShellSnapshot } from './contracts/shell-snapshot';
 import type {
+	AnswerTerminalSecretPromptRequest,
+	AnswerTerminalSecretPromptResult,
 	CloseTerminalRequest,
 	CloseTerminalResult,
 	CreateTerminalSessionRequest,
@@ -749,5 +751,9 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.writeTerminalSession]: IpcHandlerEntry<
 		WriteTerminalRequest,
 		void
+	>;
+	[IPC_CHANNELS.answerTerminalSecretPrompt]: IpcHandlerEntry<
+		AnswerTerminalSecretPromptRequest,
+		AnswerTerminalSecretPromptResult
 	>;
 }

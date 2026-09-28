@@ -520,5 +520,7 @@ export function createEnsemblrApi(): EnsemblrApi {
 		watchWorkspaceFiles: (request) => invoke('watchWorkspaceFiles', request),
 		writeForkSummary: (request) => invoke('writeForkSummary', request),
 		writeTerminalSession: (request) => invoke('writeTerminalSession', request),
+		answerTerminalSecretPrompt: (request) =>
+			invoke('answerTerminalSecretPrompt', request),
 	};
 }
