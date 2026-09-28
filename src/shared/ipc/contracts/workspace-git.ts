@@ -164,6 +164,13 @@ export interface GetWorkspaceGitStatusResult {
 	error?: WorkspaceGitFailure;
 	files: readonly WorkspaceGitFileWire[];
 	summary: WorkspaceGitChangeSummaryWire;
+	/**
+	 * How many paths hold an uncommitted change (staged, unstaged, or untracked),
+	 * the same count a `working-tree` read would put in `summary.files`. Present
+	 * only for a `branch` scope, whose rows fold committed and uncommitted edits
+	 * together, and absent when git could not read the working tree.
+	 */
+	uncommittedFiles?: number;
 }
 
 /**

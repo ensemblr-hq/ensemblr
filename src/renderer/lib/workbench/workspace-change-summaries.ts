@@ -8,6 +8,8 @@ import type {
 } from '@/shared/ipc/contracts/repository-navigation';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 
+import { buildGitStatus } from './pull-request-model';
+
 /**
  * Identifies a workspace whose sidebar/board change summary should be refreshed.
  * Every target carries a branch scope so all overview summaries share one
@@ -20,9 +22,13 @@ export interface WorkspaceChangeSummaryTarget {
 	workspaceId: string;
 }
 
-/** Carries a live change summary for one workspace. */
+/**
+ * Carries a live change summary for one workspace, plus the uncommitted file
+ * count the same branch read reports when git could read the working tree.
+ */
 export interface WorkspaceChangeSummaryUpdate {
 	changeSummary: WorkspaceShellModel['changeSummary'];
+	uncommittedFiles?: number;
 	workspaceId: string;
 }
 
@@ -31,6 +37,7 @@ export interface WorkspaceChangeSummaryQueryResult {
 	data?: {
 		error?: unknown;
 		summary: WorkspaceShellModel['changeSummary'];
+		uncommittedFiles?: number;
 	};
 }
 
@@ -71,13 +78,20 @@ export function collectWorkspaceChangeSummaryUpdates(
 					deletions: data.summary.deletions,
 					files: data.summary.files,
 				},
+				...(data.uncommittedFiles === undefined
+					? {}
+					: { uncommittedFiles: data.uncommittedFiles }),
 				workspaceId: target.workspaceId,
 			},
 		];
 	});
 }
 
-/** Applies live workspace change summaries to project models without mutating inputs. */
+/**
+ * Applies live workspace change summaries to project models without mutating
+ * inputs. Every update is applied to the navigation-mapped projects afresh, so
+ * a count that drops back to zero leaves the mapper's own git-status row.
+ */
 export function applyWorkspaceChangeSummaries(
 	projects: ProjectShellModel[],
 	updates: readonly WorkspaceChangeSummaryUpdate[],
@@ -86,22 +100,19 @@ export function applyWorkspaceChangeSummaries(
 		return projects;
 	}
 
-	const summariesByWorkspaceId = new Map(
-		updates.map((update) => [update.workspaceId, update.changeSummary]),
+	const updatesByWorkspaceId = new Map(
+		updates.map((update) => [update.workspaceId, update]),
 	);
 	let changedProjects = false;
 	const nextProjects = projects.map((project) => {
 		let changedWorkspaces = false;
 		const workspaces = project.workspaces.map((workspace) => {
-			const changeSummary = summariesByWorkspaceId.get(workspace.id);
-			if (
-				!changeSummary ||
-				areChangeSummariesEqual(workspace.changeSummary, changeSummary)
-			) {
+			const update = updatesByWorkspaceId.get(workspace.id);
+			if (!update || isUpdateApplied(workspace, update)) {
 				return workspace;
 			}
 			changedWorkspaces = true;
-			return { ...workspace, changeSummary };
+			return withChangeSummaryUpdate(workspace, update);
 		});
 
 		if (!changedWorkspaces) {
@@ -122,6 +133,57 @@ function getNavigationWorkspaceDiffScope(
 	const baseRef = workspace.baseBranch ?? repository.defaultBranch;
 
 	return baseRef ? { baseRef, kind: 'branch' } : undefined;
+}
+
+/**
+ * Folds one overview reading into a workspace row. An uncommitted count also
+ * rebuilds the pull request's git-status row, which the navigation mapper could
+ * only build from the branch's sync state: without it a workspace holding
+ * uncommitted work reads as ready to merge the moment it is not the one open.
+ * @param workspace - The navigation-mapped workspace row
+ * @param update - The overview reading for that workspace
+ * @returns A new row carrying the reading
+ */
+function withChangeSummaryUpdate(
+	workspace: WorkspaceShellModel,
+	update: WorkspaceChangeSummaryUpdate,
+): WorkspaceShellModel {
+	const { uncommittedFiles } = update;
+	if (uncommittedFiles === undefined) {
+		return { ...workspace, changeSummary: update.changeSummary };
+	}
+	return {
+		...workspace,
+		changeSummary: update.changeSummary,
+		pullRequest:
+			uncommittedFiles > 0
+				? {
+						...workspace.pullRequest,
+						gitStatus: buildGitStatus(
+							{ additions: 0, deletions: 0, files: uncommittedFiles },
+							null,
+						),
+					}
+				: workspace.pullRequest,
+		uncommittedFiles,
+	};
+}
+
+/**
+ * Whether a row already carries everything an update would write.
+ * @param workspace - The workspace row
+ * @param update - The overview reading for that workspace
+ * @returns True when applying the update would change nothing
+ */
+function isUpdateApplied(
+	workspace: WorkspaceShellModel,
+	update: WorkspaceChangeSummaryUpdate,
+): boolean {
+	return (
+		areChangeSummariesEqual(workspace.changeSummary, update.changeSummary) &&
+		(update.uncommittedFiles === undefined ||
+			workspace.uncommittedFiles === update.uncommittedFiles)
+	);
 }
 
 /** Compares change-summary values for structural equality. */

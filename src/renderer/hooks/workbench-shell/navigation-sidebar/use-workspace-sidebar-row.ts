@@ -17,8 +17,26 @@ import {
 } from '@/renderer/state/workspace';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
-/** Stands in for the working-tree counts an inactive row does not fetch. */
-const NO_WORKTREE_CHANGES = { additions: 0, deletions: 0, files: 0 } as const;
+/**
+ * The working-tree counts the row's PR model is built from: the live read the
+ * active row fetches, else the uncommitted count the overview poll stamped on
+ * the workspace, else none. Only `files` decides the git-status row, so the
+ * overview count needs no line totals.
+ * @param liveStatus - The active row's working-tree read, when it has one
+ * @param uncommittedFiles - The overview poll's uncommitted count, when it has answered
+ * @returns The change summary to fold into the PR git-status row
+ */
+function resolveWorktreeChangeSummary(
+	liveStatus:
+		| { error?: unknown; summary: WorkspaceShellModel['changeSummary'] }
+		| undefined,
+	uncommittedFiles: number | undefined,
+): WorkspaceShellModel['changeSummary'] {
+	if (liveStatus && !liveStatus.error) {
+		return liveStatus.summary;
+	}
+	return { additions: 0, deletions: 0, files: uncommittedFiles ?? 0 };
+}
 
 /**
  * Live row state for one workspace in the navigation sidebar: its unread flag,
@@ -39,8 +57,10 @@ const NO_WORKTREE_CHANGES = { additions: 0, deletions: 0, files: 0 } as const;
  * reading them here costs no extra git call. `workspace.changeSummary` is not a
  * substitute: navigation fills it from a `baseRef..HEAD` diff, so every commit on
  * the branch would read as an uncommitted edit and no PR row could ever be clean.
- * An inactive row reports what its cached `branchSync` knows (unpushed commits)
- * and stays quiet about the worktree.
+ * An inactive row uses `workspace.uncommittedFiles` instead, which the same
+ * overview poll reports beside that diff, so leaving a workspace with work still
+ * to commit keeps its row on commit-and-push rather than dropping to
+ * ready-to-merge.
  *
  * Dock activity is uniform across rows: it comes from the app-wide terminal
  * activity the workbench frame watches, not from this workspace's dock, which
@@ -72,10 +92,14 @@ export function useWorkspaceSidebarRow({
 	const { data: worktreeStatusData } = useQuery(
 		workspaceGitStatusQuery(isActive ? workspace.pathLabel : null),
 	);
-	const worktreeChangeSummary =
-		worktreeStatusData && !worktreeStatusData.error
-			? worktreeStatusData.summary
-			: NO_WORKTREE_CHANGES;
+	const worktreeChangeSummary = useMemo(
+		() =>
+			resolveWorktreeChangeSummary(
+				worktreeStatusData,
+				workspace.uncommittedFiles,
+			),
+		[worktreeStatusData, workspace.uncommittedFiles],
+	);
 	const livePullRequest = useLivePullRequestModel({
 		changeSummary: worktreeChangeSummary,
 		enabled: isActive,

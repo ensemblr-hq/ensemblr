@@ -13,14 +13,19 @@ import type { WorkspaceFileEntryWire } from '@/shared/ipc/contracts/workspace-fi
 
 const listing = vi.hoisted(() => ({ files: [] as WorkspaceFileEntryWire[] }));
 
-vi.mock('@tanstack/react-query', async (importOriginal) => ({
-	...(await importOriginal<typeof import('@tanstack/react-query')>()),
-	useQuery: ({ queryKey }: { queryKey: readonly unknown[] }) => ({
-		data: queryKey.includes('workspace-files')
-			? { files: listing.files }
-			: undefined,
-	}),
-}));
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@tanstack/react-query')>();
+	const client = new actual.QueryClient();
+	return {
+		...actual,
+		useQuery: ({ queryKey }: { queryKey: readonly unknown[] }) => ({
+			data: queryKey.includes('workspace-files')
+				? { files: listing.files }
+				: undefined,
+		}),
+		useQueryClient: () => client,
+	};
+});
 vi.mock(
 	'@/renderer/hooks/workbench-shell/route-layout/use-ensure-workspace-setup',
 	() => ({

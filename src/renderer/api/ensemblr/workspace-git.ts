@@ -224,6 +224,45 @@ export function removeDiscardedPathsFromGitStatus(
 }
 
 /**
+ * Carries a working-tree read's file count into the branch-scoped statuses
+ * cached for the same workspace, whose `uncommittedFiles` is what a sidebar row
+ * reads once its workspace is no longer the one open.
+ *
+ * The branch reads poll on a slow overview cadence and the file watcher ignores
+ * `.git`, so a commit made while the workspace is open reaches the working-tree
+ * read long before it reaches them. Without this, leaving the workspace would
+ * show a stale uncommitted count for up to a whole overview interval. Only
+ * entries that already carry a count are touched, only when it differs, and
+ * never one fetched after the read was taken: revisiting a workspace serves its
+ * cached working-tree read first, which must not undo a newer overview poll.
+ * @param queryClient - The query client holding the cached statuses
+ * @param observedAt - When the working-tree read was taken, stamped on the entries it corrects
+ * @param uncommittedFiles - The working-tree read's file count
+ * @param workspaceCwd - Absolute workspace root the read belongs to
+ */
+export function syncUncommittedFilesToBranchStatus(
+	queryClient: QueryClient,
+	{
+		observedAt,
+		uncommittedFiles,
+		workspaceCwd,
+	}: { observedAt: number; uncommittedFiles: number; workspaceCwd: string },
+) {
+	queryClient.setQueriesData<GetWorkspaceGitStatusResult>(
+		{
+			predicate: (query) => query.state.dataUpdatedAt <= observedAt,
+			queryKey: ensemblrQueryKeys.workspaceGitStatusAll(workspaceCwd),
+		},
+		(current) =>
+			current?.uncommittedFiles === undefined ||
+			current.uncommittedFiles === uncommittedFiles
+				? undefined
+				: { ...current, uncommittedFiles },
+		{ updatedAt: observedAt },
+	);
+}
+
+/**
  * Query options for the workspace's recent commits, newest first. When
  * `baseRef` is given the list is scoped to commits made on this branch
  * (`merge-base(baseRef, HEAD)..HEAD`), excluding base-branch history.
