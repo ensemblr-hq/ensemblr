@@ -460,9 +460,10 @@ export function createWorkspaceGitService({
 	 * Every change on this branch: from the fork point (`merge-base`) to the
 	 * working tree, so committed-on-branch edits and uncommitted edits both
 	 * appear. Falls back to the working-tree set when no merge-base resolves
-	 * (e.g. the base ref is unknown or unrelated). Either way the result also
-	 * says how many of those paths are uncommitted, which is what lets a
-	 * workspace nobody has open still report work waiting to be committed.
+	 * (e.g. the base ref is unknown or unrelated). Whenever git can read the
+	 * working tree, the result also says how many of those paths are
+	 * uncommitted, which is what lets a workspace nobody has open still report
+	 * work waiting to be committed.
 	 */
 	async function getBranchStatus(
 		cwd: string,

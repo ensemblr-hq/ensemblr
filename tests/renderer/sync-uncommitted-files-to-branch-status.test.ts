@@ -90,4 +90,19 @@ describe('syncUncommittedFilesToBranchStatus', () => {
 		expect(client.getQueryData(BRANCH_KEY)).toBe(before);
 		expect(client.getQueryState(BRANCH_KEY)?.dataUpdatedAt).toBe(1_000);
 	});
+
+	test('an older working-tree read never overwrites a newer branch count', () => {
+		const client = seededClient();
+		client.setQueryData(BRANCH_KEY, branchStatus(0), { updatedAt: 9_000 });
+		const before = client.getQueryData(BRANCH_KEY);
+
+		syncUncommittedFilesToBranchStatus(client, {
+			observedAt: 5_000,
+			uncommittedFiles: 3,
+			workspaceCwd: WORKSPACE_CWD,
+		});
+
+		expect(client.getQueryData(BRANCH_KEY)).toBe(before);
+		expect(client.getQueryState(BRANCH_KEY)?.dataUpdatedAt).toBe(9_000);
+	});
 });

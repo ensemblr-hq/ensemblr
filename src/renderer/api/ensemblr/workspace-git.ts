@@ -232,7 +232,9 @@ export function removeDiscardedPathsFromGitStatus(
  * `.git`, so a commit made while the workspace is open reaches the working-tree
  * read long before it reaches them. Without this, leaving the workspace would
  * show a stale uncommitted count for up to a whole overview interval. Only
- * entries that already carry a count are touched, and only when it differs.
+ * entries that already carry a count are touched, only when it differs, and
+ * never one fetched after the read was taken: revisiting a workspace serves its
+ * cached working-tree read first, which must not undo a newer overview poll.
  * @param queryClient - The query client holding the cached statuses
  * @param observedAt - When the working-tree read was taken, stamped on the entries it corrects
  * @param uncommittedFiles - The working-tree read's file count
@@ -247,7 +249,10 @@ export function syncUncommittedFilesToBranchStatus(
 	}: { observedAt: number; uncommittedFiles: number; workspaceCwd: string },
 ) {
 	queryClient.setQueriesData<GetWorkspaceGitStatusResult>(
-		{ queryKey: ensemblrQueryKeys.workspaceGitStatusAll(workspaceCwd) },
+		{
+			predicate: (query) => query.state.dataUpdatedAt <= observedAt,
+			queryKey: ensemblrQueryKeys.workspaceGitStatusAll(workspaceCwd),
+		},
 		(current) =>
 			current?.uncommittedFiles === undefined ||
 			current.uncommittedFiles === uncommittedFiles
