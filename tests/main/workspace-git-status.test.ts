@@ -889,6 +889,9 @@ test('getStatus (real git) branch scope spans commits + uncommitted', async (t) 
 			['untracked.ts', 'untracked'],
 		],
 	);
+	// Only the tracked edit and the untracked file are uncommitted; feat.ts is
+	// on the branch already.
+	assert.equal(branch.uncommittedFiles, 2);
 
 	// A base stored remote-qualified still resolves against the local branch, so
 	// a repository whose remote is not named `origin` keeps the full branch diff
@@ -913,6 +916,22 @@ test('getStatus (real git) branch scope spans commits + uncommitted', async (t) 
 		'base.ts',
 		'untracked.ts',
 	]);
+	assert.equal(fallback.uncommittedFiles, 2);
+
+	// Once everything is committed the branch still has rows but nothing is
+	// left uncommitted.
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'rest');
+	const committed = await service.getStatus({
+		scope: { baseRef: baseBranch, kind: 'branch' },
+		workspaceCwd: dir,
+	});
+	assert.equal(committed.files.length, 3);
+	assert.equal(committed.uncommittedFiles, 0);
+
+	// The working-tree scope already reports this as `summary.files`.
+	const workingTree = await service.getStatus({ workspaceCwd: dir });
+	assert.equal(workingTree.uncommittedFiles, undefined);
 });
 
 test('branch status and commits keep using the workspace fork point after the remote advances again', async (t) => {

@@ -460,7 +460,9 @@ export function createWorkspaceGitService({
 	 * Every change on this branch: from the fork point (`merge-base`) to the
 	 * working tree, so committed-on-branch edits and uncommitted edits both
 	 * appear. Falls back to the working-tree set when no merge-base resolves
-	 * (e.g. the base ref is unknown or unrelated).
+	 * (e.g. the base ref is unknown or unrelated). Either way the result also
+	 * says how many of those paths are uncommitted, which is what lets a
+	 * workspace nobody has open still report work waiting to be committed.
 	 */
 	async function getBranchStatus(
 		cwd: string,
@@ -468,7 +470,10 @@ export function createWorkspaceGitService({
 	): Promise<GetWorkspaceGitStatusResult> {
 		const mergeBase = await resolveMergeBase(cwd, baseRef);
 		if (!mergeBase) {
-			return getWorkingTreeStatus(cwd);
+			const workingTree = await getWorkingTreeStatus(cwd);
+			return workingTree.error
+				? workingTree
+				: { ...workingTree, uncommittedFiles: workingTree.files.length };
 		}
 		return buildDiffStatus(cwd, [mergeBase], {
 			appendUntracked: true,
@@ -577,7 +582,9 @@ export function createWorkspaceGitService({
 	 * The two options are separate because a turn's live leg needs one without
 	 * the other. `appendUntracked` covers a diff whose new side is the working
 	 * tree *through the index*, which never lists untracked files; a diff
-	 * against a tree written from that working tree already holds them.
+	 * against a tree written from that working tree already holds them. The
+	 * status read that finds them lists every uncommitted path besides, so an
+	 * appended result also carries `uncommittedFiles`.
 	 * `stampWorktree` covers any diff whose new side is bytes still on disk —
 	 * those can change under a reviewer, whether or not the index was involved.
 	 * A frozen range needs neither.
@@ -613,12 +620,14 @@ export function createWorkspaceGitService({
 			return { ...entry, ...counts };
 		});
 
-		if (appendUntracked) {
-			files.push(...(await readUntrackedFiles(cwd)));
-		}
-		return stampWorktree
-			? summarizeWorkspaceGitFiles(await withWorktreeFacts(cwd, files))
-			: summarizeWorkspaceGitFiles(files);
+		const worktree = appendUntracked ? await readWorktreeStatus(cwd) : null;
+		const rows = worktree ? [...files, ...worktree.untracked] : files;
+		const status = stampWorktree
+			? summarizeWorkspaceGitFiles(await withWorktreeFacts(cwd, rows))
+			: summarizeWorkspaceGitFiles(rows);
+		return worktree
+			? { ...status, uncommittedFiles: worktree.uncommittedFiles }
+			: status;
 	}
 
 	/**
@@ -645,10 +654,17 @@ export function createWorkspaceGitService({
 		);
 	}
 
-	/** Working-tree untracked files with line counts, for the branch view. */
-	async function readUntrackedFiles(
-		cwd: string,
-	): Promise<WorkspaceGitFileWire[]> {
+	/**
+	 * Reads the working tree's status for the branch view: the untracked files,
+	 * with line counts, that its index-routed diff cannot list, and how many
+	 * paths hold an uncommitted change of any kind.
+	 * @param cwd - Absolute workspace directory
+	 * @returns The untracked rows and the uncommitted path count, or null when git status failed
+	 */
+	async function readWorktreeStatus(cwd: string): Promise<{
+		uncommittedFiles: number;
+		untracked: WorkspaceGitFileWire[];
+	} | null> {
 		const statusResult = await runGit(cwd, [
 			'status',
 			'--porcelain',
@@ -656,20 +672,22 @@ export function createWorkspaceGitService({
 			'--untracked-files=all',
 		]);
 		if (statusResult.status !== 'success') {
-			return [];
+			return null;
 		}
-		const untracked = parsePorcelainStatus(statusResult.stdout).filter(
-			(entry) => entry.status === 'untracked',
-		);
+		const entries = parsePorcelainStatus(statusResult.stdout);
+		const untracked = entries.filter((entry) => entry.status === 'untracked');
 		const countable = countableUntrackedPaths(untracked);
-		return mapWithConcurrency(
-			untracked,
-			MAX_CONCURRENT_UNTRACKED_READS,
-			async (entry) => ({
-				...entry,
-				...(await untrackedCounts(cwd, entry.path, countable)),
-			}),
-		);
+		return {
+			uncommittedFiles: entries.length,
+			untracked: await mapWithConcurrency(
+				untracked,
+				MAX_CONCURRENT_UNTRACKED_READS,
+				async (entry) => ({
+					...entry,
+					...(await untrackedCounts(cwd, entry.path, countable)),
+				}),
+			),
+		};
 	}
 
 	/** One file's unified diff against HEAD, with an untracked fallback. */

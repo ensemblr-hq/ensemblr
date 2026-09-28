@@ -23,6 +23,7 @@ import {
 	collectWorkspaceChangeSummaryUpdates,
 	getNavigationWorkspaceChangeSummaryTargets,
 	getRenderableNavigationSnapshot,
+	getWorkspaceSidebarState,
 	mapNavigationSnapshotToProjects,
 	mapRepositoriesToProjects,
 	resolveWorkspaceNavigationRenderState,
@@ -210,6 +211,135 @@ test('applies live change summaries to matching workspace models', () => {
 		files: 3,
 	});
 	expect(updated[1]).toBe(projects[1]);
+});
+
+test('collects the uncommitted count a branch read reports', () => {
+	const targets = getNavigationWorkspaceChangeSummaryTargets(
+		navigationSnapshot.repositories,
+	);
+	const updates = collectWorkspaceChangeSummaryUpdates(
+		[
+			{
+				data: {
+					summary: { additions: 5, deletions: 1, files: 2 },
+					uncommittedFiles: 1,
+				},
+			},
+			{ data: { summary: { additions: 0, deletions: 0, files: 0 } } },
+		],
+		targets,
+	);
+
+	expect(updates).toEqual([
+		{
+			changeSummary: { additions: 5, deletions: 1, files: 2 },
+			uncommittedFiles: 1,
+			workspaceId: 'workspace-1',
+		},
+		{
+			changeSummary: { additions: 0, deletions: 0, files: 0 },
+			workspaceId: 'workspace-2',
+		},
+	]);
+});
+
+/** Projects whose first workspace has a pushed, ready-to-merge pull request. */
+function readyPullRequestProjects() {
+	const workspace = navigationSnapshot.repositories[0]?.workspaces[0];
+	if (!workspace) {
+		throw new Error('fixture workspace missing');
+	}
+	return mapNavigationSnapshotToProjects(
+		withRepositoryOneWorkspaces([
+			{
+				...workspace,
+				pullRequest: {
+					branchSync: {
+						ahead: 0,
+						behind: 0,
+						branchName: 'octocat/eng-120',
+						hasUpstream: true,
+					},
+					number: 42,
+					status: 'ready',
+					syncedAt: '2026-06-06T00:00:00.000Z',
+				},
+			},
+		]),
+	);
+}
+
+test('an unopened workspace with uncommitted work stops reading as ready to merge', () => {
+	const projects = readyPullRequestProjects();
+	expect(
+		getWorkspaceSidebarState(projects[0]?.workspaces[0] as WorkspaceShellModel)
+			.kind,
+	).toBe('pr-ready');
+
+	const updated = applyWorkspaceChangeSummaries(projects, [
+		{
+			changeSummary: { additions: 30, deletions: 2, files: 4 },
+			uncommittedFiles: 3,
+			workspaceId: 'workspace-1',
+		},
+	]);
+	const workspace = updated[0]?.workspaces[0] as WorkspaceShellModel;
+
+	expect(workspace.uncommittedFiles).toBe(3);
+	expect(workspace.pullRequest.gitStatus).toMatchObject({
+		actionLabel: 'Commit and push',
+		kind: 'uncommitted',
+	});
+	expect(getWorkspaceSidebarState(workspace).kind).toBe('pr-unpushed');
+	expect(projects[0]?.workspaces[0]?.pullRequest.gitStatus.kind).toBe('clean');
+});
+
+test('a fully committed branch keeps the git-status row its sync state gave it', () => {
+	const projects = readyPullRequestProjects();
+	const original = projects[0]?.workspaces[0] as WorkspaceShellModel;
+	const updated = applyWorkspaceChangeSummaries(projects, [
+		{
+			changeSummary: { additions: 30, deletions: 2, files: 4 },
+			uncommittedFiles: 0,
+			workspaceId: 'workspace-1',
+		},
+	]);
+	const workspace = updated[0]?.workspaces[0] as WorkspaceShellModel;
+
+	expect(workspace.uncommittedFiles).toBe(0);
+	expect(workspace.pullRequest).toBe(original.pullRequest);
+	expect(getWorkspaceSidebarState(workspace).kind).toBe('pr-ready');
+});
+
+test('a change in the uncommitted count alone still produces a new row', () => {
+	const projects = applyWorkspaceChangeSummaries(readyPullRequestProjects(), [
+		{
+			changeSummary: { additions: 30, deletions: 2, files: 4 },
+			uncommittedFiles: 0,
+			workspaceId: 'workspace-1',
+		},
+	]);
+	const updated = applyWorkspaceChangeSummaries(projects, [
+		{
+			changeSummary: { additions: 30, deletions: 2, files: 4 },
+			uncommittedFiles: 2,
+			workspaceId: 'workspace-1',
+		},
+	]);
+
+	expect(updated).not.toBe(projects);
+	expect(updated[0]?.workspaces[0]?.pullRequest.gitStatus.kind).toBe(
+		'uncommitted',
+	);
+	expect(
+		applyWorkspaceChangeSummaries(updated, [
+			{
+				changeSummary: { additions: 30, deletions: 2, files: 4 },
+				uncommittedFiles: 2,
+				workspaceId: 'workspace-1',
+			},
+		]),
+	).toBe(updated);
 });
 
 test('maps workspace file-count metadata as copied files', () => {

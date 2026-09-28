@@ -119,9 +119,10 @@ export function getWorkspaceSidebarState(
  *
  * How much the row knows depends on which model it came from. A live workspace
  * has both halves — its working-tree query answers for uncommitted edits and its
- * snapshot for unpushed commits. A cached navigation row has only the snapshot's
- * `branchSync`, so it reports unpushed commits and stays quiet about an
- * uncommitted edit until the workspace is opened.
+ * snapshot for unpushed commits. A navigation row gets the same two halves more
+ * slowly: unpushed commits from the snapshot's `branchSync`, and uncommitted
+ * edits from the overview git poll, which rebuilds the git-status row once it
+ * answers.
  */
 function getPullRequestSidebarState(
 	workspace: WorkspaceShellModel,

@@ -639,6 +639,14 @@ export interface WorkspaceShellModel {
 	 */
 	terminalTabsLoaded?: boolean;
 	/**
+	 * How many files the working tree holds uncommitted, as the overview poll last
+	 * saw it or the open workspace's working-tree read last corrected it to.
+	 * `changeSummary` on a navigation row counts the whole branch, so this is what
+	 * lets a row nobody has open still tell uncommitted work from work already
+	 * committed. Absent until that poll answers.
+	 */
+	uncommittedFiles?: number;
+	/**
 	 * ISO timestamp of the workspace's last change, carried from the navigation
 	 * snapshot so the dashboard board can sort by recency. Absent on optimistic
 	 * rows the snapshot has not replaced yet.

@@ -261,8 +261,8 @@ function mapPresentationChecks(
  * The git-status row is built from the presentation's `branchSync` through the
  * same builder the live model uses, with a zeroed change summary: the cached
  * snapshot knows what the branch has not pushed but nothing about the worktree,
- * so an uncommitted edit stays invisible here until the workspace is opened and
- * its working-tree query answers.
+ * so an uncommitted edit stays invisible here until the overview git poll
+ * answers and `applyWorkspaceChangeSummaries` rebuilds the row from its count.
  */
 function mapPresentationPullRequest(
 	presentation: WorkspacePrPresentation | null,

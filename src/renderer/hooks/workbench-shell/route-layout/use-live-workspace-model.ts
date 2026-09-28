@@ -1,9 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
 	settingsResolutionQuery,
+	syncUncommittedFilesToBranchStatus,
 	workspaceFilesQuery,
 	workspaceGitStatusQuery,
 } from '@/renderer/api/ensemblr-queries';
@@ -111,9 +112,26 @@ export function useLiveWorkspaceModel({
 		}),
 		select: selectScriptSettings,
 	});
-	const { data: gitStatusData } = useQuery(
+	const queryClient = useQueryClient();
+	const { data: gitStatusData, dataUpdatedAt: gitStatusObservedAt } = useQuery(
 		workspaceGitStatusQuery(activeWorkspace.pathLabel ?? null),
 	);
+	useEffect(() => {
+		const workspaceCwd = activeWorkspace.pathLabel;
+		if (!workspaceCwd || !gitStatusData || gitStatusData.error) {
+			return;
+		}
+		syncUncommittedFilesToBranchStatus(queryClient, {
+			observedAt: gitStatusObservedAt,
+			uncommittedFiles: gitStatusData.summary.files,
+			workspaceCwd,
+		});
+	}, [
+		activeWorkspace.pathLabel,
+		gitStatusData,
+		gitStatusObservedAt,
+		queryClient,
+	]);
 	const { data: allFilesData } = useQuery(
 		workspaceFilesQuery(activeWorkspace.pathLabel ?? null),
 	);
