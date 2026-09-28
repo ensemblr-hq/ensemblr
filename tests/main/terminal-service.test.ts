@@ -821,6 +821,74 @@ test('does not detect a preview URL for interactive terminal sessions', async (t
 	assert.equal(service.getSnapshot(terminalId).session?.previewUrl, null);
 });
 
+test('stamps a setup script password prompt split across chunks and clears it once answered', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { lifecycleEvents, service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({
+		kind: 'setup-script',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+
+	fake.emitData('installing system deps\r\n[sudo] passw');
+	assert.equal(service.getSnapshot(terminalId).session?.secretPrompt, null);
+
+	fake.emitData('ord for philipp: ');
+	assert.equal(
+		service.getSnapshot(terminalId).session?.secretPrompt,
+		'[sudo] password for philipp:',
+	);
+	assert.ok(
+		lifecycleEvents.some(
+			(event) => event.session.secretPrompt === '[sudo] password for philipp:',
+		),
+	);
+
+	const broadcastsBeforeAnswer = lifecycleEvents.length;
+	fake.emitData('\r\n');
+	assert.equal(service.getSnapshot(terminalId).session?.secretPrompt, null);
+	assert.equal(lifecycleEvents.length, broadcastsBeforeAnswer + 1);
+
+	fake.emitData('uid=0(root)\r\n');
+	assert.equal(lifecycleEvents.length, broadcastsBeforeAnswer + 1);
+});
+
+test('drops a run script password prompt when the script exits', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({
+		kind: 'run-script',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+
+	fake.emitData('Password:');
+	assert.equal(
+		service.getSnapshot(terminalId).session?.secretPrompt,
+		'Password:',
+	);
+
+	fake.emitExit(1);
+	assert.equal(service.getSnapshot(terminalId).session?.secretPrompt, null);
+});
+
+test('does not watch interactive terminals for password prompts', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = result.session?.id ?? '';
+
+	fake.emitData('[sudo] password for philipp: ');
+
+	assert.equal(service.getSnapshot(terminalId).session?.secretPrompt, null);
+});
+
 test('output broadcasts carry monotonic seq mirrored by snapshot lastSeq', async (t) => {
 	const fake = createFakePty();
 	const backend: PtyBackend = { spawn: () => fake.pty };

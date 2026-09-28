@@ -3951,6 +3951,12 @@ export default interface Resources {
 			'stop-label': 'Stop run script';
 			'stopped-caption': 'Test your changes here.';
 		};
+		'secret-prompt': {
+			heading: 'Script is waiting for a password';
+			'input-label': 'Password';
+			send: 'Send';
+			'send-failed': 'Could not reach the script. Try again.';
+		};
 		'session-tab': {
 			placeholder: {
 				label: 'Workspace';

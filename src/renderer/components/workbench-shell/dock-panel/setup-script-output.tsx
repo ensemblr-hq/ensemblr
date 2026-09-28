@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/renderer/components/ui/button';
 import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
 
+import { SecretPromptBar } from './secret-prompt-bar';
 import { SetupMissingEmptyState } from './setup-missing-empty-state';
 import { SetupNotRunEmptyState } from './setup-not-run-empty-state';
 import { XtermTerminal } from './xterm-terminal';
@@ -56,6 +57,12 @@ export function SetupScriptOutputPanel({
 				terminalLabel={tabLabel}
 				workspaceCwd={workspaceCwd}
 			/>
+			{script.secretPrompt ? (
+				<SecretPromptBar
+					prompt={script.secretPrompt}
+					terminalId={script.terminalId}
+				/>
+			) : null}
 			<SetupActionButton
 				onRerun={onRunSetupScript}
 				onStop={onStopSetupScript}

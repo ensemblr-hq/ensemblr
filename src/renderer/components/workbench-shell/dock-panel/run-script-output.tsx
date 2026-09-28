@@ -4,6 +4,7 @@ import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
 
 import { RunStoppedEmptyState } from './run-stopped-empty-state';
 import { ScriptEmptyState } from './script-empty-state';
+import { SecretPromptBar } from './secret-prompt-bar';
 import { XtermTerminal } from './xterm-terminal';
 
 /** Renders the Run script output or the appropriate empty state. */
@@ -59,13 +60,21 @@ export function RunScriptOutputPanel({
 	}
 
 	return (
-		<XtermTerminal
-			isVisible={isVisible}
-			readOnly
-			sessionStatus={script.sessionStatus ?? null}
-			terminalId={script.terminalId}
-			terminalLabel={tabLabel}
-			workspaceCwd={workspaceCwd}
-		/>
+		<div className='relative h-full min-h-0'>
+			<XtermTerminal
+				isVisible={isVisible}
+				readOnly
+				sessionStatus={script.sessionStatus ?? null}
+				terminalId={script.terminalId}
+				terminalLabel={tabLabel}
+				workspaceCwd={workspaceCwd}
+			/>
+			{script.secretPrompt ? (
+				<SecretPromptBar
+					prompt={script.secretPrompt}
+					terminalId={script.terminalId}
+				/>
+			) : null}
+		</div>
 	);
 }

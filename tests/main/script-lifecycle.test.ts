@@ -193,6 +193,7 @@ function createTerminalServiceFake({
 				restored: false,
 				rows: 24,
 				scriptName: options.scriptName ?? null,
+				secretPrompt: null,
 				shell: '/bin/zsh',
 				status: 'running',
 				titleIsDefault: false,

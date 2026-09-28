@@ -147,6 +147,20 @@ Still works, upgraded into one implicit script named `run`, `icon = "play"`,
 `[scripts.run.<name>]` tables exist** — with both present, the named tables win
 and the string is ignored.
 
+### Scripts that ask for a password
+
+The Setup and Run panes show output only and take no keyboard input. When a
+setup or run script stops on a password prompt, the dock lights that tab and
+floats a masked field over the pane. The prompt must be a line that names a
+password or passphrase and ends in a colon, which covers `sudo`, `sudo-rs`,
+`doas`, `ssh` and `git` over HTTPS. What the user types there goes straight to
+the script, followed by Enter, and Ensemblr keeps none of it. So `sudo` in a
+setup or run `command` works, but only a person can answer it: an agent that
+starts such a script sees it wait, and has to tell the user rather than supply
+a password. The archive script has no pane to answer from, so keep `sudo` out
+of `archive`. A prompt worded any other way is not recognised; run that
+command in a spawn terminal instead.
+
 ## Injected `ENSEMBLR_*` variables
 
 Every terminal Ensemblr launches — the setup script, a run script, a spawn

@@ -97,6 +97,14 @@ export interface TerminalSessionSnapshot {
 	 */
 	scriptName: string | null;
 	/**
+	 * The prompt a running setup or run script printed and is now blocked on —
+	 * `[sudo] password for …:` and its kin — or `null` when it is not waiting on
+	 * a password. Those panes take no keyboard input, so this is what raises the
+	 * dock's masked field. Cleared by the next line of output and on exit, and
+	 * always `null` for every other session kind.
+	 */
+	secretPrompt: string | null;
+	/**
 	 * Absolute path of the shell binary the PTY spawned. An interactive terminal
 	 * runs the user's own login shell, which may be one — fish — whose syntax a
 	 * POSIX command does not survive; a session carrying a command runs a POSIX

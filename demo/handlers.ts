@@ -239,6 +239,7 @@ function terminalSession(
 		restored: false,
 		rows: 30,
 		scriptName: terminal.scriptName ?? null,
+		secretPrompt: null,
 		shell: '/bin/zsh',
 		status: terminal.status ?? 'running',
 		title: terminal.title,

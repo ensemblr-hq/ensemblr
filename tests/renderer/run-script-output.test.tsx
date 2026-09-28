@@ -78,3 +78,22 @@ test('renders the terminal once the run script owns a session', () => {
 	expect(screen.getByTestId('xterm')).toBeInTheDocument();
 	expect(screen.queryByRole('button', { name: /Start Run/ })).toBeNull();
 });
+
+test('floats the password field over the pane only while the script is asking', () => {
+	renderPanel({
+		script: {
+			secretPrompt: '[sudo] password for philipp:',
+			status: 'running',
+			terminalId: 't1',
+		},
+	});
+
+	expect(screen.getByLabelText('Password')).toBeInTheDocument();
+	expect(screen.getByText('[sudo] password for philipp:')).toBeInTheDocument();
+});
+
+test('shows no password field while the script is not asking for one', () => {
+	renderPanel({ script: { status: 'running', terminalId: 't1' } });
+
+	expect(screen.queryByLabelText('Password')).toBeNull();
+});

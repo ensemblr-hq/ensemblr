@@ -147,6 +147,7 @@ Ensemblr equivalent:
 - Bottom-right dock provides fixed Setup and Run script-output tabs plus user-spawned terminal tabs.
 - Setup is a read-only output tab for the workspace/project setup command, for example dependency install logs.
 - Run is a read-only output tab for the workspace run command, for example a dev server process.
+- The one input either tab takes is a password. When its script stops on a password prompt (`sudo`, `ssh`, `git` over HTTPS), the tab shows its warning state and a masked field floats over the top of the pane. The field sends the answer to the script with Enter and clears itself. It never takes focus on its own, because a chat draft typed into it by accident would reach the script as a password. See [ADR 0078](adr/0078-answer-a-script-password-prompt-through-a-masked-field.md).
 - Each workspace starts with one default Terminal tab. Users can spawn additional named terminal tabs when they need more manual shells.
 - User-spawned terminal tabs are regular IDE-style interactive terminals backed by terminal session IDs.
 - Setup/run output remains visible while the user reviews chat, files, or checks.

@@ -91,3 +91,17 @@ test('renders the not-run empty state without a setup control', () => {
 	expect(screen.queryByRole('button', { name: 'Rerun setup' })).toBeNull();
 	expect(screen.queryByRole('button', { name: 'Stop setup' })).toBeNull();
 });
+
+test('keeps Stop setup reachable while the password field is showing', () => {
+	renderPanel({
+		script: scriptSummary({
+			secretPrompt: '[sudo] password for philipp:',
+			status: 'running',
+		}),
+	});
+
+	expect(screen.getByLabelText('Password')).toBeInTheDocument();
+	expect(
+		screen.getByRole('button', { name: 'Stop setup' }),
+	).toBeInTheDocument();
+});
