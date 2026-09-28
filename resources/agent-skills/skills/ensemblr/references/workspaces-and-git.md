@@ -123,9 +123,10 @@ inline on its line in Changes, and in the Checks roll-up that answers what a pas
 left open — and the list is what someone handed six findings actually wants.
 Ensemblr brings Checks forward itself after a comment op, once per batch rather
 than once per call, so the op needs no `ensemblr_focus_panel` call of its own.
-It cannot see what you focus afterwards, though: a turn that left comments ends
-on Checks, so if you brought a tab, terminal, or another panel forward since,
-finish with `ensemblr_focus_panel` and `panel: "checks"`.
+It cannot see what you focus afterwards, though, so a root orchestrator ends a
+turn that left comments on Checks: if you brought a tab, terminal, or another
+panel forward since, finish with `ensemblr_focus_panel` and `panel: "checks"`.
+A sub-agent leaves that landing to the root it reports to.
 
 **Resolve only what you actually fixed, in the turn you fixed it.** An open
 comment is a live claim that the finding still stands, so a queue of comments

@@ -443,6 +443,8 @@ describe('review port: resolving comments', () => {
 
 		expect(result.resolved).toBe(2);
 		expect(result.resolvedIds).toEqual(['c-1', 'c-2']);
+		expect(result.message).toContain('finish back on Checks');
+		expect(result.message).not.toContain('do not spend');
 		expect(saveComment).toHaveBeenCalledWith({
 			id: 'c-1',
 			status: 'resolved',

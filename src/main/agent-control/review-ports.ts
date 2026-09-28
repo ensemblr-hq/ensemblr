@@ -281,7 +281,9 @@ function filedMessage(count: number): string {
  * Renders the acknowledgement an agent reads after resolving. A batch that
  * matched nothing is reported as the no-op it is rather than an error, because
  * re-running the cleanup step after a restart lands here and an error would
- * teach a model to stop doing the bookkeeping at all.
+ * teach a model to stop doing the bookkeeping at all. Like the filed
+ * acknowledgement it asks for Checks back rather than forbidding a focus call,
+ * because a resolve pass is usually followed by a push the turn must end on.
  * @param result - The partitioned outcome of the batch.
  * @returns The message returned alongside the buckets.
  */
@@ -295,7 +297,7 @@ function resolvedMessage(
 	const trailing = result.notFound.length
 		? ` ${result.notFound.length} id(s) matched no open comment on this workspace and were skipped.`
 		: '';
-	return `Resolved ${result.resolved} review comment(s); the user sees them close in the Checks panel, where Ensemblr has already taken them — do not spend an \`ensemblr_focus_panel\` call on it. Say in your reply which comments you left open and why.${trailing}`;
+	return `Resolved ${result.resolved} review comment(s); the user sees them close in the Checks panel, where Ensemblr has already taken them, so this call needs no \`ensemblr_focus_panel\` of its own — but if you focus anything else before the turn ends, finish back on Checks. Say in your reply which comments you left open and why.${trailing}`;
 }
 
 /**

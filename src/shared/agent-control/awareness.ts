@@ -153,11 +153,12 @@ Keeping your own tab legible is your job, not the user's, and it is bookkeeping 
  * It names Checks rather than Changes as where comments are read, and says the
  * app moves the user there, because both are true: the roll-up is the view that
  * answers what a pass left open, and the port pulls focus to it so no model has
- * to remember to. The port cannot see what the agent focuses after that pull,
- * though, so the closing clause asks for Checks back at the end of a turn that
- * left comments rather than forbidding the focus call outright.
+ * to remember to. It stops at "no focus call of its own" rather than forbidding
+ * one: ending the turn on Checks is {@link CHECKS_LANDING}'s job, held by the
+ * roots alone, so a child or a plan is not handed an end-of-turn rule for a
+ * user it does not answer to.
  */
-const REVIEW_INVENTORY_READS = `- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads as a list in the Checks panel. Ensemblr brings Checks forward itself after a comment op — once per batch, not once per call — so the op needs no \`ensemblr_focus_panel\` call of its own; but a turn that left comments ends on Checks, so bring it back if you focused anything else after them.`;
+const REVIEW_INVENTORY_READS = `- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads as a list in the Checks panel. Ensemblr brings Checks forward itself after a comment op — once per batch, not once per call — so the op needs no \`ensemblr_focus_panel\` call of its own.`;
 
 /**
  * The full review bullet, for every role outside Plan Mode. Plan Mode gets
@@ -628,9 +629,10 @@ const ORCHESTRATOR_ANSWER_LAST = `Your last message is your answer to the user, 
  * Where a root leaves the user when its turn produced something Checks shows: a
  * pull request, or review comments. Held by the three workspace root playbooks —
  * Pi, native, and harness — because a root is the role whose reader is the user
- * standing in that workspace, and because the app covers only half of it — `review-focus.ts` pulls Checks once
- * per comment pass, nothing pulls it after a pull request, and any focus call
- * the agent makes afterwards moves the user away from both.
+ * standing in that workspace, and because the app covers only half of it:
+ * `review-focus.ts` pulls Checks once per comment pass, nothing pulls it after
+ * a pull request, and any focus call the agent makes afterwards moves the user
+ * away from both.
  */
 const CHECKS_LANDING = `End the turn on the Checks panel when it leaves the user something to read there: you opened a pull request or pushed to the one already open, or review comments were left on the diff this turn — by you or by a child you spawned. Checks is where the pull request's status, its CI runs, and the comment roll-up live, so make \`ensemblr_focus_panel\` with \`panel: "checks"\` your last focus call, before your final message. Ensemblr pulls Checks forward on its own after a comment op, but only once per pass and never after a pull request, and any tab, terminal, or panel you focus afterwards takes the user away again. A turn that did neither leaves the panel where the user put it.`;
 

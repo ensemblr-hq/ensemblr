@@ -496,15 +496,27 @@ describe('agent-control AWARENESS parity', () => {
 			expect(playbook).toContain('review comments were left on the diff');
 			expect(playbook).toContain('`panel: "checks"` your last focus call');
 		}
-		for (const playbook of [MANAGER_SUBAGENT_AWARENESS, SUBAGENT_AWARENESS]) {
+		for (const playbook of [
+			MANAGER_SUBAGENT_AWARENESS,
+			SUBAGENT_AWARENESS,
+			...PLAN_MODE_PLAYBOOKS,
+			CONCIERGE_AWARENESS,
+		]) {
 			expect(playbook).not.toContain('End the turn on the Checks panel');
 		}
 	});
 
-	it('asks every role for Checks back after comments instead of forbidding the focus call', () => {
+	// Landing on Checks is the root's rule alone; the shared bullet only lifts the
+	// old ban, so a child or a plan is never handed an end-of-turn focus call.
+	it('tells every role a comment op needs no focus call, without an end-of-turn rule', () => {
 		for (const playbook of playbooksFor(ALL_ON)) {
-			expect(playbook).toContain('a turn that left comments ends on Checks');
+			expect(playbook).toContain(
+				'so the op needs no `ensemblr_focus_panel` call of its own.',
+			);
 			expect(playbook).not.toContain('never spend an `ensemblr_focus_panel`');
+			expect(playbook).not.toContain(
+				'a turn that left comments ends on Checks',
+			);
 		}
 	});
 

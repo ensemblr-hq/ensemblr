@@ -1559,9 +1559,12 @@ focus at the moment of the op, but it cannot see what the agent focuses after it
 and nothing pulls Checks after the agent opens a pull request. So every root
 playbook (`CHECKS_LANDING` in `src/shared/agent-control/awareness.ts`) asks the
 agent to make `ensemblr_focus_panel` with `panel: "checks"` its last focus call
-in a turn that opened or pushed to a pull request or left review comments, and
-the review bullet every role shares asks for Checks back after comments. The
-AFK delivery loop's step 5 says the same once the pull request is opened or updated.
+in a turn that opened or pushed to a pull request or left review comments. The
+review bullet every role shares says only that a comment op needs no focus call
+of its own, so children and plans carry no end-of-turn rule; the filed and
+resolved acknowledgements ask for Checks back if the agent focuses anything
+else before its turn ends. The AFK delivery loop's step 5 repeats the root rule
+once the pull request is opened or updated.
 This is prose rather than enforcement because the port has no signal for "the
 turn is ending"; the one-yank-per-pass rule above is unchanged.
 
