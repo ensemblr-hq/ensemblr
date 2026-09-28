@@ -22,7 +22,13 @@ describe('legal document icons', () => {
 		'NOTICE',
 		'NOTICE.txt',
 		'COPYING',
+		'COPYING.LESSER',
+		'COPYING.LIB',
 		'COPYRIGHT',
+		'LICENSE.APACHE',
+		'LICENSE.MIT',
+		'LICENSE-APACHE-2.0',
+		'LICENSE-APACHE-2.0.txt',
 	])('uses the license icon for %s', (name) => {
 		expect(iconFor(name)).toBe('vscode-icons:file-type-license');
 	});
@@ -35,6 +41,8 @@ describe('legal document icons', () => {
 		['license.ts', 'vscode-icons:file-type-typescript'],
 		['notice.json', 'vscode-icons:file-type-json'],
 		['licenses', 'vscode-icons:default-file'],
+		['license.apache.ts', 'vscode-icons:file-type-typescript'],
+		['copying.lesser.json', 'vscode-icons:file-type-json'],
 	])('leaves %s to its own rule', (name, icon) => {
 		expect(iconFor(name)).toBe(icon);
 	});
@@ -84,6 +92,20 @@ describe('extension-less build and project files', () => {
 		['CONTEXT', 'file-type-markdown'],
 	])('keeps %s on %s', (name, icon) => {
 		expect(iconFor(name)).toBe(`vscode-icons:${icon}`);
+	});
+});
+
+describe('folder icons', () => {
+	it.each([
+		['docs', 'folder-type-docs'],
+		['Docs', 'folder-type-docs'],
+		['TESTS', 'folder-type-test'],
+		['Scripts', 'folder-type-script'],
+		['.GitHub', 'folder-type-github'],
+	])('matches the %s directory case-insensitively', (name, icon) => {
+		expect(getWorkspaceFileIconName({ kind: 'directory', name })).toBe(
+			`vscode-icons:${icon}`,
+		);
 	});
 });
 

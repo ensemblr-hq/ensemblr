@@ -5,6 +5,7 @@ import { ICON_SUBSET } from './icon-subset.gen';
 
 const iconPrefix = 'vscode-icons';
 
+/** Lowercased directory names that decide their own folder icon. */
 const folderIconByName: Record<string, string> = {
 	'.claude': 'folder-type-claude',
 	'.git': 'folder-type-git',
@@ -91,23 +92,33 @@ const fileIconByNamePrefix: Record<string, string> = {
 	'dockerfile.': 'file-type-docker',
 };
 
+/** The name-prefix families as pairs, so resolving a file does not rebuild them. */
+const FILE_ICON_NAME_PREFIXES: readonly (readonly [string, string])[] =
+	Object.entries(fileIconByNamePrefix);
+
 /**
  * Lowercased stems of legal documents, which keep their icon whether they ship
- * bare or as `.md`/`.txt` — `LICENSE`, `LICENSE.md` and `NOTICE.txt` alike.
+ * bare or as `.md`/`.txt` — `LICENSE`, `LICENSE.md` and `NOTICE.txt` alike. A
+ * stem may carry its own dotted suffix, as GNU's `COPYING.LESSER` does.
  */
 const fileIconByDocumentStem: Record<string, string> = {
 	copying: 'file-type-license',
+	'copying.lesser': 'file-type-license',
+	'copying.lib': 'file-type-license',
 	copyright: 'file-type-license',
 	licence: 'file-type-license',
 	license: 'file-type-license',
 	'license-apache': 'file-type-license',
+	'license-apache-2.0': 'file-type-license',
 	'license-mit': 'file-type-license',
+	'license.apache': 'file-type-license',
+	'license.mit': 'file-type-license',
 	notice: 'file-type-license',
 	unlicense: 'file-type-unlicense',
 };
 
-/** Extensions a legal document may carry and still resolve by its stem. */
-const DOCUMENT_EXTENSIONS: ReadonlySet<string> = new Set(['', 'md', 'txt']);
+/** Extensions a legal document may carry on top of its stem. */
+const DOCUMENT_EXTENSIONS: ReadonlySet<string> = new Set(['md', 'txt']);
 
 const fileIconByExtension: Record<string, string> = {
 	avif: 'file-type-image',
@@ -238,7 +249,8 @@ export function getWorkspaceFileIconName(
 
 	if (file.kind === 'directory') {
 		const baseIcon =
-			lookupIcon(folderIconByName, file.name) ?? DEFAULT_FOLDER_ICON;
+			lookupIcon(folderIconByName, file.name.toLowerCase()) ??
+			DEFAULT_FOLDER_ICON;
 		const openIcon = `${baseIcon}-opened`;
 		const iconName =
 			options?.isExpanded && folderIconExists(openIcon) ? openIcon : baseIcon;
@@ -289,16 +301,15 @@ function lookupIcon(
  * @returns The family's icon, or undefined when no prefix matches.
  */
 function getFileIconNameByPrefix(name: string): string | undefined {
-	const prefix = Object.keys(fileIconByNamePrefix).find((candidate) =>
-		name.startsWith(candidate),
-	);
-
-	return prefix ? fileIconByNamePrefix[prefix] : undefined;
+	return FILE_ICON_NAME_PREFIXES.find(([prefix]) =>
+		name.startsWith(prefix),
+	)?.[1];
 }
 
 /**
- * Finds the icon for a legal document such as `LICENSE` or `NOTICE.md`, which
- * is recognized by its stem only while it carries a document extension.
+ * Finds the icon for a legal document such as `LICENSE`, `NOTICE.md` or
+ * `COPYING.LESSER`: the name, less a trailing `.md`/`.txt`, must be a known
+ * stem, so `license.ts` is left to its extension.
  * @param name - The file name, lowercased.
  * @param extension - The name's extension, without the leading dot.
  * @returns The document's icon, or undefined when the name is not one.
@@ -307,11 +318,9 @@ function getDocumentIconName(
 	name: string,
 	extension: string,
 ): string | undefined {
-	if (!DOCUMENT_EXTENSIONS.has(extension)) {
-		return undefined;
-	}
-
-	const stem = extension ? name.slice(0, -(extension.length + 1)) : name;
+	const stem = DOCUMENT_EXTENSIONS.has(extension)
+		? name.slice(0, -(extension.length + 1))
+		: name;
 	return lookupIcon(fileIconByDocumentStem, stem);
 }
 
