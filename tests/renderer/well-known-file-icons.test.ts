@@ -95,6 +95,39 @@ describe('extension-less build and project files', () => {
 	});
 });
 
+describe('Nix files', () => {
+	it.each([
+		['flake.nix', 'file-type-nix'],
+		['default.nix', 'file-type-nix'],
+		['shell.nix', 'file-type-nix'],
+		['flake.lock', 'file-type-nix'],
+		['bun.lock', 'file-type-bun'],
+	])('maps %s to %s', (name, icon) => {
+		expect(iconFor(name)).toBe(`vscode-icons:${icon}`);
+	});
+
+	it('resolves a nested module by its extension', () => {
+		expect(getWorkspaceFileIconNameForPath('nix/packages.nix')).toBe(
+			'vscode-icons:file-type-nix',
+		);
+	});
+
+	it.each([
+		[false, 'folder-type-nix'],
+		[true, 'folder-type-nix-opened'],
+	])(
+		'gives the nix directory its folder icon (expanded: %s)',
+		(isExpanded, icon) => {
+			expect(
+				getWorkspaceFileIconName(
+					{ kind: 'directory', name: 'nix' },
+					{ isExpanded },
+				),
+			).toBe(`vscode-icons:${icon}`);
+		},
+	);
+});
+
 describe('folder icons', () => {
 	it.each([
 		['docs', 'folder-type-docs'],
