@@ -9,6 +9,10 @@ Accepted
 Relates to [0027](0027-use-workspace-archive-lifecycle.md) (workspace archive
 lifecycle), which owns the `.context/` handoff folder.
 
+Amended by [0079](0079-name-an-attachment-after-its-bytes-instead-of-refusing-it.md):
+magic bytes now name a pasted image's stored format rather than gate it, so a
+mislabeled or unrecognized image is stored instead of rejected.
+
 ## Context
 
 The composer needed to accept pasted and dropped images and files. Nothing

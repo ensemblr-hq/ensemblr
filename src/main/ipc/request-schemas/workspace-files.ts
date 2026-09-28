@@ -63,10 +63,11 @@ export const writeWorkspaceImageAttachmentRequestSchema = z.object({
  *
  * `contentBase64` is capped so an oversized paste is rejected before the handler
  * allocates the decoded buffer; ~70MB of base64 holds the 50MB decoded ceiling
- * (`HARD_MAX_ATTACHMENT_BYTES`, 4/3 expansion) with margin for whitespace.
+ * (`HARD_MAX_ATTACHMENT_BYTES`, 4/3 expansion) with margin for whitespace. It
+ * may be empty, because an empty file is still one a user can attach.
  */
 export const writeWorkspaceFileAttachmentRequestSchema = z.object({
-	contentBase64: z.string().min(1).max(70_000_000),
+	contentBase64: z.string().max(70_000_000),
 	name: z.string().max(255).optional(),
 	workspaceCwd: z.string().min(1),
 });

@@ -32,6 +32,9 @@ import {
 	extensionForImageMimeType,
 	imageSignatureMatches,
 	MAX_CONTEXT_IMAGE_BYTES,
+	signatureKeyForExtension,
+	sniffImageSignature,
+	sniffVideoContainer,
 } from './workspace-images.ts';
 import {
 	hasErrorCode,
@@ -78,7 +81,10 @@ interface AttachmentFailure {
 
 /**
  * Persists a pasted image under the workspace's content-addressed attachment
- * store after validating that its bytes really are the image type it claims.
+ * store, named after the format its bytes really carry. A payload the browser
+ * called an image but whose bytes are some other format — a "GIF" that is a
+ * WebP, an APNG, a HEIC — is stored rather than refused, since the user asked
+ * to attach a file and the extension is the only thing that was wrong.
  * @param request - The decoded-payload request from the renderer.
  * @returns The stored file row, or a typed failure.
  */
@@ -90,20 +96,35 @@ export async function writeContextImageAttachment(
 		return { error: { code: 'invalid-cwd', message: cwdResult.message } };
 	}
 
-	const validated = validatePastedImage(
-		request.mimeType,
-		request.contentBase64,
-	);
-	if (!validated.ok) {
-		return { error: validated.error, sizeBytes: validated.sizeBytes };
+	const buffer = decodeBase64Payload(request.contentBase64);
+	if (!buffer || buffer.length === 0) {
+		return {
+			error: {
+				code: 'invalid-image',
+				message: 'Pasted image could not be decoded.',
+			},
+		};
+	}
+	if (buffer.length > MAX_CONTEXT_IMAGE_BYTES) {
+		return {
+			error: {
+				code: 'invalid-image',
+				message: 'Pasted image is too large to attach.',
+			},
+			sizeBytes: buffer.length,
+		};
 	}
 
-	const stem = sanitizeAttachmentStem(
-		request.name ? path.parse(request.name).name : 'pasted-image',
-	);
+	const parsed = parseAttachmentName(request.name);
+	const extension = resolveAttachmentExtension({
+		buffer,
+		claimsImage: true,
+		declared:
+			extensionForImageMimeType(request.mimeType) ?? cleanExtension(parsed.ext),
+	});
 	return persistContentAddressed({
-		buffer: validated.buffer,
-		name: `${stem}.${validated.extension}`,
+		buffer,
+		name: `${sanitizeAttachmentStem(parsed.name, 'pasted-image')}.${extension}`,
 		workspaceCwd: cwdResult.cwd,
 		writeFailedMessage: 'Failed to write pasted image.',
 	});
@@ -111,7 +132,8 @@ export async function writeContextImageAttachment(
 
 /**
  * Persists a pasted non-image file under the workspace's content-addressed
- * attachment store.
+ * attachment store. An empty payload is a real file — an `__init__.py`, a
+ * `.gitkeep` — and is stored like any other.
  * @param request - The base64 payload and original filename from the renderer.
  * @returns The stored file row, or a typed failure.
  */
@@ -139,11 +161,13 @@ export async function writeContextFileAttachment(
 		};
 	}
 
-	const parsed = request.name
-		? path.parse(request.name)
-		: { ext: '', name: '' };
+	const parsed = parseAttachmentName(request.name);
 	const stem = sanitizeAttachmentStem(parsed.name, 'attachment');
-	const extension = resolveAttachmentExtension(parsed.ext, buffer);
+	const extension = resolveAttachmentExtension({
+		buffer,
+		claimsImage: false,
+		declared: cleanExtension(parsed.ext),
+	});
 	return persistContentAddressed({
 		buffer,
 		name: `${stem}.${extension}`,
@@ -431,63 +455,33 @@ async function prepareContextSubdir(
 }
 
 /**
- * Decodes and validates a pasted image payload: known MIME type, well-formed
- * base64, magic-byte signature matching the declared type, and within the size
- * cap.
- * @param mimeType - MIME type declared by the renderer.
- * @param contentBase64 - Base64 body of the pasted image.
- * @returns The decoded buffer and safe extension, or a typed failure.
- */
-function validatePastedImage(
-	mimeType: string,
-	contentBase64: string,
-):
-	| { buffer: Buffer; extension: string; ok: true }
-	| {
-			error: { code: 'invalid-image'; message: string };
-			ok: false;
-			sizeBytes?: number;
-	  } {
-	const extension = extensionForImageMimeType(mimeType);
-	const buffer = decodeBase64Payload(contentBase64);
-	if (!extension || !buffer || !imageSignatureMatches(buffer, extension)) {
-		return {
-			error: {
-				code: 'invalid-image',
-				message: 'Pasted attachment must be a valid image.',
-			},
-			ok: false,
-		};
-	}
-	if (buffer.length > MAX_CONTEXT_IMAGE_BYTES) {
-		return {
-			error: {
-				code: 'invalid-image',
-				message: 'Pasted image is too large to attach.',
-			},
-			ok: false,
-			sizeBytes: buffer.length,
-		};
-	}
-	return { buffer, extension, ok: true };
-}
-
-/**
- * Decodes a renderer-supplied base64 payload after cheap shape checks.
+ * Decodes a renderer-supplied base64 payload after cheap shape checks. An empty
+ * body decodes to an empty buffer: an empty file is still a file.
  * @param contentBase64 - Base64 body, possibly containing whitespace.
- * @returns The decoded buffer, or null when the payload is empty or malformed.
+ * @returns The decoded buffer, or null when the payload is malformed.
  */
 function decodeBase64Payload(contentBase64: string): Buffer | null {
 	const normalized = contentBase64.replaceAll(/\s/g, '');
-	if (
-		normalized.length === 0 ||
-		normalized.length % 4 === 1 ||
-		!BASE64_PATTERN.test(normalized)
-	) {
+	if (normalized.length === 0) {
+		return Buffer.alloc(0);
+	}
+	if (normalized.length % 4 === 1 || !BASE64_PATTERN.test(normalized)) {
 		return null;
 	}
-	const buffer = Buffer.from(normalized, 'base64');
-	return buffer.length > 0 ? buffer : null;
+	return Buffer.from(normalized, 'base64');
+}
+
+/**
+ * Splits the filename the renderer reported into the stem and extension the
+ * store names its copy from.
+ * @param name - Original filename, when the payload carried one.
+ * @returns The stem and dotted extension, both empty when there is no name.
+ */
+function parseAttachmentName(name: string | undefined): {
+	ext: string;
+	name: string;
+} {
+	return name ? path.parse(name) : { ext: '', name: '' };
 }
 
 /**
@@ -510,24 +504,61 @@ function sanitizeAttachmentStem(
 }
 
 /**
- * Resolves a safe lowercase extension for a pasted file. Prefers the original
- * filename's extension; when it has none, sniffs the payload so extensionless
- * text (Dockerfile, LICENSE, `.env`) is saved as `txt` and inlined downstream
- * rather than announced as an opaque `bin` blob.
- * @param ext - Extension parsed from the original filename (may be empty).
- * @param buffer - Decoded file bytes, sniffed only when `ext` is empty.
- * @returns The extension to store the payload under.
+ * Reduces a filename extension to the conservative lowercase form the store
+ * writes.
+ * @param ext - Extension as parsed from the original filename (may be empty).
+ * @returns The cleaned extension without its dot, or `''` when none survives.
  */
-function resolveAttachmentExtension(ext: string, buffer: Buffer): string {
-	const cleaned = ext
+function cleanExtension(ext: string): string {
+	return ext
 		.replace(/^\./, '')
 		.toLowerCase()
 		.replaceAll(/[^a-z0-9]+/g, '')
 		.slice(0, 16);
-	if (cleaned) {
-		return cleaned;
+}
+
+/**
+ * Resolves the extension a pasted file is stored under, so the name never
+ * contradicts the bytes behind it. A declared extension the bytes confirm is
+ * kept. One that names a raster format the bytes disprove is replaced by the
+ * image format or video container they do carry, or dropped when they carry
+ * neither — a WebP or MP4 saved as `.gif` would otherwise render as broken and
+ * be handed to an agent as a GIF.
+ * An extension naming some other type (`.pdf`, `.heic`) is kept as written,
+ * and an extensionless payload is sniffed, so text (Dockerfile, LICENSE) is
+ * saved as `txt` and inlined downstream rather than announced as `bin`.
+ * @param buffer - Decoded file bytes.
+ * @param claimsImage - Whether the browser reported the payload as an image,
+ *   which licenses sniffing even under an extension with no known signature.
+ * @param declared - Cleaned extension the name or MIME type declared (may be empty).
+ * @returns The extension to store the payload under.
+ */
+function resolveAttachmentExtension({
+	buffer,
+	claimsImage,
+	declared,
+}: {
+	buffer: Buffer;
+	claimsImage: boolean;
+	declared: string;
+}): string {
+	const declaredSignature = signatureKeyForExtension(declared);
+	if (declaredSignature && imageSignatureMatches(buffer, declaredSignature)) {
+		return declared;
 	}
-	return bytesLookLikeText(buffer) ? 'txt' : 'bin';
+	const isText = bytesLookLikeText(buffer);
+	const maySniff = claimsImage || declaredSignature !== null || !declared;
+	const sniffed =
+		maySniff && !isText
+			? (sniffImageSignature(buffer) ?? sniffVideoContainer(buffer))
+			: null;
+	if (sniffed) {
+		return sniffed;
+	}
+	if (declared && !declaredSignature) {
+		return declared;
+	}
+	return isText ? 'txt' : 'bin';
 }
 
 /**

@@ -9,6 +9,10 @@ Accepted
 Supersedes the pasted-image attachment model from `1cbf07c` (#99) and the
 Linear-only issue picker that inlined a one-line context block.
 
+Amended by [0079](./0079-name-an-attachment-after-its-bytes-instead-of-refusing-it.md),
+which stores a mislabeled payload under the format its bytes carry rather than
+refusing it (decision 3's image-validation paragraph).
+
 Amended by [0067](./0067-stand-stored-text-chips-in-a-tray-above-the-draft.md),
 which stands the stored-text chip in a tray above the draft rather than inline in
 it. Decision 2's "a chip has to be a node" and the one ordered list of decision 1

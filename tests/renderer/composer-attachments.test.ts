@@ -28,6 +28,8 @@ import {
 	attachPastedText,
 	attachReviewComment,
 	attachTerminalSelection,
+	getTransferItems,
+	transferItemsFromFiles,
 } from '../../src/renderer/lib/workbench/composer-attachments';
 import type { PullRequestCommentSummary } from '../../src/renderer/types/workbench';
 
@@ -60,7 +62,10 @@ describe('attachPastedFiles', () => {
 			type: 'image/png',
 		});
 
-		const result = await attachPastedFiles([png], '/repo');
+		const result = await attachPastedFiles(
+			transferItemsFromFiles([png]),
+			'/repo',
+		);
 
 		expect(writeWorkspaceImageAttachment).toHaveBeenCalledTimes(1);
 		expect(writeWorkspaceFileAttachment).not.toHaveBeenCalled();
@@ -73,12 +78,142 @@ describe('attachPastedFiles', () => {
 			type: 'image/svg+xml',
 		});
 
-		const result = await attachPastedFiles([svg], '/repo');
+		const result = await attachPastedFiles(
+			transferItemsFromFiles([svg]),
+			'/repo',
+		);
 
 		expect(writeWorkspaceFileAttachment).toHaveBeenCalledTimes(1);
 		expect(writeWorkspaceImageAttachment).not.toHaveBeenCalled();
 		expect(result.error).toBeNull();
 		expect(result.attachments).toHaveLength(1);
+	});
+
+	test('routes an empty image through the file write path, which stores empty files', async () => {
+		const empty = new File([], 'blank.gif', { type: 'image/gif' });
+
+		const result = await attachPastedFiles(
+			transferItemsFromFiles([empty]),
+			'/repo',
+		);
+
+		expect(writeWorkspaceFileAttachment).toHaveBeenCalledTimes(1);
+		expect(writeWorkspaceImageAttachment).not.toHaveBeenCalled();
+		expect(result.error).toBeNull();
+	});
+
+	test('names a refused payload in the app language rather than echoing main', async () => {
+		writeWorkspaceFileAttachment.mockResolvedValueOnce({
+			error: {
+				code: 'invalid-attachment',
+				message: 'Invalid pasted attachment payload.',
+			},
+		});
+		const doc = new File(['hi'], 'notes.txt', { type: 'text/plain' });
+
+		const result = await attachPastedFiles(
+			transferItemsFromFiles([doc]),
+			'/repo',
+		);
+
+		expect(result.error).toBe('That attachment could not be read.');
+	});
+
+	test('keeps the runtime detail main reported beside the headline', async () => {
+		writeWorkspaceFileAttachment.mockResolvedValueOnce({
+			error: {
+				code: 'write-failed',
+				message: "ENOSPC: no space left on device, write '/repo/.context'",
+			},
+		});
+		const doc = new File(['hi'], 'notes.txt', { type: 'text/plain' });
+
+		const result = await attachPastedFiles(
+			transferItemsFromFiles([doc]),
+			'/repo',
+		);
+
+		expect(result.error).toBe(
+			"That file could not be written. ENOSPC: no space left on device, write '/repo/.context'",
+		);
+	});
+
+	test('attaches a dropped folder inside the workspace as a folder chip', async () => {
+		const folder = new File([], 'src');
+		getPathForFile.mockReturnValue('/repo/src');
+
+		const result = await attachPastedFiles(
+			{ entries: [folder], folders: new Set([folder]) },
+			'/repo',
+		);
+
+		expect(result.error).toBeNull();
+		expect(result.attachments).toEqual([
+			{
+				id: 'wsdir:src',
+				kind: 'workspace-directory',
+				label: 'src',
+				path: 'src',
+			},
+		]);
+		expect(writeWorkspaceFileAttachment).not.toHaveBeenCalled();
+	});
+
+	test('explains a dropped folder outside the workspace instead of failing to read it', async () => {
+		const folder = new File([], 'photos');
+		getPathForFile.mockReturnValue('/home/me/photos');
+		const doc = new File(['hi'], 'notes.txt', { type: 'text/plain' });
+
+		const result = await attachPastedFiles(
+			{ entries: [doc, folder], folders: new Set([folder]) },
+			'/repo',
+		);
+
+		expect(result.attachments).toHaveLength(1);
+		expect(result.error).toBe(
+			'photos is a folder outside this workspace. Use Link directory to give the agent access to it.',
+		);
+	});
+
+	test('keeps a mixed drop in the order the user dropped it', async () => {
+		const folder = new File([], 'src');
+		getPathForFile.mockReturnValue('/repo/src');
+		const doc = new File(['hi'], 'notes.txt', { type: 'text/plain' });
+
+		const result = await attachPastedFiles(
+			{ entries: [folder, doc], folders: new Set([folder]) },
+			'/repo',
+		);
+
+		expect(result.error).toBeNull();
+		expect(result.attachments.map((attachment) => attachment.kind)).toEqual([
+			'workspace-directory',
+			'workspace-file',
+		]);
+	});
+
+	test('reports an unreadable file in the active language, not the raw reader error', async () => {
+		class FailingFileReader extends EventTarget {
+			error = new DOMException('A requested file could not be found.');
+			result = null;
+			readAsDataURL() {
+				queueMicrotask(() => this.dispatchEvent(new Event('error')));
+			}
+		}
+		vi.stubGlobal('FileReader', FailingFileReader);
+		const folder = new File([], 'assets');
+
+		try {
+			const result = await attachPastedFiles(
+				transferItemsFromFiles([folder]),
+				'/repo',
+			);
+
+			expect(result.error).toBe('Pasted file could not be read.');
+			expect(writeWorkspaceFileAttachment).not.toHaveBeenCalled();
+		} finally {
+			vi.unstubAllGlobals();
+		}
 	});
 
 	test('surfaces a write failure as an error while keeping earlier saves', async () => {
@@ -87,10 +222,47 @@ describe('attachPastedFiles', () => {
 		});
 		const doc = new File(['hi'], 'notes.txt', { type: 'text/plain' });
 
-		const result = await attachPastedFiles([doc], '/repo');
+		const result = await attachPastedFiles(
+			transferItemsFromFiles([doc]),
+			'/repo',
+		);
 
-		expect(result.error).toBe('disk full');
+		expect(result.error).toBe('That file could not be written.');
 		expect(result.attachments).toHaveLength(0);
+	});
+});
+
+describe('getTransferItems', () => {
+	function transferItem(file: File, isDirectory: boolean) {
+		return {
+			getAsFile: () => file,
+			kind: 'file',
+			webkitGetAsEntry: () => ({ isDirectory }),
+		};
+	}
+
+	test('splits dropped folders from dropped files', () => {
+		const gif = new File(['GIF89a'], 'loop.gif', { type: 'image/gif' });
+		const folder = new File([], 'assets');
+		const data = {
+			files: [gif, folder],
+			items: [transferItem(gif, false), transferItem(folder, true)],
+		} as unknown as DataTransfer;
+
+		expect(getTransferItems(data)).toEqual({
+			entries: [gif, folder],
+			folders: new Set([folder]),
+		});
+	});
+
+	test('reads the file list when the payload carries no items', () => {
+		const gif = new File(['GIF89a'], 'loop.gif', { type: 'image/gif' });
+		const data = { files: [gif], items: [] } as unknown as DataTransfer;
+
+		expect(getTransferItems(data)).toEqual({
+			entries: [gif],
+			folders: new Set(),
+		});
 	});
 });
 
@@ -135,7 +307,7 @@ describe('attachPastedText', () => {
 		});
 
 		await expect(attachPastedText('a long paste', '/repo')).rejects.toThrow(
-			'disk full',
+			'That file could not be written.',
 		);
 	});
 
@@ -312,7 +484,7 @@ describe('attachTerminalSelection', () => {
 				text: 'boom',
 				workspaceCwd: '/repo',
 			}),
-		).rejects.toThrow('disk full');
+		).rejects.toThrow('That file could not be written.');
 	});
 });
 
@@ -398,7 +570,7 @@ describe('attachReviewComment', () => {
 
 		await expect(
 			attachReviewComment({ comment: COMMENT, workspaceCwd: '/repo' }),
-		).rejects.toThrow('disk full');
+		).rejects.toThrow('That file could not be written.');
 	});
 });
 
@@ -479,6 +651,6 @@ describe('attachFileDiff', () => {
 				patch: PATCH,
 				workspaceCwd: '/repo',
 			}),
-		).rejects.toThrow('disk full');
+		).rejects.toThrow('That file could not be written.');
 	});
 });

@@ -96,13 +96,11 @@ export function registerWorkspaceFilesHandlers({
 				const request = writeWorkspaceImageAttachmentRequestSchema.parse(raw);
 				return listWorkspaceFilesService.writeImageAttachment(request);
 			} catch (cause) {
+				console.warn('[workspace-files] image attachment rejected.', cause);
 				return {
 					error: {
 						code: 'invalid-image',
-						message:
-							cause instanceof Error
-								? cause.message
-								: 'Invalid pasted image payload.',
+						message: 'Invalid pasted image payload.',
 					},
 				};
 			}
@@ -118,13 +116,11 @@ export function registerWorkspaceFilesHandlers({
 				const request = writeWorkspaceFileAttachmentRequestSchema.parse(raw);
 				return listWorkspaceFilesService.writeFileAttachment(request);
 			} catch (cause) {
+				console.warn('[workspace-files] file attachment rejected.', cause);
 				return {
 					error: {
 						code: 'invalid-attachment',
-						message:
-							cause instanceof Error
-								? cause.message
-								: 'Invalid pasted attachment payload.',
+						message: 'Invalid pasted attachment payload.',
 					},
 				};
 			}

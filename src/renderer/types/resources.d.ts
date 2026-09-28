@@ -576,6 +576,9 @@ export default interface Resources {
 			'file-diff-failed': {
 				message: 'Diff could not be attached.';
 			};
+			'folder-outside-workspace': {
+				message: '{{name}} is a folder outside this workspace. Use Link directory to give the agent access to it.';
+			};
 			'issue-failed': {
 				message: 'Issue could not be attached.';
 			};

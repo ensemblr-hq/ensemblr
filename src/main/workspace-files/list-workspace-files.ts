@@ -20,8 +20,6 @@ import type {
 import {
 	bytesLookLikeText,
 	imageMimeTypeForPath,
-	PREVIEW_PDF_MIME_TYPE,
-	pdfBytesLookValid,
 	previewEmbedMimeTypeForPath,
 } from '../../shared/preview-media.ts';
 import type { LocalCommandResult } from '../commands/command-types';
@@ -34,9 +32,8 @@ import {
 import { annotateSymlinkTargets } from './symlink-metadata.ts';
 import { resolveWorkspaceCwd } from './workspace-cwd.ts';
 import {
-	imageSignatureMatches,
-	MAX_CONTEXT_IMAGE_BYTES,
-	signatureExtensionForPreview,
+	embeddableMimeType,
+	MAX_PREVIEW_EMBED_BYTES,
 } from './workspace-images.ts';
 import type { PreviewPathScope } from './workspace-paths.ts';
 import {
@@ -920,7 +917,7 @@ async function resolvePreviewRead(params: {
 	}
 	const previewEmbedMimeType = previewEmbedMimeTypeForPath(displayPath);
 	const maxPreviewBytes = previewEmbedMimeType
-		? MAX_CONTEXT_IMAGE_BYTES
+		? MAX_PREVIEW_EMBED_BYTES
 		: MAX_READ_BYTES;
 	if (fileStat.size > maxPreviewBytes) {
 		const unrenderableImageMimeType = previewEmbedMimeType
@@ -986,15 +983,15 @@ function buildFilePreviewResult(params: {
 }): ReadWorkspaceFileResult {
 	const { buffer, displayPath, isExternal, previewEmbedMimeType, sizeBytes } =
 		params;
-	if (
-		previewEmbedMimeType &&
-		previewBytesLookValid(buffer, displayPath, previewEmbedMimeType)
-	) {
+	const embedMimeType = previewEmbedMimeType
+		? embeddableMimeType(buffer, displayPath, previewEmbedMimeType)
+		: null;
+	if (embedMimeType) {
 		return {
 			content: buffer.toString('base64'),
 			contentEncoding: 'base64',
 			isExternal,
-			mimeType: previewEmbedMimeType,
+			mimeType: embedMimeType,
 			path: displayPath,
 			sizeBytes,
 		};
@@ -1038,30 +1035,4 @@ function binaryReasonFor(
 		return previewEmbedMimeType ? 'invalid-image' : 'unsupported-image';
 	}
 	return previewEmbedMimeType ? 'invalid-document' : 'not-text';
-}
-
-/**
- * Confirms a preview file's leading bytes match the type its extension declares,
- * so a mislabeled text or binary file falls back to the source view instead of a
- * broken `<img>` or an embedded viewer fed something that is not a document.
- * Extensions without a known prefix signature (e.g. the AVIF container) are
- * allowed through unvalidated.
- * @param buffer - Decoded file contents.
- * @param filePath - Workspace-relative file path whose extension declares the type.
- * @param mimeType - The preview MIME type resolved for that extension.
- * @returns True when the bytes are consistent with the declared type.
- */
-function previewBytesLookValid(
-	buffer: Buffer,
-	filePath: string,
-	mimeType: string,
-): boolean {
-	if (mimeType === PREVIEW_PDF_MIME_TYPE) {
-		return pdfBytesLookValid(buffer);
-	}
-	const extension = signatureExtensionForPreview(filePath);
-	if (!extension) {
-		return true;
-	}
-	return imageSignatureMatches(buffer, extension);
 }
