@@ -168,6 +168,7 @@ function createTerminalServiceFake({
 	let counter = 0;
 
 	const terminalService: TerminalService = {
+		answerSecretPrompt: () => false,
 		close: (terminalId) => {
 			killedIds.push(terminalId);
 			sessions.delete(terminalId);
@@ -193,6 +194,7 @@ function createTerminalServiceFake({
 				restored: false,
 				rows: 24,
 				scriptName: options.scriptName ?? null,
+				secretPrompt: null,
 				shell: '/bin/zsh',
 				status: 'running',
 				titleIsDefault: false,

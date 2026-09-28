@@ -476,6 +476,8 @@ export interface WorkspaceScriptSummary {
 	previewUrl?: string | null;
 	/** Name of the run script the latest session ran, when it carried one. */
 	scriptName?: string | null;
+	/** Password prompt the running script is blocked on, when it is waiting for one. */
+	secretPrompt?: string;
 	/** Status of the most recent script session, when one exists. */
 	sessionStatus?: TerminalSessionStatus | null;
 	status: 'missing' | 'not-run' | 'running' | 'stopped' | 'succeeded';

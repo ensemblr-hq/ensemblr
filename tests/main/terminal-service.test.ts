@@ -821,6 +821,174 @@ test('does not detect a preview URL for interactive terminal sessions', async (t
 	assert.equal(service.getSnapshot(terminalId).session?.previewUrl, null);
 });
 
+test('stamps a setup script password prompt split across chunks and clears it once answered', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { lifecycleEvents, service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({
+		kind: 'setup-script',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+
+	fake.emitData('installing system deps\r\n[sudo] passw');
+	assert.equal(service.getSnapshot(terminalId).session?.secretPrompt, null);
+
+	fake.emitData('ord for philipp: ');
+	assert.equal(
+		service.getSnapshot(terminalId).session?.secretPrompt,
+		'[sudo] password for philipp:',
+	);
+	assert.ok(
+		lifecycleEvents.some(
+			(event) => event.session.secretPrompt === '[sudo] password for philipp:',
+		),
+	);
+
+	const broadcastsBeforeAnswer = lifecycleEvents.length;
+	fake.emitData('\r\n');
+	assert.equal(service.getSnapshot(terminalId).session?.secretPrompt, null);
+	assert.equal(lifecycleEvents.length, broadcastsBeforeAnswer + 1);
+
+	fake.emitData('uid=0(root)\r\n');
+	assert.equal(lifecycleEvents.length, broadcastsBeforeAnswer + 1);
+});
+
+test('drops a run script password prompt when the script exits', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({
+		kind: 'run-script',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+
+	fake.emitData('Password:');
+	assert.equal(
+		service.getSnapshot(terminalId).session?.secretPrompt,
+		'Password:',
+	);
+
+	fake.emitExit(1);
+	assert.equal(service.getSnapshot(terminalId).session?.secretPrompt, null);
+});
+
+test('does not watch interactive terminals for password prompts', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = result.session?.id ?? '';
+
+	fake.emitData('[sudo] password for philipp: ');
+
+	assert.equal(service.getSnapshot(terminalId).session?.secretPrompt, null);
+});
+
+test('answers a live password prompt once, then refuses a repeat', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { lifecycleEvents, service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({
+		kind: 'setup-script',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+	fake.emitData('[sudo] password for philipp: ');
+	const broadcastsBeforeAnswer = lifecycleEvents.length;
+
+	assert.equal(service.answerSecretPrompt(terminalId, 'hunter2'), true);
+	assert.deepEqual(fake.writes, ['hunter2\r']);
+	assert.equal(service.getSnapshot(terminalId).session?.secretPrompt, null);
+	assert.equal(lifecycleEvents.length, broadcastsBeforeAnswer + 1);
+
+	assert.equal(service.answerSecretPrompt(terminalId, 'hunter2'), false);
+	assert.deepEqual(fake.writes, ['hunter2\r']);
+});
+
+// The field can outlive its prompt by a moment — sudo timed out, the script
+// moved on — and the password must not reach whatever reads stdin next.
+test('refuses an answer once the script has moved past its prompt', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({
+		kind: 'run-script',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+	fake.emitData('Password:');
+	fake.emitData('\r\nsudo: timed out reading password\r\n');
+
+	assert.equal(service.answerSecretPrompt(terminalId, 'hunter2'), false);
+	assert.deepEqual(fake.writes, []);
+});
+
+test('refuses an answer for an interactive terminal or an unknown session', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = result.session?.id ?? '';
+	fake.emitData('[sudo] password for philipp: ');
+
+	assert.equal(service.answerSecretPrompt(terminalId, 'hunter2'), false);
+	assert.equal(service.answerSecretPrompt('missing', 'hunter2'), false);
+	assert.deepEqual(fake.writes, []);
+});
+
+test('raises the field again when the script asks a second time', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({
+		kind: 'setup-script',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+	fake.emitData('[sudo] password for philipp: ');
+	service.answerSecretPrompt(terminalId, 'wrong');
+
+	fake.emitData('\r\nSorry, try again.\r\n[sudo] password for philipp: ');
+
+	assert.equal(
+		service.getSnapshot(terminalId).session?.secretPrompt,
+		'[sudo] password for philipp:',
+	);
+});
+
+test('masks an answer the script echoes back before it reaches scrollback', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { outputEvents, service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({
+		kind: 'run-script',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+	fake.emitData('DB password: ');
+	service.answerSecretPrompt(terminalId, 'hunter2');
+
+	fake.emitData('hunter2\r\n');
+	fake.emitData('echo of a later hunter2 stays\r\n');
+
+	const { scrollback } = service.getSnapshot(terminalId);
+	assert.equal(
+		scrollback,
+		'DB password: ********\r\necho of a later hunter2 stays\r\n',
+	);
+	assert.ok(outputEvents.every((event) => !event.data.includes('hunter2\r\n')));
+});
+
 test('output broadcasts carry monotonic seq mirrored by snapshot lastSeq', async (t) => {
 	const fake = createFakePty();
 	const backend: PtyBackend = { spawn: () => fake.pty };

@@ -242,6 +242,7 @@ export const IPC_PERMISSION_ACTIONS = {
 	workspaceFilesChanged: null,
 	writeForkSummary: 'workspace-write',
 	writeTerminalSession: 'workspace-command',
+	answerTerminalSecretPrompt: 'workspace-command',
 } as const satisfies Record<IpcChannelKey, PermissionActionKind | null>;
 
 /**

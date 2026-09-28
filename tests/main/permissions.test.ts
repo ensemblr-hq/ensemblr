@@ -148,6 +148,7 @@ test('the channels that execute or mutate are gated', () => {
 	for (const [channel, action] of [
 		['createTerminalSession', 'workspace-command'],
 		['writeTerminalSession', 'workspace-command'],
+		['answerTerminalSecretPrompt', 'workspace-command'],
 		['runWorkspaceScript', 'workspace-command'],
 		['ensureWorkspaceSetup', 'workspace-command'],
 		['launchAgentHarness', 'workspace-command'],

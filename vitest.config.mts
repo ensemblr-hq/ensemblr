@@ -212,6 +212,7 @@ export default defineConfig({
 						'tests/main/pr-cache.test.ts',
 						'tests/main/terminal-scrollback-text.test.ts',
 						'tests/main/terminal-scrollback.test.ts',
+						'tests/main/terminal-secret-prompt.test.ts',
 						'tests/main/pi-stderr-ring-buffer.test.ts',
 						'tests/main/map-with-concurrency.test.ts',
 						'tests/main/terminal-tab-naming.test.ts',

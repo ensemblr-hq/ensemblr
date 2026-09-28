@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type {
+	AnswerTerminalSecretPromptResult,
 	CloseTerminalRequest,
 	CloseTerminalResult,
 	CreateTerminalSessionRequest,
@@ -18,11 +19,15 @@ import type {
 } from '../../../shared/ipc/contracts/terminal';
 import type { TerminalService } from '../../terminal';
 import { TerminalServiceError } from '../../terminal/terminal-service';
-import { sanitizeCreateTerminalSessionRequest } from '../request-schemas/terminal.ts';
+import {
+	answerTerminalSecretPromptRequestSchema,
+	sanitizeCreateTerminalSessionRequest,
+} from '../request-schemas/terminal.ts';
 
 /**
  * Registers the IPC handlers for PTY-backed terminal sessions: create, input,
- * resize, kill, close, list, list-restorable, and re-attach snapshot.
+ * password-prompt answer, resize, kill, close, list, list-restorable, and
+ * re-attach snapshot.
  * @param options - Required services.
  */
 export function registerTerminalHandlers({
@@ -154,6 +159,25 @@ export function registerTerminalHandlers({
 				}
 				// Writes to a vanished session are dropped silently.
 			}
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.answerTerminalSecretPrompt,
+		(_event, rawRequest: unknown): AnswerTerminalSecretPromptResult => {
+			const parsed =
+				answerTerminalSecretPromptRequestSchema.safeParse(rawRequest);
+
+			if (!parsed.success) {
+				return { answered: false };
+			}
+
+			return {
+				answered: terminalService.answerSecretPrompt(
+					parsed.data.terminalId,
+					parsed.data.answer,
+				),
+			};
 		},
 	);
 }

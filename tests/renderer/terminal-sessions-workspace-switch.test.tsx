@@ -38,6 +38,7 @@ function terminalSnapshot(
 		restored: false,
 		rows: 24,
 		scriptName: null,
+		secretPrompt: null,
 		shell: '/bin/zsh',
 		status: 'running',
 		title: 'Terminal',

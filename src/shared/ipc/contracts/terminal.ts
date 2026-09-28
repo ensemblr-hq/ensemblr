@@ -97,6 +97,14 @@ export interface TerminalSessionSnapshot {
 	 */
 	scriptName: string | null;
 	/**
+	 * The prompt a running setup or run script printed and is now blocked on —
+	 * `[sudo] password for …:` and its kin — or `null` when it is not waiting on
+	 * a password. Those panes take no keyboard input, so this is what raises the
+	 * dock's masked field. Cleared by the next line of output and on exit, and
+	 * always `null` for every other session kind.
+	 */
+	secretPrompt: string | null;
+	/**
 	 * Absolute path of the shell binary the PTY spawned. An interactive terminal
 	 * runs the user's own login shell, which may be one — fish — whose syntax a
 	 * POSIX command does not survive; a session carrying a command runs a POSIX
@@ -151,6 +159,24 @@ export interface CreateTerminalSessionResult {
 export interface WriteTerminalRequest {
 	data: string;
 	terminalId: string;
+}
+
+/**
+ * Request to answer the password prompt a setup or run script is blocked on.
+ * `answer` is the password as typed; main appends the one Enter the prompt reads.
+ */
+export interface AnswerTerminalSecretPromptRequest {
+	answer: string;
+	terminalId: string;
+}
+
+/**
+ * Result of answering a script's password prompt. `answered` is false when
+ * nothing was written: the request was malformed, the session is gone or is not
+ * a setup/run script, or the script is no longer waiting on a prompt.
+ */
+export interface AnswerTerminalSecretPromptResult {
+	answered: boolean;
 }
 
 /** Request to resize a terminal session's viewport. */
@@ -263,6 +289,9 @@ export interface TerminalLifecycleBroadcast {
 
 /** Terminal slice of the `window.ensemblr` API. */
 export interface TerminalApi {
+	answerTerminalSecretPrompt: (
+		request: AnswerTerminalSecretPromptRequest,
+	) => Promise<AnswerTerminalSecretPromptResult>;
 	closeTerminalSession: (
 		request: CloseTerminalRequest,
 	) => Promise<CloseTerminalResult>;

@@ -226,4 +226,5 @@ export const IPC_CHANNELS = {
 	workspaceFilesChanged: 'ensemblr:workspace-files-changed',
 	writeForkSummary: 'ensemblr:write-fork-summary',
 	writeTerminalSession: 'ensemblr:write-terminal-session',
+	answerTerminalSecretPrompt: 'ensemblr:answer-terminal-secret-prompt',
 } as const;

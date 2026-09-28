@@ -165,6 +165,7 @@ export {
 	settingsPublicationRecoveryStatusRequestSchema,
 } from './request-schemas/settings-publication.ts';
 export {
+	answerTerminalSecretPromptRequestSchema,
 	sanitizeCreateTerminalSessionRequest,
 	terminalSessionIdSchema,
 } from './request-schemas/terminal.ts';

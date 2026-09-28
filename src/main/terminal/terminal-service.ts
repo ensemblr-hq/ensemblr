@@ -45,6 +45,7 @@ import {
 	type PtyProcess,
 	type PtySpawnOptions,
 } from './pty-backend.ts';
+import { detectSecretPrompt, maskEchoedSecret } from './secret-prompt.ts';
 import type { TerminalScrollbackCapture } from './terminal-output-file.ts';
 import {
 	appendTerminalOutput,
@@ -223,6 +224,15 @@ export interface TerminalService {
 	 * {@link TerminalServiceError}, leaving that session untouched.
 	 */
 	close: (terminalId: string) => void;
+	/**
+	 * Answers the password prompt a setup or run script is blocked on: writes the
+	 * answer and one Enter to its PTY, then clears the prompt and broadcasts so
+	 * the dock drops its field. Returns `false` and writes nothing unless the
+	 * session is a running setup/run script still showing a prompt, so a field
+	 * that went stale — the script timed out or moved on — never hands the
+	 * password to whatever reads stdin next, and a second submit is refused.
+	 */
+	answerSecretPrompt: (terminalId: string, answer: string) => boolean;
 	create: (
 		options: CreateTerminalSessionOptions,
 	) => Promise<CreateTerminalSessionResult>;
@@ -471,6 +481,18 @@ interface TrackedSession {
 	 */
 	previewScanBuffer: string;
 	/**
+	 * Rolling tail of recent setup/run-script output, read for a password prompt
+	 * the script is blocked on. Kept for the session's whole life, since a script
+	 * can stop to ask at any point and a prompt can straddle two chunks.
+	 */
+	secretPromptScanBuffer: string;
+	/**
+	 * The password answer just written to a script's prompt, held only until the
+	 * output line it could be echoed on has passed, so a program reading with
+	 * echo on never puts it into scrollback, the on-disk log, or the renderer.
+	 */
+	pendingEchoAnswer: string | null;
+	/**
 	 * Rolling tail of recent agent-terminal output kept to reassemble an OSC
 	 * window-title escape (`ESC ]0;…BEL`) that may straddle two PTY chunks.
 	 */
@@ -511,6 +533,23 @@ const PREVIEW_SCAN_WINDOW = 8192;
  * for an OSC title escape to terminate. Comfortably longer than any title line.
  */
 const TITLE_SCAN_WINDOW = 512;
+
+/**
+ * How many trailing characters of script output to keep while watching for a
+ * password prompt. Only the line the cursor sits on matters, and a prompt is
+ * short, so this only has to outlast the escapes a colored prompt carries.
+ */
+const SECRET_PROMPT_SCAN_WINDOW = 512;
+
+/**
+ * Session kinds whose dock pane refuses keyboard input and so shows a masked
+ * field when the script stops on a password prompt. The archive script has no
+ * pane to answer from.
+ */
+const SECRET_PROMPT_KINDS: ReadonlySet<TerminalSessionKind> = new Set([
+	'run-script',
+	'setup-script',
+]);
 
 /**
  * How often to re-read a harness's on-disk conversation title. The harness writes
@@ -987,6 +1026,95 @@ export function createTerminalService({
 	}
 
 	/**
+	 * Re-reads a setup/run script's output tail for a password prompt and, when
+	 * the answer changes — a prompt appearing, or the line after it clearing it —
+	 * stamps it on the session and broadcasts so the dock can raise or drop its
+	 * masked field. No-op for every other kind.
+	 * @param session - Tracked session that produced the chunk.
+	 * @param data - The chunk of raw PTY output just received.
+	 */
+	function maybeDetectSecretPrompt(
+		session: TrackedSession,
+		data: string,
+	): void {
+		if (!SECRET_PROMPT_KINDS.has(session.snapshot.kind)) {
+			return;
+		}
+
+		session.secretPromptScanBuffer = (
+			session.secretPromptScanBuffer + data
+		).slice(-SECRET_PROMPT_SCAN_WINDOW);
+
+		const secretPrompt = detectSecretPrompt(session.secretPromptScanBuffer);
+
+		if (secretPrompt === session.snapshot.secretPrompt) {
+			return;
+		}
+
+		session.snapshot = { ...session.snapshot, secretPrompt };
+		broadcastLifecycle(session);
+	}
+
+	/**
+	 * Writes a password answer to the prompt a setup/run script is blocked on,
+	 * then drops the prompt so the dock lowers its field and a repeat submit is
+	 * refused. See {@link TerminalService.answerSecretPrompt}.
+	 * @param terminalId - Id of the script session the answer is for.
+	 * @param answer - The password as typed, without its Enter.
+	 * @returns True when the answer was written, false when nothing was waiting for it.
+	 */
+	function answerSecretPrompt(terminalId: string, answer: string): boolean {
+		const session = sessions.get(terminalId);
+
+		if (
+			!session?.pty ||
+			!SECRET_PROMPT_KINDS.has(session.snapshot.kind) ||
+			session.snapshot.status !== 'running' ||
+			session.snapshot.secretPrompt === null
+		) {
+			return false;
+		}
+
+		session.pty.write(`${answer}\r`);
+		session.pendingEchoAnswer = answer;
+		// The answered prompt is still in the tail; left there, the next chunk with
+		// no line break would re-read it and raise the field again.
+		session.secretPromptScanBuffer = '';
+		session.snapshot = { ...session.snapshot, secretPrompt: null };
+		broadcastLifecycle(session);
+
+		return true;
+	}
+
+	/**
+	 * Masks a program's echo of the password answer just written to it, before
+	 * the chunk reaches scrollback, the on-disk log, the renderer, or any
+	 * scanner, and forgets the answer once the line it could land on has ended.
+	 * @param session - Session the chunk came from.
+	 * @param data - The chunk of raw PTY output just received.
+	 * @returns The chunk as every consumer should see it.
+	 */
+	function maskPendingEchoAnswer(
+		session: TrackedSession,
+		data: string,
+	): string {
+		if (session.pendingEchoAnswer === null) {
+			return data;
+		}
+
+		const { chunk, lineEnded } = maskEchoedSecret(
+			data,
+			session.pendingEchoAnswer,
+		);
+
+		if (lineEnded) {
+			session.pendingEchoAnswer = null;
+		}
+
+		return chunk;
+	}
+
+	/**
 	 * Captures the window title an agent harness sets via an OSC escape and, when
 	 * it changes, stamps it on the session and broadcasts so the harness's own
 	 * conversation title surfaces on its tab. No-op for non-agent sessions.
@@ -1368,6 +1496,7 @@ export function createTerminalService({
 		session.dataSubscription = null;
 		session.exitSubscription = null;
 		session.pty = null;
+		session.pendingEchoAnswer = null;
 
 		for (const notifyExit of session.exitWaiters.splice(0)) {
 			notifyExit();
@@ -1385,6 +1514,7 @@ export function createTerminalService({
 			endedAt,
 			exitCode,
 			foregroundCommand: null,
+			secretPrompt: null,
 			status,
 		};
 
@@ -1546,7 +1676,9 @@ export function createTerminalService({
 			outputFlushedAt: null,
 			outputSeq: 0,
 			pendingOutput: '',
+			pendingEchoAnswer: null,
 			previewScanBuffer: '',
+			secretPromptScanBuffer: '',
 			titlePollTimer: null,
 			titleScanBuffer: '',
 			pty,
@@ -1571,6 +1703,7 @@ export function createTerminalService({
 				restored: Boolean(seedOutput),
 				rows,
 				scriptName: scriptName ?? null,
+				secretPrompt: null,
 				shell,
 				status: 'running',
 				title: title?.trim() || defaultTitle(kind),
@@ -1591,11 +1724,13 @@ export function createTerminalService({
 		session: TrackedSession,
 		pty: PtyProcess,
 	): void {
-		session.dataSubscription = pty.onData((data) => {
+		session.dataSubscription = pty.onData((rawData) => {
+			const data = maskPendingEchoAnswer(session, rawData);
 			session.scrollback.append(data);
 			scheduleOutputFlush(session);
 			queueOutputBroadcast(session, data);
 			maybeDetectPreviewUrl(session, data);
+			maybeDetectSecretPrompt(session, data);
 			maybeCaptureOscTitle(session, data);
 			if (session.busyFromPtySpinner && containsBrailleSpinner(data)) {
 				markPtySpinnerBusy(session);
@@ -1985,6 +2120,7 @@ export function createTerminalService({
 	}
 
 	return {
+		answerSecretPrompt,
 		close,
 		create,
 		getSnapshot: (terminalId) => {

@@ -77,10 +77,18 @@ export function selectActiveRunScript({
 	);
 }
 
-/** Maps a script summary to the dock tab activity state. */
+/**
+ * Maps a script summary to the dock tab activity state. A script blocked on a
+ * password prompt reads as a warning, so the tab asks for attention while the
+ * dock is showing something else.
+ */
 export function scriptSummaryToDockStatus(
 	summary: WorkspaceScriptSummary,
 ): DockTabStatus {
+	if (summary.secretPrompt) {
+		return 'warning';
+	}
+
 	if (summary.status === 'running') {
 		return 'running';
 	}
@@ -123,6 +131,7 @@ function buildScriptSummary({
 	return {
 		...(command ? { command } : {}),
 		...previewFields(latestSession),
+		...secretPromptFields(latestSession),
 		scriptName: latestSession?.scriptName ?? null,
 		sessionStatus: latestSession?.status ?? null,
 		status: latestSession ? summaryStatus(latestSession.status) : 'not-run',
@@ -149,6 +158,21 @@ function previewFields(
 	const port = extractPreviewPort(previewUrl);
 
 	return { previewUrl, ...(port !== null ? { port } : {}) };
+}
+
+/**
+ * Carries the password prompt a running script is blocked on onto the summary.
+ * A session that has ended is no longer reading anything, so a stale prompt
+ * never outlives it.
+ * @param session - The latest script session, when one exists.
+ * @returns The prompt field to spread onto the summary, absent when nothing is waiting.
+ */
+function secretPromptFields(
+	session: TerminalSessionSnapshot | undefined,
+): Pick<WorkspaceScriptSummary, 'secretPrompt'> {
+	return session?.status === 'running' && session.secretPrompt
+		? { secretPrompt: session.secretPrompt }
+		: {};
 }
 
 /**

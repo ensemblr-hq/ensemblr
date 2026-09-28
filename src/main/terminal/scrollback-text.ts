@@ -106,13 +106,30 @@ function paintBackspaces(segment: string): string {
 }
 
 /**
+ * Drops every escape sequence and meaningless control character from raw PTY
+ * output, keeping the newlines, carriage returns, and backspaces that still
+ * decide what each line shows.
+ * @param raw - Output exactly as the PTY produced it.
+ * @returns The text with its escapes removed and its line structure intact.
+ */
+export function stripTerminalEscapes(raw: string): string {
+	return raw
+		.replace(STRING_COMMAND_PATTERN, '')
+		.replace(OSC_PATTERN, '')
+		.replace(CSI_PATTERN, '')
+		.replace(TRUNCATED_SEQUENCE_PATTERN, '')
+		.replace(SHORT_ESCAPE_PATTERN, '')
+		.replace(CONTROL_CHARACTER_PATTERN, '');
+}
+
+/**
  * Resolves the cursor moves inside one line: everything before the last
  * carriage return was painted over and never seen, and the backspaces in what
  * remains walk back over what they cover.
  * @param line - One line of escape-stripped output.
  * @returns The text the line actually ended up showing.
  */
-function applyCursorMoves(line: string): string {
+export function applyCursorMoves(line: string): string {
 	const repainted = line.slice(line.lastIndexOf('\r') + 1);
 	return paintBackspaces(repainted).replace(TRAILING_SPACE_PATTERN, '');
 }
@@ -125,15 +142,7 @@ function applyCursorMoves(line: string): string {
  * @returns The readable rendering, which is empty when the buffer held only escapes.
  */
 export function toReadableScrollback(raw: string): string {
-	const stripped = raw
-		.replace(STRING_COMMAND_PATTERN, '')
-		.replace(OSC_PATTERN, '')
-		.replace(CSI_PATTERN, '')
-		.replace(TRUNCATED_SEQUENCE_PATTERN, '')
-		.replace(SHORT_ESCAPE_PATTERN, '')
-		.replace(CONTROL_CHARACTER_PATTERN, '');
-
-	return stripped
+	return stripTerminalEscapes(raw)
 		.replace(LINE_ENDING_PATTERN, '\n')
 		.split('\n')
 		.map(applyCursorMoves)
