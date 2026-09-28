@@ -134,10 +134,10 @@ test('a successful probe marks the target installed', async (t) => {
 
 	assert.equal(result.degraded, false);
 	assert.equal(result.detected[firstBundleTargetId]?.installed, true);
-	assert.equal(
-		result.detected[firstBundleTargetId]?.appPath,
-		'/Applications/Example.app',
-	);
+	assert.deepEqual(result.detected[firstBundleTargetId]?.iconSource, {
+		kind: 'app-bundle',
+		path: '/Applications/Example.app',
+	});
 });
 
 /**

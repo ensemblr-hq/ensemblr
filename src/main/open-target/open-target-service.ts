@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { app, clipboard, nativeImage, shell } from 'electron';
+import { app, clipboard, shell } from 'electron';
 import type {
 	OpenTargetResult,
 	WorkspaceOpenTargetBehavior,
@@ -20,6 +20,7 @@ import {
 } from './detect-installed-targets';
 import { launchLinuxApp } from './linux-app-launch';
 import { toOpenTargetFailure } from './open-target-failure';
+import { loadIconDataUrls } from './open-target-icons';
 import { resolveOpenTargetPath } from './open-target-paths';
 import {
 	findOpenTargetDefinition,
@@ -31,7 +32,6 @@ import {
 
 const OPEN_BINARY_PATH = '/usr/bin/open';
 const OPEN_TIMEOUT_MS = 5000;
-const ICON_OUTPUT_SIZE = 64;
 const CACHE_FILE_NAME = 'open-targets-cache.v1.json';
 const MAX_VISIBLE_APPS = 8;
 const MAX_DEGRADED_RETRIES = 3;
@@ -47,9 +47,9 @@ interface CachedFileShape {
 /** Public surface of the open-target service. */
 export interface OpenTargetService {
 	/**
-	 * Returns the full target list with `installed` flags resolved + real macOS
-	 * app icons embedded as data URLs. Numeric shortcuts (1..9) are assigned in
-	 * render order to installed entries only.
+	 * Returns the full target list with `installed` flags resolved + real app
+	 * icons (macOS bundles, Linux icon themes) embedded as data URLs. Numeric
+	 * shortcuts (1..9) are assigned in render order to installed entries only.
 	 */
 	listTargets: () => Promise<WorkspaceOpenTargetSnapshot[]>;
 	/**
@@ -275,47 +275,6 @@ function hasDetectedApps(
 			: undefined;
 		return detectionKind === 'bundleId' || detectionKind === 'linux-app';
 	});
-}
-
-/**
- * Renders a thumbnail for each detected `.app` via `createThumbnailFromPath`.
- * On macOS this hooks into QuickLook (not IconServices / NSWorkspace), so it
- * survives the concurrency that crashed `app.getFileIcon`. Failures fall back
- * silently to the named icon in the renderer.
- */
-async function loadIconDataUrls(
-	detected: DetectedTargetsMap,
-): Promise<Readonly<Record<string, string | undefined>>> {
-	const entries = await Promise.all(
-		Object.entries(detected).map(async ([id, entry]) => {
-			if (!entry.installed || !entry.appPath) {
-				return [id, undefined] as const;
-			}
-			const dataUrl = await loadIconDataUrlForApp(entry.appPath);
-			return [id, dataUrl ?? undefined] as const;
-		}),
-	);
-	return Object.fromEntries(entries);
-}
-
-/**
- * Render a small thumbnail for an app bundle as a data URL via QuickLook.
- * @param appPath - Absolute path to the `.app` bundle.
- * @returns The icon data URL, or null when it cannot be rendered.
- */
-async function loadIconDataUrlForApp(appPath: string): Promise<string | null> {
-	try {
-		const image = await nativeImage.createThumbnailFromPath(appPath, {
-			height: ICON_OUTPUT_SIZE,
-			width: ICON_OUTPUT_SIZE,
-		});
-		if (image.isEmpty()) {
-			return null;
-		}
-		return image.toDataURL();
-	} catch {
-		return null;
-	}
 }
 
 /**

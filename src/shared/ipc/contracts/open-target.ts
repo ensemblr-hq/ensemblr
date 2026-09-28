@@ -53,7 +53,8 @@ export interface WorkspaceOpenTargetSnapshot {
 	/** What the renderer does with the result — drives the post-action toast. */
 	behavior: WorkspaceOpenTargetBehavior;
 	/**
-	 * PNG data URL of the actual macOS app icon, when extraction succeeded.
+	 * Data URL of the app's real icon, when extraction succeeded: a PNG of the
+	 * macOS bundle icon, or the PNG or SVG the Linux desktop's icon theme uses.
 	 * Renderer prefers this over `iconName`. Utility entries (copy-path) and
 	 * detection failures leave it undefined and fall back to the named icon.
 	 */
