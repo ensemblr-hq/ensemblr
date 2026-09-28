@@ -2,6 +2,7 @@ import { access, constants } from 'node:fs/promises';
 
 import type { LocalCommandService } from '../commands/index.ts';
 import { resolveLinuxLauncher } from './linux-app-discovery.ts';
+import { createLinuxAppIconResolver } from './linux-app-icon.ts';
 import {
 	isValidBundleId,
 	OPEN_TARGET_REGISTRY,
@@ -24,13 +25,21 @@ const BUILTIN_APP_PATHS: Readonly<Record<string, readonly string[]>> = {
 };
 
 /**
- * Per-target detection result: installed flag plus, when found, the absolute
- * `.app` path so callers can fetch a real icon for it.
+ * Where a detected target's real icon comes from: a macOS `.app` bundle, whose
+ * thumbnail is the icon, or the PNG or SVG file the desktop's icon theme
+ * resolves for a Linux app.
  */
+export type IconSource =
+	| { kind: 'app-bundle'; path: string }
+	| { kind: 'icon-file'; path: string };
+
+/** Per-target detection result: installed flag plus its icon source, if any. */
 interface DetectedTarget {
-	appPath: string | null;
+	iconSource: IconSource | null;
 	installed: boolean;
 }
+
+const NOT_INSTALLED: DetectedTarget = { iconSource: null, installed: false };
 
 /** Map of registry id → detection result. */
 export type DetectedTargetsMap = Readonly<Record<string, DetectedTarget>>;
@@ -82,7 +91,7 @@ export async function detectInstalledTargets({
 	const detected: Record<string, DetectedTarget> = {};
 
 	for (const definition of OPEN_TARGET_REGISTRY) {
-		detected[definition.id] = { appPath: null, installed: false };
+		detected[definition.id] = NOT_INSTALLED;
 	}
 
 	// A packaged app inherits the launcher's PATH and XDG_DATA_DIRS, not the
@@ -95,6 +104,9 @@ export async function detectInstalledTargets({
 			? await resolveShellEnvironment(localCommandService)
 			: null;
 	let degraded = shell?.probeFailed ?? false;
+	const resolveLinuxAppIcon = shell
+		? createLinuxAppIconResolver({ env: shell.env })
+		: null;
 
 	await Promise.all(
 		OPEN_TARGET_REGISTRY.map(async (definition) => {
@@ -106,25 +118,32 @@ export async function detectInstalledTargets({
 
 			switch (behavior.detection.kind) {
 				case 'utility':
-					detected[definition.id] = { appPath: null, installed: true };
+					detected[definition.id] = { iconSource: null, installed: true };
 					return;
 				case 'builtin': {
 					const path = await resolveBuiltinAppPath(definition.id);
 					detected[definition.id] = {
-						appPath: path,
+						iconSource: toIconSource('app-bundle', path),
 						installed: path !== null,
 					};
 					return;
 				}
 				case 'linux-app': {
 					await yieldToEventLoop();
+					const launcher = resolveLinuxLauncher(behavior.detection, {
+						env: shell?.env,
+						pathValue: shell?.path ?? '',
+					});
+					if (launcher === null) {
+						return;
+					}
+					await yieldToEventLoop();
 					detected[definition.id] = {
-						appPath: null,
-						installed:
-							resolveLinuxLauncher(behavior.detection, {
-								env: shell?.env,
-								pathValue: shell?.path ?? '',
-							}) !== null,
+						iconSource: toIconSource(
+							'icon-file',
+							resolveLinuxAppIcon?.(behavior.detection) ?? null,
+						),
+						installed: true,
 					};
 					return;
 				}
@@ -134,7 +153,7 @@ export async function detectInstalledTargets({
 						localCommandService,
 					});
 					detected[definition.id] = {
-						appPath: resolution.appPath,
+						iconSource: toIconSource('app-bundle', resolution.appPath),
 						installed: resolution.appPath !== null,
 					};
 					if (resolution.appPath === null && resolution.errored) {
@@ -146,6 +165,19 @@ export async function detectInstalledTargets({
 	);
 
 	return { degraded, detected };
+}
+
+/**
+ * Pairs a location detection found with what kind of icon source it is.
+ * @param kind - Whether the path is an app bundle or an icon file.
+ * @param path - The location found, or null when detection found none.
+ * @returns The icon source, or null when there is no path.
+ */
+function toIconSource(
+	kind: IconSource['kind'],
+	path: string | null,
+): IconSource | null {
+	return path ? { kind, path } : null;
 }
 
 /**

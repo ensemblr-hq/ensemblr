@@ -57,9 +57,9 @@ const NAMED_ICON_RENDERERS: Record<WorkspaceOpenTargetIconName, IconRenderer> =
 	};
 
 /**
- * Renders the icon for an open-in target. Prefers the real macOS app icon
- * (PNG data URL extracted by the main process); falls back to the renderer
- * registered for the target's named glyph.
+ * Renders the icon for an open-in target. Prefers the real app icon (a data
+ * URL the main process extracts from the macOS bundle or the Linux icon
+ * theme); falls back to the renderer registered for the target's named glyph.
  */
 export function OpenTargetIcon({
 	className,

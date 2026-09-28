@@ -205,6 +205,8 @@ export default defineConfig({
 						'tests/main/symlink-metadata.test.ts',
 						'tests/main/open-target-paths.test.ts',
 						'tests/main/linux-app-discovery.test.ts',
+						'tests/main/linux-app-icon.test.ts',
+						'tests/main/open-target-icons.test.ts',
 						'tests/main/linux-app-launch.test.ts',
 						'tests/main/workspace-pr-sweeper.test.ts',
 						'tests/main/sweepable-workspaces.test.ts',

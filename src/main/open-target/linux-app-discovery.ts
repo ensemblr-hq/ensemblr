@@ -36,13 +36,13 @@ const FLATPAK_EXPORT_DIRS = [
 const DEFAULT_XDG_DATA_DIRS = '/usr/local/share:/usr/share';
 
 /**
- * Resolves where a Linux app's `.desktop` files may live, honouring
+ * Resolves the XDG data roots a Linux app installs into, honouring
  * `XDG_DATA_DIRS` and always including the per-user and Flatpak export roots.
  * @param env - Environment to read `XDG_DATA_DIRS` and `XDG_DATA_HOME` from.
  * @param homeDirectory - Home directory used to expand `~`.
- * @returns Absolute `applications/` directories, in search order.
+ * @returns Absolute data roots such as `/usr/share`, in search order, each once.
  */
-export function resolveDesktopEntryDirs(
+export function resolveXdgDataRoots(
 	env: Record<string, string | undefined> = process.env,
 	homeDirectory: string = homedir(),
 ): string[] {
@@ -54,11 +54,55 @@ export function resolveDesktopEntryDirs(
 			? path.join(homeDirectory, directory.slice(2))
 			: directory,
 	);
-	const roots = [dataHome, ...dataDirs, ...flatpakDirs].filter(Boolean);
 
 	return Array.from(
-		new Set(roots.map((root) => path.join(root, 'applications'))),
+		new Set([dataHome, ...dataDirs, ...flatpakDirs].filter(Boolean)),
 	);
+}
+
+/**
+ * Resolves where a Linux app's `.desktop` files may live: the `applications/`
+ * directory under every XDG data root.
+ * @param env - Environment to read `XDG_DATA_DIRS` and `XDG_DATA_HOME` from.
+ * @param homeDirectory - Home directory used to expand `~`.
+ * @returns Absolute `applications/` directories, in search order.
+ */
+export function resolveDesktopEntryDirs(
+	env: Record<string, string | undefined> = process.env,
+	homeDirectory: string = homedir(),
+): string[] {
+	return Array.from(
+		new Set(
+			resolveXdgDataRoots(env, homeDirectory).map((root) =>
+				path.join(root, 'applications'),
+			),
+		),
+	);
+}
+
+/**
+ * Finds the first `.desktop` file one of an app's entry ids names, taking the
+ * ids in preference order and each id through the directories in XDG order.
+ * @param entryIds - Freedesktop application ids, without the extension.
+ * @param directories - `applications/` directories to search, in order.
+ * @returns The entry's path and id, or `null` when none is installed.
+ */
+export function findDesktopEntry(
+	entryIds: readonly string[],
+	directories: readonly string[],
+): { desktopFilePath: string; entryId: string } | null {
+	for (const entryId of entryIds) {
+		if (!isValidDesktopEntryId(entryId)) {
+			continue;
+		}
+		for (const directory of directories) {
+			const desktopFilePath = path.join(directory, `${entryId}.desktop`);
+			if (existsSync(desktopFilePath)) {
+				return { desktopFilePath, entryId };
+			}
+		}
+	}
+	return null;
 }
 
 /**
@@ -93,18 +137,9 @@ export function resolveLinuxLauncher(
 		}
 	}
 
-	const directories = resolveDesktopEntryDirs(env, homeDirectory);
-	for (const entryId of identity.entryIds) {
-		if (!isValidDesktopEntryId(entryId)) {
-			continue;
-		}
-		for (const directory of directories) {
-			const desktopFilePath = path.join(directory, `${entryId}.desktop`);
-			if (existsSync(desktopFilePath)) {
-				return { desktopFilePath, entryId, kind: 'desktop-entry' };
-			}
-		}
-	}
-
-	return null;
+	const entry = findDesktopEntry(
+		identity.entryIds,
+		resolveDesktopEntryDirs(env, homeDirectory),
+	);
+	return entry ? { ...entry, kind: 'desktop-entry' } : null;
 }
