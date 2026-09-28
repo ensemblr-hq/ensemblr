@@ -45,7 +45,7 @@ export function SidebarPrimaryNavigation({
 							target='dashboard'
 						/>
 						<StaticNavigationItem
-							icon={<LinearLogo aria-hidden='true' className='size-3.5!' />}
+							icon={<LinearLogo aria-hidden='true' className='p-px' />}
 							isActive={activeView === 'linear'}
 							label={t('workbench:navigation-sidebar.nav.linear', 'Linear')}
 							onPrefetch={onPrefetchIssues}
