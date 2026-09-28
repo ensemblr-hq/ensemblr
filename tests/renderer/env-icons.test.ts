@@ -21,7 +21,7 @@ describe('workspace dotenv icons', () => {
 		);
 	});
 
-	it.each(['.environment', '.envrc', '.envfile'])(
+	it.each(['.environment', '.envfile'])(
 		'keeps the default file icon for %s',
 		(name) => {
 			expect(getWorkspaceFileIconName({ kind: 'file', name })).toBe(
@@ -29,6 +29,12 @@ describe('workspace dotenv icons', () => {
 			);
 		},
 	);
+
+	it('gives direnv its own icon rather than the dotenv one', () => {
+		expect(getWorkspaceFileIconName({ kind: 'file', name: '.envrc' })).toBe(
+			'vscode-icons:file-type-direnv',
+		);
+	});
 
 	it.each(['.env', '.env.local'])(
 		'preserves folder and symlink precedence for %s',

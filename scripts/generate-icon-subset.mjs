@@ -4,16 +4,21 @@
  * only the glyphs `src/renderer` actually draws.
  *
  * The full collections are 11.24 MB of SVG path data for 3,699 icons; the app
- * references ~65. `addCollection` needs the collection object, so a static
+ * references ~95. `addCollection` needs the collection object, so a static
  * import puts every byte of that into the entry graph and pays its parse before
  * React's first render. Capturing the referenced subset here at authoring time
  * keeps `<Icon>` offline — an unregistered prefix makes Iconify fetch
  * `api.iconify.design`, which in a desktop app is a blank glyph — without
- * shipping the other 99.3%.
+ * shipping the other 98.5%.
  *
  * Run `node scripts/generate-icon-subset.mjs` after adding an icon reference;
- * `tests/renderer/icon-collections.test.ts` fails on drift, so a 66th icon is a
+ * `tests/renderer/icon-collections.test.ts` fails on drift, so a new icon is a
  * red test rather than a silently missing glyph.
+ *
+ * Glyphs vary by two orders of magnitude — `file-type-bundler` alone is 43 KB —
+ * so weigh a new one before referencing it. The written module must also stay
+ * under `files.maxSize` in `biome.json`: past it Biome skips the file instead of
+ * formatting it, and the regeneration and `biome check` stop agreeing.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -223,7 +228,7 @@ import type { IconifyJSON } from '@iconify/react';
 
 /**
  * The glyphs \`src/renderer\` draws, lifted out of \`@iconify-json/vscode-icons\`
- * and \`@iconify-json/logos\` so the entry bundle carries ~80 KB of icon data
+ * and \`@iconify-json/logos\` so the entry bundle carries ~160 KB of icon data
  * instead of the 11.24 MB both full collections weigh.
  */
 export const ICON_SUBSET = {
