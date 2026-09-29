@@ -1,12 +1,14 @@
 # 12. Repository settings — `.ensemblr/settings.toml`
 
-`.ensemblr/settings.toml` at the root of a repository is the single committed
-file Ensemblr reads for per-repository configuration. It is TOML, it is checked
-in, and it is reviewed like code — everyone who clones the repository gets the
-same setup script, the same run scripts, the same branch defaults.
+`.ensemblr/settings.toml` at the root of a repository is the sole committed
+Ensemblr-owned file for per-repository settings. It is TOML, it is checked in,
+and it is reviewed like code — everyone who clones the repository gets the same
+setup script, the same run scripts, the same branch defaults.
 
-It is the *only* repository config file Ensemblr reads. Config files from other
-workspace managers left on disk are silently ignored. Background:
+It is not the only config-adjacent file Ensemblr reads: `.worktreeinclude`
+supplies files-to-copy patterns, and the Infisical CLI's `.infisical.json` can
+supply a read-only secret-project fallback. Config files from other workspace
+managers are otherwise ignored. Background:
 [ADR 0030](../adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md).
 
 Because every workspace is a git worktree, the file is read from the **active

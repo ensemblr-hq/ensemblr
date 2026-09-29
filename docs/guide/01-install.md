@@ -14,8 +14,8 @@ macOS ships one build per architecture rather than a universal binary, so an
 Apple-silicon Mac downloads only arm64 code. **The Intel Mac build first shipped
 in `0.1.20`**; the two macOS architectures are built on the same
 runner, and the Linux AppImage on a separate job, all attached to one release.
-There is no arm64 Linux build in this release — it is planned for a later one —
-and no Windows build.
+The current release workflow does not build Linux arm64, and there is no
+Windows build.
 
 ## Homebrew (macOS)
 

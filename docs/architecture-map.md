@@ -1,7 +1,7 @@
 # Architecture Map
 
 A "where does this live?" index for the four runtime boundaries. The root
-[`README.md`](../README.md#architecture) explains *what* the architecture is;
+[`README.md`](../README.md) explains *what* the architecture is;
 this file answers *which directory owns a given concern* so a change lands in the
 right place on the first try.
 

@@ -313,7 +313,7 @@ accumulated output, so do not copy that output into every presentation snapshot.
 ## Capability discovery
 
 Probed live on 2026-06-11 against pi `0.79.1` (then a Bun-global install; the
-project has since moved to npm — ADR 0038), via
+project has since moved to Bun — ADR 0073), via
 `pi --mode rpc --no-session --offline` with JSONL commands on stdin, plus a
 full read of `dist/modes/rpc/rpc-types.d.ts` (`RpcCommand` union) and
 `pi --help`. Unknown commands fail safely:

@@ -1,13 +1,12 @@
 # Build & Release
 
-Ensemblr packages through Electron Forge for four targets, one build per
-architecture rather than a universal binary: **macOS arm64** and **macOS x64**,
-where a release build is code-signed with a hardened runtime, notarized, and
-shipped as both a `.dmg` and a `.zip`; **Linux x86-64**, shipped as an unsigned
-`.AppImage`; and **Linux arm64**, which is planned for the release *after* the
-one that introduces the Intel Mac build and is not built yet. This guide covers
-the build matrix, signing, and the build channels. The packaging config lives in
-`forge.config.ts`. See
+Ensemblr packages through Electron Forge as architecture-specific artifacts
+rather than a universal binary: **macOS arm64** and **macOS x64**, where a
+release build is code-signed with a hardened runtime, notarized, and shipped as
+both a `.dmg` and a `.zip`; and **Linux x86-64**, shipped as an unsigned
+`.AppImage`. The current release workflow does not build Linux arm64. This guide
+covers the build matrix, signing, and the build channels. The packaging config
+lives in `forge.config.ts`. See
 [ADR 0056](./adr/0056-ship-a-linux-amd64-appimage.md) for why AppImage, and what
 changes off darwin, and
 [ADR 0074](./adr/0074-ship-four-build-targets-and-select-updates-by-architecture.md)
@@ -19,7 +18,7 @@ sequence is ordered.
 | macOS arm64 | `.dmg` + `.zip` | `macos-15` (native) | shipping |
 | macOS x64 | `.dmg` + `.zip` | `macos-15` (cross-built) | shipping (since 0.1.20) |
 | Linux x86-64 | `.AppImage` | `ubuntu-latest` | shipping |
-| Linux arm64 | `.appimage.bin` | not built yet | planned for the release after 0.1.20 |
+| Linux arm64 | — | — | not built by the current release workflow |
 
 ## Prerequisites
 
