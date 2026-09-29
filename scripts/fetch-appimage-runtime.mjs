@@ -34,7 +34,7 @@ const RUNTIMES = new Map([
 		{
 			name: 'x86_64',
 			sha256:
-				'1cc49bcf1e2ccd593c379adb17c9f85a36d619088296504de95b1d06215aebbf',
+				'156f4bdbde9c52d01814600013e0a273f0118dc2de98975f3c8c63427ec79074',
 			machine: 0x3e,
 		},
 	],
@@ -43,7 +43,7 @@ const RUNTIMES = new Map([
 		{
 			name: 'aarch64',
 			sha256:
-				'7d5d772b7c32f0c84caf0a452a3072a5709027d7eac5856feb89a7a7a8881372',
+				'b4ff0030242d0c3bb12ce40541828303cf167493f4793456f0436edd6255c39d',
 			machine: 0xb7,
 		},
 	],
