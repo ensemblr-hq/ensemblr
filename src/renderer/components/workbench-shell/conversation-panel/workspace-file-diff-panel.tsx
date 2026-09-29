@@ -24,6 +24,7 @@ import { useDiffCommentMutations } from '@/renderer/hooks/workbench-shell/conver
 import { useFileDiffContent } from '@/renderer/hooks/workbench-shell/conversation-panel/use-file-diff-content';
 import { useFileViewedMark } from '@/renderer/hooks/workbench-shell/conversation-panel/use-file-viewed-mark';
 import { parseSingleFileDiff } from '@/renderer/lib/diff/parse';
+import { failureText } from '@/renderer/lib/failure-text';
 import { groupDiffComments } from '@/renderer/lib/workbench/diff-comments';
 import { formatFileDiffContext } from '@/renderer/lib/workbench/review-context';
 import {
@@ -50,7 +51,8 @@ const EMPTY_LIST: readonly never[] = [];
  * whitespace, and word-wrap toggles, and a Viewed marker that dims the file and
  * sends it to the end of the Changes list. The optional `scope` selects the diff
  * (working tree by default, a commit, the whole branch, or one agent turn — a
- * turn opened while it was the newest stops where the next turn began).
+ * turn scope follows the turn's current end, and one whose end was lost is
+ * withheld rather than diffed against the live tree).
  */
 export function WorkspaceFileDiffPanel({
 	filePath,
@@ -72,6 +74,7 @@ export function WorkspaceFileDiffPanel({
 		pullRequestSnapshotQuery({ workspaceCwd, workspaceId }),
 	);
 	const currentScope = useCurrentTurnScope({ scope, workspaceId });
+	const withheld = currentScope === null;
 	const {
 		fullFileContent,
 		fullFileContentPending,
@@ -79,7 +82,11 @@ export function WorkspaceFileDiffPanel({
 		patch,
 		placeholder,
 		resolvedPath,
-	} = useFileDiffContent({ filePath, scope: currentScope, workspaceCwd });
+	} = useFileDiffContent({
+		filePath: withheld ? null : filePath,
+		scope: currentScope ?? undefined,
+		workspaceCwd,
+	});
 
 	const { onViewedChange, viewed } = useFileViewedMark({
 		filePath: resolvedPath,
@@ -107,6 +114,13 @@ export function WorkspaceFileDiffPanel({
 		}).byChangeKey;
 	}, [patch, resolvedPath, githubComments, localComments, i18n.language]);
 
+	if (withheld) {
+		return (
+			<PanelMessage
+				message={failureText(t, { code: 'range-unknown', message: '' }) ?? ''}
+			/>
+		);
+	}
 	if (placeholder) {
 		return (
 			<PanelMessage message={placeholder.message} tone={placeholder.tone} />

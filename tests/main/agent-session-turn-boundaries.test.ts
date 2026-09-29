@@ -561,6 +561,41 @@ test('two steers in quick succession each close the one before', async (t) => {
 	assert.equal(two?.status, 'submitted');
 });
 
+test('a steer queued behind another goes as a prompt once the turn has finished', async (t) => {
+	const harness = await openService(t);
+	await harness.service.submitPrompt({
+		prompt: 'first',
+		sessionId: harness.snapshot.id,
+	});
+	const capture = harness.holdNextOpen();
+
+	const firstSteer = harness.service.submitPrompt({
+		prompt: 'steer one',
+		sessionId: harness.snapshot.id,
+		streamingBehavior: 'steer',
+	});
+	await capture.entered;
+	const queued = harness.service.submitPrompt({
+		prompt: 'steer two',
+		sessionId: harness.snapshot.id,
+		streamingBehavior: 'steer',
+	});
+	harness.runtime().setStatus('idle');
+	capture.release();
+	await Promise.all([firstSteer, queued]);
+
+	const last = harness.runtime().getRequests().at(-1);
+	assert.equal(last?.prompt, 'steer two');
+	assert.equal(last?.streamingBehavior, undefined);
+	assert.equal(
+		getAgentSessionById({
+			database: harness.database,
+			id: harness.snapshot.id,
+		})?.status,
+		'streaming',
+	);
+});
+
 test('an unconfirmed steer keeps its turn, since the runtime may have taken it', async (t) => {
 	const harness = await openService(t, (adapter) =>
 		failSubmits(

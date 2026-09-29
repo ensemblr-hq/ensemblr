@@ -275,7 +275,9 @@ export function createTurnSubmitter({
 
 	/**
 	 * Runs a session's steers and follow-ups one after another, re-reading the
-	 * live binding once the previous one has settled.
+	 * live binding once the previous one has settled. The session may have
+	 * finished its turn while this input waited, so it is re-checked then: an
+	 * input that no longer has a running turn to steer goes as a prompt.
 	 * @param database - Database holding the session and turn rows
 	 * @param request - The steer or follow-up
 	 * @returns The runtime's acknowledgement
@@ -291,7 +293,9 @@ export function createTurnSubmitter({
 			if (!active || quarantiningSessions.has(sessionId)) {
 				throw sessionNotOpen(sessionId);
 			}
-			return submitInterjection({ active, database, request });
+			return isTurnInFlight(database, sessionId)
+				? submitInterjection({ active, database, request })
+				: submitTurnPrompt({ active, database, request });
 		});
 		const tail = result.then(
 			() => undefined,

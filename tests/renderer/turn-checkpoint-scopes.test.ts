@@ -147,12 +147,23 @@ test('a diff tab follows a turn that moved past the end it stored', () => {
 	).toBe(stored);
 });
 
-test('a diff tab leaves an unresolvable, unknown, or non-turn scope as it was', () => {
+test('a diff tab withholds a live scope whose turn end was lost, and keeps a closed one', () => {
+	const live = { fromRef: hashOf('a'), kind: 'turn' } as const;
+	const closed = {
+		fromRef: hashOf('a'),
+		kind: 'turn',
+		toRef: hashOf('b'),
+	} as const;
+	const lost = [checkpoint({ end: { kind: 'unknown' }, id: 'a' })];
+
+	// Diffing on against the live tree would report later work as this turn's.
+	expect(currentTurnScope(live, lost)).toBeNull();
+	expect(currentTurnScope(closed, lost)).toBe(closed);
+});
+
+test('a diff tab leaves an unlisted or non-turn scope as it was', () => {
 	const live = { fromRef: hashOf('a'), kind: 'turn' } as const;
 
-	expect(
-		currentTurnScope(live, [checkpoint({ end: { kind: 'unknown' }, id: 'a' })]),
-	).toBe(live);
 	expect(currentTurnScope(live, [])).toBe(live);
 	expect(currentTurnScope({ kind: 'working-tree' }, [])).toEqual({
 		kind: 'working-tree',

@@ -66,16 +66,18 @@ export function latestTurnCheckpointScope(
  * moved past — so every turn scope is looked up again by the checkpoint it
  * starts from, and takes that turn's current end.
  *
- * A scope whose turn's range was lost is returned as it was, rather than
- * blanking a tab the user is reading; any other scope passes through.
+ * When the turn's end was lost, a scope that still runs to the working tree is
+ * withheld, the same as every other surface withholds that range: diffing on
+ * would report later work as this turn's. A scope already closed keeps the end
+ * it had, and any other scope passes through.
  * @param scope - The scope a diff tab carries
  * @param checkpoints - The workspace's current checkpoints
- * @returns The scope with the turn's current end
+ * @returns The scope with the turn's current end, or null when it is withheld
  */
 export function currentTurnScope(
 	scope: WorkspaceGitDiffScope | undefined,
 	checkpoints: readonly TurnCheckpointWire[],
-): WorkspaceGitDiffScope | undefined {
+): WorkspaceGitDiffScope | undefined | null {
 	if (scope?.kind !== 'turn') {
 		return scope;
 	}
@@ -83,8 +85,14 @@ export function currentTurnScope(
 		(entry): entry is CapturedTurnCheckpoint =>
 			isCapturedTurnCheckpoint(entry) && entry.gitHash === scope.fromRef,
 	);
-	const current = checkpoint ? turnScopeOf(checkpoint) : null;
-	return current && !isSameTurnScope(current, scope) ? current : scope;
+	if (!checkpoint) {
+		return scope;
+	}
+	const current = turnScopeOf(checkpoint);
+	if (!current) {
+		return scope.toRef === undefined ? null : scope;
+	}
+	return isSameTurnScope(current, scope) ? scope : current;
 }
 
 /**

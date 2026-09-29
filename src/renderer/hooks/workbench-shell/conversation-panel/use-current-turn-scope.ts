@@ -15,7 +15,7 @@ import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git
  * passes through, and only a turn scope reads the checkpoint list at all.
  * @param scope - The scope the tab was opened with
  * @param workspaceId - Workspace the tab belongs to
- * @returns The scope to diff at
+ * @returns The scope to diff at, or null when the turn's range was lost
  */
 export function useCurrentTurnScope({
 	scope,
@@ -23,7 +23,7 @@ export function useCurrentTurnScope({
 }: {
 	scope: WorkspaceGitDiffScope | undefined;
 	workspaceId: string;
-}): WorkspaceGitDiffScope | undefined {
+}): WorkspaceGitDiffScope | undefined | null {
 	const isTurn = scope?.kind === 'turn';
 	const { data } = useQuery({
 		...workspaceCheckpointsQuery(workspaceId),
