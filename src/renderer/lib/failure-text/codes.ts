@@ -771,6 +771,11 @@ export const APP_FAILURE_TEXT: Record<
 			'errors:failure.publish-failed',
 			'The project was created locally, but publishing it to GitHub failed.',
 		),
+	'range-unknown': (t) =>
+		t(
+			'errors:failure.range-unknown',
+			'Where this turn ended was not recorded, so its changes cannot be told apart from what came after.',
+		),
 	'read-failed': (t) =>
 		t('errors:failure.read-failed', 'That file could not be read.'),
 	'register-failed': (t) =>

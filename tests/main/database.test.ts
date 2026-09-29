@@ -49,6 +49,7 @@ const EXPECTED_MIGRATIONS = [
 	'030_chat_tab_closed_at_index',
 	'031_spawn_reservation_workspace',
 	'032_renderer_storage_mirror',
+	'033_checkpoint_turn_end',
 ];
 
 const AGENT_VOCABULARY_MIGRATION_VERSION = 14;

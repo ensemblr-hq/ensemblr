@@ -59,8 +59,10 @@ export {
 export { loadWorkbenchShellData } from './shell-data-loader';
 export { getWorkbenchStaticRoute } from './static-navigation';
 export {
+	currentTurnScope,
 	latestTurnCheckpointScope,
 	type TurnCheckpointScope,
+	turnActionOwners,
 	turnCheckpointScopes,
 } from './turn-checkpoints';
 export { getWorkbenchHealth } from './workbench-health';

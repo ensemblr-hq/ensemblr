@@ -3,20 +3,15 @@ import type { AgentProviderId } from '../../shared/agent-provider.ts';
 import type {
 	OpenAgentSessionRequest as OpenAgentSessionWireRequest,
 	StopAgentSessionRequest as StopAgentSessionWireRequest,
-	SubmitAgentPromptRequest as SubmitAgentPromptWireRequest,
 } from '../../shared/ipc/contracts/agent-session';
 import type { PermissionMode } from '../../shared/permissions.ts';
 import type { AgentControlEnvResolver } from '../agent-control/ports.ts';
-import type { CheckpointCapturePort } from '../checkpoints';
+import type { TurnCheckpointPort } from '../checkpoints';
 import type { PiExecutableSnapshot } from '../pi-runtime';
 import {
 	type AgentSessionBranchRow,
 	type AgentSessionRow,
-	createTurn,
-	getAgentSessionById,
-	getTurnById,
 	updateAgentSession,
-	updateTurn,
 } from '../storage/repositories/agent-session-repository.ts';
 import type { AgentClient } from './agent-client.ts';
 import { AgentSessionServiceError } from './agent-session-service-error.ts';
@@ -24,10 +19,9 @@ import type {
 	AgentSessionEventSink,
 	AgentSessionSnapshot,
 } from './agent-session-types.ts';
-import { type AgentContextUsage, AgentSubmitError } from './agent-types.ts';
+import type { AgentContextUsage } from './agent-types.ts';
 import type { SessionNamingInput } from './naming/session-naming.ts';
 import {
-	type ActiveSession,
 	type ActiveSessionMap,
 	isTurnInFlight,
 } from './session/active-session.ts';
@@ -50,11 +44,25 @@ import {
 	createSummaryQueue,
 	type SummaryPersistedListener,
 } from './session/summary-queue.ts';
+import {
+	createTurnBoundaries,
+	type TurnBoundaries,
+} from './session/turn-boundaries.ts';
+import {
+	type AgentSessionSubmitRequest,
+	type AgentSessionSubmitResult,
+	createTurnSubmitter,
+	sessionNotOpen,
+} from './session/turn-submission.ts';
 import type { SessionSummaryWriter } from './session-summary-writer.ts';
 
 export type { PersistRuntimeEventPort } from './session/handle-runtime-event.ts';
 export type { ProviderExecutablePort } from './session/session-open.ts';
 export { toSnapshot } from './session/session-snapshot.ts';
+export type {
+	AgentSessionSubmitRequest,
+	AgentSessionSubmitResult,
+} from './session/turn-submission.ts';
 
 /**
  * Lifecycle-side open request. Extends the wire `OpenAgentSessionRequest` with
@@ -80,22 +88,6 @@ export interface AgentSessionOpenRequest extends OpenAgentSessionWireRequest {
 	 * mismatch is rejected. Absent when no catalog claims the model.
 	 */
 	provider?: AgentProviderId;
-}
-
-/**
- * Lifecycle-side submit request. Extends the wire shape with the runtime the
- * requested model needs, which the main process derives from its own catalog so
- * a mid-conversation model switch cannot cross the session's provider pin.
- */
-export interface AgentSessionSubmitRequest
-	extends SubmitAgentPromptWireRequest {
-	provider?: AgentProviderId;
-}
-
-/** Result of submitting a prompt to an open agent session. */
-export interface AgentSessionSubmitResult {
-	acceptedAt: string;
-	turnId: string;
 }
 
 /**
@@ -126,8 +118,6 @@ export const WORKSPACE_REMOVED_STOP_REASON = 'workspace-removed';
 
 /** Dependencies and configuration for {@link createAgentSessionLifecycle}. */
 interface AgentSessionLifecycleOptions {
-	/** Pre-prompt git checkpoint capture (ADR 0012); absent in tests. */
-	captureCheckpoint?: CheckpointCapturePort;
 	eventSink: AgentSessionEventSink | undefined;
 	/** Reads a session's Plan Mode state off the plan-mode registry. */
 	isPlanModeActive: (agentSessionId: string) => boolean;
@@ -174,6 +164,8 @@ interface AgentSessionLifecycleOptions {
 	 */
 	resolveSpawnedChildren?: SpawnedChildrenPort;
 	sessionSummaryWriter?: SessionSummaryWriter;
+	/** Turn-boundary git checkpoints (ADR 0012); absent means none are taken. */
+	turnCheckpoints?: TurnCheckpointPort;
 }
 
 /** Public surface of the agent session lifecycle: open, submit, stop, and shut down active sessions. */
@@ -224,7 +216,6 @@ interface ActiveSessionView {
  * open/resume flow are delegated to focused helpers under `./session/`.
  */
 export function createAgentSessionLifecycle({
-	captureCheckpoint,
 	eventSink,
 	isPlanModeActive,
 	isAfkModeActive,
@@ -245,10 +236,23 @@ export function createAgentSessionLifecycle({
 	resolveTurnPreamble,
 	resolveSpawnedChildren,
 	sessionSummaryWriter,
+	turnCheckpoints,
 }: AgentSessionLifecycleOptions): AgentSessionLifecycle {
 	const activeSessions: ActiveSessionMap = new Map();
 
-	const quarantiningSessions = new Set<string>();
+	const turnBoundaries = createTurnBoundaries({
+		activeSessions,
+		now,
+		turnCheckpoints,
+	});
+
+	const submitter = createTurnSubmitter({
+		activeSessions,
+		isAfkModeActive,
+		isPlanModeActive,
+		now,
+		turnBoundaries,
+	});
 
 	const summaryQueue = createSummaryQueue({
 		activeSessions,
@@ -264,6 +268,7 @@ export function createAgentSessionLifecycle({
 		persistRuntimeEvent,
 		queueNaming,
 		summaryQueue,
+		turnBoundaries,
 	});
 
 	const opener = createSessionOpener({
@@ -298,135 +303,14 @@ export function createAgentSessionLifecycle({
 		opener.openSession({ database: requireDatabase(), request });
 
 	/**
-	 * Quarantines a runtime when prompt delivery cannot be confirmed.
-	 * @param active - The binding that owns the uncertain prompt.
-	 * @param database - Database holding the session and turn rows.
-	 * @param sessionId - Session whose runtime is being quarantined.
-	 * @param turnId - Turn whose delivery is uncertain.
-	 * @returns A promise that settles after the runtime is terminated.
+	 * Submits a prompt, steer, or follow-up to an open session after checking it
+	 * is live, not mid-replacement or quarantine, and pinned to the requested
+	 * runtime. The turn bookkeeping differs by input: a prompt switches the
+	 * session to its turn before snapshotting, while a steer or follow-up
+	 * snapshots first and switches after — see {@link TurnBoundaries}.
+	 * @param request - The input and the session it targets
+	 * @returns The runtime's acknowledgement
 	 */
-	const quarantineUnconfirmedSubmit = async ({
-		active,
-		database,
-		sessionId,
-		turnId,
-	}: {
-		active: ActiveSession;
-		database: DatabaseSync;
-		sessionId: string;
-		turnId: string;
-	}): Promise<void> => {
-		const current = activeSessions.get(sessionId);
-		const ownsCurrentTurn =
-			!current ||
-			(current.agentRuntimeSession === active.agentRuntimeSession &&
-				current.activeTurnId === turnId);
-		if (!ownsCurrentTurn) {
-			const turnRow = getTurnById({ database, id: turnId });
-			if (
-				turnRow &&
-				turnRow.status !== 'completed' &&
-				turnRow.status !== 'errored'
-			) {
-				updateTurn({
-					database,
-					id: turnId,
-					patch: { completedAt: now().toISOString(), status: 'errored' },
-				});
-			}
-			return;
-		}
-		quarantiningSessions.add(sessionId);
-		try {
-			await active.agentRuntimeSession.close();
-		} catch {
-			// Quarantine still removes the binding; no automatic resend is safe.
-		} finally {
-			active.subscription.unsubscribe();
-			const currentAfterClose = activeSessions.get(sessionId);
-			const ownsTurnAfterClose =
-				!currentAfterClose ||
-				(currentAfterClose.agentRuntimeSession === active.agentRuntimeSession &&
-					currentAfterClose.activeTurnId === turnId);
-			const turnRow = getTurnById({ database, id: turnId });
-			if (
-				turnRow &&
-				turnRow.status !== 'completed' &&
-				turnRow.status !== 'errored'
-			) {
-				updateTurn({
-					database,
-					id: turnId,
-					patch: { completedAt: now().toISOString(), status: 'errored' },
-				});
-			}
-			if (ownsTurnAfterClose) {
-				updateAgentSession({
-					database,
-					id: sessionId,
-					patch: { closedAt: now().toISOString(), status: 'closed' },
-				});
-				activeSessions.delete(sessionId);
-			}
-			quarantiningSessions.delete(sessionId);
-		}
-	};
-
-	/** Rolls back a prompt rejected before runtime execution, without clobbering newer work. */
-	const recoverRejectedSubmit = async ({
-		active,
-		cause,
-		database,
-		previousStatus,
-		sessionId,
-		turnId,
-	}: {
-		active: ActiveSession;
-		cause: unknown;
-		database: DatabaseSync;
-		previousStatus: AgentSessionRow['status'];
-		sessionId: string;
-		turnId: string;
-	}): Promise<void> => {
-		if (
-			cause instanceof AgentSubmitError &&
-			cause.disposition === 'unconfirmed'
-		) {
-			await quarantineUnconfirmedSubmit({
-				active,
-				database,
-				sessionId,
-				turnId,
-			});
-			return;
-		}
-		const current = activeSessions.get(sessionId);
-		const currentRow = getAgentSessionById({ database, id: sessionId });
-		const turnRow = getTurnById({ database, id: turnId });
-		if (
-			!turnRow ||
-			(turnRow.status !== 'submitted' && turnRow.status !== 'streaming')
-		) {
-			return;
-		}
-		updateTurn({
-			database,
-			id: turnId,
-			patch: { completedAt: now().toISOString(), status: 'errored' },
-		});
-		if (
-			previousStatus !== 'streaming' &&
-			current?.activeTurnId === turnId &&
-			currentRow?.status === 'streaming'
-		) {
-			updateAgentSession({
-				database,
-				id: sessionId,
-				patch: { status: 'idle' },
-			});
-		}
-	};
-
 	const submitPrompt: AgentSessionLifecycle['submitPrompt'] = async (
 		request,
 	) => {
@@ -435,98 +319,20 @@ export function createAgentSessionLifecycle({
 			throw linkedDirectoriesBusy();
 		}
 		const active = activeSessions.get(request.sessionId);
-		if (quarantiningSessions.has(request.sessionId)) {
+		if (submitter.isQuarantining(request.sessionId)) {
 			throw new AgentSessionServiceError({
 				code: 'session-not-open',
 				message: `Agent session ${request.sessionId} is being quarantined.`,
 			});
 		}
 		if (!active) {
-			throw new AgentSessionServiceError({
-				code: 'session-not-open',
-				message: `Agent session ${request.sessionId} is not open.`,
-			});
+			throw sessionNotOpen(request.sessionId);
 		}
 		assertProviderPin({
 			pinned: active.row.provider,
 			requested: request.provider,
 		});
-
-		// Mid-turn steer/follow-up: don't open a new turn, change status, or
-		// checkpoint — the message is injected into the in-flight (steer) or next
-		// (follow-up) turn. Just forward the native RPC frame.
-		if (request.streamingBehavior) {
-			return active.agentRuntimeSession.submit({
-				prompt: request.prompt,
-				streamingBehavior: request.streamingBehavior,
-			});
-		}
-
-		const previousStatus =
-			getAgentSessionById({
-				database,
-				id: request.sessionId,
-			})?.status ?? 'idle';
-		const turn = createTurn({
-			database,
-			input: {
-				branchId: active.branch.id,
-				model: request.model ?? null,
-				promptText: request.prompt,
-				thinkingLevel: request.thinkingLevel ?? null,
-			},
-		});
-
-		const turnActive: ActiveSession = {
-			...active,
-			activeTurnId: turn.id,
-			agentResponsePendingSummary: false,
-		};
-		activeSessions.set(request.sessionId, turnActive);
-		updateAgentSession({
-			database,
-			id: request.sessionId,
-			patch: {
-				model: request.model ?? active.row.model,
-				status: 'streaming',
-				thinkingLevel: request.thinkingLevel ?? active.row.thinkingLevel,
-			},
-		});
-
-		// Capture the pre-prompt file state before the runtime can touch files.
-		// Runs after the session map update so a concurrent submit/stop never
-		// observes a turn that exists in SQLite but not in activeSessions.
-		// The port owns the warn-and-continue failure policy (ADR 0012).
-		if (captureCheckpoint) {
-			await captureCheckpoint({
-				cwd: active.row.cwd,
-				database,
-				label: summarizePromptForLabel(request.prompt),
-				agentSessionId: request.sessionId,
-				turnId: turn.id,
-				workspaceId: active.row.workspaceId,
-			});
-		}
-
-		try {
-			return await active.agentRuntimeSession.submit({
-				modelOverride: request.model ?? undefined,
-				planMode: request.planMode ?? isPlanModeActive(request.sessionId),
-				afkMode: request.afkMode ?? isAfkModeActive(request.sessionId),
-				prompt: request.prompt,
-				thinkingLevel: request.thinkingLevel ?? undefined,
-			});
-		} catch (cause) {
-			await recoverRejectedSubmit({
-				active: turnActive,
-				cause,
-				database,
-				previousStatus,
-				sessionId: request.sessionId,
-				turnId: turn.id,
-			});
-			throw cause;
-		}
+		return submitter.submit({ active, database, request });
 	};
 
 	/**
@@ -540,6 +346,9 @@ export function createAgentSessionLifecycle({
 	 * into chats that were running nothing, and restamps their last settled turn
 	 * as aborted. Its last turn settles `completed` instead, which is what that
 	 * turn did before the stop arrived.
+	 *
+	 * Only a turn still open when the stop arrives is stamped, and its diff locks
+	 * there; a turn that already settled keeps the instant it settled at.
 	 * @param request - The session to stop and the reason to record.
 	 */
 	const abortActiveSession = async (
@@ -551,6 +360,7 @@ export function createAgentSessionLifecycle({
 			return;
 		}
 		const turnInFlight = isTurnInFlight(database, request.sessionId);
+		const stoppedTurnId = turnBoundaries.openTurnIdOf({ active, database });
 		// Announce the stop before the abort, because aborting settles the turn to
 		// `idle` on its way out and a listener told only afterwards would already
 		// have read that as a turn finishing by itself.
@@ -579,14 +389,12 @@ export function createAgentSessionLifecycle({
 		// guaranteed to land first: Pi's `close` gives up waiting on a wedged child
 		// after its kill deadline, so the event can arrive once this session is
 		// already out of `activeSessions` and no longer carries the turn to stamp.
-		if (active.activeTurnId) {
-			updateTurn({
+		if (stoppedTurnId) {
+			turnBoundaries.settleStoppedTurn({
+				active,
 				database,
-				id: active.activeTurnId,
-				patch: {
-					completedAt: now().toISOString(),
-					status: turnInFlight ? 'aborted' : 'completed',
-				},
+				status: turnInFlight ? 'aborted' : 'completed',
+				turnId: stoppedTurnId,
 			});
 		}
 		updateAgentSession({
@@ -757,19 +565,9 @@ export function createAgentSessionLifecycle({
 				);
 			}
 			await Promise.all(sessionCloses);
+			await turnCheckpoints?.drain();
 		},
 		stopSession,
 		submitPrompt,
 	};
-}
-
-/** First line of the prompt, trimmed to a short checkpoint label. */
-function summarizePromptForLabel(prompt: string): string {
-	const firstLine =
-		prompt.split('\n').find((line) => line.trim().length > 0) ?? '';
-	const trimmed = firstLine.trim();
-	if (trimmed.length === 0) {
-		return 'Checkpoint';
-	}
-	return trimmed.length > 80 ? `${trimmed.slice(0, 79)}…` : trimmed;
 }

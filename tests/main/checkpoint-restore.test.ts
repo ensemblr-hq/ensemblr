@@ -12,9 +12,10 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+	CheckpointServiceError,
 	computeTurnDiff,
-	createCheckpointCapture,
 	isOrdinalHidden,
+	listWorkspaceCheckpoints,
 	readHiddenEventRanges,
 	restoreTurnCheckpoint,
 } from '../../src/main/checkpoints/checkpoint-service.ts';
@@ -22,6 +23,7 @@ import {
 	captureWorkspaceCheckpoint,
 	restoreWorkspaceTo,
 } from '../../src/main/checkpoints/git-checkpoint.ts';
+import { createTurnCheckpoints } from '../../src/main/checkpoints/turn-checkpoints.ts';
 import {
 	type EnsemblrDatabaseConnection,
 	openEnsemblrDatabase,
@@ -32,8 +34,10 @@ import {
 	createAgentSession,
 	createTurn,
 	getAgentSessionBranchById,
+	updateAgentSession,
 	updateTurn,
 } from '../../src/main/storage/repositories/agent-session-repository.ts';
+import { getCheckpointByTurnId } from '../../src/main/storage/repositories/checkpoint-repository.ts';
 
 interface Fixture {
 	agentSessionId: string;
@@ -104,8 +108,9 @@ async function captureForTurn(
 	turn: AgentTurnRow,
 	label: string,
 ) {
-	const capture = createCheckpointCapture();
+	const capture = createTurnCheckpoints().openTurn;
 	const row = await capture({
+		closingTurnId: null,
 		cwd: fixture.repoDirectory,
 		database: fixture.connection.database,
 		label,
@@ -117,7 +122,7 @@ async function captureForTurn(
 	return row;
 }
 
-test('computeTurnDiff diffs a checkpoint against the next checkpoint', async (t) => {
+test('computeTurnDiff ends a settled turn with no end of its own at the next checkpoint', async (t) => {
 	const fixture = openFixture(t);
 
 	const turn1 = newTurn(fixture, 'first change');
@@ -126,6 +131,7 @@ test('computeTurnDiff diffs a checkpoint against the next checkpoint', async (t)
 	// Simulate the agent's edits during turn 1.
 	writeFileSync(path.join(fixture.repoDirectory, 'app.txt'), 'v2\n');
 	writeFileSync(path.join(fixture.repoDirectory, 'new.txt'), 'created\n');
+	settle(fixture, turn1);
 
 	const turn2 = newTurn(fixture, 'second change');
 	await captureForTurn(fixture, turn2, 'second change');
@@ -145,122 +151,281 @@ test('computeTurnDiff diffs a checkpoint against the next checkpoint', async (t)
 	);
 });
 
-test('computeTurnDiff falls back to the live working tree for the latest turn', async (t) => {
-	const fixture = openFixture(t);
+/** Marks the fixture's session as running a turn, the way `submitPrompt` does. */
+function markSessionBusy(fixture: Fixture): void {
+	updateAgentSession({
+		database: fixture.connection.database,
+		id: fixture.agentSessionId,
+		patch: { status: 'streaming' },
+	});
+}
 
-	const turn = newTurn(fixture, 'live change');
-	await captureForTurn(fixture, turn, 'live change');
+/** Opens a turn in a second chat of the same workspace and captures its checkpoint. */
+async function captureInOtherChat(fixture: Fixture, label: string) {
+	const { mainBranch, session } = createAgentSession({
+		database: fixture.connection.database,
+		input: { cwd: fixture.repoDirectory, workspaceId: fixture.workspaceId },
+	});
+	const turn = createTurn({
+		database: fixture.connection.database,
+		input: {
+			branchId: mainBranch.id,
+			model: null,
+			promptText: label,
+			thinkingLevel: null,
+		},
+	});
+	const row = await createTurnCheckpoints().openTurn({
+		agentSessionId: session.id,
+		closingTurnId: null,
+		cwd: fixture.repoDirectory,
+		database: fixture.connection.database,
+		label,
+		turnId: turn.id,
+		workspaceId: fixture.workspaceId,
+	});
+	assert.ok(row, `checkpoint capture failed for ${label}`);
+	return row;
+}
 
-	writeFileSync(path.join(fixture.repoDirectory, 'app.txt'), 'live\n');
-
+/** The paths a turn's diff reports, sorted. */
+async function turnDiffPaths(fixture: Fixture, turn: AgentTurnRow) {
 	const diff = await computeTurnDiff({
 		cwd: fixture.repoDirectory,
 		database: fixture.connection.database,
 		turnId: turn.id,
 	});
-	assert.deepEqual(
-		diff.files.map((file) => file.path),
-		['app.txt'],
-	);
-});
+	return diff.files.map((file) => file.path).sort();
+}
 
-test('computeTurnDiff bounds a settled turn by the next checkpoint in the workspace', async (t) => {
-	const fixture = openFixture(t);
-
-	const turn = newTurn(fixture, 'only turn of this chat');
-	await captureForTurn(fixture, turn, 'only turn of this chat');
-	writeFileSync(path.join(fixture.repoDirectory, 'app.txt'), 'v2\n');
+/** Settles a turn row the way the lifecycle does at a runtime `idle`. */
+function settle(fixture: Fixture, turn: AgentTurnRow): void {
 	updateTurn({
 		database: fixture.connection.database,
 		id: turn.id,
 		patch: { completedAt: new Date().toISOString(), status: 'completed' },
 	});
+}
 
-	// A second chat in the same workspace prompts, then edits a different file.
-	const { mainBranch: otherBranch, session: otherSession } = createAgentSession(
-		{
-			database: fixture.connection.database,
-			input: { cwd: fixture.repoDirectory, workspaceId: fixture.workspaceId },
-		},
-	);
-	const otherTurn = createTurn({
-		database: fixture.connection.database,
-		input: {
-			branchId: otherBranch.id,
-			model: null,
-			promptText: 'other chat',
-			thinkingLevel: null,
-		},
-	});
-	const capture = createCheckpointCapture();
-	await capture({
-		cwd: fixture.repoDirectory,
-		database: fixture.connection.database,
-		label: 'other chat',
-		agentSessionId: otherSession.id,
-		turnId: otherTurn.id,
-		workspaceId: fixture.workspaceId,
-	});
-	writeFileSync(path.join(fixture.repoDirectory, 'other.txt'), 'not mine\n');
+test('computeTurnDiff runs a turn still in flight to the live working tree', async (t) => {
+	const fixture = openFixture(t);
 
-	const diff = await computeTurnDiff({
+	const turn = newTurn(fixture, 'live change');
+	await captureForTurn(fixture, turn, 'live change');
+	markSessionBusy(fixture);
+
+	writeFileSync(path.join(fixture.repoDirectory, 'app.txt'), 'live\n');
+
+	assert.deepEqual(await turnDiffPaths(fixture, turn), ['app.txt']);
+});
+
+test('a turn that ended is locked: later edits, by hand or by another chat, are never its own', async (t) => {
+	const fixture = openFixture(t);
+	const boundaries = createTurnCheckpoints();
+
+	const turn = newTurn(fixture, 'only turn of this chat');
+	await captureForTurn(fixture, turn, 'only turn of this chat');
+	writeFileSync(path.join(fixture.repoDirectory, 'app.txt'), 'v2\n');
+	settle(fixture, turn);
+	await boundaries.endTurn({
+		agentSessionId: fixture.agentSessionId,
 		cwd: fixture.repoDirectory,
 		database: fixture.connection.database,
 		turnId: turn.id,
+		workspaceId: fixture.workspaceId,
 	});
 
-	// The settled turn stops where the other chat started rather than claiming
-	// everything that has happened in the workspace since.
-	assert.deepEqual(
-		diff.files.map((file) => file.path),
-		['app.txt'],
+	writeFileSync(path.join(fixture.repoDirectory, 'by-hand.txt'), 'mine\n');
+	await captureInOtherChat(fixture, 'other chat');
+	writeFileSync(path.join(fixture.repoDirectory, 'other.txt'), 'not mine\n');
+
+	assert.deepEqual(await turnDiffPaths(fixture, turn), ['app.txt']);
+	const [listed] = listWorkspaceCheckpoints({
+		database: fixture.connection.database,
+		workspaceId: fixture.workspaceId,
+	});
+	assert.equal(listed?.end.kind, 'checkpoint');
+});
+
+test('the next input ends the turn it interrupts at the snapshot it opens with', async (t) => {
+	const fixture = openFixture(t);
+	const changedWorkspaces: string[] = [];
+	const boundaries = createTurnCheckpoints({
+		onChanged: (workspaceId) => changedWorkspaces.push(workspaceId),
+	});
+	const open = (turn: AgentTurnRow, closingTurnId: string | null) =>
+		boundaries.openTurn({
+			agentSessionId: fixture.agentSessionId,
+			closingTurnId,
+			cwd: fixture.repoDirectory,
+			database: fixture.connection.database,
+			label: turn.promptText,
+			turnId: turn.id,
+			workspaceId: fixture.workspaceId,
+		});
+
+	const first = newTurn(fixture, 'first ask');
+	await open(first, null);
+	writeFileSync(path.join(fixture.repoDirectory, 'first.txt'), 'first\n');
+
+	const steer = newTurn(fixture, 'steer mid-turn');
+	const steerCheckpoint = await open(steer, first.id);
+	markSessionBusy(fixture);
+	writeFileSync(path.join(fixture.repoDirectory, 'steered.txt'), 'second\n');
+
+	const firstCheckpoint = getCheckpointByTurnId({
+		database: fixture.connection.database,
+		turnId: first.id,
+	});
+	assert.equal(firstCheckpoint?.endGitHash, steerCheckpoint?.gitHash);
+	assert.equal(
+		git(fixture.repoDirectory, 'rev-parse', firstCheckpoint?.endGitRef ?? ''),
+		steerCheckpoint?.gitHash,
+	);
+	assert.deepEqual(await turnDiffPaths(fixture, first), ['first.txt']);
+	assert.deepEqual(await turnDiffPaths(fixture, steer), ['steered.txt']);
+	assert.deepEqual(changedWorkspaces, [
+		fixture.workspaceId,
+		fixture.workspaceId,
+	]);
+});
+
+test('reopening a turn drops its end until it ends again', async (t) => {
+	const fixture = openFixture(t);
+	const boundaries = createTurnCheckpoints();
+	const turn = newTurn(fixture, 'drained a queued steer');
+	await captureForTurn(fixture, turn, 'drained a queued steer');
+	const boundary = {
+		agentSessionId: fixture.agentSessionId,
+		cwd: fixture.repoDirectory,
+		database: fixture.connection.database,
+		turnId: turn.id,
+		workspaceId: fixture.workspaceId,
+	};
+	const endOf = () =>
+		getCheckpointByTurnId({
+			database: fixture.connection.database,
+			turnId: turn.id,
+		})?.endGitHash ?? null;
+
+	writeFileSync(path.join(fixture.repoDirectory, 'app.txt'), 'paused\n');
+	await boundaries.endTurn(boundary);
+	const paused = endOf();
+	assert.ok(paused);
+
+	await boundaries.endTurn(boundary);
+	assert.equal(endOf(), paused, 'a second end does not move the first');
+
+	await boundaries.reopenTurn(boundary);
+	assert.equal(endOf(), null);
+
+	writeFileSync(path.join(fixture.repoDirectory, 'resumed.txt'), 'more\n');
+	await boundaries.endTurn(boundary);
+	assert.notEqual(endOf(), paused);
+	assert.deepEqual(await turnDiffPaths(fixture, turn), [
+		'app.txt',
+		'resumed.txt',
+	]);
+});
+
+test('a turn that just stopped reads live until its end lands, and is withheld if it never does', async (t) => {
+	const fixture = openFixture(t);
+
+	const turn = newTurn(fixture, 'end still being written');
+	await captureForTurn(fixture, turn, 'end still being written');
+	writeFileSync(path.join(fixture.repoDirectory, 'app.txt'), 'v2\n');
+	settle(fixture, turn);
+
+	assert.deepEqual(await turnDiffPaths(fixture, turn), ['app.txt']);
+
+	updateTurn({
+		database: fixture.connection.database,
+		id: turn.id,
+		patch: { completedAt: new Date(Date.now() - 3_600_000).toISOString() },
+	});
+	await assert.rejects(
+		computeTurnDiff({
+			cwd: fixture.repoDirectory,
+			database: fixture.connection.database,
+			turnId: turn.id,
+		}),
+		(error: unknown) =>
+			error instanceof CheckpointServiceError && error.code === 'range-unknown',
 	);
 });
 
-test('computeTurnDiff keeps an unfinished turn running to the working tree', async (t) => {
+test('a failed capture is recorded, so neither turn it touched guesses a range', async (t) => {
 	const fixture = openFixture(t);
+	const brokenCwd = mkdtempSync(path.join(tmpdir(), 'ensemblr-not-a-repo-'));
+	t.after(() => rmSync(brokenCwd, { force: true, recursive: true }));
+	const boundaries = createTurnCheckpoints();
 
-	const turn = newTurn(fixture, 'still working');
-	await captureForTurn(fixture, turn, 'still working');
-
-	const { mainBranch: otherBranch, session: otherSession } = createAgentSession(
-		{
-			database: fixture.connection.database,
-			input: { cwd: fixture.repoDirectory, workspaceId: fixture.workspaceId },
-		},
-	);
-	const otherTurn = createTurn({
+	const first = newTurn(fixture, 'first');
+	await captureForTurn(fixture, first, 'first');
+	const second = newTurn(fixture, 'capture fails');
+	const row = await boundaries.openTurn({
+		agentSessionId: fixture.agentSessionId,
+		closingTurnId: first.id,
+		cwd: brokenCwd,
 		database: fixture.connection.database,
-		input: {
-			branchId: otherBranch.id,
-			model: null,
-			promptText: 'other chat',
-			thinkingLevel: null,
-		},
-	});
-	const capture = createCheckpointCapture();
-	const otherCheckpoint = await capture({
-		cwd: fixture.repoDirectory,
-		database: fixture.connection.database,
-		label: 'other chat',
-		agentSessionId: otherSession.id,
-		turnId: otherTurn.id,
+		label: 'capture fails',
+		turnId: second.id,
 		workspaceId: fixture.workspaceId,
 	});
-	assert.ok(otherCheckpoint, 'other chat checkpoint capture failed');
-	// Written after the other chat checkpointed, but still this turn's work.
-	writeFileSync(path.join(fixture.repoDirectory, 'app.txt'), 'late write\n');
 
-	const diff = await computeTurnDiff({
+	assert.equal(row, null);
+	const failed = getCheckpointByTurnId({
+		database: fixture.connection.database,
+		turnId: second.id,
+	});
+	assert.equal(failed?.gitHash, null);
+	assert.equal(failed?.reason, 'capture-failed');
+	const [listed] = listWorkspaceCheckpoints({
+		database: fixture.connection.database,
+		workspaceId: fixture.workspaceId,
+	});
+	assert.deepEqual(listed?.end, { kind: 'unknown' });
+});
+
+test('discarding a refused turn removes it, and drain waits for queued boundaries', async (t) => {
+	const fixture = openFixture(t);
+	const boundaries = createTurnCheckpoints();
+	const turn = newTurn(fixture, 'refused');
+	const boundary = {
+		agentSessionId: fixture.agentSessionId,
 		cwd: fixture.repoDirectory,
 		database: fixture.connection.database,
 		turnId: turn.id,
-	});
+		workspaceId: fixture.workspaceId,
+	};
 
-	assert.deepEqual(
-		diff.files.map((file) => file.path),
-		['app.txt'],
+	void boundaries.openTurn({ ...boundary, closingTurnId: null, label: 'x' });
+	void boundaries.discardTurn(boundary);
+	await boundaries.drain();
+
+	assert.equal(
+		getCheckpointByTurnId({
+			database: fixture.connection.database,
+			turnId: turn.id,
+		}),
+		null,
 	);
+});
+
+test('a turn from before ends were recorded stops where the next checkpoint in the workspace began', async (t) => {
+	const fixture = openFixture(t);
+
+	const turn = newTurn(fixture, 'legacy turn');
+	await captureForTurn(fixture, turn, 'legacy turn');
+	// Rows written before ends were recorded carry no marker.
+	fixture.connection.database
+		.prepare(`UPDATE checkpoints SET metadata_json = '{}' WHERE turn_id = ?`)
+		.run(turn.id);
+	writeFileSync(path.join(fixture.repoDirectory, 'app.txt'), 'v2\n');
+	await captureInOtherChat(fixture, 'other chat');
+	writeFileSync(path.join(fixture.repoDirectory, 'other.txt'), 'not mine\n');
+
+	assert.deepEqual(await turnDiffPaths(fixture, turn), ['app.txt']);
 });
 
 test('restoreTurnCheckpoint reverts tracked files and records truncation', async (t) => {

@@ -15,7 +15,7 @@ import type {
 	ChatTabWire,
 	ListChatTabsResult,
 } from '@/shared/ipc/contracts/chat-tab';
-import type { ListTurnCheckpointsResult } from '@/shared/ipc/contracts/checkpoint';
+import type { ListWorkspaceCheckpointsResult } from '@/shared/ipc/contracts/checkpoint';
 import type {
 	ConciergeContextPressureWire,
 	ListConciergeEventsResult,
@@ -651,7 +651,7 @@ export function createDemoHandlers(
 				),
 			};
 		},
-		listTurnCheckpoints: (): ListTurnCheckpointsResult => ({
+		listWorkspaceCheckpoints: (): ListWorkspaceCheckpointsResult => ({
 			checkpoints: [],
 		}),
 		listWorkspaceFiles: (): ListWorkspaceFilesResult => ({

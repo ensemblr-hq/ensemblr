@@ -16,8 +16,8 @@ import { PanelMessage } from './panel-message';
 
 /**
  * Read-only diff surface shown when a `kind: 'diff'` tab is active. Shows the
- * changes between a turn's pre-prompt checkpoint and the post-turn state
- * (next checkpoint, or the live working tree for the latest turn), rendering
+ * changes between a turn's opening checkpoint and where it ended (the snapshot
+ * taken as it stopped, or the live working tree while it still runs), rendering
  * one rich {@link DiffViewer} per changed file.
  *
  * The display toggles sit in this panel's own header rather than above every

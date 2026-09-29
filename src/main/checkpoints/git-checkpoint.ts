@@ -137,6 +137,36 @@ export async function captureWorkspaceCheckpoint({
 }
 
 /**
+ * Points a private ref at a commit a capture already produced, so one snapshot
+ * can close one turn and open the next without being taken twice. The ref keeps
+ * the commit reachable, which is what stops `git gc` pruning it.
+ * @param commitHash - Commit to pin
+ * @param cwd - Workspace directory whose repository owns the commit
+ * @param ref - Fully-qualified private ref to point at it
+ */
+export async function pinCheckpointRef({
+	commitHash,
+	cwd,
+	ref,
+}: {
+	commitHash: string;
+	cwd: string;
+	ref: string;
+}): Promise<void> {
+	if (!REF_PATTERN.test(ref)) {
+		throw new GitCheckpointError({
+			message: `Refusing to write outside the ensemblr ref namespace: ${ref}`,
+			step: 'validate-ref',
+		});
+	}
+	await runGit({
+		args: ['update-ref', ref, commitHash],
+		cwd,
+		step: 'update-ref',
+	});
+}
+
+/**
  * Run `body` against a throwaway git index file so the user's real index is
  * never touched, removing the temporary directory once it settles.
  * @param body - Receives the environment overlay pointing git at the temporary index

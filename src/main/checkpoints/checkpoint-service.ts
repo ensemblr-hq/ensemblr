@@ -1,118 +1,42 @@
 import type { DatabaseSync } from 'node:sqlite';
 import {
-	type AgentTurnRow,
+	resolveTurnDiffEnds,
+	type TurnDiffEnd,
+} from '../../shared/turn-diff-range.ts';
+import {
 	getAgentSessionBranchById,
 	getTurnById,
+	listAgentSessionsByWorkspace,
 	setBranchMetadata,
 } from '../storage/repositories/agent-session-repository.ts';
 import {
 	type CheckpointRow,
 	getCheckpointByTurnId,
-	getNextCheckpointInAgentSession,
-	getNextCheckpointInWorkspace,
-	insertCheckpoint,
-	listCheckpointsForAgentSession,
-	listCheckpointsForWorkspace,
+	listTurnCheckpointsForWorkspace,
+	type TurnCheckpointRow,
 } from '../storage/repositories/index.ts';
 import {
-	captureWorkspaceCheckpoint,
 	diffTrees,
 	type GitDiffResult,
 	restoreWorkspaceTo,
-	sanitizeRefSegment,
 	snapshotWorkingTree,
 } from './git-checkpoint.ts';
 
-/**
- * Capture port injected into the agent session lifecycle. Runs before each user
- * prompt reaches the runtime.
- *
- * Safety policy (ADR 0012): capture failure WARNS and continues — the prompt
- * is not blocked. The turn simply has no checkpoint row, which the restore /
- * turn-diff UI must treat as "no snapshot available". Rationale: blocking all
- * prompting on a degraded git state (or a non-git scratch workspace) is worse
- * than losing one turn's snapshot, and the failure is logged loudly.
- */
-interface CheckpointCaptureInput {
-	cwd: string;
-	database: DatabaseSync;
-	label: string;
-	agentSessionId: string;
-	turnId: string;
-	workspaceId: string;
-}
-
-/**
- * Function signature for the checkpoint capture port, invoked before a prompt
- * reaches the runtime; resolves to the recorded checkpoint row, or null when
- * capture was skipped or failed.
- */
-export type CheckpointCapturePort = (
-	input: CheckpointCaptureInput,
-) => Promise<CheckpointRow | null>;
-
-/** Builds the private ref name for a workspace/turn pair (ADR 0012). */
-export function checkpointRefFor({
-	turnId,
-	workspaceId,
-}: {
-	turnId: string;
-	workspaceId: string;
-}): string {
-	return `refs/ensemblr/checkpoints/${sanitizeRefSegment(workspaceId)}/${sanitizeRefSegment(turnId)}`;
-}
-
-/** Creates the production capture port (git + SQLite). */
-export function createCheckpointCapture(): CheckpointCapturePort {
-	return async ({
-		cwd,
-		database,
-		label,
-		agentSessionId,
-		turnId,
-		workspaceId,
-	}) => {
-		const ref = checkpointRefFor({ turnId, workspaceId });
-		try {
-			const captured = await captureWorkspaceCheckpoint({
-				cwd,
-				message: `ensemblr checkpoint: ${label}`,
-				ref,
-			});
-			return insertCheckpoint({
-				database,
-				input: {
-					gitHash: captured.commitHash,
-					gitRef: captured.ref,
-					label,
-					metadata: { treeHash: captured.treeHash },
-					agentSessionId,
-					turnId,
-					workspaceId,
-				},
-			});
-		} catch (error) {
-			console.warn('[checkpoints] capture failed; prompt continues', {
-				cwd,
-				error: error instanceof Error ? error.message : String(error),
-				ref,
-				turnId,
-				workspaceId,
-			});
-			return null;
-		}
-	};
-}
+/** Why a checkpoint service operation failed, as the IPC layer reports it. */
+type CheckpointServiceErrorCode =
+	| 'no-checkpoint'
+	| 'range-unknown'
+	| 'workspace-missing';
 
 /** Typed error thrown by checkpoint service operations for IPC translation. */
 export class CheckpointServiceError extends Error {
-	readonly code: 'no-checkpoint' | 'workspace-missing';
+	readonly code: CheckpointServiceErrorCode;
 
 	constructor({
 		code,
 		message,
 	}: {
-		code: 'no-checkpoint' | 'workspace-missing';
+		code: CheckpointServiceErrorCode;
 		message: string;
 	}) {
 		super(message);
@@ -121,30 +45,44 @@ export class CheckpointServiceError extends Error {
 	}
 }
 
-/** Lists checkpoints captured for an agent session, oldest first. */
-export function listTurnCheckpoints({
-	database,
-	agentSessionId,
-}: {
-	database: DatabaseSync;
-	agentSessionId: string;
-}): readonly CheckpointRow[] {
-	return listCheckpointsForAgentSession({ database, agentSessionId });
+/** A captured checkpoint paired with where the turn it opened ends. */
+interface TurnCheckpoint {
+	checkpoint: CheckpointRow;
+	end: TurnDiffEnd;
 }
 
 /**
- * Lists checkpoints captured anywhere in a workspace, oldest first. The Changes
- * panel is workspace-scoped rather than chat-scoped, so it resolves "the latest
- * turn" from this rather than from one session's list.
+ * Lists every turn checkpoint in a workspace, oldest capture first, each with
+ * the end of the turn it opened. One workspace-wide read serves both the chat
+ * timelines and the Changes panel, because a chat's newest turn is bounded by
+ * whatever any other chat in the workspace captured after it.
  */
 export function listWorkspaceCheckpoints({
 	database,
+	isRuntimeOpen = everySessionLive,
 	workspaceId,
 }: {
 	database: DatabaseSync;
+	/** Whether a session's runtime is up now; defaults to trusting its row. */
+	isRuntimeOpen?: (agentSessionId: string) => boolean;
 	workspaceId: string;
-}): readonly CheckpointRow[] {
-	return listCheckpointsForWorkspace({ database, workspaceId });
+}): readonly TurnCheckpoint[] {
+	const turns = listTurnCheckpointsForWorkspace({ database, workspaceId });
+	const ends = resolveWorkspaceTurnEnds({
+		database,
+		isRuntimeOpen,
+		turns,
+		workspaceId,
+	});
+	return turns
+		.flatMap(({ checkpoint, turnId }) =>
+			checkpoint
+				? [{ checkpoint, end: ends.get(turnId) ?? { kind: 'unknown' } }]
+				: [],
+		)
+		.sort((left, right) =>
+			compareCaptureOrder(left.checkpoint, right.checkpoint),
+		);
 }
 
 /** A turn's git diff paired with the checkpoint it was computed against. */
@@ -153,32 +91,135 @@ interface TurnDiffResult extends GitDiffResult {
 }
 
 /**
- * Diff between a turn's pre-prompt checkpoint and the post-turn state, which
- * {@link findNextCheckpoint} resolves to a later checkpoint or — for a turn
- * nothing has followed — the live working tree (tracked + untracked).
+ * Diff between a turn's pre-prompt checkpoint and the end
+ * {@link resolveTurnDiffEnds} gives it: a later checkpoint, or — for a turn
+ * still running as its session's newest — the live working tree (tracked +
+ * untracked).
  */
 export async function computeTurnDiff({
 	cwd,
 	database,
+	isRuntimeOpen = everySessionLive,
 	turnId,
 }: {
 	cwd: string;
 	database: DatabaseSync;
+	/** Whether a session's runtime is up now; defaults to trusting its row. */
+	isRuntimeOpen?: (agentSessionId: string) => boolean;
 	turnId: string;
 }): Promise<TurnDiffResult> {
 	const checkpoint = requireCheckpointForTurn({ database, turnId });
-	const next = findNextCheckpoint({
-		checkpoint,
+	if (!checkpoint.gitHash) {
+		throw new CheckpointServiceError({
+			code: 'no-checkpoint',
+			message: `Checkpoint for turn ${turnId} has no recorded commit.`,
+		});
+	}
+	const end = resolveWorkspaceTurnEnds({
 		database,
-		turn: getTurnById({ database, id: turnId }),
-	});
-	const toRev = next?.gitHash ?? (await snapshotWorkingTree(cwd));
-	const diff = await diffTrees({
-		cwd,
-		fromRev: checkpoint.gitHash ?? checkpoint.gitRef,
-		toRev,
-	});
+		isRuntimeOpen,
+		turns: listTurnCheckpointsForWorkspace({
+			database,
+			workspaceId: checkpoint.workspaceId,
+		}),
+		workspaceId: checkpoint.workspaceId,
+	}).get(turnId);
+	if (!end || end.kind === 'unknown') {
+		throw new CheckpointServiceError({
+			code: 'range-unknown',
+			message: `Where turn ${turnId} ended was not recorded, so its range is withheld.`,
+		});
+	}
+	const toRev =
+		end.kind === 'checkpoint' ? end.gitHash : await snapshotWorkingTree(cwd);
+	const diff = await diffTrees({ cwd, fromRev: checkpoint.gitHash, toRev });
 	return { ...diff, checkpoint };
+}
+
+/**
+ * Resolves where every captured turn in a workspace ends. A session counts as
+ * running only when its row says so and its runtime is actually up: a row a
+ * crash left reading `streaming` describes a runtime that is gone, and trusting
+ * it would read that session's last turn live forever.
+ * @param database - Open database connection
+ * @param isRuntimeOpen - Whether a session's runtime is up now
+ * @param turns - The workspace's turns with their checkpoints
+ * @param workspaceId - Workspace the turns belong to
+ * @returns Each captured turn's end, keyed by turn id
+ */
+function resolveWorkspaceTurnEnds({
+	database,
+	isRuntimeOpen,
+	turns,
+	workspaceId,
+}: {
+	database: DatabaseSync;
+	isRuntimeOpen: (agentSessionId: string) => boolean;
+	turns: readonly TurnCheckpointRow[];
+	workspaceId: string;
+}): ReadonlyMap<string, TurnDiffEnd> {
+	const live = listAgentSessionsByWorkspace({ database, workspaceId }).filter(
+		(session) =>
+			!CLOSED_SESSION_STATUSES.has(session.status) && isRuntimeOpen(session.id),
+	);
+	return resolveTurnDiffEnds({
+		busySessionIds: new Set(
+			live
+				.filter((session) => session.status === 'streaming')
+				.map((session) => session.id),
+		),
+		now: Date.now(),
+		openSessionIds: new Set(live.map((session) => session.id)),
+		turns: turns.map(
+			({ agentSessionId, checkpoint, settled, settledAt, turnId }) => ({
+				agentSessionId,
+				checkpointCreatedAt: checkpoint?.createdAt ?? null,
+				checkpointHash: checkpoint?.gitHash ?? null,
+				checkpointId: checkpoint?.id ?? null,
+				endFailed: Boolean(checkpoint?.endedAt && !checkpoint.endGitHash),
+				endHash: checkpoint?.endGitHash ?? null,
+				recordsEnd: checkpoint?.metadata.recordsEnd === true,
+				settled,
+				settledAt,
+				turnId,
+			}),
+		),
+	});
+}
+
+/** Session statuses whose runtime is gone, taking any end still owed with it. */
+const CLOSED_SESSION_STATUSES: ReadonlySet<string> = new Set([
+	'closed',
+	'errored',
+]);
+
+/**
+ * Default runtime check for callers that hold no live-session view: trusts the
+ * session row alone.
+ * @returns Always true
+ */
+function everySessionLive(): boolean {
+	return true;
+}
+
+/**
+ * Orders checkpoints the way they were captured, matching SQLite's
+ * `ORDER BY created_at, id`.
+ * @param left - First checkpoint
+ * @param right - Second checkpoint
+ * @returns Negative, zero, or positive, as `Array.prototype.sort` expects
+ */
+function compareCaptureOrder(
+	left: CheckpointRow,
+	right: CheckpointRow,
+): number {
+	if (left.createdAt !== right.createdAt) {
+		return left.createdAt < right.createdAt ? -1 : 1;
+	}
+	if (left.id === right.id) {
+		return 0;
+	}
+	return left.id < right.id ? -1 : 1;
 }
 
 /** Result of restoring a turn checkpoint, carrying the checkpoint restored. */
@@ -273,46 +314,6 @@ function requireCheckpointForTurn({
 		});
 	}
 	return checkpoint;
-}
-
-/**
- * Find the checkpoint that closes a turn: the next one in the same agent
- * session, or — once the turn has settled with none — the next one taken
- * anywhere in the workspace.
- *
- * The wider bound is what stops a finished chat's last turn from diffing the
- * live working tree forever and reporting every other chat's work since as its
- * own. It waits for `completedAt` because bounding a turn that is still writing
- * would drop whatever it writes after the other chat's prompt.
- * @param checkpoint - The turn's pre-prompt checkpoint
- * @param database - Open database connection
- * @param turn - The turn being diffed, or null when its row is gone
- * @returns The closing checkpoint, or null to diff against the working tree
- */
-function findNextCheckpoint({
-	checkpoint,
-	database,
-	turn,
-}: {
-	checkpoint: CheckpointRow;
-	database: DatabaseSync;
-	turn: AgentTurnRow | null;
-}): CheckpointRow | null {
-	const inSession = checkpoint.agentSessionId
-		? getNextCheckpointInAgentSession({
-				checkpointId: checkpoint.id,
-				database,
-				agentSessionId: checkpoint.agentSessionId,
-			})
-		: null;
-	if (inSession || !turn?.completedAt) {
-		return inSession;
-	}
-	return getNextCheckpointInWorkspace({
-		checkpointId: checkpoint.id,
-		database,
-		workspaceId: checkpoint.workspaceId,
-	});
 }
 
 /**

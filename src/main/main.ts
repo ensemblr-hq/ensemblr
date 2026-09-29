@@ -36,6 +36,7 @@ import type {
 } from '../shared/ipc/contracts/agent-session';
 import type { AppSettingsChangedBroadcast } from '../shared/ipc/contracts/app-settings';
 import type { ArchitectureSnapshotChangedBroadcast } from '../shared/ipc/contracts/architecture';
+import type { CheckpointsChangedBroadcast } from '../shared/ipc/contracts/checkpoint';
 import type { ConfigChangedBroadcast } from '../shared/ipc/contracts/health';
 import type {
 	TerminalLifecycleBroadcast,
@@ -115,6 +116,7 @@ import { createMainWindowStateStore } from './app/window-state';
 import { createArchitectureService } from './architecture';
 import { createChatTabService } from './chat-tabs/chat-tab-service.ts';
 import { persistTerminalAgentSessionId } from './chat-tabs/persist-terminal-agent-session.ts';
+import { createTurnCheckpoints } from './checkpoints/index.ts';
 import {
 	createClaudeAgentAdapter,
 	createClaudeMcpRoster,
@@ -959,6 +961,18 @@ const afkModeRegistry = createAfkModeRegistry();
 const architectureService = createArchitectureService({
 	requireDatabase: () => requireOpenDatabase(),
 });
+/**
+ * Turn-boundary snapshots (ADR 0012). Held here rather than inside the session
+ * service because quitting has to drain it: an end snapshot still queued when
+ * the database closes is lost, and its turn's diff with it.
+ */
+const turnCheckpoints = createTurnCheckpoints({
+	/** Tells every window a turn range moved, as each boundary lands. */
+	onChanged: (workspaceId) =>
+		broadcastToAllWindows(IPC_CHANNELS.checkpointsChanged, {
+			workspaceId,
+		} satisfies CheckpointsChangedBroadcast),
+});
 const agentSessionService = createAgentSessionService({
 	databaseService,
 	/** Forwards an agent session event to every window and the activity monitor. */
@@ -1028,6 +1042,7 @@ const agentSessionService = createAgentSessionService({
 			parentSessionId: sessionId,
 		}),
 	sessionSummaryWriter,
+	turnCheckpoints,
 });
 const localRepositoryRegistrationService =
 	createLocalRepositoryRegistrationService({
@@ -2084,8 +2099,16 @@ const quitGuard = createQuitGuard({
 });
 
 /**
- * Terminates the Pi RPC children and the terminal PTY children, then re-issues
- * the quit. Both shutdowns resolve only once each child has actually exited,
+ * How long a quit waits, once the agent children are down, for turn end
+ * snapshots their shutdown queued. Short of a hung git, a capture lands well
+ * inside it; past it the turn's range is withheld rather than quit held up.
+ */
+const TURN_CHECKPOINT_QUIT_DRAIN_MS = 5000;
+
+/**
+ * Terminates the Pi RPC children and the terminal PTY children, waits briefly
+ * for the turn end snapshots their shutdown queued, then re-issues the quit.
+ * Both shutdowns resolve only once each child has actually exited,
  * which keeps orphaned `pi --mode rpc` processes from surviving app quit and
  * keeps a dying PTY from reporting its exit into a half-destroyed JS environment
  * — where node-pty's native callback aborts the process instead of surfacing.
@@ -2108,6 +2131,12 @@ function beginAgentShutdown(exit: QuitExit): void {
 		await Promise.race([
 			Promise.allSettled([agentClient.shutdown(), terminalService.shutdown()]),
 			new Promise((resolve) => setTimeout(resolve, 3000)),
+		]);
+		await Promise.race([
+			turnCheckpoints.drain(),
+			new Promise((resolve) =>
+				setTimeout(resolve, TURN_CHECKPOINT_QUIT_DRAIN_MS),
+			),
 		]);
 		if (exit === 'install-update') {
 			updates.finishInstall();

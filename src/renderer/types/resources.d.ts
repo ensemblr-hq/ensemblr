@@ -801,6 +801,7 @@ export default interface Resources {
 			'pruned-snapshot-restore-failed': 'The branch was checked out, but the uncommitted changes saved when the workspace was archived could not be restored.';
 			'publication-unexpected': 'That settings operation failed unexpectedly. Check the workspace’s file before trying again.';
 			'publish-failed': 'The project was created locally, but publishing it to GitHub failed.';
+			'range-unknown': 'No checkpoint was captured for the turn after this one, so its changes cannot be told apart from that turn’s.';
 			'read-failed': 'That file could not be read.';
 			'reconcile-child-not-directory': 'An entry under the root is not a directory and was skipped.';
 			'reconcile-directory-read-failed': 'A directory under the root could not be read during the scan.';

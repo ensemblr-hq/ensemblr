@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { workspaceCheckpointsQuery } from '@/renderer/api/ensemblr';
+import { useCheckpointsChangedRefresh } from '@/renderer/hooks/workspace/use-checkpoints-changed-refresh';
 import { latestTurnCheckpointScope } from '@/renderer/lib/workbench';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 
@@ -11,6 +12,8 @@ import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git
  * `scope` is null both while the list is in flight and when the workspace has
  * never run a turn, so callers must read `isPending`/`isError` rather than
  * treating a null scope as "no changes" — the two need opposite handling.
+ * `isError` also covers a newest turn whose range was lost, which must not
+ * degrade to the working tree either.
  */
 export interface LatestTurnScope {
 	isError: boolean;
@@ -37,6 +40,7 @@ export function useLatestTurnScope(
 		...workspaceCheckpointsQuery(workspaceId),
 		enabled,
 	});
+	useCheckpointsChangedRefresh(enabled ? workspaceId : '');
 
 	const latest = useMemo(
 		() => (data ? latestTurnCheckpointScope(data.checkpoints) : null),
@@ -44,7 +48,7 @@ export function useLatestTurnScope(
 	);
 
 	return {
-		isError,
+		isError: isError || (latest !== null && latest.scope === null),
 		// A disabled query reports `isPending` forever, which would read as a
 		// permanently loading turn to anyone who did not ask for one.
 		isPending: enabled && isPending,

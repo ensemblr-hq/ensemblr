@@ -108,6 +108,7 @@ function renderTimeline(seeded: ListAgentSessionEventsResult) {
 		listAgentSessionEvents,
 		listAgentSessions: vi.fn(() => new Promise(() => undefined)),
 		onAgentSessionEvent: vi.fn(() => () => undefined),
+		onCheckpointsChanged: vi.fn(() => () => undefined),
 	});
 	const client = createTestQueryClient();
 	client.setQueryData(

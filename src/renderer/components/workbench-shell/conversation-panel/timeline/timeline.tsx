@@ -28,7 +28,10 @@ import {
 	turnMetadataOf,
 } from '@/renderer/lib/agent-timeline';
 import { cn } from '@/renderer/lib/utils';
-import type { TurnCheckpointScope } from '@/renderer/lib/workbench';
+import {
+	type TurnCheckpointScope,
+	turnActionOwners,
+} from '@/renderer/lib/workbench';
 import { resolveTurnTiming } from '@/renderer/lib/workbench/timeline-timing';
 import type {
 	SessionTabModel,
@@ -204,6 +207,7 @@ export function AgentSessionTimeline({
 		() => retryPromptsByMessageId(messages),
 		[messages],
 	);
+	const actionOwners = useMemo(() => turnActionOwners(messages), [messages]);
 
 	// Reset per chat tab by the `key` its call site passes, not by an effect.
 	const [windowSize, setWindowSize] = useState(TRANSCRIPT_WINDOW);
@@ -312,6 +316,8 @@ export function AgentSessionTimeline({
 								onOpenWorkspaceFileDiff={openWorkspaceFileDiff}
 								onRequestRestore={requestRestore}
 								onViewTurnDiff={openTurnDiff}
+								ownsTurnDiff={actionOwners.diffOwnerIds.has(message.id)}
+								ownsTurnRestore={actionOwners.restoreOwnerIds.has(message.id)}
 								retryPrompt={retryPrompts.get(message.id) ?? null}
 								workspaceCwd={workspace.pathLabel ?? null}
 							/>
@@ -356,6 +362,8 @@ const TimelineMessage = memo(function TimelineMessage({
 	onOpenWorkspaceFileDiff,
 	onRequestRestore,
 	onViewTurnDiff,
+	ownsTurnDiff,
+	ownsTurnRestore,
 	retryPrompt,
 	workspaceCwd,
 }: {
@@ -368,6 +376,10 @@ const TimelineMessage = memo(function TimelineMessage({
 	onOpenWorkspaceFileDiff: WorkspaceFileDiffOpener | null;
 	onRequestRestore: (target: { label: string; turnId: string }) => void;
 	onViewTurnDiff: ((input: { label: string; turnId: string }) => void) | null;
+	/** Whether this row is the last of its turn, where the turn's diff lives. */
+	ownsTurnDiff: boolean;
+	/** Whether this row is the first of its turn, where its restore point lives. */
+	ownsTurnRestore: boolean;
 	/** The prompt "Send again" re-sends, when this row is an error with one before it. */
 	retryPrompt: string | null;
 	workspaceCwd: string | null;
@@ -397,6 +409,8 @@ const TimelineMessage = memo(function TimelineMessage({
 			onOpenWorkspaceFileDiff={onOpenWorkspaceFileDiff}
 			onRequestRestore={onRequestRestore}
 			onViewTurnDiff={onViewTurnDiff}
+			ownsTurnDiff={ownsTurnDiff}
+			ownsTurnRestore={ownsTurnRestore}
 			workspaceCwd={workspaceCwd}
 		/>
 	);
@@ -411,6 +425,8 @@ function AssistantTimelineTurn({
 	onOpenWorkspaceFileDiff,
 	onRequestRestore,
 	onViewTurnDiff,
+	ownsTurnDiff,
+	ownsTurnRestore,
 	workspaceCwd,
 }: {
 	checkpointsByTurnId: ReadonlyMap<string, TurnCheckpointScope>;
@@ -420,6 +436,8 @@ function AssistantTimelineTurn({
 	onOpenWorkspaceFileDiff: WorkspaceFileDiffOpener | null;
 	onRequestRestore: (target: { label: string; turnId: string }) => void;
 	onViewTurnDiff: ((input: { label: string; turnId: string }) => void) | null;
+	ownsTurnDiff: boolean;
+	ownsTurnRestore: boolean;
 	workspaceCwd: string | null;
 }) {
 	const metadata = turnMetadataOf(message);
@@ -430,9 +448,9 @@ function AssistantTimelineTurn({
 		checkpoint: metadata?.turnId
 			? checkpointsByTurnId.get(metadata.turnId)
 			: undefined,
-		onOpenWorkspaceFileDiff,
-		onRequestRestore,
-		onViewTurnDiff,
+		onOpenWorkspaceFileDiff: ownsTurnDiff ? onOpenWorkspaceFileDiff : null,
+		onRequestRestore: ownsTurnRestore ? onRequestRestore : null,
+		onViewTurnDiff: ownsTurnDiff ? onViewTurnDiff : null,
 	});
 
 	return (
@@ -459,10 +477,11 @@ function AssistantTimelineTurn({
  *
  * A turn whose capture failed gets `undefined` for every one of them, which is
  * what makes the footer degrade to duration and copy alone rather than offering
- * actions with nothing behind them.
+ * actions with nothing behind them. A turn whose end main could not resolve
+ * keeps its restore but loses the diff, rather than diffing into the next turn.
  * @param checkpoint - The turn's checkpoint scope, when one was captured
- * @param onOpenWorkspaceFileDiff - Opens a file diff, or null outside a workspace
- * @param onRequestRestore - Opens the restore confirmation for a turn
+ * @param onOpenWorkspaceFileDiff - Opens a file diff, or null outside a workspace or on a row that does not own the turn's diff
+ * @param onRequestRestore - Opens the restore confirmation, or null on a row that does not own the turn's restore point
  * @param onViewTurnDiff - Opens the whole-turn diff tab, or null when unavailable
  * @returns The subset of turn props the checkpoint enables
  */
@@ -474,7 +493,9 @@ function checkpointAffordances({
 }: {
 	checkpoint: TurnCheckpointScope | undefined;
 	onOpenWorkspaceFileDiff: WorkspaceFileDiffOpener | null;
-	onRequestRestore: (target: { label: string; turnId: string }) => void;
+	onRequestRestore:
+		| ((target: { label: string; turnId: string }) => void)
+		| null;
 	onViewTurnDiff: ((input: { label: string; turnId: string }) => void) | null;
 }): Pick<
 	ComponentProps<typeof ChatAssistantTurn>,
@@ -484,13 +505,20 @@ function checkpointAffordances({
 		return { turnScope: null };
 	}
 	const target = { label: checkpoint.label, turnId: checkpoint.turnId };
+	const restore = onRequestRestore
+		? { onRestoreToCheckpoint: () => onRequestRestore(target) }
+		: {};
+	const scope = checkpoint.scope;
+	if (!scope) {
+		return { ...restore, turnScope: null };
+	}
 	return {
+		...restore,
 		onOpenTurnFile: onOpenWorkspaceFileDiff
-			? (filePath) => onOpenWorkspaceFileDiff(filePath, checkpoint.scope)
+			? (filePath) => onOpenWorkspaceFileDiff(filePath, scope)
 			: undefined,
-		onRestoreToCheckpoint: () => onRequestRestore(target),
 		onViewTurnDiff: onViewTurnDiff ? () => onViewTurnDiff(target) : undefined,
-		turnScope: checkpoint.scope,
+		turnScope: onOpenWorkspaceFileDiff ? scope : null,
 	};
 }
 

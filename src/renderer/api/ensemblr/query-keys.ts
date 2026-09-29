@@ -15,9 +15,9 @@ export const ensemblrQueryKeys = {
 	/** Query key for a workspace's open chat tabs. */
 	chatTabs: (workspaceId: string) =>
 		[...ensemblrQueryKeys.all, 'chat-tabs', workspaceId] as const,
-	/** Query key for an agent session's checkpoints. */
-	checkpointsForSession: (agentSessionId: string) =>
-		[...ensemblrQueryKeys.all, 'checkpoints', agentSessionId] as const,
+	/** Prefix matching every workspace's checkpoint list at once. */
+	checkpointsForAllWorkspaces: () =>
+		[...ensemblrQueryKeys.all, 'workspace-checkpoints'] as const,
 	/** Query key for every checkpoint captured in a workspace. */
 	checkpointsForWorkspace: (workspaceId: string) =>
 		[...ensemblrQueryKeys.all, 'workspace-checkpoints', workspaceId] as const,
@@ -161,6 +161,8 @@ export const ensemblrQueryKeys = {
 	/** Query key for a single turn's diff. */
 	turnDiff: (turnId: string) =>
 		[...ensemblrQueryKeys.all, 'turn-diff', turnId] as const,
+	/** Prefix matching every turn's cached diff at once. */
+	turnDiffAll: () => [...ensemblrQueryKeys.all, 'turn-diff'] as const,
 	/** Query key for the workspace history list. */
 	workspaceHistory: () =>
 		[...ensemblrQueryKeys.all, 'workspace-history'] as const,

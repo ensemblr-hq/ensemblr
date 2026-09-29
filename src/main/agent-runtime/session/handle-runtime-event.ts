@@ -8,7 +8,6 @@ import {
 	type AgentTurnStatus,
 	getAgentSessionById,
 	updateAgentSession,
-	updateTurn,
 } from '../../storage/repositories/agent-session-repository.ts';
 import type { AgentSession } from '../agent-client.ts';
 import { eventPayload } from '../agent-session-persistence.ts';
@@ -27,6 +26,7 @@ import {
 } from './active-session.ts';
 import { isValidContextUsage } from './session-activity-snapshot.ts';
 import type { SummaryQueue } from './summary-queue.ts';
+import type { TurnBoundaries } from './turn-boundaries.ts';
 
 /** Lifecycle calls this to mirror runtime events into `agent_session_events`. */
 export type PersistRuntimeEventPort = (input: {
@@ -46,6 +46,8 @@ interface RuntimeEventHandlerOptions {
 	/** Retries the derived tab title at every turn boundary; self-gates. */
 	queueNaming: (input: SessionNamingInput) => void;
 	summaryQueue: SummaryQueue;
+	/** Settles the active turn at idle and reopens it when the runtime resumes it. */
+	turnBoundaries: TurnBoundaries;
 }
 
 /** Handler that persists a normalized runtime event and schedules summary refreshes. */
@@ -84,6 +86,7 @@ export function createRuntimeEventHandler({
 	persistRuntimeEvent,
 	queueNaming,
 	summaryQueue,
+	turnBoundaries,
 }: RuntimeEventHandlerOptions): RuntimeEventHandler {
 	/**
 	 * Fast path for live message deltas: synthesizes an ephemeral row with a
@@ -155,7 +158,14 @@ export function createRuntimeEventHandler({
 
 	/**
 	 * Applies a status change: patches the session row, and at a turn boundary
-	 * drains the summary queue and retries the derived tab title.
+	 * settles the active turn, drains the summary queue, and retries the derived
+	 * tab title.
+	 *
+	 * `idle` ends the active turn and locks its diff. A later `streaming` on the
+	 * same turn reopens it: Claude reports `idle` at every SDK result and streams
+	 * again when it drains a queued follow-up or carries on by itself, so the
+	 * settle it just made was premature. A turn a new input superseded is never
+	 * the active one by then, and an aborted or errored turn stays settled.
 	 * @param active - The live session, when it is still in the active map
 	 * @param branchId - Branch the event belongs to
 	 * @param database - Open database handle
@@ -176,8 +186,18 @@ export function createRuntimeEventHandler({
 		status: AgentSessionStatus;
 	}): void => {
 		updateAgentSession({ database, id: sessionId, patch: { status } });
+		if (status === 'streaming' && active) {
+			turnBoundaries.reopenSettledTurn({ active, database });
+		}
 		if (status !== 'idle') {
 			return;
+		}
+		if (active) {
+			turnBoundaries.settleOpenTurn({
+				active,
+				database,
+				status: 'completed',
+			});
 		}
 		summaryQueue.queueSummaryAfterAgentResponse({ database, sessionId });
 		if (active) {
@@ -201,9 +221,10 @@ export function createRuntimeEventHandler({
 	 * Closes out a session the runtime shut down: stamps the row closed, drains
 	 * the summary queue, settles the open turn, and drops the active entry.
 	 *
-	 * `activeTurnId` keeps pointing at the last turn once it has settled, so a
-	 * shutdown that interrupted nothing — the workspace teardown closing an idle
-	 * session — would otherwise restamp a finished turn as aborted.
+	 * `activeTurnId` keeps pointing at the last turn once it has settled, so only
+	 * a turn still open is stamped — a shutdown that interrupted nothing, such as
+	 * the workspace teardown closing an idle session, must neither restamp a
+	 * finished turn as aborted nor move the instant its diff locked.
 	 * @param active - The live session, when it is still in the active map
 	 * @param database - Open database handle
 	 * @param reason - Why the runtime shut the session down
@@ -231,14 +252,11 @@ export function createRuntimeEventHandler({
 			patch: { closedAt: now().toISOString(), status: 'closed' },
 		});
 		summaryQueue.queueSummaryAfterAgentResponse({ database, sessionId });
-		if (active?.activeTurnId) {
-			updateTurn({
+		if (active) {
+			turnBoundaries.settleOpenTurn({
+				active,
 				database,
-				id: active.activeTurnId,
-				patch: {
-					completedAt: now().toISOString(),
-					status: settledStatus,
-				},
+				status: settledStatus,
 			});
 		}
 		activeSessions.delete(sessionId);

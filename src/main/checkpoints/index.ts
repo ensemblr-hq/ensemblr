@@ -1,10 +1,7 @@
-export type { CheckpointCapturePort } from './checkpoint-service.ts';
 export {
 	CheckpointServiceError,
 	computeTurnDiff,
-	createCheckpointCapture,
 	isOrdinalHidden,
-	listTurnCheckpoints,
 	listWorkspaceCheckpoints,
 	readHiddenEventRanges,
 	restoreTurnCheckpoint,
@@ -15,3 +12,7 @@ export {
 	sanitizeRefSegment,
 	snapshotWorkingTree,
 } from './git-checkpoint.ts';
+export {
+	createTurnCheckpoints,
+	type TurnCheckpointPort,
+} from './turn-checkpoints.ts';

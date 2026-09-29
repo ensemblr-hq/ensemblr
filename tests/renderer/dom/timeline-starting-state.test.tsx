@@ -91,6 +91,7 @@ describe('timeline startup state', () => {
 		installEnsemblrApi({
 			listAgentSessions: vi.fn(() => new Promise(() => undefined)),
 			onAgentSessionEvent: vi.fn(() => () => undefined),
+			onCheckpointsChanged: vi.fn(() => () => undefined),
 		});
 	});
 

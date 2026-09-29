@@ -29,10 +29,22 @@ const MERGE_CONFLICTS_REFETCH_INTERVAL_MS = 120_000;
  * @returns Whether the scope's content is fixed
  */
 function isFrozenScope(scope: WorkspaceGitDiffScope | undefined): boolean {
-	if (scope?.kind === 'commit') {
+	return isFrozenScopeKey(serializeWorkspaceGitDiffScope(scope));
+}
+
+/**
+ * {@link isFrozenScope} read off the serialized scope a status query is keyed by.
+ * @param scopeKey - The scope segment of a git-status query key
+ * @returns Whether that query's content is fixed
+ */
+function isFrozenScopeKey(scopeKey: unknown): boolean {
+	if (typeof scopeKey !== 'string') {
+		return false;
+	}
+	if (scopeKey.startsWith('commit:')) {
 		return true;
 	}
-	return scope?.kind === 'turn' && scope.toRef !== undefined;
+	return scopeKey.startsWith('turn:') && !scopeKey.endsWith('..working-tree');
 }
 
 /**
@@ -168,6 +180,11 @@ export function discardWorkspaceChanges(
  * A scoped key alone is the wrong reach: the Changes tab defaults to the whole
  * branch and the sidebar summaries are branch-scoped too, so invalidating only
  * the working tree leaves both waiting out their poll after an edit lands.
+ *
+ * Frozen scopes are passed over. Invalidation refetches an active query
+ * whatever its `staleTime`, and every settled turn footer in an open transcript
+ * holds one, so an agent's edits would re-run a `git diff` per footer per file
+ * write for content that cannot change.
  * @param queryClient - The query client holding the cached statuses
  * @param workspaceCwd - Absolute workspace root whose statuses to refresh
  * @returns A promise settling once the refetches are dispatched
@@ -176,8 +193,10 @@ export function invalidateWorkspaceGitStatus(
 	queryClient: QueryClient,
 	workspaceCwd: string,
 ) {
+	const prefix = ensemblrQueryKeys.workspaceGitStatusAll(workspaceCwd);
 	return queryClient.invalidateQueries({
-		queryKey: ensemblrQueryKeys.workspaceGitStatusAll(workspaceCwd),
+		predicate: (query) => !isFrozenScopeKey(query.queryKey[prefix.length]),
+		queryKey: prefix,
 	});
 }
 
