@@ -27,6 +27,8 @@ const REMOTE_RESOLUTION_KEY = /^remote\.(.+)\.gh-resolved$/;
 const BRANCH_REMOTE_KEY = /^branch\.(.+)\.remote$/;
 /** The value `gh repo set-default` writes on the remote it resolved to. */
 const RESOLVED_TO_THIS_REMOTE = 'base';
+/** What GitHub's GraphQL API answers for a repository it cannot find. */
+const UNRESOLVABLE_REPOSITORY_MARKER = 'could not resolve to a repository';
 
 /** One configured remote, as far as the head-repository lookup needs it. */
 interface RemoteEntry {
@@ -125,9 +127,29 @@ export async function runInPullRequestRepository({
 		headRef && branchName && isNoPullRequest(result)
 			? await readHeadRepository({ branchName, runGit })
 			: null;
-	return headRepository
-		? { repository: headRepository, result: await runGh(headRepository) }
-		: { repository: DEFAULT_REPOSITORY, result };
+	if (!headRepository) {
+		return { repository: DEFAULT_REPOSITORY, result };
+	}
+	const headResult = await runGh(headRepository);
+	return isUnresolvableRepository(headResult)
+		? { repository: DEFAULT_REPOSITORY, result }
+		: { repository: headRepository, result: headResult };
+}
+
+/**
+ * Whether GitHub could not find the repository a command named. A remote left
+ * pointing at a fork that was since deleted or renamed answers this way on every
+ * call — GraphQL does not follow a rename — and no pull request can live in a
+ * repository GitHub cannot resolve, so the retry settles on the default's
+ * "no pull request" rather than reporting a failure that never clears.
+ * @param result - The retried command's result.
+ * @returns True when GitHub reported the repository as unresolvable.
+ */
+function isUnresolvableRepository(result: LocalCommandResult): boolean {
+	return (
+		result.status !== 'success' &&
+		result.stderr.toLowerCase().includes(UNRESOLVABLE_REPOSITORY_MARKER)
+	);
 }
 
 /**

@@ -1810,3 +1810,54 @@ test('mergePullRequest merges a pull request opened inside a fork', async () => 
 		['pr', 'merge', 'feature/x', '--repo', 'psoldunov/Solaar', '--squash'],
 	]);
 });
+
+test('getPullRequestSnapshot settles on no pull request when the fork no longer resolves', async () => {
+	const { calls, service } = createService((request) => {
+		const git = respondToForkCheckout(request);
+		if (git) {
+			return git;
+		}
+		return request.args?.includes('--repo')
+			? buildResult({
+					exitCode: 1,
+					status: 'failure',
+					stderr:
+						"GraphQL: Could not resolve to a Repository with the name 'psoldunov/Solaar'. (repository)",
+				})
+			: noPullRequestResult();
+	});
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.error, undefined);
+	assert.equal(result.snapshot?.pullRequest, null);
+	assert.equal(ghCalls(calls, 'view').length, 2);
+});
+
+test('getPullRequestSnapshot surfaces a transient failure of the fork lookup', async () => {
+	const { service } = createService((request) => {
+		const git = respondToForkCheckout(request);
+		if (git) {
+			return git;
+		}
+		return request.args?.includes('--repo')
+			? buildResult({
+					exitCode: 1,
+					status: 'failure',
+					stderr: 'error connecting to api.github.com',
+				})
+			: noPullRequestResult();
+	});
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.error?.code, 'command-failed');
+});
