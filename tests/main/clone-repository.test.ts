@@ -7,7 +7,10 @@ import {
 	type CloneCommandRunner,
 	createGithubCloneService,
 } from '../../src/main/repository/clone-repository.ts';
-import { parseGithubUrl } from '../../src/main/repository/github-url.ts';
+import {
+	parseGithubRemoteUrl,
+	parseGithubUrl,
+} from '../../src/main/repository/github-url.ts';
 import type { LocalRepositoryRegistrationService } from '../../src/main/repository/register-repository.ts';
 import type { EnsemblrDatabaseService } from '../../src/main/storage/database.ts';
 import { buildRegistrationStub } from './helpers/registration-stub.ts';
@@ -685,4 +688,34 @@ test('parseGithubUrl still accepts the names GitHub does issue', () => {
 			?.repositoryName,
 		'repo.name',
 	);
+});
+
+test('parseGithubRemoteUrl reads every remote URL form git accepts for github.com', () => {
+	const expected = { name: 'Solaar', owner: 'psoldunov' };
+	assert.deepEqual(
+		parseGithubRemoteUrl('git@github.com:psoldunov/Solaar.git'),
+		expected,
+	);
+	assert.deepEqual(
+		parseGithubRemoteUrl('https://github.com/psoldunov/Solaar.git'),
+		expected,
+	);
+	assert.deepEqual(
+		parseGithubRemoteUrl('https://token@github.com/psoldunov/Solaar'),
+		expected,
+	);
+	assert.deepEqual(
+		parseGithubRemoteUrl('ssh://git@github.com:22/psoldunov/Solaar.git'),
+		expected,
+	);
+});
+
+test('parseGithubRemoteUrl refuses the shorthand, which as a remote is a local path', () => {
+	assert.equal(parseGithubRemoteUrl('psoldunov/Solaar'), null);
+	assert.equal(parseGithubRemoteUrl('/srv/git/Solaar.git'), null);
+	assert.equal(
+		parseGithubRemoteUrl('git@gitlab.com:psoldunov/Solaar.git'),
+		null,
+	);
+	assert.equal(parseGithubRemoteUrl('https://github.com/-x/Solaar'), null);
 });

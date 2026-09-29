@@ -1526,3 +1526,287 @@ test('getPullRequestSnapshot keeps a closed PR when the ancestry check cannot ru
 	assert.equal(result.snapshot?.pullRequest?.number, 7);
 	assert.equal(result.snapshot?.pullRequest?.state, 'closed');
 });
+
+/**
+ * A checkout cloned from a fork the way `gh repo clone` leaves it: the fork as
+ * `origin`, the parent as `upstream` and resolved as `gh`'s default, and the
+ * workspace branch pushed to `origin`.
+ */
+const FORK_REMOTE_CONFIG = [
+	'remote.origin.url git@github.com:psoldunov/Solaar.git',
+	'branch.master.remote origin',
+	'remote.upstream.url git@github.com:pwr-Solaar/Solaar.git',
+	'remote.upstream.gh-resolved base',
+	'branch.feature/x.remote origin',
+].join('\n');
+
+function respondToForkCheckout(
+	request: LocalCommandRequest,
+	remoteConfig = FORK_REMOTE_CONFIG,
+): LocalCommandResult | undefined {
+	if (request.command !== 'git') {
+		return undefined;
+	}
+	if (request.args?.[0] === 'rev-parse') {
+		return buildResult({
+			stdout: request.args?.[1] === '--abbrev-ref' ? 'feature/x\n' : HEAD_SHA,
+		});
+	}
+	if (request.args?.[0] === 'config' && request.args?.[1] === '--get-regexp') {
+		return buildResult({ stdout: `${remoteConfig}\n` });
+	}
+	if (request.args?.[0] === 'config') {
+		return buildResult({ stdout: 'refs/heads/feature/x\n' });
+	}
+	return buildResult({ stdout: '0\t0\n' });
+}
+
+function noPullRequestResult(): LocalCommandResult {
+	return buildResult({
+		command: 'gh',
+		exitCode: 1,
+		status: 'failure',
+		stderr: 'no pull requests found for branch "feature/x"',
+	});
+}
+
+function ghCalls(
+	calls: readonly LocalCommandRequest[],
+	subcommand: string,
+): (readonly string[] | undefined)[] {
+	return calls
+		.filter(
+			(call) =>
+				call.command === 'gh' &&
+				call.args?.[0] === 'pr' &&
+				call.args?.[1] === subcommand,
+		)
+		.map((call) => call.args);
+}
+
+test('getPullRequestSnapshot finds a pull request opened inside a fork', async () => {
+	const { calls, service } = createService((request) => {
+		const git = respondToForkCheckout(request);
+		if (git) {
+			return git;
+		}
+		if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+			return request.args.includes('--repo')
+				? buildResult({ stdout: PR_VIEW_JSON })
+				: noPullRequestResult();
+		}
+		return buildResult({ stdout: '[]' });
+	});
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.error, undefined);
+	assert.equal(result.snapshot?.pullRequest?.number, 7);
+	assert.deepEqual(ghCalls(calls, 'view'), [
+		['pr', 'view', 'feature/x', '--json', PR_VIEW_JSON_FIELDS],
+		[
+			'pr',
+			'view',
+			'feature/x',
+			'--repo',
+			'psoldunov/Solaar',
+			'--json',
+			PR_VIEW_JSON_FIELDS,
+		],
+	]);
+});
+
+test('a pull request found in a fork has its deployments and threads read from the fork', async () => {
+	const { calls, service } = createService((request) => {
+		const git = respondToForkCheckout(request);
+		if (git) {
+			return git;
+		}
+		if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+			return request.args.includes('--repo')
+				? buildResult({ stdout: PR_VIEW_JSON })
+				: noPullRequestResult();
+		}
+		if (request.args?.[3] === 'repos/psoldunov/Solaar/deployments') {
+			return buildResult({ stdout: DEPLOYMENT_ROWS_JSON });
+		}
+		if (
+			request.args?.[3] === 'repos/psoldunov/Solaar/deployments/99/statuses'
+		) {
+			return buildResult({ stdout: DEPLOYMENT_STATUSES_JSON });
+		}
+		return buildResult({ exitCode: 1, status: 'failure', stderr: 'HTTP 404' });
+	});
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(
+		result.snapshot?.pullRequest?.deployments[0]?.url,
+		'https://app-git-feature-acme.vercel.app',
+	);
+	const graphqlCall = calls.find((call) => call.args?.[1] === 'graphql');
+	assert.deepEqual(graphqlCall?.args?.slice(2, 8), [
+		'-f',
+		'owner=psoldunov',
+		'-f',
+		'name=Solaar',
+		'-F',
+		'number=7',
+	]);
+	assert.equal(
+		calls.some((call) =>
+			call.args?.some(
+				(arg) => arg.includes('{owner}') || arg.includes('{repo}'),
+			),
+		),
+		false,
+	);
+});
+
+test('a pull request the default repository holds is read without consulting the remotes', async () => {
+	const { calls, service } = createService(
+		(request) =>
+			respondToForkCheckout(request) ??
+			(request.args?.[0] === 'pr' && request.args?.[1] === 'view'
+				? buildResult({ stdout: PR_VIEW_JSON })
+				: buildResult({ stdout: '[]' })),
+	);
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.snapshot?.pullRequest?.number, 7);
+	assert.equal(ghCalls(calls, 'view').length, 1);
+	assert.equal(
+		calls.some((call) => call.args?.[1] === '--get-regexp'),
+		false,
+	);
+	const deploymentsCall = calls.find((call) =>
+		call.args?.[3]?.endsWith('/deployments'),
+	);
+	assert.equal(deploymentsCall?.args?.[3], 'repos/{owner}/{repo}/deployments');
+});
+
+for (const [label, remoteConfig] of [
+	[
+		'a checkout with a single remote',
+		[
+			'remote.origin.url git@github.com:psoldunov/Solaar.git',
+			'branch.feature/x.remote origin',
+		].join('\n'),
+	],
+	[
+		'a branch whose remote gh already resolves to',
+		[
+			'remote.origin.url git@github.com:psoldunov/Solaar.git',
+			'remote.origin.gh-resolved base',
+			'remote.upstream.url git@github.com:pwr-Solaar/Solaar.git',
+			'branch.feature/x.remote origin',
+		].join('\n'),
+	],
+	[
+		'a branch whose repository gh is pointed at by name',
+		[
+			'remote.origin.url https://github.com/psoldunov/Solaar.git',
+			'remote.upstream.url git@github.com:pwr-Solaar/Solaar.git',
+			'remote.upstream.gh-resolved psoldunov/solaar',
+			'branch.feature/x.remote origin',
+		].join('\n'),
+	],
+	[
+		'a branch pushed to a remote that is not on github.com',
+		[
+			'remote.origin.url git@gitlab.com:psoldunov/Solaar.git',
+			'remote.upstream.url git@github.com:pwr-Solaar/Solaar.git',
+			'remote.upstream.gh-resolved base',
+			'branch.feature/x.remote origin',
+		].join('\n'),
+	],
+	[
+		'a branch that tracks another local branch',
+		[
+			'remote.origin.url git@github.com:psoldunov/Solaar.git',
+			'remote.upstream.url git@github.com:pwr-Solaar/Solaar.git',
+			'remote.upstream.gh-resolved base',
+			'branch.feature/x.remote .',
+		].join('\n'),
+	],
+] as const) {
+	test(`getPullRequestSnapshot asks gh only once for ${label}`, async () => {
+		const { calls, service } = createService(
+			(request) =>
+				respondToForkCheckout(request, remoteConfig) ?? noPullRequestResult(),
+		);
+
+		const result = await service.getPullRequestSnapshot({
+			refresh: true,
+			workspaceCwd: '/tmp/ws',
+			workspaceId: 'ws-1',
+		});
+
+		assert.equal(result.error, undefined);
+		assert.equal(result.snapshot?.pullRequest, null);
+		assert.equal(ghCalls(calls, 'view').length, 1);
+	});
+}
+
+test('getPullRequestSnapshot surfaces a default-repository failure instead of retrying in the fork', async () => {
+	const { calls, service } = createService(
+		(request) =>
+			respondToForkCheckout(request) ??
+			buildResult({
+				exitCode: 1,
+				status: 'failure',
+				stderr: 'error connecting to api.github.com',
+			}),
+	);
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.notEqual(result.error, undefined);
+	assert.equal(ghCalls(calls, 'view').length, 1);
+});
+
+test('mergePullRequest merges a pull request opened inside a fork', async () => {
+	const { calls, service } = createService((request) => {
+		const git = respondToForkCheckout(request);
+		if (git) {
+			return git;
+		}
+		if (request.args?.[0] === 'pr') {
+			if (!request.args.includes('--repo')) {
+				return noPullRequestResult();
+			}
+			return buildResult({
+				stdout: request.args[1] === 'view' ? PR_VIEW_JSON : '',
+			});
+		}
+		return buildResult({ stdout: '[]' });
+	});
+
+	const result = await service.mergePullRequest({
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.merged, true);
+	assert.deepEqual(ghCalls(calls, 'merge'), [
+		['pr', 'merge', 'feature/x', '--squash'],
+		['pr', 'merge', 'feature/x', '--repo', 'psoldunov/Solaar', '--squash'],
+	]);
+});
