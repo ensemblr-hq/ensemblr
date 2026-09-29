@@ -4,13 +4,12 @@ import type {
 	CheckpointFailure,
 	CheckpointWire,
 	ComputeTurnDiffResult,
-	ListTurnCheckpointsResult,
+	ListWorkspaceCheckpointsResult,
 	RestoreCheckpointResult,
 } from '../../../shared/ipc/contracts/checkpoint';
 import {
 	CheckpointServiceError,
 	computeTurnDiff,
-	listTurnCheckpoints,
 	listWorkspaceCheckpoints,
 	restoreTurnCheckpoint,
 } from '../../checkpoints/index.ts';
@@ -23,7 +22,6 @@ import {
 import { getWorkspacePathById } from '../../storage/repositories/workspace-repository.ts';
 import {
 	computeTurnDiffRequestSchema,
-	listTurnCheckpointsRequestSchema,
 	listWorkspaceCheckpointsRequestSchema,
 	restoreCheckpointRequestSchema,
 } from '../request-schemas.ts';
@@ -31,12 +29,16 @@ import {
 /**
  * Registers IPC handlers for checkpoint listing, turn diff, and restore
  * (ADR 0012). Diff/restore resolve the workspace cwd from the checkpoint row
- * so the renderer never supplies filesystem paths.
+ * so the renderer never supplies filesystem paths. Turn ranges are resolved
+ * against which sessions have a runtime right now, since a session row still
+ * reading `streaming` after a crash describes a runtime that is gone.
  */
 export function registerCheckpointHandlers({
 	databaseService,
+	isRuntimeOpen,
 }: {
 	databaseService: EnsemblrDatabaseService;
+	isRuntimeOpen: (agentSessionId: string) => boolean;
 }): void {
 	const requireCheckpointDatabase = () =>
 		requireDatabase(
@@ -45,28 +47,21 @@ export function registerCheckpointHandlers({
 		);
 
 	ipcMain.handle(
-		IPC_CHANNELS.listTurnCheckpoints,
-		async (_event, raw: unknown): Promise<ListTurnCheckpointsResult> => {
-			const request = listTurnCheckpointsRequestSchema.parse(raw);
-			const database = requireCheckpointDatabase();
-			const checkpoints = listTurnCheckpoints({
-				database,
-				agentSessionId: request.agentSessionId,
-			});
-			return { checkpoints: checkpoints.map(toWire) };
-		},
-	);
-
-	ipcMain.handle(
 		IPC_CHANNELS.listWorkspaceCheckpoints,
-		async (_event, raw: unknown): Promise<ListTurnCheckpointsResult> => {
+		async (_event, raw: unknown): Promise<ListWorkspaceCheckpointsResult> => {
 			const request = listWorkspaceCheckpointsRequestSchema.parse(raw);
 			const database = requireCheckpointDatabase();
 			const checkpoints = listWorkspaceCheckpoints({
 				database,
+				isRuntimeOpen,
 				workspaceId: request.workspaceId,
 			});
-			return { checkpoints: checkpoints.map(toWire) };
+			return {
+				checkpoints: checkpoints.map(({ checkpoint, end }) => ({
+					...toWire(checkpoint),
+					end,
+				})),
+			};
 		},
 	);
 
@@ -80,6 +75,7 @@ export function registerCheckpointHandlers({
 				const result = await computeTurnDiff({
 					cwd,
 					database,
+					isRuntimeOpen,
 					turnId: request.turnId,
 				});
 				return {

@@ -12,14 +12,14 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
-	checkpointRefFor,
-	createCheckpointCapture,
-} from '../../src/main/checkpoints/checkpoint-service.ts';
-import {
 	captureWorkspaceCheckpoint,
 	diffTrees,
 	restoreWorkspaceTo,
 } from '../../src/main/checkpoints/git-checkpoint.ts';
+import {
+	checkpointRefFor,
+	createTurnCheckpoints,
+} from '../../src/main/checkpoints/turn-checkpoints.ts';
 import {
 	type EnsemblrDatabaseConnection,
 	openEnsemblrDatabase,
@@ -100,8 +100,9 @@ test('captures dirty and untracked files into a private ref', async (t) => {
 	writeFileSync(path.join(fixture.repoDirectory, 'tracked.txt'), 'modified\n');
 	writeFileSync(path.join(fixture.repoDirectory, 'untracked.txt'), 'new\n');
 
-	const capture = createCheckpointCapture();
+	const capture = createTurnCheckpoints().openTurn;
 	const row = await capture({
+		closingTurnId: null,
 		cwd: fixture.repoDirectory,
 		database: fixture.connection.database,
 		label: 'change something',
@@ -347,15 +348,16 @@ test('refuses refs outside the ensemblr checkpoint namespace', async () => {
 	);
 });
 
-test('capture failure warns and returns null without blocking', async (t) => {
+test('capture failure warns, records the loss, and returns null without blocking', async (t) => {
 	const fixture = openFixture(t);
 	const nonGitDirectory = mkdtempSync(
 		path.join(tmpdir(), 'ensemblr-checkpoint-nongit-'),
 	);
 	t.after(() => rmSync(nonGitDirectory, { force: true, recursive: true }));
 
-	const capture = createCheckpointCapture();
+	const capture = createTurnCheckpoints().openTurn;
 	const row = await capture({
+		closingTurnId: null,
 		cwd: nonGitDirectory,
 		database: fixture.connection.database,
 		label: 'no repo here',
@@ -365,11 +367,11 @@ test('capture failure warns and returns null without blocking', async (t) => {
 	});
 
 	assert.equal(row, null);
-	assert.equal(
-		getCheckpointByTurnId({
-			database: fixture.connection.database,
-			turnId: fixture.turnId,
-		}),
-		null,
-	);
+	// Recorded without a commit, so the turn reads as lost rather than pending.
+	const recorded = getCheckpointByTurnId({
+		database: fixture.connection.database,
+		turnId: fixture.turnId,
+	});
+	assert.equal(recorded?.gitHash, null);
+	assert.equal(recorded?.reason, 'capture-failed');
 });

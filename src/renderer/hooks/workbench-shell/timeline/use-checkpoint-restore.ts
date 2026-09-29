@@ -55,11 +55,11 @@ export function useCheckpointRestore(): {
 			queryKey: ensemblrQueryKeys.agentSessionEvents(target.branchId),
 		});
 		void queryClient.invalidateQueries({
-			queryKey: ensemblrQueryKeys.checkpointsForSession(target.agentSessionId),
+			queryKey: ensemblrQueryKeys.checkpointsForAllWorkspaces(),
 		});
 		// Restore rewrites workspace files, so every cached diff/preview is stale.
 		void queryClient.invalidateQueries({
-			queryKey: [...ensemblrQueryKeys.all, 'turn-diff'],
+			queryKey: ensemblrQueryKeys.turnDiffAll(),
 		});
 		void queryClient.invalidateQueries({
 			queryKey: [...ensemblrQueryKeys.all, 'file-preview'],

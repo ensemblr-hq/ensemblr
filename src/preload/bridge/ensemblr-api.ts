@@ -22,6 +22,7 @@ import type {
 import type { EnsemblrApi } from '../../shared/ipc/contracts/api';
 import type { AppSettingsChangedBroadcast } from '../../shared/ipc/contracts/app-settings';
 import type { ArchitectureSnapshotChangedBroadcast } from '../../shared/ipc/contracts/architecture';
+import type { CheckpointsChangedBroadcast } from '../../shared/ipc/contracts/checkpoint';
 import type { CloneGithubRepositoryProgressEvent } from '../../shared/ipc/contracts/clone';
 import type { ConciergeEventBroadcastWire } from '../../shared/ipc/contracts/concierge';
 import type { ConfigChangedBroadcast } from '../../shared/ipc/contracts/health';
@@ -264,7 +265,6 @@ export function createEnsemblrApi(): EnsemblrApi {
 		listRepositoryIssues: (request) => invoke('listRepositoryIssues', request),
 		listRepositoryPullRequests: (request) =>
 			invoke('listRepositoryPullRequests', request),
-		listTurnCheckpoints: (request) => invoke('listTurnCheckpoints', request),
 		listWorkspaceCheckpoints: (request) =>
 			invoke('listWorkspaceCheckpoints', request),
 		listRestorableTerminals: (request) =>
@@ -375,6 +375,11 @@ export function createEnsemblrApi(): EnsemblrApi {
 		onChatTurnFinished: (listener) =>
 			subscribe<ChatTurnFinishedBroadcast>(
 				IPC_CHANNELS.chatTurnFinished,
+				listener,
+			),
+		onCheckpointsChanged: (listener) =>
+			subscribe<CheckpointsChangedBroadcast>(
+				IPC_CHANNELS.checkpointsChanged,
 				listener,
 			),
 		onNotificationSoundRequested: (listener) =>

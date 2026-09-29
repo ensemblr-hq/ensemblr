@@ -2,40 +2,29 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 import type {
+	CheckpointsChangedBroadcast,
 	ComputeTurnDiffResult,
-	ListTurnCheckpointsResult,
+	ListWorkspaceCheckpointsResult,
 	RestoreCheckpointRequest,
 	RestoreCheckpointResult,
 } from '@/shared/ipc/contracts/checkpoint';
 
-import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
-
-/** Query options for the checkpoints captured across an agent session's turns. */
-export function turnCheckpointsQuery(agentSessionId: string | null) {
-	return queryOptions({
-		enabled: Boolean(agentSessionId),
-		queryFn: (): Promise<ListTurnCheckpointsResult> =>
-			profileElectronIpcCall(
-				{ channel: 'ensemblr:list-turn-checkpoints', usesDatabase: true },
-				() =>
-					getEnsemblrApi().listTurnCheckpoints({
-						agentSessionId: agentSessionId ?? '',
-					}),
-			),
-		queryKey: ensemblrQueryKeys.checkpointsForSession(agentSessionId ?? ''),
-		staleTime: 5000,
-	});
-}
+import {
+	ensemblrQueryKeys,
+	getEnsemblrApi,
+	getEnsemblrApiOrNull,
+} from './query-keys';
 
 /**
- * Query options for every checkpoint captured in a workspace, oldest first.
- * Backs the Changes panel's "Latest turn" source, which is workspace-scoped and
- * so cannot read one chat's session list.
+ * Query options for every checkpoint captured in a workspace, oldest first,
+ * each carrying where main resolved its turn to end. Backs both the chat
+ * timelines' turn ranges and the Changes panel's "Latest turn" source; the
+ * `checkpoints-changed` push keeps it current while a prompt is running.
  */
 export function workspaceCheckpointsQuery(workspaceId: string | null) {
 	return queryOptions({
 		enabled: Boolean(workspaceId),
-		queryFn: (): Promise<ListTurnCheckpointsResult> =>
+		queryFn: (): Promise<ListWorkspaceCheckpointsResult> =>
 			profileElectronIpcCall(
 				{ channel: 'ensemblr:list-workspace-checkpoints', usesDatabase: true },
 				() =>
@@ -70,4 +59,19 @@ export function restoreCheckpoint(
 		{ channel: 'ensemblr:restore-checkpoint', usesDatabase: true },
 		() => getEnsemblrApi().restoreCheckpoint(request),
 	);
+}
+
+/**
+ * Subscribes to main's push after each checkpoint capture.
+ * @param listener - Called with the workspace whose turn ranges moved
+ * @returns Unsubscribe function; a no-op outside Electron
+ */
+export function subscribeCheckpointsChanged(
+	listener: (broadcast: CheckpointsChangedBroadcast) => void,
+): () => void {
+	const api = getEnsemblrApiOrNull();
+	if (!api) {
+		return () => undefined;
+	}
+	return api.onCheckpointsChanged(listener);
 }

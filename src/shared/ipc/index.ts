@@ -105,13 +105,15 @@ export type {
 	CheckpointApi,
 	CheckpointFailure,
 	CheckpointFailureCode,
+	CheckpointsChangedBroadcast,
 	CheckpointWire,
 	ComputeTurnDiffRequest,
 	ComputeTurnDiffResult,
-	ListTurnCheckpointsRequest,
-	ListTurnCheckpointsResult,
+	ListWorkspaceCheckpointsRequest,
+	ListWorkspaceCheckpointsResult,
 	RestoreCheckpointRequest,
 	RestoreCheckpointResult,
+	TurnCheckpointWire,
 	TurnDiffFileWire,
 } from './contracts/checkpoint';
 export type {

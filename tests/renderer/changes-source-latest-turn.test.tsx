@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { useChangesSource } from '@/renderer/hooks/workbench-shell/review-files/use-changes-source';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import type { TurnDiffEnd } from '@/shared/turn-diff-range';
 import {
 	clearEnsemblrApi,
 	createTestQueryClient,
@@ -48,11 +49,20 @@ function scopesRead(calls: readonly [{ scope?: unknown }][]): unknown[] {
 	return calls.map(([request]) => request.scope);
 }
 
-/** A checkpoint row as the workspace listing returns it. */
-function checkpoint(gitHash: string, turnId: string, label: string) {
+/**
+ * A checkpoint row as the workspace listing returns it.
+ * @param end - Where main resolved the turn to end; the working tree by default
+ */
+function checkpoint(
+	gitHash: string,
+	turnId: string,
+	label: string,
+	end: TurnDiffEnd = { kind: 'working-tree' },
+) {
 	return {
 		agentSessionId: 'session-1',
 		createdAt: '2026-09-13T15:48:00.000Z',
+		end,
 		gitHash,
 		gitRef: `refs/ensemblr/checkpoints/ws-1/${turnId}`,
 		id: `checkpoint-${turnId}`,
@@ -82,9 +92,13 @@ test('the latest-turn source resolves to the newest checkpoint, run live', async
 	}));
 	installEnsemblrApi({
 		getWorkspaceGitStatus,
+		onCheckpointsChanged: () => () => undefined,
 		listWorkspaceCheckpoints: async () => ({
 			checkpoints: [
-				checkpoint(OLDER_REF, 'turn-1', 'an earlier turn'),
+				checkpoint(OLDER_REF, 'turn-1', 'an earlier turn', {
+					gitHash: FROM_REF,
+					kind: 'checkpoint',
+				}),
 				checkpoint(FROM_REF, 'turn-2', 'the newest turn'),
 			],
 		}),
@@ -101,12 +115,45 @@ test('the latest-turn source resolves to the newest checkpoint, run live', async
 	expect(result.current.latestTurnLabel).toBe('the newest turn');
 });
 
+test('a newest turn whose range was lost never shows the working tree', async () => {
+	const getWorkspaceGitStatus = vi.fn(
+		async (_request: { scope?: unknown }) => ({
+			files: [],
+			summary: { additions: 0, deletions: 0, files: 0 },
+		}),
+	);
+	installEnsemblrApi({
+		getWorkspaceGitStatus,
+		onCheckpointsChanged: () => () => undefined,
+		listWorkspaceCheckpoints: async () => ({
+			checkpoints: [
+				checkpoint(FROM_REF, 'turn-2', 'the newest turn', { kind: 'unknown' }),
+			],
+		}),
+	});
+
+	const { result } = renderHook(() => useChangesSource(workspace()), {
+		wrapper,
+	});
+	result.current.setSource({ kind: 'latest-turn' });
+
+	await waitFor(() => {
+		expect(result.current.emptyState.title).toBe(
+			'Could not find the latest turn',
+		);
+	});
+	expect(scopesRead(getWorkspaceGitStatus.mock.calls)).not.toContainEqual({
+		kind: 'working-tree',
+	});
+});
+
 test('a workspace with no checkpoint degrades to the working tree', async () => {
 	installEnsemblrApi({
 		getWorkspaceGitStatus: async () => ({
 			files: [],
 			summary: { additions: 0, deletions: 0, files: 0 },
 		}),
+		onCheckpointsChanged: () => () => undefined,
 		listWorkspaceCheckpoints: async () => ({ checkpoints: [] }),
 	});
 
@@ -133,6 +180,7 @@ test('a failed checkpoint read never shows working-tree files as the latest turn
 	);
 	installEnsemblrApi({
 		getWorkspaceGitStatus,
+		onCheckpointsChanged: () => () => undefined,
 		listWorkspaceCheckpoints: async () => {
 			throw new Error('database unavailable');
 		},
@@ -167,6 +215,7 @@ test('the turn source stays in its loading state until checkpoints land', async 
 	);
 	installEnsemblrApi({
 		getWorkspaceGitStatus,
+		onCheckpointsChanged: () => () => undefined,
 		listWorkspaceCheckpoints: () => new Promise(() => undefined),
 	});
 

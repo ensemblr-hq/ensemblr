@@ -379,7 +379,11 @@ export function registerIpcHandlers({
 				flushSummaryForChatTab: agentSessionService.flushSummaryForChatTab,
 			});
 			registerArchitectureHandlers({ architectureService });
-			registerCheckpointHandlers({ databaseService });
+			registerCheckpointHandlers({
+				databaseService,
+				isRuntimeOpen: (agentSessionId) =>
+					agentSessionService.readStatus(agentSessionId)?.runtimeOpen ?? false,
+			});
 			registerReviewHandlers({
 				reviewService: createReviewService({ databaseService }),
 			});

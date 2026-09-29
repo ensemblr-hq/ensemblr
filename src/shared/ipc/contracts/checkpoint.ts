@@ -3,6 +3,8 @@
  * listing, turn diff computation, and workspace restore.
  */
 
+import type { TurnDiffEnd } from '../../turn-diff-range.ts';
+
 /** Renderer-facing snapshot of a checkpoint row. */
 export interface CheckpointWire {
 	agentSessionId: string | null;
@@ -15,23 +17,32 @@ export interface CheckpointWire {
 	workspaceId: string;
 }
 
-/** List checkpoints captured for an agent session, oldest first. */
-export interface ListTurnCheckpointsRequest {
-	agentSessionId: string;
-}
-
-/** Result of listing an agent session's checkpoints. */
-export interface ListTurnCheckpointsResult {
-	checkpoints: readonly CheckpointWire[];
+/** A turn's checkpoint with where main resolved that turn's changes to end. */
+export interface TurnCheckpointWire extends CheckpointWire {
+	end: TurnDiffEnd;
 }
 
 /**
  * List every checkpoint captured in a workspace, oldest first, across all of
- * its agent sessions. The Changes panel is workspace-scoped rather than
- * chat-scoped, so "the latest turn" there means the newest checkpoint in the
- * workspace whichever chat produced it.
+ * its agent sessions. The chat timelines read their turns' ranges from it, and
+ * the Changes panel reads "the latest turn" — the newest checkpoint in the
+ * workspace, whichever chat produced it.
  */
 export interface ListWorkspaceCheckpointsRequest {
+	workspaceId: string;
+}
+
+/** Result of listing a workspace's checkpoints, oldest capture first. */
+export interface ListWorkspaceCheckpointsResult {
+	checkpoints: readonly TurnCheckpointWire[];
+}
+
+/**
+ * Pushed after a checkpoint is captured, so every window re-reads the turn
+ * ranges it closes. Without it the turn before a running prompt keeps reading
+ * as the newest and diffs the live tree the running prompt is writing to.
+ */
+export interface CheckpointsChangedBroadcast {
 	workspaceId: string;
 }
 
@@ -49,6 +60,7 @@ export interface TurnDiffFileWire {
 export type CheckpointFailureCode =
 	| 'diff-failed'
 	| 'no-checkpoint'
+	| 'range-unknown'
 	| 'restore-failed'
 	| 'workspace-missing';
 
@@ -59,8 +71,8 @@ export interface CheckpointFailure {
 }
 
 /**
- * Diff between a turn's pre-prompt checkpoint and the post-turn state (the
- * next checkpoint when one exists, otherwise the live working tree).
+ * Diff between a turn's pre-prompt checkpoint and where the turn ends: the
+ * checkpoint that closes it, or the live working tree while it is the newest.
  */
 export interface ComputeTurnDiffRequest {
 	turnId: string;
@@ -95,17 +107,17 @@ export type RestoreCheckpointResult =
 	| { checkpoint: CheckpointWire; ok: true }
 	| { error: CheckpointFailure; ok: false };
 
-/** Checkpoint IPC surface — list / diff / restore. */
+/** Checkpoint IPC surface — list / diff / restore, plus the capture push. */
 export interface CheckpointApi {
 	computeTurnDiff: (
 		request: ComputeTurnDiffRequest,
 	) => Promise<ComputeTurnDiffResult>;
-	listTurnCheckpoints: (
-		request: ListTurnCheckpointsRequest,
-	) => Promise<ListTurnCheckpointsResult>;
 	listWorkspaceCheckpoints: (
 		request: ListWorkspaceCheckpointsRequest,
-	) => Promise<ListTurnCheckpointsResult>;
+	) => Promise<ListWorkspaceCheckpointsResult>;
+	onCheckpointsChanged: (
+		listener: (broadcast: CheckpointsChangedBroadcast) => void,
+	) => () => void;
 	restoreCheckpoint: (
 		request: RestoreCheckpointRequest,
 	) => Promise<RestoreCheckpointResult>;

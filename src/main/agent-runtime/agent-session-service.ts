@@ -13,9 +13,9 @@ import {
 	type PermissionMode,
 } from '../../shared/permissions.ts';
 import type { AgentControlEnvResolver } from '../agent-control/ports.ts';
-import type { CheckpointCapturePort } from '../checkpoints';
+import type { TurnCheckpointPort } from '../checkpoints';
 import {
-	createCheckpointCapture,
+	createTurnCheckpoints,
 	isOrdinalHidden,
 	readHiddenEventRanges,
 } from '../checkpoints/index.ts';
@@ -112,8 +112,6 @@ export type {
 
 /** Dependencies and configuration for constructing the agent session service. */
 interface AgentSessionServiceOptions {
-	/** Override for tests; defaults to the git-backed capture (ADR 0012). */
-	captureCheckpoint?: CheckpointCapturePort;
 	databaseService: EnsemblrDatabaseService;
 	eventSink?: AgentSessionEventSink;
 	agentClient: AgentClient;
@@ -178,6 +176,8 @@ interface AgentSessionServiceOptions {
 	 */
 	resolveSpawnedChildren?: SpawnedChildrenPort;
 	sessionSummaryWriter?: SessionSummaryWriter;
+	/** Override for tests; defaults to the git-backed turn checkpoints (ADR 0012). */
+	turnCheckpoints?: TurnCheckpointPort;
 	now?: () => Date;
 }
 
@@ -334,7 +334,6 @@ function toSummaryHeading(title: string): string {
  *   - `sessionSummaryWriter` — optional live summary updates after agent turns
  */
 export function createAgentSessionService({
-	captureCheckpoint = createCheckpointCapture(),
 	databaseService,
 	eventSink,
 	agentClient,
@@ -353,6 +352,7 @@ export function createAgentSessionService({
 	resolveTurnPreamble,
 	resolveSpawnedChildren,
 	sessionSummaryWriter,
+	turnCheckpoints = createTurnCheckpoints(),
 	now = () => new Date(),
 }: AgentSessionServiceOptions): AgentSessionService {
 	const requireSessionDatabase = (): DatabaseSync =>
@@ -366,7 +366,6 @@ export function createAgentSessionService({
 		);
 
 	const lifecycle = createAgentSessionLifecycle({
-		captureCheckpoint,
 		eventSink,
 		isPlanModeActive,
 		isAfkModeActive,
@@ -387,6 +386,7 @@ export function createAgentSessionService({
 		resolveTurnPreamble,
 		resolveSpawnedChildren,
 		sessionSummaryWriter,
+		turnCheckpoints,
 	});
 
 	/**

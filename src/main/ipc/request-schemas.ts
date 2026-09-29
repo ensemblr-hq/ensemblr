@@ -57,7 +57,6 @@ export {
 } from './request-schemas/chat-tab.ts';
 export {
 	computeTurnDiffRequestSchema,
-	listTurnCheckpointsRequestSchema,
 	listWorkspaceCheckpointsRequestSchema,
 	restoreCheckpointRequestSchema,
 } from './request-schemas/checkpoint.ts';

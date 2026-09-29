@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AgentEvent } from '../../src/main/agent-runtime/agent-types.ts';
 import { isTimelineAgentEvent } from '../../src/main/agent-runtime/event-admission.ts';
 import { createRuntimeEventHandler } from '../../src/main/agent-runtime/session/handle-runtime-event.ts';
+import { createTurnBoundaries } from '../../src/main/agent-runtime/session/turn-boundaries.ts';
 import type { AgentEventRow } from '../../src/main/storage/repositories/agent-event-repository.ts';
 
 const AT = '2026-09-12T10:00:00.000Z';
@@ -47,16 +48,23 @@ function persistedRow(): AgentEventRow {
 function buildHandler() {
 	const persistRuntimeEvent = vi.fn(() => persistedRow());
 	const eventSink = vi.fn();
+	const activeSessions = new Map();
+	const now = () => new Date(AT);
 	const handler = createRuntimeEventHandler({
-		activeSessions: new Map(),
+		activeSessions,
 		eventSink,
-		now: () => new Date(AT),
+		now,
 		persistRuntimeEvent,
 		queueNaming: vi.fn(),
 		summaryQueue: {
 			flushPendingSummaries: vi.fn(),
 			queueSummaryAfterAgentResponse: vi.fn(),
 		} as never,
+		turnBoundaries: createTurnBoundaries({
+			activeSessions,
+			now,
+			turnCheckpoints: undefined,
+		}),
 	});
 
 	return { eventSink, handler, persistRuntimeEvent };

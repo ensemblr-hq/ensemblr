@@ -1312,6 +1312,21 @@ CREATE TABLE renderer_storage_seeded_origins (
 ) STRICT;
 `,
 	},
+	{
+		id: '033_checkpoint_turn_end',
+		version: 33,
+		// A checkpoint is taken before a prompt, so a turn had no snapshot of its
+		// own end and its diff ran on to whatever came next — the next turn's
+		// checkpoint, or the live tree — absorbing later turns' and hand edits.
+		// The end commit is captured when the turn ends (settle, stop, or the next
+		// input) and pinned by `end_git_ref`, which locks the range for good. Rows
+		// from before this carry NULL and keep the older bound.
+		sql: `
+ALTER TABLE checkpoints ADD COLUMN end_git_hash TEXT;
+ALTER TABLE checkpoints ADD COLUMN end_git_ref TEXT;
+ALTER TABLE checkpoints ADD COLUMN ended_at TEXT;
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

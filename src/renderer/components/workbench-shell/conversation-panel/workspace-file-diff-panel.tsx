@@ -19,6 +19,7 @@ import {
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
 import { OpenInToolbarMenu } from '@/renderer/components/workbench-shell/open-in-toolbar-menu';
+import { useCurrentTurnScope } from '@/renderer/hooks/workbench-shell/conversation-panel/use-current-turn-scope';
 import { useDiffCommentMutations } from '@/renderer/hooks/workbench-shell/conversation-panel/use-diff-comment-mutations';
 import { useFileDiffContent } from '@/renderer/hooks/workbench-shell/conversation-panel/use-file-diff-content';
 import { useFileViewedMark } from '@/renderer/hooks/workbench-shell/conversation-panel/use-file-viewed-mark';
@@ -48,7 +49,8 @@ const EMPTY_LIST: readonly never[] = [];
  * threads and Action-bot comments, read-only), diff/full-file, split,
  * whitespace, and word-wrap toggles, and a Viewed marker that dims the file and
  * sends it to the end of the Changes list. The optional `scope` selects the diff
- * (working tree by default, a commit, or the whole branch).
+ * (working tree by default, a commit, the whole branch, or one agent turn — a
+ * turn opened while it was the newest stops where the next turn began).
  */
 export function WorkspaceFileDiffPanel({
 	filePath,
@@ -69,6 +71,7 @@ export function WorkspaceFileDiffPanel({
 	const { data: snapshotData } = useQuery(
 		pullRequestSnapshotQuery({ workspaceCwd, workspaceId }),
 	);
+	const currentScope = useCurrentTurnScope({ scope, workspaceId });
 	const {
 		fullFileContent,
 		fullFileContentPending,
@@ -76,7 +79,7 @@ export function WorkspaceFileDiffPanel({
 		patch,
 		placeholder,
 		resolvedPath,
-	} = useFileDiffContent({ filePath, scope, workspaceCwd });
+	} = useFileDiffContent({ filePath, scope: currentScope, workspaceCwd });
 
 	const { onViewedChange, viewed } = useFileViewedMark({
 		filePath: resolvedPath,

@@ -58,10 +58,10 @@ export interface WorkspaceGitChangeSummaryWire {
  *     (`merge-base(baseRef, HEAD)`) to the working tree, so committed-on-branch
  *     changes and uncommitted edits both appear. Falls back to `working-tree`
  *     when no merge-base can be resolved.
- *   - `turn`: what one agent turn changed, between the checkpoint commits
- *     captured before each prompt (ADR 0012). An absent `toRef` means the live
- *     working tree, which is what the newest turn diffs against — so that view
- *     stays live and also carries any edit made by hand since the turn ended.
+ *   - `turn`: what one agent turn changed, from the checkpoint captured as its
+ *     input arrived to the one captured when it ended (ADR 0012). An absent
+ *     `toRef` means the live working tree, which only a turn still running
+ *     diffs against; once it ends its range is locked to the end commit.
  */
 export type WorkspaceGitDiffScope =
 	| { kind: 'working-tree' }

@@ -4,9 +4,9 @@ import { useEffect, useMemo, useRef } from 'react';
 import {
 	agentSessionsForWorkspaceQuery,
 	ensemblrQueryKeys,
-	turnCheckpointsQuery,
 	workspaceCheckpointsQuery,
 } from '@/renderer/api/ensemblr-queries';
+import { useCheckpointsChangedRefresh } from '@/renderer/hooks/workspace/use-checkpoints-changed-refresh';
 import {
 	type TurnCheckpointScope,
 	turnCheckpointScopes,
@@ -65,39 +65,18 @@ export function useTimelineSession({
 				);
 	const agentSessionId = activeAgentSession?.id ?? null;
 
-	const { data: checkpointsData } = useQuery(
-		turnCheckpointsQuery(agentSessionId),
-	);
 	const isStreaming =
 		activeAgentSession?.status === 'streaming' ||
 		activeAgentSession?.status === 'starting';
-	// This session's last turn has no checkpoint after it in its own list, so the
-	// workspace's says where that turn ended rather than leaving it diffing the
-	// live tree for as long as the chat exists.
-	const { data: workspaceCheckpointsData } = useQuery(
+	const { data: checkpointsData } = useQuery(
 		workspaceCheckpointsQuery(workspace.id),
 	);
 	const checkpointsByTurnId = useMemo(
-		() =>
-			turnCheckpointScopes(checkpointsData?.checkpoints ?? [], {
-				isStreaming,
-				workspaceCheckpoints: workspaceCheckpointsData?.checkpoints ?? [],
-			}),
-		[
-			checkpointsData?.checkpoints,
-			isStreaming,
-			workspaceCheckpointsData?.checkpoints,
-		],
+		() => turnCheckpointScopes(checkpointsData?.checkpoints ?? []),
+		[checkpointsData?.checkpoints],
 	);
-	// Capture happens in main before the next prompt, and the checkpoint query
-	// neither polls nor is invalidated by the event stream — so without this the
-	// turn that just finished has no checkpoint until the tab remounts, and its
-	// diff affordances stay hidden.
-	useCheckpointRefreshOnTurnEnd({
-		agentSessionId,
-		isStreaming,
-		workspaceId: workspace.id,
-	});
+	useCheckpointsChangedRefresh(agentSessionId ? workspace.id : '');
+	useCheckpointRefreshOnTurnEnd({ isStreaming, workspaceId: workspace.id });
 
 	return {
 		branchId: activeAgentSession?.branchId ?? '',
@@ -117,19 +96,17 @@ export function useTimelineSession({
 }
 
 /**
- * Refetches the checkpoint lists once a turn stops streaming, so the newly
- * captured checkpoint reaches the timeline and the Changes panel without
- * waiting for a remount.
- * @param agentSessionId - Session whose checkpoint list to refresh
+ * Refetches the workspace's checkpoint list once a turn stops streaming. No
+ * capture marks that edge, yet it moves a range: main keeps a session's newest
+ * turn live only while the session is busy, so a turn that settled with another
+ * chat's checkpoint already behind it takes that bound here.
  * @param isStreaming - Whether the session is mid-turn
  * @param workspaceId - Workspace whose checkpoint list to refresh
  */
 function useCheckpointRefreshOnTurnEnd({
-	agentSessionId,
 	isStreaming,
 	workspaceId,
 }: {
-	agentSessionId: string | null;
 	isStreaming: boolean;
 	workspaceId: string;
 }): void {
@@ -142,13 +119,8 @@ function useCheckpointRefreshOnTurnEnd({
 		if (isStreaming || !wasStreaming) {
 			return;
 		}
-		if (agentSessionId) {
-			void queryClient.invalidateQueries({
-				queryKey: ensemblrQueryKeys.checkpointsForSession(agentSessionId),
-			});
-		}
 		void queryClient.invalidateQueries({
 			queryKey: ensemblrQueryKeys.checkpointsForWorkspace(workspaceId),
 		});
-	}, [agentSessionId, isStreaming, queryClient, workspaceId]);
+	}, [isStreaming, queryClient, workspaceId]);
 }

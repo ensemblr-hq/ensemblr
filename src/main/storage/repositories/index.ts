@@ -89,14 +89,18 @@ export {
 	setChatTabMetadata,
 	setRuntimeState,
 } from './chat-tab-repository.ts';
-export type { CheckpointRow } from './checkpoint-repository.ts';
+export type {
+	CheckpointRow,
+	TurnCheckpointRow,
+} from './checkpoint-repository.ts';
 export {
+	clearCheckpointEnd,
+	deleteCheckpointForTurn,
 	getCheckpointByTurnId,
-	getNextCheckpointInAgentSession,
-	getNextCheckpointInWorkspace,
 	insertCheckpoint,
-	listCheckpointsForAgentSession,
-	listCheckpointsForWorkspace,
+	listTurnCheckpointsForWorkspace,
+	markCheckpointEndFailed,
+	setCheckpointEnd,
 } from './checkpoint-repository.ts';
 export type {
 	ConciergeMemoryHit,
