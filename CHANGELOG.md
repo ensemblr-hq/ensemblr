@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-29
+
+Ensemblr 0.2.0 pins each turn's diff to the moment the turn ended, so a chip on the timeline never shows the next turn's edits, and finds pull requests opened inside a fork.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.2.0) ·
+[`.dmg` (Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.0/Ensemblr-0.2.0-arm64.dmg) ·
+[`.dmg` (Intel)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.0/Ensemblr-0.2.0-x64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.0/Ensemblr-0.2.0-x64.AppImage)
+
+### Fixed
+
+- **A turn's diff locks when the turn ends.** The agent finishing, the user stopping it, or the next prompt, steer or follow-up arriving now closes the turn at its own snapshot, so the diff chips on the timeline no longer show the following turn's changes, and a steer gets its own turn instead of sharing one. The renderer and main resolve a turn's range through one resolver, a turn whose end snapshot was lost shows no diff rather than a later one, and diff tabs opened from a finished turn stop following the working tree. Quitting mid-turn records the turn's end before the database closes. Turns recorded before this release have no end of their own and fall back to the next checkpoint in their session, or show no diff. (#673)
+- **Pull requests opened inside a fork show up.** In a checkout cloned from a fork, `gh` resolves to the parent repository and reported no pull request for one opened from a branch into the fork itself. When the default lookup finds none, Ensemblr retries once against the repository the branch's remote points at, and uses that repository for deployments, review threads and merges. Single-remote checkouts make no extra `gh` calls. (#672)
+
 ## [0.1.24] - 2026-09-29
 
 Ensemblr 0.1.24 keeps Sonnet 5 selectable now that Claude Code's `sonnet` alias resolves to Sonnet 5.5, and gives more file types their own icon.

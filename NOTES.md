@@ -1,16 +1,13 @@
-# Ensemblr v0.1.24
+# Ensemblr v0.2.0
 
-Ensemblr 0.1.24 keeps Sonnet 5 selectable now that Claude Code's `sonnet` alias resolves to Sonnet 5.5, and gives more file types their own icon.
+Ensemblr 0.2.0 pins each turn's diff to the moment the turn ended, so a chip on the timeline never shows the next turn's edits, and finds pull requests opened inside a fork.
 
 ### Fixed
 
-* **Sonnet 5 stays in the Claude model picker.** Claude Code 2.1.284 resolves the `sonnet` alias to `claude-sonnet-5-5`, the same gap #645 closed for Opus 5. `claude-sonnet-5` is now pinned as "Sonnet 5", so both rows show up on a build whose alias has moved. (#668)
+* **A turn's diff locks when the turn ends.** The agent finishing, the user stopping it, or the next prompt, steer or follow-up arriving now closes the turn at its own snapshot, so the diff chips on the timeline no longer show the following turn's changes, and a steer gets its own turn instead of sharing one. A turn whose end snapshot was lost shows no diff rather than a later one, and diff tabs opened from a finished turn stop following the working tree. Turns recorded before this release have no end of their own and fall back to the next checkpoint in their session, or show no diff. (#673)
+* **Pull requests opened inside a fork show up.** In a checkout cloned from a fork, `gh` resolves to the parent repository and reported no pull request for one opened from a branch into the fork itself. Ensemblr now retries once against the repository the branch's remote points at, and uses it for deployments, review threads and merges. Single-remote checkouts make no extra `gh` calls. (#672)
 
-### Changed
-
-* **Lockfiles get their own icon instead of the generic Bun glyph.** Cargo.lock, yarn.lock, deno.lock, poetry.lock, uv.lock, pdm.lock, Pipfile.lock, composer.lock, pubspec.lock, mix.lock and Package.resolved now show the icon of the tool that owns them; bun.lockb keeps the Bun icon. `.desktop` launchers, `.icns` and `.nix` files also get proper icons, and flake.lock is highlighted as JSON. (#668, #667)
-
-See the [changelog](https://github.com/ensemblr-hq/ensemblr/blob/v0.1.24/CHANGELOG.md) for every change.
+See the [changelog](https://github.com/ensemblr-hq/ensemblr/blob/v0.2.0/CHANGELOG.md) for every change.
 
 ### Install
 
@@ -20,7 +17,7 @@ macOS (Apple silicon and Intel):
 brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
-Or download the `.dmg` for your Mac: `Ensemblr-0.1.24-arm64.dmg` (Apple silicon) or `Ensemblr-0.1.24-x64.dmg` (Intel).
+Or download the `.dmg` for your Mac: `Ensemblr-0.2.0-arm64.dmg` (Apple silicon) or `Ensemblr-0.2.0-x64.dmg` (Intel).
 
 Linux (x64):
 
@@ -32,4 +29,4 @@ Both `.dmg` files are signed with a Developer ID certificate, hardened-runtime, 
 
 ---
 
-*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.1.23...v0.1.24>
+*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.1.24...v0.2.0>
