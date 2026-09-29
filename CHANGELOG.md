@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.24] - 2026-09-29
+
+Ensemblr 0.1.24 keeps Sonnet 5 selectable now that Claude Code's `sonnet` alias resolves to Sonnet 5.5, and gives more file types their own icon.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.1.24) ·
+[`.dmg` (Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.24/Ensemblr-0.1.24-arm64.dmg) ·
+[`.dmg` (Intel)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.24/Ensemblr-0.1.24-x64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.1.24/Ensemblr-0.1.24-x64.AppImage)
+
+### Fixed
+
+- **Sonnet 5 stays in the Claude model picker.** Claude Code 2.1.284 resolves the `sonnet` alias to `claude-sonnet-5-5`, the same gap #645 closed for Opus 5. `claude-sonnet-5` is now pinned as "Sonnet 5", so both rows show up on a build whose alias has moved. (#668)
+
+### Changed
+
+- **Lockfiles get their own icon instead of the generic Bun glyph.** Cargo.lock, yarn.lock, deno.lock, poetry.lock, uv.lock, pdm.lock, Pipfile.lock, composer.lock, pubspec.lock, mix.lock and Package.resolved now show the icon of the tool that owns them; bun.lockb keeps the Bun icon. `.desktop` launchers, `.icns` and `.nix` files also get proper icons, and flake.lock is highlighted as JSON. (#668, #667)
+- **The AppImage runtime pin was refreshed** to follow the upstream `AppImage/type2-runtime` `continuous` tag's move (extraction directories now created with mode `0700` instead of `0755`, closing an information-disclosure gap on multi-user systems). (#670)
+
 ## [0.1.23] - 2026-09-28
 
 Ensemblr 0.1.23 ships Ensemblr as a Nix flake, lets a setup or run script ask for your password, accepts any file dropped on the composer, and stops Claude turns that spin on a rejected credential.
