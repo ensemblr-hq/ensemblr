@@ -42,6 +42,13 @@ import {
 	retainCheckObservation,
 	retainKnownMergeability,
 } from './pr-snapshot.ts';
+import {
+	type PullRequestRepository,
+	repositoryApiPath,
+	repositoryFlag,
+	repositoryGraphqlVariables,
+	runInPullRequestRepository,
+} from './pull-request-repository.ts';
 
 const GIT_TIMEOUT_MS = 30_000;
 const GH_TIMEOUT_MS = 45_000;
@@ -410,6 +417,38 @@ export function createGithubService({
 		};
 	}
 
+	/**
+	 * Runs `gh pr <subcommand>` for the workspace branch's pull request in
+	 * whichever repository holds it, which in a fork checkout may be the fork
+	 * rather than the parent `gh` resolves by default.
+	 * @param cwd - Workspace working directory.
+	 * @param branchSync - The branch's sync state, which carries its local name.
+	 * @param headRef - The remote branch `gh` is asked about, when there is one.
+	 * @param command - The `gh pr` subcommand followed by its flags.
+	 * @returns The command's result and the repository that produced it.
+	 */
+	function runInBranchPullRequestRepository(
+		cwd: string,
+		branchSync: GitBranchSyncWire | null,
+		headRef: string | null,
+		command: readonly [string, ...string[]],
+	) {
+		const [subcommand, ...flags] = command;
+		return runInPullRequestRepository({
+			branchName: branchSync?.branchName ?? null,
+			headRef,
+			runGh: (repository) =>
+				run('gh', cwd, [
+					'pr',
+					subcommand,
+					...(headRef ? [headRef] : []),
+					...repositoryFlag(repository),
+					...flags,
+				]),
+			runGit: (args) => run('git', cwd, args),
+		});
+	}
+
 	/** Fetches the live PR snapshot from `gh`, enriching with deployments/threads. */
 	async function fetchSnapshot(
 		cwd: string,
@@ -420,10 +459,12 @@ export function createGithubService({
 	> {
 		const { branchSync, remoteHeadRef: headRef } =
 			await readWorkspaceBranchState(cwd, baseBranch);
-		const viewArgs = headRef
-			? ['pr', 'view', headRef, '--json', PR_VIEW_JSON_FIELDS]
-			: ['pr', 'view', '--json', PR_VIEW_JSON_FIELDS];
-		const viewResult = await run('gh', cwd, viewArgs);
+		const { repository, result: viewResult } =
+			await runInBranchPullRequestRepository(cwd, branchSync, headRef, [
+				'view',
+				'--json',
+				PR_VIEW_JSON_FIELDS,
+			]);
 		if (viewResult.status !== 'success') {
 			const failure = classifyCommandFailure(
 				viewResult,
@@ -466,10 +507,11 @@ export function createGithubService({
 			await Promise.all([
 				fetchDeployments(
 					cwd,
+					repository,
 					[pullRequest.headRefOid, pullRequest.headRefName].filter(Boolean),
 				),
 				hasCommitLocally(cwd, pullRequest.headRefOid),
-				fetchReviewThreads(cwd, pullRequest.number),
+				fetchReviewThreads(cwd, repository, pullRequest.number),
 			]);
 
 		return {
@@ -495,12 +537,17 @@ export function createGithubService({
 	 * recorded under and never resolves branch to commit, so a head SHA misses
 	 * deployments a workflow recorded under the branch name and vice versa.
 	 * @param cwd - Workspace working directory.
+	 * @param repository - The repository the pull request was found in.
 	 * @param refs - Candidate refs, most precise first.
 	 * @returns Deployment wire rows for the first ref that has any.
 	 */
-	async function fetchDeployments(cwd: string, refs: readonly string[]) {
+	async function fetchDeployments(
+		cwd: string,
+		repository: PullRequestRepository,
+		refs: readonly string[],
+	) {
 		for (const ref of refs) {
-			const deployments = await fetchDeploymentsForRef(cwd, ref);
+			const deployments = await fetchDeploymentsForRef(cwd, repository, ref);
 			if (deployments.length > 0) {
 				return deployments;
 			}
@@ -514,15 +561,20 @@ export function createGithubService({
 	 * ENS-055/ENS-056. Failures degrade to an empty list — preview links are
 	 * best-effort.
 	 * @param cwd - Workspace working directory.
+	 * @param repository - The repository the pull request was found in.
 	 * @param ref - Branch name or commit SHA to match deployments against.
 	 * @returns Deployment wire rows for the ref, or an empty list.
 	 */
-	async function fetchDeploymentsForRef(cwd: string, ref: string) {
+	async function fetchDeploymentsForRef(
+		cwd: string,
+		repository: PullRequestRepository,
+		ref: string,
+	) {
 		const deploymentsResult = await run('gh', cwd, [
 			'api',
 			'-X',
 			'GET',
-			'repos/{owner}/{repo}/deployments',
+			repositoryApiPath(repository, 'deployments'),
 			'-f',
 			`ref=${ref}`,
 			'-f',
@@ -552,7 +604,8 @@ export function createGithubService({
 		const rowsById = await mapWithConcurrency(
 			ids,
 			DEPLOYMENT_STATUS_CONCURRENCY,
-			async (id) => (id ? await fetchDeploymentStatuses(cwd, id) : []),
+			async (id) =>
+				id ? await fetchDeploymentStatuses(cwd, repository, id) : [],
 		);
 
 		const statuses = new Map<string, readonly unknown[]>();
@@ -569,15 +622,20 @@ export function createGithubService({
 	 * Reads the status rows of one deployment. An unreadable response degrades to
 	 * no rows, which renders the deployment without a preview URL.
 	 * @param cwd - Workspace working directory.
+	 * @param repository - The repository the pull request was found in.
 	 * @param deploymentId - GitHub deployment id.
 	 * @returns The raw status rows, or an empty list.
 	 */
-	async function fetchDeploymentStatuses(cwd: string, deploymentId: string) {
+	async function fetchDeploymentStatuses(
+		cwd: string,
+		repository: PullRequestRepository,
+		deploymentId: string,
+	) {
 		const statusResult = await run('gh', cwd, [
 			'api',
 			'-X',
 			'GET',
-			`repos/{owner}/{repo}/deployments/${deploymentId}/statuses`,
+			repositoryApiPath(repository, `deployments/${deploymentId}/statuses`),
 			'-f',
 			`per_page=${DEPLOYMENT_STATUS_PAGE_SIZE}`,
 		]);
@@ -592,18 +650,25 @@ export function createGithubService({
 		}
 	}
 
-	/** Reads review-thread resolution state through `gh api graphql`. */
-	async function fetchReviewThreads(cwd: string, prNumber: number) {
+	/**
+	 * Reads review-thread resolution state through `gh api graphql`.
+	 * @param cwd - Workspace working directory.
+	 * @param repository - The repository the pull request was found in.
+	 * @param prNumber - The pull request's number in that repository.
+	 * @returns The parsed review threads, or an empty list.
+	 */
+	async function fetchReviewThreads(
+		cwd: string,
+		repository: PullRequestRepository,
+		prNumber: number,
+	) {
 		if (!prNumber) {
 			return [];
 		}
 		const result = await run('gh', cwd, [
 			'api',
 			'graphql',
-			'-F',
-			'owner={owner}',
-			'-F',
-			'name={repo}',
+			...repositoryGraphqlVariables(repository),
 			'-F',
 			`number=${prNumber}`,
 			'-f',
@@ -808,16 +873,14 @@ export function createGithubService({
 			}
 			const method = request.method ?? 'squash';
 			const baseBranch = readWorkspaceBaseBranch(request.workspaceId);
-			const { remoteHeadRef: headRef } = await readWorkspaceBranchState(
+			const { branchSync, remoteHeadRef: headRef } =
+				await readWorkspaceBranchState(cwd.cwd, baseBranch);
+			const { result: mergeResult } = await runInBranchPullRequestRepository(
 				cwd.cwd,
-				baseBranch,
+				branchSync,
+				headRef,
+				['merge', `--${method}`],
 			);
-			const mergeResult = await run('gh', cwd.cwd, [
-				'pr',
-				'merge',
-				...(headRef ? [headRef] : []),
-				`--${method}`,
-			]);
 			if (mergeResult.status !== 'success') {
 				return {
 					error: classifyCommandFailure(mergeResult, 'gh pr merge failed.'),
