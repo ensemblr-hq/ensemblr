@@ -44,6 +44,7 @@ describe('the standard tier', () => {
 		'claude-opus-5',
 		'claude-opus-4-8',
 		'sonnet',
+		'claude-sonnet-5-5',
 		'claude-haiku-4-5-20251001',
 		'anthropic/claude-sonnet-4',
 		'openai/gpt-5',

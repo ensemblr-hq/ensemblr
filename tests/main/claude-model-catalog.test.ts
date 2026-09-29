@@ -194,6 +194,7 @@ describe('the Claude catalog appends the pinned releases', () => {
 			'claude-opus-5',
 			'opus[1m]',
 			'claude-opus-4-7',
+			'claude-sonnet-5',
 			'sonnet',
 		]);
 	});
@@ -254,6 +255,164 @@ describe('the Claude catalog keeps a release the alias has moved away from', () 
 			models.filter((model) => model.displayName === 'Opus 5'),
 		).toHaveLength(1);
 		expect(models.map((model) => model.id)).not.toContain('claude-opus-5');
+	});
+
+	it('lists Sonnet 5 under its own id once the alias resolves to Sonnet 5.5', () => {
+		const models = presentClaudeModels([
+			modelInfo({
+				displayName: 'Sonnet',
+				resolvedModel: 'claude-sonnet-5-5',
+				value: 'sonnet',
+			}),
+		]);
+
+		expect(
+			models
+				.filter((model) => model.displayName.startsWith('Sonnet'))
+				.map((model) => [model.id, model.displayName]),
+		).toEqual([
+			['sonnet', 'Sonnet 5.5'],
+			['claude-sonnet-5', 'Sonnet 5'],
+			['claude-sonnet-4-6', 'Sonnet 4.6'],
+		]);
+	});
+
+	it('keeps one Sonnet 5 row while the alias still resolves to it', () => {
+		const models = presentClaudeModels(ALIAS_ROWS);
+
+		expect(
+			models.filter((model) => model.displayName === 'Sonnet 5'),
+		).toHaveLength(1);
+		expect(models.map((model) => model.id)).not.toContain('claude-sonnet-5');
+	});
+});
+
+/**
+ * What Claude Code 2.1.284 reports once the Sonnet alias has moved on to 5.5:
+ * the aliases drop the `[1m]` qualifier, and the releases they left are
+ * advertised under their own ids.
+ */
+const SONNET_5_5_ROWS: readonly ModelInfo[] = [
+	modelInfo({
+		displayName: 'Default (recommended)',
+		resolvedModel: 'claude-opus-5-5',
+		value: 'default',
+	}),
+	modelInfo({
+		displayName: 'Opus 5.5',
+		resolvedModel: 'claude-opus-5-5',
+		supportedEffortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+		value: 'opus',
+	}),
+	modelInfo({
+		displayName: 'Fable 5.1',
+		resolvedModel: 'claude-fable-5-1',
+		supportedEffortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+		value: 'claude-fable-5-1',
+	}),
+	modelInfo({
+		displayName: 'Sonnet 5.5',
+		resolvedModel: 'claude-sonnet-5-5',
+		supportedEffortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+		value: 'sonnet',
+	}),
+	modelInfo({
+		displayName: 'Haiku 4.5',
+		resolvedModel: 'claude-haiku-4-5-20251001',
+		value: 'haiku',
+	}),
+	modelInfo({
+		displayName: 'Sonnet 5',
+		resolvedModel: 'claude-sonnet-5',
+		supportedEffortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+		value: 'claude-sonnet-5',
+	}),
+	modelInfo({
+		displayName: 'Opus 5',
+		resolvedModel: 'claude-opus-5',
+		supportedEffortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+		value: 'claude-opus-5',
+	}),
+	modelInfo({
+		displayName: 'Fable 5',
+		resolvedModel: 'claude-fable-5',
+		supportedEffortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+		value: 'claude-fable-5',
+	}),
+	modelInfo({
+		displayName: 'Opus 4.8',
+		resolvedModel: 'claude-opus-4-8',
+		supportedEffortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+		value: 'claude-opus-4-8',
+	}),
+	modelInfo({
+		displayName: 'Opus 4.7',
+		resolvedModel: 'claude-opus-4-7',
+		supportedEffortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+		value: 'claude-opus-4-7',
+	}),
+	modelInfo({
+		displayName: 'Opus 4.6',
+		resolvedModel: 'claude-opus-4-6',
+		supportedEffortLevels: ['low', 'medium', 'high', 'max'],
+		value: 'claude-opus-4-6',
+	}),
+	modelInfo({
+		displayName: 'Sonnet 4.6',
+		resolvedModel: 'claude-sonnet-4-6',
+		supportedEffortLevels: ['low', 'medium', 'high', 'max'],
+		value: 'claude-sonnet-4-6',
+	}),
+];
+
+describe('the Claude catalog presents Sonnet 5.5 as Claude Code 2.1.284 reports it', () => {
+	it('lists every release once, newest first within each family', () => {
+		expect(
+			presentClaudeModels(SONNET_5_5_ROWS).map((model) => [
+				model.id,
+				model.displayName,
+			]),
+		).toEqual([
+			['claude-fable-5-1', 'Fable 5.1'],
+			['claude-fable-5', 'Fable 5'],
+			['opus', 'Opus 5.5'],
+			['claude-opus-5', 'Opus 5'],
+			['claude-opus-4-8', 'Opus 4.8'],
+			['claude-opus-4-7', 'Opus 4.7'],
+			['claude-opus-4-6', 'Opus 4.6'],
+			['sonnet', 'Sonnet 5.5'],
+			['claude-sonnet-5', 'Sonnet 5'],
+			['claude-sonnet-4-6', 'Sonnet 4.6'],
+			['haiku', 'Haiku 4.5'],
+		]);
+	});
+
+	it('offers Sonnet 5.5 the full effort ladder it reports', () => {
+		const sonnet = presentClaudeModels(SONNET_5_5_ROWS).find(
+			(model) => model.id === 'sonnet',
+		);
+
+		expect(sonnet?.thinkingLevels).toEqual([
+			'off',
+			'low',
+			'medium',
+			'high',
+			'xhigh',
+			'max',
+		]);
+	});
+
+	it('stamps a Sonnet 5.5 reading on the alias that resolves to it', () => {
+		const windows = new Map(
+			presentClaudeModels(SONNET_5_5_ROWS, {
+				contextWindow: 1_000_000,
+				model: 'claude-sonnet-5-5',
+			}).map((model) => [model.id, model.contextWindow]),
+		);
+
+		expect(windows.get('sonnet')).toBe(1_000_000);
+		expect(windows.get('claude-sonnet-5')).toBeNull();
+		expect(windows.get('opus')).toBeNull();
 	});
 });
 

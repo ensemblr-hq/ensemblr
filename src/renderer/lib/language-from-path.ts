@@ -23,6 +23,7 @@ const EXTENSION_LANGUAGE: Record<string, string> = {
 	mdx: 'mdx',
 	mjs: 'javascript',
 	mts: 'typescript',
+	nix: 'nix',
 	php: 'php',
 	prisma: 'prisma',
 	py: 'python',
@@ -46,6 +47,7 @@ const EXTENSION_LANGUAGE: Record<string, string> = {
 
 const BASENAME_LANGUAGE: Record<string, string> = {
 	dockerfile: 'docker',
+	'flake.lock': 'json',
 	makefile: 'makefile',
 };
 

@@ -22,7 +22,9 @@ const folderIconByName: Record<string, string> = {
 /**
  * Whole file names, lowercased, that decide their own icon. This is where a
  * repository's extension-less files — build files, ownership files, plain-text
- * docs, and dotfiles with no extension of their own — get a glyph.
+ * docs, and dotfiles with no extension of their own — get a glyph. Lockfiles
+ * live here too: a `.lock` extension names no ecosystem, so each one is keyed
+ * by its whole name and an unknown one keeps the default glyph.
  */
 const fileIconByName: Record<string, string> = {
 	'.browserslistrc': 'file-type-browserslist',
@@ -56,15 +58,19 @@ const fileIconByName: Record<string, string> = {
 	'biome.json': 'file-type-biome',
 	brewfile: 'file-type-brew',
 	'bun.lock': 'file-type-bun',
+	'bun.lockb': 'file-type-bun',
+	'cargo.lock': 'file-type-rust',
 	changelog: 'file-type-text',
 	changes: 'file-type-text',
 	'cmakelists.txt': 'file-type-cmake',
 	codeowners: 'file-type-codeowners',
 	'components.json': 'file-type-json',
+	'composer.lock': 'file-type-php',
 	containerfile: 'file-type-docker',
 	context: 'file-type-markdown',
 	'context.md': 'file-type-markdown',
 	contributors: 'file-type-text',
+	'deno.lock': 'file-type-deno',
 	dockerfile: 'file-type-docker',
 	'flake.lock': 'file-type-nix',
 	'forge.config.ts': 'file-type-config',
@@ -75,14 +81,21 @@ const fileIconByName: Record<string, string> = {
 	justfile: 'file-type-just',
 	maintainers: 'file-type-text',
 	makefile: 'file-type-makefile',
+	'mix.lock': 'file-type-elixir',
 	'package.json': 'file-type-npm',
 	'package.resolved': 'file-type-swift',
+	'pdm.lock': 'file-type-pdm',
+	'pipfile.lock': 'file-type-python',
+	'poetry.lock': 'file-type-poetry',
 	procfile: 'file-type-procfile',
+	'pubspec.lock': 'file-type-dartlang',
 	rakefile: 'file-type-rake',
 	readme: 'file-type-text',
 	todo: 'file-type-todo',
+	'uv.lock': 'file-type-uv',
 	vagrantfile: 'file-type-vagrant',
 	version: 'file-type-text',
+	'yarn.lock': 'file-type-yarn',
 };
 
 /**
@@ -146,6 +159,7 @@ const fileIconByExtension: Record<string, string> = {
 	hpp: 'file-type-cppheader',
 	htm: 'file-type-html',
 	html: 'file-type-html',
+	icns: 'file-type-image',
 	ico: 'file-type-image',
 	java: 'file-type-java',
 	jpeg: 'file-type-image',
@@ -155,7 +169,6 @@ const fileIconByExtension: Record<string, string> = {
 	jsonc: 'file-type-json',
 	jsx: 'file-type-js',
 	kt: 'file-type-kotlin',
-	lock: 'file-type-bun',
 	log: 'file-type-log',
 	m: 'file-type-objectivec',
 	markdown: 'file-type-markdown',
@@ -203,6 +216,15 @@ const fileIconByExtension: Record<string, string> = {
 	zsh: 'file-type-shell',
 };
 
+/**
+ * Extensions whose glyph lives outside vscode-icons, as fully-qualified iconify
+ * names. vscode-icons has no freedesktop desktop-entry glyph, so a `.desktop`
+ * launcher takes the Linux mascot from `logos`.
+ */
+const qualifiedFileIconByExtension: Record<string, string> = {
+	desktop: 'logos:linux-tux',
+};
+
 /** Icon this file falls back to when no name or extension rule matches. */
 const DEFAULT_FILE_ICON = 'default-file';
 
@@ -234,7 +256,9 @@ type WorkspaceFileIconTarget = Pick<
 >;
 
 /**
- * Picks a shortcut icon for symlinks, otherwise a VSCode file or folder icon.
+ * Picks a shortcut icon for symlinks, otherwise a VSCode file or folder icon —
+ * or, for the few extensions vscode-icons does not cover, a glyph from another
+ * bundled collection.
  * @param file - File/folder identity and optional symlink target kind.
  * @param options - When `isExpanded` is set, directories resolve to their
  *   open-folder glyph (falling back to the closed one if no `-opened` variant
@@ -262,7 +286,12 @@ export function getWorkspaceFileIconName(
 		return `${iconPrefix}:${iconName}`;
 	}
 
-	return `${iconPrefix}:${getFileIconName(file.name.toLowerCase())}`;
+	const fileName = file.name.toLowerCase();
+
+	return (
+		lookupIcon(qualifiedFileIconByExtension, getFileExtension(fileName)) ??
+		`${iconPrefix}:${getFileIconName(fileName)}`
+	);
 }
 
 /**
