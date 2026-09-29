@@ -128,11 +128,75 @@ describe('Nix files', () => {
 	);
 });
 
+describe('lockfiles', () => {
+	it.each([
+		['bun.lock', 'file-type-bun'],
+		['bun.lockb', 'file-type-bun'],
+		['yarn.lock', 'file-type-yarn'],
+		['deno.lock', 'file-type-deno'],
+		['Cargo.lock', 'file-type-rust'],
+		['cargo.lock', 'file-type-rust'],
+		['poetry.lock', 'file-type-poetry'],
+		['uv.lock', 'file-type-uv'],
+		['pdm.lock', 'file-type-pdm'],
+		['Pipfile.lock', 'file-type-python'],
+		['composer.lock', 'file-type-php'],
+		['pubspec.lock', 'file-type-dartlang'],
+		['mix.lock', 'file-type-elixir'],
+	])('maps %s to %s', (name, icon) => {
+		expect(iconFor(name)).toBe(`vscode-icons:${icon}`);
+	});
+
+	it('resolves a nested workspace lockfile by its name', () => {
+		expect(getWorkspaceFileIconNameForPath('crates/cli/Cargo.lock')).toBe(
+			'vscode-icons:file-type-rust',
+		);
+	});
+
+	it.each(['Podfile.lock', 'renv.lock', 'something.lock'])(
+		'leaves the unrecognised %s on the default glyph rather than Bun',
+		(name) => {
+			expect(iconFor(name)).toBe('vscode-icons:default-file');
+		},
+	);
+});
+
 describe('Swift package files', () => {
 	it.each([
 		['Package.swift', 'file-type-swift'],
 		['Package.resolved', 'file-type-swift'],
 		['package.json', 'file-type-npm'],
+	])('maps %s to %s', (name, icon) => {
+		expect(iconFor(name)).toBe(`vscode-icons:${icon}`);
+	});
+});
+
+describe('Linux desktop entries', () => {
+	it.each([
+		'ensemblr.desktop',
+		'org.gnome.Nautilus.desktop',
+		'Launcher.DESKTOP',
+	])('gives %s the Linux icon', (name) => {
+		expect(iconFor(name)).toBe('logos:linux-tux');
+	});
+
+	it('resolves a desktop entry by path too', () => {
+		expect(
+			getWorkspaceFileIconNameForPath('packaging/linux/ensemblr.desktop'),
+		).toBe('logos:linux-tux');
+	});
+
+	it('leaves a file merely named desktop to the default glyph', () => {
+		expect(iconFor('desktop')).toBe('vscode-icons:default-file');
+		expect(iconFor('.desktop')).toBe('vscode-icons:default-file');
+	});
+});
+
+describe('icon image files', () => {
+	it.each([
+		['icon.icns', 'file-type-image'],
+		['AppIcon.ICNS', 'file-type-image'],
+		['favicon.ico', 'file-type-image'],
 	])('maps %s to %s', (name, icon) => {
 		expect(iconFor(name)).toBe(`vscode-icons:${icon}`);
 	});
