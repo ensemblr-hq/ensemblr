@@ -28,18 +28,21 @@ const DEFAULT_MODEL_ALIAS = 'default';
  * chat needs a model whose behaviour is known rather than whichever one the
  * alias points at today. Each time an alias moves on, the release it left
  * disappears from `supportedModels()` and needs a row here — Opus 5 joined when
- * `opus[1m]` moved to Opus 5.5.
+ * `opus[1m]` moved to Opus 5.5, and Sonnet 5 when `sonnet` moved to Sonnet 5.5.
+ * Claude Code 2.1.284 advertises those earlier releases under their own ids,
+ * and the release-key dedupe hides the pin wherever it does.
  *
  * Ids come from the Claude model catalogue and each was verified to resolve
  * through this SDK; `claude-sonnet-4-8` is deliberately absent because no such
- * model exists — the Sonnet line runs 4.6 → 5. An entry the signed-in account
- * is not entitled to fails only when it is actually selected.
+ * model exists — the Sonnet line runs 4.6 → 5 → 5.5. An entry the signed-in
+ * account is not entitled to fails only when it is actually selected.
  */
 const PINNED_MODELS = [
 	{ displayName: 'Fable 5.1', id: 'claude-fable-5-1' },
 	{ displayName: 'Opus 5', id: 'claude-opus-5' },
 	{ displayName: 'Opus 4.8', id: 'claude-opus-4-8' },
 	{ displayName: 'Opus 4.7', id: 'claude-opus-4-7' },
+	{ displayName: 'Sonnet 5', id: 'claude-sonnet-5' },
 	{ displayName: 'Sonnet 4.6', id: 'claude-sonnet-4-6' },
 ] as const;
 

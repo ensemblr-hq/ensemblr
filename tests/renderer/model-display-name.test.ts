@@ -18,6 +18,7 @@ describe('formatModelDisplayName — Claude', () => {
 		['claude-opus-4-5-20251101', 'Claude Opus 4.5 (20251101)'],
 		['claude-opus-4-1', 'Claude Opus 4.1'],
 		['claude-sonnet-4-6', 'Claude Sonnet 4.6'],
+		['claude-sonnet-5-5', 'Claude Sonnet 5.5'],
 		// A `.0` minor reads as the bare major (Opus 4, not Opus 4.0).
 		['claude-opus-4-0', 'Claude Opus 4'],
 	])('%s → %s', (input, expected) => {
