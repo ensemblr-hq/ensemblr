@@ -6,8 +6,8 @@ overview; this is the runbook.
 ## 1. Prerequisites
 
 Ensemblr targets **macOS** — Apple silicon (arm64) and Intel (x64), each a signed,
-notarized `.app` — and **Linux x86-64** (an unsigned `.AppImage`); Linux arm64 is
-planned for a later release. There is no Windows path. What differs between the two
+notarized `.app` — and **Linux x86-64** (an unsigned `.AppImage`). The current
+release workflow does not build Linux arm64. There is no Windows path. What differs between the two
 is declared per platform rather than branched inline — the secret store, the
 "Open in…" registry, the battery reader, the window chrome, and updates — so
 developing on either is the same loop.
@@ -127,7 +127,8 @@ Read these in order:
    `tailwind.config.js`), and
    [`../.claude/rules/patterns.md`](../.claude/rules/patterns.md) for the
    structural rules a change has to respect.
-5. [`adr/`](./adr) — 71 Architecture Decision Records. When something looks odd,
+5. [`adr/`](./adr) — 78 Architecture Decision Records, numbered `0001`–`0079`
+(`0007` was withdrawn before acceptance). When something looks odd,
    the ADR usually explains it. Start with
    [0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) if
    you are touching the agent layer.
@@ -219,10 +220,9 @@ user's AppImage. `lint` and `typecheck` run on Linux alone, because neither
 Biome nor tsc can reach a different verdict on macOS. `nix-deps` builds the Nix
 flake's pinned dependencies, but only on a PR that touches `bun.lock`, the flake,
 or `nix/` (see [the Nix flake](./build-and-release.md#the-nix-flake)). A tiny
-`verify` job collapses all of them into a single status check. `master` has no branch
-protection or ruleset, so nothing on GitHub enforces that check: a pull request
-with a failing `verify` can still be merged, and confirming it is green before
-merging is on whoever merges.
+`verify` job collapses all of them into a single status check. Its name stays
+stable because the repository's GitHub ruleset requires it; confirm the current
+GitHub enforcement on the pull request before merging.
 `scan` runs a `react-doctor` scan diffed against `master`, failing on `error`.
 
 A second push to a PR cancels the run it superseded, so pushing three fixups in
@@ -250,18 +250,18 @@ changed set, per [`../.claude/rules/code-review.md`](../.claude/rules/code-revie
 
 | Task | Files to touch |
 | --- | --- |
-| New IPC call | `src/shared/ipc/channels.ts` → `src/shared/ipc/contracts/<concern>.ts` → `src/main/ipc/request-schemas/<concern>.ts` → `src/main/ipc/handlers/<concern>.ts` → `src/preload/bridge/ensemblr-api.ts` → `src/renderer/api/` |
+| New IPC call | `src/shared/ipc/channels.ts` → `src/shared/ipc/contracts/<concern>.ts` → `src/shared/ipc/contracts/api.ts` → `src/main/ipc/request-schemas/<concern>.ts` → `src/main/ipc/handlers/<concern>.ts` → `src/preload/bridge/ensemblr-api.ts` → `src/renderer/api/` |
 | New route | A file under `src/renderer/routing/routes/`; let the Vite plugin regenerate `routeTree.gen.ts` |
 | New durable UI state | `src/renderer/state/<concern>/`, re-exported from that folder's `index.ts` |
 | New DB table or column | A numbered migration in `src/main/storage/database.ts`, plus its id in `tests/main/database.test.ts` |
 | New main-process concern | A folder under `src/main/` with an `index.ts`; add it to `src/main/AGENTS.md`. Main-process barrels are deliberately **not** listed in `.fallowrc.jsonc` — they are reachable from `src/main/main.ts`, so a genuinely unused export in one should still surface. Shared and renderer concern barrels *are* listed there |
 | New user-facing string | A `t('<ns>:<key>', 'Default English')` call site, then `bun run i18n:extract` and hand-fill `locales/ru/**` and `locales/el/**`; add the term to `docs/i18n-glossary.md` if it is new |
 | New native menu item | An id in `src/shared/menu-commands.ts` → a label in all three languages in `src/main/menu/menu-strings.ts` → an entry in the relevant `src/main/menu/<name>-menu.ts` → a `useMenuCommand` registration in the renderer surface that owns the action ([ADR 0046](./adr/0046-drive-the-native-menu-bar-from-a-renderer-command-bus.md)) |
-| New agent runtime | A sibling adapter folder under `src/main/` implementing the `src/main/agent-runtime/` contract — never a branch inside `pi-agent/` or `claude-agent/` ([ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md)) |
+| New agent runtime | A sibling adapter folder under `src/main/` implementing the `src/main/agent-runtime/` contract — never a branch inside `pi-agent/` or `claude-agent/` — plus a provider id in `src/shared/agent-provider.ts` and the client's adapter map ([ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md)) |
 | New agent control op | A service first, then a port in `src/main/agent-control/ports.ts` — control never adds capability code of its own |
 | New pure-logic test under `tests/main/` | The explicit `include` array in `vitest.config.mts` — it is not a glob |
-| New setup check | `src/shared/ipc/contracts/setup.ts` → `SETUP_CHECK_ORDER` in `src/main/setup/setup-diagnostics.ts` → the implementation under `src/main/setup/` → the check table in `docs/guide/02-requirements.md` |
-| New `.ensemblr/settings.toml` key | The field map in `src/main/config/repository-config.ts` → the reference table in `docs/guide/12-repository-settings.md` |
-| New keyboard shortcut | `SHORTCUTS` in `src/shared/keymap/shortcuts.ts` → the scope table in `docs/guide/13-keyboard-shortcuts.md` |
+| New setup check | `SetupCheckId` in `src/shared/ipc/contracts/setup.ts` → `SETUP_CHECK_ORDER` and the provider map in `src/main/setup/setup-diagnostics.ts` → the implementation under `src/main/setup/` → the check table in `docs/guide/02-requirements.md` |
+| New `.ensemblr/settings.toml` key | The field map in `src/main/config/repository-config.ts` → `schemas/settings.schema.json` → its parity test in `tests/main/published-schemas.test.ts` → the reference table in `docs/guide/12-repository-settings.md` |
+| New keyboard shortcut | `SHORTCUTS` in `src/shared/keymap/shortcuts.ts` → the localized name in `src/renderer/routing/routes/_workbench/settings/shortcuts.tsx` → the scope table in `docs/guide/13-keyboard-shortcuts.md` |
 | A dependency added, removed, or renamed | `bun run credits:generate`, which rewrites `src/main/menu/credits-manifest.gen.ts` for the native About panel. The packaged app ships no `node_modules` to read a license out of, so the manifest is captured at authoring time; `tests/main/credits-manifest.test.ts` recomputes it and fails on drift |
-| A decision worth recording | The next numbered ADR in `docs/adr/`, and bump the count in all three places it appears: `docs/README.md`, the documentation list in `README.md`, and §4 of this file |
+| A decision worth recording | The next numbered ADR in `docs/adr/`, and bump the count in `docs/README.md` and §4 of this file. The documentation-list count in `README.md` is release-owned |
