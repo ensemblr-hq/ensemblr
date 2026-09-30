@@ -215,7 +215,7 @@ draft and manual variants behind the header button's dropdown:
 
 | Action | What happens |
 | --- | --- |
-| **Push branch** | pushes directly. On a branch with no upstream, Ensemblr sets one when **Settings → Git → Set upstream on push** is enabled, which it is by default. |
+| **Push branch** | pushes directly. On a branch with no upstream, Ensemblr sets one when **Settings → Git → Set upstream on plain `git push`** is enabled, which it is by default. |
 | **Commit and push** | asks the chat agent to stage every changed file, write a commit message following the repository's conventions, and push — setting upstream when the branch is not yet tracked. |
 | **Create PR** | asks the chat agent to commit anything outstanding, push, and open the PR onto the target branch with `gh pr create`, using the title and description you wrote. |
 | **Create draft PR** | the same, opened as a draft. |
@@ -282,13 +282,18 @@ Not every workspace ends in a merge, and the answer for one that does not is
 
 Archiving runs the repository's archive script, preserves the workspace's
 `.context/` handoff files under `archived-contexts/` in your Ensemblr root, and
-marks the workspace archived. Whether the worktree folder and local branch go
-with it follows **Settings → Git → Delete branch on archive** — the same setting
-the merge path above obeys, so archiving by hand and archiving on merge cannot
-disagree. The dialog states which of the two it is about to do before you press
-Archive. An archived workspace can be restored later from **Browse archive…**,
-which rebuilds the worktree from the recorded base branch when branch cleanup
-ran.
+marks the workspace archived. The worktree folder is removed either way, to
+reclaim its disk. What differs is the branch, and that follows **Settings → Git →
+Delete branch on archive** — the same setting the merge path above obeys, so
+archiving by hand and archiving on merge cannot disagree. With it off (the
+default) the local branch is kept, along with a snapshot of any uncommitted
+changes; with it on the branch is dropped and anything not pushed is lost. The
+dialog states which of the two it is about to do, and how many uncommitted
+changes archiving will not commit or push, before you press Archive. An archived
+workspace can be restored later from **Workspace archive**, in the project's
+context menu: when the branch was kept, restoring brings back the worktree and
+the uncommitted changes from it and rebuilds dependencies; when it was dropped,
+the worktree is rebuilt from the recorded base branch.
 
 **Delete** is the separate, explicitly named destructive action: it removes the
 worktree folder, drops the local branch, and deletes the workspace from

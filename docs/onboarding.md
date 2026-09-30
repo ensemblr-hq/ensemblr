@@ -33,17 +33,14 @@ needs *an* agent runtime, not a particular one, so satisfying either one alone
 gets you past setup. Both have a readiness probe surfaced in **Settings →
 Providers**, where you can also point at a binary that is not on `PATH`.
 
-The two surfaces that ask the question do not ask it identically. The
-diagnostics rollup resolves `AGENT_RUNTIME_CHECK_GROUPS`
-(`src/shared/setup-checks.ts`) onto each check's `blocking` flag —
-`claude: ['claude-executable']` against `pi: ['pi-executable',
-'pi-agent-directory', 'pi-rpc', 'pi-provider-model']`. The onboarding wizard's
-`agent-cli` step carries its own narrower list in
-`src/renderer/lib/onboarding/gates.ts` — `['pi-executable',
-'claude-executable']` under an `any` gate — so the wizard clears on either
-executable while diagnostics still holds Pi to its RPC and provider checks.
-Diagnostics is the stricter authority; the JSDoc on `AGENT_RUNTIME_CHECK_GROUPS`
-claiming both gates read that one table is stale.
+Both surfaces that ask the question read one table,
+`AGENT_RUNTIME_CHECK_GROUPS` (`src/shared/setup-checks.ts`) — `claude:
+['claude-executable']` against `pi: ['pi-executable', 'pi-agent-directory',
+'pi-rpc', 'pi-provider-model']`. The diagnostics rollup resolves it onto each
+check's `blocking` flag, and the onboarding wizard
+(`src/renderer/lib/onboarding/check-mapping.ts`) backs each runtime card with its
+whole group under an `any` gate in `src/renderer/lib/onboarding/gates.ts`, so the
+wizard cannot call a machine ready that diagnostics still blocks.
 
 ### The Node 24 pin is load-bearing
 
@@ -123,7 +120,7 @@ Read these in order:
    scoped `AGENTS.md` for whichever subtree you are editing.
 4. [`../.claude/rules/stack.md`](../.claude/rules/stack.md) — the pinned versions
    and the constraints that are *not* obvious from `package.json` (why two
-   packages must stay unbundled, why `legacy-peer-deps` is set, why there is no
+   packages must stay unbundled, why there is no `.npmrc` and no
    `tailwind.config.js`), and
    [`../.claude/rules/patterns.md`](../.claude/rules/patterns.md) for the
    structural rules a change has to respect.

@@ -46,8 +46,10 @@ Values sit under an `app` key, one object per pane:
 | --- | --- |
 | General | `app.general` |
 | Models | `app.models`, plus `app.concierge` for the Concierge's own runtime |
+| Providers | `app.providers` |
 | Git | `app.git` |
 | Appearance | `app.appearance` |
+| Integrations | `app.dictation` for Dictation, and `app.linear` for an optional custom Linear OAuth application |
 | Experimental | `app.experimental` |
 
 The first-run wizard also records its completion timestamp under
@@ -210,6 +212,18 @@ Visibility notes:
 
 See [6. Agents](./06-agents.md) for what the runtimes differ on.
 
+**Delegation.** The Models pane also holds how agents hand work to one another.
+
+| Setting | What it does | Default |
+| --- | --- | --- |
+| When to delegate | `Delegate automatically`, or `Only when I ask` — agents then do the work in the conversation and wait for you to ask for a hand-off. It steers what agents are told rather than which tools they hold, and AFK runs ignore it. | Delegate automatically |
+| Allow cross-runtime delegation | Lets Ensemblr-managed children explicitly run on another configured runtime and model provider. A child with no model named still inherits the caller's runtime. Filesystem permissions and cost approvals do not change. | Off |
+| Delegation roles | Assign models to the advisory roles Sage, Coder, Builder, Grunt, and Explorer, so a brief that names a role is routed to a model you chose for it. Saved assignments for a model that is hidden or no longer reported stay listed until you clear them. | None assigned |
+
+A Claude Code chat set to its built-in sub-agents (see **Providers** below)
+bypasses Ensemblr delegation, so the role assignments and cross-runtime routing do
+not reach it; the pane says so.
+
 ### Concierge settings
 
 The Concierge is an app-level agent that works above every project rather than
@@ -311,6 +325,13 @@ and you run it in a terminal. It never captures the credential.
 **Settings file.** Claude Code reads its own configuration from
 `~/.claude/settings.json`. The pane links out to it — Ensemblr never edits that
 file. Change permissions, hooks, or MCP servers there.
+
+**Read-only tools.** Plan Mode and the Concierge refuse tools Ensemblr cannot
+vouch for. Each runtime tab lists the extra tools it has reported and lets you
+trust one as read-only — only if it cannot change files, run commands, or act on
+your accounts. On Claude Code only MCP tools (`mcp__server__tool`) can be
+trusted, and a tool Ensemblr already has a rule for cannot be overridden here.
+A runtime lists its extra tools once you have started a conversation on it.
 
 **Sub-agents** (Claude Code only). Which mechanism a first-class Claude Code chat
 delegates through. Only one is ever live in a session, so a model is never
@@ -429,6 +450,7 @@ See [12. Repository settings](./12-repository-settings.md).
 | Let agents name the workspace and branch | Ask the agent to rename a workspace away from its placeholder composer name, and its git branch to match, once it knows what the work is. Off leaves the placeholder in place. | On / off | On |
 | Delete branch on archive | Delete the local branch when a workspace is archived. The remote branch is untouched — configure that on GitHub. | On / off | Off |
 | Archive on merge | Archive a workspace automatically after its pull request merges. | On / off | Off |
+| Credit Ensemblr as a commit co-author | Ask agents to end every commit they make with the `Co-authored-by: Ensemblr <howdy@ensemblr.dev>` trailer, which GitHub credits to the Ensemblr account. | On / off | On |
 | Set upstream on plain `git push` | Configure new workspaces so a bare `git push` sets the branch upstream. Turning it off avoids writing git worktree config, at the cost of less reliable PR information until branches have an upstream. | On / off | On |
 
 Workspace and branch mechanics are covered in
@@ -472,10 +494,11 @@ can be disconnected at any time.
 | Linear | Connected, Disconnected, Reconnect required, Not configured | Connect to browse Linear issues, manage them from Ensemblr, and create workspaces from issues. |
 | Infisical | one row per configured account | Machine-Identity accounts that repository secret links resolve through. |
 
-Linear needs a client id before it can be connected at all: add
-`app.linear.clientId` to `~/.config/ensemblr/config.json`. Without it the pane
-reads `Not configured`. Linear is optional — local and GitHub-only workflows
-never need it.
+Linear connects out of the box: Ensemblr ships a registered OAuth application.
+Set `app.linear.clientId` in `~/.config/ensemblr/config.json` only to use your
+own application instead — it overrides the built-in one. `Not configured` shows
+only when no client id is available at all. Linear is optional — local and
+GitHub-only workflows never need it.
 
 `Reconnect required` means the stored token expired and could not be refreshed
 automatically. Reconnecting is a full sign-in, in your browser.
@@ -491,6 +514,20 @@ project half lives in the repository's own **Secrets** pane, and is committed.
 Removing an account arms on the first click rather than deleting on it —
 Infisical shows a Universal Auth client secret exactly once, so there is no
 undo. Details in [10. Integrations](./10-integrations.md).
+
+**Dictation** speaks a prompt into the composer: Ensemblr records while you use
+the microphone control, then sends the clip to a transcription service you
+configure here. Enabling it shows a microphone in the composer, toggled with
+`⌥D`, once an API key is stored.
+
+| Setting | What it does | Default |
+| --- | --- | --- |
+| Enable dictation | Shows the microphone in the composer control row. Stays hidden until an API key is stored. | Off |
+| API endpoint | Root of an OpenAI-compatible API; Ensemblr posts to its `/audio/transcriptions` path. An unencrypted `http://` address is warned about unless it is local. | `https://api.openai.com/v1` |
+| Model | Transcription model id, for example `gpt-4o-mini-transcribe` or `whisper-large-v3-turbo`. | `gpt-4o-mini-transcribe` |
+| API key | Stored in the OS secret store, never in a config file, and sent only to the endpoint above. | — |
+
+Transcription is English only for now.
 
 GitHub is not on this pane. Ensemblr shells out to the `gh` CLI and stores no
 GitHub token of its own. See [10. Integrations](./10-integrations.md).
@@ -509,7 +546,12 @@ from this pane rather than looking up the command.
 | Control | What it does |
 | --- | --- |
 | Copy diagnostics bundle | Copies a support bundle to the clipboard. It redacts secrets, account ids, and full paths before it leaves the app. |
+| Database → Compact database | Rewrites `ensemblr.db` to reclaim disk space. Ensemblr prunes old agent history on its own, but SQLite never shrinks the file by itself. Asks you to click again to confirm, reports the size reclaimed, and blocks other database activity while it runs. |
 | Setup wizard → Re-run wizard | Reopens the first-run wizard. Nothing already configured is undone — it re-probes every check and walks you through whatever is still unresolved. |
+
+On Linux, when no keyring daemon answers, this pane also shows a **Secrets are
+only obfuscated, not encrypted** notice with an **Accept and store secrets
+anyway** action — start gnome-keyring or KWallet for real encryption.
 
 For what each check requires, see [2. Requirements](./02-requirements.md). For
 what to do when one keeps failing, see
@@ -531,6 +573,7 @@ Developer-only controls and early automation defaults.
 | Setting | What it does | Default |
 | --- | --- | --- |
 | Architecture diagram | Show the workspace architecture diagram and let agents read and redraw it. The diagram is a committed `.ensemblr/architecture.json` an agent authors — nothing derives one, so a workspace nobody has drawn simply has none. New sessions pick the switch up; the ones already running keep the surface they started with. | Off |
+| Third-party CLI harnesses | Launch Claude Code, OpenAI Codex, or Mistral Vibe in a terminal tab, and let agents launch one too. Off, a harness terminal already open keeps running until you close it. | Off |
 | Auto-run after setup | Start a repository's run script automatically after setup, when no repository-specific setting overrides it. | Off |
 | Developer Mode | Show developer-only diagnostics and Pi debug controls. | Off |
 

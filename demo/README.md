@@ -4,7 +4,7 @@ A second Electron entrypoint that renders the **real** app against scripted
 fixtures, for capturing promotional and documentation screenshots.
 
 ```sh
-npm run dev:demo
+bun run dev:demo
 ```
 
 Nothing under `src/` is modified to support this. Demo mode imports the app
@@ -70,7 +70,7 @@ enforces it in both directions.
 
 ## Composing a shot
 
-1. `npm run dev:demo` opens the window on the first scenario.
+1. `bun run dev:demo` opens the window on the first scenario.
    `-- --scenario=<id>` opens a specific one.
 2. Edit a file under `scenarios/`. The window repaints over HMR — no restart.
 3. `⌘D` toggles the toolbar: scenario, theme, frozen/live motion, shoot. Picking
@@ -181,7 +181,7 @@ state the app will not take from data.
 ## Capture
 
 ```sh
-npm run dev:demo -- --shoot --scenario=board
+bun run dev:demo -- --shoot --scenario=board
 ```
 
 Waits for the renderer to settle, captures, and quits. Stills are written to

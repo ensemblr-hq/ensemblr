@@ -368,6 +368,10 @@ tools; writing, editing, and any `bash` command that is not read-only are
 refused, as are the tools that would hand the work to something else — starting a
 conversation, launching a harness, opening a terminal.
 
+A tool Ensemblr cannot vouch for as read-only is refused too, which would lock
+out a Pi extension of your own. You can trust individual tools under **Settings →
+Providers**; see [11. App settings](./11-app-settings.md#providers).
+
 When it is ready it submits a plan. Ensemblr writes the plan to a file under the
 workspace's `.context/plans/`, posts it into the chat, and raises a review panel
 where you approve it or send it back for refinement.
@@ -558,6 +562,10 @@ a block of stored text stands in a tray above it:
 | A Linear or GitHub issue | the issue picker |
 | A review-comment thread | from the Changes panel |
 | A terminal's output | select it, then **Attach selection to chat** from the terminal's right-click menu |
+
+Any file can be dropped on the composer, not just images and text: it is stored
+under the format its bytes carry, empty files included, and a dropped folder
+becomes a chip.
 
 They form **one ordered list**, and the outgoing prompt carries each one at the
 position its chip sat in the draft. "Compare this screenshot against this file"

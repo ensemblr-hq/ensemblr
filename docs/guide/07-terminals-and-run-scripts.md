@@ -24,6 +24,11 @@ Script output panes are **read-only**: they show what the command printed, and
 nothing you type reaches the process. To change what a script is doing, stop it
 from its tab and start it again.
 
+The one exception is a password prompt. When a setup or run script stops on one
+— `sudo`, `doas`, `ssh`, or `git` over HTTPS asking for a password or
+passphrase — the dock floats a masked field over the pane. What you type goes
+straight to the process and is never stored.
+
 Interactive terminals are the only kind Ensemblr brings back after a restart. A
 tab that was open when you quit reopens with its previous scrollback replayed
 above a dim `── restored session — output above is from the previous run ──`
@@ -31,7 +36,8 @@ divider, and a fresh shell below it. Script runs are transient and are never
 re-offered; agent harness tabs resume through their own path instead, described
 in [`../harnesses.md`](../harnesses.md).
 
-Open a new interactive terminal from the **+** in the dock's tab strip.
+Open a new interactive terminal from the **+** in the dock's tab strip, or with
+**⌃⇧`**.
 
 The dock is not the only place a terminal can live — a coding-agent CLI launched
 as a harness opens its own terminal tab in the chat tab strip instead. See

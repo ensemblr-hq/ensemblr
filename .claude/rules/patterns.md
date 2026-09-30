@@ -173,7 +173,8 @@ thin ones — but keep files focused; 200–400 lines is typical, 800 is the cei
 ## Generated and vendored code
 
 Never hand-edit: `src/renderer/routing/routeTree.gen.ts` (TanStack Router Vite
-plugin — change the route files and let it regenerate) and `package-lock.json`.
+plugin — change the route files and let it regenerate) and `bun.lock` (Bun writes
+it, and its `lockfileVersion` stays at 1).
 
 Treat `src/renderer/components/ui/**` as vendored shadcn: exempt from the JSDoc
 policy and quieted per-rule in fallow (`ignoreExports`). An installed primitive

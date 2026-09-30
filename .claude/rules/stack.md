@@ -4,7 +4,7 @@ The versions this repo is pinned to, and the constraints that are not obvious
 from `package.json`. Policies for *how* to use the stack (Bun, Biome, Jotai,
 Tailwind scale, JSDoc) live in `AGENTS.md` — this file is the stack itself.
 
-`package.json` declares the supported ranges; `package-lock.json` records the
+`package.json` declares the supported ranges; `bun.lock` records the
 resolved versions. Re-check both before asserting an exact version.
 
 ## Platform
@@ -192,8 +192,8 @@ packaged app ships without them.
 | Async data | TanStack Query, TanStack Virtual |
 | State | Jotai (+ `jotai-family` for parameterized atoms) |
 | Terminal | `@xterm/xterm` 6, rendered through `@xterm/addon-webgl` |
-| Composer editor | `lexical` + `@lexical/react` 0.49, plain-text mode only |
-| Markdown | `streamdown` + Shiki, with the `@streamdown/{cjk,code,math,mermaid}` plugins wired in `src/renderer/components/message.tsx` |
+| Composer editor | `lexical` + `@lexical/react` 0.51, plain-text mode only |
+| Markdown | `streamdown` + Shiki, with the `@streamdown/{cjk,math,mermaid}` plugins wired in `src/renderer/components/message.tsx` |
 | Diff rendering | `react-diff-view`, tokenized through Shiki |
 | Layout / motion | `react-resizable-panels`, `motion` (imported as `motion/react`) |
 | Drag and drop | `@atlaskit/pragmatic-drag-and-drop` (+ `-hitbox`), used by the dashboard board |
@@ -324,7 +324,7 @@ a primitive gets reformatted to house style.
   Config uses `linter.rules.preset: "recommended"`; the older
   `linter.rules.recommended: true` was deprecated in Biome 2.5, so do not
   "fix" it back. Import organization runs through `assist.actions.source.organizeImports`.
-- **Vitest 4** with `happy-dom` 20 and `@vitest/coverage-istanbul`. Never
+- **Vitest 5** with `happy-dom` 20 and `@vitest/coverage-istanbul`. Never
   `bun:test`, Jest, or Mocha.
 - **fallow** (`.fallowrc.jsonc`) and **react-doctor** (`doctor.config.jsonc`) run
   as review diagnostics; CI runs react-doctor against `master`.

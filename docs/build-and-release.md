@@ -731,7 +731,10 @@ workspace's unmerged commit.
    not record the root package's version, so `bun.lock` does not change), open
    the version-bump PR, and merge it once the **Checks** workflow is green
    — `master` is unprotected, so GitHub will not stop a merge that is red. Advisory review services are not a release gate.
-2. Write the final release body in `NOTES.md`.
+2. Write the final release body in `NOTES.md` and the matching `CHANGELOG.md`
+   entry (both tracked, both written from `git log <previous-tag>..origin/master`).
+   Leave them uncommitted for now: they ship in the post-release docs PR below,
+   after the asset names are known.
 3. Fetch the merged `master`, resolve it to a commit SHA, confirm that tree
    carries the intended package version, and publish the release against that
    immutable target:
@@ -785,11 +788,11 @@ does not bump Homebrew because that side effect belongs to the original
 The workflow refuses to build when `package.json`'s `version` does not match the
 tag with `v` stripped, or when the release is still a draft.
 
-**Six version-pinned files stay hand-edited, and the version-bump commit
+**Seven version-pinned files stay hand-edited, and the version-bump commit
 touches none of them.** The root README carries three current-release mentions;
 four more files live under `docs/` and quietly point at the previous release
-until someone edits them. The sixth, `nix/pins.json`, is written by a script
-rather than by hand:
+until someone edits them. `nix/pins.json` is written by a script rather than by
+hand, and `NOTES.md` and `CHANGELOG.md` take the release's own entry:
 
 | File | What is pinned |
 | --- | --- |
@@ -798,7 +801,8 @@ rather than by hand:
 | `docs/guide/README.md` | the version this guide describes |
 | `docs/guide/01-install.md` | current-version examples and every asset URL, both architectures |
 | `docs/build-and-release.md` | the command and `update-darwin-arm64.json` examples |
-| `nix/pins.json` | the flake's `release` variant: version, AppImage name, and hash — run `nix/update-pins.sh release` once the AppImage is attached |
+| `NOTES.md`, `CHANGELOG.md` | the release body (already published) and its changelog entry, with the real asset names in the links |
+| `nix/pins.json` | the flake's `release` variant: version, AppImage name, and hash — run `nix/update-pins.sh release` once the AppImage is attached; `nix` lives at `/nix/var/nix/profiles/default/bin` and may be off a non-login `PATH` |
 
 **Never string-replace the old version into the new one.** Asset filenames
 change shape between releases — `0.1.0` dropped the `-beta.N` segment, so

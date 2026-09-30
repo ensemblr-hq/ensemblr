@@ -195,6 +195,8 @@ The guardrails, so you know what a denial means:
 | Nesting depth | 2 — root → depth-1 manager → depth-2 leaf |
 | Spawns per root tree | 20 (closing or stopping does not refund it) |
 | Spawns per minute | 10 |
+| Terminals open at once, per root tree | 8 (terminal starts are not spawns and never spend the spawn budget) |
+| Terminal starts per minute | 10 |
 | One blocking wait | 300 s, then it returns `timedOut` |
 
 A blocking wait whose target is an ancestor of the caller is refused

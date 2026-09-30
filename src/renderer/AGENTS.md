@@ -62,17 +62,17 @@ These instructions apply to everything under `src/renderer/`.
 
 - Every user-facing string is a catalogue key, not a literal. Write
   `t('<namespace>:<surface>.<element>', 'Default English')` — English is
-  extracted from the call sites by `npm run i18n:extract`, never hand-written
+  extracted from the call sites by `bun run i18n:extract`, never hand-written
   into `lib/i18n/locales/en/`.
 - `i18n.t()` is for `lib/` only. Anything reachable from a component or a hook
   must use `useTranslation()`, or it will not re-render when the language
   changes.
 - Never hand-edit `lib/i18n/locales/en/**`; change the English default at its
-  `t()` call site and run `npm run i18n:extract`. The extractor generates the
+  `t()` call site and run `bun run i18n:extract`. The extractor generates the
   key skeletons for `lib/i18n/locales/ru/**` and `lib/i18n/locales/el/**`, but
   their translation values are hand-filled there, not generated from call sites.
-  Fill new values after extraction, then run `npm run i18n:types` and
-  `npm run i18n:status` to confirm per-locale completion.
+  Fill new values after extraction, then run `bun run i18n:types` and
+  `bun run i18n:status` to confirm per-locale completion.
 - Plurals pass `count` with `defaultValue_one` / `defaultValue_other`. Never
   concatenate a plural — Russian has four categories and changes the verb too.
   One `t()` call pluralises exactly one noun; a sentence with two countable
@@ -88,7 +88,7 @@ These instructions apply to everything under `src/renderer/`.
   a label it returns is English forever — and interpolating one into a
   translated sentence yields half-translated output, `aria-label`s included.
   Export the union and translate it renderer-side.
-- `npm run check` runs `i18n:lint`, which fails on hardcoded strings and on
+- `bun run check` runs `i18n:lint`, which fails on hardcoded strings and on
   sentences concatenated across translations. Suppress a genuine false positive
   — a brand name, a `⌘↵` glyph, a command example — with an
   `i18next-instrument-ignore` directive, not by widening the config.
@@ -106,6 +106,6 @@ These instructions apply to everything under `src/renderer/`.
 
 ## Verification
 
-- For changes touching renderer JavaScript, TypeScript, JSX, TSX, CSS, or JSON, run `npm run check`.
-- Run `npm run typecheck` after moving renderer files or changing imports.
-- Run `npm run test:renderer` after changing renderer behavior, component structure, state, routing, or fixtures.
+- For changes touching renderer JavaScript, TypeScript, JSX, TSX, CSS, or JSON, run `bun run check`.
+- Run `bun run typecheck` after moving renderer files or changing imports.
+- Run `bun run test:renderer` after changing renderer behavior, component structure, state, routing, or fixtures.
