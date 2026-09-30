@@ -61,7 +61,7 @@ nothing to report: the Keychain is reached directly and surfaces its own
 failures, so the row would be a permanently green no-op.
 
 Checks 1–7 are about Ensemblr's own state. Ensemblr creates the config file,
-the database, the root directory, and the three managed subdirectories itself —
+the database, the root directory, and the four managed subdirectories itself —
 they appear on the list because a failure there is worth naming, not because
 you have to set them up.
 

@@ -76,7 +76,7 @@ Nothing needs root and nothing is written outside `$HOME`:
 
 | Option | Does |
 | --- | --- |
-| `--version <tag>` | install a specific release, e.g. `--version v0.2.0` |
+| `--version <tag>` | install a specific release, e.g. `--version v0.2.1` |
 | `--nightly` | install the rolling canary build, **alongside** a release |
 | `--dir <path>` | where the AppImage goes |
 | `--no-desktop` | skip the launcher entry and the icons |
@@ -150,16 +150,16 @@ variants run directly on the host, so `sudo` works in Ensemblr's terminals.
 
 ## Download
 
-The current build is **`0.2.0`**:
+The current build is **`0.2.1`**:
 
-- [**`Ensemblr-0.2.0-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.0/Ensemblr-0.2.0-arm64.dmg)
+- [**`Ensemblr-0.2.1-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.1/Ensemblr-0.2.1-arm64.dmg)
   — the macOS disk image for Apple silicon. Open it and drag Ensemblr to `/Applications`.
-- [`Ensemblr-darwin-arm64-0.2.0.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.0/Ensemblr-darwin-arm64-0.2.0.zip)
+- [`Ensemblr-darwin-arm64-0.2.1.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.1/Ensemblr-darwin-arm64-0.2.1.zip)
   — the same `.app`, zipped, if you would rather not mount an image.
-- [**`Ensemblr-0.2.0-x64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.0/Ensemblr-0.2.0-x64.dmg)
-  and [`Ensemblr-darwin-x64-0.2.0.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.0/Ensemblr-darwin-x64-0.2.0.zip)
+- [**`Ensemblr-0.2.1-x64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.1/Ensemblr-0.2.1-x64.dmg)
+  and [`Ensemblr-darwin-x64-0.2.1.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.1/Ensemblr-darwin-x64-0.2.1.zip)
   — the same pair for Intel Macs. `0.1.19` and earlier are Apple-silicon only.
-- [**`Ensemblr-0.2.0-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.0/Ensemblr-0.2.0-x64.AppImage)
+- [**`Ensemblr-0.2.1-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.1/Ensemblr-0.2.1-x64.AppImage)
   — the Linux build, if you would rather place it yourself than run the
   [install script](#install-script-linux). One file, no installer:
 
@@ -198,7 +198,7 @@ it against the checksum on the release page if you want a check, or let the
 [install script](#install-script-linux) do it for you. Either way this is
 **pre-1.0** software, with breaking changes expected before 1.0.
 
-The app reports the full version, any prerelease suffix included — `0.2.0` in
+The app reports the full version, any prerelease suffix included — `0.2.1` in
 **Settings → General**, and on macOS in the bundle's
 `CFBundleShortVersionString`. It matches the release tag, so a bug report only
 has to quote one string.
@@ -425,7 +425,7 @@ Five locations, and nothing outside them:
 | Projects, workspaces, agent sessions, board state | `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` |
 | Window state, recents, per-repository overrides, Electron's own caches | `~/Library/Application Support/Ensemblr` (macOS) · `~/.config/ensemblr/electron` (Linux) |
 | Secrets (Linear OAuth tokens, Infisical client secrets) | macOS: the Keychain, service `dev.ensemblr.app.secret-store` · Linux: encrypted with Electron `safeStorage` and held as ciphertext in `ensemblr.db` |
-| Your repositories, worktrees, and archived context | The root directory you pick during setup — `~/Ensemblr` unless you change it |
+| Your repositories, worktrees, and archived context | The Ensemblr root directory — `~/Ensemblr` unless you change it in **Settings → General** |
 
 The two Application Support directories split along a real seam. The
 bundle-id-scoped one is Ensemblr's own SQLite store; the product-name one is

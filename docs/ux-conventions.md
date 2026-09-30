@@ -48,7 +48,7 @@ behavior. Remaining polish, such as the full session-tree fork UX, is ongoing.
 
 ### App Shell
 
-- Persistent macOS desktop window with native menu bar support.
+- Persistent desktop window (macOS and Linux) with native menu bar support.
 - Left sidebar with visible Dashboard, History, Settings, and Help entries.
 - Dashboard board for workspace triage across Backlog, In progress, In review, Done, and Canceled.
 - Projects grouped in the sidebar, each containing one or more workspaces.
@@ -61,7 +61,7 @@ behavior. Remaining polish, such as the full session-tree fork UX, is ongoing.
 
 Ensemblr equivalent:
 
-- Use Electron native menu APIs for macOS menus.
+- Use Electron native menu APIs for the menu bar.
 - Use file-based TanStack Router for durable app navigation. The selected workspace and chat tab are URL path params (`/projects/$projectId/workspaces/$workspaceId/chats/$chatId`); review and dock tabs are validated search params. Per-workspace dock, review, and last-chat selections are persisted so switching workspaces restores them.
 - Use TanStack Query for backend/preload snapshots such as health, setup diagnostics, repository/workspace records, file status, terminal metadata, and PR/check state.
 - Use Jotai atoms in `src/renderer/state/` for durable renderer-only UI state
@@ -94,7 +94,7 @@ Ensemblr equivalent:
 - A first launch opens the setup wizard at `/onboarding` rather than the workbench: a welcome moment, then one screen per gate — agent CLI, GitHub CLI, Linear — and a Ready screen that names whatever is still unresolved.
 - The wizard is the first-run surface only. Settings → Diagnostics owns the recurring case and remains the full gate; the wizard shows the five checks a first run can act on and reads them from the same `setupDiagnostics` probe.
 - The agent-CLI gate is either-or: a working Pi *or* a working Claude Code satisfies it, so a machine carrying one runtime reads as ready and the runtime the user skipped dims instead of turning red. Linear is a soft gate that always leaves a way forward.
-- The same either-or rule governs the diagnostics rollup, not just the wizard, but the two resolve it from different lists. The rollup reads the `AGENT_RUNTIME_CHECK_GROUPS` table in `src/shared/setup-checks.ts` — Pi's four checks, Claude's one — and `setupDiagnostics` resolves it onto each check's `blocking` flag before computing `blocked`: with one runtime working the others demote to optional, and with none working every runtime check is promoted to required, because either would fix it. The wizard's `agent-cli` step carries its own narrower list in `src/renderer/lib/onboarding/gates.ts` — `['pi-executable', 'claude-executable']` under an `any` gate — so it clears on either executable while diagnostics still holds Pi to its RPC and provider checks. Diagnostics is the stricter authority; the wizard is deliberately the cheaper one. Ensemblr needs *an* agent runtime, never a particular one and never both.
+- The same either-or rule governs the diagnostics rollup, not just the wizard, and both read one table: `AGENT_RUNTIME_CHECK_GROUPS` in `src/shared/setup-checks.ts` — Pi's four checks, Claude's one. `setupDiagnostics` resolves it onto each check's `blocking` flag before computing `blocked`: with one runtime working the others demote to optional, and with none working every runtime check is promoted to required, because either would fix it. The wizard (`src/renderer/lib/onboarding/check-mapping.ts`) backs each runtime card with its whole group, and its `agent-cli` step clears on either card under an `any` gate in `src/renderer/lib/onboarding/gates.ts`, so it cannot call a machine ready that diagnostics still blocks. Ensemblr needs *an* agent runtime, never a particular one and never both.
 - `warning` counts as a pass wherever the question is "can the app use this" — `isPassingSetupStatus`, shared by both gates, so a Pi binary whose version probe is flaky never blocks a machine the rest of the app calls ready. The Linear step is the deliberate exception: `linear-oauth` reports `warning` for "not connected", so that step demands an outright `success` rather than drawing itself as done.
 - Both exits — finishing and skipping — record `app.onboarding.completedAt` in `~/.config/ensemblr/config.json`, so the wizard never nags. Clearing that field re-runs it.
 - The guard sits on the workbench shell route, not on `/_workbench`, so `/settings/*` stays reachable while onboarding is outstanding.

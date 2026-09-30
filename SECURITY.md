@@ -28,7 +28,7 @@ An agent doing something Ensemblr's permission model says it cannot do **is**.
 - **Plan-mode bypass** — reaching a write tool while a session is held in plan mode.
 - **The loopback control server** — accepting a non-local caller, accepting a request without a valid
   per-session bearer token, or leaking a token across workspaces.
-- **Secrets escaping the Keychain** — a stored credential written to disk, a log, a support bundle, or a
+- **Secrets escaping the platform secret store** (the macOS Keychain, or `safeStorage` ciphertext on Linux) — a stored credential written to disk, a log, a support bundle, or a
   prompt.
 - **IPC handlers accepting unvalidated renderer input** in a way that reaches the filesystem, the shell,
   or the database.
@@ -49,7 +49,7 @@ An agent doing something Ensemblr's permission model says it cannot do **is**.
   vulnerability).
 - Or email **howdy@ensemblr.dev**.
 
-Please include the version and build channel, macOS version, which agent runtime was involved, and the
+Please include the version and build channel, macOS version or Linux distribution, which agent runtime was involved, and the
 smallest reproduction you have. A proof of concept is welcome; please do not test against anyone else's
 machine or data.
 

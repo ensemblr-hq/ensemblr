@@ -255,19 +255,23 @@ Because the worktree is a normal git worktree, any other tool you point at it �
 your editor's git integration, a source-control GUI, your own shell — sees
 exactly the same repository state.
 
-## macOS: opening a workspace elsewhere
+## Opening a workspace elsewhere
 
 The workbench header carries an **Open workspace in…** split button that hands
 the workspace directory to another app
 ([ADR 0028](../adr/0028-use-launch-services-for-open-workspace-in-app.md)).
 
-Ensemblr detects installed apps through Launch Services and shows their real
-macOS icons. **Only apps you actually have installed appear** — the menu never
-lists something that would fail to open. The candidate set spans Finder, editors
-(VS Code and Insiders, Cursor, Windsurf, Zed, Xcode, Sublime Text, Nova,
-IntelliJ IDEA, WebStorm, PyCharm), terminals (Ghostty, Warp, iTerm, Hyper,
-Alacritty, kitty, Terminal), and source-control apps (GitHub Desktop, Tower,
-Fork, Sourcetree, GitKraken), plus **Copy path**.
+Ensemblr detects installed apps — through Launch Services on macOS, `.desktop`
+entries on Linux — and shows their real icons. **Only apps you actually have
+installed appear** — the menu never lists something that would fail to open. The
+candidate set is per platform. On macOS it spans Finder, editors (VS Code and
+Insiders, Cursor, Windsurf, Zed, Xcode, Sublime Text, Nova, IntelliJ IDEA,
+WebStorm, PyCharm), terminals (Ghostty, Warp, iTerm, Hyper, Alacritty, kitty,
+Terminal), and source-control apps (GitHub Desktop, Tower, Fork, Sourcetree,
+GitKraken). On Linux it spans file managers (Files, Dolphin, Thunar, Nemo), editors (VS Code
+and Insiders, Cursor, Windsurf, Zed, Sublime Text, IntelliJ IDEA, WebStorm,
+PyCharm), terminals (Ghostty, Warp, Alacritty, kitty, WezTerm, Konsole, GNOME
+Terminal), and GitKraken. Both add **Copy path**.
 
 | Shortcut | Action |
 | --- | --- |

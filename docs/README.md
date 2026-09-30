@@ -8,7 +8,7 @@ then dive in here.
 
 ## Using Ensemblr
 
-The current build is [`0.2.0`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.2.0), for macOS on Apple silicon and Intel and Linux on x86-64. On macOS, `brew install --cask ensemblr-hq/tap/ensemblr` or download the `.dmg` ([Apple silicon](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.0/Ensemblr-0.2.0-arm64.dmg), [Intel](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.0/Ensemblr-0.2.0-x64.dmg)) — signed, notarized and stapled. On Linux, `curl -fsSL https://www.ensemblr.dev/install.sh | sh`, or take the [`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.0/Ensemblr-0.2.0-x64.AppImage) yourself — it is unsigned, because Linux has no equivalent to notarization. You bring your own agent CLI — Pi or Claude Code, one is enough — plus `git` and an authenticated `gh`.
+The current build is [`0.2.1`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.2.1), for macOS on Apple silicon and Intel and Linux on x86-64. On macOS, `brew install --cask ensemblr-hq/tap/ensemblr` or download the `.dmg` ([Apple silicon](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.1/Ensemblr-0.2.1-arm64.dmg), [Intel](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.1/Ensemblr-0.2.1-x64.dmg)) — signed, notarized and stapled. On Linux, `curl -fsSL https://www.ensemblr.dev/install.sh | sh`, or take the [`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.1/Ensemblr-0.2.1-x64.AppImage) yourself — it is unsigned, because Linux has no equivalent to notarization. You bring your own agent CLI — Pi or Claude Code, one is enough — plus `git` and an authenticated `gh`.
 
 - [`guide/`](./guide) — the user guide: [install](./guide/01-install.md), [requirements](./guide/02-requirements.md), [first run](./guide/03-first-run.md), [concepts](./guide/04-concepts.md), and the day-to-day surfaces through to [troubleshooting](./guide/14-troubleshooting.md). Start at [`guide/README.md`](./guide/README.md).
 
@@ -23,6 +23,7 @@ The current build is [`0.2.0`](https://github.com/ensemblr-hq/ensemblr/releases/
 - [`agent-control.md`](./agent-control.md) — **Ensemblr Control**: how agents drive the app, the permission model, guardrails, and multi-agent orchestration.
 - [`harnesses.md`](./harnesses.md) — the two first-class agent runtimes (Pi, Claude Code) versus the terminal harnesses Ensemblr launches as their native TUI, with install, auto-approve, and resume details.
 - [`build-and-release.md`](./build-and-release.md) — packaging for both targets, code signing and notarization on macOS, the Linux AppImage and its Steam Deck runbook, and build channels.
+- [`homebrew-cask-two-arch.md`](./homebrew-cask-two-arch.md) — the two-architecture Homebrew cask shape the release workflow bumps, and what it requires of the tap.
 
 ## Reference
 

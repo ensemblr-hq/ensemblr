@@ -7,7 +7,8 @@ mode that governs its file and shell access.
 An agent with Control can:
 
 - open a chat tab and start another conversation, steer it, and close it
-- launch a harness — Claude Code, Codex, Vibe — in a terminal
+- launch a harness — Claude Code, Codex, Vibe — in a terminal, when **Settings →
+  Experimental → Third-party CLI harnesses** is on (it is off by default)
 - start and stop the setup script, a run script, or a scratch terminal, type into
   one, and read its output
 - bring a tab, terminal, or the Agents / Files / Changes / Checks panel forward
@@ -99,6 +100,8 @@ Delegation is bounded so a runaway agent cannot fill your machine with children:
 | Spawn depth | **2** — a root may open a depth-1 manager, which may open depth-2 leaves |
 | Spawns per root tree | 20 |
 | Spawns per minute | 10 |
+| Terminals open at once, per root tree | 8 — starting one is not a spawn and never spends the spawn budget |
+| Terminal starts per minute | 10 |
 | Blocking wait | times out after 5 minutes; the child keeps running |
 | Waiting on an ancestor | refused — it would deadlock |
 

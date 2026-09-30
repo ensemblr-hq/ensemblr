@@ -244,8 +244,10 @@ line in a file your login shell does not read will be invisible to it.
 2. Point Ensemblr at the binary. **Settings → Providers → Claude Code executable
    path** takes an absolute path (`which claude`) and overrides discovery. Leave
    it empty to use `PATH`, which is the recommended state when `PATH` works.
-3. Set it per repository. `.ensemblr/settings.toml` accepts
-   `claude_executable_path`, for when one project needs a different binary.
+
+The override is app-wide. `claude_executable_path` in `.ensemblr/settings.toml`
+parses but does nothing — see
+[12. Repository settings](./12-repository-settings.md#keys-that-are-accepted-but-do-nothing).
 
 An override that stops working is reported distinctly: *"The configured Claude
 Code executable could not be run. Clear the override to fall back to the claude
@@ -290,11 +292,13 @@ because they are genuinely broken, and Pi chats will not open.
 
 ### Codex or Vibe is missing from the harness menu
 
-**Cause.** A harness appears in the menu only when its binary is found on
-`PATH`. There is no setup check for them and no error — an absent harness is
-silently absent.
+**Cause.** Two things, in the order worth checking. The launcher is behind
+**Settings → Experimental → Third-party CLI harnesses**, which is off by default;
+with it off, the tab-strip menu is not drawn at all. With it on, a harness
+appears only when its binary is found on `PATH`. There is no setup check for
+them and no error — an absent harness is silently absent.
 
-**Fix.** Install the CLI from its vendor and confirm it resolves — `which codex`,
+**Fix.** Turn the setting on, then install the CLI from its vendor and confirm it resolves — `which codex`,
 `which vibe`. If it resolves in your terminal but the menu is still empty, it is
 the same `PATH` problem as the `claude` entry above. Unlike the agent runtimes,
 harnesses have **no** path override — the binary has to be on the `PATH`

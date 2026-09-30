@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-30
+
+Ensemblr 0.2.1 cuts rendering stutter in busy workspaces, gives more file types their own icon, and labels an agent's own status read as "this chat".
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.2.1) ·
+[`.dmg` (Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.1/Ensemblr-0.2.1-arm64.dmg) ·
+[`.dmg` (Intel)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.1/Ensemblr-0.2.1-x64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.1/Ensemblr-0.2.1-x64.AppImage)
+
+### Changed
+
+- **Busy workspaces stutter less.** Live agent updates are isolated from the workbench shell and share one agent-session event feed, streaming deltas are coalesced into 32 ms runs, and the timeline keeps only a bounded live tail. The Changes tree is virtualized, the All Files tree is memoized, and whole-turn diff rendering is capped per file and per reveal window. On Linux, workspace scans are bounded, watcher invalidations are classified, and listing rebuilds are serialized so stale results are never published. Checkpoint boundaries are serialized per workspace. (#679)
+- **More file types get their own icon.** `.ini`, `.qml`, `qmldir` and the systemd units `.service`, `.socket` and `.timer` now show their own glyphs, and configure-time templates ending in `.in` (such as `.service.in`, `config.h.in` and `Makefile.in`) take the icon of the file they generate. (#678)
+
+### Fixed
+
+- **An agent reading its own status no longer looks like it checked a sub-agent.** `ensemblr_get_conversation_status` with no session now shows "Checked this chat" instead of "Checked a sub-agent" on both the workspace and Concierge surfaces, in English, Russian and Greek. (#677)
+
 ## [0.2.0] - 2026-09-29
 
 Ensemblr 0.2.0 pins each turn's diff to the moment the turn ended, so a chip on the timeline never shows the next turn's edits, and finds pull requests opened inside a fork.

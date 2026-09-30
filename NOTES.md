@@ -1,13 +1,17 @@
-# Ensemblr v0.2.0
+# Ensemblr v0.2.1
 
-Ensemblr 0.2.0 pins each turn's diff to the moment the turn ended, so a chip on the timeline never shows the next turn's edits, and finds pull requests opened inside a fork.
+Ensemblr 0.2.1 cuts rendering stutter in busy workspaces, gives more file types their own icon, and labels an agent's own status read as "this chat".
+
+### Changed
+
+* **Busy workspaces stutter less.** Live agent updates are isolated from the workbench shell and share one agent-session event feed, streaming deltas are coalesced, and the timeline keeps only a bounded live tail. The Changes tree is virtualized, the All Files tree is memoized, and whole-turn diff rendering is capped per file. On Linux, workspace scans are bounded and watcher events are classified so unrelated writes stop rebuilding the file listing. (#679)
+* **More file types get their own icon.** `.ini`, `.qml`, `qmldir` and the systemd units `.service`, `.socket` and `.timer` now show their own glyphs, and configure-time templates ending in `.in` (such as `.service.in` or `config.h.in`) take the icon of the file they generate. (#678)
 
 ### Fixed
 
-* **A turn's diff locks when the turn ends.** The agent finishing, the user stopping it, or the next prompt, steer or follow-up arriving now closes the turn at its own snapshot, so the diff chips on the timeline no longer show the following turn's changes, and a steer gets its own turn instead of sharing one. A turn whose end snapshot was lost shows no diff rather than a later one, and diff tabs opened from a finished turn stop following the working tree. Turns recorded before this release have no end of their own and fall back to the next checkpoint in their session, or show no diff. (#673)
-* **Pull requests opened inside a fork show up.** In a checkout cloned from a fork, `gh` resolves to the parent repository and reported no pull request for one opened from a branch into the fork itself. Ensemblr now retries once against the repository the branch's remote points at, and uses it for deployments, review threads and merges. Single-remote checkouts make no extra `gh` calls. (#672)
+* **An agent reading its own status no longer looks like it checked a sub-agent.** A status read that names no session now shows "Checked this chat" instead of "Checked a sub-agent", in English, Russian and Greek. (#677)
 
-See the [changelog](https://github.com/ensemblr-hq/ensemblr/blob/v0.2.0/CHANGELOG.md) for every change.
+See the [changelog](https://github.com/ensemblr-hq/ensemblr/blob/v0.2.1/CHANGELOG.md) for every change.
 
 ### Install
 
@@ -17,7 +21,7 @@ macOS (Apple silicon and Intel):
 brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
-Or download the `.dmg` for your Mac: `Ensemblr-0.2.0-arm64.dmg` (Apple silicon) or `Ensemblr-0.2.0-x64.dmg` (Intel).
+Or download the `.dmg` for your Mac: `Ensemblr-0.2.1-arm64.dmg` (Apple silicon) or `Ensemblr-0.2.1-x64.dmg` (Intel).
 
 Linux (x64):
 
@@ -29,4 +33,4 @@ Both `.dmg` files are signed with a Developer ID certificate, hardened-runtime, 
 
 ---
 
-*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.1.24...v0.2.0>
+*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.2.0...v0.2.1>

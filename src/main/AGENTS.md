@@ -14,15 +14,22 @@ These instructions apply to everything under `src/main/`.
   - `pi-ipc/` for transport plumbing shared by `pi-runtime/` and `pi-agent/`; pure utilities, no protocol knowledge.
   - `agent-providers/` for the provider-parameterized settings surface: model catalogue, executable overrides, readiness probes.
   - `agents/` for detecting which spawnable harnesses are installed and their trusted launch commands.
+  - `agent-skills/` for where the Agent Skill bundle Ensemblr ships lives on disk, addressed per runtime; path resolution only.
   - `agent-control/` for the loopback control server, its MCP endpoint, ports/adapters, guardrails, and origin registry.
   - `plan-mode/` for the per-session plan registry, plan-file writing, and plan submission.
+  - `afk-mode/` for the in-memory registry of sessions the user has stepped away from.
+  - `architecture/` for the per-workspace architecture diagram file, its service, and upkeep state.
   - `app/` for BrowserWindow creation and app lifecycle helpers.
   - `chat-tabs/` for the chat-tab service, preview slot, and terminal-session persistence.
   - `checkpoints/` for git-backed per-turn checkpoints.
   - `commands/` for local process and shell execution.
+  - `concierge/` for the Concierge home directory, memory service and pass, and session service.
+  - `concurrency/` for bounded fan-out helpers such as `mapWithConcurrency`.
   - `config/` for declarative config loading, settings resolution, and repository config.
   - `environment/` for environment variable catalog and assembly.
+  - `dictation/` for the composer's speech-to-text service and its endpoint policy.
   - `github/` and `linear/` for the `gh` CLI wrapper and PR sweeper, and Linear OAuth, client, and store.
+  - `infisical/` for the Infisical REST client, account and link stores, and the environment layer it feeds.
   - `ipc/` for main-process IPC handler registration and request validation.
   - `linked-directories/` for read grants over directories outside a workspace, and the app-global recents list behind them.
   - `menu/` for the native Electron menu bar: one builder per menu behind `createMenuItemFactory`, composed by `application-menu.ts`, labelled from `menu-strings.ts`, and enabled from the renderer's command report.
@@ -30,11 +37,13 @@ These instructions apply to everything under `src/main/`.
   - `repository/` for repository registration, git probing, and lifecycle.
   - `review/` for Ensemblr-local review comments and todos.
   - `root/` for managed root directory resolution and reconciliation.
+  - `safe-fs/` for symlink-safe containment and atomic-write primitives used by writers inside a repository checkout.
   - `scripts/` for the named run-script lifecycle, setup/archive hooks, and setup fingerprint and state file.
   - `secrets/` for secret storage backends and metadata.
   - `setup/` for setup diagnostics orchestration.
   - `storage/` for SQLite connections, migrations, and the per-aggregate repository modules.
   - `terminal/` for `node-pty` PTY sessions and scrollback.
+  - `updates/` for the release feed, update preconditions, and the AppImage and Homebrew update paths.
   - `workspace-files/` and `workspace-git/` for workspace file watching and listing, the content-addressed composer attachment store, path-safety and image-signature checks, and git status, commits, and worktrees.
 - Do not add new root-level files under `src/main/` unless Electron Forge or Vite needs them as entrypoints.
 - Main returns locale-neutral codes, never English labels — it cannot reach the renderer's i18n instance, so adding a code here is a user-facing change that owes the renderer mapper a `t()` case with `ru` and `el` filled. `menu/menu-strings.ts` is the one exception: it holds all three languages itself, because the menu bar is built before any renderer exists.
@@ -55,6 +64,6 @@ These instructions apply to everything under `src/main/`.
 
 ## Verification
 
-- After moving main-process files or imports, run `npm run typecheck`.
-- Run the narrow `npm run test:<concern>` script for any changed behavior under a main concern.
-- Run `npm run check` before finishing JavaScript, TypeScript, CSS, or JSON changes.
+- After moving main-process files or imports, run `bun run typecheck`.
+- Run the narrow `bun run test:<concern>` script for any changed behavior under a main concern.
+- Run `bun run check` before finishing JavaScript, TypeScript, CSS, or JSON changes.

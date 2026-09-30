@@ -88,11 +88,12 @@ src/
 ├── main/       Electron main process (Node), organized concern-first — one folder per
 │               concern, each behind an index.ts. Entry: main.ts.
 │                 agent-runtime · pi-agent · claude-agent · agent-providers · agents
-│                 agent-control · plan-mode · chat-tabs · checkpoints · commands
+│                 agent-skills · agent-control · plan-mode · afk-mode · concierge
+│                 chat-tabs · checkpoints · commands · architecture · dictation
 │                 repository · workspace-git · workspace-files · review · github · linear
-│                 terminal · scripts · storage · config · environment · secrets · setup
-│                 ipc · app · menu · open-target · root · pi-ipc · pi-runtime
-│                 linked-directories
+│                 infisical · terminal · scripts · storage · config · environment · secrets
+│                 setup · ipc · app · menu · open-target · root · updates · safe-fs
+│                 concurrency · pi-ipc · pi-runtime · linked-directories
 ├── preload/    Context-isolated IPC bridge (bridge/ensemblr-api.ts). Entry: preload.ts.
 ├── renderer/   React UI, organized type-first: api · components · config · fixtures ·
 │               hooks · lib · routing · state · styles · types. Entry: main.tsx.
@@ -100,8 +101,12 @@ src/
                 agent-control, harness registry (agents.ts), scripts, plan-mode, keymap,
                 terminal, pi-rpc, menu-commands
 
-resources/      Shipped Pi extensions (pi-extensions/ensemblr-control.mts)
+resources/      Shipped Pi extensions (pi-extensions/) and Agent Skill bundles (agent-skills/,
+                agent-skills-architecture/)
 playground/     Vite-only component preview harness (bun run dev:playground)
+demo/           Demo mode: the real app against scripted fixtures, for screenshots (bun run dev:demo)
+schemas/        Published JSON Schemas for config.json and .ensemblr/settings.toml
+nix/            Nix flake packaging (see docs/build-and-release.md)
 docs/           Guide, ADRs, runtime references — see docs/README.md
 tests/          main/ · renderer/ · shared/ · fixtures/
 scripts/        Build and maintenance scripts
@@ -117,4 +122,5 @@ if you skip it.
 ## Generated files
 
 Never hand-edit `src/renderer/routing/routeTree.gen.ts` (the TanStack Router plugin regenerates it),
-`package-lock.json`, or `src/renderer/lib/i18n/locales/en/**`.
+`bun.lock` (Bun writes it; its `lockfileVersion` stays at 1), or
+`src/renderer/lib/i18n/locales/en/**`.
