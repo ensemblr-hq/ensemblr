@@ -111,7 +111,9 @@ export function installScrollViewport(height = 1200): () => void {
 	return () => {
 		if (original) {
 			Object.defineProperty(HTMLElement.prototype, 'offsetHeight', original);
+			return;
 		}
+		Reflect.deleteProperty(HTMLElement.prototype, 'offsetHeight');
 	};
 }
 
