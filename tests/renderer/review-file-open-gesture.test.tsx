@@ -9,7 +9,11 @@ import {
 } from '../../src/renderer/components/workbench-shell/conversation-panel/file-preview-context';
 import { ReviewFileList } from '../../src/renderer/components/workbench-shell/review-files/review-file-list';
 import type { ReviewFileSummary } from '../../src/renderer/types/workbench';
-import { installLocalStorage, renderWithProviders } from './support/dom';
+import {
+	installLocalStorage,
+	installScrollViewport,
+	renderWithProviders,
+} from './support/dom';
 
 const sourceFile: ReviewFileSummary = {
 	additions: 4,
@@ -55,6 +59,7 @@ function openRowMenu(path: string) {
 
 beforeEach(() => {
 	installLocalStorage();
+	return installScrollViewport();
 });
 
 test('a single click opens a changed file into the preview slot', () => {

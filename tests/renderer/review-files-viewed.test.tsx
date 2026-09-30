@@ -19,11 +19,14 @@ import {
 	viewedChangesByWorkspaceAtom,
 } from '../../src/renderer/state/workspace';
 import type { ReviewFileSummary } from '../../src/renderer/types/workbench';
-import { installLocalStorage } from './support/dom';
+import { installLocalStorage, installScrollViewport } from './support/dom';
 
 // Marks persist to localStorage, so each test needs its own storage or the
 // previous test's marks arrive with the atom when it mounts.
-beforeEach(installLocalStorage);
+beforeEach(() => {
+	installLocalStorage();
+	return installScrollViewport();
+});
 
 const FIRST: ReviewFileSummary = {
 	additions: 10,

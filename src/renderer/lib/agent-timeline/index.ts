@@ -33,6 +33,7 @@ export {
 } from './optimistic-prompts.ts';
 export { parsePromptAttachments } from './prompt-attachment-parser.ts';
 export { parseStackTrace } from './stack-trace.ts';
+export { appendLiveEvents } from './streaming-delta-rows.ts';
 export { splitSettledMarkdown } from './streaming-markdown-split.ts';
 export {
 	countNestedToolCalls,

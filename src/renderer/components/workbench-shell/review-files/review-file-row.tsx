@@ -8,7 +8,7 @@ import {
 	TriangleAlertIcon,
 	Undo2Icon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { FilePathLabel } from '@/renderer/components/file-path-label';
@@ -47,66 +47,112 @@ const fileStatusLabel: Record<ReviewFileSummary['status'], string> = {
  * Owns only the hover/viewed/discarding state the three clusters share; each
  * reads the actions it needs from the row-actions context itself.
  */
-export function ReviewFileRow({
-	ariaLevel,
-	file,
-	level = 0,
-	showPath,
-}: {
-	/** Tree depth (1-based) when rendered inside the folder tree; omit in the flat list. */
-	ariaLevel?: number;
-	file: ReviewFileSummary;
-	level?: number;
-	showPath: boolean;
-}) {
-	const { isDiscarding, isViewed } = useReviewFileActions();
-	const [isMenuOpen, setIsMenuOpen] = useState(false);
+export const ReviewFileRow = memo(
+	function ReviewFileRow({
+		ariaLevel,
+		ariaPosInSet,
+		ariaSetSize,
+		file,
+		level = 0,
+		showPath,
+	}: {
+		/** Tree depth (1-based) when rendered inside the folder tree; omit in the flat list. */
+		ariaLevel?: number;
+		/** 1-based position among the parent's entries; omit in the flat list. */
+		ariaPosInSet?: number;
+		/** Number of entries under the same parent; omit in the flat list. */
+		ariaSetSize?: number;
+		file: ReviewFileSummary;
+		level?: number;
+		showPath: boolean;
+	}) {
+		const { isDiscarding, isViewed } = useReviewFileActions();
+		const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-	const discarding = isDiscarding(file.path);
-	const viewed = isViewed(file);
+		const discarding = isDiscarding(file.path);
+		const viewed = isViewed(file);
 
+		return (
+			<div
+				className={cn(
+					'group relative flex h-8 w-full items-center rounded-md pr-1.5 hover:bg-muted',
+					isMenuOpen && 'bg-muted',
+					// Dim the whole row rather than its text so the file icon and status
+					// mark recede with it, and lift it back on hover so a reviewer
+					// returning to a signed-off file can still read it.
+					viewed && 'opacity-50 hover:opacity-100',
+					// `pointer-events-none` covers the pointer, and stops the viewed lift
+					// above from firing besides, since a row that is not a hit-test target
+					// never matches `:hover`. It leaves the tab order untouched, so each
+					// control carries `disabled` for the keyboard as well.
+					discarding && 'pointer-events-none opacity-50',
+					fileTreeIndentClassName(level),
+				)}
+				aria-busy={discarding || undefined}
+				data-row-kind='file'
+				data-row-path={file.path}
+				// `aria-level` is only valid alongside a tree role: apply both together
+				// in the folder tree, neither in the flat list.
+				{...(ariaLevel === undefined
+					? {}
+					: {
+							'aria-level': ariaLevel,
+							'aria-posinset': ariaPosInSet,
+							'aria-setsize': ariaSetSize,
+							role: 'treeitem' as const,
+						})}
+			>
+				<ReviewFileOpenButton
+					discarding={discarding}
+					file={file}
+					showPath={showPath}
+				/>
+				<ReviewFileRowSummary
+					file={file}
+					isMenuOpen={isMenuOpen}
+					viewed={viewed}
+				/>
+				<ReviewFileRowActions
+					discarding={discarding}
+					file={file}
+					isMenuOpen={isMenuOpen}
+					onMenuOpenChange={setIsMenuOpen}
+				/>
+			</div>
+		);
+	},
+	// Objects are recreated on every git-status mapping, so the file compares by
+	// value. Every prop is listed: a prop added to this component must be added
+	// here too, or memo silently skips renders on stale props.
+	(previous, next) =>
+		previous.ariaLevel === next.ariaLevel &&
+		previous.ariaPosInSet === next.ariaPosInSet &&
+		previous.ariaSetSize === next.ariaSetSize &&
+		previous.level === next.level &&
+		previous.showPath === next.showPath &&
+		isSameReviewFile(previous.file, next.file),
+);
+
+/**
+ * Whether two rows describe the same file in the same state, field by field.
+ * @param previous - The row rendered last
+ * @param next - The row about to render
+ * @returns True when nothing the row displays or acts on has changed
+ */
+function isSameReviewFile(
+	previous: ReviewFileSummary,
+	next: ReviewFileSummary,
+): boolean {
 	return (
-		<div
-			className={cn(
-				'group relative flex h-8 w-full items-center rounded-md pr-1.5 hover:bg-muted',
-				isMenuOpen && 'bg-muted',
-				// Dim the whole row rather than its text so the file icon and status
-				// mark recede with it, and lift it back on hover so a reviewer
-				// returning to a signed-off file can still read it.
-				viewed && 'opacity-50 hover:opacity-100',
-				// `pointer-events-none` covers the pointer, and stops the viewed lift
-				// above from firing besides, since a row that is not a hit-test target
-				// never matches `:hover`. It leaves the tab order untouched, so each
-				// control carries `disabled` for the keyboard as well.
-				discarding && 'pointer-events-none opacity-50',
-				fileTreeIndentClassName(level),
-			)}
-			aria-busy={discarding || undefined}
-			data-row-kind='file'
-			data-row-path={file.path}
-			// `aria-level` is only valid alongside a tree role: apply both together
-			// in the folder tree, neither in the flat list.
-			{...(ariaLevel === undefined
-				? {}
-				: { 'aria-level': ariaLevel, role: 'treeitem' as const })}
-		>
-			<ReviewFileOpenButton
-				discarding={discarding}
-				file={file}
-				showPath={showPath}
-			/>
-			<ReviewFileRowSummary
-				file={file}
-				isMenuOpen={isMenuOpen}
-				viewed={viewed}
-			/>
-			<ReviewFileRowActions
-				discarding={discarding}
-				file={file}
-				isMenuOpen={isMenuOpen}
-				onMenuOpenChange={setIsMenuOpen}
-			/>
-		</div>
+		previous === next ||
+		(previous.id === next.id &&
+			previous.path === next.path &&
+			previous.status === next.status &&
+			previous.additions === next.additions &&
+			previous.deletions === next.deletions &&
+			previous.contentId === next.contentId &&
+			previous.renamedFrom === next.renamedFrom &&
+			previous.symlinkTargetKind === next.symlinkTargetKind)
 	);
 }
 

@@ -2,10 +2,11 @@
 
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'jotai';
+import { useMemo } from 'react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { ensemblrQueryKeys } from '../../../src/renderer/api/ensemblr/query-keys';
-import { AgentsPanel } from '../../../src/renderer/components/workbench-shell/agents-panel/agents-panel';
-import { useAgentsPanelState } from '../../../src/renderer/state/agents';
+import { AgentLiveStateFeed } from '../../../src/renderer/components/workbench-shell/agent-live-state-feed';
+import { LiveAgentsPanel } from '../../../src/renderer/components/workbench-shell/agents-panel/live-agents-panel';
 import type {
 	AgentSessionEventBroadcast,
 	AgentSessionSnapshotWire,
@@ -73,7 +74,11 @@ function agentSession(
 	};
 }
 
-/** Mounts the real panel around its production query/state hook. */
+/**
+ * Mounts the live panel beside the feed that maintains its state, the way the
+ * workspace shell does: the feed stays mounted for the workspace, the panel only
+ * while the Agents tab shows.
+ */
 function ProductionPanel({
 	onDismiss,
 	onRestore,
@@ -85,14 +90,16 @@ function ProductionPanel({
 	onSelect: (chatTabId: string) => void;
 	workspaceId?: string;
 }) {
-	const props = useAgentsPanelState({
-		onDismiss,
-		onRestore,
-		onSelect,
-		selectedChatTabId: 'open-chat',
-		workspaceId,
-	});
-	return <AgentsPanel {...props} />;
+	const navigation = useMemo(
+		() => ({ onDismiss, onRestore, onSelect, selectedChatTabId: 'open-chat' }),
+		[onDismiss, onRestore, onSelect],
+	);
+	return (
+		<>
+			<AgentLiveStateFeed workspaceId={workspaceId} />
+			<LiveAgentsPanel navigation={navigation} workspaceId={workspaceId} />
+		</>
+	);
 }
 
 /** Seeds every query the production hook reads without polling the bridge. */

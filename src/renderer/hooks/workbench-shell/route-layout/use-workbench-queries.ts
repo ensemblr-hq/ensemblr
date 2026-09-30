@@ -140,7 +140,8 @@ export function useWorkbenchQueries({
 	// Only the active workspace is ever watched (`useWorkspaceFilesWatch` calls
 	// `watchWorkspaceFiles` for one `workspaceCwd` at a time), so this only ever
 	// sharpens that one entry; every other row still waits out the interval
-	// above.
+	// above. Every broadcast counts, whatever flags it carries: a plain write
+	// moves the diff stats without touching the listed tree.
 	useEffect(() => {
 		const api = getEnsemblrApiOrNull();
 		if (!api || !hasPreloadBridge) {

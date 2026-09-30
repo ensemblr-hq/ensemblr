@@ -27,13 +27,20 @@ import {
 	AgentSubmitError,
 } from '../../src/main/agent-runtime/agent-types.ts';
 import { createFakeAgentAdapter } from '../../src/main/agent-runtime/fake-agent-adapter.ts';
+import {
+	createSessionNaming,
+	type SessionNamingInput,
+} from '../../src/main/agent-runtime/naming/session-naming.ts';
 import type {
 	SessionSummaryWriter,
 	WriteSessionSummaryInput,
 } from '../../src/main/agent-runtime/session-summary-writer.ts';
 import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
-import { listEventsByBranch } from '../../src/main/storage/repositories/agent-event-repository.ts';
+import {
+	type AgentEventRow,
+	listEventsByBranch,
+} from '../../src/main/storage/repositories/agent-event-repository.ts';
 import {
 	getAgentSessionBranchById,
 	getAgentSessionById,
@@ -393,6 +400,7 @@ function createService(
 		adapter?: AgentAdapter;
 		deferShutdown?: boolean;
 		eventSink?: AgentSessionEventSink;
+		queueNaming?: (input: SessionNamingInput) => void;
 		refreshPlanUsage?: () => Promise<boolean>;
 		rejectAbortFor?: (index: number) => boolean;
 		rejectSubmitFor?: (index: number) => boolean;
@@ -415,7 +423,7 @@ function createService(
 		},
 		eventSink: options.eventSink,
 		agentClient,
-		queueNaming: () => undefined,
+		queueNaming: options.queueNaming ?? (() => undefined),
 		resolveAgentControlEnv: options.resolveAgentControlEnv,
 		resolveSpawnedChildren: options.resolveSpawnedChildren,
 		sessionSummaryWriter: options.sessionSummaryWriter,
@@ -2409,6 +2417,96 @@ test('a fork from an earlier turn falls back to the transcript', async (t) => {
 	assert.equal(summaryCalls.at(-1)?.agentSummary, null);
 });
 
+// A delta run is held for one flush window before it is broadcast, so a test
+// waits for the run to reach the sink instead of assuming when it will. The
+// settle delay only backs a negative check, that nothing further is sent.
+const DELTA_WINDOW_SETTLE_MS = 80;
+const DELTA_WAIT_TIMEOUT_MS = 3000;
+
+async function waitUntil(condition: () => boolean): Promise<void> {
+	const deadline = Date.now() + DELTA_WAIT_TIMEOUT_MS;
+	while (!condition()) {
+		assert.ok(Date.now() < deadline, 'timed out waiting for a delta run');
+		await delay(5);
+	}
+}
+
+function streamingDelta(
+	text: string,
+	overrides: {
+		kind?: 'reasoning-delta' | 'text-delta';
+		parentToolCallId?: string;
+	} = {},
+): AgentEvent {
+	return {
+		at: '2026-06-08T00:00:00.000Z',
+		...(overrides.parentToolCallId
+			? { parentToolCallId: overrides.parentToolCallId }
+			: {}),
+		payload: { kind: overrides.kind ?? 'text-delta', text },
+		role: 'agent',
+		turnId: 'fake-turn',
+		type: 'message',
+	};
+}
+
+function sealedText(text: string): AgentEvent {
+	return {
+		at: '2026-06-08T00:00:02.000Z',
+		payload: { kind: 'text', text },
+		role: 'agent',
+		turnId: 'fake-turn',
+		type: 'message',
+	};
+}
+
+function labelBroadcast(event: AgentEventRow): string {
+	const envelope = event.payload;
+	if (
+		envelope?.kind === 'message' &&
+		(envelope.payload.kind === 'text-delta' ||
+			envelope.payload.kind === 'reasoning-delta')
+	) {
+		return `${envelope.payload.kind}:${envelope.payload.text}`;
+	}
+	return event.eventType;
+}
+
+async function openStreamingSession(
+	t: import('node:test').TestContext,
+	options: {
+		eventSink?: (event: AgentEventRow) => void;
+		queueNaming?: (input: SessionNamingInput) => void;
+	} = {},
+) {
+	const fixture = openFixture(t);
+	const broadcasts: AgentEventRow[] = [];
+	const { fake, service } = createService(fixture.database, {
+		eventSink: ({ event }) => {
+			broadcasts.push(event);
+			options.eventSink?.(event);
+		},
+		queueNaming: options.queueNaming,
+	});
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.submitPrompt({ prompt: 'stream', sessionId: snapshot.id });
+	await delay(10);
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(runtime, 'expected one open runtime session');
+	return {
+		broadcasts,
+		database: fixture.database,
+		fake,
+		runtime,
+		service,
+		snapshot,
+	};
+}
+
 test('a streaming delta keeps its subagent link on the broadcast row', async (t) => {
 	const fixture = openFixture(t);
 	const parents: Array<string | undefined> = [];
@@ -2448,8 +2546,370 @@ test('a streaming delta keeps its subagent link on the broadcast row', async (t)
 		turnId: 'fake-turn',
 		type: 'message',
 	});
+	await waitUntil(() => parents.length === 2);
 
 	assert.deepEqual(parents, ['toolu_task_1', undefined]);
+});
+
+test('fifty synchronous text deltas reach the sink as one broadcast', async (t) => {
+	const { broadcasts, runtime } = await openStreamingSession(t);
+	const before = broadcasts.length;
+	const words = Array.from({ length: 50 }, (_, index) => `w${index} `);
+
+	for (const word of words) {
+		runtime.emit(streamingDelta(word));
+	}
+	assert.equal(broadcasts.length, before, 'held until the flush window closes');
+	await waitUntil(() => broadcasts.length > before);
+	await delay(DELTA_WINDOW_SETTLE_MS);
+
+	assert.deepEqual(broadcasts.slice(before).map(labelBroadcast), [
+		`text-delta:${words.join('')}`,
+	]);
+});
+
+test('a persisted event is broadcast right after the deltas it flushed', async (t) => {
+	const { broadcasts, runtime } = await openStreamingSession(t);
+	const before = broadcasts.length;
+
+	runtime.emit(streamingDelta('Hel'));
+	runtime.emit(streamingDelta('lo'));
+	runtime.emit(sealedText('Hello'));
+
+	const [run, sealed, ...rest] = broadcasts.slice(before);
+	assert.equal(run && labelBroadcast(run), 'text-delta:Hello');
+	assert.equal(sealed && labelBroadcast(sealed), 'message');
+	assert.ok(run && sealed && run.ordinal < sealed.ordinal);
+	await delay(DELTA_WINDOW_SETTLE_MS);
+	assert.equal(rest.length, 0);
+	assert.equal(
+		broadcasts.length,
+		before + 2,
+		'the flushed run is not sent twice',
+	);
+});
+
+test('a status change flushes the buffered deltas before it is broadcast', async (t) => {
+	const { broadcasts, runtime } = await openStreamingSession(t);
+	const before = broadcasts.length;
+
+	runtime.emit(streamingDelta('almost done'));
+	runtime.setStatus('idle');
+
+	assert.deepEqual(broadcasts.slice(before, before + 2).map(labelBroadcast), [
+		'text-delta:almost done',
+		'status',
+	]);
+});
+
+test('deltas of another kind or thread start their own run, in order', async (t) => {
+	const { broadcasts, runtime } = await openStreamingSession(t);
+	const before = broadcasts.length;
+
+	runtime.emit(streamingDelta('a'));
+	runtime.emit(streamingDelta('b'));
+	runtime.emit(streamingDelta('r', { kind: 'reasoning-delta' }));
+	runtime.emit(streamingDelta('c', { parentToolCallId: 'toolu_task_1' }));
+	runtime.emit(streamingDelta('d'));
+	await waitUntil(() => broadcasts.length >= before + 4);
+	await delay(DELTA_WINDOW_SETTLE_MS);
+
+	const runs = broadcasts.slice(before);
+	assert.deepEqual(runs.map(labelBroadcast), [
+		'text-delta:ab',
+		'reasoning-delta:r',
+		'text-delta:c',
+		'text-delta:d',
+	]);
+	const ordinals = runs.map((run) => run.ordinal);
+	assert.deepEqual(
+		ordinals,
+		[...ordinals].sort((left, right) => left - right),
+		'runs keep the order they opened in',
+	);
+	assert.deepEqual(
+		runs.map((run) => run.id.split(':').at(-1)),
+		['1', '2', '3', '4'],
+		'one ordinal is reserved per run, not per token',
+	);
+});
+
+test('a steer tags later deltas with the new turn instead of the interrupted one', async (t) => {
+	const { broadcasts, runtime, service, snapshot } =
+		await openStreamingSession(t);
+	const before = broadcasts.length;
+
+	runtime.emit(streamingDelta('one '));
+	await service.submitPrompt({
+		prompt: 'change course',
+		sessionId: snapshot.id,
+		streamingBehavior: 'steer',
+	});
+	runtime.emit(streamingDelta('two'));
+	const deltaRuns = () =>
+		broadcasts
+			.slice(before)
+			.filter((event) => labelBroadcast(event).startsWith('text-delta:'));
+	await waitUntil(() => deltaRuns().length >= 2);
+
+	const runs = deltaRuns();
+	assert.deepEqual(runs.map(labelBroadcast), [
+		'text-delta:one ',
+		'text-delta:two',
+	]);
+	assert.ok(runs[0]?.turnId && runs[1]?.turnId);
+	assert.notEqual(runs[0]?.turnId, runs[1]?.turnId);
+});
+
+test('each session streams into its own run', async (t) => {
+	const fixture = openFixture(t);
+	const broadcasts: Array<{ label: string; sessionId: string }> = [];
+	const { fake, service } = createService(fixture.database, {
+		eventSink: ({ event, sessionId }) => {
+			broadcasts.push({ label: labelBroadcast(event), sessionId });
+		},
+	});
+	const open = () =>
+		service.openSession({
+			executable: createReadyExecutable(),
+			workspaceCwd: '/tmp/ensemblr/svc/ws',
+			workspaceId: fixture.workspaceId,
+		});
+	const first = await open();
+	const second = await open();
+	await service.submitPrompt({ prompt: 'one', sessionId: first.id });
+	await service.submitPrompt({ prompt: 'two', sessionId: second.id });
+	await delay(10);
+	const [firstRuntime, secondRuntime] = fake.getOpenSessions();
+	assert.ok(
+		firstRuntime && secondRuntime,
+		'expected two open runtime sessions',
+	);
+
+	firstRuntime.emit(streamingDelta('a1 '));
+	secondRuntime.emit(streamingDelta('b1 '));
+	firstRuntime.emit(streamingDelta('a2'));
+	secondRuntime.emit(streamingDelta('b2'));
+	const deltasOf = (sessionId: string) =>
+		broadcasts
+			.filter((entry) => entry.sessionId === sessionId)
+			.map((entry) => entry.label)
+			.filter((label) => label.startsWith('text-delta:'));
+	await waitUntil(
+		() => deltasOf(first.id).length > 0 && deltasOf(second.id).length > 0,
+	);
+	await delay(DELTA_WINDOW_SETTLE_MS);
+
+	assert.deepEqual(deltasOf(first.id), ['text-delta:a1 a2']);
+	assert.deepEqual(deltasOf(second.id), ['text-delta:b1 b2']);
+});
+
+test('a sink that throws on a delta run does not stop later broadcasts', async (t) => {
+	t.mock.method(console, 'warn', () => undefined);
+	let failDeltas = true;
+	const { broadcasts, runtime } = await openStreamingSession(t, {
+		eventSink: (event) => {
+			if (failDeltas && labelBroadcast(event).startsWith('text-delta:')) {
+				throw new Error('renderer gone');
+			}
+		},
+	});
+	const before = broadcasts.length;
+
+	runtime.emit(streamingDelta('lost'));
+	await waitUntil(() => broadcasts.length > before);
+	failDeltas = false;
+	runtime.emit(streamingDelta('kept'));
+	runtime.emit(sealedText('kept'));
+
+	assert.deepEqual(broadcasts.slice(before).map(labelBroadcast), [
+		'text-delta:lost',
+		'text-delta:kept',
+		'message',
+	]);
+});
+
+// Rows also reach the timeline from outside the runtime event stream: a plan the
+// app submits for the agent, a workspace rename, a tab name the agent chooses, and
+// the title derived from the first prompt. None of them passes through the
+// runtime handler, so a delta run must step past them from storage rather than
+// from the last event the handler saw, or it sorts below a row that arrived
+// before it.
+async function deltaRunOrdinal(
+	broadcasts: readonly AgentEventRow[],
+	runtime: { emit: (event: AgentEvent) => void },
+	text: string,
+): Promise<number> {
+	const isRun = (event: AgentEventRow) =>
+		labelBroadcast(event) === `text-delta:${text}`;
+	runtime.emit(streamingDelta(text));
+	await waitUntil(() => broadcasts.some(isRun));
+	const run = broadcasts.find(isRun);
+	assert.ok(run, 'expected the delta run to reach the sink');
+	return run.ordinal;
+}
+
+function isChatTitleRow(event: AgentEventRow): boolean {
+	const envelope = event.payload;
+	return (
+		envelope?.kind === 'metadata' && envelope.metadata.chatTitle !== undefined
+	);
+}
+
+test('a delta after a plan appended outside the runtime stream sorts above it', async (t) => {
+	const { broadcasts, runtime, service, snapshot } =
+		await openStreamingSession(t);
+	runtime.emit(sealedText('drafting'));
+
+	service.appendAgentMessage({ sessionId: snapshot.id, text: '# Plan' });
+	const plan = broadcasts.at(-1);
+	assert.ok(plan && labelBroadcast(plan) === 'message');
+	const ordinal = await deltaRunOrdinal(broadcasts, runtime, 'after the plan');
+
+	assert.ok(
+		ordinal > plan.ordinal,
+		`delta ordinal ${ordinal} must sort above the plan row ${plan.ordinal}`,
+	);
+});
+
+test('a delta after a workspace rename sorts above the rename row', async (t) => {
+	const { broadcasts, runtime, service, snapshot } =
+		await openStreamingSession(t);
+	runtime.emit(sealedText('drafting'));
+
+	service.appendWorkspaceRenamed(snapshot.id);
+	const renamed = broadcasts.at(-1);
+	assert.ok(renamed && labelBroadcast(renamed) === 'metadata');
+	const ordinal = await deltaRunOrdinal(broadcasts, runtime, 'after rename');
+
+	assert.ok(
+		ordinal > renamed.ordinal,
+		`delta ordinal ${ordinal} must sort above the rename row ${renamed.ordinal}`,
+	);
+});
+
+test('a delta after the agent names the tab sorts above the title row', async (t) => {
+	const { broadcasts, runtime, service, snapshot } =
+		await openStreamingSession(t);
+	runtime.emit(sealedText('drafting'));
+
+	await service.setSessionName({
+		name: 'Refactor auth flow',
+		provenance: 'agent',
+		sessionId: snapshot.id,
+	});
+	const title = broadcasts.at(-1);
+	assert.ok(title && isChatTitleRow(title));
+	const ordinal = await deltaRunOrdinal(broadcasts, runtime, 'after the name');
+
+	assert.ok(
+		ordinal > title.ordinal,
+		`delta ordinal ${ordinal} must sort above the title row ${title.ordinal}`,
+	);
+});
+
+test('a delta after the derived first-prompt title sorts above the title row', async (t) => {
+	const { broadcasts, runtime } = await openStreamingSession(t, {
+		queueNaming: createSessionNaming(),
+	});
+
+	runtime.setStatus('idle');
+	await waitUntil(() => broadcasts.some(isChatTitleRow));
+	const title = broadcasts.find(isChatTitleRow);
+	assert.ok(title);
+	const ordinal = await deltaRunOrdinal(broadcasts, runtime, 'next turn');
+
+	assert.ok(
+		ordinal > title.ordinal,
+		`delta ordinal ${ordinal} must sort above the title row ${title.ordinal}`,
+	);
+});
+
+test('runs opened after one append keep their own ordinals, in order', async (t) => {
+	const { broadcasts, runtime, service, snapshot } =
+		await openStreamingSession(t);
+	runtime.emit(sealedText('drafting'));
+	service.appendAgentMessage({ sessionId: snapshot.id, text: '# Plan' });
+	const before = broadcasts.length;
+
+	runtime.emit(streamingDelta('a'));
+	runtime.emit(streamingDelta('r', { kind: 'reasoning-delta' }));
+	runtime.emit(streamingDelta('b'));
+	await waitUntil(() => broadcasts.length >= before + 3);
+	await delay(DELTA_WINDOW_SETTLE_MS);
+
+	const runs = broadcasts.slice(before);
+	assert.deepEqual(runs.map(labelBroadcast), [
+		'text-delta:a',
+		'reasoning-delta:r',
+		'text-delta:b',
+	]);
+	const ordinals = runs.map((run) => run.ordinal);
+	assert.deepEqual(
+		ordinals,
+		[...ordinals].sort((left, right) => left - right),
+	);
+	assert.equal(new Set(runs.map((run) => run.id)).size, runs.length);
+	assert.equal(new Set(ordinals).size, runs.length);
+});
+
+test('a delta run still broadcasts when the branch ordinal cannot be read', async (t) => {
+	const warn = t.mock.method(console, 'warn', () => undefined);
+	const { broadcasts, database, runtime } = await openStreamingSession(t);
+	const prepare = database.prepare.bind(database);
+	t.mock.method(database, 'prepare', (sql: string) => {
+		if (sql.includes('AS max')) {
+			throw new Error('disk I/O error');
+		}
+		return prepare(sql);
+	});
+
+	await deltaRunOrdinal(broadcasts, runtime, 'still streaming');
+
+	const warnings = warn.mock.calls.map((call) => String(call.arguments[0]));
+	assert.ok(
+		warnings.some((message) => message.includes('newest event ordinal')),
+		'the failed read is reported',
+	);
+});
+
+test('a run still buffered when its session is stopped reaches the workspace before the shutdown', async (t) => {
+	const fixture = openFixture(t);
+	const broadcasts: Array<{ label: string; workspaceId: string }> = [];
+	const { fake, service } = createService(fixture.database, {
+		deferShutdown: true,
+		eventSink: ({ event, workspaceId }) => {
+			broadcasts.push({ label: labelBroadcast(event), workspaceId });
+		},
+	});
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.submitPrompt({ prompt: 'stream', sessionId: snapshot.id });
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(runtime, 'expected one open runtime session');
+
+	runtime.emit(streamingDelta('cut off mid-sentence'));
+	await service.stopSession({ sessionId: snapshot.id });
+	await waitUntil(
+		() =>
+			broadcasts.some((entry) => entry.label === 'shutdown') &&
+			broadcasts.some((entry) => entry.label.startsWith('text-delta:')),
+	);
+
+	const tail = broadcasts.filter(
+		(entry) =>
+			entry.label === 'shutdown' || entry.label.startsWith('text-delta:'),
+	);
+	assert.deepEqual(tail, [
+		{
+			label: 'text-delta:cut off mid-sentence',
+			workspaceId: fixture.workspaceId,
+		},
+		{ label: 'shutdown', workspaceId: fixture.workspaceId },
+	]);
 });
 
 test('refreshPlanUsage reaches the live runtime and reports that it answered', async (t) => {

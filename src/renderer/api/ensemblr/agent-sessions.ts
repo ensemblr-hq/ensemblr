@@ -18,6 +18,7 @@ import type {
 	WriteForkSummaryRequest,
 	WriteForkSummaryResult,
 } from '@/shared/ipc/contracts/agent-session';
+import type { EnsemblrApi } from '@/shared/ipc/contracts/api';
 import { readCachedAgentModels } from './agent-models-cache';
 import {
 	type AgentModelsPollState,
@@ -188,7 +189,84 @@ export function agentSessionEventsQuery(branchId: string) {
 	});
 }
 
-/** Subscribes to live agent session event broadcasts. Returns an unsubscribe fn. */
+/** One subscriber to the shared agent session event feed. */
+interface AgentSessionEventSubscriber {
+	listener: (event: AgentSessionEventBroadcast) => void;
+}
+
+/** The one bridge registration every subscriber shares, and the bridge it was made on. */
+interface AgentSessionEventRegistration {
+	api: EnsemblrApi;
+	release: () => void;
+}
+
+/**
+ * Every live subscriber. Each subscription is its own entry rather than the bare
+ * function, so one function subscribed twice is called twice and each release
+ * removes only its own entry.
+ */
+const agentSessionEventSubscribers = new Set<AgentSessionEventSubscriber>();
+
+/** The shared bridge registration, or null while nobody is subscribed. */
+let agentSessionEventRegistration: AgentSessionEventRegistration | null = null;
+
+/**
+ * Hands one bridge broadcast to the subscribers present when it arrived, in
+ * subscription order. A subscriber that joins mid-delivery first sees the next
+ * event, one released mid-delivery is skipped, and a listener that throws is
+ * reported without cutting off the ones after it.
+ */
+function deliverAgentSessionEvent(event: AgentSessionEventBroadcast): void {
+	for (const subscriber of [...agentSessionEventSubscribers]) {
+		if (!agentSessionEventSubscribers.has(subscriber)) {
+			continue;
+		}
+		try {
+			subscriber.listener(event);
+		} catch (error) {
+			console.error('An agent session event listener failed:', error);
+		}
+	}
+}
+
+/**
+ * Points the shared registration at `api`. A registration made on a bridge that
+ * has since been replaced is released only after the new one holds, so a bridge
+ * that refuses leaves the old registration in place.
+ */
+function bindAgentSessionEventRegistration(api: EnsemblrApi): void {
+	if (agentSessionEventRegistration?.api === api) {
+		return;
+	}
+	const replaced = agentSessionEventRegistration;
+	agentSessionEventRegistration = {
+		api,
+		release: api.onAgentSessionEvent(deliverAgentSessionEvent),
+	};
+	replaced?.release();
+}
+
+/** Removes one subscriber and drops the bridge registration once none remain. */
+function releaseAgentSessionEventSubscriber(
+	subscriber: AgentSessionEventSubscriber,
+): void {
+	if (
+		!agentSessionEventSubscribers.delete(subscriber) ||
+		agentSessionEventSubscribers.size > 0
+	) {
+		return;
+	}
+	const registration = agentSessionEventRegistration;
+	agentSessionEventRegistration = null;
+	registration?.release();
+}
+
+/**
+ * Subscribes to live agent session event broadcasts. Every subscriber shares one
+ * bridge registration, so a broadcast crosses the bridge once however many hooks
+ * listen; the registration follows `window.ensemblr` if the bridge is replaced.
+ * Returns an unsubscribe fn.
+ */
 export function subscribeAgentSessionEvents(
 	listener: (event: AgentSessionEventBroadcast) => void,
 ): () => void {
@@ -196,7 +274,10 @@ export function subscribeAgentSessionEvents(
 	if (!api) {
 		return () => undefined;
 	}
-	return api.onAgentSessionEvent(listener);
+	bindAgentSessionEventRegistration(api);
+	const subscriber: AgentSessionEventSubscriber = { listener };
+	agentSessionEventSubscribers.add(subscriber);
+	return () => releaseAgentSessionEventSubscriber(subscriber);
 }
 
 /**

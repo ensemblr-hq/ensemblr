@@ -18,6 +18,10 @@
  * driven from both sides here: the gauges through the query cache *and* through
  * the live broadcast feed they also subscribe to, and the buffer on a painting
  * window *and* on one that never paints at all.
+ *
+ * What the buffer writes is bounded too. A stream is cached as its first row plus
+ * one accumulated tail instead of a row per chunk, so a long turn no longer grows
+ * the list — and the copy of it made every frame — with the length of its text.
  */
 
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -98,9 +102,12 @@ async function settleFrame(): Promise<void> {
 }
 
 /** One streamed text delta, as the main process synthesizes it. */
-function textDelta(ordinal: number): AgentSessionEventWire {
+function textDelta(
+	ordinal: number,
+	branchId: string = BRANCH_ID,
+): AgentSessionEventWire {
 	return {
-		branchId: BRANCH_ID,
+		branchId,
 		createdAt: new Date(0).toISOString(),
 		eventType: 'message',
 		id: `delta-${ordinal}`,
@@ -113,6 +120,30 @@ function textDelta(ordinal: number): AgentSessionEventWire {
 		stream: 'protocol',
 		turnId: 'turn-1',
 	} as unknown as AgentSessionEventWire;
+}
+
+/**
+ * The text every streamed delta row in the list carries, in list order. A live
+ * stream is cached as its first row plus one accumulated tail, so the rows
+ * themselves say little about how many chunks arrived; their text does.
+ */
+function streamedText(events: readonly AgentSessionEventWire[]): string {
+	return events
+		.map((event) => {
+			const envelope = event.payload;
+			return envelope?.kind === 'message' && 'text' in envelope.payload
+				? envelope.payload.text
+				: '';
+		})
+		.join('');
+}
+
+/** The text `textDelta` rows carry for ordinals `first` through `last`. */
+function chunksThrough(first: number, last: number): string {
+	return Array.from(
+		{ length: last - first + 1 },
+		(_, index) => `chunk ${first + index}`,
+	).join('');
 }
 
 /** A context-usage reading, which is one of the two events the gauges care about. */
@@ -271,9 +302,43 @@ describe('streaming render load', () => {
 		await settleFrame();
 
 		expect(setQueryData).toHaveBeenCalledTimes(1);
-		expect(result.current.events.map((event) => event.ordinal)).toEqual(
-			Array.from({ length: 40 }, (_, index) => index + 1),
+		expect(result.current.events.map((event) => event.ordinal)).toEqual([
+			1, 40,
+		]);
+		expect(streamedText(result.current.events)).toBe(chunksThrough(1, 40));
+	});
+
+	/**
+	 * A stream is cached as its first row plus one accumulated tail, so however long
+	 * a turn runs the cached list, the copy of it written each frame, and the walk
+	 * the projector makes over it stay the size of a stream's shape instead of the
+	 * length of its text. Frame by frame is the point: it is the per-frame merge
+	 * that used to append a row per chunk.
+	 */
+	test('a long stream keeps two cached rows however many frames it spans', async () => {
+		installBridge();
+		const client = createTestQueryClient();
+		const { result } = renderHook(
+			() => useTimelineEvents({ branchId: BRANCH_ID, sessionId: SESSION_ID }),
+			{ wrapper: providerFor(client) },
 		);
+		await settle();
+
+		const framesOfFifty = 20;
+		for (let frame = 0; frame < framesOfFifty; frame += 1) {
+			act(() => {
+				for (let offset = 1; offset <= 50; offset += 1) {
+					broadcast(textDelta(frame * 50 + offset));
+				}
+			});
+			await settleFrame();
+			expect(result.current.events.length).toBeLessThanOrEqual(2);
+		}
+
+		expect(result.current.events.map((event) => event.ordinal)).toEqual([
+			1, 1000,
+		]);
+		expect(streamedText(result.current.events)).toBe(chunksThrough(1, 1000));
 	});
 
 	/**
@@ -319,8 +384,11 @@ describe('streaming render load', () => {
 		await settle();
 
 		expect(setQueryData).toHaveBeenCalledTimes(1);
-		expect(result.current.events).toHaveLength(BUFFER_CAP);
+		expect(result.current.events).toHaveLength(2);
 		expect(result.current.events.at(-1)?.ordinal).toBe(BUFFER_CAP);
+		expect(streamedText(result.current.events)).toBe(
+			chunksThrough(1, BUFFER_CAP),
+		);
 		expect(scheduledFrames).toBe(1);
 	});
 
@@ -343,6 +411,82 @@ describe('streaming render load', () => {
 
 		expect(result.current.events.map((event) => event.ordinal)).toEqual([
 			1, 2, 3,
+		]);
+	});
+
+	test('the newest delta delivered twice still lands once after the run was folded', async () => {
+		installBridge();
+		const client = createTestQueryClient();
+		const { result } = renderHook(
+			() => useTimelineEvents({ branchId: BRANCH_ID, sessionId: SESSION_ID }),
+			{ wrapper: providerFor(client) },
+		);
+		await settle();
+
+		act(() => {
+			for (let ordinal = 1; ordinal <= 5; ordinal += 1) {
+				broadcast(textDelta(ordinal));
+			}
+		});
+		await settleFrame();
+		act(() => {
+			broadcast(textDelta(5));
+		});
+		await settleFrame();
+
+		expect(result.current.events.map((event) => event.ordinal)).toEqual([1, 5]);
+		expect(streamedText(result.current.events)).toBe(chunksThrough(1, 5));
+	});
+
+	test('deltas of two branches fold into their own caches', async () => {
+		installBridge();
+		const client = createTestQueryClient();
+		renderHook(
+			() => useTimelineEvents({ branchId: BRANCH_ID, sessionId: SESSION_ID }),
+			{ wrapper: providerFor(client) },
+		);
+		await settle();
+
+		act(() => {
+			for (let ordinal = 1; ordinal <= 6; ordinal += 1) {
+				broadcast(textDelta(ordinal));
+				broadcast(textDelta(ordinal, 'branch-2'));
+			}
+		});
+		await settleFrame();
+
+		const cachedFor = (branchId: string) =>
+			client.getQueryData<ListAgentSessionEventsResult>(
+				ensemblrQueryKeys.agentSessionEvents(branchId),
+			)?.events ?? [];
+		for (const branchId of [BRANCH_ID, 'branch-2']) {
+			expect(cachedFor(branchId).map((event) => event.ordinal)).toEqual([1, 6]);
+			expect(streamedText(cachedFor(branchId))).toBe(chunksThrough(1, 6));
+		}
+	});
+
+	test('a persisted event ends the folded run and the next delta starts a new one', async () => {
+		installBridge();
+		const client = createTestQueryClient();
+		const { result } = renderHook(
+			() => useTimelineEvents({ branchId: BRANCH_ID, sessionId: SESSION_ID }),
+			{ wrapper: providerFor(client) },
+		);
+		await settle();
+
+		act(() => {
+			for (let ordinal = 1; ordinal <= 4; ordinal += 1) {
+				broadcast(textDelta(ordinal));
+			}
+			broadcast(contextUsage(5, 1_000));
+			for (let ordinal = 6; ordinal <= 9; ordinal += 1) {
+				broadcast(textDelta(ordinal));
+			}
+		});
+		await settleFrame();
+
+		expect(result.current.events.map((event) => event.ordinal)).toEqual([
+			1, 4, 5, 6, 9,
 		]);
 	});
 

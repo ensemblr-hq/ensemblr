@@ -3,7 +3,7 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr';
 import { useWorkspaceFilesWatch } from '../../src/renderer/hooks/workbench-shell/route-layout/use-workspace-files-watch';
@@ -58,7 +58,11 @@ test('invalidates files and workspace-scoped settings after a watched workspace 
 	});
 
 	act(() => {
-		listener?.({ workspaceCwd: '/tmp/workspace' });
+		listener?.({
+			membershipChanged: true,
+			settingsChanged: true,
+			workspaceCwd: '/tmp/workspace',
+		});
 	});
 
 	expect(invalidateQueries).toHaveBeenCalledWith({
@@ -121,7 +125,11 @@ test('throttles the expanded-directory refresh a burst of broadcasts would fan o
 
 		act(() => {
 			for (let index = 0; index < 5; index += 1) {
-				listener?.({ workspaceCwd: WORKSPACE_CWD });
+				listener?.({
+					membershipChanged: true,
+					settingsChanged: false,
+					workspaceCwd: WORKSPACE_CWD,
+				});
 			}
 		});
 
@@ -141,7 +149,11 @@ test('throttles the expanded-directory refresh a burst of broadcasts would fan o
 		expect(directoryRefreshCount(invalidateQueries.mock.calls)).toBe(1);
 
 		act(() => {
-			listener?.({ workspaceCwd: WORKSPACE_CWD });
+			listener?.({
+				membershipChanged: true,
+				settingsChanged: false,
+				workspaceCwd: WORKSPACE_CWD,
+			});
 			vi.advanceTimersByTime(1);
 		});
 		expect(directoryRefreshCount(invalidateQueries.mock.calls)).toBe(1);
@@ -154,4 +166,111 @@ test('throttles the expanded-directory refresh a burst of broadcasts would fan o
 	} finally {
 		vi.useRealTimers();
 	}
+});
+
+/**
+ * Mounts the hook against a stub bridge. `broadcast` delivers one event and lets
+ * every timer the hook armed run out; `invalidatedKeys` reads back, as strings
+ * comparable to `ensemblrQueryKeys` output, what the hook invalidated.
+ */
+function mountWatchWithBroadcast(): {
+	broadcast: (
+		flags: Omit<WorkspaceFilesChangedBroadcast, 'workspaceCwd'>,
+	) => void;
+	invalidatedKeys: () => string[];
+} {
+	const client = createTestQueryClient();
+	const invalidateQueries = vi.spyOn(client, 'invalidateQueries');
+	let listener: ((event: WorkspaceFilesChangedBroadcast) => void) | null = null;
+
+	installEnsemblrApi({
+		onWorkspaceFilesChanged: (
+			nextListener: (event: WorkspaceFilesChangedBroadcast) => void,
+		) => {
+			listener = nextListener;
+			return vi.fn();
+		},
+		unwatchWorkspaceFiles: vi.fn(),
+		watchWorkspaceFiles: vi.fn(),
+	});
+
+	renderHook(
+		() =>
+			useWorkspaceFilesWatch({
+				repositoryId: 'repo-1',
+				workspaceCwd: WORKSPACE_CWD,
+			}),
+		{
+			wrapper: ({ children }: { children: ReactNode }) => (
+				<QueryClientProvider client={client}>{children}</QueryClientProvider>
+			),
+		},
+	);
+
+	return {
+		broadcast: (flags) => {
+			act(() => {
+				listener?.({ ...flags, workspaceCwd: WORKSPACE_CWD });
+				vi.advanceTimersByTime(10_000);
+			});
+		},
+		invalidatedKeys: () =>
+			invalidateQueries.mock.calls.map(([argument]) =>
+				JSON.stringify(argument?.queryKey),
+			),
+	};
+}
+
+const FILE_LIST_KEY = JSON.stringify(
+	ensemblrQueryKeys.workspaceFiles(WORKSPACE_CWD),
+);
+const DIRECTORIES_KEY = JSON.stringify(
+	ensemblrQueryKeys.workspaceDirectories(WORKSPACE_CWD),
+);
+const SETTINGS_KEY = JSON.stringify(
+	ensemblrQueryKeys.settingsResolution('repo-1', WORKSPACE_CWD),
+);
+
+describe('broadcast flags gate what the hook invalidates', () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	test('a change that touched no entry and no settings input invalidates nothing', () => {
+		const { broadcast, invalidatedKeys } = mountWatchWithBroadcast();
+
+		broadcast({ membershipChanged: false, settingsChanged: false });
+
+		expect(invalidatedKeys()).toEqual([]);
+	});
+
+	test('a membership change refreshes the file list and expanded directories, not settings', () => {
+		const { broadcast, invalidatedKeys } = mountWatchWithBroadcast();
+
+		broadcast({ membershipChanged: true, settingsChanged: false });
+
+		expect(invalidatedKeys()).toEqual([FILE_LIST_KEY, DIRECTORIES_KEY]);
+	});
+
+	test('a settings change refreshes settings, not the file list or directories', () => {
+		const { broadcast, invalidatedKeys } = mountWatchWithBroadcast();
+
+		broadcast({ membershipChanged: false, settingsChanged: true });
+
+		expect(invalidatedKeys()).toEqual([SETTINGS_KEY]);
+	});
+
+	test('a change that touched both refreshes all three', () => {
+		const { broadcast, invalidatedKeys } = mountWatchWithBroadcast();
+
+		broadcast({ membershipChanged: true, settingsChanged: true });
+
+		expect(invalidatedKeys().sort()).toEqual(
+			[FILE_LIST_KEY, DIRECTORIES_KEY, SETTINGS_KEY].sort(),
+		);
+	});
 });

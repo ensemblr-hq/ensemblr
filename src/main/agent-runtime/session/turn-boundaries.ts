@@ -379,7 +379,7 @@ function boundaryFor({
 
 /**
  * Lets a checkpoint write finish in the background. The port is serialized per
- * session and warns on git failures itself; this only keeps a database failure
+ * workspace and warns on git failures itself; this only keeps a database failure
  * from surfacing as an unhandled rejection.
  * @param operation - Which boundary the write records, for the warning
  * @param write - The pending port call

@@ -18,6 +18,10 @@ export type FlatFileTreeRow<TFile> =
 			labelParts: string[];
 			level: number;
 			node: FileTreeNode<TFile>;
+			/** 1-based position among the parent's directories then files. */
+			posInSet: number;
+			/** Number of entries under the same parent, hidden or not. */
+			setSize: number;
 			type: 'directory';
 	  }
 	| {
@@ -25,5 +29,9 @@ export type FlatFileTreeRow<TFile> =
 			/** Stable React key: the file's (unique) path. */
 			key: string;
 			level: number;
+			/** 1-based position among the parent's directories then files. */
+			posInSet: number;
+			/** Number of entries under the same parent, hidden or not. */
+			setSize: number;
 			type: 'file';
 	  };

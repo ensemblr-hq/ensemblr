@@ -384,7 +384,7 @@ function DiffBody({
 					})
 				}
 			</Diff>
-			{!showEveryHunk && bounded.hiddenHunks > 0 ? (
+			{!showEveryHunk && bounded.hiddenRows > 0 ? (
 				<button
 					className='w-full border-border/60 border-t px-3 py-2 text-left text-muted-foreground text-xs hover:text-foreground'
 					onClick={() => setBudgetLifted(true)}

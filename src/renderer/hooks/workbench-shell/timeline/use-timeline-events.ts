@@ -11,6 +11,7 @@ import {
 	ensemblrQueryKeys,
 	subscribeAgentSessionEvents,
 } from '@/renderer/api/ensemblr-queries';
+import { appendLiveEvents } from '@/renderer/lib/agent-timeline';
 import type {
 	AgentSessionEventWire,
 	ListAgentSessionEventsResult,
@@ -147,13 +148,15 @@ function prependOlder(
  * Collects broadcast events and folds them into the query cache at most once per
  * painted frame instead of once per event.
  *
- * A runtime broadcasts one event per streamed token, and every cache write wakes
- * every observer of that branch — so an unbuffered subscription commits React
- * once per token and pins the compositor at the display's refresh rate for the
- * whole turn. Coalescing on `requestAnimationFrame` caps that at what the screen
- * can actually show, collapses the per-token copy of the event array into one
- * copy per frame, and back-pressures on its own, since a saturated renderer
- * simply gets fewer frames to flush on.
+ * A runtime broadcasts a stream as a steady run of events — the main process
+ * folds adjacent tokens into one event per flush window, but interleaved streams
+ * and every persisted event still arrive on their own — and every cache write
+ * wakes every observer of that branch. An unbuffered subscription therefore
+ * commits React once per event and can pin the compositor at the display's
+ * refresh rate for the whole turn. Coalescing on `requestAnimationFrame` caps
+ * that at what the screen can actually show, collapses the per-event copy of the
+ * event array into one copy per frame, and back-pressures on its own, since a
+ * saturated renderer simply gets fewer frames to flush on.
  * @param queryClient - Cache each batch is folded into.
  * @returns `push` for an incoming event, and `flush` to drain what is queued.
  */
@@ -203,6 +206,12 @@ function createBroadcastBuffer(queryClient: QueryClient): {
  * Merges a frame's worth of broadcast events into the cached event list, keeping
  * it ordered by ordinal and de-duplicated by id.
  *
+ * An in-order batch is appended with each run of streaming deltas folded into
+ * the run's first row and one accumulated tail (see {@link appendLiveEvents}), so
+ * the cached list — and the copy written every frame — stays the size of what is
+ * on screen instead of growing with every chunk. Events that arrive out of order
+ * or twice take the slower path, which keeps every row it is given.
+ *
  * `hasOlder` is carried through untouched: it describes where the *start* of the
  * window sits, and appending live events at the end cannot move that. Dropping
  * it would retire the scroll-back control on the first streamed token.
@@ -219,7 +228,7 @@ function mergeBroadcasts(
 	// Fast path: deltas stream in monotonic order, so one append covers the whole
 	// batch and skips both the id set and the O(n log n) sort.
 	if (incoming.length > 0 && extendsInOrder(existing, incoming)) {
-		return { events: [...existing, ...incoming], ...hasOlder };
+		return { events: appendLiveEvents(existing, incoming), ...hasOlder };
 	}
 	const merged = sortedUnion(existing, incoming);
 	return merged

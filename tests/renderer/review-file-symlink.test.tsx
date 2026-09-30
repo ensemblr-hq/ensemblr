@@ -18,7 +18,11 @@ import type {
 	ReviewFileActions,
 	ReviewFileSummary,
 } from '../../src/renderer/types/workbench';
-import { installLocalStorage, renderWithProviders } from './support/dom';
+import {
+	installLocalStorage,
+	installScrollViewport,
+	renderWithProviders,
+} from './support/dom';
 
 const actions: ReviewFileActions = {
 	attachDiff: () => {},
@@ -70,6 +74,7 @@ function glyphBody(iconName: string): string {
 beforeEach(() => {
 	registerIconCollections();
 	installLocalStorage();
+	return installScrollViewport();
 });
 
 test('a changed symlink to a directory draws the folder shortcut glyph', () => {

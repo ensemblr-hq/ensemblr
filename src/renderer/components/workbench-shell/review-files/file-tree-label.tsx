@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 
 /**
  * Renders a file-tree row's path segments as a `/`-separated breadcrumb. Shared
- * by the folder rows in `all-files-list` and `review-file-tree` so the two views
+ * by the folder rows in `all-files-list` and `review-folder-row` so the two views
  * stay visually identical from one source.
  */
 export function FileTreeLabel({ parts }: { parts: readonly string[] }) {

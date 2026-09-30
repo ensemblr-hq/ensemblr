@@ -122,6 +122,17 @@ test('folders mode renders a collapsible tree, not a flat list', () => {
 	expect(markup).not.toContain('>src/main/ipc/handlers/</span>');
 });
 
+test('folders mode hides the positioning wrappers and numbers rows among siblings', () => {
+	const markup = renderList('folders');
+
+	expect(markup).toContain('class="absolute top-0 left-0 w-full" role="none"');
+	expect(markup).toContain('aria-posinset="1"');
+	expect(markup).toContain('aria-posinset="2"');
+	expect(markup).toContain('aria-setsize="2"');
+	expect(renderList('list')).not.toContain('role="none"');
+	expect(renderList('list')).not.toContain('aria-setsize');
+});
+
 test('the view switcher actually changes the rendered output', () => {
 	expect(renderList('list')).not.toBe(renderList('folders'));
 });

@@ -1,10 +1,9 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
 	settingsResolutionQuery,
-	syncUncommittedFilesToBranchStatus,
 	workspaceFilesQuery,
 	workspaceGitStatusQuery,
 } from '@/renderer/api/ensemblr-queries';
@@ -23,6 +22,7 @@ import type { SettingsResolutionSnapshot } from '@/shared/ipc/contracts/settings
 import type { WorkspaceFileEntryWire } from '@/shared/ipc/contracts/workspace-files';
 import { parseWorkspaceScriptSettings } from '@/shared/scripts';
 
+import { useCarryWorkingTreeCount } from './use-carry-working-tree-count';
 import { useEnsureWorkspaceSetup } from './use-ensure-workspace-setup';
 import { useLivePullRequestModel } from './use-live-pull-request-model';
 import { usePullRequestAutoRefresh } from './use-pull-request-auto-refresh';
@@ -112,26 +112,10 @@ export function useLiveWorkspaceModel({
 		}),
 		select: selectScriptSettings,
 	});
-	const queryClient = useQueryClient();
-	const { data: gitStatusData, dataUpdatedAt: gitStatusObservedAt } = useQuery(
+	const { data: gitStatusData } = useQuery(
 		workspaceGitStatusQuery(activeWorkspace.pathLabel ?? null),
 	);
-	useEffect(() => {
-		const workspaceCwd = activeWorkspace.pathLabel;
-		if (!workspaceCwd || !gitStatusData || gitStatusData.error) {
-			return;
-		}
-		syncUncommittedFilesToBranchStatus(queryClient, {
-			observedAt: gitStatusObservedAt,
-			uncommittedFiles: gitStatusData.summary.files,
-			workspaceCwd,
-		});
-	}, [
-		activeWorkspace.pathLabel,
-		gitStatusData,
-		gitStatusObservedAt,
-		queryClient,
-	]);
+	useCarryWorkingTreeCount(activeWorkspace.pathLabel ?? null);
 	const { data: allFilesData } = useQuery(
 		workspaceFilesQuery(activeWorkspace.pathLabel ?? null),
 	);

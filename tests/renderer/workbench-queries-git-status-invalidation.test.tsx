@@ -9,6 +9,7 @@ import type {
 	RepositoryWorkspaceNavigationSnapshot,
 	RepositoryWorkspaceNavigationWorkspace,
 } from '@/shared/ipc/contracts/repository-navigation';
+import type { WorkspaceFilesChangedBroadcast } from '@/shared/ipc/contracts/workspace-files';
 import {
 	clearEnsemblrApi,
 	createTestQueryClient,
@@ -64,9 +65,74 @@ describe('useWorkbenchQueries git-status invalidation', () => {
 		clearEnsemblrApi();
 	});
 
+	// A write to an existing file moves the diff stats and nothing in the listed
+	// tree, so the broadcast that carries neither flag is exactly the one the
+	// sidebar's git status still has to answer.
+	it('refetches a workspace git status for a change that touched no entry and no settings input', async () => {
+		let callCount = 0;
+		let broadcast:
+			| ((event: WorkspaceFilesChangedBroadcast) => void)
+			| undefined;
+
+		installEnsemblrApi({
+			getWorkspaceGitStatus: () => {
+				callCount += 1;
+				return Promise.resolve({
+					files: [],
+					summary: {
+						additions: callCount === 1 ? 1 : 7,
+						deletions: 0,
+						files: 1,
+					},
+				});
+			},
+			health: () => Promise.resolve({ status: 'ok' }),
+			onWorkspaceFilesChanged: (
+				listener: (event: WorkspaceFilesChangedBroadcast) => void,
+			) => {
+				broadcast = listener;
+				return () => {
+					broadcast = undefined;
+				};
+			},
+			repositoryWorkspaceNavigation: () => Promise.resolve(snapshot()),
+			setupDiagnostics: () => Promise.resolve({ checks: [], status: 'ok' }),
+		});
+		const client = createTestQueryClient();
+
+		const { result } = renderHook(
+			() => useWorkbenchQueries({ loaderData: loaderData() }),
+			{
+				wrapper: ({ children }) => (
+					<QueryClientProvider client={client}>{children}</QueryClientProvider>
+				),
+			},
+		);
+
+		await waitFor(() => {
+			expect(
+				result.current.projects[0]?.workspaces[0]?.changeSummary.additions,
+			).toBe(1);
+		});
+
+		broadcast?.({
+			membershipChanged: false,
+			settingsChanged: false,
+			workspaceCwd: '/tmp/ws-a',
+		});
+
+		await waitFor(() => {
+			expect(
+				result.current.projects[0]?.workspaces[0]?.changeSummary.additions,
+			).toBe(7);
+		});
+	});
+
 	it('refetches a workspace git status when its file watcher broadcasts a change', async () => {
 		let callCount = 0;
-		let broadcast: ((event: { workspaceCwd: string }) => void) | undefined;
+		let broadcast:
+			| ((event: WorkspaceFilesChangedBroadcast) => void)
+			| undefined;
 
 		installEnsemblrApi({
 			getWorkspaceGitStatus: () => {
@@ -110,7 +176,11 @@ describe('useWorkbenchQueries git-status invalidation', () => {
 		});
 		expect(broadcast).toBeDefined();
 
-		broadcast?.({ workspaceCwd: '/tmp/ws-a' });
+		broadcast?.({
+			membershipChanged: true,
+			settingsChanged: false,
+			workspaceCwd: '/tmp/ws-a',
+		});
 
 		await waitFor(() => {
 			expect(
@@ -133,9 +203,13 @@ describe('useWorkbenchQueries git-status invalidation', () => {
 			},
 			health: () => Promise.resolve({ status: 'ok' }),
 			onWorkspaceFilesChanged: (
-				listener: (event: { workspaceCwd: string }) => void,
+				listener: (event: WorkspaceFilesChangedBroadcast) => void,
 			) => {
-				listener({ workspaceCwd: '/tmp/some-other-workspace' });
+				listener({
+					membershipChanged: true,
+					settingsChanged: true,
+					workspaceCwd: '/tmp/some-other-workspace',
+				});
 				return () => {};
 			},
 			repositoryWorkspaceNavigation: () => Promise.resolve(snapshot()),

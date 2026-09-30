@@ -4,6 +4,7 @@ import {
 	createTimelineProjector,
 	eventsToUIMessages,
 } from '../../src/renderer/lib/agent-timeline/event-to-ui-message';
+import { appendLiveEvents } from '../../src/renderer/lib/agent-timeline/streaming-delta-rows';
 import type {
 	AgentPersistedEnvelope,
 	AgentSessionEventWire,
@@ -193,5 +194,116 @@ describe('createTimelineProjector', () => {
 		for (const index of [0, 1, 2]) {
 			expect(second[index]).toBe(first[index]);
 		}
+	});
+});
+
+describe('createTimelineProjector with a replaced tail row', () => {
+	const HEAD = [
+		...SETTLED,
+		prompt('evt-5', 4, 'third question'),
+		delta('evt-d1', 5, 'Hel'),
+		delta('evt-d2', 6, 'lo'),
+	];
+	const SETTLED_MESSAGES = [0, 1, 2, 3, 4];
+
+	test('projects a replaced tail like a full fold and keeps settled turns identical', () => {
+		const project = createTimelineProjector();
+		const first = project(HEAD);
+
+		const grown = [...HEAD.slice(0, -1), delta('evt-d3', 7, 'lo wor')];
+		const second = project(grown);
+
+		expect(second).toEqual(eventsToUIMessages(grown));
+		for (const index of SETTLED_MESSAGES) {
+			expect(second[index]).toBe(first[index]);
+		}
+		expect(second.at(-1)).not.toBe(first.at(-1));
+	});
+
+	test('projects a replaced tail followed by new rows in one call', () => {
+		const project = createTimelineProjector();
+		const first = project(HEAD);
+
+		const grown = [
+			...HEAD.slice(0, -1),
+			delta('evt-d3', 7, 'lo wor'),
+			delta('evt-d4', 8, 'ld'),
+			answer('evt-6', 9, 'Hello world'),
+		];
+		const second = project(grown);
+
+		expect(second).toEqual(eventsToUIMessages(grown));
+		for (const index of SETTLED_MESSAGES) {
+			expect(second[index]).toBe(first[index]);
+		}
+	});
+
+	test('keeps the messages before a replaced group-opening delta identical', () => {
+		const project = createTimelineProjector();
+		const opening = [...SETTLED, prompt('evt-5', 4, 'third question')];
+		const first = project([...opening, delta('evt-d1', 5, 'Hel')]);
+
+		const replaced = [...opening, delta('evt-d2', 6, 'Hello')];
+		const second = project(replaced);
+
+		expect(second).toEqual(eventsToUIMessages(replaced));
+		for (const index of [0, 1, 2, 3]) {
+			expect(second[index]).toBe(first[index]);
+		}
+	});
+
+	test('follows a thousand-delta stream through the live cache step by step', () => {
+		const project = createTimelineProjector();
+		let cached = appendLiveEvents(
+			[...SETTLED, prompt('evt-5', 4, 'third question')],
+			[delta('evt-d5', 5, 'w5 ')],
+		);
+		const settled = project(cached);
+
+		for (let ordinal = 6; ordinal < 1005; ordinal += 1) {
+			cached = appendLiveEvents(cached, [
+				delta(`evt-d${ordinal}`, ordinal, `w${ordinal} `),
+			]);
+			const messages = project(cached);
+			if (ordinal % 97 === 0) {
+				expect(messages).toEqual(eventsToUIMessages(cached));
+			}
+			for (const index of SETTLED_MESSAGES) {
+				expect(messages[index]).toBe(settled[index]);
+			}
+		}
+
+		expect(cached).toHaveLength(7);
+	});
+
+	test('refolds when the replaced last row is not a streaming delta', () => {
+		const project = createTimelineProjector();
+		project([...HEAD, answer('evt-6', 7, 'Hello')]);
+
+		const corrected = [...HEAD, answer('evt-6', 7, 'Hello, corrected')];
+
+		expect(project(corrected)).toEqual(eventsToUIMessages(corrected));
+	});
+
+	test('refolds when the run shrinks below what was folded', () => {
+		const project = createTimelineProjector();
+		project(HEAD);
+
+		const shorter = [...HEAD.slice(0, -2), delta('evt-d9', 9, 'other')];
+
+		expect(project(shorter)).toEqual(eventsToUIMessages(shorter));
+	});
+
+	test('refolds when a row before the replaced tail changed as well', () => {
+		const project = createTimelineProjector();
+		project(HEAD);
+
+		const rewritten = [
+			...HEAD.slice(0, -2),
+			delta('evt-d1', 5, 'HEL'),
+			delta('evt-d3', 7, 'lo wor'),
+		];
+
+		expect(project(rewritten)).toEqual(eventsToUIMessages(rewritten));
 	});
 });

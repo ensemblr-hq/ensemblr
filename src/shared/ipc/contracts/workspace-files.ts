@@ -44,8 +44,31 @@ export interface WatchWorkspaceFilesRequest {
 	workspaceCwd: string;
 }
 
-/** Broadcast announcing that files changed under a watched workspace cwd. */
-export interface WorkspaceFilesChangedBroadcast {
+/**
+ * What one burst of file events may have changed, so a consumer refetches only
+ * what could differ. Both are conservative: an event the watcher cannot place
+ * raises both, and a plain write to an existing file raises neither.
+ */
+export interface WorkspaceFilesChangeFlags {
+	/**
+	 * An entry may have been created, removed, or renamed, or a `.gitignore` was
+	 * edited, so the listed tree and the folders expanded beneath it may differ.
+	 */
+	membershipChanged: boolean;
+	/**
+	 * A file the settings resolver reads — anything under `.ensemblr/`, or the
+	 * root `.worktreeinclude` — may have changed.
+	 */
+	settingsChanged: boolean;
+}
+
+/**
+ * Broadcast announcing that files changed under a watched workspace cwd. Every
+ * relevant change is broadcast, whatever its flags, because the git status
+ * behind the sidebar's diff stats moves with a plain write too.
+ */
+export interface WorkspaceFilesChangedBroadcast
+	extends WorkspaceFilesChangeFlags {
 	workspaceCwd: string;
 }
 

@@ -25,6 +25,7 @@ import {
 	buildInterruptedMessage,
 } from './diagnostic-event-mapper';
 import { withTruncationNotice } from './payload-truncation.ts';
+import { isStreamingDeltaRow } from './streaming-delta-rows.ts';
 import { parentToolCallIdOf } from './subagent-parts.ts';
 import {
 	dropStreamedFailureEcho,
@@ -61,11 +62,30 @@ export function eventsToUIMessages(
 }
 
 /**
+ * The fold as it stood at an event boundary: the group then open, and how many
+ * messages had been finalized. Enough to put the fold back at that boundary.
+ */
+interface FoldCheckpoint {
+	pending: PendingGroup | null;
+	resultLength: number;
+}
+
+/**
  * Resumable state of one projection: the exact event run already folded, the
- * messages it produced, and the group left open at its end.
+ * messages it produced, the group left open at its end, and the checkpoint just
+ * before its last event, which lets that one event be replaced without a refold.
  */
 interface ProjectionCursor {
+	beforeLast: FoldCheckpoint | null;
 	folded: readonly AgentEventFrame[];
+	pending: PendingGroup | null;
+	result: UIMessage[];
+}
+
+/** Where a projection picks up: how many events are already folded, and the fold state there. */
+interface ResumePoint {
+	beforeLast: FoldCheckpoint | null;
+	from: number;
 	pending: PendingGroup | null;
 	result: UIMessage[];
 }
@@ -104,7 +124,7 @@ interface SkillActivation {
  * @returns A cursor that has folded nothing
  */
 function emptyCursor(): ProjectionCursor {
-	return { folded: [], pending: null, result: [] };
+	return { beforeLast: null, folded: [], pending: null, result: [] };
 }
 
 /**
@@ -114,6 +134,11 @@ function emptyCursor(): ProjectionCursor {
  * pushes a long conversation past the frame budget mid-stream; the settled
  * messages it returns also keep their identity, so only the live turn
  * re-renders.
+ *
+ * The live cache keeps a stream's tail as one accumulated row that is replaced
+ * as the stream grows, so the projector also resumes when only the last folded
+ * row changed and that row was a streaming delta. Anything else that breaks the
+ * folded run refolds it from the start.
  *
  * Hold one projector per timeline for the component's lifetime. Handing it an
  * unrelated event run is safe — it detects the break and refolds from the start.
@@ -131,25 +156,27 @@ export function createTimelineProjector(): (
 	let cursor = emptyCursor();
 
 	return (events) => {
-		const resumed = canResumeProjection(cursor, events);
-		// The cursor's own array, not a copy: this runs once per animation frame of
-		// a stream, and copying made one delta cost a walk of the whole transcript.
-		// Safe because `finalizeProjection` never hands its input back.
-		const result: UIMessage[] = resumed ? cursor.result : [];
-		let pending = resumed ? cursor.pending : null;
+		const start = resumePointOf(cursor, events);
+		const result = start.result;
+		let pending = start.pending;
+		let beforeLast = start.beforeLast;
+		const lastIndex = events.length - 1;
 
-		for (const event of events.slice(resumed ? cursor.folded.length : 0)) {
+		for (const [offset, event] of events.slice(start.from).entries()) {
+			if (start.from + offset === lastIndex) {
+				beforeLast = { pending, resultLength: result.length };
+			}
 			pending = handleEvent(event, pending, result);
 		}
 
-		cursor = { folded: [...events], pending, result };
+		cursor = { beforeLast, folded: [...events], pending, result };
 
 		return finalizeProjection(result, pending, decorations);
 	};
 }
 
 /**
- * Whether `events` extends the exact run the cursor already folded.
+ * Decides how much of the previous fold `events` can reuse.
  *
  * Compares every reference in the folded prefix rather than sampling its ends.
  * TanStack Query's structural sharing keeps unchanged rows referentially
@@ -157,21 +184,74 @@ export function createTimelineProjector(): (
  * end-sampled check would resume on a stale fold and serve a wrong transcript
  * with no repair path short of a remount. The cursor compares against its own
  * copy of the prefix, so a caller that appends to the array it handed over in
- * place cannot make the check read the grown length as already folded. Both
- * walks are pointer equality, orders of magnitude cheaper than the fold they
- * guard, which allocates per event.
+ * place cannot make the check read the grown length as already folded. The walk
+ * is pointer equality, orders of magnitude cheaper than the fold it guards,
+ * which allocates per event.
+ *
+ * When exactly the last folded row was replaced and it was a streaming delta,
+ * the fold is put back to the checkpoint taken before it. Folding a delta only
+ * replaces the open group or appends the messages it closed, so restoring the
+ * group and the message count undoes it completely; any other kind of row can
+ * rewrite an earlier message in place and is never rewound.
  * @param cursor - State left by the previous projection
  * @param events - The event run being projected now
- * @returns True when the fold can resume instead of starting over
+ * @returns The point to resume folding from, and the fold state at that point
  */
-function canResumeProjection(
+function resumePointOf(
 	cursor: ProjectionCursor,
 	events: readonly AgentEventFrame[],
-): boolean {
-	return (
-		events.length >= cursor.folded.length &&
-		cursor.folded.every((event, index) => event === events[index])
-	);
+): ResumePoint {
+	const foldedCount = cursor.folded.length;
+	const shared = sharedPrefixLength(cursor.folded, events);
+	if (shared === foldedCount) {
+		// The cursor's own array, not a copy: this runs once per animation frame of
+		// a stream, and copying made one delta cost a walk of the whole transcript.
+		// Safe because `finalizeProjection` never hands its input back.
+		return {
+			beforeLast: cursor.beforeLast,
+			from: foldedCount,
+			pending: cursor.pending,
+			result: cursor.result,
+		};
+	}
+	const replaced = cursor.folded[foldedCount - 1];
+	if (
+		shared === foldedCount - 1 &&
+		events.length >= foldedCount &&
+		cursor.beforeLast &&
+		replaced &&
+		isStreamingDeltaRow(replaced)
+	) {
+		const { pending, resultLength } = cursor.beforeLast;
+		return {
+			beforeLast: null,
+			from: shared,
+			pending,
+			result:
+				resultLength === cursor.result.length
+					? cursor.result
+					: cursor.result.slice(0, resultLength),
+		};
+	}
+	return { beforeLast: null, from: 0, pending: null, result: [] };
+}
+
+/**
+ * Counts how many leading rows two event runs share by reference.
+ * @param folded - The run the cursor already folded
+ * @param events - The run being projected now
+ * @returns The length of the identical prefix
+ */
+function sharedPrefixLength(
+	folded: readonly AgentEventFrame[],
+	events: readonly AgentEventFrame[],
+): number {
+	const limit = Math.min(folded.length, events.length);
+	let length = 0;
+	while (length < limit && folded[length] === events[length]) {
+		length += 1;
+	}
+	return length;
 }
 
 /**

@@ -4,6 +4,7 @@ import {
 	reduceAgentActivity,
 } from '../../../shared/agent-activity.ts';
 import type { AgentEventRow } from '../../storage/repositories';
+import { getMaxOrdinalForBranch } from '../../storage/repositories/agent-event-repository.ts';
 import {
 	type AgentTurnStatus,
 	getAgentSessionById,
@@ -24,6 +25,11 @@ import {
 	type ActiveSessionMap,
 	isTurnInFlight,
 } from './active-session.ts';
+import {
+	createDeltaCoalescer,
+	type DeltaRun,
+	type DeltaSlot,
+} from './delta-coalescer.ts';
 import { isValidContextUsage } from './session-activity-snapshot.ts';
 import type { SummaryQueue } from './summary-queue.ts';
 import type { TurnBoundaries } from './turn-boundaries.ts';
@@ -68,10 +74,16 @@ interface RuntimeEventHandler {
  * ephemerally and superseded by the authoritative `message_end`, and an event
  * the timeline cannot render at all (see {@link isTimelineAgentEvent}).
  *
- * Side-effect ordering is load-bearing: persistence write → snapshot/broadcast
- * → agent-end fan-out (sets `agentResponsePendingSummary`) → status/shutdown
- * patches → summary queue check. Reordering risks race regressions where a
- * summary write fires before the latest message_end is persisted.
+ * Adjacent deltas of one stream are coalesced into a single broadcast per flush
+ * window (see {@link createDeltaCoalescer}). The open run is flushed ahead of
+ * every event that is persisted, so a run always reaches the sink before the
+ * event that followed it and its ephemeral ordinal sorts below that event's.
+ *
+ * Side-effect ordering is load-bearing: delta flush → persistence write →
+ * snapshot/broadcast → agent-end fan-out (sets `agentResponsePendingSummary`) →
+ * status/shutdown patches → summary queue check. Reordering risks race
+ * regressions where a summary write fires before the latest message_end is
+ * persisted.
  *
  * Summary writes are NOT drained on the agent `message` event — only at turn
  * boundaries (`status: 'idle'`) and on `shutdown`. This keeps `.context/` from
@@ -89,25 +101,70 @@ export function createRuntimeEventHandler({
 	turnBoundaries,
 }: RuntimeEventHandlerOptions): RuntimeEventHandler {
 	/**
-	 * Fast path for live message deltas: synthesizes an ephemeral row with a
-	 * fractional ordinal between the last persisted event and the next one and
-	 * broadcasts it directly, skipping the `BEGIN IMMEDIATE` write per token. The
-	 * authoritative `message_end` still persists the full text so a refetch
-	 * rehydrates correctly.
+	 * Broadcasts one coalesced run of live message deltas as an ephemeral row
+	 * whose fractional ordinal sits between the last persisted event and the next
+	 * one, skipping the `BEGIN IMMEDIATE` write per token. The authoritative
+	 * `message_end` still persists the full text so a refetch rehydrates
+	 * correctly.
+	 * @param run - The run to broadcast, carrying the ordinal reserved when it opened
+	 */
+	const broadcastDeltaRun = (run: DeltaRun): void => {
+		const syntheticRow: AgentEventRow = {
+			branchId: run.branchId,
+			createdAt: run.at,
+			eventType: 'message',
+			id: run.slot.id,
+			ordinal: run.slot.ordinal,
+			payload: {
+				kind: 'message',
+				...(run.parentToolCallId
+					? { parentToolCallId: run.parentToolCallId }
+					: {}),
+				payload: { kind: run.kind, text: run.text },
+				role: run.role,
+			},
+			stream: 'protocol',
+			turnId: run.turnId,
+		};
+		try {
+			eventSink?.({
+				event: syntheticRow,
+				sessionId: run.sessionId,
+				workspaceId: run.workspaceId,
+			});
+		} catch (cause) {
+			// Sink failures (renderer gone, IPC closed) must not break the
+			// streaming path.
+			console.warn('[agent-session] failed to broadcast streaming delta', {
+				cause: cause instanceof Error ? cause.message : String(cause),
+				sessionId: run.sessionId,
+			});
+		}
+	};
+
+	const deltas = createDeltaCoalescer({ emit: broadcastDeltaRun });
+
+	/**
+	 * Fast path for live message deltas: folds the delta into its session's open
+	 * run, which is broadcast once its flush window closes or a persisted event
+	 * arrives, instead of broadcasting every token.
 	 * @param active - The live session, when it is still in the active map
 	 * @param branchId - Branch the event belongs to
+	 * @param database - Open database handle, read when a run opens
 	 * @param event - The normalized runtime event
 	 * @param sessionId - Session the event belongs to
-	 * @returns True when the event was a delta this broadcast, false to fall through to persistence
+	 * @returns True when the event was a delta this took in, false to fall through to persistence
 	 */
-	const tryBroadcastDelta = ({
+	const tryCoalesceDelta = ({
 		active,
 		branchId,
+		database,
 		event,
 		sessionId,
 	}: {
 		active: ActiveSession | undefined;
 		branchId: string;
+		database: DatabaseSync;
 		event: AgentEvent;
 		sessionId: string;
 	}): boolean => {
@@ -121,38 +178,22 @@ export function createRuntimeEventHandler({
 			return false;
 		}
 
-		active.deltaCounter += 1;
-		const syntheticRow: AgentEventRow = {
-			branchId,
-			createdAt: event.at,
-			eventType: event.type,
-			id: `delta:${sessionId}:${active.lastBroadcastOrdinal}:${active.deltaCounter}`,
-			ordinal: active.lastBroadcastOrdinal + active.deltaCounter * 1e-6,
-			payload: {
-				kind: 'message',
+		deltas.push(
+			{
+				at: event.at,
+				branchId,
+				kind: event.payload.kind,
 				...(event.parentToolCallId
 					? { parentToolCallId: event.parentToolCallId }
 					: {}),
-				payload: event.payload,
 				role: event.role,
-			},
-			stream: 'protocol',
-			turnId: active.activeTurnId,
-		};
-		try {
-			eventSink({
-				event: syntheticRow,
 				sessionId,
+				text: event.payload.text,
+				turnId: active.activeTurnId,
 				workspaceId: active.row.workspaceId,
-			});
-		} catch (cause) {
-			// Sink failures (renderer gone, IPC closed) must not break the
-			// streaming path.
-			console.warn('[agent-session] failed to broadcast streaming delta', {
-				cause: cause instanceof Error ? cause.message : String(cause),
-				sessionId,
-			});
-		}
+			},
+			() => reserveDeltaSlot({ active, branchId, database, sessionId }),
+		);
 		return true;
 	};
 
@@ -285,13 +326,15 @@ export function createRuntimeEventHandler({
 		}
 		const active = activeCandidate;
 
-		if (tryBroadcastDelta({ active, branchId, event, sessionId })) {
+		if (tryCoalesceDelta({ active, branchId, database, event, sessionId })) {
 			return;
 		}
 
 		if (!isTimelineAgentEvent(event)) {
 			return;
 		}
+
+		deltas.flush(sessionId);
 
 		// The runtime's turnId (event.turnId) is an opaque adapter identifier and
 		// is NOT a foreign key into agent_turns. We attach the active turn row's id
@@ -370,6 +413,82 @@ export function createRuntimeEventHandler({
 	};
 
 	return { handle };
+}
+
+/**
+ * Reserves the ordinal a delta run will broadcast under: a fractional step past
+ * the newest row of the branch, so the run sorts after everything already sent
+ * and before whatever is persisted next. Called once per run, when it opens.
+ *
+ * The newest row is read from storage rather than remembered from the last
+ * event this handler persisted, because rows also land from outside the runtime
+ * stream — a derived or chosen tab title, a submitted plan, a workspace rename —
+ * and a remembered ordinal would leave the run sorting below them. That is one
+ * indexed read per run, never one per token.
+ * @param active - The live session whose ordinal space the run joins
+ * @param branchId - Branch the run belongs to
+ * @param database - Open database handle
+ * @param sessionId - Session the run belongs to
+ * @returns The run's ephemeral row id and ordinal
+ */
+function reserveDeltaSlot({
+	active,
+	branchId,
+	database,
+	sessionId,
+}: {
+	active: ActiveSession;
+	branchId: string;
+	database: DatabaseSync;
+	sessionId: string;
+}): DeltaSlot {
+	const newest = readNewestOrdinal({
+		branchId,
+		database,
+		fallback: active.lastBroadcastOrdinal,
+		sessionId,
+	});
+	if (newest > active.lastBroadcastOrdinal) {
+		active.lastBroadcastOrdinal = newest;
+		active.deltaCounter = 0;
+	}
+	active.deltaCounter += 1;
+	return {
+		id: `delta:${sessionId}:${active.lastBroadcastOrdinal}:${active.deltaCounter}`,
+		ordinal: active.lastBroadcastOrdinal + active.deltaCounter * 1e-6,
+	};
+}
+
+/**
+ * Reads the newest stored ordinal of a branch. A failed read falls back to the
+ * ordinal already known, so it costs a possibly stale sort position rather than
+ * the streaming path, matching how a failed event write is handled.
+ * @param branchId - Branch to read
+ * @param database - Open database handle
+ * @param fallback - Ordinal to use when storage cannot answer
+ * @param sessionId - Session the read is for, named in the warning
+ * @returns The newest stored ordinal, or the fallback
+ */
+function readNewestOrdinal({
+	branchId,
+	database,
+	fallback,
+	sessionId,
+}: {
+	branchId: string;
+	database: DatabaseSync;
+	fallback: number;
+	sessionId: string;
+}): number {
+	try {
+		return getMaxOrdinalForBranch({ branchId, database });
+	} catch (cause) {
+		console.warn('[agent-session] failed to read the newest event ordinal', {
+			cause: cause instanceof Error ? cause.message : String(cause),
+			sessionId,
+		});
+		return fallback;
+	}
 }
 
 /**

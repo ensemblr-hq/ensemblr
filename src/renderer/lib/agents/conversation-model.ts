@@ -152,6 +152,36 @@ function conversationOf({
 }
 
 /**
+ * Whether a persisted tab is a conversation the Agents panel lists: a chat that
+ * has opened an agent session, which a fresh chat has not until its first
+ * submission.
+ * @param tab - Persisted chat tab of any kind
+ * @returns True for a chat backed by an agent session
+ */
+function isSessionBackedChat(tab: ChatTabWire): boolean {
+	return tab.kind === 'chat' && tab.agentSessionId !== null;
+}
+
+/**
+ * Counts the conversations {@link toAgentConversations} would build that are not
+ * closed, straight from the chat tabs, so a badge does not have to build every
+ * row to read one number.
+ * @param options - The workspace's open and closed chat tabs
+ * @returns How many listed conversations are open
+ */
+export function countOpenAgentConversations({
+	closedTabs,
+	openTabs,
+}: {
+	closedTabs: readonly ChatTabWire[];
+	openTabs: readonly ChatTabWire[];
+}): number {
+	return [...openTabs, ...closedTabs].filter(
+		(tab) => isSessionBackedChat(tab) && tab.closedAt === null,
+	).length;
+}
+
+/**
  * Builds stable session-backed Agents rows and resolves session lineage to chat ids.
  * A fresh chat has no agent-session foreign key until its first submission opens one.
  * @param options - Workspace chats, session state, lineage, and display language.
@@ -177,11 +207,9 @@ export function toAgentConversations({
 	sessions: readonly AgentSessionSnapshotWire[];
 }): AgentConversation[] {
 	const sessionById = new Map(sessions.map((session) => [session.id, session]));
-	const openSessionTabs = openTabs.filter(
-		(tab) => tab.kind === 'chat' && tab.agentSessionId !== null,
-	);
+	const openSessionTabs = openTabs.filter(isSessionBackedChat);
 	const closedSessionTabs = closedTabs
-		.filter((tab) => tab.kind === 'chat' && tab.agentSessionId !== null)
+		.filter(isSessionBackedChat)
 		.sort((left, right) =>
 			(right.closedAt ?? '').localeCompare(left.closedAt ?? ''),
 		);

@@ -1,6 +1,9 @@
-import { type Dirent, type FSWatcher, watch } from 'node:fs';
+import { type Dirent, type WatchEventType, watch } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
+
+import { mapWithConcurrency } from '../concurrency/index.ts';
+import type { WorkspaceFileEvent } from './workspace-file-changes.ts';
 
 /**
  * Ceiling on the directories one workspace watch may hold. A tree that runs
@@ -17,10 +20,33 @@ const MAX_WATCHED_DIRECTORIES = 4_096;
  */
 const RESCAN_COALESCE_MS = 100;
 
+/**
+ * Directory reads one watch keeps in flight. libuv serves `readdir` from a
+ * four-thread pool, so reads beyond a handful only queue behind it while each
+ * pins its entry array and continuation, which is what fanning out over every
+ * directory of a large tree at once costs.
+ */
+const SCAN_CONCURRENCY = 8;
+
 /** Handle to a running watch; `close` releases every OS watcher it holds. */
 export interface LinuxRecursiveWatchHandle {
 	close: () => void;
 }
+
+/** The part of a directory entry the walk reads. */
+type DirectoryEntry = Pick<Dirent, 'isDirectory' | 'name'>;
+
+/** Lists one directory's entries, rejecting when it cannot be read. */
+export type ReadDirectory = (
+	directory: string,
+) => Promise<readonly DirectoryEntry[]>;
+
+/** Opens one OS watch on a directory; `onError` fires when that watch dies. */
+export type WatchDirectory = (
+	directory: string,
+	onEvent: (event: WatchEventType, filename: string | null) => void,
+	onError: () => void,
+) => { close: () => void };
 
 /** Options for {@link startLinuxRecursiveWatch}. */
 export interface LinuxRecursiveWatchOptions {
@@ -28,13 +54,41 @@ export interface LinuxRecursiveWatchOptions {
 	ignoredDirectoryNames: ReadonlySet<string>;
 	/** Overrides {@link MAX_WATCHED_DIRECTORIES}; exists for tests. */
 	maxDirectories?: number;
-	/** Receives each change as a path relative to `root`. */
-	onChange: (changed: string | null) => void;
+	/** Receives each event with the path it named, relative to `root`. */
+	onChange: (event: WorkspaceFileEvent) => void;
 	/** Called when the root's own watch fails, so the caller can drop the entry. */
 	onError: () => void;
+	/** Overrides the directory read; exists so tests can drive the walk off disk. */
+	readDirectory?: ReadDirectory;
 	/** Absolute directory at the top of the watched tree. */
 	root: string;
+	/** Overrides the OS watch; exists so tests can drive the walk off disk. */
+	watchDirectory?: WatchDirectory;
 }
+
+/**
+ * Default {@link ReadDirectory}: one `readdir` reporting entry types.
+ * @param directory - Absolute directory to list.
+ * @returns The directory's entries.
+ */
+const readDirectoryFromDisk: ReadDirectory = (directory) =>
+	readdir(directory, { withFileTypes: true });
+
+/**
+ * Default {@link WatchDirectory}: one non-recursive `fs.watch`.
+ * @param directory - Absolute directory to watch.
+ * @param onEvent - Called with each OS event and the entry name it named.
+ * @param onError - Called when the watch fails.
+ * @returns The watcher, whose `close` releases the OS watch.
+ */
+const watchDirectoryOnDisk: WatchDirectory = (directory, onEvent, onError) => {
+	const watcher = watch(directory, (event, filename) => {
+		onEvent(event, filename);
+	});
+	watcher.on('error', onError);
+
+	return watcher;
+};
 
 /**
  * Watches a directory tree on Linux by holding one OS watch per directory,
@@ -60,22 +114,31 @@ export function startLinuxRecursiveWatch({
 	maxDirectories = MAX_WATCHED_DIRECTORIES,
 	onChange,
 	onError,
+	readDirectory = readDirectoryFromDisk,
 	root,
+	watchDirectory = watchDirectoryOnDisk,
 }: LinuxRecursiveWatchOptions): LinuxRecursiveWatchHandle {
-	const watchers = new Map<string, FSWatcher>();
+	const watchers = new Map<string, { close: () => void }>();
 	const pendingScans = new Map<string, ReturnType<typeof setTimeout>>();
+	const queuedScans = new Map<string, boolean>();
+	let draining = false;
 	let closed = false;
 
 	/**
-	 * Reports one OS event as a path relative to the watched root, matching the
+	 * Reports one OS event with a path relative to the watched root, matching the
 	 * shape a native recursive watch hands back.
 	 * @param directory - Absolute directory whose watcher fired.
+	 * @param kind - The OS event kind.
 	 * @param filename - Entry name the OS named, when it named one.
 	 */
-	const reportChange = (directory: string, filename: string | null): void => {
+	const reportChange = (
+		directory: string,
+		kind: WatchEventType,
+		filename: string | null,
+	): void => {
 		const absolute = filename ? path.join(directory, filename) : directory;
 
-		onChange(path.relative(root, absolute) || null);
+		onChange({ kind, path: path.relative(root, absolute) || null });
 	};
 
 	/**
@@ -139,13 +202,18 @@ export function startLinuxRecursiveWatch({
 		}
 
 		try {
-			const watcher = watch(directory, (event, filename) => {
-				handleEvent(directory, event, filename);
-			});
-			watcher.on('error', () => {
-				closeBranch(directory);
-			});
-			watchers.set(directory, watcher);
+			watchers.set(
+				directory,
+				watchDirectory(
+					directory,
+					(event, filename) => {
+						handleEvent(directory, event, filename);
+					},
+					() => {
+						closeBranch(directory);
+					},
+				),
+			);
 		} catch {
 			return false;
 		}
@@ -154,31 +222,47 @@ export function startLinuxRecursiveWatch({
 	};
 
 	/**
-	 * Re-reads one directory, watching child directories it has gained and
-	 * dropping those it has lost, then descends into the new ones.
-	 * @param directory - Absolute directory to re-read.
+	 * Reads one directory, watching the child directories it has gained and, when
+	 * asked, dropping the ones it has lost.
+	 * @param directory - Absolute directory to read.
+	 * @param pruneRemoved - Whether children no longer listed may still hold
+	 *   watchers. False for a directory this walk only just began watching, which
+	 *   cannot have any, so the initial walk never scans every watcher per directory.
+	 * @returns The child directories this read started watching, which each still
+	 *   need a read of their own.
 	 */
-	const scan = async (directory: string): Promise<void> => {
-		let entries: Dirent[];
+	const scan = async (
+		directory: string,
+		pruneRemoved: boolean,
+	): Promise<string[]> => {
+		if (closed || !watchers.has(directory)) {
+			return [];
+		}
+
+		let entries: readonly DirectoryEntry[];
 
 		try {
-			entries = await readdir(directory, { withFileTypes: true });
+			entries = await readDirectory(directory);
 		} catch {
+			if (closed) {
+				return [];
+			}
+
 			if (directory === root) {
 				onError();
 			} else {
 				closeBranch(directory);
 			}
 
-			return;
+			return [];
 		}
 
-		if (closed) {
-			return;
+		if (closed || !watchers.has(directory)) {
+			return [];
 		}
 
 		const live = new Set<string>();
-		const descend: string[] = [];
+		const gained: string[] = [];
 
 		for (const entry of entries) {
 			if (!entry.isDirectory() || ignoredDirectoryNames.has(entry.name)) {
@@ -189,12 +273,61 @@ export function startLinuxRecursiveWatch({
 			live.add(child);
 
 			if (watchChild(child)) {
-				descend.push(child);
+				gained.push(child);
 			}
 		}
 
-		pruneRemovedChildren(directory, live);
-		await Promise.all(descend.map((child) => scan(child)));
+		if (pruneRemoved) {
+			pruneRemovedChildren(directory, live);
+		}
+
+		return gained;
+	};
+
+	/**
+	 * Reads queued directories a level at a time, at most {@link SCAN_CONCURRENCY}
+	 * at once, until the queue is empty. Only one pass runs per watch, so the
+	 * bound holds across the first walk and every event-driven re-read alike.
+	 */
+	const drainScans = async (): Promise<void> => {
+		if (draining) {
+			return;
+		}
+
+		draining = true;
+
+		try {
+			while (!closed && queuedScans.size > 0) {
+				const level = [...queuedScans];
+				queuedScans.clear();
+
+				const gained = await mapWithConcurrency(
+					level,
+					SCAN_CONCURRENCY,
+					([directory, pruneRemoved]) => scan(directory, pruneRemoved),
+				);
+
+				for (const child of gained.flat()) {
+					queueScan(child, false);
+				}
+			}
+		} finally {
+			draining = false;
+		}
+	};
+
+	/**
+	 * Queues one read of a directory and makes sure a pass is draining the queue.
+	 * A directory already queued keeps the stronger of the two prune requests.
+	 * @param directory - Absolute directory to read.
+	 * @param pruneRemoved - Whether the read must drop children that vanished.
+	 */
+	const queueScan = (directory: string, pruneRemoved: boolean): void => {
+		queuedScans.set(
+			directory,
+			pruneRemoved || queuedScans.get(directory) === true,
+		);
+		void drainScans();
 	};
 
 	/**
@@ -211,7 +344,7 @@ export function startLinuxRecursiveWatch({
 			directory,
 			setTimeout(() => {
 				pendingScans.delete(directory);
-				void scan(directory);
+				queueScan(directory, true);
 			}, RESCAN_COALESCE_MS),
 		);
 	};
@@ -245,14 +378,14 @@ export function startLinuxRecursiveWatch({
 	 */
 	const handleEvent = (
 		directory: string,
-		event: string,
+		event: WatchEventType,
 		filename: string | null,
 	): void => {
 		if (closed) {
 			return;
 		}
 
-		reportChange(directory, filename);
+		reportChange(directory, event, filename);
 
 		if (event !== 'rename') {
 			return;
@@ -265,12 +398,17 @@ export function startLinuxRecursiveWatch({
 		scheduleScan(directory);
 	};
 
-	const rootWatcher = watch(root, (event, filename) => {
-		handleEvent(root, event, filename);
-	});
-	rootWatcher.on('error', onError);
-	watchers.set(root, rootWatcher);
-	void scan(root);
+	watchers.set(
+		root,
+		watchDirectory(
+			root,
+			(event, filename) => {
+				handleEvent(root, event, filename);
+			},
+			onError,
+		),
+	);
+	queueScan(root, false);
 
 	return {
 		close: () => {
@@ -281,6 +419,7 @@ export function startLinuxRecursiveWatch({
 			}
 
 			pendingScans.clear();
+			queuedScans.clear();
 
 			for (const watcher of watchers.values()) {
 				watcher.close();

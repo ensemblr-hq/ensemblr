@@ -1322,13 +1322,18 @@ const conciergeSessionService = createConciergeSessionService({
 let ipcHandlersHandle: IpcHandlersHandle | null = null;
 const workspaceFilesWatcher = createWorkspaceFilesWatcher({
 	/**
-	 * Drops the workspace's cached listing, then tells the renderer to refetch.
-	 * Order matters: the broadcast is what triggers the refetch, so invalidating
-	 * afterwards would serve the stale tree the change just invalidated.
+	 * Drops the workspace's cached listing when an entry may have come or gone,
+	 * then tells the renderer what changed. Order matters: the broadcast is what
+	 * triggers the refetch, so invalidating afterwards would serve the stale tree
+	 * the change just invalidated. A plain write leaves the listing valid but is
+	 * still broadcast, because git status behind the diff stats moves with it.
 	 */
-	onChange: (workspaceCwd) => {
-		listWorkspaceFilesService.invalidate(workspaceCwd);
+	onChange: (workspaceCwd, changes) => {
+		if (changes.membershipChanged) {
+			listWorkspaceFilesService.invalidate(workspaceCwd);
+		}
 		broadcastToAllWindows(IPC_CHANNELS.workspaceFilesChanged, {
+			...changes,
 			workspaceCwd,
 		} satisfies WorkspaceFilesChangedBroadcast);
 	},

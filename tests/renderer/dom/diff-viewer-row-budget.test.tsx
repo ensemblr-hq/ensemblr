@@ -42,6 +42,19 @@ function patchOf(count: number): string {
 	return `diff --git a/big.ts b/big.ts\nindex 111..222 100644\n--- a/big.ts\n+++ b/big.ts\n${hunks}\n`;
 }
 
+/**
+ * Builds a patch for a newly added file whose every line lands in one hunk, the
+ * shape of a generated file or a committed bundle.
+ * @param lines - How many lines the single hunk adds
+ * @returns A unified patch
+ */
+function singleHunkPatchOf(lines: number): string {
+	const body = Array.from({ length: lines }, (_, line) => `+line ${line}`).join(
+		'\n',
+	);
+	return `diff --git a/big.ts b/big.ts\nnew file mode 100644\nindex 0000000..2222222\n--- /dev/null\n+++ b/big.ts\n@@ -0,0 +1,${lines} @@\n${body}\n`;
+}
+
 /** Renders the viewer inside the providers its toolbar and tooltips need. */
 function renderViewer(patch: string) {
 	installLocalStorage();
@@ -84,6 +97,39 @@ describe('the diff row budget', () => {
 		);
 
 		expect(laidOutRows(container)).toBe(hunks * HUNK_LINES);
+		expect(screen.queryByRole('button', { name: /remaining/ })).toBeNull();
+	});
+
+	test('cuts a single hunk that alone exceeds the budget', () => {
+		const { container } = renderViewer(
+			singleHunkPatchOf(MAX_RENDERED_DIFF_ROWS + 700),
+		);
+
+		expect(laidOutRows(container)).toBe(MAX_RENDERED_DIFF_ROWS);
+		expect(
+			screen.getByRole('button', { name: 'Show the remaining 700 lines' }),
+		).toBeInTheDocument();
+	});
+
+	test('lays out the rest of a cut hunk on request', async () => {
+		const { container } = renderViewer(
+			singleHunkPatchOf(MAX_RENDERED_DIFF_ROWS + 700),
+		);
+
+		await userEvent.click(
+			screen.getByRole('button', { name: /Show the remaining/ }),
+		);
+
+		expect(laidOutRows(container)).toBe(MAX_RENDERED_DIFF_ROWS + 700);
+		expect(screen.queryByRole('button', { name: /remaining/ })).toBeNull();
+	});
+
+	test('lays out a single hunk that fits the budget whole', () => {
+		const { container } = renderViewer(
+			singleHunkPatchOf(MAX_RENDERED_DIFF_ROWS),
+		);
+
+		expect(laidOutRows(container)).toBe(MAX_RENDERED_DIFF_ROWS);
 		expect(screen.queryByRole('button', { name: /remaining/ })).toBeNull();
 	});
 });

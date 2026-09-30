@@ -428,6 +428,139 @@ describe('createListWorkspaceFilesService.list caching', () => {
 		expect(spawned.length).toBe(4);
 	});
 
+	// The watcher fires while a build is still reading the tree, so the build
+	// finishes with a listing from before the change. That listing must reach only
+	// the callers that were already waiting on it: everyone after the invalidation
+	// gets a build of their own, and it is that build the cache keeps.
+	test('rebuilds and caches once after an invalidation lands mid-build', async () => {
+		const cwd = seedRepo();
+		const real = createLocalCommandService();
+		let primaryBuilds = 0;
+		let releaseFirstBuild: () => void = () => undefined;
+		const firstBuildHeld = new Promise<void>((resolve) => {
+			releaseFirstBuild = resolve;
+		});
+		let firstBuildRead: () => void = () => undefined;
+		const firstBuildHasRead = new Promise<void>((resolve) => {
+			firstBuildRead = resolve;
+		});
+		const service = createListWorkspaceFilesService({
+			localCommandService: {
+				...real,
+				run: async (request) => {
+					const result = await real.run(request);
+					if (request.args?.includes('--stage')) {
+						primaryBuilds += 1;
+						if (primaryBuilds === 1) {
+							firstBuildRead();
+							await firstBuildHeld;
+						}
+					}
+					return result;
+				},
+			},
+		});
+
+		const overtaken = service.list({ workspaceCwd: cwd });
+		await firstBuildHasRead;
+		writeFileSync(path.join(cwd, 'fresh.ts'), 'export {};\n');
+		service.invalidate(cwd);
+		const afterInvalidation = service.list({ workspaceCwd: cwd });
+		releaseFirstBuild();
+		const [overtakenResult, freshResult] = await Promise.all([
+			overtaken,
+			afterInvalidation,
+		]);
+		const cachedResult = await service.list({ workspaceCwd: cwd });
+
+		expect(overtakenResult.files.map((file) => file.path)).not.toContain(
+			'fresh.ts',
+		);
+		expect(freshResult.files.map((file) => file.path)).toContain('fresh.ts');
+		expect(cachedResult.files.map((file) => file.path)).toContain('fresh.ts');
+		expect(primaryBuilds).toBe(2);
+	});
+
+	test('never runs builds concurrently under repeated invalidation', async () => {
+		const cwd = seedRepo();
+		const real = createLocalCommandService();
+		let activeBuilds = 0;
+		let maxActiveBuilds = 0;
+		let primaryBuilds = 0;
+		const releases: Array<() => void> = [];
+		const service = createListWorkspaceFilesService({
+			localCommandService: {
+				...real,
+				run: async (request) => {
+					if (!request.args?.includes('--stage')) {
+						return real.run(request);
+					}
+					activeBuilds += 1;
+					primaryBuilds += 1;
+					maxActiveBuilds = Math.max(maxActiveBuilds, activeBuilds);
+					const result = await real.run(request);
+					await new Promise<void>((resolve) => releases.push(resolve));
+					activeBuilds -= 1;
+					return result;
+				},
+			},
+		});
+		const settleBuilds = async () => {
+			for (let round = 0; round < 10; round += 1) {
+				await new Promise((resolve) => setTimeout(resolve, 20));
+				releases.splice(0).forEach((release) => {
+					release();
+				});
+			}
+		};
+
+		const first = service.list({ workspaceCwd: cwd });
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		const callers = [];
+		for (let index = 0; index < 5; index += 1) {
+			service.invalidate(cwd);
+			callers.push(service.list({ workspaceCwd: cwd }));
+		}
+		writeFileSync(path.join(cwd, 'fresh.ts'), 'export {};\n');
+		service.invalidate(cwd);
+		callers.push(service.list({ workspaceCwd: cwd }));
+		await settleBuilds();
+		const results = await Promise.all([first, ...callers]);
+		await settleBuilds();
+
+		expect(maxActiveBuilds).toBe(1);
+		expect(primaryBuilds).toBeLessThanOrEqual(2);
+		for (const result of results.slice(1)) {
+			expect(result.files.map((file) => file.path)).toContain('fresh.ts');
+		}
+	});
+
+	test('still shares one build between callers when nothing invalidated it', async () => {
+		const cwd = seedRepo();
+		const real = createLocalCommandService();
+		let primaryBuilds = 0;
+		const service = createListWorkspaceFilesService({
+			localCommandService: {
+				...real,
+				run: async (request) => {
+					if (request.args?.includes('--stage')) {
+						primaryBuilds += 1;
+					}
+					return real.run(request);
+				},
+			},
+		});
+
+		await Promise.all([
+			service.list({ workspaceCwd: cwd }),
+			service.list({ workspaceCwd: cwd }),
+			service.list({ workspaceCwd: cwd }),
+		]);
+		await service.list({ workspaceCwd: cwd });
+
+		expect(primaryBuilds).toBe(1);
+	});
+
 	test('never caches a failed listing', async () => {
 		const cwd = mkdtempSync(path.join(tmpdir(), 'ensemblr-not-a-repo-'));
 		tempDirs.push(cwd);

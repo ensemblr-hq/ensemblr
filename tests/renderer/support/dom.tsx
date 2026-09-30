@@ -93,6 +93,29 @@ export function installImmediateIntersectionObserver(): () => void {
 }
 
 /**
+ * Gives every element a layout height. happy-dom reports each element as 0×0, so
+ * a virtualized list measures an empty viewport and mounts no rows; this is the
+ * viewport the real virtualizer then windows against.
+ * @param height - Height in pixels every element reports
+ * @returns A restore function putting the original getter back
+ */
+export function installScrollViewport(height = 1200): () => void {
+	const original = Object.getOwnPropertyDescriptor(
+		HTMLElement.prototype,
+		'offsetHeight',
+	);
+	Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+		configurable: true,
+		get: () => height,
+	});
+	return () => {
+		if (original) {
+			Object.defineProperty(HTMLElement.prototype, 'offsetHeight', original);
+		}
+	};
+}
+
+/**
  * Replaces the clipboard with a recorder that accepts both the plain and the
  * rich write paths, so a test can assert what a copy control actually offered.
  */
