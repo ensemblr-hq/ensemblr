@@ -509,11 +509,6 @@ describe('ensemblrToolLabel', () => {
 		['ensemblr_start_conversation', 'Started a chat', 'Started a sub-agent'],
 		['ensemblr_send_follow_up', 'Steered a chat', 'Steered a sub-agent'],
 		[
-			'ensemblr_get_conversation_status',
-			'Checked a chat',
-			'Checked a sub-agent',
-		],
-		[
 			'ensemblr_get_last_message',
 			"Read a chat's report",
 			"Read a sub-agent's report",
@@ -532,6 +527,33 @@ describe('ensemblrToolLabel', () => {
 		expect(labelFor(toolName, {}, false, 'concierge')?.title).toBe(concierge);
 		expect(labelFor(toolName, {}, false, 'workspace')?.title).toBe(workspace);
 	});
+
+	test('calls a status read on a named session a chat in the Concierge', () => {
+		const input = { agentSessionId: 'session-1' };
+
+		expect(
+			labelFor('ensemblr_get_conversation_status', input, false, 'concierge')
+				?.title,
+		).toBe('Checked a chat');
+		expect(
+			labelFor('ensemblr_get_conversation_status', input, false, 'workspace')
+				?.title,
+		).toBe('Checked a sub-agent');
+	});
+
+	// A status read that names no session is the caller reading its own window,
+	// which is neither a sub-agent it spawned nor some other chat.
+	test.each(['concierge', 'workspace'] as const)(
+		'calls a status read that names no session this chat on %s',
+		(surface) => {
+			expect(
+				labelFor('ensemblr_get_conversation_status', {}, false, surface)?.title,
+			).toBe('Checked this chat');
+			expect(
+				labelFor('ensemblr_get_conversation_status', {}, true, surface)?.title,
+			).toBe('Checking this chat');
+		},
+	);
 
 	// Every other tool means the same thing wherever it is called, and a surface
 	// that quietly reworded them all would be a second catalogue to keep in step.
@@ -788,6 +810,14 @@ describe('ensemblrToolLabel against the target role', () => {
 		);
 		expect(titleFor('ensemblr_wait_for_agents', { mode: 'all' }, true)).toBe(
 			'Waiting for sub-agents',
+		);
+	});
+
+	// Omitting the session on a status read means the caller itself, so there is
+	// nothing to look up and no child to name.
+	test('checks this chat when a status read names no session', () => {
+		expect(titleFor('ensemblr_get_conversation_status', {})).toBe(
+			'Checked this chat',
 		);
 	});
 

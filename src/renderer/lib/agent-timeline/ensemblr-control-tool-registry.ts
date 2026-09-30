@@ -63,6 +63,10 @@ export type TitlePair = readonly [() => string, () => string];
  * answer in its own arguments — `peer: true` is what made the thing a root — and
  * so resolves for certain. A tool handed session ids has to look them up, and a
  * lookup can come up empty.
+ *
+ * A tool handed session ids may also be handed none, and what that means is the
+ * op's to decide: {@link EnsemblrToolLabel.title} when it means every child, and
+ * `own` when it means the caller itself.
  */
 type TargetNaming =
 	| {
@@ -87,6 +91,14 @@ type TargetNaming =
 			sessionKeys: readonly string[];
 			/** Anything the call named that is not wholly the caller's own children. */
 			chat: TitlePair;
+			/**
+			 * A call that names none, for an op that answers it about the caller's
+			 * own conversation — `ensemblr_get_conversation_status` does, because
+			 * that is the only way an agent reads its own window. Read on both
+			 * surfaces, since the caller is the one conversation that is neither a
+			 * sub-agent nor another chat wherever the row is rendered.
+			 */
+			own?: TitlePair;
 	  };
 
 /**
@@ -113,7 +125,8 @@ interface EnsemblrToolLabel {
 	 * that conversation is not necessarily a child. Absent for the tools that act
 	 * on no conversation at all, and unused on the Concierge's transcript, where
 	 * {@link EnsemblrToolLabel.conciergeTitle} already speaks of every target as a
-	 * chat because every one of them is a root.
+	 * chat because every one of them is a root — except for its `own` reading,
+	 * which names the caller and so holds on both.
 	 */
 	target?: TargetNaming;
 	/**
@@ -416,6 +429,18 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 					i18n.t(
 						'workbench:control-tool.get-conversation-status.chat.running',
 						'Checking a chat',
+					),
+			],
+			own: [
+				() =>
+					i18n.t(
+						'workbench:control-tool.get-conversation-status.own.done',
+						'Checked this chat',
+					),
+				() =>
+					i18n.t(
+						'workbench:control-tool.get-conversation-status.own.running',
+						'Checking this chat',
 					),
 			],
 			sessionKeys: ['agentSessionId'],

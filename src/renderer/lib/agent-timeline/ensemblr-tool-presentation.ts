@@ -368,6 +368,33 @@ function targetTitles(
 }
 
 /**
+ * Names the caller's own conversation, for an op that reads a call naming no
+ * session as the caller asking about itself.
+ *
+ * Checked before the surface picks its vocabulary: a status read with no
+ * `agentSessionId` is an agent reading its own window, and calling that a
+ * sub-agent — or, in the Concierge, another chat — names a conversation nobody
+ * spawned.
+ * @param label - The tool's registry entry
+ * @param input - The tool call's input bag
+ * @returns The own-conversation titles, or null when the call named a session
+ * or the tool has no such reading
+ */
+function ownTitles(
+	label: (typeof ENSEMBLR_TOOL_LABELS)[string],
+	input: Record<string, unknown>,
+): TitlePair | null {
+	const target = label.target;
+	if (!target || !('sessionKeys' in target) || !target.own) {
+		return null;
+	}
+	const namesSession = target.sessionKeys.some((key) =>
+		valuesAtPath(input, key).some((named) => typeof named === 'string'),
+	);
+	return namesSession ? null : target.own;
+}
+
+/**
  * Resolves the human-readable title, glyph, and chip for a control tool call,
  * folding in the one argument that says which tab, sub-agent, or status it acted
  * on. A call still in flight reads in the present participle, so a blocking wait
@@ -377,7 +404,8 @@ function targetTitles(
  * `ensemblr_start_conversation` opens a sub-agent for a workspace agent and a
  * chat the user can talk to for the Concierge. Inside a workspace the target's
  * own role narrows it further — see {@link targetTitles} — so steering a peer or
- * the Review conversation stops reading as steering a child.
+ * the Review conversation stops reading as steering a child. A call about the
+ * caller itself outranks both, on either surface — see {@link ownTitles}.
  *
  * A surface that hands the detail to a chip gets an `unpinnedTitle` back as
  * well, because whether the chip resolves is only known once a component has
@@ -409,9 +437,10 @@ export function ensemblrToolLabel(
 	}
 	const input = inputOf(part);
 	const titles =
-		surface === 'concierge'
+		ownTitles(label, input) ??
+		(surface === 'concierge'
 			? (label.conciergeTitle ?? label.title)
-			: (targetTitles(label, input, resolveRole) ?? label.title);
+			: (targetTitles(label, input, resolveRole) ?? label.title));
 	const action = titles[isRunning ? 1 : 0]();
 	const detailKeys =
 		surface === 'concierge'
