@@ -192,6 +192,47 @@ describe('Linux desktop entries', () => {
 	});
 });
 
+describe('configuration, QML, and systemd files', () => {
+	it.each([
+		['setup.ini', 'file-type-ini'],
+		['PHP.INI', 'file-type-ini'],
+		['Main.qml', 'file-type-qml'],
+		['qmldir', 'file-type-qmldir'],
+		['ensemblr.service', 'file-type-systemd'],
+		['ensemblr.socket', 'file-type-systemd'],
+		['backup.timer', 'file-type-systemd'],
+	])('maps %s to %s', (name, icon) => {
+		expect(iconFor(name)).toBe(`vscode-icons:${icon}`);
+	});
+});
+
+describe('configure-time templates', () => {
+	it.each([
+		['ensemblr.service.in', 'vscode-icons:file-type-systemd'],
+		['settings.ini.in', 'vscode-icons:file-type-ini'],
+		['Main.qml.in', 'vscode-icons:file-type-qml'],
+		['config.h.in', 'vscode-icons:file-type-cheader'],
+		['Makefile.in', 'vscode-icons:file-type-makefile'],
+		['org.gnome.App.desktop.in', 'logos:linux-tux'],
+		['org.gnome.App.desktop.in.in', 'logos:linux-tux'],
+	])('gives %s the icon of the file it generates', (name, icon) => {
+		expect(iconFor(name)).toBe(icon);
+	});
+
+	it('resolves a template by path too', () => {
+		expect(
+			getWorkspaceFileIconNameForPath('data/systemd/ensemblr.service.in'),
+		).toBe('vscode-icons:file-type-systemd');
+	});
+
+	it.each(['template.in', '.in', 'in', 'requirements.in'])(
+		'leaves %s, which generates nothing recognisable, on the default glyph',
+		(name) => {
+			expect(iconFor(name)).toBe('vscode-icons:default-file');
+		},
+	);
+});
+
 describe('icon image files', () => {
 	it.each([
 		['icon.icns', 'file-type-image'],
