@@ -435,6 +435,10 @@
 				"running": "Checking a chat"
 			},
 			"done": "Checked a sub-agent",
+			"own": {
+				"done": "Checked this chat",
+				"running": "Checking this chat"
+			},
 			"running": "Checking a sub-agent"
 		},
 		"get-diff-comments": {
