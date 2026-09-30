@@ -20,12 +20,12 @@ const DIRECTORY_REFRESH_INTERVAL_MS = 5_000;
  * after mount is always immediate — hence the `-Infinity` seed rather than `0`,
  * which would make the leading edge depend on the epoch the clock starts at.
  *
- * The file list is invalidated on every broadcast because it is what the tree
- * draws from, but each expanded ignored folder is a query of its own, so an
- * unthrottled broadcast costs one IPC round-trip per folder the session has ever
- * opened — and `invalidateQueries` refetches an active query whatever its
- * `staleTime`. The watcher clamps sustained churn to a broadcast per second, so
- * that fan-out would otherwise be paid every second for contents that are
+ * The file list is invalidated on every membership change because it is what
+ * the tree draws from, but each expanded ignored folder is a query of its own,
+ * so an unthrottled broadcast costs one IPC round-trip per folder the session
+ * has ever opened — and `invalidateQueries` refetches an active query whatever
+ * its `staleTime`. The watcher clamps sustained churn to a broadcast per second,
+ * so that fan-out would otherwise be paid every second for contents that are
  * ignored by definition.
  * @param workspaceCwd - Absolute workspace root whose directories to refresh
  * @returns A function requesting a refresh, coalescing calls inside the window
@@ -66,13 +66,15 @@ function useThrottledDirectoryRefresh(workspaceCwd: string | null): () => void {
 /**
  * Keeps the workspace file list fresh in near-real-time: asks the main process
  * to watch `workspaceCwd` and invalidates the cached file list whenever a
- * change is broadcast, along with the lazily enumerated directories the files
- * tree expanded, so a child deleted or moved out of an ignored folder leaves the
- * tree with everything else. The polling on `workspaceFilesQuery` stays as a
- * coarse fallback for platforms or ignored paths the watcher cannot cover. The
- * same broadcast also refreshes the workspace-scoped settings snapshot, so a
- * newly authored `.ensemblr/settings.toml` updates the Setup and Run dock
- * panels.
+ * broadcast reports that an entry may have come or gone, along with the lazily
+ * enumerated directories the files tree expanded, so a child deleted or moved
+ * out of an ignored folder leaves the tree with everything else. The polling on
+ * `workspaceFilesQuery` stays as a coarse fallback for platforms or ignored
+ * paths the watcher cannot cover. A broadcast that reports a settings input
+ * changed also refreshes the workspace-scoped settings snapshot, so a newly
+ * authored `.ensemblr/settings.toml` updates the Setup and Run dock panels. A
+ * plain write to an existing file refreshes neither; git status, which does move
+ * with it, is refreshed by `useWorkbenchQueries` on every broadcast.
  *
  * The directory leg is throttled rather than immediate — see
  * {@link useThrottledDirectoryRefresh} — because it fans out per expanded folder
@@ -105,13 +107,15 @@ export function useWorkspaceFilesWatch({
 				return;
 			}
 
-			void queryClient.invalidateQueries({
-				queryKey: ensemblrQueryKeys.workspaceFiles(workspaceCwd),
-			});
+			if (event.membershipChanged) {
+				void queryClient.invalidateQueries({
+					queryKey: ensemblrQueryKeys.workspaceFiles(workspaceCwd),
+				});
 
-			refreshExpandedDirectories();
+				refreshExpandedDirectories();
+			}
 
-			if (repositoryId) {
+			if (event.settingsChanged && repositoryId) {
 				void queryClient.invalidateQueries({
 					queryKey: ensemblrQueryKeys.settingsResolution(
 						repositoryId,

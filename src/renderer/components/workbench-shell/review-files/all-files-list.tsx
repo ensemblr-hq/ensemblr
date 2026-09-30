@@ -32,8 +32,15 @@ import type {
 import { AllFilesContextMenuContent } from './all-files-context-menu';
 import { FileTreeLabel } from './file-tree-label';
 
-/** Collapsible folder tree of every workspace file (files tab). */
-export function AllFilesList({
+/**
+ * Collapsible folder tree of every workspace file (files tab).
+ *
+ * Memoized on its props: `files` keeps its identity while the listing is
+ * unchanged (the live workspace model reuses the previous array for an equal
+ * refetch), so a render of the review panel that moved nothing here does not
+ * rebuild the tree model or re-run the virtualizer.
+ */
+export const AllFilesList = memo(function AllFilesList({
 	files,
 	workspaceCwd,
 	workspaceId,
@@ -65,7 +72,7 @@ export function AllFilesList({
 			workspaceId={workspaceId}
 		/>
 	);
-}
+});
 
 /**
  * Builds the tree from the flat file list, flattens it to the visible rows, and

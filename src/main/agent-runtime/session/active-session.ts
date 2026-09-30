@@ -33,12 +33,18 @@ export interface ActiveSession {
 	summaryQueued: boolean;
 	subscription: AgentSubscription;
 	/**
-	 * Largest ordinal we've broadcast so far for this session's branch. Updated
-	 * from every successful `persistRuntimeEvent` and used as the seed when we
-	 * synthesize ephemeral delta rows for live streaming.
+	 * Largest ordinal known for this session's branch: seeded at open, moved by
+	 * every successful `persistRuntimeEvent`, and raised from storage each time a
+	 * delta run opens, so rows appended outside the runtime stream (a tab title, a
+	 * submitted plan, a workspace rename) are stepped past. It is the seed for the
+	 * ephemeral delta rows synthesized during live streaming.
 	 */
 	lastBroadcastOrdinal: number;
-	/** Monotonic counter for fractional delta ordinals between persisted events. */
+	/**
+	 * Counts the delta runs opened since `lastBroadcastOrdinal` last moved, one
+	 * per coalesced broadcast rather than one per token, so each run reserves its
+	 * own fractional ordinal above that base.
+	 */
 	deltaCounter: number;
 }
 

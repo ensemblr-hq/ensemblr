@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useRef } from 'react';
+import { memo, type ReactNode, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -13,7 +13,7 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from '@/renderer/components/ui/sheet';
-import type { AgentsPanelProps } from '@/renderer/types/agents';
+import type { AgentsPanelNavigation } from '@/renderer/types/agents';
 import type {
 	DockTabId,
 	ReviewPanelTab,
@@ -28,7 +28,7 @@ import { useWorkbenchLayout } from './shell-contexts';
 /** Everything the review rail renders, in either of the two hosts below. */
 export interface ReviewRailProps {
 	activeReviewTab: ReviewPanelTab;
-	agentsPanel: AgentsPanelProps;
+	agentsNavigation: AgentsPanelNavigation;
 	activeWorkspace: WorkspaceShellModel;
 	dockActions: WorkbenchDockActions;
 	dockTabId: DockTabId;
@@ -54,10 +54,14 @@ export function ReviewRailFrame({ children }: { children: ReactNode }) {
  *
  * `onDismiss` adds the close affordance the sheet needs, since the toolbar toggle
  * that would otherwise close the rail sits behind the overlay.
+ *
+ * Memoized because the workspace shell renders for reasons that never reach the
+ * rail — a composer or session-tab change — and everything under it is heavy:
+ * the review tabs, the file trees, the terminal dock.
  */
-export function ReviewRail({
+export const ReviewRail = memo(function ReviewRail({
 	activeReviewTab,
-	agentsPanel,
+	agentsNavigation,
 	activeWorkspace,
 	dockActions,
 	dockTabId,
@@ -78,7 +82,7 @@ export function ReviewRail({
 				<ResizablePanel className='min-h-0' defaultSize='62%' minSize='8rem'>
 					<ReviewPanel
 						activeTab={activeReviewTab}
-						agentsPanel={agentsPanel}
+						agentsNavigation={agentsNavigation}
 						onFileSearchOpen={onFileSearchOpen}
 						onTabChange={onReviewTabChange}
 						workspace={activeWorkspace}
@@ -108,7 +112,7 @@ export function ReviewRail({
 			</ResizablePanelGroup>
 		</ReviewRailFrame>
 	);
-}
+});
 
 /** Shared narrow-window sheet host for right-sidebar presentation. */
 export function ReviewRailSheetHost({
@@ -122,6 +126,11 @@ export function ReviewRailSheetHost({
 }) {
 	const { state, actions } = useWorkbenchLayout();
 	const sheetRef = useRef<HTMLDivElement | null>(null);
+	const { setRightSidebarSheetOpen } = actions;
+	/** Closes the sheet; its identity survives renders so the memoized rail inside can skip them. */
+	const closeSheet = useCallback(() => {
+		setRightSidebarSheetOpen(false);
+	}, [setRightSidebarSheetOpen]);
 	// A press the rail itself consumed is not a press outside the sheet.
 	// `react-resizable-panels` (v4, `PanelGroup`'s document `pointerdown` listener)
 	// and xterm both call `preventDefault()` in the document's *capture* phase,
@@ -155,7 +164,7 @@ export function ReviewRailSheetHost({
 					<SheetTitle>{title}</SheetTitle>
 					<SheetDescription>{description}</SheetDescription>
 				</SheetHeader>
-				{children(() => actions.setRightSidebarSheetOpen(false))}
+				{children(closeSheet)}
 			</SheetContent>
 		</Sheet>
 	);

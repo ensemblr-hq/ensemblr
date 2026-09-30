@@ -1,16 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { FileDiffIcon } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { turnDiffQuery } from '@/renderer/api/ensemblr-queries';
 import { CodeViewerHeader } from '@/renderer/components/code-surface';
 import {
+	countPatchesWithinRowBudget,
 	DiffDisplayToggles,
 	DiffViewer,
+	MAX_RENDERED_TURN_DIFF_ROWS,
 } from '@/renderer/components/diff-viewer';
 import { splitCombinedPatch } from '@/renderer/lib/diff/parse';
 import { failureText } from '@/renderer/lib/failure-text';
-import type { TurnDiffFileWire } from '@/shared/ipc/contracts/checkpoint';
+import type {
+	ComputeTurnDiffResult,
+	TurnDiffFileWire,
+} from '@/shared/ipc/contracts/checkpoint';
 
 import { PanelMessage } from './panel-message';
 
@@ -28,11 +33,6 @@ import { PanelMessage } from './panel-message';
 export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 	const { t } = useTranslation();
 	const { data, isError, isPending } = useQuery(turnDiffQuery(turnId));
-
-	const patchFiles = useMemo(
-		() => (data?.ok && data.patch ? splitCombinedPatch(data.patch) : []),
-		[data],
-	);
 
 	if (!turnId) {
 		return (
@@ -70,8 +70,7 @@ export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 		);
 	}
 
-	const files = result.files;
-	if (files.length === 0) {
+	if (result.files.length === 0) {
 		return (
 			<PanelMessage
 				message={t(
@@ -82,6 +81,42 @@ export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 		);
 	}
 
+	return <TurnDiffFiles key={turnId} result={result} />;
+}
+
+/**
+ * The loaded turn diff: a summary of every changed file, then a viewer per file
+ * mounted one row budget at a time.
+ *
+ * Every file stays in the summary, but only the leading files that fit
+ * {@link MAX_RENDERED_TURN_DIFF_ROWS} get a viewer, and a control lays out the
+ * next window's worth on request. Mounting them all is what let a turn that
+ * touched hundreds of files, or added one generated file, commit tens of
+ * thousands of table rows at once. Keyed by turn at the call site, so a window
+ * opened on one turn is not inherited by the next.
+ */
+function TurnDiffFiles({
+	result,
+}: {
+	result: Extract<ComputeTurnDiffResult, { ok: true }>;
+}) {
+	const { t } = useTranslation();
+	const [windows, setWindows] = useState(1);
+	const patchFiles = useMemo(
+		() => (result.patch ? splitCombinedPatch(result.patch) : []),
+		[result.patch],
+	);
+	const { revealCount, shownCount } = useMemo(() => {
+		const patches = patchFiles.map((file) => file.patch);
+		const budget = windows * MAX_RENDERED_TURN_DIFF_ROWS;
+		const shown = countPatchesWithinRowBudget(patches, budget);
+		const next = countPatchesWithinRowBudget(
+			patches,
+			budget + MAX_RENDERED_TURN_DIFF_ROWS,
+		);
+		return { revealCount: next - shown, shownCount: shown };
+	}, [patchFiles, windows]);
+
 	return (
 		<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
 			<CodeViewerHeader
@@ -89,7 +124,7 @@ export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 					<>
 						<span className='text-muted-foreground text-xs tabular-nums'>
 							{t('workbench:turn-diff.file-count', {
-								count: files.length,
+								count: result.files.length,
 								defaultValue_one: '{{count}} file',
 								defaultValue_other: '{{count}} files',
 							})}
@@ -108,7 +143,7 @@ export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 			/>
 			<div className='sleek-scrollbar min-h-0 flex-1 overflow-auto'>
 				<ul className='border-border border-b px-3 py-2'>
-					{files.map((file) => (
+					{result.files.map((file) => (
 						<li
 							className='flex items-center gap-2 py-0.5 font-mono text-code-body leading-code'
 							key={file.path}
@@ -127,7 +162,7 @@ export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 					))}
 				</ul>
 				<div className='flex flex-col'>
-					{patchFiles.map((file) => (
+					{patchFiles.slice(0, shownCount).map((file) => (
 						<div
 							className='border-border border-b last:border-b-0'
 							key={file.path || file.patch}
@@ -141,6 +176,19 @@ export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 						</div>
 					))}
 				</div>
+				{revealCount > 0 ? (
+					<button
+						className='w-full border-border border-t px-3 py-2 text-left text-muted-foreground text-xs hover:text-foreground'
+						onClick={() => setWindows((current) => current + 1)}
+						type='button'
+					>
+						{t('workbench:turn-diff.show-more-files', {
+							count: revealCount,
+							defaultValue_one: 'Show {{count}} more file',
+							defaultValue_other: 'Show {{count}} more files',
+						})}
+					</button>
+				) : null}
 			</div>
 		</div>
 	);

@@ -96,6 +96,7 @@ export default defineConfig({
 						'tests/main/architecture-control-port.test.ts',
 						'tests/main/architecture-service.test.ts',
 						'tests/main/diagram-upkeep.test.ts',
+						'tests/main/delta-coalescer.test.ts',
 						'tests/main/branch-name-slug.test.ts',
 						'tests/main/concierge-context-clear.test.ts',
 						'tests/main/concierge-memory-policy.test.ts',

@@ -1713,7 +1713,9 @@
 			"no-turn": "Αυτή η καρτέλα δεν έχει συσχετισμένο γύρο."
 		},
 		"file-count_one": "{{count}} αρχείο",
-		"file-count_other": "{{count}} αρχεία"
+		"file-count_other": "{{count}} αρχεία",
+		"show-more-files_one": "Εμφάνιση {{count}} ακόμη αρχείου",
+		"show-more-files_other": "Εμφάνιση {{count}} ακόμη αρχείων"
 	},
 	"window-controls": {
 		"close": "Κλείσιμο παραθύρου",

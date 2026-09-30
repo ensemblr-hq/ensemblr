@@ -41,6 +41,17 @@ export interface AgentConversation {
 /** Loading state for the prop-driven Agents panel. */
 export type AgentsPanelState = 'error' | 'loading' | 'ready';
 
+/**
+ * What the live Agents panel needs from the workspace shell: how to open or
+ * restore a conversation, and how to close the narrow-window sheet around it.
+ */
+export interface AgentsPanelNavigation {
+	onDismiss: () => void;
+	onRestore: (chatTabId: string) => Promise<boolean>;
+	onSelect: (chatTabId: string) => void;
+	selectedChatTabId: string | null;
+}
+
 /** Public presentation inputs and navigation callbacks for the Agents panel. */
 export interface AgentsPanelProps {
 	conversations: readonly AgentConversation[];

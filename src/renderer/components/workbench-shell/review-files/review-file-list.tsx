@@ -1,14 +1,14 @@
 import { GitPullRequestArrowIcon, TriangleAlertIcon } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
 	ContextMenu,
 	ContextMenuTrigger,
 } from '@/renderer/components/ui/context-menu';
-import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { PanelPlaceholder } from '@/renderer/components/workbench-shell/panel-placeholder';
 import { useBuildReviewFileActions } from '@/renderer/hooks/workbench-shell/review-files/use-build-review-file-actions';
+import { useReviewFileRows } from '@/renderer/hooks/workbench-shell/review-files/use-review-file-rows';
 import { useRowContextMenuTarget } from '@/renderer/hooks/workbench-shell/review-files/use-row-context-menu-target';
 import { describeWorkspaceGitFailure } from '@/renderer/lib/workbench/git-failure-copy';
 import {
@@ -27,15 +27,15 @@ import type {
 } from '@/shared/ipc/contracts/workspace-git';
 
 import { ReviewFileActionsProvider } from './review-file-actions-context';
-import { ReviewFileRow } from './review-file-row';
-import { ReviewFileTree } from './review-file-tree';
+import { ReviewFileVirtualList } from './review-file-virtual-list';
 import { ReviewFilesContextMenuContent } from './review-files-context-menu';
 
 /**
  * Renders the changes panel as either a flat list or a collapsible folder tree.
- * Rows marked viewed dim, and in the flat list they sink below the rest.
+ * Rows marked viewed dim, and in the flat list they sink below the rest. Memoized
+ * so a review panel render that leaves these props alone skips the row model.
  */
-export function ReviewFileList({
+export const ReviewFileList = memo(function ReviewFileList({
 	conflictPaths,
 	diffScope,
 	discardablePaths,
@@ -100,6 +100,13 @@ export function ReviewFileList({
 		[conflictPaths, markedFiles, listedFiles],
 	);
 
+	const { rows, toggleDirectory } = useReviewFileRows({
+		conflictGroups,
+		listedFiles,
+		markedFiles,
+		viewMode,
+	});
+
 	const buildMenuTarget = useCallback(
 		(path: string): ReviewFileMenuTarget => {
 			const row = files.find((file) => file.path === path);
@@ -145,65 +152,21 @@ export function ReviewFileList({
 		);
 	}
 
-	const flatList = conflictGroups ? (
-		<>
-			<ReviewFileGroup
-				files={conflictGroups.conflicted}
-				label={t('review:changes.group-conflicts', 'Conflicts')}
-			/>
-			<ReviewFileGroup
-				files={conflictGroups.clean}
-				label={t('review:changes.group-clean', 'Clean')}
-			/>
-		</>
-	) : (
-		listedFiles.map((file) => (
-			<ReviewFileRow file={file} key={file.id} showPath />
-		))
-	);
-
 	return (
 		<ReviewFileActionsProvider value={actions}>
 			<ContextMenu>
 				<ContextMenuTrigger asChild>
-					<div className='h-full' onContextMenuCapture={handleContextCapture}>
-						<ScrollArea className='h-full'>
-							<div className='flex flex-col gap-1 p-3'>
-								{viewMode === 'folders' ? (
-									<ReviewFileTree files={markedFiles} />
-								) : (
-									flatList
-								)}
-							</div>
-						</ScrollArea>
+					<div className='h-full'>
+						<ReviewFileVirtualList
+							isTree={viewMode === 'folders'}
+							onContextMenuCapture={handleContextCapture}
+							onToggleDirectory={toggleDirectory}
+							rows={rows}
+						/>
 					</div>
 				</ContextMenuTrigger>
 				<ReviewFilesContextMenuContent target={menuTarget} />
 			</ContextMenu>
 		</ReviewFileActionsProvider>
 	);
-}
-
-/** One labelled band of the flat list, used when conflicts split it in two. */
-function ReviewFileGroup({
-	files,
-	label,
-}: {
-	files: readonly ReviewFileSummary[];
-	label: string;
-}) {
-	if (files.length === 0) {
-		return null;
-	}
-
-	return (
-		<section className='flex min-w-0 flex-col gap-1'>
-			<h3 className='px-2 pt-1 font-semibold text-muted-foreground text-xs'>
-				{label}
-			</h3>
-			{files.map((file) => (
-				<ReviewFileRow file={file} key={file.id} showPath />
-			))}
-		</section>
-	);
-}
+});

@@ -4390,6 +4390,8 @@ export default interface Resources {
 			};
 			'file-count_one': '{{count}} file';
 			'file-count_other': '{{count}} files';
+			'show-more-files_one': 'Show {{count}} more file';
+			'show-more-files_other': 'Show {{count}} more files';
 		};
 		'window-controls': {
 			close: 'Close window';

@@ -49,7 +49,13 @@ function makeActions(
 
 function renderRow(
 	file: ReviewFileSummary,
-	props: { ariaLevel?: number; level?: number; showPath: boolean },
+	props: {
+		ariaLevel?: number;
+		ariaPosInSet?: number;
+		ariaSetSize?: number;
+		level?: number;
+		showPath: boolean;
+	},
 	actions: ReviewFileActions = makeActions(),
 ) {
 	return renderToStaticMarkup(
@@ -168,6 +174,8 @@ test('a conflicted file is marked U with a danger-toned warning triangle', () =>
 test('tree mode renders only the basename and tree semantics', () => {
 	const markup = renderRow(modifiedFile, {
 		ariaLevel: 3,
+		ariaPosInSet: 2,
+		ariaSetSize: 5,
 		level: 2,
 		showPath: false,
 	});
@@ -178,6 +186,8 @@ test('tree mode renders only the basename and tree semantics', () => {
 	expect(markup).not.toContain('>src/main/ipc/handlers/</span>');
 	expect(markup).toContain('role="treeitem"');
 	expect(markup).toContain('aria-level="3"');
+	expect(markup).toContain('aria-posinset="2"');
+	expect(markup).toContain('aria-setsize="5"');
 });
 
 test('every row exposes a Discard affordance regardless of open targets', () => {

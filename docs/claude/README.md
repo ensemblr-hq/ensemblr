@@ -544,10 +544,14 @@ Persistence is best-effort on the live path; the timeline rehydrates from
 whatever landed.
 
 Streaming deltas are the exception: `text-delta` and `reasoning-delta` take a
-fast path in `src/main/agent-runtime/session/handle-runtime-event.ts` that
-synthesizes an ephemeral row with a fractional ordinal and broadcasts it
-directly, skipping a `BEGIN IMMEDIATE` write per token. **They are never
-persisted** — the authoritative seal carries the full text.
+fast path in `src/main/agent-runtime/session/handle-runtime-event.ts`. Adjacent
+deltas of one stream are folded by `delta-coalescer.ts` into a single run per
+32 ms window, and each run is broadcast as one ephemeral row whose fractional
+ordinal sits just above the branch's newest stored row (read once when the run
+opens, so rows appended outside the runtime stream are stepped past). That
+skips a `BEGIN IMMEDIATE` write and an IPC message per token. The open run is
+flushed ahead of every persisted event. **Deltas are never persisted** — the
+authoritative seal carries the full text.
 
 ### Redacted reasoning (#237)
 

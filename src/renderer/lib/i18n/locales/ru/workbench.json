@@ -1827,7 +1827,11 @@
 		"file-count_one": "{{count}} файл",
 		"file-count_few": "{{count}} файла",
 		"file-count_many": "{{count}} файлов",
-		"file-count_other": "{{count}} файла"
+		"file-count_other": "{{count}} файла",
+		"show-more-files_one": "Показать ещё {{count}} файл",
+		"show-more-files_few": "Показать ещё {{count}} файла",
+		"show-more-files_many": "Показать ещё {{count}} файлов",
+		"show-more-files_other": "Показать ещё {{count}} файла"
 	},
 	"window-controls": {
 		"close": "Закрыть окно",

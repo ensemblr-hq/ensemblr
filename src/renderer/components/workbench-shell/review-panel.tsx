@@ -11,15 +11,16 @@ import { useTranslation } from 'react-i18next';
 import { TabScroller } from '@/renderer/components/tab-scroller';
 import { Button } from '@/renderer/components/ui/button';
 import { Tabs, TabsContent } from '@/renderer/components/ui/tabs';
-import { AgentsPanel } from '@/renderer/components/workbench-shell/agents-panel/agents-panel';
+import { LiveAgentsPanel } from '@/renderer/components/workbench-shell/agents-panel/live-agents-panel';
 import { useChangesSource } from '@/renderer/hooks/workbench-shell/review-files/use-changes-source';
 import { useDiscardChanges } from '@/renderer/hooks/workbench-shell/review-files/use-discard-changes';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { useWorkspaceConflicts } from '@/renderer/hooks/workbench-shell/review-files/use-workspace-conflicts';
 import { cn } from '@/renderer/lib/utils';
+import { useOpenAgentConversationCount } from '@/renderer/state/agents';
 import { useMenuCommand } from '@/renderer/state/menu-commands';
 import { changesViewModeAtom } from '@/renderer/state/workspace';
-import type { AgentsPanelProps } from '@/renderer/types/agents';
+import type { AgentsPanelNavigation } from '@/renderer/types/agents';
 import type {
 	ReviewPanelTab,
 	WorkspaceShellModel,
@@ -87,13 +88,13 @@ export function ReviewPanelTabsHeader<TabId extends string>({
  */
 export function ReviewPanel({
 	activeTab,
-	agentsPanel,
+	agentsNavigation,
 	onFileSearchOpen,
 	onTabChange,
 	workspace,
 }: {
 	activeTab: ReviewPanelTab;
-	agentsPanel: AgentsPanelProps;
+	agentsNavigation: AgentsPanelNavigation;
 	onFileSearchOpen: () => void;
 	onTabChange: (tab: ReviewPanelTab) => void;
 	workspace: WorkspaceShellModel;
@@ -109,6 +110,7 @@ export function ReviewPanel({
 	const canReview = useReviewableChanges(workspace);
 
 	const { paths: conflictPaths } = useWorkspaceConflicts(workspace);
+	const openAgentCount = useOpenAgentConversationCount(workspace.id);
 
 	const {
 		changesCount,
@@ -125,9 +127,7 @@ export function ReviewPanel({
 
 	const reviewTabs: readonly ReviewPanelHeaderTab<ReviewPanelTab>[] = [
 		{
-			count: agentsPanel.conversations.filter(
-				(conversation) => !conversation.isClosed,
-			).length,
+			count: openAgentCount,
 			id: 'agents',
 			label: t('workbench:agents.label', 'Agents'),
 		},
@@ -188,7 +188,10 @@ export function ReviewPanel({
 				tabs={reviewTabs}
 			/>
 			<TabsContent className='min-h-0 overflow-hidden' value='agents'>
-				<AgentsPanel {...agentsPanel} />
+				<LiveAgentsPanel
+					navigation={agentsNavigation}
+					workspaceId={workspace.id}
+				/>
 			</TabsContent>
 			<TabsContent className='min-h-0 overflow-hidden' value='files'>
 				<AllFilesList

@@ -84,10 +84,17 @@
 				// because a shell reads its input as a stream: a reordered pair of
 				// chunks is corrupted input, not slow input. Promise.all there is a
 				// correctness bug rather than a speedup.
+				//
+				// linux-recursive-watch drains its directory queue a level at a time:
+				// a level's reads are what discover the next level's directories, and
+				// how many run at once (SCAN_CONCURRENCY) is the whole point. A
+				// Promise.all over the tree is the unbounded fan-out it replaced, which
+				// opened thousands of reads at once on a large workspace.
 				"files": [
 					"src/main/agent-runtime/session/summary-queue.ts",
 					"src/main/repository/delete-repository.ts",
 					"src/main/terminal/agent-conversation-title.ts",
+					"src/main/workspace-files/linux-recursive-watch.ts",
 					"src/renderer/components/workbench-shell/dock-panel/xterm-terminal.tsx",
 					"src/renderer/lib/workbench/composer-attachments.ts"
 				],

@@ -16,7 +16,6 @@ const queries = vi.hoisted(() => ({
 	client: undefined as QueryClient | undefined,
 	workingTree: {
 		data: undefined as GetWorkspaceGitStatusResult | undefined,
-		dataUpdatedAt: 0,
 	},
 }));
 
@@ -29,7 +28,7 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
 			queryKey.includes('workspace-git-status') &&
 			queryKey.includes('working-tree')
 				? queries.workingTree
-				: { data: undefined, dataUpdatedAt: 0 },
+				: { data: undefined },
 		useQueryClient: () => queries.client,
 	};
 });
@@ -74,10 +73,16 @@ test('the open workspace carries its working-tree count into its cached branch s
 		},
 		{ updatedAt: 1_000 },
 	);
-	queries.workingTree = {
-		data: { files: [], summary: { additions: 0, deletions: 0, files: 0 } },
-		dataUpdatedAt: 5_000,
+	const workingTree: GetWorkspaceGitStatusResult = {
+		files: [],
+		summary: { additions: 0, deletions: 0, files: 0 },
 	};
+	client.setQueryData(
+		ensemblrQueryKeys.workspaceGitStatus(workspace.pathLabel ?? ''),
+		workingTree,
+		{ updatedAt: 5_000 },
+	);
+	queries.workingTree = { data: workingTree };
 
 	renderHook(() =>
 		useLiveWorkspaceModel({

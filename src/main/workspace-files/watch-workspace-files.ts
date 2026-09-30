@@ -1,7 +1,16 @@
 import { watch } from 'node:fs';
 import path from 'node:path';
 
+import type { WorkspaceFilesChangeFlags } from '../../shared/ipc/contracts/workspace-files';
 import { startLinuxRecursiveWatch } from './linux-recursive-watch.ts';
+import {
+	classifyWorkspaceFileEvent,
+	IGNORED_DIRECTORY_NAMES,
+	isIgnoredChange,
+	mergeFileChangeFlags,
+	NO_FILE_CHANGES,
+	type WorkspaceFileEvent,
+} from './workspace-file-changes.ts';
 
 const WATCH_DEBOUNCE_MS = 250;
 /**
@@ -12,26 +21,6 @@ const WATCH_DEBOUNCE_MS = 250;
  */
 const WATCH_MAX_WAIT_MS = 1_000;
 
-/**
- * Directories whose churn never changes `git ls-files` output but would
- * otherwise trigger refetch storms — `.git` rewrites itself on every git
- * command, and `node_modules` is gitignored in practice. The renderer's polling
- * fallback still covers the rare repo that tracks these paths.
- *
- * They carry the watch's whole cost, so on Linux — where a recursive watch is
- * emulated one OS watch per entry — this set is what the walk never descends
- * into, not just what its events are filtered against.
- */
-const IGNORED_DIRECTORY_NAMES = new Set(['.git', 'node_modules']);
-
-/**
- * Filenames whose churn never changes the listed tree but recurs constantly —
- * macOS rewrites `.DS_Store` on nearly every Finder interaction. Matched by
- * basename at any depth, plus AppleDouble `._*` sidecars. These are also hidden
- * from the listing itself, so a refetch would never surface them anyway.
- */
-const IGNORED_BASENAMES = new Set(['.DS_Store']);
-
 /** Handle to a single OS watch; `close` releases it. */
 interface WatchHandle {
 	close: () => void;
@@ -41,24 +30,26 @@ interface WatchHandle {
  * Starts one recursive directory watch. Abstracted so tests can drive synthetic
  * change/error events without touching the real filesystem.
  * @param directory - Absolute directory to watch recursively.
- * @param onChange - Called with the changed path (relative to `directory`).
+ * @param onChange - Called with each event, its path relative to `directory`.
  * @param onError - Called when the underlying watcher errors.
  * @returns A handle whose `close` stops the watch.
  */
 export type StartWatch = (
 	directory: string,
-	onChange: (changed: string | null) => void,
+	onChange: (event: WorkspaceFileEvent) => void,
 	onError: () => void,
 ) => WatchHandle;
 
 /**
  * Internal per-directory watch state: OS handle, debounce timer, the start of the
- * current burst (for the max-wait clamp), and reference count.
+ * current burst (for the max-wait clamp), what the burst has raised so far, and
+ * reference count.
  */
 interface WatchEntry {
 	burstStartedAt: number | null;
 	debounce: ReturnType<typeof setTimeout> | null;
 	handle: WatchHandle;
+	pending: WorkspaceFilesChangeFlags;
 	refCount: number;
 }
 
@@ -81,8 +72,11 @@ export interface WorkspaceFilesWatcher {
 
 /** Options for constructing a {@link WorkspaceFilesWatcher}. */
 export interface CreateWorkspaceFilesWatcherOptions {
-	/** Notified (debounced, per cwd) when a non-ignored file change is seen. */
-	onChange: (workspaceCwd: string) => void;
+	/**
+	 * Notified (debounced, per cwd) when a non-ignored file change is seen, with
+	 * what every event in the burst may have changed.
+	 */
+	onChange: (workspaceCwd: string, changes: WorkspaceFilesChangeFlags) => void;
 	/** Watch primitive; defaults to a recursive `fs.watch`. Injected in tests. */
 	startWatch?: StartWatch;
 }
@@ -103,12 +97,23 @@ export function createWorkspaceFilesWatcher({
 }: CreateWorkspaceFilesWatcherOptions): WorkspaceFilesWatcher {
 	const entries = new Map<string, WatchEntry>();
 
-	const scheduleChange = (workspaceCwd: string): void => {
+	/**
+	 * Folds one event into its directory's burst and (re)arms the debounce that
+	 * delivers the burst, so a burst is announced once with everything it raised.
+	 * @param workspaceCwd - Absolute path of the watched directory.
+	 * @param changes - Flags the event raised.
+	 */
+	const scheduleChange = (
+		workspaceCwd: string,
+		changes: WorkspaceFilesChangeFlags,
+	): void => {
 		const entry = entries.get(workspaceCwd);
 
 		if (!entry) {
 			return;
 		}
+
+		entry.pending = mergeFileChangeFlags(entry.pending, changes);
 
 		if (entry.debounce) {
 			clearTimeout(entry.debounce);
@@ -122,9 +127,12 @@ export function createWorkspaceFilesWatcher({
 		);
 
 		entry.debounce = setTimeout(() => {
+			const burst = entry.pending;
+
 			entry.debounce = null;
 			entry.burstStartedAt = null;
-			onChange(workspaceCwd);
+			entry.pending = NO_FILE_CHANGES;
+			onChange(workspaceCwd, burst);
 		}, delay);
 	};
 
@@ -135,6 +143,7 @@ export function createWorkspaceFilesWatcher({
 		}
 
 		entry.burstStartedAt = null;
+		entry.pending = NO_FILE_CHANGES;
 		entry.handle.close();
 	};
 
@@ -173,9 +182,9 @@ export function createWorkspaceFilesWatcher({
 			try {
 				handle = startWatch(
 					workspaceCwd,
-					(changed) => {
-						if (!isIgnoredChange(changed)) {
-							scheduleChange(workspaceCwd);
+					(event) => {
+						if (!isIgnoredChange(event.path)) {
+							scheduleChange(workspaceCwd, classifyWorkspaceFileEvent(event));
 						}
 					},
 					// A watcher error (e.g. the directory was removed) must not crash
@@ -194,6 +203,7 @@ export function createWorkspaceFilesWatcher({
 				burstStartedAt: null,
 				debounce: null,
 				handle,
+				pending: NO_FILE_CHANGES,
 				refCount: 1,
 			});
 		},
@@ -233,13 +243,13 @@ export function createWorkspaceFilesWatcher({
  * the call returns, which blocks the main process for over a second on a
  * workspace with `node_modules` installed — see {@link startLinuxRecursiveWatch}.
  * @param directory - Absolute directory to watch recursively.
- * @param onChange - Called with the changed path, relative to `directory`.
+ * @param onChange - Called with each event, its path relative to `directory`.
  * @param onError - Called when the underlying watcher errors.
  * @returns A handle whose `close` stops the watch.
  */
 function defaultStartWatch(
 	directory: string,
-	onChange: (changed: string | null) => void,
+	onChange: (event: WorkspaceFileEvent) => void,
 	onError: () => void,
 ): WatchHandle {
 	if (process.platform === 'linux') {
@@ -251,30 +261,10 @@ function defaultStartWatch(
 		});
 	}
 
-	const watcher = watch(directory, { recursive: true }, (_event, changed) => {
-		onChange(changed);
+	const watcher = watch(directory, { recursive: true }, (kind, changed) => {
+		onChange({ kind, path: changed });
 	});
 	watcher.on('error', onError);
 
 	return { close: () => watcher.close() };
-}
-
-/**
- * True when a change is confined to a directory `git ls-files` never lists.
- * Every segment is tested, not just the first, so a monorepo package's nested
- * `node_modules` is filtered the same way a root one is — and the same way the
- * Linux walk already skips those names at any depth.
- */
-function isIgnoredChange(changed: string | null): boolean {
-	if (!changed) {
-		return false;
-	}
-
-	const segments = changed.split(/[/\\]/);
-	if (segments.some((segment) => IGNORED_DIRECTORY_NAMES.has(segment))) {
-		return true;
-	}
-
-	const basename = segments.at(-1) ?? changed;
-	return IGNORED_BASENAMES.has(basename) || basename.startsWith('._');
 }

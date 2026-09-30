@@ -9,6 +9,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import type { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
 import {
@@ -374,4 +375,276 @@ test('capture failure warns, records the loss, and returns null without blocking
 	});
 	assert.equal(recorded?.gitHash, null);
 	assert.equal(recorded?.reason, 'capture-failed');
+});
+
+/** A chat of some workspace with one turn to open, as a boundary operation takes it. */
+interface Chat {
+	agentSessionId: string;
+	cwd: string;
+	database: DatabaseSync;
+	turnId: string;
+	workspaceId: string;
+}
+
+/**
+ * Adds a chat with one turn to `workspaceId`, creating that workspace first when
+ * it is new. The fake captures below never touch `cwd`, so every chat can share
+ * the fixture's repository.
+ */
+function addChat(fixture: Fixture, workspaceId: string): Chat {
+	const { database } = fixture.connection;
+	database
+		.prepare(
+			`INSERT OR IGNORE INTO workspaces (id, repository_id, slug, name, path)
+VALUES (?, 'repo-ckpt', ?, ?, ?)`,
+		)
+		.run(
+			workspaceId,
+			workspaceId,
+			workspaceId,
+			`${fixture.repoDirectory}-${workspaceId}`,
+		);
+	const { mainBranch, session } = createAgentSession({
+		database,
+		input: { cwd: fixture.repoDirectory, workspaceId },
+	});
+	const turn = createTurn({
+		database,
+		input: {
+			branchId: mainBranch.id,
+			model: null,
+			promptText: 'ask',
+			thinkingLevel: null,
+		},
+	});
+
+	return {
+		agentSessionId: session.id,
+		cwd: fixture.repoDirectory,
+		database,
+		turnId: turn.id,
+		workspaceId,
+	};
+}
+
+/** The opening ref a chat's turn is captured under. */
+const openingRef = (chat: Chat): string =>
+	checkpointRefFor({ turnId: chat.turnId, workspaceId: chat.workspaceId });
+
+/** The ref the same turn's end is captured under. */
+const endingRef = (chat: Chat): string => `${openingRef(chat)}-end`;
+
+/** Lets every promise the port has queued run to its next real wait. */
+const flush = (): Promise<void> =>
+	new Promise((resolve) => {
+		setImmediate(resolve);
+	});
+
+/**
+ * A capture that holds each snapshot in flight until the test releases its ref,
+ * recording which refs started and how many were in flight at once.
+ */
+function createHeldCapture() {
+	const started: string[] = [];
+	const releases = new Map<string, () => void>();
+	let inFlight = 0;
+	let peak = 0;
+	const capture: typeof captureWorkspaceCheckpoint = async ({ ref }) => {
+		started.push(ref);
+		inFlight += 1;
+		peak = Math.max(peak, inFlight);
+		await new Promise<void>((resolve) => {
+			releases.set(ref, resolve);
+		});
+		inFlight -= 1;
+
+		return {
+			commitHash: `commit-${started.length}`,
+			parentHash: null,
+			ref,
+			treeHash: 'tree',
+		};
+	};
+
+	return {
+		capture,
+		inFlight: () => inFlight,
+		peak: () => peak,
+		release: (ref: string) => releases.get(ref)?.(),
+		started,
+	};
+}
+
+test('two chats in one workspace never capture at the same time', async (t) => {
+	const fixture = openFixture(t);
+	const first = addChat(fixture, fixture.workspaceId);
+	const second = addChat(fixture, fixture.workspaceId);
+	const held = createHeldCapture();
+	const boundaries = createTurnCheckpoints({ capture: held.capture });
+
+	const opened = [
+		boundaries.openTurn({ ...first, closingTurnId: null, label: 'first' }),
+		boundaries.openTurn({ ...second, closingTurnId: null, label: 'second' }),
+	];
+	await flush();
+	assert.deepEqual(held.started, [openingRef(first)]);
+
+	held.release(openingRef(first));
+	await flush();
+	assert.deepEqual(held.started, [openingRef(first), openingRef(second)]);
+
+	held.release(openingRef(second));
+	await Promise.all(opened);
+	assert.equal(held.peak(), 1);
+});
+
+test('chats in different workspaces capture at the same time', async (t) => {
+	const fixture = openFixture(t);
+	const here = addChat(fixture, fixture.workspaceId);
+	const elsewhere = addChat(fixture, 'ws-ckpt-elsewhere');
+	const held = createHeldCapture();
+	const boundaries = createTurnCheckpoints({ capture: held.capture });
+
+	const opened = [
+		boundaries.openTurn({ ...here, closingTurnId: null, label: 'here' }),
+		boundaries.openTurn({
+			...elsewhere,
+			closingTurnId: null,
+			label: 'elsewhere',
+		}),
+	];
+	await flush();
+	assert.equal(held.inFlight(), 2);
+
+	held.release(openingRef(here));
+	held.release(openingRef(elsewhere));
+	await Promise.all(opened);
+});
+
+test('one chat keeps its boundaries in the order they were queued', async (t) => {
+	const fixture = openFixture(t);
+	const chat = addChat(fixture, fixture.workspaceId);
+	const held = createHeldCapture();
+	const boundaries = createTurnCheckpoints({ capture: held.capture });
+
+	const opened = boundaries.openTurn({
+		...chat,
+		closingTurnId: null,
+		label: 'ask',
+	});
+	const ended = boundaries.endTurn(chat);
+	await flush();
+	assert.deepEqual(held.started, [openingRef(chat)]);
+
+	held.release(openingRef(chat));
+	await flush();
+	assert.deepEqual(held.started, [openingRef(chat), endingRef(chat)]);
+
+	held.release(endingRef(chat));
+	await Promise.all([opened, ended]);
+});
+
+test('flushing a chat waits for its last boundary at that moment and for nothing else', async (t) => {
+	const fixture = openFixture(t);
+	const first = addChat(fixture, fixture.workspaceId);
+	const second = addChat(fixture, fixture.workspaceId);
+	const held = createHeldCapture();
+	const boundaries = createTurnCheckpoints({ capture: held.capture });
+	let flushed = false;
+
+	const firstOpened = boundaries.openTurn({
+		...first,
+		closingTurnId: null,
+		label: 'first',
+	});
+	const secondOpened = boundaries.openTurn({
+		...second,
+		closingTurnId: null,
+		label: 'second',
+	});
+	const flushing = boundaries.flushSession(first.agentSessionId).then(() => {
+		flushed = true;
+	});
+	const firstEnded = boundaries.endTurn(first);
+	await flush();
+	assert.equal(flushed, false);
+
+	held.release(openingRef(first));
+	await flushing;
+	assert.equal(flushed, true);
+	assert.deepEqual(held.started, [openingRef(first), openingRef(second)]);
+
+	held.release(openingRef(second));
+	await flush();
+	held.release(endingRef(first));
+	await Promise.all([firstOpened, secondOpened, firstEnded]);
+});
+
+test('flushing a chat with nothing queued resolves at once', async () => {
+	await createTurnCheckpoints().flushSession('a-chat-that-never-queued');
+});
+
+test('a boundary that fails does not stall the ones queued behind it', async (t) => {
+	const fixture = openFixture(t);
+	const failing = addChat(fixture, fixture.workspaceId);
+	const following = addChat(fixture, fixture.workspaceId);
+	const boundaries = createTurnCheckpoints({
+		capture: async ({ ref }) => ({
+			commitHash: 'commit',
+			parentHash: null,
+			ref,
+			treeHash: 'tree',
+		}),
+	});
+	const closedDatabase = {
+		prepare: () => {
+			throw new Error('database is closed');
+		},
+	} as unknown as DatabaseSync;
+
+	const discarded = boundaries.discardTurn({
+		...failing,
+		database: closedDatabase,
+	});
+	const opened = boundaries.openTurn({
+		...following,
+		closingTurnId: null,
+		label: 'after the failure',
+	});
+
+	await assert.rejects(discarded, /database is closed/);
+	assert.ok(await opened);
+	await boundaries.flushSession(failing.agentSessionId);
+	await boundaries.drain();
+});
+
+test('drain waits for boundaries in every workspace', async (t) => {
+	const fixture = openFixture(t);
+	const here = addChat(fixture, fixture.workspaceId);
+	const elsewhere = addChat(fixture, 'ws-ckpt-elsewhere');
+	const held = createHeldCapture();
+	const boundaries = createTurnCheckpoints({ capture: held.capture });
+	let drained = false;
+
+	const opened = [
+		boundaries.openTurn({ ...here, closingTurnId: null, label: 'here' }),
+		boundaries.openTurn({
+			...elsewhere,
+			closingTurnId: null,
+			label: 'elsewhere',
+		}),
+	];
+	const draining = boundaries.drain().then(() => {
+		drained = true;
+	});
+	await flush();
+
+	held.release(openingRef(here));
+	await flush();
+	assert.equal(drained, false);
+
+	held.release(openingRef(elsewhere));
+	await draining;
+	assert.equal(drained, true);
+	await Promise.all(opened);
 });

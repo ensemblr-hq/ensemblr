@@ -8,6 +8,7 @@ import {
 	markCheckpointEndFailed,
 	setCheckpointEnd,
 } from '../storage/repositories/index.ts';
+import { createBoundaryQueue } from './boundary-queue.ts';
 import {
 	captureWorkspaceCheckpoint,
 	pinCheckpointRef,
@@ -27,9 +28,11 @@ import {
  * absence, so the resolver can tell a capture still being taken, whose turn
  * reads live meanwhile, from one that never landed, whose range it withholds.
  *
- * Operations for one session run strictly in order, so an end captured as a
- * turn settles lands before the next input's opening snapshot, and a reopen
- * never races the end it undoes.
+ * Operations for one workspace run one at a time, in the order they were
+ * queued. That keeps a chat's boundaries in order — an end captured as a turn
+ * settles lands before the next input's opening snapshot, and a reopen never
+ * races the end it undoes — and stops two chats of the same workspace staging
+ * its worktree at once. Chats in different workspaces still proceed together.
  */
 export interface TurnCheckpointPort {
 	/**
@@ -108,6 +111,8 @@ function endRefFor({
 
 /**
  * Creates the production turn-boundary port (git + SQLite).
+ * @param capture - Takes each snapshot; only tests replace it, to hold captures
+ *   in flight and watch what overlaps
  * @param now - Clock stamping when a turn ended
  * @param onChanged - Told the workspace whose turn ranges moved, after every
  *   boundary that wrote one, so the renderer re-reads them as they land rather
@@ -115,19 +120,21 @@ function endRefFor({
  * @returns The port
  */
 export function createTurnCheckpoints({
+	capture = captureWorkspaceCheckpoint,
 	now = () => new Date(),
 	onChanged,
 }: {
+	capture?: typeof captureWorkspaceCheckpoint;
 	now?: () => Date;
 	onChanged?: (workspaceId: string) => void;
 } = {}): TurnCheckpointPort {
-	const queue = createSessionQueue();
+	const queue = createBoundaryQueue();
 	const inOrder = queue.run;
 	const changed = (workspaceId: string): void =>
 		notifyChanged(onChanged, workspaceId);
 	return {
 		discardTurn: (input) =>
-			inOrder(input.agentSessionId, async () => {
+			inOrder(input, async () => {
 				if (
 					deleteCheckpointForTurn({
 						database: input.database,
@@ -138,10 +145,9 @@ export function createTurnCheckpoints({
 				}
 			}),
 		drain: queue.drain,
-		flushSession: (agentSessionId) =>
-			inOrder(agentSessionId, async () => undefined),
+		flushSession: queue.flushSession,
 		endTurnAt: ({ commitHash, openingRef, ...input }) =>
-			inOrder(input.agentSessionId, async () => {
+			inOrder(input, async () => {
 				const checkpoint = getCheckpointByTurnId({
 					database: input.database,
 					turnId: input.turnId,
@@ -158,19 +164,23 @@ export function createTurnCheckpoints({
 				changed(input.workspaceId);
 			}),
 		endTurn: (input) =>
-			inOrder(input.agentSessionId, async () => {
-				if (await endTurnNow({ ...input, endedAt: now() })) {
+			inOrder(input, async () => {
+				if (await endTurnNow({ ...input, capture, endedAt: now() })) {
 					changed(input.workspaceId);
 				}
 			}),
 		openTurn: (input) =>
-			inOrder(input.agentSessionId, async () => {
-				const checkpoint = await openTurnNow({ ...input, endedAt: now() });
+			inOrder(input, async () => {
+				const checkpoint = await openTurnNow({
+					...input,
+					capture,
+					endedAt: now(),
+				});
 				changed(input.workspaceId);
 				return checkpoint;
 			}),
 		reopenTurn: (input) =>
-			inOrder(input.agentSessionId, async () => {
+			inOrder(input, async () => {
 				if (
 					clearCheckpointEnd({ database: input.database, turnId: input.turnId })
 				) {
@@ -181,46 +191,15 @@ export function createTurnCheckpoints({
 }
 
 /**
- * Runs each session's tasks one after another, in the order they were queued,
- * while different sessions proceed independently. A task that fails does not
- * stall the ones queued behind it.
- * @returns `run`, queueing a task for a session and resolving to its result,
- *   and `drain`, resolving once nothing is queued anywhere
- */
-function createSessionQueue(): {
-	drain: () => Promise<void>;
-	run: <T>(sessionId: string, task: () => Promise<T>) => Promise<T>;
-} {
-	const tails = new Map<string, Promise<unknown>>();
-	return {
-		drain: async () => {
-			while (tails.size > 0) {
-				await Promise.all(tails.values());
-			}
-		},
-		run: (sessionId, task) => {
-			const run = (tails.get(sessionId) ?? Promise.resolve()).then(task);
-			const tail = run.catch(() => undefined);
-			tails.set(sessionId, tail);
-			void tail.then(() => {
-				if (tails.get(sessionId) === tail) {
-					tails.delete(sessionId);
-				}
-			});
-			return run;
-		},
-	};
-}
-
-/**
  * Captures the snapshot an input opens its turn at, and ends the turn it
  * interrupts at the same commit. A failed capture still writes the new turn's
  * row, without a commit, and marks the interrupted turn's end as lost.
- * @param input - The turn to open, the one to close, and when
+ * @param input - The turn to open, the one to close, when, and how to capture
  * @returns The new turn's checkpoint, or null when capture failed
  */
 async function openTurnNow({
 	agentSessionId,
+	capture,
 	closingTurnId,
 	cwd,
 	database,
@@ -228,10 +207,13 @@ async function openTurnNow({
 	label,
 	turnId,
 	workspaceId,
-}: OpenTurnInput & { endedAt: Date }): Promise<CheckpointRow | null> {
+}: OpenTurnInput & {
+	capture: typeof captureWorkspaceCheckpoint;
+	endedAt: Date;
+}): Promise<CheckpointRow | null> {
 	const ref = checkpointRefFor({ turnId, workspaceId });
 	try {
-		const captured = await captureWorkspaceCheckpoint({
+		const captured = await capture({
 			cwd,
 			message: `ensemblr checkpoint: ${label}`,
 			ref,
@@ -342,23 +324,27 @@ function recordFailedOpening({
  * the end as lost when the capture fails. Skips a turn with no opening
  * checkpoint, which has no range to close, and one whose end was already
  * recorded or lost, so a shutdown after the turn settled does not move it.
- * @param input - The turn to end, and when it ended
+ * @param input - The turn to end, when it ended, and how to capture
  * @returns Whether the turn's end changed
  */
 async function endTurnNow({
+	capture,
 	cwd,
 	database,
 	endedAt,
 	turnId,
 	workspaceId,
-}: TurnBoundaryInput & { endedAt: Date }): Promise<boolean> {
+}: TurnBoundaryInput & {
+	capture: typeof captureWorkspaceCheckpoint;
+	endedAt: Date;
+}): Promise<boolean> {
 	const checkpoint = getCheckpointByTurnId({ database, turnId });
 	if (!checkpoint?.gitHash || checkpoint.endedAt) {
 		return false;
 	}
 	const ref = endRefFor({ turnId, workspaceId });
 	try {
-		const captured = await captureWorkspaceCheckpoint({
+		const captured = await capture({
 			cwd,
 			message: `ensemblr checkpoint end: ${checkpoint.label}`,
 			ref,

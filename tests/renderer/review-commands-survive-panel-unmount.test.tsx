@@ -113,16 +113,19 @@ function renderShell() {
 	};
 }
 
+const AGENTS_NAVIGATION = {
+	onDismiss: () => undefined,
+	onRestore: async () => true,
+	onSelect: () => undefined,
+	selectedChatTabId: null,
+};
+
 /** The real review panel, with the props it needs to render the fixture. */
 function Panel() {
 	return (
 		<ReviewPanel
 			activeTab='files'
-			agentsPanel={{
-				conversations: [],
-				onRestore: () => undefined,
-				onSelect: () => undefined,
-			}}
+			agentsNavigation={AGENTS_NAVIGATION}
 			onFileSearchOpen={() => undefined}
 			onTabChange={() => undefined}
 			workspace={WORKSPACE}

@@ -11,7 +11,11 @@ import { ReviewFileList } from '../../src/renderer/components/workbench-shell/re
 import type { ReviewFileSummary } from '../../src/renderer/types/workbench';
 import type { ChangesViewMode } from '../../src/renderer/types/workbench-shell';
 import type { WorkspaceGitDiffScope } from '../../src/shared/ipc/contracts/workspace-git';
-import { installLocalStorage, renderWithProviders } from './support/dom';
+import {
+	installLocalStorage,
+	installScrollViewport,
+	renderWithProviders,
+} from './support/dom';
 
 const imageFile: ReviewFileSummary = {
 	additions: 0,
@@ -77,6 +81,7 @@ function openRowMenu(path: string) {
 describe('ReviewFileList image routing', () => {
 	beforeEach(() => {
 		installLocalStorage();
+		return installScrollViewport();
 	});
 
 	test('opens a changed image in the image preview instead of a binary diff', () => {

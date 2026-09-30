@@ -106,6 +106,15 @@ const IGNORED_ROOT_MAX_ENTRIES = 2000;
  */
 const LISTING_CACHE_TTL_MS = 60_000;
 
+/** One workspace's listing build and the follow-up queued behind it. */
+interface ListingBuild {
+	/** The single build queued to start once this one settles after an invalidation. */
+	next: Promise<ListWorkspaceFilesResult> | undefined;
+	promise: Promise<ListWorkspaceFilesResult>;
+	/** Set once an invalidation overtook this build, so it is never cached or joined. */
+	stale: boolean;
+}
+
 /** Service surface for listing and safely reading files within a workspace. */
 export interface ListWorkspaceFilesService {
 	list: (
@@ -132,6 +141,11 @@ export interface ListWorkspaceFilesService {
 	 * Drops a workspace's cached listing so the next {@link list} re-reads the
 	 * tree. Called by whatever observes the worktree changing — in production the
 	 * file watcher, which already broadcasts the same event to the renderer.
+	 *
+	 * A build still running is not joined by later callers and not cached when it
+	 * settles, since it may have read the tree before the change; the callers
+	 * already waiting on it still receive it. Later callers share one follow-up
+	 * build that starts after it settles, so builds never overlap.
 	 */
 	invalidate: (workspaceCwd: string) => void;
 }
@@ -169,8 +183,13 @@ export function createListWorkspaceFilesService({
 		string,
 		{ at: number; result: ListWorkspaceFilesResult }
 	>();
-	/** Listings currently being built, so concurrent callers share one. */
-	const listingsInFlight = new Map<string, Promise<ListWorkspaceFilesResult>>();
+	/**
+	 * The build running for each workspace, so concurrent callers share one. An
+	 * invalidation marks it `stale` instead of starting a second build beside it:
+	 * later callers share a single `next` build that begins once it settles, so a
+	 * burst of invalidations costs one running build and one follow-up.
+	 */
+	const builds = new Map<string, ListingBuild>();
 	/**
 	 * Ignored roots last seen to exceed the per-root enumeration cap, keyed by
 	 * workspace-relative path and holding the root's mtime at the time.
@@ -254,10 +273,44 @@ export function createListWorkspaceFilesService({
 		};
 	}
 
+	/**
+	 * Starts the build for a workspace and registers it as the running one. A
+	 * failure or a listing an invalidation overtook is never what the cache keeps:
+	 * the first is a transient state of the workspace, the second may predate the
+	 * change that caused it.
+	 * @param cwd - Resolved absolute workspace root.
+	 * @returns The registered build.
+	 */
+	function startBuild(cwd: string): ListingBuild {
+		const build: ListingBuild = {
+			next: undefined,
+			promise: buildListing(cwd)
+				.then((result) => {
+					if (!result.error && !build.stale) {
+						listings.set(cwd, { at: Date.now(), result });
+					}
+					return result;
+				})
+				.finally(() => {
+					if (builds.get(cwd) === build && !build.next) {
+						builds.delete(cwd);
+					}
+				}),
+			stale: false,
+		};
+		builds.set(cwd, build);
+		return build;
+	}
+
 	return {
 		invalidate(workspaceCwd) {
 			const cwdResult = resolveWorkspaceCwd(workspaceCwd);
-			listings.delete(cwdResult.ok ? cwdResult.cwd : workspaceCwd);
+			const cwd = cwdResult.ok ? cwdResult.cwd : workspaceCwd;
+			listings.delete(cwd);
+			const running = builds.get(cwd);
+			if (running) {
+				running.stale = true;
+			}
 		},
 		async list(request) {
 			const cwdResult = resolveWorkspaceCwd(request.workspaceCwd);
@@ -277,26 +330,17 @@ export function createListWorkspaceFilesService({
 				return cached.result;
 			}
 
-			const pending = listingsInFlight.get(cwd);
-			if (pending) {
-				return pending;
+			const running = builds.get(cwd);
+			if (!running) {
+				return startBuild(cwd).promise;
 			}
-
-			const flight = buildListing(cwd)
-				.then((result) => {
-					// A failure is a transient state of the workspace — mid-clone, a
-					// worktree being replaced — not a fact about its tree, so it is
-					// never what the next caller is served.
-					if (!result.error) {
-						listings.set(cwd, { at: Date.now(), result });
-					}
-					return result;
-				})
-				.finally(() => {
-					listingsInFlight.delete(cwd);
-				});
-			listingsInFlight.set(cwd, flight);
-			return flight;
+			if (!running.stale) {
+				return running.promise;
+			}
+			running.next ??= running.promise
+				.catch(() => undefined)
+				.then(() => startBuild(cwd).promise);
+			return running.next;
 		},
 		async read(request) {
 			const cwdResult = resolveWorkspaceCwd(request.workspaceCwd);

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -100,13 +100,22 @@ export function useDiscardChanges({
 		},
 	});
 
+	// Read through a ref so the handler keeps one identity across status
+	// refreshes: every changed-file row consumes it, and a new one re-renders them all.
+	const sourceFilesRef = useRef(sourceFiles);
+	useEffect(() => {
+		sourceFilesRef.current = sourceFiles;
+	}, [sourceFiles]);
+
 	const handleDiscardFile = useCallback(
 		(filePath: string) => {
-			const file = sourceFiles.find((entry) => entry.path === filePath);
+			const file = sourceFilesRef.current.find(
+				(entry) => entry.path === filePath,
+			);
 			const paths = file ? discardPathsOf(file) : [filePath];
 			openDiscardTarget({ fileCount: 1, paths, title: filePath });
 		},
-		[openDiscardTarget, sourceFiles],
+		[openDiscardTarget],
 	);
 
 	// Discard every uncommitted change at once. Only working-tree files revert,

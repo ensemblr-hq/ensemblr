@@ -1,5 +1,11 @@
 import { useSetAtom } from 'jotai';
-import { type ComponentType, useCallback, useRef, useState } from 'react';
+import {
+	type ComponentType,
+	useCallback,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import { useWorkspaceMenuCommands } from '@/renderer/components/workbench-shell/workspace-menu-commands';
 import { useDrawArchitectureDiagram } from '@/renderer/hooks/workbench-shell/architecture-diagram/use-draw-architecture-diagram';
 import { useReviewAgentActions } from '@/renderer/hooks/workbench-shell/review-actions/use-review-agent-actions';
@@ -8,13 +14,14 @@ import { useLayoutMenuCommands } from '@/renderer/hooks/workbench-shell/use-layo
 import { useReviewPanelCommands } from '@/renderer/hooks/workbench-shell/use-review-panel-commands';
 import { useRightSidebarController } from '@/renderer/hooks/workbench-shell/use-right-sidebar-controller';
 import { useRunScriptCommands } from '@/renderer/hooks/workbench-shell/use-run-script-commands';
+import { useWorkbenchLayoutValue } from '@/renderer/hooks/workbench-shell/use-workbench-layout-value';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
-import { useAgentsPanelState } from '@/renderer/state/agents';
 import {
 	useRequestDiffLineReveal,
 	workspaceDirectoryRevealRequestAtom,
 } from '@/renderer/state/workspace';
 import { useProvideDockExpander } from '@/renderer/state/workspace/terminal-requests';
+import type { AgentsPanelNavigation } from '@/renderer/types/agents';
 import type { WorkspaceMainContentState } from '@/renderer/types/components';
 import type {
 	FileOpenOptions,
@@ -27,6 +34,7 @@ import type {
 	WorkbenchShellProps,
 } from '@/renderer/types/workbench-shell';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
+import { AgentLiveStateFeed } from './agent-live-state-feed';
 import {
 	CommentPreviewOpenerProvider,
 	ReviewFilePreviewOpenerProvider,
@@ -73,6 +81,7 @@ export function WorkspaceWorkbenchContent({
 
 	const rightSidebar = useRightSidebarController();
 	const dock = useDockController();
+	const layoutValue = useWorkbenchLayoutValue({ dock, rightSidebar });
 	const { expandDockPanel } = dock;
 	const { expandRightSidebar, setRightSidebarSheetOpen } = rightSidebar;
 	const [isFileSearchOpen, setIsFileSearchOpen] = useState(false);
@@ -113,13 +122,21 @@ export function WorkspaceWorkbenchContent({
 		sessionNavigation.effectiveActiveSession.kind === 'chat'
 			? sessionNavigation.effectiveActiveSession.id
 			: null;
-	const agentsPanel = useAgentsPanelState({
-		onDismiss: dismissReviewRailSheet,
-		onRestore: sessionNavigation.restoreSessionTabAsync,
-		onSelect: onSessionTabChange,
-		selectedChatTabId: selectedAgentChatTabId,
-		workspaceId: activeWorkspace.id,
-	});
+	const { restoreSessionTabAsync } = sessionNavigation;
+	const agentsNavigation = useMemo<AgentsPanelNavigation>(
+		() => ({
+			onDismiss: dismissReviewRailSheet,
+			onRestore: restoreSessionTabAsync,
+			onSelect: onSessionTabChange,
+			selectedChatTabId: selectedAgentChatTabId,
+		}),
+		[
+			dismissReviewRailSheet,
+			onSessionTabChange,
+			restoreSessionTabAsync,
+			selectedAgentChatTabId,
+		],
+	);
 	const setDirectoryRevealRequest = useSetAtom(
 		workspaceDirectoryRevealRequestAtom,
 	);
@@ -275,30 +292,8 @@ export function WorkspaceWorkbenchContent({
 	};
 
 	return (
-		<WorkbenchLayoutProvider
-			value={{
-				state: {
-					initialRightSidebarSize: rightSidebar.initialRightSidebarSize,
-					isDockCollapsed: dock.isDockCollapsed,
-					isNarrowViewport: rightSidebar.isNarrowViewport,
-					isRightSidebarCollapsed: rightSidebar.isRightSidebarCollapsed,
-					isRightSidebarSheetOpen: rightSidebar.isRightSidebarSheetOpen,
-				},
-				actions: {
-					collapseRightSidebar: rightSidebar.collapseRightSidebar,
-					expandDockPanel: dock.expandDockPanel,
-					expandRightSidebar: rightSidebar.expandRightSidebar,
-					toggleDockPanel: dock.toggleDockPanel,
-					handleDockResize: dock.handleDockResize,
-					handleRightSidebarResize: rightSidebar.handleRightSidebarResize,
-					setRightSidebarSheetOpen: rightSidebar.setRightSidebarSheetOpen,
-				},
-				meta: {
-					dockPanelRef: dock.dockPanelRef,
-					rightSidebarPanelRef: rightSidebar.rightSidebarPanelRef,
-				},
-			}}
-		>
+		<WorkbenchLayoutProvider value={layoutValue}>
+			<AgentLiveStateFeed workspaceId={activeWorkspace.id} />
 			<ReviewActionsProvider
 				activeProject={activeProject}
 				activeWorkspace={activeWorkspace}
@@ -311,7 +306,7 @@ export function WorkspaceWorkbenchContent({
 							<WorkbenchPanelLayout
 								activeProject={activeProject}
 								activeReviewTab={activeReviewTab}
-								agentsPanel={agentsPanel}
+								agentsNavigation={agentsNavigation}
 								activeWorkspace={activeWorkspace}
 								dockActions={dockActions}
 								dockTabId={dockTabId}

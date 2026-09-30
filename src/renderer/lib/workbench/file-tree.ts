@@ -177,7 +177,9 @@ export function flattenFileTree<TFile extends FileTreeEntry>(
 	const rows: FlatFileTreeRow<TFile>[] = [];
 
 	const walk = (node: FileTreeNode<TFile>, level: number): void => {
-		for (const directory of node.directories) {
+		const setSize = node.directories.length + node.files.length;
+
+		for (const [index, directory] of node.directories.entries()) {
 			const { labelParts, node: compactNode } =
 				getCompactFileDirectory(directory);
 			const expanded = isExpanded(compactNode.path);
@@ -189,6 +191,8 @@ export function flattenFileTree<TFile extends FileTreeEntry>(
 				labelParts,
 				level,
 				node: compactNode,
+				posInSet: index + 1,
+				setSize,
 				type: 'directory',
 			});
 
@@ -197,8 +201,15 @@ export function flattenFileTree<TFile extends FileTreeEntry>(
 			}
 		}
 
-		for (const file of node.files) {
-			rows.push({ file, key: file.path, level, type: 'file' });
+		for (const [index, file] of node.files.entries()) {
+			rows.push({
+				file,
+				key: file.path,
+				level,
+				posInSet: node.directories.length + index + 1,
+				setSize,
+				type: 'file',
+			});
 		}
 	};
 

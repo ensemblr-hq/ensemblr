@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useAtomValue, useSetAtom } from 'jotai';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAtomValue } from 'jotai';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -8,39 +8,34 @@ import {
 	agentSessionsForWorkspaceQuery,
 	ensemblrQueryKeys,
 	listChatTabsQuery,
-	subscribeAgentSessionEvents,
 } from '@/renderer/api/ensemblr-queries';
 import { toAgentConversations } from '@/renderer/lib/agents/conversation-model';
 import { pendingAskUserQuestionsAtom } from '@/renderer/state/ask-user-question';
 import { pendingToolApprovalsAtom } from '@/renderer/state/tool-approval';
 import type {
 	AgentConversation,
+	AgentsPanelNavigation,
 	AgentsPanelProps,
 } from '@/renderer/types/agents';
 import type { AgentSessionLineage } from '@/shared/agent-control';
 import type { AgentSessionSnapshotWire } from '@/shared/ipc/contracts/agent-session';
-import {
-	agentWorkspaceLiveStateAtomFamily,
-	applyAgentConversationEventAtom,
-	seedAgentConversationSnapshotsAtom,
-} from './atoms';
+import { useAgentWorkspaceLiveState } from './use-agent-workspace-live-state';
 
 const EMPTY_SESSIONS: readonly AgentSessionSnapshotWire[] = [];
 
-/** Production Agents panel state and navigation backed by workspace snapshots. */
+/**
+ * Production Agents panel state and navigation backed by workspace snapshots.
+ * It reads the live state but does not maintain it: {@link useAgentLiveStateFeed}
+ * seeds and updates that for the whole workspace, so this hook is safe to mount
+ * only while the Agents tab is showing.
+ */
 export function useAgentsPanelState({
 	onDismiss,
 	onRestore,
 	onSelect,
 	selectedChatTabId,
 	workspaceId,
-}: {
-	onDismiss: () => void;
-	onRestore: (chatTabId: string) => Promise<boolean>;
-	onSelect: (chatTabId: string) => void;
-	selectedChatTabId: string | null;
-	workspaceId: string;
-}): AgentsPanelProps {
+}: AgentsPanelNavigation & { workspaceId: string }): AgentsPanelProps {
 	const { i18n } = useTranslation();
 	const language = i18n.language;
 	const queryClient = useQueryClient();
@@ -49,39 +44,11 @@ export function useAgentsPanelState({
 	const modelsQuery = useQuery(agentModelsQuery);
 	const pendingQuestions = useAtomValue(pendingAskUserQuestionsAtom);
 	const pendingApprovals = useAtomValue(pendingToolApprovalsAtom);
-	const liveBySessionId = useAtomValue(
-		agentWorkspaceLiveStateAtomFamily(workspaceId),
-	);
-	const seedSnapshots = useSetAtom(seedAgentConversationSnapshotsAtom);
-	const applyEvent = useSetAtom(applyAgentConversationEventAtom);
+	const liveBySessionId = useAgentWorkspaceLiveState(workspaceId);
 	const [restoreStates, setRestoreStates] = useState<
 		Readonly<Record<string, 'error' | 'pending'>>
 	>({});
 	const sessions = sessionsQuery.data?.sessions ?? EMPTY_SESSIONS;
-
-	useEffect(() => {
-		seedSnapshots({ sessions, workspaceId });
-	}, [seedSnapshots, sessions, workspaceId]);
-
-	useEffect(
-		() =>
-			subscribeAgentSessionEvents((broadcast) => {
-				if (
-					broadcast.workspaceId !== workspaceId ||
-					broadcast.event.payload === null
-				) {
-					return;
-				}
-				applyEvent({
-					branchId: broadcast.event.branchId,
-					envelope: broadcast.event.payload,
-					ordinal: broadcast.event.ordinal,
-					sessionId: broadcast.sessionId,
-					workspaceId,
-				});
-			}),
-		[applyEvent, workspaceId],
-	);
 
 	/** Refetches the two workspace snapshots required by the panel. */
 	const retry = useCallback(() => {

@@ -5,6 +5,7 @@ import {
 	readFileSync,
 	readlinkSync,
 	rmSync,
+	type WatchEventType,
 	writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,9 +14,12 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
 import {
 	type LinuxRecursiveWatchHandle,
+	type ReadDirectory,
 	startLinuxRecursiveWatch,
+	type WatchDirectory,
 } from '../../src/main/workspace-files/linux-recursive-watch';
 import { createWorkspaceFilesWatcher } from '../../src/main/workspace-files/watch-workspace-files';
+import type { WorkspaceFileEvent } from '../../src/main/workspace-files/workspace-file-changes';
 
 const IGNORED = new Set(['.git', 'node_modules']);
 // inotify delivers on the next loop turns; the walk that adds a new directory's
@@ -73,8 +77,8 @@ describe.skipIf(process.platform !== 'linux')(
 			handle = startLinuxRecursiveWatch({
 				ignoredDirectoryNames: IGNORED,
 				...(maxDirectories === undefined ? {} : { maxDirectories }),
-				onChange: (changed) => {
-					changes.push(changed);
+				onChange: (event) => {
+					changes.push(event.path);
 				},
 				onError: () => {
 					errors += 1;
@@ -227,6 +231,346 @@ describe.skipIf(process.platform !== 'linux')(
 		});
 	},
 );
+
+interface FakeEntry {
+	isDirectory: () => boolean;
+	name: string;
+}
+
+type FakeTree = Record<string, readonly FakeEntry[]>;
+
+interface FakeDisk {
+	closed: Set<string>;
+	emit: (
+		directory: string,
+		event: WatchEventType,
+		filename: string | null,
+	) => void;
+	errors: number;
+	failing: Set<string>;
+	gated: boolean;
+	held: (() => void)[];
+	inFlight: number;
+	opened: string[];
+	peakInFlight: number;
+	readDirectory: ReadDirectory;
+	reads: string[];
+	release: () => void;
+	tree: FakeTree;
+	watchDirectory: WatchDirectory;
+}
+
+const FAKE_ROOT = path.join(path.sep, 'fake', 'root');
+
+/** Absolute path of an entry beneath the fake root. */
+const at = (...segments: string[]): string => path.join(FAKE_ROOT, ...segments);
+
+/** A directory entry as `readdir` reports it, or a file with `isDirectory` false. */
+const entry = (name: string, isDirectory = true): FakeEntry => ({
+	isDirectory: () => isDirectory,
+	name,
+});
+
+/** A root of `width` directories, each holding one nested directory and one file. */
+function wideTree(width: number): FakeTree {
+	const names = Array.from({ length: width }, (_, index) => `dir-${index}`);
+
+	return {
+		[FAKE_ROOT]: names.map((name) => entry(name)),
+		...Object.fromEntries(
+			names.map((name) => [
+				at(name),
+				[entry('nested'), entry('file.ts', false)],
+			]),
+		),
+	};
+}
+
+/**
+ * An in-memory stand-in for the directory reads and OS watches the walk makes.
+ * Reads either finish on the next microtask or, once `gated`, stay in flight
+ * until `release`, which is how a test freezes the walk part-way.
+ */
+function createFakeDisk(tree: FakeTree): FakeDisk {
+	const listeners = new Map<
+		string,
+		(event: WatchEventType, filename: string | null) => void
+	>();
+	const disk: FakeDisk = {
+		closed: new Set(),
+		emit: (directory, event, filename) => {
+			listeners.get(directory)?.(event, filename);
+		},
+		errors: 0,
+		failing: new Set(),
+		gated: false,
+		held: [],
+		inFlight: 0,
+		opened: [],
+		peakInFlight: 0,
+		readDirectory: async (directory) => {
+			disk.reads.push(directory);
+			disk.inFlight += 1;
+			disk.peakInFlight = Math.max(disk.peakInFlight, disk.inFlight);
+
+			try {
+				await new Promise<void>((resolve) => {
+					if (disk.gated) {
+						disk.held.push(resolve);
+					} else {
+						resolve();
+					}
+				});
+
+				if (disk.failing.has(directory)) {
+					throw new Error(`EACCES: ${directory}`);
+				}
+
+				return disk.tree[directory] ?? [];
+			} finally {
+				disk.inFlight -= 1;
+			}
+		},
+		reads: [],
+		release: () => {
+			for (const resolve of disk.held.splice(0)) {
+				resolve();
+			}
+		},
+		tree,
+		watchDirectory: (directory, onEvent) => {
+			disk.opened.push(directory);
+			listeners.set(directory, onEvent);
+
+			return {
+				close: () => {
+					disk.closed.add(directory);
+				},
+			};
+		},
+	};
+
+	return disk;
+}
+
+/**
+ * Lets every promise the walk has queued run. The fake disk never waits on a
+ * timer, so a macrotask boundary is enough for the walk to reach its next await.
+ */
+const settle = (): Promise<void> => sleep(0);
+
+/** Releases gated reads round after round until the walk has nothing left in flight. */
+async function runToCompletion(disk: FakeDisk): Promise<void> {
+	await settle();
+
+	for (let round = 0; round < 500 && disk.held.length > 0; round += 1) {
+		disk.release();
+		await settle();
+	}
+}
+
+// The seams replace `readdir` and `fs.watch`, so this suite drives the walk on
+// every platform and needs no inotify or wall-clock budget.
+describe('startLinuxRecursiveWatch walk', () => {
+	let handle: LinuxRecursiveWatchHandle | null = null;
+
+	afterEach(() => {
+		handle?.close();
+		handle = null;
+	});
+
+	/** Starts a watch over the fake root, counting root errors on the disk. */
+	function start(disk: FakeDisk): LinuxRecursiveWatchHandle {
+		handle = startLinuxRecursiveWatch({
+			ignoredDirectoryNames: IGNORED,
+			onChange: () => undefined,
+			onError: () => {
+				disk.errors += 1;
+			},
+			readDirectory: disk.readDirectory,
+			root: FAKE_ROOT,
+			watchDirectory: disk.watchDirectory,
+		});
+
+		return handle;
+	}
+
+	test('reports each event with its kind and its path relative to the root', async () => {
+		const disk = createFakeDisk({ [FAKE_ROOT]: [entry('src')] });
+		const events: WorkspaceFileEvent[] = [];
+		handle = startLinuxRecursiveWatch({
+			ignoredDirectoryNames: IGNORED,
+			onChange: (event) => {
+				events.push(event);
+			},
+			onError: () => undefined,
+			readDirectory: disk.readDirectory,
+			root: FAKE_ROOT,
+			watchDirectory: disk.watchDirectory,
+		});
+		await runToCompletion(disk);
+
+		disk.emit(at('src'), 'change', 'app.ts');
+		disk.emit(FAKE_ROOT, 'rename', 'README.md');
+		disk.emit(FAKE_ROOT, 'change', null);
+
+		expect(events).toEqual([
+			{ kind: 'change', path: path.join('src', 'app.ts') },
+			{ kind: 'rename', path: 'README.md' },
+			{ kind: 'change', path: null },
+		]);
+	});
+
+	test('keeps at most eight directory reads in flight across a wide tree', async () => {
+		const disk = createFakeDisk(wideTree(50));
+
+		start(disk);
+		await runToCompletion(disk);
+
+		expect(disk.peakInFlight).toBeLessThanOrEqual(8);
+		expect(disk.peakInFlight).toBeGreaterThan(1);
+		expect(disk.reads).toHaveLength(1 + 50 + 50);
+	});
+
+	test('watches every eligible directory and reads no ignored one', async () => {
+		const disk = createFakeDisk({
+			[FAKE_ROOT]: [
+				entry('src'),
+				entry('node_modules'),
+				entry('.git'),
+				entry('README.md', false),
+			],
+			[at('src')]: [
+				entry('components'),
+				entry('state'),
+				entry('index.ts', false),
+			],
+			[at('src', 'components')]: [entry('ui')],
+			[at('node_modules')]: [entry('react')],
+			[at('.git')]: [entry('objects')],
+		});
+
+		start(disk);
+		await runToCompletion(disk);
+
+		expect([...disk.opened].sort()).toEqual(
+			[
+				FAKE_ROOT,
+				at('src'),
+				at('src', 'components'),
+				at('src', 'components', 'ui'),
+				at('src', 'state'),
+			].sort(),
+		);
+		expect(disk.reads).not.toContain(at('node_modules'));
+		expect(disk.reads).not.toContain(at('.git'));
+	});
+
+	test('stops reading and watching once closed part-way through the walk', async () => {
+		const disk = createFakeDisk(wideTree(50));
+		disk.gated = true;
+
+		start(disk);
+		await settle();
+		disk.release();
+		await settle();
+		expect(disk.inFlight).toBeGreaterThan(0);
+		const readsAtClose = disk.reads.length;
+		const opened = [...disk.opened];
+
+		handle?.close();
+		await runToCompletion(disk);
+
+		expect(disk.reads).toHaveLength(readsAtClose);
+		expect(disk.opened).toEqual(opened);
+		expect([...disk.closed].sort()).toEqual([...opened].sort());
+	});
+
+	test('does not report a root read that fails after the watch closed', async () => {
+		const disk = createFakeDisk({ [FAKE_ROOT]: [] });
+		disk.gated = true;
+		disk.failing.add(FAKE_ROOT);
+
+		start(disk);
+		await settle();
+		handle?.close();
+		await runToCompletion(disk);
+
+		expect(disk.errors).toBe(0);
+	});
+
+	test('reports a root that cannot be read and descends into nothing', async () => {
+		const disk = createFakeDisk(wideTree(3));
+		disk.failing.add(FAKE_ROOT);
+
+		start(disk);
+		await runToCompletion(disk);
+
+		expect(disk.errors).toBe(1);
+		expect(disk.opened).toEqual([FAKE_ROOT]);
+	});
+
+	test('a directory that cannot be read loses its own branch and nothing else', async () => {
+		const disk = createFakeDisk({
+			[FAKE_ROOT]: [entry('a'), entry('b'), entry('c')],
+			[at('a')]: [entry('a1')],
+			[at('b')]: [entry('b1')],
+			[at('c')]: [entry('c1')],
+		});
+		disk.failing.add(at('b'));
+
+		start(disk);
+		await runToCompletion(disk);
+
+		expect([...disk.closed]).toEqual([at('b')]);
+		expect(disk.opened).toEqual(
+			expect.arrayContaining([at('a', 'a1'), at('c', 'c1')]),
+		);
+		expect(disk.opened).not.toContain(at('b', 'b1'));
+		expect(disk.errors).toBe(0);
+	});
+
+	test('holds event-driven rescans to the same bound as the first walk', async () => {
+		const names = Array.from({ length: 12 }, (_, index) => `dir-${index}`);
+		const disk = createFakeDisk({
+			[FAKE_ROOT]: names.map((name) => entry(name)),
+			...Object.fromEntries(names.map((name) => [at(name), [entry('x')]])),
+		});
+		disk.gated = true;
+
+		start(disk);
+		await settle();
+		disk.release();
+		await settle();
+
+		for (const name of names.slice(8)) {
+			disk.emit(at(name), 'rename', 'created');
+		}
+		await sleep(150);
+		await runToCompletion(disk);
+
+		expect(disk.peakInFlight).toBeLessThanOrEqual(8);
+	});
+
+	test('a rescan drops watches on directories that vanished and adds new ones', async () => {
+		const disk = createFakeDisk({
+			[FAKE_ROOT]: [entry('keep'), entry('gone')],
+			[at('gone')]: [entry('deep')],
+		});
+
+		start(disk);
+		await runToCompletion(disk);
+		disk.tree = { [FAKE_ROOT]: [entry('keep'), entry('fresh')] };
+		disk.emit(FAKE_ROOT, 'rename', 'unrelated');
+		await sleep(150);
+		await runToCompletion(disk);
+
+		expect([...disk.closed].sort()).toEqual(
+			[at('gone'), at('gone', 'deep')].sort(),
+		);
+		expect(disk.opened).toContain(at('fresh'));
+	});
+});
 
 /** Counts the inotify watches this process holds, across every inotify fd. */
 function inotifyWatchCount(): number {

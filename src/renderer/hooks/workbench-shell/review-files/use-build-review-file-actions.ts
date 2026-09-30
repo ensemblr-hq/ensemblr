@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import {
 	useReviewFilePreviewOpener,
@@ -16,6 +16,9 @@ import type {
 } from '@/renderer/types/workbench';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 import { isPreviewableImagePath } from '@/shared/preview-media';
+
+/** Joins paths into a comparable key; NUL cannot occur in a file path. */
+const PATH_SEPARATOR = '\0';
 
 /**
  * Assembles the shared action bundle every review file row consumes through
@@ -53,9 +56,16 @@ export function useBuildReviewFileActions({
 } {
 	const openDiff = useWorkspaceFileDiffOpener();
 	const openPreview = useReviewFilePreviewOpener();
-	const imagePreviewPaths = useMemo(
-		() => previewableImagePathsIn(files, diffScope),
+	const imagePreviewPathsKey = useMemo(
+		() => previewableImagePathsIn(files, diffScope).join(PATH_SEPARATOR),
 		[files, diffScope],
+	);
+	const imagePreviewPaths = useMemo<ReadonlySet<string>>(
+		() =>
+			new Set(
+				imagePreviewPathsKey ? imagePreviewPathsKey.split(PATH_SEPARATOR) : [],
+			),
+		[imagePreviewPathsKey],
 	);
 	// Gated on the diff opener alone — the fallback every changed file has. A
 	// preview-only mount would make this a callable that no-ops on source rows.
@@ -75,15 +85,19 @@ export function useBuildReviewFileActions({
 	const { copyTarget, invokeTarget, openInTargets } = useOpenTargets({
 		workspaceId,
 	});
+	const stableDiscardablePaths = useStableSet(discardablePaths);
+	const stablePendingDiscardPaths = useStableSet(pendingDiscardPaths);
 	const isDiscardable = useMemo(
 		() => (filePath: string) =>
-			discardablePaths ? discardablePaths.has(filePath) : true,
-		[discardablePaths],
+			stableDiscardablePaths ? stableDiscardablePaths.has(filePath) : true,
+		[stableDiscardablePaths],
 	);
 	const isDiscarding = useMemo(
 		() => (filePath: string) =>
-			pendingDiscardPaths ? pendingDiscardPaths.has(filePath) : false,
-		[pendingDiscardPaths],
+			stablePendingDiscardPaths
+				? stablePendingDiscardPaths.has(filePath)
+				: false,
+		[stablePendingDiscardPaths],
 	);
 
 	// Marks are stored against the revision they were set at, so a row the agent
@@ -126,6 +140,45 @@ export function useBuildReviewFileActions({
 }
 
 /**
+ * Keeps a set's previous identity while its members are unchanged, so a source
+ * that rebuilds an equal set on every refresh does not invalidate the consumers
+ * keyed on it.
+ * @param next - The set this render received
+ * @returns The earlier set when it has the same members, otherwise `next`
+ */
+function useStableSet(
+	next: ReadonlySet<string> | undefined,
+): ReadonlySet<string> | undefined {
+	const [stable, setStable] = useState(next);
+
+	if (stable !== next && !haveSameMembers(stable, next)) {
+		setStable(next);
+		return next;
+	}
+
+	return stable;
+}
+
+/**
+ * Whether two optional sets hold exactly the same members.
+ * @param first - One set, or undefined
+ * @param second - The other set, or undefined
+ * @returns True when both are absent or both hold the same members
+ */
+function haveSameMembers(
+	first: ReadonlySet<string> | undefined,
+	second: ReadonlySet<string> | undefined,
+): boolean {
+	if (!(first && second)) {
+		return first === second;
+	}
+
+	return (
+		first.size === second.size && [...first].every((path) => second.has(path))
+	);
+}
+
+/**
  * Paths in a change set that belong in the image preview instead of a diff: a
  * previewable image the workspace still holds. Git renders a changed image as
  * "Binary files differ", so the preview is the only view that shows the change.
@@ -140,23 +193,19 @@ export function useBuildReviewFileActions({
  * @returns Workspace-relative paths a row click should preview.
  */
 function previewableImagePathsIn(
-	files: ReviewFileSummary[],
+	files: readonly ReviewFileSummary[],
 	diffScope: WorkspaceGitDiffScope | undefined,
-): ReadonlySet<string> {
+): string[] {
 	if (!diffNewSideIsWorkingTree(diffScope)) {
-		return new Set();
+		return [];
 	}
 
-	const paths = new Set<string>();
-	for (const file of files) {
-		if (
-			file.status !== 'deleted' &&
-			isPreviewableImagePath(file.path) &&
-			isPreviewableWorkspaceFile(file)
-		) {
-			paths.add(file.path);
-		}
-	}
-
-	return paths;
+	return files
+		.filter(
+			(file) =>
+				file.status !== 'deleted' &&
+				isPreviewableImagePath(file.path) &&
+				isPreviewableWorkspaceFile(file),
+		)
+		.map((file) => file.path);
 }
