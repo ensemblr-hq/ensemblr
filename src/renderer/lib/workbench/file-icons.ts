@@ -89,6 +89,7 @@ const fileIconByName: Record<string, string> = {
 	'poetry.lock': 'file-type-poetry',
 	procfile: 'file-type-procfile',
 	'pubspec.lock': 'file-type-dartlang',
+	qmldir: 'file-type-qmldir',
 	rakefile: 'file-type-rake',
 	readme: 'file-type-text',
 	todo: 'file-type-todo',
@@ -161,6 +162,7 @@ const fileIconByExtension: Record<string, string> = {
 	html: 'file-type-html',
 	icns: 'file-type-image',
 	ico: 'file-type-image',
+	ini: 'file-type-ini',
 	java: 'file-type-java',
 	jpeg: 'file-type-image',
 	jpg: 'file-type-image',
@@ -188,17 +190,21 @@ const fileIconByExtension: Record<string, string> = {
 	pptx: 'file-type-powerpoint',
 	prisma: 'file-type-prisma',
 	py: 'file-type-python',
+	qml: 'file-type-qml',
 	rb: 'file-type-ruby',
 	rs: 'file-type-rust',
 	rtf: 'file-type-word',
 	scss: 'file-type-scss',
+	service: 'file-type-systemd',
 	sh: 'file-type-shell',
+	socket: 'file-type-systemd',
 	sql: 'file-type-sql',
 	storyboard: 'file-type-storyboard',
 	svelte: 'file-type-svelte',
 	svg: 'file-type-svg',
 	swift: 'file-type-swift',
 	tiff: 'file-type-image',
+	timer: 'file-type-systemd',
 	toml: 'file-type-toml',
 	ts: 'file-type-typescript',
 	tsv: 'file-type-excel',
@@ -224,6 +230,13 @@ const fileIconByExtension: Record<string, string> = {
 const qualifiedFileIconByExtension: Record<string, string> = {
 	desktop: 'logos:linux-tux',
 };
+
+/**
+ * The `.in` suffixes autoconf, meson, and gettext append to a file they fill
+ * in at configure time — `foo.service.in`, `config.h.in`, `app.desktop.in.in`.
+ * The lookbehind keeps a bare `.in` intact.
+ */
+const TEMPLATE_SUFFIXES = /(?<=.)(?:\.in)+$/;
 
 /** Icon this file falls back to when no name or extension rule matches. */
 const DEFAULT_FILE_ICON = 'default-file';
@@ -286,12 +299,22 @@ export function getWorkspaceFileIconName(
 		return `${iconPrefix}:${iconName}`;
 	}
 
-	const fileName = file.name.toLowerCase();
+	const fileName = stripTemplateSuffixes(file.name.toLowerCase());
 
 	return (
 		lookupIcon(qualifiedFileIconByExtension, getFileExtension(fileName)) ??
 		`${iconPrefix}:${getFileIconName(fileName)}`
 	);
+}
+
+/**
+ * Drops configure-time template suffixes, so a template takes the icon of the
+ * file it generates: `foo.service.in` resolves as `foo.service`.
+ * @param name - The file name, lowercased.
+ * @returns The name without its trailing `.in` suffixes.
+ */
+function stripTemplateSuffixes(name: string): string {
+	return name.replace(TEMPLATE_SUFFIXES, '');
 }
 
 /**
