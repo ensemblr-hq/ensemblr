@@ -50,6 +50,18 @@ export const FILE_IMAGE_ELEMENT = 'ensemblr-file-image';
 /** Attribute carrying the rewritten image's source, as the document wrote it. */
 export const FILE_IMAGE_SRC_ATTRIBUTE = 'data-file-src';
 
+/** Element name a `<picture>` source naming a workspace file is rewritten to. */
+export const FILE_PICTURE_SOURCE_ELEMENT = 'ensemblr-file-source';
+
+/** Attribute carrying the density or width descriptor a rewritten source wrote. */
+export const FILE_SOURCE_DESCRIPTOR_ATTRIBUTE = 'data-file-descriptor';
+
+/**
+ * The first candidate of a `srcset`: its URL, which may hold a comma but cannot
+ * end on one, then the descriptor up to the comma closing the candidate.
+ */
+const FIRST_SRCSET_CANDIDATE = /^\s*(\S*[^\s,])(?:,|\s+([^,]*))?/;
+
 /** Table tags that hold cells rather than content of their own. */
 const TABLE_STRUCTURE_TAGS = new Set(['thead', 'tr', 'th', 'td']);
 
@@ -142,9 +154,9 @@ function rewriteReferenceAnchors(node: HastNode): void {
 }
 
 /**
- * Rewrites every link and image whose destination is a path rather than a URL
- * into an element only this app renders, carrying the destination as a data
- * attribute.
+ * Rewrites every link, image, and picture source whose destination is a path
+ * rather than a URL into an element only this app renders, carrying the
+ * destination as a data attribute.
  *
  * A markdown document in a repository points at its neighbours — an ADR at the
  * ADR it supersedes, a guide page at the screenshot beside it — and those
@@ -172,6 +184,7 @@ function rewriteLocalReferences(node: HastNode): void {
 	if (node.type === 'element') {
 		rewriteLocalAnchor(node);
 		rewriteLocalImage(node);
+		rewriteLocalPictureSource(node);
 	}
 	for (const child of node.children ?? []) {
 		rewriteLocalReferences(child);
@@ -214,6 +227,37 @@ function rewriteLocalImage(node: HastNode): void {
 	const { src: _src, ...properties } = node.properties ?? {};
 	node.tagName = FILE_IMAGE_ELEMENT;
 	node.properties = { ...properties, [FILE_IMAGE_SRC_ATTRIBUTE]: src };
+}
+
+/**
+ * Replaces a `<picture>` source whose `srcset` names a path with the app's own
+ * source element, keeping its media query and the descriptor it wrote.
+ *
+ * Left alone, the source a README picks its dark screenshot with resolves
+ * against the app's origin, and the image beside it fails along with it. Only
+ * the first candidate is carried: a color-scheme source names one file, and a
+ * set of densities would cost a workspace read per entry for a choice the
+ * screen makes anyway.
+ * @param node - The element to weigh.
+ */
+function rewriteLocalPictureSource(node: HastNode): void {
+	if (node.tagName !== 'source') {
+		return;
+	}
+	const srcset =
+		typeof node.properties?.srcSet === 'string' ? node.properties.srcSet : '';
+	const [, url = '', descriptor = ''] =
+		FIRST_SRCSET_CANDIDATE.exec(srcset) ?? [];
+	if (!isLocalFileReference(url)) {
+		return;
+	}
+	const { srcSet: _srcSet, ...properties } = node.properties ?? {};
+	node.tagName = FILE_PICTURE_SOURCE_ELEMENT;
+	node.properties = {
+		...properties,
+		[FILE_IMAGE_SRC_ATTRIBUTE]: url,
+		[FILE_SOURCE_DESCRIPTOR_ATTRIBUTE]: descriptor.trim(),
+	};
 }
 
 /**

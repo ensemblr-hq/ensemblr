@@ -11,6 +11,7 @@ import { ConciergeReferenceChip } from '@/renderer/components/concierge/concierg
 import {
 	MarkdownFileLink,
 	MarkdownImage,
+	MarkdownPictureSource,
 	useMarkdownDocumentScope,
 } from '@/renderer/components/markdown';
 import {
@@ -23,6 +24,7 @@ import { documentReferenceLookupPath } from '@/renderer/lib/markdown-references'
 import {
 	CONCIERGE_REFERENCE_ELEMENT,
 	FILE_IMAGE_ELEMENT,
+	FILE_PICTURE_SOURCE_ELEMENT,
 	FILE_REFERENCE_ELEMENT,
 	MARKDOWN_REHYPE_PLUGINS,
 } from '@/renderer/lib/markdown-rehype-plugins';
@@ -78,6 +80,7 @@ export const MessageResponse = memo(
 				code: MessageCodeBlock,
 				[CONCIERGE_REFERENCE_ELEMENT]: ConciergeReferenceChip,
 				[FILE_IMAGE_ELEMENT]: MarkdownImage,
+				[FILE_PICTURE_SOURCE_ELEMENT]: MarkdownPictureSource,
 				[FILE_REFERENCE_ELEMENT]: MarkdownFileLink,
 				img: MarkdownImage,
 				inlineCode: MessageInlineCode,

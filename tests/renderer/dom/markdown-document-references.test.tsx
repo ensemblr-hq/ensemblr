@@ -29,6 +29,9 @@ import {
 const WORKSPACE_CWD = '/Users/me/repo';
 const PIXEL_BASE64 =
 	'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+const PIXEL_SOURCE = `data:image/png;base64,${PIXEL_BASE64}`;
+const LOGO_SVG =
+	'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect width="1" height="1"/></svg>';
 
 /** A tree entry keyed on its own path, which is all the resolver reads. */
 function entry(
@@ -69,22 +72,58 @@ function renderDocument(
 	).container;
 }
 
-/** Answers the file read with a one-pixel PNG for every path but `missing`. */
+/**
+ * Answers a file read the way the preview IPC does: an SVG comes back as the
+ * markup it is, `missing` is not found, and anything else is a one-pixel PNG.
+ * @param path - The workspace-relative path being read.
+ * @returns The read result for that path.
+ */
+function previewReadFor(path: string): ReadWorkspaceFileResult {
+	if (path.includes('missing')) {
+		return { error: { code: 'not-found', message: 'gone' }, path };
+	}
+	if (path.endsWith('.svg')) {
+		return {
+			content: LOGO_SVG,
+			contentEncoding: 'utf8',
+			path,
+			sizeBytes: LOGO_SVG.length,
+		};
+	}
+	return {
+		content: PIXEL_BASE64,
+		contentEncoding: 'base64',
+		mimeType: 'image/png',
+		path,
+		sizeBytes: 68,
+	};
+}
+
+/** Installs a file-read stub answering every path through {@link previewReadFor}. */
 function stubFileReads(): ReturnType<typeof vi.fn> {
 	const readWorkspaceFile = vi.fn(
 		async ({ path }: { path: string }): Promise<ReadWorkspaceFileResult> =>
-			path.includes('missing')
-				? { error: { code: 'not-found', message: 'gone' }, path }
-				: {
-						content: PIXEL_BASE64,
-						contentEncoding: 'base64',
-						mimeType: 'image/png',
-						path,
-						sizeBytes: 68,
-					},
+			previewReadFor(path),
 	);
 	installEnsemblrApi({ readWorkspaceFile });
 	return readWorkspaceFile;
+}
+
+/**
+ * Writes a README-style `<picture>` whose `<source>` swaps in another file under
+ * a dark color scheme.
+ * @param srcset - The `<source>` element's `srcset`, exactly as written.
+ * @returns The markdown holding the picture.
+ */
+function pictureMarkdown(srcset: string): string {
+	return [
+		'<p align="center">',
+		'  <picture>',
+		`    <source media="(prefers-color-scheme: dark)" srcset="${srcset}">`,
+		'    <img src="images/welcome.png" width="300" alt="The welcome screen">',
+		'  </picture>',
+		'</p>',
+	].join('\n');
 }
 
 beforeEach(() => {
@@ -196,13 +235,24 @@ describe('images a document writes', () => {
 		const image = await screen.findByRole('img', {
 			name: 'The welcome screen',
 		});
-		expect(image.getAttribute('src')).toBe(
-			`data:image/png;base64,${PIXEL_BASE64}`,
-		);
+		expect(image.getAttribute('src')).toBe(PIXEL_SOURCE);
 		expect(readWorkspaceFile).toHaveBeenCalledWith({
 			path: 'docs/guide/images/welcome.png',
 			workspaceCwd: WORKSPACE_CWD,
 		});
+	});
+
+	// The preview reads an SVG back as markup so the file view and diff show its
+	// source, which is exactly what an `<img>` cannot take as bytes.
+	test('draws an SVG the workspace reads back as markup', async () => {
+		renderDocument('<img src="images/logo.svg" width="128" alt="The logo">');
+
+		const image = await screen.findByRole('img', { name: 'The logo' });
+		const source = image.getAttribute('src') ?? '';
+		expect(source.startsWith('data:image/svg+xml')).toBe(true);
+		expect(decodeURIComponent(source.slice(source.indexOf(',') + 1))).toBe(
+			LOGO_SVG,
+		);
 	});
 
 	test('falls back to the alt text when the file cannot be read', async () => {
@@ -237,6 +287,78 @@ describe('images a document writes', () => {
 			await screen.findByText('x (image unavailable)'),
 		).toBeInTheDocument();
 		expect(readWorkspaceFile).not.toHaveBeenCalled();
+	});
+});
+
+// A README picks its dark screenshot with a `<source>`. Left as a path, the one
+// that matches resolves against the app's origin, fails, and the failure lands
+// on the `<img>` beside it, which then draws nothing at all.
+describe('pictures a document writes', () => {
+	test('draws the color-scheme source from the workspace bytes', async () => {
+		const readWorkspaceFile = stubFileReads();
+		const container = renderDocument(
+			pictureMarkdown('images/dark/welcome.png'),
+		);
+
+		await screen.findByRole('img', { name: 'The welcome screen' });
+		await vi.waitFor(() => {
+			expect(
+				container.querySelector('picture source')?.getAttribute('srcset'),
+			).toBe(PIXEL_SOURCE);
+		});
+		expect(
+			container.querySelector('picture source')?.getAttribute('media'),
+		).toBe('(prefers-color-scheme: dark)');
+		expect(readWorkspaceFile).toHaveBeenCalledWith({
+			path: 'docs/guide/images/dark/welcome.png',
+			workspaceCwd: WORKSPACE_CWD,
+		});
+	});
+
+	test('keeps the density the author gave the source', async () => {
+		const container = renderDocument(
+			pictureMarkdown('images/dark/welcome.png 2x'),
+		);
+
+		await vi.waitFor(() => {
+			expect(
+				container.querySelector('picture source')?.getAttribute('srcset'),
+			).toBe(`${PIXEL_SOURCE} 2x`);
+		});
+	});
+
+	test('drops a source it cannot read, leaving the picture to its image', async () => {
+		const container = renderDocument(
+			pictureMarkdown('images/dark/missing.png'),
+		);
+
+		const image = await screen.findByRole('img', {
+			name: 'The welcome screen',
+		});
+		expect(image.getAttribute('src')).toBe(PIXEL_SOURCE);
+		expect(container.querySelector('picture source')).toBeNull();
+	});
+
+	test('reads nothing off disk for a source outside the workspace', async () => {
+		const readWorkspaceFile = stubFileReads();
+		const container = renderDocument(pictureMarkdown('/etc/passwd'));
+
+		await screen.findByRole('img', { name: 'The welcome screen' });
+		expect(container.querySelector('picture source')).toBeNull();
+		expect(readWorkspaceFile).not.toHaveBeenCalledWith(
+			expect.objectContaining({ path: expect.stringContaining('passwd') }),
+		);
+	});
+
+	test('leaves a remote source to the platform', async () => {
+		const container = renderDocument(
+			pictureMarkdown('https://example.com/dark.png'),
+		);
+
+		await screen.findByRole('img', { name: 'The welcome screen' });
+		expect(
+			container.querySelector('picture source')?.getAttribute('srcset'),
+		).toBe('https://example.com/dark.png');
 	});
 });
 
