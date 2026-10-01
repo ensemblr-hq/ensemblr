@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
 	buildFileTree,
-	fileTreeIndentClassName,
+	fileTreeIndentStyle,
 	flattenFileTree,
 	getCompactFileDirectory,
 	listDirectoryPaths,
@@ -158,15 +158,34 @@ describe('buildFileTree', () => {
 	});
 });
 
-describe('fileTreeIndentClassName', () => {
-	test('maps depth to the matching padding class and caps at pl-16', () => {
-		expect(fileTreeIndentClassName(-1)).toBe('');
-		expect(fileTreeIndentClassName(0)).toBe('');
-		expect(fileTreeIndentClassName(1)).toBe('pl-6');
-		expect(fileTreeIndentClassName(2)).toBe('pl-10');
-		expect(fileTreeIndentClassName(3)).toBe('pl-14');
-		expect(fileTreeIndentClassName(4)).toBe('pl-16');
-		expect(fileTreeIndentClassName(9)).toBe('pl-16');
+describe('fileTreeIndentStyle', () => {
+	test('leaves root rows to their own padding', () => {
+		expect(fileTreeIndentStyle(-1)).toBeUndefined();
+		expect(fileTreeIndentStyle(0)).toBeUndefined();
+	});
+
+	test('matches the pl-6 / pl-10 / pl-14 steps of the first three levels', () => {
+		expect(fileTreeIndentStyle(1)).toEqual({
+			paddingLeft: 'calc(var(--spacing) * 6)',
+		});
+		expect(fileTreeIndentStyle(2)).toEqual({
+			paddingLeft: 'calc(var(--spacing) * 10)',
+		});
+		expect(fileTreeIndentStyle(3)).toEqual({
+			paddingLeft: 'calc(var(--spacing) * 14)',
+		});
+	});
+
+	test('keeps adding the same step past level 3 instead of capping', () => {
+		expect(fileTreeIndentStyle(4)).toEqual({
+			paddingLeft: 'calc(var(--spacing) * 18)',
+		});
+		expect(fileTreeIndentStyle(5)).toEqual({
+			paddingLeft: 'calc(var(--spacing) * 22)',
+		});
+		expect(fileTreeIndentStyle(12)).toEqual({
+			paddingLeft: 'calc(var(--spacing) * 50)',
+		});
 	});
 });
 

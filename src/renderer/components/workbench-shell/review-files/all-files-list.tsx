@@ -19,7 +19,7 @@ import { useWorkspaceFileTree } from '@/renderer/hooks/workbench-shell/review-fi
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
 import { cn } from '@/renderer/lib/utils';
 import {
-	fileTreeIndentClassName,
+	fileTreeIndentStyle,
 	getWorkspaceFileIconName,
 	isPreviewableWorkspaceFile,
 } from '@/renderer/lib/workbench';
@@ -213,7 +213,6 @@ const WorkspaceFolderRow = memo(
 				// fill for expanded folders.
 				className={cn(
 					'h-7 w-full justify-start gap-1.5 rounded-md px-2 text-xs aria-expanded:bg-transparent aria-expanded:hover:bg-muted',
-					fileTreeIndentClassName(level),
 					// Git-ignored folders stay visible but dimmed, VS Code style.
 					isIgnored && 'opacity-50',
 				)}
@@ -222,6 +221,7 @@ const WorkspaceFolderRow = memo(
 				onClick={() => onToggle(node, isCollapsed)}
 				role='treeitem'
 				size='sm'
+				style={fileTreeIndentStyle(level)}
 				variant='ghost'
 			>
 				<FolderChevronIcon aria-hidden='true' className='size-3 shrink-0' />
@@ -285,7 +285,6 @@ const WorkspaceFileRow = memo(function WorkspaceFileRow({
 			aria-level={level + 1}
 			className={cn(
 				'h-7 w-full justify-start gap-1.5 rounded-md px-2 py-0.5 text-left font-normal',
-				fileTreeIndentClassName(level),
 				// Git-ignored entries stay visible but dimmed, VS Code style.
 				file.isIgnored && 'opacity-50',
 				!canPreview && 'cursor-default',
@@ -300,6 +299,7 @@ const WorkspaceFileRow = memo(function WorkspaceFileRow({
 			}
 			role='treeitem'
 			size='sm'
+			style={fileTreeIndentStyle(level)}
 			variant='ghost'
 		>
 			<span aria-hidden='true' className='size-3 shrink-0' />

@@ -21,7 +21,7 @@ import {
 import { OpenInFileMenu } from '@/renderer/components/workbench-shell/open-in-file-menu';
 import { cn } from '@/renderer/lib/utils';
 import {
-	fileTreeIndentClassName,
+	fileTreeIndentStyle,
 	getWorkspaceFileIconName,
 	isPreviewableWorkspaceFile,
 } from '@/renderer/lib/workbench';
@@ -86,11 +86,11 @@ export const ReviewFileRow = memo(
 					// never matches `:hover`. It leaves the tab order untouched, so each
 					// control carries `disabled` for the keyboard as well.
 					discarding && 'pointer-events-none opacity-50',
-					fileTreeIndentClassName(level),
 				)}
 				aria-busy={discarding || undefined}
 				data-row-kind='file'
 				data-row-path={file.path}
+				style={fileTreeIndentStyle(level)}
 				// `aria-level` is only valid alongside a tree role: apply both together
 				// in the folder tree, neither in the flat list.
 				{...(ariaLevel === undefined

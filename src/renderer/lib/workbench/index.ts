@@ -21,7 +21,7 @@ export {
 } from './file-icons';
 export {
 	buildFileTree,
-	fileTreeIndentClassName,
+	fileTreeIndentStyle,
 	flattenFileTree,
 	getCompactFileDirectory,
 	listDirectoryPaths,

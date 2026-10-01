@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 import type { FileTreeNode, FlatFileTreeRow } from '@/renderer/types/workbench';
 
 /** File-tree node augmented with a directory lookup map for fast child access while the tree is being built. */
@@ -218,23 +220,28 @@ export function flattenFileTree<TFile extends FileTreeEntry>(
 	return rows;
 }
 
-/** Maps a tree depth to the matching Tailwind left-padding class. */
-export function fileTreeIndentClassName(level: number): string {
+/** Spacing steps of left padding a nested row starts from before any depth is added. */
+const FILE_TREE_BASE_INDENT_STEPS = 2;
+
+/** Spacing steps each level of depth adds to a row's left padding. */
+const FILE_TREE_LEVEL_INDENT_STEPS = 4;
+
+/**
+ * Indents a file-tree row by one fixed step per level of depth, with no cap, so
+ * a child always sits right of its parent however deep the tree goes. It is an
+ * inline style rather than a class because the depth is unbounded and Tailwind
+ * only generates the classes it finds spelled out in source.
+ * @param level - Zero-based depth of the row in the tree.
+ * @returns The padding for a nested row, or undefined at the root so the row
+ * keeps the padding its own classes give it.
+ */
+export function fileTreeIndentStyle(level: number): CSSProperties | undefined {
 	if (level <= 0) {
-		return '';
+		return undefined;
 	}
 
-	if (level === 1) {
-		return 'pl-6';
-	}
+	const steps =
+		FILE_TREE_BASE_INDENT_STEPS + FILE_TREE_LEVEL_INDENT_STEPS * level;
 
-	if (level === 2) {
-		return 'pl-10';
-	}
-
-	if (level === 3) {
-		return 'pl-14';
-	}
-
-	return 'pl-16';
+	return { paddingLeft: `calc(var(--spacing) * ${steps})` };
 }
