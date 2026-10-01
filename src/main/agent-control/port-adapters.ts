@@ -47,6 +47,7 @@ import type {
 import type { CreateTerminalSessionResult } from '../../shared/ipc/contracts/terminal.ts';
 import { assignedRolesFor } from '../../shared/model-role.ts';
 import type { PermissionMode } from '../../shared/permissions.ts';
+import { planModeFollowUpDenial } from '../../shared/plan-mode.ts';
 import { selectDefaultRunScript } from '../../shared/scripts.ts';
 import type {
 	SpawnCallerIdentity,
@@ -57,6 +58,7 @@ import { acceptableThinkingLevels } from '../agent-providers';
 import type {
 	AgentSessionOpenRequest,
 	AgentSessionService,
+	AgentSessionSnapshot,
 } from '../agent-runtime/agent-session-service.ts';
 import {
 	applyBranchSlug,
@@ -133,6 +135,15 @@ import {
  * empty string would read to the agent as a tab with no identity at all.
  */
 const UNNAMED_TAB_TITLE = 'New chat';
+
+/**
+ * What a follow-up to a stopped conversation answers when it is not the
+ * sender's own sub-agent. A sub-agent has no composer to resume it from, so its
+ * orchestrator is the way back; an orchestrator has one, and its tab holds the
+ * linked directories a resume needs.
+ */
+const STOPPED_CONVERSATION_REFUSAL =
+	'That conversation was stopped, and it is not a sub-agent you spawned — `ensemblr_send_follow_up` resumes only your own stopped sub-agents. The user resumes an orchestrator from its own tab, and another orchestrator’s sub-agent is that orchestrator’s to bring back; leave it stopped and carry the work on here, or tell the user it needs resuming.';
 
 /**
  * Names a file or diff tab an agent opened after the file it targets, the same
@@ -428,6 +439,136 @@ function reopenClosedChatTab(
 }
 
 /**
+ * Reattaches a runtime to a conversation that has none, so a follow-up resumes
+ * it instead of failing on a session with nothing live to submit to. Stopping an
+ * orchestrator closes every sub-agent's runtime along with its own, and a child
+ * tab carries no composer to resume it from, so this is the only way back.
+ *
+ * It takes the same resume door the composer opens before a send — the runtime
+ * reloads its own history and the persisted lineage keeps a child a child — and
+ * into the tab the conversation already lives in, since a resume handed no tab
+ * mints a new one. The stop released the conversation's Plan Mode and AFK
+ * state, so it comes back holding the sender's, as a fresh spawn would.
+ * @param deps - Adapter collaborators.
+ * @param session - The stopped sub-agent the follow-up targets.
+ * @param modes - The sender's Plan Mode and AFK state.
+ * @returns The conversation as it stands once a runtime is attached.
+ */
+async function resumeClosedRuntime(
+	deps: PortAdapterDeps,
+	session: AgentSessionSnapshot,
+	modes: { afkMode: boolean; planMode: boolean },
+): Promise<AgentSessionSnapshot> {
+	const target = { agentSessionId: session.id };
+	const tab = readTargetTabRow(deps, target);
+	const resumed = await deps.agentSessionService.openSession({
+		afkMode: modes.afkMode || undefined,
+		chatTabId: tab?.id ?? null,
+		executable: await deps.piExecutableService.getSnapshot(),
+		planMode: modes.planMode || undefined,
+		resumeSessionId: session.id,
+		workspaceCwd: session.cwd,
+		workspaceId: session.workspaceId,
+	});
+	const chatTabId = tab?.id ?? readTargetTabRow(deps, target)?.id;
+	if (chatTabId) {
+		applyResumedModes(
+			deps,
+			{ ...target, chatTabId, workspaceId: session.workspaceId },
+			modes,
+		);
+	}
+	if (!tab) {
+		deps.broadcastTabsChanged({ workspaceId: session.workspaceId });
+	}
+	return resumed;
+}
+
+/**
+ * Hands a resumed conversation the sender's Plan Mode and AFK state, and mirrors
+ * whatever it did not hand over too. The per-chat toggles still show what the
+ * conversation held before the stop, so a child spawned planning and resumed by
+ * a sender that is not would otherwise keep a Plan badge over a runtime free to
+ * edit. Spawns keep the on-only mirror {@link activateInheritedModes} gives them.
+ * @param deps - Adapter collaborators.
+ * @param target - The conversation and the tab it lives in.
+ * @param modes - The sender's Plan Mode and AFK state.
+ */
+function applyResumedModes(
+	deps: PortAdapterDeps,
+	target: { agentSessionId: string; chatTabId: string; workspaceId: string },
+	modes: { afkMode: boolean; planMode: boolean },
+): void {
+	activateInheritedModes(deps, target, modes);
+	if (!modes.planMode) {
+		deps.broadcastPlanMode({
+			...target,
+			planMode: deps.planMode.isActive(target.agentSessionId),
+		});
+	}
+	if (!modes.afkMode) {
+		deps.broadcastAfkMode({
+			...target,
+			afkMode: deps.afkMode.isActive(target.agentSessionId),
+		});
+	}
+}
+
+/**
+ * Why a follow-up may not reach its target as the target stands right now. A
+ * stopped conversation resumes only when it is a marked sub-agent the sender
+ * itself opened. A live one is refused a planning sender unless it is planning
+ * itself, and that is read in the same synchronous stretch as the submit that
+ * follows, so no runtime can open or reopen in between. An unknown session
+ * answers nothing here and fails at the submit, as it always has.
+ * @param deps - Adapter collaborators.
+ * @param session - The conversation the follow-up targets, if it exists.
+ * @param sender - The sending session and whether it is planning.
+ * @returns The refusal for the calling agent, or null when the follow-up may go.
+ */
+function followUpRefusal(
+	deps: PortAdapterDeps,
+	session: AgentSessionSnapshot | null,
+	sender: { planMode: boolean; sessionId: string },
+): string | null {
+	if (!session) {
+		return null;
+	}
+	if (!session.runtimeOpen) {
+		return isOwnSubAgent(deps, session.id, sender.sessionId)
+			? null
+			: STOPPED_CONVERSATION_REFUSAL;
+	}
+	return sender.planMode
+		? planModeFollowUpDenial(deps.planMode.isActive(session.id))
+		: null;
+}
+
+/**
+ * Whether a conversation is a sub-agent the given session opened: its tab
+ * carries the sub-agent marker, and the persisted lineage — which outlives a
+ * stop, unlike the live origin registry — names that session as its parent.
+ * @param deps - Adapter collaborators.
+ * @param agentSessionId - The conversation to classify.
+ * @param parentSessionId - The session that would have opened it.
+ * @returns True only when both records agree.
+ */
+function isOwnSubAgent(
+	deps: PortAdapterDeps,
+	agentSessionId: string,
+	parentSessionId: string,
+): boolean {
+	const database = deps.databaseService.getConnection()?.database;
+	if (!database || !readSubAgentMarker(deps, agentSessionId)) {
+		return false;
+	}
+	return listImmediateAgentSessionChildren({
+		database,
+		parentSessionId,
+	}).includes(agentSessionId);
+}
+
+/**
  * Whether a tab is still in the open set, for telling a close that landed from
  * one the service refused. A read that throws answers "still open": a stale
  * unread mark is recoverable, while claiming a close that did not happen retires
@@ -644,6 +785,30 @@ async function openSpawnedSession(input: {
 }
 
 /**
+ * Switches on the Plan Mode and AFK state a conversation takes from the agent
+ * that opened or resumed it, and mirrors each to the renderer's per-chat toggle,
+ * so a planning or unattended parent's delegation stays as restricted as the
+ * parent. On only, like the ports it drives.
+ * @param deps - Adapter collaborators.
+ * @param target - The conversation and the tab it lives in.
+ * @param modes - Which modes the parent holds.
+ */
+function activateInheritedModes(
+	deps: PortAdapterDeps,
+	target: { agentSessionId: string; chatTabId: string; workspaceId: string },
+	modes: { afkMode?: boolean; planMode?: boolean },
+): void {
+	if (modes.planMode) {
+		deps.planMode.activateForSpawn(target.agentSessionId);
+		deps.broadcastPlanMode({ ...target, planMode: true });
+	}
+	if (modes.afkMode) {
+		deps.afkMode.activateForSpawn(target.agentSessionId);
+		deps.broadcastAfkMode({ ...target, afkMode: true });
+	}
+}
+
+/**
  * Activates inherited turn modes and submits the first prompt as one rollback boundary.
  * @param input - Open session, resolved model, request, and owned tab allocation.
  */
@@ -657,24 +822,15 @@ async function submitSpawnedConversation(input: {
 	const { deps, request, selection, sessionId, tab } = input;
 	let marker: ReturnType<typeof writeSubAgentMarker> = null;
 	try {
-		if (request.planMode) {
-			deps.planMode.activateForSpawn(sessionId);
-			deps.broadcastPlanMode({
-				agentSessionId: sessionId,
-				chatTabId: tab.targetTabId,
-				planMode: true,
-				workspaceId: request.workspaceId,
-			});
-		}
-		if (request.afkMode) {
-			deps.afkMode.activateForSpawn(sessionId);
-			deps.broadcastAfkMode({
-				afkMode: true,
+		activateInheritedModes(
+			deps,
+			{
 				agentSessionId: sessionId,
 				chatTabId: tab.targetTabId,
 				workspaceId: request.workspaceId,
-			});
-		}
+			},
+			request,
+		);
 		const childRole =
 			spawnedChildRole({
 				concierge: request.callerConcierge,
@@ -907,16 +1063,35 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			};
 		},
 		/**
-		 * Steers a live conversation with another turn, respelled for the runtime
-		 * that conversation runs on rather than the one the sender runs on — a
-		 * follow-up reaches a child, a peer, or the Review conversation, any of which
-		 * may hold the wrapped names while its sender holds the bare ones.
+		 * Steers a conversation with another turn, resuming the runtime of a stopped
+		 * sub-agent the sender opened first, respelled for the runtime that conversation runs on rather
+		 * than the one the sender runs on — a follow-up reaches a child, a peer, or
+		 * the Review conversation, any of which may hold the wrapped names while its
+		 * sender holds the bare ones. A live target is judged and submitted to with
+		 * no await between, so the refusal answers the runtime the turn lands in.
 		 */
-		sendFollowUp: async ({ agentSessionId, prompt }) => {
+		sendFollowUp: async ({
+			afkMode,
+			agentSessionId,
+			planMode,
+			prompt,
+			senderSessionId,
+		}) => {
+			const known = deps.agentSessionService.getSession(agentSessionId);
+			const refusal = followUpRefusal(deps, known, {
+				planMode,
+				sessionId: senderSessionId,
+			});
+			if (refusal) {
+				return { ok: false, reason: refusal };
+			}
 			// Ahead of the submit, so the tab is back on screen before the turn it
 			// steers starts streaming into it.
 			reopenClosedChatTab(deps, { agentSessionId });
-			const session = deps.agentSessionService.getSession(agentSessionId);
+			const session =
+				known && !known.runtimeOpen
+					? await resumeClosedRuntime(deps, known, { afkMode, planMode })
+					: known;
 			await deps.agentSessionService.submitPrompt({
 				sessionId: agentSessionId,
 				prompt: namespaceControlToolNames(
@@ -926,6 +1101,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				streamingBehavior:
 					session?.status === 'streaming' ? 'followUp' : undefined,
 			});
+			return { ok: true };
 		},
 		setName: async ({ agentSessionId, name }) => {
 			const applied = await applyConversationName(deps, {

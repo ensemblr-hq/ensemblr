@@ -2,6 +2,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import {
 	bindAgentSession,
 	type ChatTabRow,
+	getChatTabById,
 	openChatTab,
 	setChatTabMetadata,
 } from '../../storage/repositories/index.ts';
@@ -32,7 +33,12 @@ function resetTitleGateForReuse(database: DatabaseSync, tab: ChatTabRow): void {
 	});
 }
 
-/** Binds a new agent session to an existing chat tab, or creates a tab fallback. */
+/**
+ * Binds an agent session to an existing chat tab, or creates a tab fallback. A
+ * tab already bound to this very session — a resume into the tab it lives in —
+ * keeps its title and naming gate: nothing about the conversation changed, so
+ * a title its agent or orchestrator chose is not stale.
+ */
 export function attachSessionToChatTab({
 	chatTabId,
 	database,
@@ -47,13 +53,17 @@ export function attachSessionToChatTab({
 	workspaceId: string;
 }): ChatTabRow {
 	if (chatTabId) {
+		const rebinding =
+			getChatTabById({ database, id: chatTabId })?.agentSessionId === sessionId;
 		const tab = bindAgentSession({
 			database,
 			id: chatTabId,
 			agentSessionId: sessionId,
 		});
 		if (tab) {
-			resetTitleGateForReuse(database, tab);
+			if (!rebinding) {
+				resetTitleGateForReuse(database, tab);
+			}
 			return tab;
 		}
 	}

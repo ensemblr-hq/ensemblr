@@ -28,7 +28,7 @@ const makePorts = (planningSessions: ReadonlySet<string>): AgentControlPorts =>
 				chatTabId: 't',
 				agentSessionId: 'pi-1',
 			}),
-			sendFollowUp: vi.fn().mockResolvedValue(undefined),
+			sendFollowUp: vi.fn().mockResolvedValue({ ok: true }),
 			setName: vi.fn().mockResolvedValue({ chatTabId: 't', title: 'Named' }),
 			waitForIdle: vi.fn().mockResolvedValue('completed'),
 			getStatus: vi.fn().mockResolvedValue(null),
@@ -348,6 +348,80 @@ describe('plan mode: sendFollowUp', () => {
 		expect(ports.conversations.sendFollowUp).not.toHaveBeenCalled();
 	});
 
+	// A stop releases the target's Plan Mode with its runtime, and the resume the
+	// follow-up triggers hands it the planning sender's, so it comes back
+	// restricted rather than as the writer the released registry suggests.
+	it('resumes a stopped target into Plan Mode rather than refusing it', async () => {
+		const { ports, service } = setup({ planning: true });
+		vi.mocked(ports.conversations.getStatus).mockResolvedValue({
+			agentSessionId: TARGET_SESSION,
+			contextUsage: null,
+			runtimeOpen: false,
+			status: 'closed',
+		});
+
+		const result = await invoke(service, 'sendFollowUp', {
+			agentSessionId: TARGET_SESSION,
+			prompt: 'pick it back up',
+		});
+
+		expect(result.ok).toBe(true);
+		expect(ports.conversations.sendFollowUp).toHaveBeenCalledWith(
+			expect.objectContaining({
+				agentSessionId: TARGET_SESSION,
+				planMode: true,
+				senderSessionId: PLANNING_SESSION,
+			}),
+		);
+	});
+
+	// The service read the target stopped, but the port judges it again as it
+	// sends; a refusal from there is the caller's answer, not a success.
+	it('passes on the refusal the port reaches at the moment of sending', async () => {
+		const { ports, service } = setup({ planning: true });
+		vi.mocked(ports.conversations.getStatus).mockResolvedValue({
+			agentSessionId: TARGET_SESSION,
+			contextUsage: null,
+			runtimeOpen: false,
+			status: 'closed',
+		});
+		vi.mocked(ports.conversations.sendFollowUp).mockResolvedValue({
+			ok: false,
+			reason: 'that conversation is not planning',
+		});
+
+		const result = await invoke(service, 'sendFollowUp', {
+			agentSessionId: TARGET_SESSION,
+			prompt: 'pick it back up',
+			wait: true,
+		});
+
+		expect(result).toEqual({
+			ok: false,
+			code: 'denied-scope',
+			error: 'that conversation is not planning',
+		});
+		expect(ports.conversations.waitForIdle).not.toHaveBeenCalled();
+	});
+
+	it('still refuses a live target that is not planning', async () => {
+		const { ports, service } = setup({ planning: true });
+		vi.mocked(ports.conversations.getStatus).mockResolvedValue({
+			agentSessionId: TARGET_SESSION,
+			contextUsage: null,
+			runtimeOpen: true,
+			status: 'idle',
+		});
+
+		const result = await invoke(service, 'sendFollowUp', {
+			agentSessionId: TARGET_SESSION,
+			prompt: 'go implement this',
+		});
+
+		expect(result.ok).toBe(false);
+		expect(ports.conversations.sendFollowUp).not.toHaveBeenCalled();
+	});
+
 	it('leaves a non-planning caller alone', async () => {
 		const { ports, service } = setup({ planning: false });
 
@@ -357,7 +431,9 @@ describe('plan mode: sendFollowUp', () => {
 		});
 
 		expect(result.ok).toBe(true);
-		expect(ports.conversations.sendFollowUp).toHaveBeenCalled();
+		expect(ports.conversations.sendFollowUp).toHaveBeenCalledWith(
+			expect.objectContaining({ planMode: false }),
+		);
 	});
 
 	// Answering the plan-mode question before the scope check would tell a caller

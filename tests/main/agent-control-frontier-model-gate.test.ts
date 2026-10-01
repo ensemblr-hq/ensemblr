@@ -75,7 +75,7 @@ const makePorts = (options: PortOptions): AgentControlPorts =>
 			listModels: options.listModels,
 			readTranscript: vi.fn(),
 			resolveConversationWorkspace: vi.fn().mockResolvedValue('ws'),
-			sendFollowUp: vi.fn().mockResolvedValue(undefined),
+			sendFollowUp: vi.fn().mockResolvedValue({ ok: true }),
 			setName: vi.fn().mockResolvedValue(null),
 			startConversation: options.startConversation,
 			waitForIdle: vi.fn().mockResolvedValue('completed'),

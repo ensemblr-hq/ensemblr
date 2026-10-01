@@ -939,7 +939,11 @@ describe('agent-control port adapters: reopening a closed chat tab', () => {
 
 	const withSession = (deps: PortAdapterDeps, submitPrompt = vi.fn()) => {
 		(deps as { agentSessionService: unknown }).agentSessionService = {
-			getSession: vi.fn(() => ({ status: 'idle', workspaceId: 'ws' })),
+			getSession: vi.fn(() => ({
+				runtimeOpen: true,
+				status: 'idle',
+				workspaceId: 'ws',
+			})),
 			submitPrompt,
 		};
 		return submitPrompt;
@@ -959,8 +963,11 @@ describe('agent-control port adapters: reopening a closed chat tab', () => {
 		const ports = createAgentControlPorts(deps);
 
 		await ports.conversations.sendFollowUp({
+			afkMode: false,
 			agentSessionId: 'sess-1',
+			planMode: false,
 			prompt: 'keep going',
+			senderSessionId: 'parent-1',
 		});
 
 		expect(restoreTab).toHaveBeenCalledWith({ chatTabId: 'tab-1' });
@@ -979,8 +986,11 @@ describe('agent-control port adapters: reopening a closed chat tab', () => {
 		const ports = createAgentControlPorts(deps);
 
 		await ports.conversations.sendFollowUp({
+			afkMode: false,
 			agentSessionId: 'sess-1',
+			planMode: false,
 			prompt: 'keep going',
+			senderSessionId: 'parent-1',
 		});
 
 		expect(restoreTab).not.toHaveBeenCalled();
@@ -997,8 +1007,11 @@ describe('agent-control port adapters: reopening a closed chat tab', () => {
 		const ports = createAgentControlPorts(deps);
 
 		await ports.conversations.sendFollowUp({
+			afkMode: false,
 			agentSessionId: 'sess-1',
+			planMode: false,
 			prompt: 'keep going',
+			senderSessionId: 'parent-1',
 		});
 
 		expect(restoreTab).not.toHaveBeenCalled();
@@ -1019,8 +1032,11 @@ describe('agent-control port adapters: reopening a closed chat tab', () => {
 		const ports = createAgentControlPorts(deps);
 
 		await ports.conversations.sendFollowUp({
+			afkMode: false,
 			agentSessionId: 'sess-1',
+			planMode: false,
 			prompt: 'keep going',
+			senderSessionId: 'parent-1',
 		});
 
 		expect(submitPrompt).toHaveBeenCalledWith({
@@ -1039,8 +1055,11 @@ describe('agent-control port adapters: reopening a closed chat tab', () => {
 		const ports = createAgentControlPorts(deps);
 
 		await ports.conversations.sendFollowUp({
+			afkMode: false,
 			agentSessionId: 'sess-1',
+			planMode: false,
 			prompt: 'keep going',
+			senderSessionId: 'parent-1',
 		});
 
 		expect(restoreTab).not.toHaveBeenCalled();
@@ -1133,6 +1152,252 @@ describe('agent-control port adapters: reopening a closed chat tab', () => {
 
 		expect(restoreTab).toHaveBeenCalledWith({ chatTabId: 'tab-1' });
 		expect(broadcastTabsChanged).toHaveBeenCalledWith({ workspaceId: 'ws' });
+	});
+});
+
+describe('agent-control port adapters: resuming a stopped conversation', () => {
+	const EXECUTABLE = { path: '/bin/pi', status: 'ready' };
+
+	const stoppedSession = (overrides: Record<string, unknown> = {}) => ({
+		cwd: '/repo/ws',
+		id: 'sess-1',
+		provider: 'pi',
+		runtimeOpen: false,
+		status: 'closed',
+		workspaceId: 'ws',
+		...overrides,
+	});
+
+	const withStoppedSession = (
+		deps: PortAdapterDeps,
+		session: Record<string, unknown> = stoppedSession(),
+	) => {
+		const submitPrompt = vi.fn();
+		const openSession = vi.fn(async () =>
+			stoppedSession({ runtimeOpen: true, status: 'starting' }),
+		);
+		Object.assign(deps, {
+			agentSessionService: {
+				getSession: vi.fn(() => session),
+				openSession,
+				submitPrompt,
+			},
+			piExecutableService: { getSnapshot: vi.fn(async () => EXECUTABLE) },
+		});
+		return { openSession, submitPrompt };
+	};
+
+	const send = (
+		deps: PortAdapterDeps,
+		modes: { afkMode: boolean; planMode: boolean } = {
+			afkMode: false,
+			planMode: false,
+		},
+	) =>
+		createAgentControlPorts(deps).conversations.sendFollowUp({
+			agentSessionId: 'sess-1',
+			prompt: 'pick it back up',
+			senderSessionId: 'parent-1',
+			...modes,
+		});
+
+	const subAgentRow = (overrides: Record<string, unknown> = {}) =>
+		openChatRow({
+			agentSessionId: 'sess-1',
+			metadata: { agentRole: 'subagent' },
+			...overrides,
+		}) as unknown as ReturnType<typeof getChatTabByAgentSessionId>;
+
+	beforeEach(() => {
+		vi.mocked(getChatTabByAgentSessionId).mockReset();
+		vi.mocked(getChatTabByAgentSessionId).mockReturnValue(subAgentRow());
+		vi.mocked(listImmediateAgentSessionChildren).mockReturnValue(['sess-1']);
+	});
+
+	// The marked row and the lineage would otherwise follow later suites into
+	// their readers and turn every caller they build into a sub-agent.
+	afterEach(() => {
+		vi.mocked(getChatTabByAgentSessionId).mockReset();
+		vi.mocked(listImmediateAgentSessionChildren).mockReturnValue([]);
+	});
+
+	it('resumes a closed runtime into its own tab before submitting the turn', async () => {
+		const { deps, broadcastTabsChanged } = makeDeps();
+		const { openSession, submitPrompt } = withStoppedSession(deps);
+
+		await expect(send(deps)).resolves.toEqual({ ok: true });
+
+		expect(openSession).toHaveBeenCalledWith({
+			afkMode: undefined,
+			chatTabId: 'tab-1',
+			executable: EXECUTABLE,
+			planMode: undefined,
+			resumeSessionId: 'sess-1',
+			workspaceCwd: '/repo/ws',
+			workspaceId: 'ws',
+		});
+		expect(submitPrompt).toHaveBeenCalledWith({
+			prompt: 'pick it back up',
+			sessionId: 'sess-1',
+			streamingBehavior: undefined,
+		});
+		expect(openSession.mock.invocationCallOrder[0]).toBeLessThan(
+			submitPrompt.mock.invocationCallOrder[0],
+		);
+		expect(broadcastTabsChanged).not.toHaveBeenCalled();
+	});
+
+	it('steers a live runtime without reopening it', async () => {
+		const { deps } = makeDeps();
+		vi.mocked(deps.planMode.isActive).mockReturnValue(true);
+		const { openSession, submitPrompt } = withStoppedSession(
+			deps,
+			stoppedSession({ runtimeOpen: true, status: 'streaming' }),
+		);
+
+		await expect(
+			send(deps, { afkMode: true, planMode: true }),
+		).resolves.toEqual({ ok: true });
+
+		expect(openSession).not.toHaveBeenCalled();
+		expect(deps.planMode.activateForSpawn).not.toHaveBeenCalled();
+		expect(deps.afkMode.activateForSpawn).not.toHaveBeenCalled();
+		expect(submitPrompt).toHaveBeenCalledWith(
+			expect.objectContaining({ streamingBehavior: 'followUp' }),
+		);
+	});
+
+	// Orchestrators have a composer, hold linked directories only the renderer
+	// knows, and count against the co-tenancy cap, so a resume from here is refused.
+	it('refuses to resume a stopped orchestrator', async () => {
+		vi.mocked(getChatTabByAgentSessionId).mockReturnValue(
+			subAgentRow({ closedAt: '2026-10-01T00:00:00Z', metadata: {} }),
+		);
+		const { deps } = makeDeps();
+		const { openSession, submitPrompt } = withStoppedSession(deps);
+
+		const outcome = await send(deps);
+
+		expect(outcome).toEqual({
+			ok: false,
+			reason: expect.stringContaining('resumes only your own stopped'),
+		});
+		expect(openSession).not.toHaveBeenCalled();
+		expect(submitPrompt).not.toHaveBeenCalled();
+		expect(deps.chatTabService.restoreTab).not.toHaveBeenCalled();
+	});
+
+	// The co-tenancy cap leaves sub-agents out because their orchestrator
+	// sequences them; resumed by anybody else, one would write unsequenced.
+	it("refuses to resume another orchestrator's stopped sub-agent", async () => {
+		vi.mocked(listImmediateAgentSessionChildren).mockReturnValue([]);
+		const { deps } = makeDeps();
+		const { openSession, submitPrompt } = withStoppedSession(deps);
+
+		const outcome = await send(deps);
+
+		expect(outcome).toEqual({
+			ok: false,
+			reason: expect.stringContaining('not a sub-agent you spawned'),
+		});
+		expect(listImmediateAgentSessionChildren).toHaveBeenCalledWith({
+			database: {},
+			parentSessionId: 'parent-1',
+		});
+		expect(openSession).not.toHaveBeenCalled();
+		expect(submitPrompt).not.toHaveBeenCalled();
+	});
+
+	// The service answers this earlier, but the runtime can open between that
+	// read and this one; the port's read is the one the turn lands in.
+	it('refuses a planning sender a live target that is not planning', async () => {
+		const { deps } = makeDeps();
+		const { submitPrompt } = withStoppedSession(
+			deps,
+			stoppedSession({ runtimeOpen: true, status: 'idle' }),
+		);
+
+		const outcome = await send(deps, { afkMode: false, planMode: true });
+
+		expect(outcome).toEqual({
+			ok: false,
+			reason: expect.stringContaining('reaches only a conversation that is'),
+		});
+		expect(deps.planMode.isActive).toHaveBeenCalledWith('sess-1');
+		expect(submitPrompt).not.toHaveBeenCalled();
+	});
+
+	it('tells the toggles a resume left a mode off that the child held before its stop', async () => {
+		const { deps } = makeDeps();
+		withStoppedSession(deps);
+
+		await send(deps);
+
+		expect(deps.planMode.activateForSpawn).not.toHaveBeenCalled();
+		expect(deps.broadcastPlanMode).toHaveBeenCalledWith({
+			agentSessionId: 'sess-1',
+			chatTabId: 'tab-1',
+			planMode: false,
+			workspaceId: 'ws',
+		});
+		expect(deps.broadcastAfkMode).toHaveBeenCalledWith({
+			afkMode: false,
+			agentSessionId: 'sess-1',
+			chatTabId: 'tab-1',
+			workspaceId: 'ws',
+		});
+	});
+
+	// The stop released the child's Plan Mode and AFK state with its runtime, so
+	// without this a planning orchestrator's child would come back able to edit.
+	it("brings a resumed conversation back in the sender's Plan Mode and AFK state", async () => {
+		const { deps } = makeDeps();
+		const { openSession } = withStoppedSession(deps);
+
+		await send(deps, { afkMode: true, planMode: true });
+
+		expect(openSession).toHaveBeenCalledWith(
+			expect.objectContaining({ afkMode: true, planMode: true }),
+		);
+		expect(deps.planMode.activateForSpawn).toHaveBeenCalledWith('sess-1');
+		expect(deps.afkMode.activateForSpawn).toHaveBeenCalledWith('sess-1');
+		expect(deps.broadcastPlanMode).toHaveBeenCalledExactlyOnceWith({
+			agentSessionId: 'sess-1',
+			chatTabId: 'tab-1',
+			planMode: true,
+			workspaceId: 'ws',
+		});
+		expect(deps.broadcastAfkMode).toHaveBeenCalledExactlyOnceWith({
+			afkMode: true,
+			agentSessionId: 'sess-1',
+			chatTabId: 'tab-1',
+			workspaceId: 'ws',
+		});
+	});
+
+	it('announces the tab a resume had to open when the conversation had none', async () => {
+		vi.mocked(getChatTabByAgentSessionId)
+			.mockReturnValueOnce(subAgentRow())
+			.mockReturnValue(null);
+		const { deps, broadcastTabsChanged } = makeDeps();
+		const { openSession } = withStoppedSession(deps);
+
+		await send(deps);
+
+		expect(openSession).toHaveBeenCalledWith(
+			expect.objectContaining({ chatTabId: null }),
+		);
+		expect(broadcastTabsChanged).toHaveBeenCalledWith({ workspaceId: 'ws' });
+	});
+
+	it('submits nothing when the resume fails', async () => {
+		const { deps } = makeDeps();
+		const { openSession, submitPrompt } = withStoppedSession(deps);
+		openSession.mockRejectedValue(new Error('runtime would not start'));
+
+		await expect(send(deps)).rejects.toThrow('runtime would not start');
+
+		expect(submitPrompt).not.toHaveBeenCalled();
 	});
 });
 
@@ -2292,6 +2557,7 @@ describe('agent-control port adapters: control tool names in a prompt', () => {
 		(deps as { agentSessionService: unknown }).agentSessionService = {
 			getSession: vi.fn(() => ({
 				provider: 'claude',
+				runtimeOpen: true,
 				status: 'idle',
 				workspaceId: 'ws',
 			})),
@@ -2299,8 +2565,11 @@ describe('agent-control port adapters: control tool names in a prompt', () => {
 		};
 
 		await createAgentControlPorts(deps).conversations.sendFollowUp({
+			afkMode: false,
 			agentSessionId: 'sess-1',
+			planMode: false,
 			prompt: BRIEF,
+			senderSessionId: 'parent-1',
 		});
 
 		expect(submitPrompt).toHaveBeenCalledWith(

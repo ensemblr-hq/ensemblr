@@ -232,7 +232,13 @@ peer or Review, overrides inherited Plan/AFK state, or steers another branch:
 
 A child's last message is its report, and it is persisted permanently — it
 survives the child closing and an app restart. A `closed` or `idle` child is not
-lost work: read it with `ensemblr_get_last_message`.
+lost work: read it with `ensemblr_get_last_message`. A `closed` child can also be
+resumed — stopping an orchestrator stops its sub-agents, and
+`ensemblr_send_follow_up` brings one back with its history, in the sender's Plan
+Mode and AFK state, to take another turn. Only your own sub-agent resumes that
+way: a stopped orchestrator — a peer, a Review conversation, the user's own tab
+— is refused, because the user resumes it from its own tab, and so is another
+orchestrator's sub-agent, which is that orchestrator's to bring back.
 
 **Close each child's tab as it settles**, with `ensemblr_close_tab` and the
 `chatTabId` from step 1 — nothing else ever closes one, so a fan-out that tidies
