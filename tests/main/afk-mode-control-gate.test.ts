@@ -35,7 +35,7 @@ const makePorts = (options: {
 				chatTabId: 't',
 				ok: true,
 			}),
-			sendFollowUp: vi.fn().mockResolvedValue(undefined),
+			sendFollowUp: vi.fn().mockResolvedValue({ ok: true }),
 			setName: vi.fn().mockResolvedValue({ chatTabId: 't', title: 'Named' }),
 			waitForIdle: vi.fn().mockResolvedValue('completed'),
 			getStatus: vi.fn().mockResolvedValue(null),
@@ -255,5 +255,36 @@ describe('afk mode: the peer-orchestrator confirmation', () => {
 		});
 
 		expect(confirm).toHaveBeenCalledOnce();
+	});
+});
+
+describe('afk mode: resuming a stopped conversation', () => {
+	// A stop releases the target's AFK state with its runtime, so the follow-up
+	// that resumes it carries the sender's — a child an unattended orchestrator
+	// brings back must not raise a questionnaire nobody is there to answer.
+	it("hands an unattended sender's AFK state to the follow-up", async () => {
+		const { ports, service } = setup({ unattended: true });
+
+		await invoke(service, 'sendFollowUp', {
+			agentSessionId: 'target',
+			prompt: 'pick it back up',
+		});
+
+		expect(ports.conversations.sendFollowUp).toHaveBeenCalledWith(
+			expect.objectContaining({ afkMode: true, agentSessionId: 'target' }),
+		);
+	});
+
+	it('hands no AFK state over while the user is present', async () => {
+		const { ports, service } = setup({ unattended: false });
+
+		await invoke(service, 'sendFollowUp', {
+			agentSessionId: 'target',
+			prompt: 'pick it back up',
+		});
+
+		expect(ports.conversations.sendFollowUp).toHaveBeenCalledWith(
+			expect.objectContaining({ afkMode: false }),
+		);
 	});
 });

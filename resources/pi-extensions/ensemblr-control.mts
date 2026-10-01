@@ -1594,7 +1594,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_send_follow_up',
 		'sendFollowUp',
-		'Send a follow-up prompt into a conversation that is already running, whichever runtime it is on — not necessarily a child you spawned. Pass the `agentSessionId` that opening the conversation returned, not your own. Steering a conversation whose chat tab was closed puts that tab back in the tab strip, so the turn you asked for streams where the user is looking instead of into closed history.',
+		'Send a follow-up prompt into a conversation, whichever runtime it is on — not necessarily a child you spawned. Pass the `agentSessionId` that opening the conversation returned, not your own. A sub-agent you spawned that was stopped — on its own or because you were — is resumed with its history and takes this turn, inheriting your Plan Mode and AFK state the way a fresh spawn would. Any other stopped conversation is refused: the user resumes an orchestrator (a peer, a Review conversation, a chat the user started) from its tab, and another orchestrator resumes its own sub-agents. Steering a conversation whose chat tab was closed puts that tab back in the tab strip, so the turn you asked for streams where the user is looking instead of into closed history.',
 		Type.Object({
 			agentSessionId: Type.String(),
 			prompt: Type.String(),

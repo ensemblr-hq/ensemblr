@@ -66,7 +66,7 @@ const makePorts = (
 		startConversation: vi
 			.fn()
 			.mockResolvedValue({ ok: true, chatTabId: 't', agentSessionId: 'pi-1' }),
-		sendFollowUp: vi.fn().mockResolvedValue(undefined),
+		sendFollowUp: vi.fn().mockResolvedValue({ ok: true }),
 		setName: vi
 			.fn()
 			.mockResolvedValue({ chatTabId: 'named-tab', title: 'Named' }),

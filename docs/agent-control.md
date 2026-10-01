@@ -571,6 +571,21 @@ reopening would surface an emptied row rather than the chat somebody asked to se
 would come back whole is reopened, and that is asked of every target rather than inferred from how
 it was found. Reopening is best-effort: it never costs the op it accompanies.
 
+**Steering a stopped sub-agent resumes it.** Stopping an orchestrator stops every sub-agent under
+it, and a sub-agent's tab has no composer to bring it back from, so `ensemblr_send_follow_up`
+reattaches a runtime through the same resume path the composer uses — into the tab the child
+already lives in, with its history, its lineage, and its tab title intact — and then submits the
+turn. A stop releases the child's Plan Mode and AFK state, so it comes back holding the sender's, as
+a fresh spawn would, and the per-chat toggles are told the result either way. Only the sender's own
+sub-agent resumes — its tab carries the sub-agent marker and the persisted lineage names the sender
+as its parent. A stopped orchestrator — a peer, a Review conversation, the user's own tab — is
+refused: it has a composer of its own, its linked directories live only in the renderer, and a
+resume from here would seat a writer past the co-tenancy cap without asking. Another orchestrator's
+sub-agent is refused for the same cap: sub-agents stay out of it because the orchestrator that
+opened one sequences it, and resumed by anybody else it would write with nobody sequencing it. The port judges
+the target at the moment it sends, not on the service's earlier read, so a runtime that opened in
+between cannot carry a planning sender's turn into a conversation that is not planning.
+
 ### Naming and session record
 
 | Tool | Arguments | Gate | Withheld from |

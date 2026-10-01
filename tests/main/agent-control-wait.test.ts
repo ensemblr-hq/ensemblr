@@ -58,7 +58,7 @@ const makePorts = (
 		startConversation: vi
 			.fn()
 			.mockResolvedValue({ chatTabId: 't', agentSessionId: 'p' }),
-		sendFollowUp: vi.fn().mockResolvedValue(undefined),
+		sendFollowUp: vi.fn().mockResolvedValue({ ok: true }),
 		setName: vi.fn().mockResolvedValue(null),
 		waitForIdle: vi.fn().mockResolvedValue('completed'),
 		getStatus: vi.fn<

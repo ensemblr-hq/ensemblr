@@ -80,6 +80,39 @@ test('reusing an auto-named tab clears the naming gate so it re-titles', (t) => 
 	assert.equal(reused?.metadata.titleAutoNamed, false);
 });
 
+// A resume rebinds the tab to the session it already holds. Resetting the gate
+// there would let the namer replace an orchestrator-chosen title with the brief.
+test('rebinding a tab to the session it already holds keeps its title', (t) => {
+	const fixture = openFixture(t);
+	const session = newSession(fixture);
+	const tab = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			agentSessionId: session,
+			title: 'Review: auth',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	setChatTabMetadata({
+		database: fixture.database,
+		id: tab.id,
+		metadata: { titleAutoNamed: true, titleProvenance: 'agent' },
+	});
+
+	attachSessionToChatTab({
+		chatTabId: tab.id,
+		database: fixture.database,
+		sessionId: session,
+		workspaceId: fixture.workspaceId,
+	});
+
+	const rebound = getChatTabById({ database: fixture.database, id: tab.id });
+	assert.equal(rebound?.title, 'Review: auth');
+	assert.equal(rebound?.metadata.titleAutoNamed, true);
+	assert.equal(rebound?.metadata.titleProvenance, 'agent');
+});
+
 test('reusing a user-named tab preserves its title provenance', (t) => {
 	const fixture = openFixture(t);
 	const firstSession = newSession(fixture);

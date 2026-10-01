@@ -2511,11 +2511,28 @@ export function createAgentControlService({
 	};
 
 	/**
-	 * Steers another conversation. A planning caller may only reach a target that
-	 * is itself planning, so delegation cannot be laundered into an edit through a
-	 * conversation that is not restricted. The plan-mode check runs after the scope
-	 * check on purpose: answering it earlier would tell a caller in another
-	 * workspace whether a session it cannot see is planning.
+	 * Whether a follow-up finds the conversation stopped rather than live: a stop
+	 * closed its runtime and released its Plan Mode with it, so the follow-up
+	 * either resumes it holding the sender's or — for anything but the sender's
+	 * own sub-agent — is refused by the port, and neither lets a planning sender
+	 * reach an editor.
+	 * @param agentSessionId - Conversation the follow-up targets.
+	 * @returns True when the conversation exists with no runtime attached.
+	 */
+	const resumesOnFollowUp = async (agentSessionId: string): Promise<boolean> =>
+		(await ports.conversations.getStatus(agentSessionId))?.runtimeOpen ===
+		false;
+
+	/**
+	 * Steers another conversation, resuming it when a stop closed the runtime of a
+	 * sub-agent the caller opened. A planning caller may only reach a target that is itself planning,
+	 * so delegation cannot be laundered into an edit through a conversation that
+	 * is not restricted — a resumed target counts, because it comes back planning
+	 * with its sender. The plan-mode check runs after the scope check on purpose:
+	 * answering it earlier would tell a caller in another workspace whether a
+	 * session it cannot see is planning. It is the early answer, not the last
+	 * word: the target's runtime can open between this read and the send, so the
+	 * port judges the target again at the moment it acts and may still refuse.
 	 * @param origin - Resolved caller identity.
 	 * @param args - Target session, prompt, and whether to block on it.
 	 * @param signal - Aborts when the steering turn ends, so a `wait: true` poll
@@ -2547,18 +2564,26 @@ export function createAgentControlService({
 		if (childDenied) {
 			return childDenied;
 		}
-		if (isPlanning(origin)) {
+		const planMode = isPlanning(origin);
+		if (planMode) {
 			const denial = planModeFollowUpDenial(
-				ports.planMode.isActive(args.agentSessionId),
+				ports.planMode.isActive(args.agentSessionId) ||
+					(await resumesOnFollowUp(args.agentSessionId)),
 			);
 			if (denial) {
 				return fail('denied-scope', denial);
 			}
 		}
-		await ports.conversations.sendFollowUp({
+		const delivered = await ports.conversations.sendFollowUp({
+			afkMode: isUnattended(origin),
 			agentSessionId: args.agentSessionId,
+			planMode,
 			prompt: args.prompt,
+			senderSessionId: origin.sessionId,
 		});
+		if (!delivered.ok) {
+			return fail('denied-scope', delivered.reason);
+		}
 		const result = await waitIfRequested(
 			args.agentSessionId,
 			args.wait,

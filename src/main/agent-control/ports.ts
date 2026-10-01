@@ -238,6 +238,15 @@ export type StartConversationOutcome =
 	| { ok: true; chatTabId: string; agentSessionId: string }
 	| { ok: false; reason: string };
 
+/**
+ * What a follow-up did. A target the follow-up may not reach as it stands at the
+ * moment of sending — a stopped orchestrator, or a live conversation that is not
+ * planning while its sender is — is a modelled refusal whose reason is prose for
+ * the calling agent; a runtime that will not resume, or a submit that fails,
+ * still rejects.
+ */
+export type FollowUpOutcome = { ok: true } | { ok: false; reason: string };
+
 /** Agent conversation lifecycle plus its scope-check and read helpers. */
 export interface ConversationPort {
 	startConversation: (input: {
@@ -326,10 +335,29 @@ export interface ConversationPort {
 		runtime: AgentProviderId | null;
 		includeHidden?: boolean;
 	}) => Promise<AgentControlModelList>;
+	/**
+	 * Steers a conversation with another turn, resuming its runtime first when a
+	 * stop closed it — but only a sub-agent of `senderSessionId`'s own. A stopped
+	 * orchestrator is refused: it has a composer to resume it from, and a resume
+	 * from here would seat a writer past the co-tenancy cap without the linked
+	 * directories only the renderer holds. Another orchestrator's stopped
+	 * sub-agent is refused for the same cap: the cap leaves sub-agents out because
+	 * the orchestrator that opened one sequences it, and a resume by anybody else
+	 * would bring it back with nobody sequencing it. A stop releases the
+	 * conversation's Plan Mode and AFK state with its runtime, so `planMode` and
+	 * `afkMode` are the sender's own, taken on by a resumed conversation exactly as
+	 * a spawn takes them on; they are required for the reason they are on a spawn.
+	 * A conversation whose runtime is still open keeps its own, and a planning
+	 * sender is refused one that is not planning, judged here at the moment of
+	 * sending rather than on an earlier read.
+	 */
 	sendFollowUp: (input: {
 		agentSessionId: string;
 		prompt: string;
-	}) => Promise<void>;
+		senderSessionId: string;
+		planMode: boolean;
+		afkMode: boolean;
+	}) => Promise<FollowUpOutcome>;
 	/**
 	 * Sets the display name of an active conversation's tab (Pi `/name`).
 	 * Resolves null when the session is not active, and `applied: false` when the
