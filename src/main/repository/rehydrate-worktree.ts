@@ -1,11 +1,8 @@
-import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { promisify } from 'node:util';
 
 import { restoreWorkspaceTo } from '../checkpoints/index.ts';
 import type { LocalCommandService } from '../commands/local-command';
-import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 import { clearSetupStateFile } from '../scripts/index.ts';
 import { copyDirectoryTree } from './copy-directory.ts';
 import {
@@ -15,8 +12,6 @@ import {
 } from './git-ops.ts';
 import { ARCHIVED_FILES_TO_COPY_DIRECTORY } from './prune-worktree.ts';
 import { removeManagedDirectory, WORKTREE_DEPTH } from './remove-directory.ts';
-
-const execFileAsync = promisify(execFile);
 
 /**
  * Why a rehydrate could not put the worktree back. Both map onto unarchive
@@ -199,12 +194,11 @@ async function resolvePlacement({
 }
 
 /**
- * Restores the captured working tree over the fresh checkout, then unstages it.
+ * Restores the captured working tree over the fresh checkout.
  *
- * `read-tree -u --reset` leaves the index matching the snapshot, which reads as
- * a pile of staged changes; the `reset` that follows puts tracked edits back as
- * unstaged and previously untracked files back as untracked. The one thing not
- * reproduced is the original staged/unstaged split — no content is lost.
+ * `restoreWorkspaceTo` leaves the restored work unstaged: tracked edits come
+ * back as unstaged and previously untracked files as untracked. The one thing
+ * not reproduced is the original staged/unstaged split — no content is lost.
  * @param options - Recorded snapshot commit and the rehydrated worktree.
  * @returns True when a snapshot was restored.
  */
@@ -223,10 +217,6 @@ async function restoreWorkingTree({
 		await restoreWorkspaceTo({
 			commitHash: prunedWipCommit,
 			cwd: workspacePath,
-		});
-		await execFileAsync('git', ['reset', '--quiet'], {
-			cwd: workspacePath,
-			env: stripLaunchContextEnv({ ...process.env }),
 		});
 		return true;
 	} catch {
