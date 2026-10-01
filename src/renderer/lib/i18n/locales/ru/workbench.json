@@ -315,6 +315,7 @@
 		"send-tooltip": "Отправить сообщение",
 		"send-tooltip-hold": "Удержать до вашей отправки",
 		"send-tooltip-queue": "В очередь до конца хода агента",
+		"send-tooltip-steer-now": "Shift+клик — направить сейчас",
 		"session-open-failed": "Не удалось открыть сессию агента.",
 		"setup-blocked": {
 			"placeholder": "Устраните блокеры настройки перед отправкой запроса.",

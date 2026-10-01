@@ -234,6 +234,7 @@ Rules of thumb:
 | English | Русский | Ελληνικά | Note |
 | --- | --- | --- | --- |
 | Steer | Направить | Καθοδήγηση | Interrupting an agent mid-turn. |
+| Shift-click | Shift+клик | Shift+κλικ | Clicking with Shift held, named in a tooltip as the way to override a control's default. `Shift` stays English in both because it is the label printed on the key; the joiner is `+`, matching how both languages already spell a chord such as `Cmd+Shift+.`. Greek `κλικ` is the loan the catalogue already uses in `Κάντε κλικ`. |
 | Follow-up | Дополнение | Συμπλήρωμα | The queued/steering message. |
 | Queue | В очередь | Σε ουρά | |
 | Held | Удерживается | Κρατείται | A follow-up the `block` behavior keeps out of a running turn. |

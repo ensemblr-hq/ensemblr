@@ -117,7 +117,8 @@ steering the running turn.
 steer frame whatever **Follow-up behavior** says, because that is the only
 delivery a running turn can receive; idle it is an ordinary send. It jumps this
 one message past the queue and leaves anything already parked exactly where it
-is.
+is. Shift-clicking the Send button does the same thing with the pointer, and
+while a plain click would queue or hold, the Send tooltip says so.
 
 **`diffComment.submit` is composer-scoped, not dialog-scoped.** A review-comment
 box is a composer, so `⌘↵` submits the comment when one has focus. See

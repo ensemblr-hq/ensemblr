@@ -128,6 +128,8 @@ export interface ComposerStateApi {
 	/** Stops the running turn and pauses the queue rather than draining into the gap. */
 	handleStop: () => Promise<void>;
 	handleSubmit: () => Promise<void> | void;
+	/** Sends the draft this instant, steering past the queue mid-turn whatever the Follow-up behavior. */
+	sendNow: () => void;
 	hasChips: boolean;
 	/** True when the composer holds any draft text or attachment. */
 	hasContent: boolean;
@@ -544,6 +546,7 @@ export function useComposerState({
 		handleKeyDown,
 		handleStop,
 		handleSubmit,
+		sendNow,
 		hasChips,
 		hasContent,
 		initialDraft,

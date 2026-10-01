@@ -2973,6 +2973,7 @@ export default interface Resources {
 			'send-tooltip': 'Send message';
 			'send-tooltip-hold': 'Hold until you send it';
 			'send-tooltip-queue': 'Queue for when the agent finishes';
+			'send-tooltip-steer-now': 'Shift-click to steer now';
 			'session-open-failed': 'Unable to open an agent session.';
 			'setup-blocked': {
 				placeholder: 'Fix setup blockers before sending a prompt.';
