@@ -496,6 +496,7 @@ export function useComposerSubmit({
 		}, [composer.isStreaming, enqueueDraft, readDraft, submitText]),
 		/**
 		 * Sends the current draft this instant, whatever the Follow-up behavior says.
+		 * The send-now chord and a shift-click on Send both land here.
 		 * Mid-turn it goes as a steer frame, which is the only delivery that reaches
 		 * a turn already running; `queue` and `block` would both have parked it, and
 		 * bypassing them is the whole point. Idle it is an ordinary send, so the

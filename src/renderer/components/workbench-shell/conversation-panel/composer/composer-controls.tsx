@@ -156,10 +156,62 @@ function sendTooltipLabel(intent: ComposerSendIntent, t: TFunction): string {
 }
 
 /**
+ * One line of the Send tooltip: what an action does, then its chord in muted
+ * text.
+ */
+function SendTooltipLine({
+	label,
+	shortcut,
+}: {
+	label: string;
+	shortcut: string;
+}) {
+	return (
+		<span>
+			{label}
+			<span className='ml-2 text-muted-foreground'>{shortcut}</span>
+		</span>
+	);
+}
+
+/**
+ * The Send tooltip's body. While a click would queue or hold the draft, a
+ * second line names the shift-click that steers past the queue instead, since
+ * that is the only moment the two clicks differ.
+ */
+function SendTooltipBody({
+	intent,
+	sendShortcutHint,
+}: {
+	intent: ComposerSendIntent;
+	sendShortcutHint: string;
+}) {
+	const { t } = useTranslation();
+	return (
+		<span className='flex flex-col gap-1'>
+			<SendTooltipLine
+				label={sendTooltipLabel(intent, t)}
+				shortcut={sendShortcutHint}
+			/>
+			{intent === 'send' ? null : (
+				<SendTooltipLine
+					label={t(
+						'workbench:composer.send-tooltip-steer-now',
+						'Shift-click to steer now',
+					)}
+					shortcut={formatShortcut('composer.sendNow')}
+				/>
+			)}
+		</span>
+	);
+}
+
+/**
  * The send / stop control and its tooltip. Stop shows only while the agent
  * is working AND there is nothing to send — the moment the user drafts a
  * follow-up the control becomes Send, so a live turn never hides the ability
- * to steer.
+ * to steer. Shift-click sends now, the pointer twin of the send-now chord, so a
+ * queue or hold behavior can be overridden for one message without a keyboard.
  */
 function SubmitControl({
 	composer,
@@ -192,7 +244,13 @@ function SubmitControl({
 			aria-label={t('common:actions.send', 'Send')}
 			className='rounded-md'
 			disabled={!state.canSend}
-			onClick={() => void state.handleSubmit()}
+			onClick={(event) => {
+				if (event.shiftKey) {
+					state.sendNow();
+					return;
+				}
+				void state.handleSubmit();
+			}}
 			size='icon-sm'
 			type='button'
 			variant={state.canSend ? 'default' : 'secondary'}
@@ -210,12 +268,10 @@ function SubmitControl({
 				{composer.disabled && composer.disabledReason ? (
 					composer.disabledReason
 				) : (
-					<>
-						{sendTooltipLabel(state.sendIntent, t)}
-						<span className='ml-2 text-muted-foreground'>
-							{sendShortcutHint}
-						</span>
-					</>
+					<SendTooltipBody
+						intent={state.sendIntent}
+						sendShortcutHint={sendShortcutHint}
+					/>
 				)}
 			</TooltipContent>
 		</Tooltip>

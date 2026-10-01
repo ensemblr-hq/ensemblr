@@ -700,6 +700,10 @@ attachment chips included, inline and in place — the same mark the composer ga
 each chip while you were typing it — so a message written around a chip reads as
 you wrote it rather than with a hole where the chip was.
 
+To skip the queue for one message, **shift-click Send** (or press `⌘⇧↵`): it
+reaches the running turn straight away as a steer, whatever **Follow-up
+behavior** says, and leaves the messages already queued where they are.
+
 Two things stop a queue draining, and the strip says which: **stopping a turn**
 parks the messages that turn was holding, so resuming is your call rather than
 something that happens the moment the agent falls silent, and a **send that
