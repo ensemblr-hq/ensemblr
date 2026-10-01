@@ -20,6 +20,12 @@ describe('file path language detection', () => {
 		expect(languageForFilePath('nix/flake.lock')).toBe('json');
 	});
 
+	test('highlights QML documents and module definitions', () => {
+		expect(languageForFilePath('qml/Main.qml')).toBe('qml');
+		expect(languageForFilePath('src/ui/PickerTile.QML')).toBe('qml');
+		expect(languageForFilePath('qml/Wye/qmldir')).toBe('qmldir');
+	});
+
 	test('leaves other lockfiles as plain text', () => {
 		expect(languageForFilePath('Cargo.lock')).toBe('text');
 	});
@@ -29,5 +35,9 @@ describe('fence tag language resolution', () => {
 	test('resolves a nix fence to the bundled Nix grammar', () => {
 		expect(toBundledLanguage('nix')).toBe('nix');
 		expect(toBundledLanguage('Nix')).toBe('nix');
+	});
+
+	test('resolves a qml fence to the bundled QML grammar', () => {
+		expect(toBundledLanguage('qml')).toBe('qml');
 	});
 });

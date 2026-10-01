@@ -8,11 +8,15 @@ import { useMarkdownDocumentScope } from '@/renderer/components/markdown/markdow
 import { imageSourceForPreview } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-helpers';
 import { staysInsideWorkspace } from '@/renderer/lib/markdown-references';
 import type { MarkdownReference } from '@/renderer/types/markdown';
+import type { ReadWorkspaceFileResult } from '@/shared/ipc/contracts/workspace-files';
 
 import { useMarkdownFileReference } from './use-markdown-file-reference';
 
 /** How long a markdown image's bytes stay fresh before another read is made. */
 const IMAGE_STALE_TIME_MS = 60_000;
+
+/** A path naming an SVG, whatever case its extension is written in. */
+const SVG_PATH = /\.svg$/i;
 
 /**
  * What a markdown `<img>` should actually load, and whether that is still being
@@ -52,6 +56,33 @@ function readableWorkspacePath(reference: MarkdownReference): string {
 }
 
 /**
+ * The URL a markdown image draws a workspace read from.
+ *
+ * The preview reads an SVG back as text, because the file view and the diff show
+ * its source, so it never arrives as the image bytes a raster file does. Handed
+ * to an `<img>` as a data URL it is drawn as a static picture: an SVG in image
+ * context runs no script and loads nothing it references.
+ * @param result - The workspace read for the image's path.
+ * @param path - The workspace-relative path that was read.
+ * @returns A data URL for the image, or null when the read holds no image.
+ */
+function imageSourceForRead(
+	result: ReadWorkspaceFileResult,
+	path: string,
+): string | null {
+	const rasterSource = imageSourceForPreview(result);
+	if (rasterSource) {
+		return rasterSource;
+	}
+	if (result.contentEncoding !== 'utf8' || !result.content) {
+		return null;
+	}
+	return SVG_PATH.test(path)
+		? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(result.content)}`
+		: null;
+}
+
+/**
  * Resolves what a markdown image renders from.
  *
  * A remote source is handed back untouched — the platform fetches it, as it does
@@ -88,6 +119,6 @@ export function useMarkdownImageSource(src: string): MarkdownImageSource {
 	}
 	return {
 		isPending: false,
-		source: data ? imageSourceForPreview(data) : null,
+		source: data ? imageSourceForRead(data, path) : null,
 	};
 }
