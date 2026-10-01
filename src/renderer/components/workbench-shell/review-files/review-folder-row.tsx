@@ -4,9 +4,8 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
-import { cn } from '@/renderer/lib/utils';
 import {
-	fileTreeIndentClassName,
+	fileTreeIndentStyle,
 	getWorkspaceFileIconName,
 } from '@/renderer/lib/workbench';
 
@@ -66,13 +65,11 @@ export const ReviewFolderRow = memo(
 				// Highlight only on hover: drop the ghost variant's persistent
 				// open-state fill (`aria-expanded:bg-muted`) while keeping the hover
 				// fill for expanded folders.
-				className={cn(
-					'h-7 w-full justify-start gap-1.5 rounded-md px-2 text-xs aria-expanded:bg-transparent aria-expanded:hover:bg-muted',
-					fileTreeIndentClassName(level),
-				)}
+				className='h-7 w-full justify-start gap-1.5 rounded-md px-2 text-xs aria-expanded:bg-transparent aria-expanded:hover:bg-muted'
 				onClick={() => onToggle(path)}
 				role='treeitem'
 				size='sm'
+				style={fileTreeIndentStyle(level)}
 				variant='ghost'
 			>
 				<FolderChevronIcon aria-hidden='true' className='size-3 shrink-0' />
