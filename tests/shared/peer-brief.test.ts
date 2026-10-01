@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
 	buildPeerBriefDirective,
+	buildReviewPeerDirective,
 	PEER_BRIEF_HEADER,
 	spawnedChildRole,
 } from '../../src/shared/agent-control.ts';
@@ -29,7 +30,12 @@ describe('the contract a peer orchestrator opens with', () => {
 	it('names the git commands that move HEAD or the index', () => {
 		const directive = buildPeerBriefDirective('sess-parent');
 
-		for (const command of ['git commit', 'git rebase', 'git checkout']) {
+		for (const command of [
+			'git add',
+			'git commit',
+			'git rebase',
+			'git checkout',
+		]) {
 			expect(directive).toContain(command);
 		}
 	});
@@ -58,5 +64,15 @@ describe('the role a spawn opens its child with', () => {
 		expect(spawnedChildRole({ concierge: false, peer: false })).toBe(
 			'subagent',
 		);
+	});
+});
+
+describe('the contract the review conversation opens with', () => {
+	it('names staging alongside the git commands that move HEAD or the index', () => {
+		const directive = buildReviewPeerDirective('sess-parent');
+
+		for (const command of ['git add', 'git commit', 'git stash']) {
+			expect(directive).toContain(command);
+		}
 	});
 });

@@ -385,6 +385,17 @@ export function parseCombinedDiff(combined: string): GitDiffResult {
  * `git read-tree -u --reset`. Conservative by design (ADR 0012): files created
  * AFTER the checkpoint that were never tracked are left in place rather than
  * deleted, so unrelated user work cannot be destroyed.
+ *
+ * The read-tree leaves the index matching the snapshot, which would present
+ * every restored change as staged for whoever commits next, so the index is
+ * reset to HEAD afterwards: restored edits come back unstaged and files that
+ * were untracked at capture come back untracked. The snapshot records no
+ * staged/unstaged split, so none is reproduced. The reset also ends an
+ * in-progress merge, cherry-pick, or revert, whose conflict entries the
+ * read-tree has already discarded, so the next commit cannot record one over
+ * the restored files.
+ * @param commitHash - Checkpoint commit whose tree to restore
+ * @param cwd - Workspace directory to restore
  */
 export async function restoreWorkspaceTo({
 	commitHash,
@@ -399,6 +410,7 @@ export async function restoreWorkspaceTo({
 		cwd,
 		step: 'read-tree-restore',
 	});
+	await runGit({ args: ['reset', '--quiet'], cwd, step: 'unstage-restored' });
 }
 
 /**

@@ -51,6 +51,15 @@ function git(cwd: string, ...args: string[]): string {
 	return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 }
 
+function porcelainStatus(cwd: string): string[] {
+	return execFileSync('git', ['status', '--porcelain'], {
+		cwd,
+		encoding: 'utf8',
+	})
+		.split('\n')
+		.filter((line) => line.length > 0);
+}
+
 function openFixture(t: import('node:test').TestContext): Fixture {
 	const root = mkdtempSync(path.join(tmpdir(), 'ensemblr-restore-test-'));
 	const repoDirectory = path.join(root, 'repo');
@@ -519,6 +528,37 @@ test('restore leaves never-tracked post-checkpoint files in place', async (t) =>
 	assert.equal(existsSync(strayPath), true);
 });
 
+test('restoreTurnCheckpoint leaves restored changes unstaged instead of staging them', async (t) => {
+	const fixture = openFixture(t);
+	const appPath = path.join(fixture.repoDirectory, 'app.txt');
+	const notePath = path.join(fixture.repoDirectory, 'note.txt');
+	writeFileSync(appPath, 'edited before the turn\n');
+	writeFileSync(notePath, 'untracked before the turn\n');
+
+	const turn = newTurn(fixture, 'unstaged restore');
+	await captureForTurn(fixture, turn, 'unstaged restore');
+
+	writeFileSync(appPath, 'wrecked\n');
+	writeFileSync(notePath, 'wrecked\n');
+
+	await restoreTurnCheckpoint({
+		cwd: fixture.repoDirectory,
+		database: fixture.connection.database,
+		turnId: turn.id,
+	});
+
+	assert.equal(readFileSync(appPath, 'utf8'), 'edited before the turn\n');
+	assert.equal(readFileSync(notePath, 'utf8'), 'untracked before the turn\n');
+	assert.equal(
+		git(fixture.repoDirectory, 'diff', '--cached', '--name-only'),
+		'',
+	);
+	assert.deepEqual(porcelainStatus(fixture.repoDirectory), [
+		' M app.txt',
+		'?? note.txt',
+	]);
+});
+
 test('contaminated restore updates only its worktree, leaving sibling files, index, and HEAD intact', async (t) => {
 	const { repoDirectory } = openFixture(t);
 	const workspace = path.join(path.dirname(repoDirectory), 'workspace');
@@ -573,8 +613,11 @@ test('contaminated restore updates only its worktree, leaving sibling files, ind
 		readFileSync(path.join(workspace, 'keep.txt'), 'utf8'),
 		'untracked user work\n',
 	);
-	assert.equal(git(workspace, 'show', ':app.txt'), 'workspace snapshot');
-	assert.equal(git(workspace, 'show', ':note.txt'), 'captured note');
+	assert.deepEqual(porcelainStatus(workspace), [
+		' M app.txt',
+		'?? keep.txt',
+		'?? note.txt',
+	]);
 	assert.deepEqual(readFileSync(siblingIndex), indexBefore);
 	assert.equal(git(repoDirectory, 'rev-parse', 'HEAD'), headBefore);
 	assert.equal(git(workspace, 'rev-parse', 'HEAD'), headBefore);

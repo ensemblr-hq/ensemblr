@@ -535,7 +535,9 @@ and [ADR 0068](../adr/0068-let-afk-agents-choose-review-delegation.md).
 
 Before each of your prompts runs, Ensemblr captures the workspace's file state
 into a private git ref tied to that turn. Restoring a checkpoint reverts the
-files to how they were at that boundary and hides the messages after it.
+files to how they were at that boundary and hides the messages after it. The
+reverted files come back as unstaged changes, so nothing is left staged for the
+next commit to sweep in.
 
 The conversation history itself is not destroyed by a restore — the runtime's own
 session record stays intact. Checkpoints are about **files**; **session
