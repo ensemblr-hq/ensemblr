@@ -27,6 +27,7 @@ const EXTENSION_LANGUAGE: Record<string, string> = {
 	php: 'php',
 	prisma: 'prisma',
 	py: 'python',
+	qml: 'qml',
 	rb: 'ruby',
 	rs: 'rust',
 	scss: 'scss',
@@ -49,6 +50,7 @@ const BASENAME_LANGUAGE: Record<string, string> = {
 	dockerfile: 'docker',
 	'flake.lock': 'json',
 	makefile: 'makefile',
+	qmldir: 'qmldir',
 };
 
 /**
