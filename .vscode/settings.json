@@ -21,7 +21,7 @@
 		"editor.defaultFormatter": "biomejs.biome"
 	},
 	"evenBetterToml.schema.associations": {
-		".*/\\.ensemblr/settings\\.toml$": "./schemas/settings.schema.json"
+		".*/\\.ensemblr/settings\\.toml$": "./apps/desktop/schemas/settings.schema.json"
 	},
 	"editor.codeActionsOnSave": {
 		"source.organizeImports.biome": "explicit",

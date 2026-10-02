@@ -1,0 +1,493 @@
+# 12. Repository settings — `.ensemblr/settings.toml`
+
+`.ensemblr/settings.toml` at the root of a repository is the sole committed
+Ensemblr-owned file for per-repository settings. It is TOML, it is checked in,
+and it is reviewed like code — everyone who clones the repository gets the same
+setup script, the same run scripts, the same branch defaults.
+
+It is not the only config-adjacent file Ensemblr reads: `.worktreeinclude`
+supplies files-to-copy patterns, and the Infisical CLI's `.infisical.json` can
+supply a read-only secret-project fallback. Config files from other workspace
+managers are otherwise ignored. Background:
+[ADR 0030](../adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md).
+
+Because every workspace is a git worktree, the file is read from the **active
+workspace's worktree**, not the primary clone. A branch that edits
+`.ensemblr/settings.toml` changes behaviour for the workspace on that branch and
+nowhere else.
+
+---
+
+## Layering: the file versus your personal settings
+
+Repository settings resolve per key. Highest wins:
+
+| Precedence | Source | Notes |
+| --- | --- | --- |
+| 1 | `.worktreeinclude` | Files-to-copy patterns only |
+| 2 | **`.ensemblr/settings.toml`** | The committed file — this page |
+| 3 | Personal settings | Rows you edit in the Repo settings panes, stored locally |
+| 4 | User defaults | Your `~/.config/ensemblr/config.json` |
+| 5 | Built-in defaults | What ships with Ensemblr |
+
+**The committed file outranks your personal settings.** When both define the
+same key, the committed value wins and your personal edit is stored but
+shadowed — several Repo settings panes say so inline. Keys the file omits fall
+through to your personal rows, then your user defaults, then the built-in
+default. See [11. App settings](./11-app-settings.md) for the user-scope side.
+
+`.worktreeinclude` is a separate, generic files-to-copy list, kept for
+compatibility with tooling that already uses it. When present, its patterns win
+over `file_include_globs` below.
+
+---
+
+## Editing it in an editor
+
+Ensemblr publishes a JSON Schema for this file. TOML has no schema language of
+its own, but [Taplo](https://taplo.tamasfe.dev/) — the engine behind the Even
+Better TOML extension — validates TOML against JSON Schema, so a directive on
+the first line buys you completion for every key, block, and icon name:
+
+```toml
+#:schema https://www.ensemblr.dev/schemas/settings.schema.json
+```
+
+A save from the Scripts pane drops every comment in the file, but this one
+directive is read back and restored, so wiring a repository up survives an edit
+from the app. That URL is the schema's canonical id and the site serves it; the
+copy it is cut from is committed at
+[`schemas/settings.schema.json`](../../schemas/settings.schema.json), and
+[`schemas/README.md`](../../schemas/README.md) covers both config files.
+
+Ensemblr's own `.ensemblr/settings.toml` points at the checked-in copy with a
+relative path (`#:schema ../schemas/settings.schema.json`), which validates
+offline and always against the tree it ships with.
+
+---
+
+## Diagnostics
+
+Ensemblr never silently drops a config file over one bad key. A key it does not
+recognise, or a value of the wrong type, becomes a **warning diagnostic** naming
+the exact path (`$.git.branch_prefix`, `$.scripts.run.dev.icon`) and is skipped;
+everything else in the file still loads.
+
+The same holds inside a single run script: a mistyped `icon`, `default`, or
+`available_in` costs you that field only, and the script still launches with the
+default for it. **Only a missing or empty `command` drops an entry.**
+
+One exception runs the other way: a file that does not *parse* at all is never
+overwritten by the Scripts pane. The write fails, surfaces an error, and leaves
+your file byte-for-byte intact.
+
+---
+
+## Top-level keys
+
+| Key | Type | What it does |
+| --- | --- | --- |
+| `file_include_globs` | array of strings | Gitignore-style patterns for files copied into every new workspace. Defaults to `[".env*"]`. |
+| `environment_variables` | table | Accepted and validated; see below. |
+| `claude_executable_path` | string | Accepted and validated; see below. |
+| `codex_executable_path` | string | Accepted and validated; see below. |
+| `gemini_executable_path` | string | Accepted and validated; see below. |
+| `opencode_executable_path` | string | Accepted and validated; see below. Also accepted as `open_code_executable_path`. |
+| `amp_executable_path` | string | Accepted and validated; see below. |
+| `copilot_executable_path` | string | Accepted and validated; see below. |
+| `pi_executable_path` | string | Accepted and validated; see below. |
+| `enterprise_data_privacy` | boolean | Accepted and validated; see below. |
+| `spotlight_testing` | table | Accepted and validated; see below. |
+
+Blocks — `[git]`, `[infisical]`, `[scripts]`, `[scripts.run.<name>]`,
+`[prompts]` — are documented in their own sections below.
+
+### Keys that are accepted but do nothing
+
+Some keys parse and type-check without changing any behaviour. Ensemblr accepts
+them so a file carrying one still loads cleanly, but **nothing reads the value**:
+
+| Key | Type it must be | Status |
+| --- | --- | --- |
+| `enterprise_data_privacy` | boolean | Accepted, validated, inert |
+| `spotlight_testing` | table | Accepted, validated, inert |
+| `environment_variables` | table | Accepted, validated, inert |
+| `claude_executable_path` | string | Accepted, validated, inert |
+| `codex_executable_path` | string | Accepted, validated, inert |
+| `gemini_executable_path` | string | Accepted, validated, inert |
+| `opencode_executable_path` / `open_code_executable_path` | string | Accepted, validated, inert |
+| `amp_executable_path` | string | Accepted, validated, inert |
+| `copilot_executable_path` | string | Accepted, validated, inert |
+| `pi_executable_path` | string | Accepted, validated, inert |
+
+If you find one of these in a real repository, it is not doing what its name
+suggests. A wrong type still produces a diagnostic, so the file will tell you
+you got the type wrong for a key that has no effect either way.
+
+`environment_variables` is the one most likely to mislead, because it fails
+silently in both directions: the key normalises into the repository scope and
+stops there. The environment a terminal or a script launches with is assembled
+from env files, Infisical, the plain values in Ensemblr's own database, and the
+platform secret store — never from a repository's committed settings. A team
+that commits `environment_variables` for the whole repo gets a file that
+validates, a settings screen that raises no diagnostic, and terminals that
+launch without any of it.
+
+To actually set a variable, use **Settings → Environment** or an env file — see
+[11. App settings](./11-app-settings.md). To pin the executable a runtime uses,
+use **Settings → Providers**. Both apply app-wide, not per repository.
+
+---
+
+## `[infisical]`
+
+Which Infisical project this repository's secrets come from. Written by
+**Settings → Repo → Secrets**, and committed on purpose: a teammate who clones
+the repository is already pointed at the right secrets and only has to add a
+Machine Identity of their own.
+
+**No credential is ever written here.** The identity — instance URL, client id,
+client secret — is per-machine state, kept in SQLite with its secret in the OS
+secret store: the macOS Keychain, or `safeStorage` ciphertext on Linux.
+
+| Key | Type | What it does |
+| --- | --- | --- |
+| `project_id` | string | The Infisical project id. Required — the block is ignored without it. |
+| `environment` | string | The environment slug to read, e.g. `dev`. Required. |
+| `path` | string | Secret path within the environment. Defaults to `/`. |
+| `recursive` | boolean | Also read folders nested under `path`. Defaults to `false`. |
+| `site_url` | string | Instance URL, for self-hosted or EU-cloud deployments. |
+| `project_name` | string | The project's display name, kept so the pane can name it before a fetch. |
+
+```toml
+[infisical]
+project_id = "8f1c0c74-1f7c-4c0a-9e2d-0b1a2c3d4e5f"
+environment = "dev"
+path = "/"
+recursive = false
+site_url = "https://app.infisical.com"
+project_name = "ensemblr"
+```
+
+Values resolve live at every launch, so a rotated secret takes effect on the
+next terminal, script, or agent you start. Keys the app does not model survive a
+rewrite untouched.
+
+A repository with no `[infisical]` block is not necessarily unlinked: Ensemblr
+falls back to the `.infisical.json` the Infisical CLI writes, reading it but
+never writing to it. The rest of the integration — accounts, that resolution
+order, what happens when Infisical is unreachable — is in
+[10. Integrations](./10-integrations.md).
+
+---
+
+## `[git]`
+
+Per-repository git defaults. Each one overrides the matching user-scope Git
+setting for this repository.
+
+| Key | Type | What it does |
+| --- | --- | --- |
+| `branch_from` | string | The branch new workspaces fork from. |
+| `branch_prefix` | string | Prefix for new workspace branch names. |
+| `remote_origin` | string | The remote Ensemblr treats as origin. |
+| `delete_local_branch_on_archive` | boolean | Delete the local branch when a workspace is archived. The remote branch is untouched. |
+| `archive_after_merge` | boolean | Archive a workspace automatically once its pull request merges. |
+| `set_upstream_on_push` | boolean | Configure new workspaces so a plain `git push` sets the branch upstream. |
+
+**Historical spelling.** `branchPrefix` in camelCase is still accepted as an
+alias for `branch_prefix`, so configs written before the snake_case convention
+keep resolving. It is the only camelCase `[git]` key accepted — the other five
+must be snake_case.
+
+```toml
+[git]
+branch_from = "develop"
+branch_prefix = "feat/"
+delete_local_branch_on_archive = true
+archive_after_merge = true
+set_upstream_on_push = true
+```
+
+Branch and workspace mechanics: [5. Workspaces](./05-workspaces.md).
+
+---
+
+## `[scripts]`
+
+| Key | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `setup` | string | unset | Runs when a new workspace is created. |
+| `archive` | string | unset | Runs before a workspace is archived. |
+| `run` | string *or* table | unset | Either the legacy single run command, or the `[scripts.run.<name>]` tables below. |
+| `run_mode` | string | `concurrent` | Whether run scripts may run in parallel across workspaces. |
+| `auto_run_after_setup` | boolean | `false` | Start the default run script automatically once setup exits 0. |
+
+`run_mode` takes exactly two values, with no hyphen:
+
+| Value | Behaviour |
+| --- | --- |
+| `concurrent` | Run scripts may run in several workspaces at once. |
+| `nonconcurrent` | Only one run script runs at a time. |
+
+**An unrecognised value falls back to `concurrent`** rather than failing. A
+non-string value produces a diagnostic and also leaves the default in place.
+
+```toml
+[scripts]
+setup = "bun ci"
+archive = "rm -rf node_modules"
+run_mode = "nonconcurrent"
+auto_run_after_setup = true
+```
+
+The Scripts pane in Repo settings reads and writes this block — see
+[Editing from the app](#editing-from-the-app) below.
+
+---
+
+## `[scripts.run.<name>]`
+
+Each table declares one named run script. The table name is the script's name;
+`dev-server` renders in the UI as `Dev server`.
+
+| Key | Type | Required | Default | What it does |
+| --- | --- | --- | --- | --- |
+| `command` | string | **Yes** | — | The shell command to run. |
+| `icon` | string | No | `play` | One of the curated icon names below. |
+| `default` | boolean | No | `false` | Marks this script as the one `⌘R` and the Run button start. |
+| `available_in` | array of strings | No | unset | Environments the script is offered in. |
+
+**`command` is the one field a script cannot do without.** An entry with no
+`command`, or an empty one, is dropped entirely and reported as a diagnostic.
+Every other field degrades: a bad `icon` falls back to `play`, a bad `default`
+is treated as `false`, a bad `available_in` is treated as undeclared. One bad
+field never hides an otherwise launchable script.
+
+**`default` is exclusive.** At most one script keeps it. If a second table also
+sets `default = true`, that second one is rejected with a diagnostic and loaded
+with `default = false` — the first declared default wins. When no script sets
+it, the first declared script is used.
+
+**Duplicate names are first-wins.** A second table with a name already taken is
+dropped with a diagnostic.
+
+**`available_in` filters, it does not fail.** The key also names cloud
+sandboxes; Ensemblr is local-only, so the only value it launches is `local`. A
+script that omits `available_in` is available. A script that declares it without
+`local` is filtered out of the Run menu — it is marked `Not available locally`
+in the Scripts pane rather than offered and failed at launch.
+
+### Icon names
+
+There are **57** curated icon names. The list is closed so that a committed
+config can never reference an icon that fails to render. Anything outside it
+falls back to the default, **`play`**.
+
+```text
+activity          badge-check       blocks            book-open
+box               bug               calculator        cloud
+code              cog               component         container
+cpu               database          download          eye
+file-code         flame             flask-conical     folder
+gauge             git-branch        git-merge         git-pull-request
+globe             hammer            hard-drive        key
+layers            layout-dashboard  list-checks       lock
+microscope        monitor           network           package
+paintbrush        palette           play              plug
+refresh-cw        repeat            rocket            search
+send              server            settings          shield-check
+smartphone        sparkles          terminal          test-tube
+timer             trending-up       upload            wrench
+zap
+```
+
+### The legacy `run = "…"` form
+
+Before named run scripts, a repository declared one command:
+
+```toml
+[scripts]
+run = "bun run dev"
+```
+
+That form still works. It is upgraded into a single implicit script:
+
+| Field | Value it gets |
+| --- | --- |
+| Name | `run` |
+| `command` | The string you wrote |
+| `icon` | `play` |
+| `default` | `true` |
+| `available_in` | unset (available everywhere) |
+
+The upgrade applies **only when no `[scripts.run.<name>]` tables exist**. If the
+file has both, the named tables win and the legacy string is ignored.
+
+Run scripts in use: [7. Terminals and run scripts](./07-terminals-and-run-scripts.md).
+
+---
+
+## `[prompts]`
+
+Team-shared custom instructions attached to the workspace action buttons. Each
+value is a string. A personal preference typed into the Repo → Actions pane wins
+over the committed text for you only; clearing yours falls back to the shared
+text.
+
+| Canonical key | Accepted aliases | Applies to |
+| --- | --- | --- |
+| `code_review` | `review`, `codeReview` | The **Review** button |
+| `create_pr` | `createPr` | The **Create PR** button |
+| `fix_errors` | `fix_check_errors`, `fixCheckErrors`, `fixErrors` | The **Fix errors** button |
+| `resolve_conflicts` | `resolveConflicts` | The **Resolve conflicts** button |
+| `branch_rename` | `branch_naming`, `branchNaming`, `branchRename` | Branch-name generation |
+| `general` | — | A master prompt prepended to the first message of every new chat in the repository |
+
+Prefer the canonical snake_case spelling. The aliases exist so files written
+before the convention settled keep resolving; they are not deprecated warnings,
+they simply resolve to the same setting.
+
+```toml
+[prompts]
+code_review = "Check migrations against the schema in docs/ before approving."
+create_pr = "Always include a test plan section."
+general = "This repo targets Node 24. Never suggest a Node 22 API."
+```
+
+The action buttons themselves: [8. Reviewing changes](./08-reviewing-changes.md).
+
+---
+
+## A worked example
+
+This shortened example is drawn from Ensemblr's committed
+[`.ensemblr/settings.toml`](../../../../.ensemblr/settings.toml). See that file for the
+full run-script list, including the demo host and Linux build/diagnostic scripts.
+
+```toml
+#:schema ../schemas/settings.schema.json
+
+# Node 24 is pinned by scripts/require-node-version.mjs, so every command goes
+# through the wrapper. Ensemblr does inject the workspace directory's login-shell
+# PATH, and that capture activates mise — but a startup file that prepends
+# Homebrew after activating mise leaves Homebrew's Node ahead of Node 24, so
+# on PATH is not the same as first on PATH. See scripts/with-pinned-node.sh.
+# Never add PATH to [environment_variables]: the resolver is gated on the key
+# being absent, so configuring one silently disables it.
+[scripts]
+setup = "./scripts/with-pinned-node.sh bun ci"
+
+# Electron dev server.
+[scripts.run.dev]
+command = "./scripts/with-pinned-node.sh bun run dev"
+icon = "play"
+default = true
+available_in = ["local"]
+
+[scripts.run.checks]
+command = "./scripts/with-pinned-node.sh bun run check && ./scripts/with-pinned-node.sh bun run typecheck"
+icon = "list-checks"
+available_in = ["local"]
+
+[scripts.run.test]
+command = "./scripts/with-pinned-node.sh bun run test"
+icon = "test-tube"
+available_in = ["local"]
+
+[scripts.run.playground]
+command = "./scripts/with-pinned-node.sh bun run dev:playground"
+icon = "play"
+available_in = ["local"]
+
+# macOS artifact. `make:unsigned` builds for the host architecture and `open`
+# is macOS-only, so this one does nothing useful on a Linux host — build
+# `appimage` there.
+[scripts.run.unsigned]
+command = "./scripts/with-pinned-node.sh bun run make:unsigned && open out"
+icon = "package"
+available_in = ["local"]
+```
+
+Reading it line by line:
+
+- **`[scripts] setup`** — every new workspace runs `bun ci` on creation,
+  through the Node-pinning wrapper. It is a frozen install from `bun.lock`, and
+  because Bun keeps a global package cache and clones from it, a fresh
+  worktree's `node_modules` costs seconds rather than a full extraction. No
+  `archive` script, so nothing runs on the way out.
+- **No `run_mode`**, so it falls back to `concurrent`: several workspaces can run
+  their dev server at the same time, each on its own `ENSEMBLR_PORT`.
+- **No `auto_run_after_setup`**, so it falls back to `false`: after `bun ci`
+  finishes, nothing starts on its own.
+- **The named run scripts shown here** appear in declaration order in the Run
+  menu: Dev, Checks, Test, Playground, Unsigned. The full file adds more entries.
+- **`[scripts.run.dev]` carries `default = true`** — it is what `⌘R` and the
+  Run button start. No other table sets `default`, so there is no conflict to
+  resolve.
+- **The `unsigned` script carries a comment** that is worth keeping in a real
+  file: `make:unsigned` builds for the host architecture, and `open` exists only
+  on macOS.
+- **Icons** are drawn from the curated set: `play` for the two servers,
+  `list-checks` for the lint/typecheck pair, `test-tube` for the suite, and
+  `package` for the build.
+- **Every script declares `available_in = ["local"]`** — explicit rather than
+  omitted. Same effect here, since `local` is the only environment Ensemblr
+  launches, but it documents intent.
+- **The comment above `[scripts]`** explains why every command is wrapped in a
+  Node-pinning script. Ensemblr captures a **login shell's** `PATH` for the
+  workspace directory — which activates mise — and injects it into setup
+  scripts, run scripts, and terminals. But mise's Node being *on* that `PATH` is
+  not it being *first*: a shell startup file that prepends Homebrew after
+  `mise activate` leaves Homebrew's Node in front, and the install's preinstall
+  guard then refuses it. The wrapper puts the pinned Node first and is a no-op
+  when it already is. The capture itself runs only when
+  `[environment_variables]` does *not* define `PATH`: the presence of the key,
+  even set to an empty string, switches it off. So never set `PATH` there. The
+  comment does not survive a save from the Scripts pane; the leading `#:schema`
+  directive does.
+- **No `[git]`, `[prompts]`, `environment_variables`, or
+  `file_include_globs`** — those all fall through to personal settings, then to
+  user defaults. `file_include_globs` therefore resolves to its built-in
+  `[".env*"]`.
+
+---
+
+## Editing from the app
+
+**Repo settings → Scripts** reads and writes this file directly. It is the sole
+store for script settings — there is no shadow copy elsewhere.
+
+What that means in practice:
+
+- Saving on the Scripts pane rewrites `.ensemblr/settings.toml`. Every other
+  section survives by value; the write is atomic (temp file plus rename).
+- **Comments and blank-line grouping are lost** on a save. The rewrite emits
+  scalars ahead of sub-tables and no comments at all. If your file's comments
+  matter, edit it by hand instead. The one exception is a leading `#:schema`
+  directive, which is read back and restored above the rewritten document.
+- A file that does not parse is never overwritten. The save fails with an error
+  and your file is untouched.
+- **The write targets a live workspace you name, never the repository root
+  clone.** The pane shows which workspace receives it and lets you change it,
+  and it reads that same workspace, so what is on screen is what that workspace
+  runs. Commit the file on that branch and merge it to share the change. A
+  repository with no live workspace cannot edit its scripts here.
+
+Shared settings an older Ensemblr wrote into the repository's root clone are
+still recoverable: the **Settings file** pane previews a merge of them into a
+workspace, publishes it onto that workspace's branch, and — as a separate
+confirmed step — restores the root clone's copy to its committed state. A
+snapshot is kept before each step, so either side can be put back.
+
+Every other Repo settings pane — Environment, Git, Actions, Security, Misc —
+writes personal rows that never touch this file. Background:
+[ADR 0041](../adr/0041-write-repository-scripts-to-ensemblr-settings-toml.md)
+and
+[ADR 0070](../adr/0070-publish-shared-repository-settings-onto-a-workspace-branch.md).
+
+---
+
+← [11. App settings](./11-app-settings.md) ·
+[Guide index](./README.md) ·
+[13. Keyboard shortcuts](./13-keyboard-shortcuts.md) →

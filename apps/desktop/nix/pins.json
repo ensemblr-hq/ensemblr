@@ -1,0 +1,14 @@
+{
+	"release": {
+		"version": "0.2.2",
+		"asset": "Ensemblr-0.2.2-x64.AppImage",
+		"hash": "sha256-rcIMbU6rLNQiO/bnBMK4Zej7w8fXcw12h9ycBfKtFUE="
+	},
+	"bun": {
+		"version": "1.4.2",
+		"hash": "sha256-xngEDxT+BEDrg503y9DOTAUaMtpygGrJfeamqra/co8="
+	},
+	"deps": {
+		"x86_64-linux": "sha256-8Jcl3kzWSfgB6Dq8IObScPbZVRWa7hcBvwhPGiojjnk="
+	}
+}

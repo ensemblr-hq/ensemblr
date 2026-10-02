@@ -1,0 +1,16 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+	"root": false,
+	"extends": "//",
+	"files": {
+		"includes": [
+			"**",
+			"!.demo",
+			"!src/components/ui",
+			"!src/hooks/ui",
+			"!src/renderer/fixtures/pi-captures",
+			"!tests/fixtures/architecture",
+			"!src/renderer/routing/routeTree.gen.ts"
+		]
+	}
+}

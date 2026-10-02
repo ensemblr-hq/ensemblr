@@ -9,10 +9,10 @@ Closes #
 - [ ] The change was discussed in an issue first
 - [ ] `bun run check` passes
 - [ ] `bun run typecheck` passes
-- [ ] `bun run test` passes, plus any `electron --test` suite this change touches
-- [ ] New user-facing strings have `ru` and `el` filled (`bun run i18n:status`)
-- [ ] A new migration id is registered in `tests/main/database.test.ts`
-- [ ] A contract or cross-cutting decision has an ADR under `docs/adr/`
+- [ ] `bun run test` passes, plus any `electron --test` suite this change touches (`bun run --cwd apps/desktop test:<suite>`)
+- [ ] New user-facing strings have `ru` and `el` filled (`bun run --cwd apps/desktop i18n:status`)
+- [ ] A new migration id is registered in `apps/desktop/tests/main/database.test.ts`
+- [ ] A contract or cross-cutting decision has an ADR under `apps/desktop/docs/adr/`
 - [ ] Screenshots for UI changes
 
 ## Notes for the reviewer

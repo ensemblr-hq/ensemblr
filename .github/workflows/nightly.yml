@@ -63,7 +63,7 @@ jobs:
           #
           # `g` prefix: an all-digit short sha with a leading zero is an invalid
           # semver prerelease identifier, which git describe solves the same way.
-          base=$(node -p "require('./package.json').version.split('-')[0]")
+          base=$(node -p "require('./apps/desktop/package.json').version.split('-')[0]")
           echo "version=$base-nightly.$(date -u +%Y%m%d).g$short_sha" >> "$GITHUB_OUTPUT"
           echo "sha=$head_sha" >> "$GITHUB_OUTPUT"
           echo "short_sha=$short_sha" >> "$GITHUB_OUTPUT"
@@ -142,6 +142,7 @@ jobs:
       - uses: ./.github/actions/install-dependencies
 
       - name: Stamp the nightly version
+        working-directory: apps/desktop
         run: bun pm pkg set version="$NIGHTLY_VERSION"
 
       - uses: ./.github/actions/apple-signing
@@ -158,12 +159,14 @@ jobs:
       # registration. Notarized rather than merely signed — Gatekeeper blocks an
       # un-notarized build on every machine except the one that made it.
       - name: Build the signed, notarized canary
+        working-directory: apps/desktop
         env:
           ENSEMBLR_BUILD_CHANNEL: canary
           ENSEMBLR_REQUIRE_SIGN: "1"
         run: bun run make --arch="$ARCH"
 
       - name: Verify every artifact is signed, notarized and stapled
+        working-directory: apps/desktop
         env:
           ENSEMBLR_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
         run: bun run verify:signing --arch="$ARCH"
@@ -180,7 +183,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/nightly"
-          find out/make -type f \( -name '*.dmg' -o -name '*.zip' \) > "$RUNNER_TEMP/built.txt"
+          find apps/desktop/out/make -type f \( -name '*.dmg' -o -name '*.zip' \) > "$RUNNER_TEMP/built.txt"
           cp "$(bash .github/scripts/select-asset.sh "$RUNNER_TEMP/built.txt" "-${ARCH}\.dmg\$")" "$RUNNER_TEMP/nightly/$DMG_NAME"
           cp "$(bash .github/scripts/select-asset.sh "$RUNNER_TEMP/built.txt" "/[^/]*-darwin-${ARCH}-[^/]*\.zip\$")" "$RUNNER_TEMP/nightly/$ZIP_NAME"
 
@@ -293,9 +296,11 @@ jobs:
       - uses: ./.github/actions/install-dependencies
 
       - name: Stamp the nightly version
+        working-directory: apps/desktop
         run: bun pm pkg set version="$NIGHTLY_VERSION"
 
       - name: Build the canary AppImage
+        working-directory: apps/desktop
         env:
           ENSEMBLR_BUILD_CHANNEL: canary
           ENSEMBLR_TARGET_ARCH: ${{ matrix.arch }}
@@ -306,7 +311,7 @@ jobs:
       - name: Check the AppImage was produced
         run: |
           set -euo pipefail
-          find out/make -type f -name '*.AppImage' > "$RUNNER_TEMP/built.txt"
+          find apps/desktop/out/make -type f -name '*.AppImage' > "$RUNNER_TEMP/built.txt"
           built=$(bash .github/scripts/select-asset.sh "$RUNNER_TEMP/built.txt" "-${ARCH}\.AppImage\$")
           cp "$built" "$RUNNER_TEMP/$APPIMAGE_NAME"
 

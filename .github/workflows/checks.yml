@@ -42,8 +42,9 @@ jobs:
       - name: Biome, Tailwind scale, i18n lint, hardcoded strings
         run: bun run check
 
-  # `bun run typecheck` runs the four tsconfig projects concurrently
-  # (scripts/typecheck.mjs). They each `include` `src`, so chaining them with
+  # `bun run typecheck` fans out to every workspace; the desktop app's runs its
+  # four tsconfig projects concurrently (apps/desktop/scripts/typecheck.mjs).
+  # They each `include` `src`, so chaining them with
   # `&&` type-checked the bulk of the program four times in a row.
   typecheck:
     runs-on: ubuntu-latest
@@ -82,7 +83,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/install-dependencies
+      # Sharding is a Vitest flag, so this runs the desktop app's suite directly
+      # rather than the root fan-out, which would hand it to every workspace.
       - name: Vitest (shard ${{ matrix.shard }} of 3)
+        working-directory: apps/desktop
         run: bun run test --shard=${{ matrix.shard }}/3
 
   scan:
@@ -116,11 +120,14 @@ jobs:
       # advisory and unscoped. Check action.yml before editing.
       - uses: millionco/react-doctor@013f7373f91a3b9e68bd1dc7d4d354f4b041b117 # v2
         with:
+          # The desktop app is the React project, and its doctor.config.jsonc
+          # lives beside it rather than at the repository root.
+          directory: apps/desktop
           scope: changed
           blocking: error
 
   # The flake's `master` output installs node_modules through one fixed-output
-  # derivation whose hash is pinned in nix/pins.json, and every bun.lock change
+  # derivation whose hash is pinned in apps/desktop/nix/pins.json, and every bun.lock change
   # moves it. Building it here keeps a lockfile change from reaching master
   # without its pin, which would break `nix run …#master` until someone re-pinned.
   # The job runs on every PR so `verify` always sees a result, but only fetches
@@ -139,14 +146,14 @@ jobs:
         id: changes
         if: github.event_name == 'pull_request'
         run: |
-          if ! git diff --quiet HEAD^1 HEAD -- bun.lock bunfig.toml flake.nix flake.lock nix; then
+          if ! git diff --quiet HEAD^1 HEAD -- bun.lock bunfig.toml flake.nix flake.lock apps/desktop/nix; then
             echo "deps=true" >>"$GITHUB_OUTPUT"
           fi
 
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
         if: steps.changes.outputs.deps == 'true'
 
-      - name: Build master.deps against nix/pins.json
+      - name: Build master.deps against apps/desktop/nix/pins.json
         if: steps.changes.outputs.deps == 'true'
         run: |
           if nix build .#master.deps --no-link 2>build.log; then
@@ -155,11 +162,11 @@ jobs:
           cat build.log >&2
           got=$(sed -nE 's/.*got: +(sha256-[A-Za-z0-9+/]+=*).*/\1/p' build.log | tail -n1)
           if [ -n "$got" ]; then
-            echo "::error file=nix/pins.json::The Nix deps pin is stale. Run nix/update-pins.sh deps on this branch, or set deps.x86_64-linux to $got."
+            echo "::error file=apps/desktop/nix/pins.json::The Nix deps pin is stale. Run apps/desktop/nix/update-pins.sh deps on this branch, or set deps.x86_64-linux to $got."
             cat >>"$GITHUB_STEP_SUMMARY" <<EOF
           ### The Nix deps pin is stale
 
-          Run \`nix/update-pins.sh deps\` on this branch, or set \`deps.x86_64-linux\` in \`nix/pins.json\` to:
+          Run \`apps/desktop/nix/update-pins.sh deps\` on this branch, or set \`deps.x86_64-linux\` in \`apps/desktop/nix/pins.json\` to:
 
           \`$got\`
           EOF

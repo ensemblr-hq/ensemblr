@@ -31,7 +31,7 @@ body:
     id: version
     attributes:
       label: Ensemblr version
-      description: Ensemblr → About, or the version in `package.json` if you built from source.
+      description: Ensemblr → About, or the version in `apps/desktop/package.json` if you built from source.
     validations:
       required: true
 

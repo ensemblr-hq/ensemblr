@@ -16,15 +16,20 @@ and no DCO sign-off.
 
 ## Getting set up
 
-[`docs/onboarding.md`](./docs/onboarding.md) is the runbook: prerequisites, install, run, first change,
-first PR, and which test runner a new test belongs to. [`docs/architecture-map.md`](./docs/architecture-map.md)
+[`apps/desktop/docs/onboarding.md`](./apps/desktop/docs/onboarding.md) is the runbook: prerequisites, install, run, first change,
+first PR, and which test runner a new test belongs to. [`apps/desktop/docs/architecture-map.md`](./apps/desktop/docs/architecture-map.md)
 is the directory-level index of which subtree owns which concern.
 
 The short version: macOS (Apple silicon or Intel) or Linux on x86-64, Node **exactly 24.x**, Bun 1.4 (Node stays the runtime; `mise install` sets up both).
 
+This is a Bun workspaces monorepo. The desktop app lives in [`apps/desktop/`](./apps/desktop); `apps/website/` and
+`packages/shared/` are reserved for the site and for code the two share. Install once from the root, then work
+inside the app's directory:
+
 ```bash
-bun install          # postinstall fixes node-pty native-module permissions
-bun run dev          # the app
+bun install              # installs every workspace; the desktop postinstall links Forge's packages and fixes node-pty permissions
+cd apps/desktop
+bun run dev              # the app
 bun run dev:playground   # the component preview harness, Vite only
 ```
 
@@ -42,15 +47,18 @@ Pushing again to a PR cancels the run it superseded, so a fixup does not queue b
 read.
 
 ```bash
-bun run check       # Biome + Tailwind class check + i18n lint + hardcoded-string scan
-bun run typecheck   # all four tsconfig projects, concurrently (scripts/typecheck.mjs)
+# From the repository root — each one runs every workspace's script of the same name
+bun run check       # lockfile check + Biome, then the desktop app's Tailwind class check, i18n lint, hardcoded-string scan
+bun run typecheck   # the desktop app's four tsconfig projects, concurrently (apps/desktop/scripts/typecheck.mjs)
 bun run test        # Vitest: renderer, shared, and pure-logic main suites
+
+# From apps/desktop
 bun run doctor      # react-doctor diagnostics
 ```
 
 The `electron --test` suites (`bun run test:db`, `test:workspace`, `test:github`, `test:linear`,
 `test:agent-runtime`, …) need the Electron runtime and are not part of `bun run test` — so they are the one
-set CI does not run either. Run the ones your change touches. `package.json` has the full list.
+set CI does not run either. Run them from `apps/desktop`. Run the ones your change touches. `apps/desktop/package.json` has the full list.
 
 ## House rules
 
@@ -63,23 +71,23 @@ files are normative and this section is a pointer, not a second copy.
 - **Tailwind scale**, not px-based arbitrary utilities — `w-[13px]` fails `bun run check`.
 - **JSDoc on every function**, and no comments inside function bodies. See
   [`.claude/rules/jsdoc.md`](./.claude/rules/jsdoc.md) and [`.claude/rules/comments.md`](./.claude/rules/comments.md).
-- **Each `src/*` subtree has its own scoped `AGENTS.md`**, and it overrides the root file. `src/main` is
-  organized concern-first and `src/renderer` type-first — deliberately opposite axes. Do not copy one
+- **Each `apps/desktop/src/*` subtree has its own scoped `AGENTS.md`**, and it overrides the root file. `apps/desktop/src/main` is
+  organized concern-first and `apps/desktop/src/renderer` type-first — deliberately opposite axes. Do not copy one
   layout into the other.
 - **A decision that changes a contract or cuts across the codebase gets an ADR** under
-  [`docs/adr/`](./docs/adr). Follow the format of the existing records.
+  [`apps/desktop/docs/adr/`](./apps/desktop/docs/adr). Follow the format of the existing records.
 - **Conventional Commits**: `<type>: <description>`, with types `feat`, `fix`, `refactor`, `docs`, `test`,
   `chore`, `perf`, `ci`.
 
 ### Two rules that are easy to miss
 
 - **A new user-facing string ships translated.** Add the `t('ns:key', 'Default English')` call site, run
-  `bun run i18n:extract`, then hand-fill the new empty values in `src/renderer/lib/i18n/locales/ru/**`
-  **and** `src/renderer/lib/i18n/locales/el/**`. `locales/en/**` is generated — never hand-edit it. Check
+  `bun run i18n:extract`, then hand-fill the new empty values in `apps/desktop/src/renderer/lib/i18n/locales/ru/**`
+  **and** `apps/desktop/src/renderer/lib/i18n/locales/el/**`. `locales/en/**` is generated — never hand-edit it. Check
   with `bun run i18n:status`. The full contract is [`.claude/rules/i18n.md`](./.claude/rules/i18n.md).
 - **A new database migration registers its id in the test.** Migrations in
-  `src/main/storage/database.ts` are numbered and append-only, and every id is asserted in
-  `tests/main/database.test.ts`. Add to both in the same change, and never edit an existing migration.
+  `apps/desktop/src/main/storage/database.ts` are numbered and append-only, and every id is asserted in
+  `apps/desktop/tests/main/database.test.ts`. Add to both in the same change, and never edit an existing migration.
 
 ## Project structure
 
@@ -114,13 +122,13 @@ scripts/        Build and maintenance scripts
 
 ## Adding something new
 
-[`docs/onboarding.md`](./docs/onboarding.md) §9 has the quick-reference table: which files a new IPC call,
+[`apps/desktop/docs/onboarding.md`](./apps/desktop/docs/onboarding.md) §9 has the quick-reference table: which files a new IPC call,
 route, durable state slice, migration, menu item, agent runtime, control op, or user-facing string has to
 touch. Read it before adding one of those — several of them have a registration step that fails silently
 if you skip it.
 
 ## Generated files
 
-Never hand-edit `src/renderer/routing/routeTree.gen.ts` (the TanStack Router plugin regenerates it),
+Never hand-edit `apps/desktop/src/renderer/routing/routeTree.gen.ts` (the TanStack Router plugin regenerates it),
 `bun.lock` (Bun writes it; its `lockfileVersion` stays at 1), or
-`src/renderer/lib/i18n/locales/en/**`.
+`apps/desktop/src/renderer/lib/i18n/locales/en/**`.

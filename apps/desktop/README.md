@@ -1,0 +1,491 @@
+<p align="center">
+  <img alt="Ensemblr" src="./assets/wordmark.gif" width="588">
+</p>
+
+# Ensemblr™
+
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/ensemblr-hq/ensemblr?utm_source=oss&utm_medium=github&utm_campaign=ensemblr-hq%2Fensemblr&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
+**A desktop orchestrator for multi-agent coding work, driving the Pi CLI or the Claude Code CLI — whichever
+you already run.**
+
+The agent inside a workspace can drive the app itself: spawn sub-agents into their own chat tabs, delegate
+a unit of work to each, block until they finish, read their reports, and integrate the results. That
+permission-gated surface is **Ensemblr Control**. Each workspace gets its own git worktree, branch, and
+review path. Agents inside it share that checkout, so the orchestrator splits file ownership and integrates
+the results; separate workspaces keep independent streams of work apart.
+
+**One agent sits above all of it.** The [**Concierge**](#the-concierge--one-agent-above-every-workspace)
+belongs to no workspace: it reads across every project you have open, remembers what it learns between
+conversations, and never edits your project files — real change is delegated to an orchestrator it spawns into
+the workspace that needs it.
+
+**macOS (Apple silicon or Intel), or Linux on x86-64. Bring your own agent CLI — Pi or Claude Code, one is enough.
+`git` and an authenticated `gh` are required.**
+
+No Ensemblr account, no sign-in, no cloud sync, no telemetry. State is a local SQLite database. Secrets
+use the macOS Keychain or Electron `safeStorage` backed by gnome-keyring / KWallet on Linux, where only
+encrypted ciphertext is stored in SQLite. GitHub tokens stay with `gh` and are never copied anywhere, and
+the app ships no agent binary of its own — it drives the one you installed.
+
+![The Ensemblr workbench: an orchestrator's timeline in the middle with two delegates beside it in the tab strip, the five-file diff the turn produced in the Changes panel, and the dev server it started still streaming in the dock.](./docs/guide/images/00-hero-orchestrator.png)
+
+*Ensemblr Control driving the app from inside a workspace: the agent moved the workspace to In progress, started a run script, delegated to two sub-agents in their own chat tabs, and launched a Claude Code harness in a terminal — all of it visible on one screen.*
+
+- **Version:** [`0.2.2`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.2.2) (stable)
+- **License:** Apache-2.0
+
+| Platform | Artifact | Install |
+| --- | --- | --- |
+| macOS, Apple silicon | `.dmg` (signed, notarized, stapled) | `brew install --cask ensemblr-hq/tap/ensemblr` |
+| macOS, Intel | `.dmg` (signed, notarized, stapled) | `brew install --cask ensemblr-hq/tap/ensemblr` |
+| Linux, x86-64 | `.AppImage` | `curl -fsSL https://www.ensemblr.dev/install.sh \| sh` |
+| Linux, x86-64 (Nix) | flake | `nix run github:ensemblr-hq/ensemblr` (`#master` builds from source) |
+
+Each Mac architecture gets its own `.dmg` rather than one universal binary; the Intel build first shipped
+in `0.1.20`. arm64 Linux is planned for a later release and is not built
+yet. Windows is not supported.
+
+---
+
+## Status
+
+Ensemblr is **stable at 0.2.2**, released 2026-10-02. The core workflows —
+isolated workspaces, Pi and Claude Code agent sessions, the review and PR flow, and the GitHub / Linear /
+git integrations — are implemented and wired to real services, on both macOS and Linux. Stable means
+ordinary semver rather than a frozen surface: breaking changes remain possible before 1.0 and are recorded
+in [`CHANGELOG.md`](./CHANGELOG.md) when they land.
+
+## Install
+
+```bash
+brew install --cask ensemblr-hq/tap/ensemblr
+```
+
+Or download Ensemblr 0.2.2 (.dmg): **[Apple silicon](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.2/Ensemblr-0.2.2-arm64.dmg)** · **[Intel](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.2/Ensemblr-0.2.2-x64.dmg)** — open it and drag Ensemblr to Applications.
+
+The macOS build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
+stapled, so it opens without a Gatekeeper prompt and validates offline. Every build is on the
+[Releases page](https://github.com/ensemblr-hq/ensemblr/releases).
+
+On **Linux**, one line installs it:
+
+```bash
+curl -fsSL https://www.ensemblr.dev/install.sh | sh
+```
+
+The script needs no root and writes nothing outside `$HOME`. It resolves the newest release, verifies the
+download against the digest GitHub publishes, puts the AppImage in `~/.local/share/ensemblr`, symlinks it
+to `~/.local/bin/ensemblr`, and extracts the desktop entry and icon ladder the AppImage already carries so
+the app appears in your launcher. A manifest records exactly what it added, and `--uninstall` removes that
+and nothing else. Re-running it is an update. Useful flags: `--version <tag>` pins a release, `--nightly`
+takes the rolling canary alongside it, `--dir <path>` moves the install, `--no-desktop` skips the launcher
+entry. Pipe to `sh -s -- --flag` to pass one.
+
+Or take the `.AppImage` from the [Releases page](https://github.com/ensemblr-hq/ensemblr/releases) by hand:
+
+```bash
+chmod +x Ensemblr-*.AppImage
+./Ensemblr-*.AppImage
+```
+
+The AppImage runtime is statically linked and needs no libfuse2 on the host. If it still refuses to mount —
+a container, or a kernel with no FUSE at all — run it with `--appimage-extract-and-run`. From a writable
+directory, Ensemblr downloads a newer AppImage, verifies its GitHub-published SHA-256 digest, stages it,
+and atomically swaps it on restart. A non-AppImage build or one in a read-only directory keeps the
+check-only path and links to the release page.
+
+On **NixOS**, the repository is a flake: `nix run github:ensemblr-hq/ensemblr` runs the release, patched
+to run natively, and `nix run github:ensemblr-hq/ensemblr#master` compiles the newest commit. Both install
+as `ensemblr`, so a system carries one of them. Nix updates them, never the app itself — see
+[the install guide](./docs/guide/01-install.md#nix-nixos).
+
+To build it yourself instead, with Node 24.x and [Bun](https://bun.sh) 1.4:
+
+```bash
+bun install           # from the repository root; installs every workspace
+cd apps/desktop       # the app lives in the monorepo's apps/desktop workspace
+bun run make          # macOS, host architecture: .dmg + .zip under apps/desktop/out/make/
+bun run make:linux    # Linux: .AppImage under apps/desktop/out/make/ (needs squashfs-tools)
+```
+
+`make:linux` refuses to run anywhere but Linux. `node-pty` ships no linux-x64
+prebuild, so cross-building it from macOS silently packages the host's Mach-O
+binary and produces an AppImage whose terminals are all dead. Build it on Linux,
+in CI, or in a `linux/amd64` container —
+[`docs/build-and-release.md`](./docs/build-and-release.md) has the one-liner.
+
+A build of your own is signed and notarized only when Apple API credentials are present in the
+environment; without them you get an unsigned build that Gatekeeper will hold on first launch. The full
+path — prerequisites, channels, unsigned builds, and where Ensemblr keeps its data — is
+[`docs/guide/01-install.md`](./docs/guide/01-install.md).
+
+## Prerequisites
+
+Ensemblr drives CLIs you install and authenticate yourself — it ships no agent binary and holds no provider
+key. On a clean Mac — on Linux, install the same tools with your distribution's package
+manager or the upstream scripts below:
+
+```bash
+# 1 — Homebrew
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# 2 — GitHub CLI
+brew install gh
+
+# 3 — at least one agent runtime; either one on its own is enough
+brew install --cask claude-code             # Claude Code
+curl -fsSL https://pi.dev/install.sh | sh   # Pi
+
+# 4 — authenticate GitHub
+gh auth login --hostname github.com
+
+# 5 — authenticate the runtime you installed
+claude                                      # complete the login prompt, or /login inside a session
+pi --list-models                            # verifies your Pi providers resolve
+```
+
+On macOS `git` comes with the Xcode command line tools — `xcode-select --install` if `git --version`
+fails. On Linux install it with your distribution's package manager, or see
+<https://git-scm.com/download/linux>.
+
+Claude Code also installs with the official script, which is what the app itself offers when that check
+fails: `curl -fsSL https://claude.ai/install.sh | bash`. Pi providers are configured in Pi, not in
+Ensemblr; the Providers settings tab reports what `pi --list-models` returns and lets you point Ensemblr at
+a specific executable.
+
+## Requirements
+
+`git`, the GitHub CLI (`gh`, authenticated), and **at least one** agent runtime — either the Pi CLI or the
+Claude Code CLI. The two are gated against each other: a machine carrying only one of them is ready.
+Ensemblr checks all of this itself at first launch and offers a fix per failing check. Every check is
+documented in [`docs/guide/02-requirements.md`](./docs/guide/02-requirements.md).
+
+## Documentation
+
+**Using Ensemblr** — the [user guide](./docs/guide/README.md):
+[install](./docs/guide/01-install.md) ·
+[requirements](./docs/guide/02-requirements.md) ·
+[first run](./docs/guide/03-first-run.md) ·
+[concepts](./docs/guide/04-concepts.md) ·
+[workspaces](./docs/guide/05-workspaces.md) ·
+[agents](./docs/guide/06-agents.md) ·
+[terminals & run scripts](./docs/guide/07-terminals-and-run-scripts.md) ·
+[reviewing changes](./docs/guide/08-reviewing-changes.md) ·
+[agent control](./docs/guide/09-agent-control.md) ·
+[integrations](./docs/guide/10-integrations.md) ·
+[app settings](./docs/guide/11-app-settings.md) ·
+[repository settings](./docs/guide/12-repository-settings.md) ·
+[shortcuts](./docs/guide/13-keyboard-shortcuts.md) ·
+[troubleshooting](./docs/guide/14-troubleshooting.md)
+
+**Working on Ensemblr** — [`CONTRIBUTING.md`](../../CONTRIBUTING.md) ·
+[`docs/onboarding.md`](./docs/onboarding.md) (clone → run → first change) ·
+[`docs/architecture-map.md`](./docs/architecture-map.md) (which directory owns which concern) ·
+[`docs/adr/`](./docs/adr) (78 Architecture Decision Records) ·
+[`docs/agent-control.md`](./docs/agent-control.md) ·
+[`docs/harnesses.md`](./docs/harnesses.md) ·
+[`docs/build-and-release.md`](./docs/build-and-release.md) ·
+[`CONTEXT.md`](./CONTEXT.md) (product definition and ubiquitous language) ·
+[`SECURITY.md`](../../SECURITY.md)
+
+---
+
+## What it does
+
+**Agents drive the app — that is the point.** Ensemblr Control is a permission-gated surface that lets an
+agent spawn conversations, launch harnesses, run terminals, open file and diff tabs, read the workspace
+diff and leave review comments on it, read and write Linear issues, ask you a multiple-choice question, and
+move its workspace across the board. Pi reaches it through a shipped extension; Claude Code and any
+MCP-capable harness reach the same operations through an embedded MCP server, so the two surfaces cannot
+drift.
+
+**Delegation with a bounded hierarchy.** A root agent can hand a workstream to a manager, which can split
+it into leaf tasks before reporting back. Each agent has its own chat tab and context. Choose model-role
+preferences and opt into delegation between Pi and Claude Code; the parent remains responsible for
+checking and integrating the results. [How delegation works ↓](#delegation-and-orchestration)
+
+**Two agent runtimes, one chat surface.** Pi runs as a CLI in RPC mode; Claude Code is driven through the
+Agent SDK against *your own* `claude` binary — Ensemblr ships none. Both share the same timeline, tool
+cards, model and thinking pickers, tool-approval prompts, git-backed checkpoints, session branching, and
+composer attachments. **Plan mode** holds an agent to read-only tools until it submits a plan, enforced per
+tool call rather than by instruction, and inherited by every sub-agent it spawns.
+
+**A worktree manager underneath.** Start a workspace from an existing branch, a GitHub PR, or a Linear
+issue. Each one is a git worktree with its own branch, working tree, agent sessions, run state, and review
+path. A workspace either *adopts* an existing branch or *cuts* a fresh one; the base branch is fetched and
+fast-forwarded first, and can be retargeted later without touching the worktree. A dashboard board groups
+workspaces into Backlog, In progress, In review, Done, and Canceled.
+
+**A board that starts before the workspace does.** Backlog also carries the work that has no workspace yet
+— unstarted Linear issues and unassigned open GitHub issues — and dragging one rightward is what creates
+the workspace from it. Nothing is ever written back to the tracker: dismissing an issue hides it locally,
+and its own status stays yours to change. GitHub issues are cached locally so the board paints at app
+start rather than waiting on a `gh` call per repository, and says so when it is showing cached rows.
+
+![The dashboard board with workspace cards spread across Backlog, In progress, In review, and Done, each showing its repository, branch, and diff size.](./docs/guide/images/00-hero-dashboard.png)
+
+**Integrations that account for more than one account.** Connect any number of Linear organizations at
+once — every one syncs, and browse, search, and the issue pickers show them all with the organization on
+each row. Link a repository to an Infisical project and its secrets resolve live into every workspace,
+terminal, and agent at launch, never written into the repository. Claude Code sessions surface what the
+account has spent against its claude.ai plan, per rate-limit window, next to the session's running cost.
+
+**Local-first review that ends in GitHub.** One panel with Files, Changes, and Checks. Source-scoped diffs,
+per-file discard, a live file tree, and review comments anchored to specific lines that agents can read,
+answer, and resolve. Then an inline PR editor, commit and push, per-check status through `gh`, and a
+two-step merge — or archive the workspace instead.
+
+![The diff viewer open on a changed file, with a review comment thread anchored to the line it is about.](./docs/guide/images/08-changes.png)
+
+**Terminals and run scripts.** An xterm.js dock over real PTYs, restored across restart. A repository
+declares any number of named run scripts in its committed `.ensemblr/settings.toml`, each with a command
+and an icon, one of them the ⌘R default; single-command setup and archive scripts run on the same
+lifecycle, with setup fingerprinted so an unchanged workspace skips it.
+
+![The dock with a dev server streaming into a run-script terminal, and the picker open beside it listing the repository's named scripts.](./docs/guide/images/07-dock-run-scripts.png)
+
+**Three languages.** The app ships in English, Russian, and Greek — window, native menu bar, and the prose
+agents write back. A user-facing string a change adds ships translated in the same change.
+
+The scope rests on **five commitments**: the agent can drive the app under permission; isolation is the
+product; the agent runtime is pluggable and never privileged; review is local-first and ends in GitHub;
+configuration is committed, legible, and ours.
+
+---
+
+## Delegation and orchestration
+
+Give one agent the task. It can investigate the shared ground once, split independent work into clear
+briefs, and keep the decisions and final integration in the parent conversation. You can open each
+child's tab to see its work, rather than trusting a progress message from the parent.
+
+![An orchestrator waiting for a manager and its two leaf agents, with their hierarchy, status, and context usage visible in the Agents panel.](./docs/guide/images/09-agents-panel.png)
+
+### A manager can split its work too
+
+Delegation now has **two edges: root → manager → leaf**. A manager owns one workstream and can open fresh
+leaf conversations for independent parts of it. It collects their reports, checks the results, and sends
+one integrated account to its parent. Leaves cannot delegate further. A small task needs no extra layer.
+
+The whole tree shares a lifetime budget of **20 spawns**, with **10 per minute** allowed. Closing a child
+or restarting the app does not replenish it. Plan Mode and AFK Mode pass down both edges; a manager cannot
+give a leaf permissions it does not have.
+
+**Separate contexts, shared files.** Children use the parent's workspace, branch, and git index, not a
+worktree each. The parent must divide file ownership before parallel edits. A manager is still a
+sub-agent, not the separate root orchestrator you can explicitly request alongside an existing one.
+
+### Pick models for the work
+
+In **Settings → Models**, assign delegation roles to your models:
+
+| Role | Use it for |
+| --- | --- |
+| **Sage** | Architecture, difficult tradeoffs, and decisions with unresolved questions. |
+| **Coder** | Implementation where the design or approach still needs working out. |
+| **Builder** | Carrying a settled design or established pattern through to working code. |
+| **Grunt** | Fully specified mechanical work that needs no judgment. |
+| **Explorer** | Read-only investigation and an actionable implementation plan. |
+
+These are preferences the agent sees when choosing a delegate, not permission levels or a rigid routing
+system. A model can have several roles. The agent also chooses a thinking level for the task, using the
+levels that model actually supports.
+
+Children inherit the parent's model and runtime unless a model is explicitly selected. Turn on **Allow
+cross-runtime delegation** in the same settings pane to let a Pi parent choose a Claude Code child, or
+the reverse. Both runtimes must be configured; the switch does not widen filesystem permissions or bypass
+cost approvals. Choosing a frontier-tier model explicitly still asks for confirmation.
+
+Pi always delegates through Ensemblr. For Claude Code, choose **Ensemblr chat tabs** in
+**Settings → Providers → Claude Code** to use this routing; Claude's built-in sub-agents use its native
+mechanism instead.
+
+### Wait, verify, then integrate
+
+The parent follows **delegate → wait → evaluate → integrate**. `ensemblr_wait_for_agents` returns reports
+and identifies children still running; a blocked child can wake its parent for a decision. The parent can
+send follow-ups and inspect a child's actual tool calls before relying on what its report claims.
+
+**Pi enforces the wait.** Roots and managers cannot resume unrelated work while their delegated children
+are outstanding. The barrier survives reloads and requires a wait to collect every child's settled
+report. Finished tabs can be closed without losing their transcripts or reports, which remain readable
+after an app restart.
+
+The control contract is in [`docs/agent-control.md`](./docs/agent-control.md); the hierarchy decision is
+[ADR 0069](./docs/adr/0069-allow-one-manager-layer-between-root-and-leaves.md).
+
+---
+
+## The Concierge — one agent above every workspace
+
+Every other agent in Ensemblr lives *inside* a workspace and can see exactly that one. The **Concierge**
+does not. It runs above every project, in a folder of its own under the Ensemblr root, and it is the only
+agent that can answer a question about all of your work at once — which workspaces have something waiting,
+what a running agent actually did, where a body of work stands.
+
+Open it with `⌘⇧C`, from View ▸ Concierge, or from the round launcher floating over the window. It is a
+**panel** rather than a chat tab: drag it where you want it, maximize it with `⌘⇧M`, dismiss it with `⎋`.
+It belongs to the app rather than to a workspace, so it is the same conversation whichever project you
+happen to be looking at. It runs on the same two runtimes as everything else — Pi or Claude Code — under a
+model setting of its own, because the model that suits supervising a dozen workspaces is not the one that
+suits editing a file in any of them.
+
+![The Concierge panel floating over the dashboard board, answering a question about where every workspace stands.](./docs/guide/images/06-concierge.png)
+
+**It reads everywhere.** Every workspace's files, diff, and review comments; any conversation in any
+workspace replayed with its tool calls and results; every terminal's output, the board, and Linear. A
+project, workspace, chat, or artifact it names in an answer renders as a chip you can click, and typing
+`@` in its composer ranks all four across the whole app rather than the one you are looking at.
+
+**It writes in one place — its own folder — and that is enforced per tool call rather than asked for in a
+prompt.** A write anywhere else is refused, `bash` is held to read-only commands, and it cannot open a
+terminal or launch a harness, because a shell is a write channel the read-only rules cannot see into. So
+when something actually needs changing, it spawns a **root orchestrator** into the workspace that needs it
+and briefs that agent — a peer that owns the task and fans out its own sub-agents, not a child of the
+Concierge. The containment that keeps one workspace from touching another is the same containment that
+keeps the Concierge from becoming a way around it.
+
+![The Concierge open over one workspace while it works on another: it has replayed that workspace's transcript and read its diff, and is now starting a chat in Rate limit headers, a workspace in the other repository.](./docs/guide/images/06-concierge-delegation.png)
+
+**Its memory outlives the conversation.** Its context does not survive a clear, so what it learns goes to
+one markdown file per fact under `memory/`, indexed in `MEMORY.md` and read back first next session. The
+test it applies is not whether a fact is useful but whether a tool could fetch it again — no workspace ids,
+no branch lists, no counts — because a memory that duplicates a tool call is worse than no memory at all:
+it will trust the file instead of making the call. Clearing hands you the fresh conversation immediately
+and leaves the retired one running one last turn, stripped of every control tool, to write its files.
+
+Full detail in [`docs/guide/06-agents.md`](./docs/guide/06-agents.md#the-concierge).
+
+---
+
+## AFK mode — hand over the machine, not the judgement
+
+Toggle **AFK** (⌥⇧A) and the agent is told you are away: finish the task, or take it as far as it honestly
+goes, without stopping to ask. It is plan mode's opposite number — planning exists to stop and ask, so
+switching one on switches the other off — and every conversation it spawns inherits it.
+
+![An unattended run part-way through the delivery loop: the AFK chip lit under a dashed composer border, the approach and the rejected alternative written into the timeline, and the delegated investigation and review in the tab strip carrying the same away tint.](./docs/guide/images/06-afk-mode.png)
+
+Three things change while the chip is on. **The question tool is refused** — `ensemblr_ask_user_question`
+has no time limit by design, which is right while you are watching and is exactly what strands an overnight
+run when you are not; instead the agent takes the most defensible reading and records what it assumed.
+**Approval prompts are answered for you**, without widening the workspace's permission mode: a `read-only`
+workspace still blocks every write, because AFK answers a question the mode already permits rather than
+granting a new one. **A second orchestrator is refused rather than approved**, since a peer writer on the
+worktree only ever happens because you asked for one. The explicitly requested Review action remains
+available, but AFK alone does not request it.
+
+**A change gets a delivery loop, not just a longer leash.** Nobody is there to correct the approach at
+message three or read the diff before it lands, so the agent plans in writing before its first edit, builds
+it, reviews the diff, fixes what it finds, then opens a pull request. **The agent decides whether and whom
+to delegate review to**, using the normal delegation rules; self-review is allowed. The manual **Review**
+button keeps your configured review model and thinking level, which do not pin AFK delegates. It never
+merges, never force-pushes over work that is not its own, and updates an existing PR rather than opening a
+second. It judges each finding rather than accepting the list, and decides how many rounds the loop runs.
+
+Not every change earns all five steps. A documentation edit, a version bump, or a rename the compiler
+follows end to end takes a **short path** — make it, run your checks, read the diff back adversarially, open
+the PR. The agent sizes the change first, breaks towards the full loop when it cannot tell, and never drops
+out of the full loop to save time.
+
+![A finished unattended run: the report naming the path it took, the calls it made on the user's behalf, the review finding it argued with, and what it is least sure of — with the Review chat beside it in the tab strip and the pull request it opened in the header.](./docs/guide/images/06-afk-report.png)
+
+**The report is the point.** You come back to one account of the run: which path it took, whether it
+self-reviewed or delegated review and why, what each review round moved, every decision it made on your
+behalf, every finding it disagreed with and why, what it could not finish, and the pull request. The same account lands in the session summary, so the tab still tells you
+months later. Full detail in [`docs/guide/06-agents.md`](./docs/guide/06-agents.md#afk-mode) and
+[ADR 0060](./docs/adr/0060-let-a-chat-run-unattended.md).
+
+---
+
+## What it stores, and where
+
+There is no Ensemblr account to create, nothing to sign in to, and nothing synced off your machine.
+
+- **No account, no server.** Ensemblr talks to GitHub, Linear, and your agent CLIs directly. There is no
+  Ensemblr backend in the path and no telemetry.
+- **GitHub tokens stay with `gh`.** Ensemblr stores none — no token field in settings, no OAuth screen, no
+  second place one can leak from. It shells out to the CLI you already authenticated.
+- **Secrets use OS-backed encryption**, never plaintext files or environment variables: the macOS
+  Keychain stores values directly; on Linux, Electron's `safeStorage` encrypts them through gnome-keyring
+  or KWallet and Ensemblr stores only the ciphertext in SQLite. The app can list metadata without reading
+  values back. On a Linux session with no keyring daemon running, a setup check warns that values are only
+  obfuscated rather than encrypted.
+- **State is a local SQLite database** (Node 24's built-in `node:sqlite`), alongside worktrees under a root
+  directory you choose.
+- **No agent binary ships in the app.** Your `pi` and `claude` installs, your credentials, your models,
+  your config — the ~260 MB the Claude Agent SDK would bundle is deliberately left out.
+
+The threat model, including what is explicitly *out* of scope, is [`SECURITY.md`](../../SECURITY.md); what each
+integration stores is [`docs/guide/10-integrations.md`](./docs/guide/10-integrations.md).
+
+---
+
+## Core vocabulary
+
+Full glossary in [`CONTEXT.md`](./CONTEXT.md); the user-facing tour is
+[`docs/guide/04-concepts.md`](./docs/guide/04-concepts.md).
+
+| Term | Meaning |
+| --- | --- |
+| **Project** | A tracked codebase Ensemblr can open, configure, and use as the source for workspaces. |
+| **Workspace** | An isolated project copy for one stream of work — its own branch, working tree, agent sessions, run state, and review path. |
+| **Agent Runtime** | A coding agent Ensemblr drives on its own chat surface — Pi or Claude Code — selected per conversation. |
+| **Harness** | A coding-agent CLI launched in a workspace terminal tab as its native TUI, rather than on the chat surface. |
+| **Concierge** | The one agent that belongs to no workspace: it reads across every project at once, writes only inside its own folder, and delegates real change to an orchestrator it spawns into the workspace that needs it. |
+| **Ensemblr Control** | The permission-gated surface that lets an agent drive the app itself, through the `ensemblr_*` tools. |
+| **Review Flow** | Inspect changes, run checks, create a PR, merge accepted work, or archive rejected work. |
+
+---
+
+## Tech stack
+
+| Area | Choice |
+| --- | --- |
+| Desktop shell | Electron 44, Electron Forge 7 (Vite plugin, Fuses hardening) |
+| UI | React 19, TypeScript 7 (strict) |
+| Styling | Tailwind CSS 4, shadcn/ui (`radix-nova`) + Radix UI, Lucide icons |
+| Routing | TanStack Router (file-based) |
+| Async data | TanStack Query, TanStack Virtual |
+| State | Jotai |
+| Composer editor | Lexical (`lexical` + `@lexical/react`), plain-text mode with decorator-node chips |
+| Localization | i18next 26 + react-i18next 17 — `en` / `ru` / `el`, catalogues bundled as JSON |
+| Terminal | xterm.js 6 (WebGL renderer) + `node-pty` |
+| Markdown | `streamdown` + Shiki |
+| Agent runtimes | Pi (CLI RPC) + Claude Code (`@anthropic-ai/claude-agent-sdk`); Codex / Vibe / `claude` TUI as terminal harnesses |
+| Agent control | Loopback HTTP + MCP (`@modelcontextprotocol/sdk`) |
+| Validation | Zod 4 |
+| Storage | SQLite via Node 24's built-in `node:sqlite` |
+| Build | Vite 8, Electron Forge (DMG + ZIP per architecture, hardened runtime, arm64 and x64) |
+| Testing | Vitest 5 (+ happy-dom) and `electron --test` |
+| Lint / format | Biome 2.5 |
+| Runtime / package manager | Node 24.x (exactly), Bun 1.4 |
+
+---
+
+## Contributing
+
+Issues are welcome. For code, open an issue to discuss the change first — this is a pre-1.0 codebase with
+opinionated structure, and a large unsolicited diff is hard to take. Start at
+[`CONTRIBUTING.md`](../../CONTRIBUTING.md).
+
+Security reports go to [`SECURITY.md`](../../SECURITY.md), never to a public issue.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](../../LICENSE). Copyright 2026 Philipp Soldunov.
+
+Bundled third-party components and their licenses are listed in [`NOTICE`](../../NOTICE).
+
+### Trademark
+
+Ensemblr™ is a trademark of Philipp Soldunov (EUTM application pending).
+
+The Apache 2.0 license covers this source code. It does not grant any
+right to use the Ensemblr name, logo, or branding. You may state that
+your project is derived from or compatible with Ensemblr. You may not
+name your fork or distribution "Ensemblr", nor use the name or logo in
+a way that suggests endorsement by or affiliation with the project.
+
+Built with love in Cyprus 🇨🇾
