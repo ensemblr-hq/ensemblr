@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-02
+
+Ensemblr 0.2.2 lets you steer an agent past its follow-up queue, resume a stopped sub-agent, and fixes file tree indentation, checkpoint restores and markdown image previews.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.2.2) ·
+[`.dmg` (Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.2/Ensemblr-0.2.2-arm64.dmg) ·
+[`.dmg` (Intel)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.2/Ensemblr-0.2.2-x64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.2/Ensemblr-0.2.2-x64.AppImage)
+
+### Added
+
+- **Shift-click Send steers past the follow-up queue.** Holding Shift while pressing Send delivers the message as a steer instead of queuing it behind earlier follow-ups. (#686)
+- **Resume a stopped sub-agent.** An orchestrator's follow-up now resumes a sub-agent that has stopped. (#685)
+
+### Fixed
+
+- **File tree rows keep indenting past depth four.** (#684)
+- **Restored checkpoint changes stay unstaged.** (#683)
+- **SVG and `<picture>` images draw in markdown previews, and QML is highlighted.** (#682)
+
 ## [0.2.1] - 2026-09-30
 
 Ensemblr 0.2.1 cuts rendering stutter in busy workspaces, gives more file types their own icon, and labels an agent's own status read as "this chat".

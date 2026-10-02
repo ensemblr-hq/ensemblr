@@ -1236,6 +1236,12 @@ silently.
   active, a startup file is prepending Homebrew after `mise activate` — move
   `brew shellenv` above it so mise's paths end up in front. Also check that
   `[environment_variables]` in `.ensemblr/settings.toml` does not set `PATH`.
+- **`hdiutil detach /Volumes/Ensemblr` fails in a release build.** The macOS
+  runner occasionally loses the disk image mid-`make` (`hdiutil: detach failed -
+  No such file or directory`) and the arm64 or x64 job dies in *Build the signed,
+  notarized distributables*. It is a runner flake, not a packaging break: run
+  `gh run rerun RUN_ID --failed`, which reruns only the failed job (v0.2.2's
+  arm64 leg passed on the first rerun).
 - **App icon.** Regenerate with `bun run icon:generate`
   (`scripts/generate-app-icon.mjs`).
 - **README wordmark.** `assets/wordmark.gif` is the animated dot-matrix mark at

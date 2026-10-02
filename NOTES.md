@@ -1,17 +1,19 @@
-# Ensemblr v0.2.1
+# Ensemblr v0.2.2
 
-Ensemblr 0.2.1 cuts rendering stutter in busy workspaces, gives more file types their own icon, and labels an agent's own status read as "this chat".
+Ensemblr 0.2.2 lets you steer an agent past its follow-up queue, resume a stopped sub-agent, and fixes the file tree, checkpoint restores and markdown image previews.
 
-### Changed
+### Added
 
-* **Busy workspaces stutter less.** Live agent updates are isolated from the workbench shell and share one agent-session event feed, streaming deltas are coalesced, and the timeline keeps only a bounded live tail. The Changes tree is virtualized, the All Files tree is memoized, and whole-turn diff rendering is capped per file. On Linux, workspace scans are bounded and watcher events are classified so unrelated writes stop rebuilding the file listing. (#679)
-* **More file types get their own icon.** `.ini`, `.qml`, `qmldir` and the systemd units `.service`, `.socket` and `.timer` now show their own glyphs, and configure-time templates ending in `.in` (such as `.service.in` or `config.h.in`) take the icon of the file they generate. (#678)
+* **Shift-click Send steers past the follow-up queue.** Holding Shift while pressing Send delivers the message as a steer instead of queuing it behind earlier follow-ups. (#686)
+* **Resume a stopped sub-agent.** An orchestrator's follow-up now resumes a sub-agent that has stopped. (#685)
 
 ### Fixed
 
-* **An agent reading its own status no longer looks like it checked a sub-agent.** A status read that names no session now shows "Checked this chat" instead of "Checked a sub-agent", in English, Russian and Greek. (#677)
+* **File tree rows keep indenting past depth four.** (#684)
+* **Restored checkpoint changes stay unstaged.** (#683)
+* **SVG and `<picture>` images draw in markdown previews, and QML is highlighted.** (#682)
 
-See the [changelog](https://github.com/ensemblr-hq/ensemblr/blob/v0.2.1/CHANGELOG.md) for every change.
+See the [changelog](https://github.com/ensemblr-hq/ensemblr/blob/v0.2.2/CHANGELOG.md) for every change.
 
 ### Install
 
@@ -21,7 +23,7 @@ macOS (Apple silicon and Intel):
 brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
-Or download the `.dmg` for your Mac: `Ensemblr-0.2.1-arm64.dmg` (Apple silicon) or `Ensemblr-0.2.1-x64.dmg` (Intel).
+Or download the `.dmg` for your Mac: `Ensemblr-0.2.2-arm64.dmg` (Apple silicon) or `Ensemblr-0.2.2-x64.dmg` (Intel).
 
 Linux (x64):
 
@@ -33,4 +35,4 @@ Both `.dmg` files are signed with a Developer ID certificate, hardened-runtime, 
 
 ---
 
-*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.2.0...v0.2.1>
+*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.2.1...v0.2.2>
