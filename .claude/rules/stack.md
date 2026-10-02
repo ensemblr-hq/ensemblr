@@ -1,11 +1,13 @@
 # Stack
 
 The versions this repo is pinned to, and the constraints that are not obvious
-from `package.json`. Policies for *how* to use the stack (Bun, Biome, Jotai,
-Tailwind scale, JSDoc) live in `AGENTS.md` — this file is the stack itself.
+from `apps/desktop/package.json`. Policies for *how* to use the stack (Bun,
+Biome, Jotai, Tailwind scale, JSDoc) live in `AGENTS.md` and
+`apps/desktop/AGENTS.md` — this file is the stack itself. Today every entry
+below belongs to the desktop app, the monorepo's only workspace with code.
 
-`package.json` declares the supported ranges; `bun.lock` records the
-resolved versions. Re-check both before asserting an exact version.
+`apps/desktop/package.json` declares the supported ranges; the root `bun.lock`
+records the resolved versions. Re-check both before asserting an exact version.
 
 ## Platform
 
@@ -21,7 +23,7 @@ and darwin-x64 (the latter cross-built on `macos-15`), linux-x64, and linux-arm6
 (next release). A universal build roughly doubles the download for every
 Apple-silicon user, and `@electron/universal` throws on non-Mach-O files that
 differ between architectures — `node-pty/build/Release/.forge-meta` is exactly
-that. No `package.json` script hardcodes `--arch`, so Forge defaults to the host
+that. No `apps/desktop/package.json` script hardcodes `--arch`, so Forge defaults to the host
 architecture; CI passes `--arch` explicitly on every leg. Update feeds are
 `update-<platform>-<arch>.json`, and `update-darwin-arm64.json` keeps its exact
 name and shape forever because already-installed arm64 Macs read it by that name
@@ -33,10 +35,10 @@ AppImage through `@reforged/maker-appimage` (there is no
 external binary, so CI installs `squashfs-tools`. What differs from macOS is
 declared per platform rather than branched inline: the secret store
 (`safeStorage` ciphertext in SQLite, not the Keychain — ADR 0056), the
-"Open in…" registry (`src/main/open-target/open-target-registry.ts` carries a
+"Open in…" registry (`apps/desktop/src/main/open-target/open-target-registry.ts` carries a
 `platforms` map), the battery reader (`linux-battery.ts` reads sysfs), the
 workspace file watcher (`linux-recursive-watch.ts`), the window chrome
-(`src/shared/window-chrome.ts`), and updates (Linux swaps the running AppImage
+(`apps/desktop/src/shared/window-chrome.ts`), and updates (Linux swaps the running AppImage
 when its containing directory is writable; other Linux builds check and link
 instead — ADR 0065).
 
@@ -47,9 +49,9 @@ because `node-pty` is deliberately not in `trustedDependencies` (it would compil
 against Node's ABI; the binding has to come from Forge's `@electron/rebuild`
 against Electron's). The hosts most likely to run this app
 (SteamOS, Silverblue, NixOS) ship no compiler at all.
-`scripts/require-linux-toolchain.mjs` runs ahead of `dev`, `package:linux`, and
+`apps/desktop/scripts/require-linux-toolchain.mjs` runs ahead of `dev`, `package:linux`, and
 `make:linux`; when the binding is missing or stamped for the wrong Electron ABI
-*and* the host cannot compile, it shells out to `scripts/rebuild-native-linux.sh`
+*and* the host cannot compile, it shells out to `apps/desktop/scripts/rebuild-native-linux.sh`
 rather than printing an instruction the contributor would only have to retype.
 Three things keep that from misfiring, and all three are load-bearing: `--report`
 never builds (it is a diagnostic, and it is also how the shell script verifies
@@ -66,7 +68,7 @@ primitive and emulates it by walking the tree and registering an inotify watch
 per *entry*, files included, before the call returns. On a workspace with
 `node_modules` installed that measured ~68,000 watches and ~1.9s of blocked main
 event loop per call — which stalls every pending IPC reply and reads as a frozen
-window. `src/main/workspace-files/linux-recursive-watch.ts` is the Linux leg:
+window. `apps/desktop/src/main/workspace-files/linux-recursive-watch.ts` is the Linux leg:
 directories only, `node_modules` and `.git` never descended into, the walk off
 the synchronous path. Reach for it rather than a recursive `fs.watch` whenever a
 new watch could cover a repository-sized tree.
@@ -76,10 +78,10 @@ new watch could cover a repository-sized tree.
 session, so a user on this Electron 44 gets it automatically;
 `--ozone-platform=x11` is the documented escape hatch. What Wayland *does*
 forbid is a client reading or setting its own position, which is why
-`forbidsWindowPositioning` in `src/main/app/window-state.ts` skips the `x`/`y`
+`forbidsWindowPositioning` in `apps/desktop/src/main/app/window-state.ts` skips the `x`/`y`
 restore there.
 
-`scripts/require-node-version.mjs` gates both `preinstall` and
+`apps/desktop/scripts/require-node-version.mjs` gates both `preinstall` and
 `build`/`package`/`make`. Do not route around it: installing under the wrong
 major compiles `macos-alias` (V8-ABI-bound, via `nan`) for that major, so a later
 Node 24 `make` dies on `NODE_MODULE_VERSION` mismatch. Node 24 is also the Active
@@ -101,7 +103,7 @@ Electron major that moves it needs a matching change there or `brew` offers the
 build to machines that cannot run it. Electron 44 also made the `clipboard`
 module async and removed it from the renderer — the renderer already uses
 `navigator.clipboard`, and the one main-process call site is in
-`src/main/open-target/open-target-service.ts`.
+`apps/desktop/src/main/open-target/open-target-service.ts`.
 
 **There is no `.npmrc`.** `@electron-forge/plugin-fuses@7` declares a stale peer
 range (`@electron/fuses@^1`) against the v2 this repo pins; npm needed
@@ -111,14 +113,14 @@ exactly one `@electron/fuses@2.1.3` resolves, so no override is needed either.
 **Bun is the package manager, Node is the runtime.** Bun does not shim itself as
 `node`: in `bun run` scripts and in `preinstall`/`postinstall`, `node` is the real
 Node on `PATH` and `process.versions.bun` is `undefined`. Four pieces of install
-configuration are load-bearing, and `docs/build-and-release.md#bun-and-node` has
+configuration are load-bearing, and `apps/desktop/docs/build-and-release.md#bun-and-node` has
 the detail for each:
 
 - **`bun.lock` is pinned to `lockfileVersion: 1`.** dependabot-core's
   `MAX_SUPPORTED_LOCKFILE_VERSION` is 1 and its parser raises above it, so a
   version-2 file (Bun 1.4's default stamp) stops dependency PRs silently.
   `scripts/check-lockfile-version.mjs` (`bun run check:lockfile`, wired into
-  `check`) enforces it and refuses a stray `bun.lockb`. The file was produced by
+  the root `check`) enforces it and refuses a stray `bun.lockb`. The file was produced by
   `bun pm migrate` under Bun 1.4.2, stamped back to 1 by hand, then loaded under
   Bun 1.3.13 — the only sequence that kept all 1250 packages on the versions the
   npm lockfile pinned. A plain `bun install` with no lockfile re-resolves the
@@ -127,7 +129,18 @@ the detail for each:
   match flat `/node_modules/<pkg>/` paths; the isolated linker's symlinked
   `node_modules/.bun/` store would not match, and the packaged app would ship
   without `node-pty` and the Claude Agent SDK.
-- **`trustedDependencies` is `esbuild`, `fs-xattr`, `macos-alias`.** An explicit
+- **Hoisting puts the desktop app's dependencies in the root `node_modules`,
+  and Forge only looks in `apps/desktop/node_modules`.** It locates Electron
+  there (its ancestor search knows npm, yarn and pnpm lockfiles, never
+  `bun.lock`), and packager copies the app directory and nothing above it. The
+  desktop workspace's `postinstall`,
+  `apps/desktop/scripts/link-hoisted-packages.mjs`, links Electron plus the
+  `PACKAGE_KEEP_*` packages into it; `apps/desktop/forge.config.ts` sets
+  `derefSymlinks: true` so the package carries real files, and `prune: false`
+  because packager's pruning walker climbs two directories at a time and steps
+  over the root's `node_modules`.
+- **The root `package.json#trustedDependencies` is `esbuild`, `fs-xattr`,
+  `macos-alias`.** Bun reads it, and `overrides`, from the root manifest only. An explicit
   list replaces Bun's built-in allowlist. `node-pty`, `@swc/core`, and
   `core-js-pure` stay blocked — the same three npm's old `allowScripts: false`
   entries named. Never run `bun pm trust --all`.
@@ -160,24 +173,24 @@ stable.
 
 - **TypeScript 7**, `strict: true`, `noImplicitAny: true`, `moduleResolution: "bundler"`,
   `target`/`lib` ES2022, `allowImportingTsExtensions: true`. Path alias `@/*` → `./src/*`.
-- **Vite 8** — app configs: `vite.main.config.mts`, `vite.preload.config.mts`,
-  `vite.renderer.config.mts`; playground: `vite.playground.config.mts`; demo:
-  `vite.demo-main.config.mts`, `vite.demo.config.mts`.
+- **Vite 8** — app configs: `apps/desktop/vite.main.config.mts`, `apps/desktop/vite.preload.config.mts`,
+  `apps/desktop/vite.renderer.config.mts`; playground: `apps/desktop/vite.playground.config.mts`; demo:
+  `apps/desktop/vite.demo-main.config.mts`, `apps/desktop/vite.demo.config.mts`.
 - Four tsconfig projects, all checked by `bun run typecheck`: app
-  (`tsconfig.json`), scripts (`tsconfig.scripts.json`), tests
-  (`tsconfig.tests.json`), demo (`tsconfig.demo.json`). They each `include`
-  `src`, so `scripts/typecheck.mjs` runs them concurrently rather than chaining
+  (`apps/desktop/tsconfig.json`), scripts (`apps/desktop/tsconfig.scripts.json`), tests
+  (`apps/desktop/tsconfig.tests.json`), demo (`apps/desktop/tsconfig.demo.json`). They each `include`
+  `apps/desktop/src`, so `apps/desktop/scripts/typecheck.mjs` runs them concurrently rather than chaining
   four passes over the same program.
 
 **Two packages are deliberately `external` and must not be bundled**
-(`vite.main.config.mts`):
+(`apps/desktop/vite.main.config.mts`):
 
 - `node-pty` — native module, resolved from `node_modules` at runtime.
 - `@anthropic-ai/claude-agent-sdk` — calls `createRequire(import.meta.url)` at
   module load; Rollup rewrites `import.meta.url` to `{}.url` for the CJS main
   bundle, so bundling throws `ERR_INVALID_ARG_VALUE` before the app starts.
 
-Both therefore need matching `PACKAGE_KEEP_*` entries in `forge.config.ts` or the
+Both therefore need matching `PACKAGE_KEEP_*` entries in `apps/desktop/forge.config.ts` or the
 packaged app ships without them.
 
 ## UI
@@ -193,12 +206,12 @@ packaged app ships without them.
 | State | Jotai (+ `jotai-family` for parameterized atoms) |
 | Terminal | `@xterm/xterm` 6, rendered through `@xterm/addon-webgl` |
 | Composer editor | `lexical` + `@lexical/react` 0.51, plain-text mode only |
-| Markdown | `streamdown` + Shiki, with the `@streamdown/{cjk,math,mermaid}` plugins wired in `src/renderer/components/message.tsx` |
+| Markdown | `streamdown` + Shiki, with the `@streamdown/{cjk,math,mermaid}` plugins wired in `apps/desktop/src/renderer/components/message.tsx` |
 | Diff rendering | `react-diff-view`, tokenized through Shiki |
 | Layout / motion | `react-resizable-panels`, `motion` (imported as `motion/react`) |
 | Drag and drop | `@atlaskit/pragmatic-drag-and-drop` (+ `-hitbox`), used by the dashboard board |
 | Validation | Zod 4 |
-| i18n | `i18next` 26 + `react-i18next` 17; catalogues bundled as JSON under `src/renderer/lib/i18n/locales/` |
+| i18n | `i18next` 26 + `react-i18next` 17; catalogues bundled as JSON under `apps/desktop/src/renderer/lib/i18n/locales/` |
 
 **xterm addons are versioned independently of the core and declare no peer
 range**, so nothing but the publish date pairs them: `@xterm/addon-fit` 0.11,
@@ -225,7 +238,7 @@ absorbs that loss, so dark mode looked untouched and only light mode read as
 washed out. With the option off the WebGL renderer matches the DOM renderer's
 coverage exactly (1,877), and it regains the fast blend path as a side effect.
 Nothing needs to show through: `readThemeFromDocument` already resolves every
-token to an opaque `#rrggbb`. `tests/renderer/terminal-webgl-renderer.test.ts`
+token to an opaque `#rrggbb`. `apps/desktop/tests/renderer/terminal-webgl-renderer.test.ts`
 guards it.
 
 **xterm never waits for a webfont, so the adapter has to.** Neither the core nor
@@ -255,27 +268,27 @@ onto it without a catch.
 
 **Lexical is confined to the composer editor.** Everything that imports it lives
 under
-`src/renderer/components/workbench-shell/conversation-panel/composer/editor/`,
+`apps/desktop/src/renderer/components/workbench-shell/conversation-panel/composer/editor/`,
 behind that folder's `index.ts`. The editor publishes the draft back out as plain
 text plus its runs and chips in document order, so the autocomplete engine and
 the send pipeline never learn a rich-text editor is involved
-([ADR 0047](../../docs/adr/0047-model-composer-attachments-as-one-ordered-list-in-a-lexical-draft.md)).
+([ADR 0047](../../apps/desktop/docs/adr/0047-model-composer-attachments-as-one-ordered-list-in-a-lexical-draft.md)).
 A Lexical import outside that folder means the linearizer is missing a case.
 
 The `ai` package (Vercel AI SDK 7) is a **type-only** dependency of the renderer:
 the agent timeline models turns as `UIMessage` / `DynamicToolUIPart`. Every one
 of its ~20 imports is an `import type` — nothing calls into it at runtime, and no
 model provider is wired through it. Keep it that way; runtimes are reached
-through `src/main/agent-runtime/`.
+through `apps/desktop/src/main/agent-runtime/`.
 
 **Tailwind 4 is CSS-first — there is no `tailwind.config.js` and there must not
-be one.** All configuration lives in `src/renderer/styles/index.css` via
+be one.** All configuration lives in `apps/desktop/src/renderer/styles/index.css` via
 `@import "tailwindcss"`, `@theme`, `@plugin`, `@source`, and `@custom-variant`.
 That file also pulls in `tw-animate-css` and `shadcn/tailwind.css` as CSS
 imports, which is why `tailwindcss`, `@tailwindcss/typography`, and `shadcn` sit
-in `devDependencies` and are allowlisted in `.fallowrc.jsonc`
+in `devDependencies` and are allowlisted in `apps/desktop/.fallowrc.jsonc`
 `ignoreDependencies` — Vite compiles them at build time and the renderer bundle
-needs none of them at runtime. `components.json` reflects the CSS-first setup
+needs none of them at runtime. `apps/desktop/components.json` reflects the CSS-first setup
 with `"tailwind": { "config": "" }`. A v3-style JS config file will simply be
 ignored.
 
@@ -286,15 +299,15 @@ shadcn aliases resolve into the renderer: `@/renderer/components`,
 `@/renderer/components/ui`, `@/renderer/lib`, `@/renderer/hooks/ui` — the last
 of which has no directory in the tree today. Vendored `ui/**`
 primitives are quieted per-rule in fallow and react-doctor; treat them as
-third-party. They are **not** excluded from Biome — `biome.json` ignores
-`src/components/ui` and `src/hooks/ui`, neither of which exists, so re-vendoring
+third-party. They are **not** excluded from Biome — `apps/desktop/biome.json` ignores
+`apps/desktop/src/components/ui` and `apps/desktop/src/hooks/ui`, neither of which exists, so re-vendoring
 a primitive gets reformatted to house style.
 
 ## Data and integrations
 
 - **SQLite via `node:sqlite` (`DatabaseSync`)** — Node 24's built-in. There is no
   `better-sqlite3` or `sql.js` dependency; do not add one.
-- **TOML** — `js-toml`, read and written through `src/main/config/`, which owns
+- **TOML** — `js-toml`, read and written through `apps/desktop/src/main/config/`, which owns
   the atomic writer both the scripts and the Infisical link writers share for the
   committed `.ensemblr/settings.toml`.
 - **Secrets** — macOS Keychain; Linux uses Electron `safeStorage` ciphertext in
@@ -318,7 +331,9 @@ a primitive gets reformatted to house style.
 ## Tooling
 
 - **Biome 2.5.14** is the only linter and formatter — no ESLint, no Prettier.
-  Tabs for indentation; single quotes for JS **and** JSX. `biome.json` pins the
+  Tabs for indentation; single quotes for JS **and** JSX. The root `biome.json`
+  holds that house style, and `apps/desktop/biome.json` extends it (`"root":
+  false`, `"extends": "//"`) with the app's ignores. Both pin the
   `$schema` URL to the installed version, so a Biome bump updates that line too
   or `biome check` reports the config as stale.
   Config uses `linter.rules.preset: "recommended"`; the older
@@ -326,7 +341,7 @@ a primitive gets reformatted to house style.
   "fix" it back. Import organization runs through `assist.actions.source.organizeImports`.
 - **Vitest 5** with `happy-dom` 20 and `@vitest/coverage-istanbul`. Never
   `bun:test`, Jest, or Mocha.
-- **fallow** (`.fallowrc.jsonc`) and **react-doctor** (`doctor.config.jsonc`) run
+- **fallow** (`apps/desktop/.fallowrc.jsonc`) and **react-doctor** (`apps/desktop/doctor.config.jsonc`) run
   as review diagnostics; CI runs react-doctor against `master`.
 - **i18next-cli** drives `bun run i18n:{extract,types,status,lint}`. `i18n:lint`
   runs inside `bun run check` and fails the build on hardcoded user-facing
@@ -335,7 +350,7 @@ a primitive gets reformatted to house style.
   `i18n:extract` and `i18n:types` each re-run Biome over what they wrote —
   i18next-cli emits 2-space JSON and Biome formats with tabs, so without that
   the two rewrite each other on every run.
-- `scripts/check-tailwind-classes.mjs` runs inside `bun run check` and fails on
+- `apps/desktop/scripts/check-tailwind-classes.mjs` runs inside `bun run check` and fails on
   px-based arbitrary utilities.
 
 ## Adding a dependency
@@ -345,7 +360,7 @@ a primitive gets reformatted to house style.
    Keep `bun.lock` at `lockfileVersion: 1` (`bun run check:lockfile`), and do not
    add the package to `trustedDependencies` unless its install script must run.
 2. If it is a native module or must stay unbundled, add it to `external` in the
-   relevant Vite config **and** to `PACKAGE_KEEP_*` in `forge.config.ts`.
+   relevant Vite config **and** to `PACKAGE_KEEP_*` in `apps/desktop/forge.config.ts`.
 3. If fallow cannot see its import edges (CSS-only, or consumed solely from
-   vendored `ui/**`), add it to `ignoreDependencies` in `.fallowrc.jsonc` with a
+   vendored `ui/**`), add it to `ignoreDependencies` in `apps/desktop/.fallowrc.jsonc` with a
    comment saying why.

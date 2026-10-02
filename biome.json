@@ -12,12 +12,6 @@
 			"**",
 			"!.agents/skills/ai-elements/scripts",
 			"!.claude",
-			"!.demo",
-			"!src/components/ui",
-			"!src/hooks/ui",
-			"!src/renderer/fixtures/pi-captures",
-			"!tests/fixtures/architecture",
-			"!src/renderer/routing/routeTree.gen.ts",
 			"!.ensemblr/architecture.json"
 		]
 	},

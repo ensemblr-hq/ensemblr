@@ -1,25 +1,16 @@
 .DS_Store
 .context/
-.vite/
-.demo/
 dist/
 node_modules/
-out/
-/out.*/
+coverage/
 .playwright-cli/
 .playwright-mcp/
 .fallow/
-.pi-capture-sandbox/
-coverage/
-assets/avatar.png
 .env
 .env.*
 !.env.example
 *.p8
 *.p12
-
-# Verified AppImage runtime, fetched by scripts/fetch-appimage-runtime.mjs.
-.appimage-runtime/
 
 # `nix build` output links.
 /result

@@ -68,6 +68,6 @@ These are not body comments and stay as they are:
 
 ## Scope
 
-Applies to `src/**` and `scripts/**`. Tests are exempt from the JSDoc requirement but follow the same comment discipline.
+Applies to every workspace's `src/**` and `scripts/**` — today `apps/desktop/src/**` and `apps/desktop/scripts/**` — and to the root `scripts/`. Tests are exempt from the JSDoc requirement but follow the same comment discipline.
 
 The JSDoc block documents the contract; clear code documents the mechanism. Comments that echo the code rot and add noise.

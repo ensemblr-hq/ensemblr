@@ -10,7 +10,9 @@
       # compiles node-pty against Electron's x64 headers.
       systems = [ "x86_64-linux" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
-      ensemblrVariants = pkgs: import ./nix/packages.nix { inherit pkgs self; };
+      # The desktop app owns its packaging; this flake stays at the repository
+      # root because that is where `github:ensemblr-hq/ensemblr#…` resolves it.
+      ensemblrVariants = pkgs: import ./apps/desktop/nix/packages.nix { inherit pkgs self; };
     in
     {
       # `release` is the AppImage a GitHub release ships; `master` is compiled

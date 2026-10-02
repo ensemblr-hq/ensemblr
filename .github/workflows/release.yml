@@ -158,18 +158,18 @@ jobs:
               echo "::error::Release $TAG is still a draft. Publish it, then re-run."
               exit 1 ;;
             *)
-              echo "::error::No GitHub Release for $TAG. Cut one with notes first: gh release create $TAG --notes-file NOTES.md"
+              echo "::error::No GitHub Release for $TAG. Cut one with notes first: gh release create $TAG --notes-file apps/desktop/NOTES.md"
               exit 1 ;;
           esac
 
       - uses: ./.github/actions/install-dependencies
 
-      - name: Check package.json matches the tag
+      - name: Check apps/desktop/package.json matches the tag
         run: |
           set -euo pipefail
-          declared=$(node -p "require('./package.json').version")
+          declared=$(node -p "require('./apps/desktop/package.json').version")
           if [ "$declared" != "${TAG#v}" ]; then
-            echo "::error::package.json version ($declared) does not match tag $TAG."
+            echo "::error::apps/desktop/package.json version ($declared) does not match tag $TAG."
             exit 1
           fi
 
@@ -185,11 +185,13 @@ jobs:
       # Forge defaults to the host architecture, so `--arch` is what makes the x64
       # leg an Intel build rather than a second arm64 one.
       - name: Build the signed, notarized distributables
+        working-directory: apps/desktop
         env:
           ENSEMBLR_REQUIRE_SIGN: "1"
         run: bun run make --arch="$ARCH"
 
       - name: Verify every artifact is signed, notarized and stapled
+        working-directory: apps/desktop
         env:
           ENSEMBLR_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
         run: bun run verify:signing --arch="$ARCH"
@@ -199,7 +201,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          find out/make -type f \( -name '*.dmg' -o -name '*.zip' \) \
+          find apps/desktop/out/make -type f \( -name '*.dmg' -o -name '*.zip' \) \
             > "$RUNNER_TEMP/assets.txt"
           dmg=$(bash .github/scripts/select-asset.sh "$RUNNER_TEMP/assets.txt" "-${ARCH}\.dmg\$")
           zip=$(bash .github/scripts/select-asset.sh "$RUNNER_TEMP/assets.txt" "/[^/]*-darwin-${ARCH}-[^/]*\.zip\$")
@@ -351,7 +353,7 @@ jobs:
             while IFS= read -r asset; do echo "- \`$asset\`"; done \
               < "$RUNNER_TEMP/release-assets.txt"
             echo
-            echo "README still needs these lines by hand, and its platform table row for macOS no longer says Apple silicon only:"
+            echo "apps/desktop/README.md still needs these lines by hand, and its platform table row for macOS no longer says Apple silicon only:"
             echo
             echo '```markdown'
             echo "- **Version:** [\`$version\`]($base/tag/$TAG) (pre-1.0, polish stage)"
@@ -520,16 +522,17 @@ jobs:
 
       - uses: ./.github/actions/install-dependencies
 
-      - name: Check package.json matches the tag
+      - name: Check apps/desktop/package.json matches the tag
         run: |
           set -euo pipefail
-          declared=$(node -p "require('./package.json').version")
+          declared=$(node -p "require('./apps/desktop/package.json').version")
           if [ "$declared" != "${TAG#v}" ]; then
-            echo "::error::package.json version ($declared) does not match tag $TAG."
+            echo "::error::apps/desktop/package.json version ($declared) does not match tag $TAG."
             exit 1
           fi
 
       - name: Build the AppImage
+        working-directory: apps/desktop
         env:
           ENSEMBLR_TARGET_ARCH: ${{ matrix.arch }}
         run: bun run make:linux --arch="$ARCH"
@@ -541,7 +544,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          find out/make -type f -name '*.AppImage' > "$RUNNER_TEMP/linux-assets.txt"
+          find apps/desktop/out/make -type f -name '*.AppImage' > "$RUNNER_TEMP/linux-assets.txt"
           appimage=$(bash .github/scripts/select-asset.sh "$RUNNER_TEMP/linux-assets.txt" "-${ARCH}\.AppImage\$")
           gh release upload "$TAG" "$appimage" --clobber
 
