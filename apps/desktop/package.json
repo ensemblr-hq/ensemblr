@@ -151,7 +151,7 @@
 		"js-toml": "^2.0.1",
 		"lexical": "^0.52.0",
 		"lucide-react": "^1.48.0",
-		"motion": "^13.4.0",
+		"motion": "^13.4.6",
 		"node-pty": "^1.1.0",
 		"radix-ui": "^1.6.7",
 		"react": "^19.3.0",
