@@ -12,6 +12,7 @@ import { githubIssueSourceId } from '@/renderer/lib/github';
 import {
 	describeLinearListGap,
 	isLinearIssueInTeamScope,
+	mapLinearIssuesToWorkspaceSources,
 } from '@/renderer/lib/linear';
 import {
 	branchSourceId,
@@ -21,6 +22,7 @@ import {
 	mapStartableIssuesToWorkspaceSources,
 	pullRequestSourceId,
 	selectStartableIssues,
+	selectStartedLinearIssues,
 } from '@/renderer/lib/workbench';
 import type {
 	ProjectShellModel,
@@ -35,7 +37,9 @@ import type { ListLinearIssuesResult } from '@/shared/ipc/contracts/linear';
  * Result of the create-from picker's per-repository, per-tab data fetch.
  * `linearGap` is the localized reason the Issues tab may be missing Linear rows
  * — a failed read, or an organization that could not be reached — so an empty
- * tab is not taken for "nothing to start".
+ * tab is not taken for "nothing to start". `startedSources` are the Linear
+ * issues somebody has already started, offered only while the Issues tab is
+ * being searched, so the default list stays work nobody has picked up.
  */
 interface WorkspaceSourcePickerState {
 	error: GithubFailure | null;
@@ -43,6 +47,7 @@ interface WorkspaceSourcePickerState {
 	itemsById: Map<string, WorkspaceSourceItem>;
 	linearGap: string | null;
 	sources: WorkspaceSource[];
+	startedSources: WorkspaceSource[];
 }
 
 /** Separator for the linked-issue key signature; no Linear id or GitHub URL contains one. */
@@ -57,21 +62,28 @@ const LINKED_KEY_SEPARATOR = '\n';
  * only work nobody has started — Linear issues in Backlog or Todo, and no issue
  * any of `projects`' workspaces is already linked to — ordered by priority, then
  * by last update, and reads as loading while the team scope loads or a Linear
- * refresh is running behind cached rows. Returns display sources plus a map
- * back to the raw rows so a selection can be turned into a creation seed.
+ * refresh is running behind cached rows. A non-blank `query` on that tab also
+ * reaches unlinked Linear issues already in progress, in the same team scope,
+ * returned apart from the startable rows. Those come from the all-states browse
+ * list, read only while the tab is searched, because the not-started list holds
+ * none. Returns display sources plus a map back to the raw rows so a selection
+ * can be turned into a creation seed.
  */
 export function useWorkspaceSourcePicker({
 	kind,
 	open,
 	projects,
+	query,
 	repoId,
 }: {
 	kind: WorkspaceSourceKind;
 	open: boolean;
 	projects: readonly ProjectShellModel[];
+	query: string;
 	repoId: string;
 }): WorkspaceSourcePickerState {
 	const hasRepo = repoId.length > 0;
+	const reachesStartedIssues = kind === 'issue' && query.trim().length > 0;
 	// The sidebar rebuilds `projects` on every render, so the memo keys on the
 	// linked keys' content rather than the array's identity.
 	const linkedIssueSignature =
@@ -111,6 +123,17 @@ export function useWorkspaceSourcePicker({
 		}),
 		enabled: open && repository !== undefined,
 	});
+	// Only a search shows started issues, so their all-states sync waits for one.
+	const browseLinearIssues = useQuery({
+		...linearIssuesQuery({}),
+		enabled: open && reachesStartedIssues,
+	});
+	const startedLinearResult = reachesStartedIssues
+		? browseLinearIssues.data
+		: undefined;
+	const isStartedLinearLoading =
+		reachesStartedIssues &&
+		(browseLinearIssues.isLoading || isLinearSyncing(browseLinearIssues.data));
 
 	const rows = useMemo<Omit<WorkspaceSourcePickerState, 'linearGap'>>(() => {
 		if (kind === 'branch') {
@@ -126,6 +149,7 @@ export function useWorkspaceSourcePicker({
 				isLoading: branchesQuery.isLoading,
 				itemsById,
 				sources: mapRepositoryBranchesToWorkspaceSources(branches),
+				startedSources: [],
 			};
 		}
 
@@ -142,17 +166,25 @@ export function useWorkspaceSourcePicker({
 				isLoading: pullRequestsQuery.isLoading,
 				itemsById,
 				sources: mapPullRequestsToWorkspaceSources(pullRequests),
+				startedSources: [],
 			};
 		}
 
+		const teams = linearTeams.data ?? [];
 		const { githubIssues, linearIssues: linearIssueRows } =
 			selectStartableIssues({
 				githubIssues: githubIssuesQuery.data?.issues ?? [],
 				linearIssues: (linearIssues.data?.issues ?? []).filter((issue) =>
-					isLinearIssueInTeamScope(issue, linearTeams.data ?? []),
+					isLinearIssueInTeamScope(issue, teams),
 				),
 				linkedIssueKeys,
 			});
+		const startedLinearRows = selectStartedLinearIssues({
+			linearIssues: (startedLinearResult?.issues ?? []).filter((issue) =>
+				isLinearIssueInTeamScope(issue, teams),
+			),
+			linkedIssueKeys,
+		});
 		const itemsById = new Map<string, WorkspaceSourceItem>();
 		for (const issue of githubIssues) {
 			itemsById.set(githubIssueSourceId(issue.number), {
@@ -160,7 +192,7 @@ export function useWorkspaceSourcePicker({
 				kind: 'github-issue',
 			});
 		}
-		for (const issue of linearIssueRows) {
+		for (const issue of [...linearIssueRows, ...startedLinearRows]) {
 			itemsById.set(issue.id, { issue, kind: 'linear-issue' });
 		}
 		return {
@@ -169,15 +201,19 @@ export function useWorkspaceSourcePicker({
 				githubIssuesQuery.isLoading ||
 				linearIssues.isLoading ||
 				linearTeams.isLoading ||
-				isLinearSyncing(linearIssues.data),
+				isLinearSyncing(linearIssues.data) ||
+				isStartedLinearLoading,
 			itemsById,
 			sources: mapStartableIssuesToWorkspaceSources({
 				githubIssues,
 				linearIssues: linearIssueRows,
 			}),
+			startedSources: mapLinearIssuesToWorkspaceSources(startedLinearRows),
 		};
 	}, [
 		kind,
+		startedLinearResult,
+		isStartedLinearLoading,
 		branchesQuery.data,
 		branchesQuery.isLoading,
 		pullRequestsQuery.data,
@@ -194,14 +230,18 @@ export function useWorkspaceSourcePicker({
 	return {
 		...rows,
 		linearGap:
-			kind === 'issue' ? describeLinearListGap(linearIssues.data) : null,
+			kind === 'issue'
+				? (describeLinearListGap(linearIssues.data) ??
+					describeLinearListGap(startedLinearResult))
+				: null,
 	};
 }
 
 /**
  * Whether a Linear list was answered from stale cached rows while its refresh
  * is still running. When the filter leaves none of those rows, the refresh may
- * still bring a Backlog or Todo issue, so "nothing to start" would be premature.
+ * still bring one it keeps — a Backlog or Todo issue, or a started one a search
+ * reaches — so "nothing to start" or "no match" would be premature.
  * @param result - The Linear list answer, if one has arrived
  * @returns True while the refresh behind the answer is in flight
  */

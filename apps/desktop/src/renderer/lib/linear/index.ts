@@ -33,6 +33,7 @@ export {
 	getLinearStateBucketLabel,
 	isLinearIssueClosed,
 	isLinearIssueNotStarted,
+	isLinearIssueStarted,
 	LINEAR_PRIORITY_ORDER,
 	linearPriorityRank,
 	orderLinearIssues,

@@ -82,6 +82,7 @@ export {
 	openableWorkspaceId,
 	pullRequestSourceId,
 	selectStartableIssues,
+	selectStartedLinearIssues,
 	workspaceSeedFromSourceItem,
 } from './workspace-source-mappers';
 export {

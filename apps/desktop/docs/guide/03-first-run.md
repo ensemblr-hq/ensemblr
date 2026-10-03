@@ -179,7 +179,12 @@ offers three sources:
 | **Issues** | A workspace for an issue nobody has started — an open GitHub issue, or a Linear issue in Backlog or Todo — with the issue linked to it. An issue that already has a workspace is not offered again — unless that workspace is archived and the issue is still open or not yet started. Linear issues come from every connected team unless the repository's [`[linear]` block](./12-repository-settings.md#linear) names its own. The most urgent Linear issues come first and those with no priority last; GitHub issues have no priority, so they sit with those. Within each priority, the most recently updated issue leads. |
 
 Each is searchable: branches by name, pull requests by title, number, or author,
-issues by number, title, or description.
+issues by number, title, or description. A search on the Issues tab also reaches
+Linear issues somebody has already started — In Progress, In Review — so you can
+pick up a teammate's ticket; the results then split into a **Backlog** and an
+**In progress** section. The repository's `[linear]` teams narrow these too.
+Done and canceled issues never appear, and neither does one an active workspace
+is already linked to.
 
 ## What just happened on disk
 

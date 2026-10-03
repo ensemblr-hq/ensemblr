@@ -44,6 +44,7 @@ vi.mock(
 			itemsById: new Map<string, WorkspaceSourceItem>(),
 			linearGap: null,
 			sources: pickerHolder.sources,
+			startedSources: [],
 		}),
 	}),
 );

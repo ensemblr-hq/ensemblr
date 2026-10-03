@@ -130,6 +130,19 @@ export function isLinearIssueNotStarted(
 }
 
 /**
+ * Whether a Linear issue is work somebody has picked up and not finished: in a
+ * started state such as In Progress or In Review, and not archived. Matched on
+ * `stateType`, like {@link isLinearIssueNotStarted}, so a renamed state counts.
+ * @param issue - The issue to test
+ * @returns True when the issue is in progress
+ */
+export function isLinearIssueStarted(
+	issue: Pick<LinearIssueWire, 'archivedAt' | 'stateType'>,
+): boolean {
+	return issue.archivedAt === null && issue.stateType === 'started';
+}
+
+/**
  * Sort rank for a Linear priority number, which counts *up* as urgency falls
  * and reserves 0 for "none" — so the raw number sorts backwards.
  * @param priority - Linear priority number, 0 (none) through 4 (low)
