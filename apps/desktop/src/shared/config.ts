@@ -180,6 +180,22 @@ const appearanceSettingsSchema = z.object({
 	terminalScrollbackMb: z.number().int().min(1).max(200).catch(10),
 });
 
+/**
+ * The app-wide compute queue that heavy agent commands — test runners, builds,
+ * typechecks, nix rebuilds — wait in, so parallel agents across workspaces
+ * cannot saturate the machine. `concurrency` is how many heavy jobs run at once
+ * across every workspace; `niceness` is the CPU priority they run at. The two
+ * pattern lists extend and carve out of the built-in heavy-command list.
+ * Disabled, every gate passes through and queued work starts at once.
+ */
+const computeQueueSettingsSchema = z.object({
+	enabled: z.boolean().catch(true),
+	concurrency: z.number().int().min(1).max(16).catch(1),
+	niceness: z.number().int().min(0).max(19).catch(10),
+	extraPatterns: z.array(z.string()).catch([]),
+	exemptPatterns: z.array(z.string()).catch([]),
+});
+
 const appSettingsSchema = z.object({
 	general: generalSettingsSchema,
 	models: modelSettingsSchema,
@@ -189,6 +205,7 @@ const appSettingsSchema = z.object({
 	dictation: dictationSettingsSchema,
 	concierge: conciergeSettingsSchema,
 	experimental: experimentalSettingsSchema,
+	computeQueue: computeQueueSettingsSchema,
 	onboarding: onboardingSettingsSchema,
 });
 
@@ -210,6 +227,8 @@ export type DictationSettings = AppSettings['dictation'];
 export type ConciergeSettings = AppSettings['concierge'];
 /** The `experimental` section of App settings. */
 export type ExperimentalSettings = AppSettings['experimental'];
+/** The `computeQueue` heavy-command queue section of App settings. */
+export type ComputeQueueSettings = AppSettings['computeQueue'];
 /** The `onboarding` first-run state section of App settings. */
 export type OnboardingSettings = AppSettings['onboarding'];
 
@@ -226,6 +245,7 @@ export interface AppSettingsPatch {
 	dictation?: Partial<DictationSettings>;
 	concierge?: Partial<ConciergeSettings>;
 	experimental?: Partial<ExperimentalSettings>;
+	computeQueue?: Partial<ComputeQueueSettings>;
 	onboarding?: Partial<OnboardingSettings>;
 }
 
@@ -239,6 +259,7 @@ export const appSettingsPatchSchema = z.object({
 	dictation: dictationSettingsSchema.partial().optional(),
 	concierge: conciergeSettingsSchema.partial().optional(),
 	experimental: experimentalSettingsSchema.partial().optional(),
+	computeQueue: computeQueueSettingsSchema.partial().optional(),
 	onboarding: onboardingSettingsSchema.partial().optional(),
 });
 
@@ -254,11 +275,13 @@ export const appSettingsPatchSchema = z.object({
  * `providers` decide which tools Plan Mode and the Concierge refuse, so a
  * Concierge that could patch them could grant itself a writer. None belongs to
  * a supervising agent, and an unattended Concierge writes app settings without
- * a dialog.
+ * a dialog. `computeQueue` is omitted whole because it is the gate on agents'
+ * own heavy commands: an agent that could switch it off or exempt a pattern
+ * would hold the key to the lock it is behind.
  */
 export type AppSettingsControlPatch = Omit<
 	AppSettingsPatch,
-	'dictation' | 'general' | 'onboarding' | 'providers'
+	'computeQueue' | 'dictation' | 'general' | 'onboarding' | 'providers'
 > & {
 	general?: Omit<Partial<GeneralSettings>, 'automaticUpdates'>;
 	providers?: Omit<
@@ -387,6 +410,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = appSettingsSchema.parse({
 	dictation: {},
 	concierge: {},
 	experimental: {},
+	computeQueue: {},
 	onboarding: {},
 });
 
@@ -413,6 +437,7 @@ export function parseAppSettings(raw: unknown): AppSettings {
 		dictation: asRecord(record.dictation),
 		concierge: asRecord(record.concierge),
 		experimental: asRecord(record.experimental),
+		computeQueue: asRecord(record.computeQueue),
 		onboarding: asRecord(record.onboarding),
 	});
 	return result.success ? result.data : DEFAULT_APP_SETTINGS;
@@ -432,6 +457,7 @@ export function mergeAppSettings(
 		dictation: { ...current.dictation, ...patch.dictation },
 		concierge: { ...current.concierge, ...patch.concierge },
 		experimental: { ...current.experimental, ...patch.experimental },
+		computeQueue: { ...current.computeQueue, ...patch.computeQueue },
 		onboarding: { ...current.onboarding, ...patch.onboarding },
 	};
 }

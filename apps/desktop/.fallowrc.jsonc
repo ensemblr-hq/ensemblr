@@ -53,6 +53,7 @@
 		"src/shared/afk-mode.ts",
 		"src/shared/agent-failure.ts",
 		"src/shared/architecture-diagram.ts",
+		"src/shared/compute-queue.ts",
 		"src/shared/plan-mode.ts",
 		"src/shared/review-brief.ts",
 		"src/shared/scripts.ts",

@@ -323,6 +323,7 @@ describe('mergeAppSettings', () => {
 describe('appSettingsControlPatchSchema', () => {
 	test('accepts and preserves every allowed preference field', () => {
 		const {
+			computeQueue: _computeQueue,
 			dictation: _dictation,
 			onboarding: _onboarding,
 			...projection
@@ -360,6 +361,21 @@ describe('appSettingsControlPatchSchema', () => {
 		expect(
 			appSettingsControlPatchSchema.safeParse({
 				general: { automaticUpdates: false },
+			}).success,
+		).toBe(false);
+	});
+
+	// The compute queue is the gate on agents' own heavy commands, so an agent
+	// that could disable it or exempt a pattern would hold the key to its lock.
+	test('rejects every compute-queue setting', () => {
+		expect(
+			appSettingsControlPatchSchema.safeParse({
+				computeQueue: { enabled: false },
+			}).success,
+		).toBe(false);
+		expect(
+			appSettingsControlPatchSchema.safeParse({
+				computeQueue: { exemptPatterns: ['run test*'] },
 			}).success,
 		).toBe(false);
 	});
