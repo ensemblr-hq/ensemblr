@@ -1877,6 +1877,32 @@ export default interface Resources {
 				description: 'Prevent automatic system sleep while an in-app agent works. The display may sleep. Pauses below 10% battery when unplugged.';
 				label: 'Caffeinate while agents are running';
 			};
+			'compute-queue': {
+				concurrency: {
+					'aria-label': 'Compute queue slots';
+					description: 'How many queued commands may run at the same time. Scripts you start yourself always run at once and hold a slot.';
+					label: 'Concurrent slots';
+				};
+				enabled: {
+					description: 'Heavy commands agents run, such as builds, tests, and installs, wait for a free slot across all workspaces instead of starting together. Keeps the machine responsive when several agents work at once.';
+					label: 'Compute queue';
+				};
+				'exempt-patterns': {
+					'aria-label': 'Exempt command patterns, one per line';
+					description: 'Commands that never wait in the queue, one pattern per line, using the same syntax. Exemptions win over heavy patterns.';
+					label: 'Exempt commands';
+				};
+				'extra-patterns': {
+					'aria-label': 'Extra heavy command patterns, one per line';
+					description: 'Commands to queue in addition to the built-in list, one pattern per line. A pattern is a command prefix split on spaces; * matches within a word. Package scripts match as run <script>, for example run test*.';
+					label: 'Extra heavy commands';
+				};
+				niceness: {
+					'aria-label': 'Compute queue CPU priority';
+					description: 'CPU priority of queued commands, from 0 to 19. A higher value yields more CPU to your own apps.';
+					label: 'CPU priority (niceness)';
+				};
+			};
 			'context-usage': {
 				description: 'Always show context usage. By default, only shown when more than 70% is used.';
 				label: 'Always show context usage';
@@ -3747,6 +3773,20 @@ export default interface Resources {
 			unselected: 'Select model';
 		};
 		'navigation-sidebar': {
+			'compute-queue': {
+				cancel: 'Cancel {{label}}';
+				initiator: {
+					agent: 'Agent';
+					auto: 'Setup';
+					user: 'You';
+				};
+				'open-log': 'Open log';
+				position: '#{{position}}';
+				slots: '{{inUse}}/{{slots}}';
+				'slots-hint': 'Slots in use';
+				summary: '{{running}} running · {{queued}} queued';
+				title: 'Compute queue';
+			};
 			footer: {
 				repositories_one: '{{count}} repo';
 				repositories_other: '{{count}} repos';

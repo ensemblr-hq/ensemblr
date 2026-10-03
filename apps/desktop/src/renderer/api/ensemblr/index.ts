@@ -38,6 +38,7 @@ export * from './secrets';
 export * from './settings';
 export * from './settings-publication';
 export * from './setup';
+export * from './compute-queue';
 export * from './updates';
 export * from './window-controls';
 export * from './workspace-files';

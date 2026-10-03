@@ -8,6 +8,7 @@ import type { ArchiveApi } from './archive-lifecycle';
 import type { ChatTabApi } from './chat-tab';
 import type { CheckpointApi } from './checkpoint';
 import type { CloneApi } from './clone';
+import type { ComputeQueueApi } from './compute-queue';
 import type { ConciergeApi } from './concierge';
 import type { DictationApi } from './dictation';
 import type { EnvironmentApi } from './environment';
@@ -88,4 +89,5 @@ export interface EnsemblrApi
 		OpenTargetApi,
 		SecretsApi,
 		TextEditingApi,
-		UpdateApi {}
+		UpdateApi,
+		ComputeQueueApi {}

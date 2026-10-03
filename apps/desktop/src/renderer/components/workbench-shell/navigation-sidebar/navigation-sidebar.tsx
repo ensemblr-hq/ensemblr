@@ -34,7 +34,7 @@ import type {
 } from '@/renderer/types/workbench-shell';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 import { RenameWorkspaceDialog } from '../rename-workspace-dialog';
-
+import { SidebarComputeQueuePanel } from './compute-queue-panel';
 import { NavigationSidebarHeader } from './navigation-sidebar-header';
 import { PinnedWorkspaceGroup } from './pinned-workspace-group';
 import { ProjectNavigationGroups } from './project-navigation-groups';
@@ -128,6 +128,7 @@ export function WorkspaceNavigationSidebar({
 				</ScrollArea>
 			</SidebarContent>
 
+			<SidebarComputeQueuePanel />
 			<SidebarUpdatePanel />
 			{developerMode ? (
 				<SidebarHealthFooter health={health} projects={projects} />

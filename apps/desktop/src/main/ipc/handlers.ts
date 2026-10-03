@@ -14,6 +14,7 @@ import type { HarnessDetectionService } from '../agents/index.ts';
 import type { ArchitectureService } from '../architecture/index.ts';
 import { createChatTabService } from '../chat-tabs/index.ts';
 import type { LocalCommandService } from '../commands/local-command';
+import type { ComputeQueueService } from '../compute-queue/types.ts';
 import type { ConciergeHome, ConciergeSessionService } from '../concierge';
 import type {
 	AppSettingsService,
@@ -81,6 +82,7 @@ import { registerArchitectureHandlers } from './handlers/architecture';
 import { registerChatTabHandlers } from './handlers/chat-tab';
 import { registerCheckpointHandlers } from './handlers/checkpoint';
 import { registerCloneHandlers } from './handlers/clone';
+import { registerComputeQueueHandlers } from './handlers/compute-queue';
 import { registerConciergeHandlers } from './handlers/concierge';
 import { registerDictationHandlers } from './handlers/dictation';
 import { registerEnvironmentHandlers } from './handlers/environment';
@@ -201,6 +203,7 @@ interface RegisterIpcHandlersOptions {
 	toolTrustService: ToolTrustService;
 	unarchiveWorkspaceService: UnarchiveWorkspaceService;
 	updateService: UpdateService;
+	computeQueueService: Pick<ComputeQueueService, 'cancel' | 'snapshot'>;
 	workspaceFilesWatcher: WorkspaceFilesWatcher;
 }
 
@@ -277,6 +280,7 @@ export function registerIpcHandlers({
 	toolTrustService,
 	updateService,
 	unarchiveWorkspaceService,
+	computeQueueService,
 	workspaceFilesWatcher,
 }: RegisterIpcHandlersOptions): IpcHandlersHandle {
 	const resolvePermissionMode = createPermissionModeResolver({
@@ -405,6 +409,7 @@ export function registerIpcHandlers({
 			registerSetupHandlers({ setupDiagnosticsService });
 			registerTerminalHandlers({ terminalService });
 			registerUpdateHandlers({ updateService });
+			registerComputeQueueHandlers({ computeQueueService });
 			registerAgentHandlers({
 				augmentHarnessCommand,
 				databaseService,

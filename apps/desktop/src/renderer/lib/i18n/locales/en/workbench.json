@@ -1066,6 +1066,20 @@
 		"unselected": "Select model"
 	},
 	"navigation-sidebar": {
+		"compute-queue": {
+			"cancel": "Cancel {{label}}",
+			"initiator": {
+				"agent": "Agent",
+				"auto": "Setup",
+				"user": "You"
+			},
+			"open-log": "Open log",
+			"position": "#{{position}}",
+			"slots": "{{inUse}}/{{slots}}",
+			"slots-hint": "Slots in use",
+			"summary": "{{running}} running · {{queued}} queued",
+			"title": "Compute queue"
+		},
 		"footer": {
 			"repositories_one": "{{count}} repo",
 			"repositories_other": "{{count}} repos",

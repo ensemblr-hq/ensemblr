@@ -1066,6 +1066,20 @@
 		"unselected": "Επιλογή μοντέλου"
 	},
 	"navigation-sidebar": {
+		"compute-queue": {
+			"cancel": "Ακύρωση {{label}}",
+			"initiator": {
+				"agent": "Πράκτορας",
+				"auto": "Εγκατάσταση",
+				"user": "Εσείς"
+			},
+			"open-log": "Άνοιγμα καταγραφής",
+			"position": "#{{position}}",
+			"slots": "{{inUse}}/{{slots}}",
+			"slots-hint": "Θέσεις σε χρήση",
+			"summary": "{{running}} σε εκτέλεση · {{queued}} στην ουρά",
+			"title": "Ουρά υπολογισμών"
+		},
 		"footer": {
 			"repositories_one": "{{count}} αποθετήριο",
 			"repositories_other": "{{count}} αποθετήρια",

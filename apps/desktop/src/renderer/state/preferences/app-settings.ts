@@ -278,6 +278,27 @@ export const terminalScrollbackMbAtom = settingAtom(
 	'terminalScrollbackMb',
 );
 
+// ─── Compute queue ────────────────────────────────────────────────────────────
+/** Whether heavy agent commands wait for a free slot instead of starting at once. */
+export const computeQueueEnabledAtom = settingAtom('computeQueue', 'enabled');
+/** How many queued jobs may run at the same time. */
+export const computeQueueConcurrencyAtom = settingAtom(
+	'computeQueue',
+	'concurrency',
+);
+/** CPU niceness queued commands run at; higher yields more to the user's own apps. */
+export const computeQueueNicenessAtom = settingAtom('computeQueue', 'niceness');
+/** Extra command patterns the queue treats as heavy. */
+export const computeQueueExtraPatternsAtom = settingAtom(
+	'computeQueue',
+	'extraPatterns',
+);
+/** Command patterns that skip the queue even when they would match a heavy one. */
+export const computeQueueExemptPatternsAtom = settingAtom(
+	'computeQueue',
+	'exemptPatterns',
+);
+
 /** Whether the composer shows its dictation control. */
 export const dictationEnabledAtom = settingAtom('dictation', 'enabled');
 /** OpenAI-compatible API root the transcription request is posted to. */

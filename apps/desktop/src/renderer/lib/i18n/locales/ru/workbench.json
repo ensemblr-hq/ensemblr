@@ -1136,6 +1136,20 @@
 		"unselected": "Выбрать модель"
 	},
 	"navigation-sidebar": {
+		"compute-queue": {
+			"cancel": "Отменить {{label}}",
+			"initiator": {
+				"agent": "Агент",
+				"auto": "Настройка",
+				"user": "Вы"
+			},
+			"open-log": "Открыть лог",
+			"position": "№{{position}}",
+			"slots": "{{inUse}}/{{slots}}",
+			"slots-hint": "Занято слотов",
+			"summary": "{{running}} в работе · {{queued}} в очереди",
+			"title": "Очередь вычислений"
+		},
 		"footer": {
 			"repositories_one": "{{count}} репозиторий",
 			"repositories_few": "{{count}} репозитория",

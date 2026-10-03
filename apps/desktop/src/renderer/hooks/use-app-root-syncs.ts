@@ -5,6 +5,7 @@ import { useModalInertBodyGuard } from '@/renderer/hooks/use-modal-inert-body-gu
 import { useNotificationSoundSync } from '@/renderer/hooks/use-notification-sound-sync';
 import { useAfkModeSync } from '@/renderer/state/afk-mode';
 import { useAskUserQuestionSync } from '@/renderer/state/ask-user-question';
+import { useComputeQueueSync } from '@/renderer/state/compute-queue';
 import { usePlanModeSync, usePlanReviewSync } from '@/renderer/state/plan-mode';
 import {
 	useAppearanceEffect,
@@ -45,5 +46,6 @@ export function useAppRootSyncs(): void {
 	usePlanModeSync();
 	useAfkModeSync();
 	useUpdateSync();
+	useComputeQueueSync();
 	useModalInertBodyGuard();
 }
