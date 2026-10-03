@@ -65,6 +65,28 @@ export function getRenderableNavigationSnapshot({
 	return querySnapshot ?? cachedSnapshot ?? null;
 }
 
+/**
+ * Whether a navigation PR model states the verdict a presentation carries: the
+ * same pull request, in the same state and status. A consumer holding the
+ * current snapshot's presentation uses it to tell a model mapped from that
+ * snapshot from one a held render state kept from an older snapshot, which has
+ * no right to the current snapshot's observation stamp.
+ * @param pullRequest - The navigation-derived PR model.
+ * @param presentation - The presentation the current snapshot holds for the same workspace.
+ * @returns True when the model states that presentation's verdict.
+ */
+export function statesPresentationVerdict(
+	pullRequest: WorkspaceShellModel['pullRequest'],
+	presentation: WorkspacePrPresentation,
+): boolean {
+	const { state, status } = mapPresentationStatus(presentation.status);
+	return (
+		pullRequest.number === presentation.number &&
+		pullRequest.state === state &&
+		pullRequest.status === status
+	);
+}
+
 /** Builds a placeholder session tab from a workspace shell model. */
 export function createPlaceholderSession(
 	workspace: WorkspaceShellModel,
@@ -251,9 +273,11 @@ function mapPresentationChecks(
  * state, label) are populated; the heavier panel model is still built from the
  * live snapshot elsewhere.
  *
- * The presentation's `syncedAt` is carried through so `useLivePullRequestModel`
- * can tell this observation apart from the one its own snapshot query holds and
- * render whichever saw GitHub last. The status label comes from the same
+ * The model carries no observation stamp. `useLivePullRequestModel` reads the
+ * latest one for the workspace straight from the snapshot's
+ * `pullRequestSyncedAt`, so the stamp can move on every sweep without making an
+ * unchanged row a new model; {@link statesPresentationVerdict} is how it checks
+ * the model still says what that stamp observed. The status label comes from the same
  * `git:pull-request.label.*` keys the live model uses, so the pill reads its real
  * status from the first frame instead of a placeholder that changes a second
  * later.
@@ -305,7 +329,6 @@ function mapPresentationPullRequest(
 		number: presentation.number,
 		state,
 		status,
-		syncedAt: presentation.syncedAt,
 	};
 }
 

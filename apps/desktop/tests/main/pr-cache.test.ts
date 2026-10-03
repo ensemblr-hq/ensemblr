@@ -161,8 +161,40 @@ describe('navigation snapshot PR presentation', () => {
 			branchSync: null,
 			number: 42,
 			status: 'checking',
-			syncedAt: LATER,
 		});
+		expect(navigation.pullRequestSyncedAt).toEqual({ [WORKSPACE_ID]: LATER });
+	});
+
+	// The sweeper re-stamps a row on every write, including the ones that observe
+	// no change. The renderer's project list keys on `repositories` keeping its
+	// reference across such a poll, which structural sharing only grants when the
+	// tree itself is deep-equal — so the stamp has to live outside it.
+	test('keeps a re-stamped, unchanged pull request out of the tree', () => {
+		const database = openTestDatabase();
+		writeCachedPullRequestSnapshot({
+			database,
+			snapshot: snapshotAt(EARLIER, 'pending'),
+			workspaceId: WORKSPACE_ID,
+		});
+		const before = getRepositoryWorkspaceNavigationSnapshot({ database });
+		writeCachedPullRequestSnapshot({
+			database,
+			snapshot: snapshotAt(LATER, 'pending'),
+			workspaceId: WORKSPACE_ID,
+		});
+		const after = getRepositoryWorkspaceNavigationSnapshot({ database });
+
+		expect(after.repositories).toEqual(before.repositories);
+		expect(before.pullRequestSyncedAt).toEqual({ [WORKSPACE_ID]: EARLIER });
+		expect(after.pullRequestSyncedAt).toEqual({ [WORKSPACE_ID]: LATER });
+	});
+
+	test('leaves a workspace with no cached pull request unstamped', () => {
+		const database = openTestDatabase();
+		const navigation = getRepositoryWorkspaceNavigationSnapshot({ database });
+
+		expect(navigation.repositories[0]?.workspaces[0]?.pullRequest).toBeNull();
+		expect(navigation.pullRequestSyncedAt).toEqual({});
 	});
 
 	// The row reads unpushed commits off this copy rather than opening a git

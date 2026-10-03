@@ -16,11 +16,10 @@ import type {
  * ready, but stays dependency-free so the main process can derive and persist
  * it per workspace without importing renderer types.
  *
- * Carries the snapshot's own `syncedAt` so a consumer holding two observations
- * of the same workspace — this compact one and a full snapshot of its own — can
- * tell which describes GitHub more recently. Without it the two are only
- * orderable by which happens to be loaded, which is what lets a status move
- * backwards; see {@link isFresherPrObservation}.
+ * The presentation says nothing about *when* it was observed: that is the
+ * snapshot's own `syncedAt`, which {@link parseWorkspacePrPresentation} hands
+ * back beside it rather than inside it. The navigation tree keeps the two apart
+ * because the stamp moves on every sweep while the status mostly does not.
  *
  * `branchSync` rides along for the same reason the status does: it is already in
  * the snapshot this parses, so every row can report unpushed commits without the
@@ -44,13 +43,24 @@ export function deriveWorkspacePrPresentation(
 			observedAt: snapshot.syncedAt,
 			pullRequest,
 		}),
-		syncedAt: snapshot.syncedAt,
 	};
 }
 
+/** A compact presentation and the stamp of the snapshot it was derived from. */
+export interface StampedWorkspacePrPresentation {
+	presentation: WorkspacePrPresentation;
+	/**
+	 * When the snapshot behind `presentation` observed GitHub. A consumer holding
+	 * a full snapshot of its own orders the two by this, through
+	 * {@link isFresherPrObservation}; without it they are only orderable by which
+	 * happens to be loaded, which is what lets a status move backwards.
+	 */
+	syncedAt: string;
+}
+
 /**
- * Derives the compact presentation from a stored snapshot column, tolerating a
- * missing join or a malformed cache row.
+ * Derives the compact presentation from a stored snapshot column, with the
+ * snapshot's stamp beside it, tolerating a missing join or a malformed cache row.
  *
  * A row with no readable `syncedAt` yields no presentation rather than an
  * unstamped one: consumers order this observation against a live snapshot by
@@ -58,12 +68,16 @@ export function deriveWorkspacePrPresentation(
  * the two". It is also what the check-registration grace is measured against,
  * so an unstamped row could not be judged for staleness either.
  * @param snapshotJson - Raw cached snapshot JSON, or null when there is none.
- * @returns The compact PR presentation, or null when absent or unparseable.
+ * @returns The compact PR presentation and its stamp, or null when absent or unparseable.
  */
 export function parseWorkspacePrPresentation(
 	snapshotJson: string | null,
-): WorkspacePrPresentation | null {
-	return deriveWorkspacePrPresentation(parseSnapshotJson(snapshotJson));
+): StampedWorkspacePrPresentation | null {
+	const snapshot = parseSnapshotJson(snapshotJson);
+	const presentation = deriveWorkspacePrPresentation(snapshot);
+	return snapshot && presentation
+		? { presentation, syncedAt: snapshot.syncedAt }
+		: null;
 }
 
 /**

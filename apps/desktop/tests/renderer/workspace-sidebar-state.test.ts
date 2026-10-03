@@ -25,7 +25,7 @@ const SYNCED_BRANCH: GitBranchSyncWire = {
 
 function workspaceModelWith(
 	presentation:
-		| (Omit<WorkspacePrPresentation, 'branchSync' | 'syncedAt'> & {
+		| (Omit<WorkspacePrPresentation, 'branchSync'> & {
 				branchSync?: GitBranchSyncWire | null;
 		  })
 		| null,
@@ -35,11 +35,11 @@ function workspaceModelWith(
 				branchSync: presentation.branchSync ?? SYNCED_BRANCH,
 				number: presentation.number,
 				status: presentation.status,
-				syncedAt: '2026-07-15T00:00:00.000Z',
 			}
 		: null;
 	const snapshot: RepositoryWorkspaceNavigationSnapshot = {
 		generatedAt: '2026-07-15T00:00:00.000Z',
+		pullRequestSyncedAt: {},
 		repositories: [
 			{
 				createdAt: '2026-07-15T00:00:00.000Z',

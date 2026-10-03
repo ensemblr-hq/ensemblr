@@ -38,6 +38,7 @@ import type {
 
 const navigationSnapshot: RepositoryWorkspaceNavigationSnapshot = {
 	generatedAt: '2026-06-06T00:00:00.000Z',
+	pullRequestSyncedAt: {},
 	repositories: [
 		{
 			createdAt: '2026-06-06T00:00:00.000Z',
@@ -262,7 +263,6 @@ function readyPullRequestProjects() {
 					},
 					number: 42,
 					status: 'ready',
-					syncedAt: '2026-06-06T00:00:00.000Z',
 				},
 			},
 		]),
@@ -531,11 +531,13 @@ test('keeps cached navigation snapshot renderable while live query is pending', 
 			cachedSnapshot: navigationSnapshot,
 			querySnapshot: {
 				generatedAt: '2026-06-06T00:00:01.000Z',
+				pullRequestSyncedAt: {},
 				repositories: [],
 			},
 		}),
 	).toEqual({
 		generatedAt: '2026-06-06T00:00:01.000Z',
+		pullRequestSyncedAt: {},
 		repositories: [],
 	});
 	expect(

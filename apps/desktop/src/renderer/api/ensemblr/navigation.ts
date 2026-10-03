@@ -1,6 +1,8 @@
 import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
+import type { StampedWorkspacePrPresentation } from '@/shared/github-pr-presentation';
+import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 
 import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
 
@@ -82,3 +84,41 @@ export const repositoryWorkspaceNavigationQuery = queryOptions({
 	refetchInterval: 15000,
 	staleTime: 2000,
 });
+
+/**
+ * Query options that read one workspace's pull-request observation out of the
+ * cached navigation snapshot: the presentation its sidebar row is mapped from,
+ * paired with when that was observed, or null when the workspace has none.
+ *
+ * It never fetches — the workbench's own subscription to the same key keeps the
+ * snapshot polled. The snapshot holds the stamps apart from its tree because
+ * they move on every sweep while the presentations mostly do not, and selecting
+ * one pair back out per workspace means a consumer re-renders when its own
+ * workspace's observation moves rather than whenever any of them does.
+ * @param workspaceId - Workspace whose observation to read.
+ * @returns Query options selecting that workspace's observation from the cache.
+ */
+export function workspacePrObservationQuery(workspaceId: string) {
+	return queryOptions({
+		...repositoryWorkspaceNavigationQuery,
+		enabled: false,
+		select: (snapshot) => selectPrObservation(snapshot, workspaceId),
+	});
+}
+
+/**
+ * Pairs one workspace's presentation in a navigation snapshot with its stamp.
+ * @param snapshot - The cached navigation snapshot.
+ * @param workspaceId - Workspace whose observation to read.
+ * @returns The presentation and its stamp, or null when the workspace has no pull request.
+ */
+function selectPrObservation(
+	snapshot: RepositoryWorkspaceNavigationSnapshot,
+	workspaceId: string,
+): StampedWorkspacePrPresentation | null {
+	const presentation = snapshot.repositories
+		.flatMap((repository) => repository.workspaces)
+		.find((workspace) => workspace.id === workspaceId)?.pullRequest;
+	const syncedAt = snapshot.pullRequestSyncedAt[workspaceId];
+	return presentation && syncedAt ? { presentation, syncedAt } : null;
+}

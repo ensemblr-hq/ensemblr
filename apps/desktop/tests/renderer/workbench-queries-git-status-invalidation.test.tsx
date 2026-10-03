@@ -39,6 +39,7 @@ function workspaceRow(id: string): RepositoryWorkspaceNavigationWorkspace {
 function snapshot(): RepositoryWorkspaceNavigationSnapshot {
 	return {
 		generatedAt: NOW,
+		pullRequestSyncedAt: {},
 		repositories: [
 			{
 				createdAt: NOW,
