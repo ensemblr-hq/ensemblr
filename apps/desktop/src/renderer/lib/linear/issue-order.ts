@@ -141,6 +141,25 @@ export function linearPriorityRank(priority: number | null): number {
 	return priority === null || priority === 0 ? 5 : priority;
 }
 
+/**
+ * Orders issues urgent first and "no priority" last, then most recently updated
+ * first, with an undated issue last in its rank. An issue from a tracker with no
+ * priority of its own, such as GitHub, passes a null priority and sorts with the
+ * unprioritized ones.
+ * @param left - One issue's priority and last-update time
+ * @param right - The other issue's priority and last-update time
+ * @returns A comparator result
+ */
+export function compareByPriorityThenRecency(
+	left: Pick<LinearIssueWire, 'priority' | 'updatedAt'>,
+	right: Pick<LinearIssueWire, 'priority' | 'updatedAt'>,
+): number {
+	return (
+		linearPriorityRank(left.priority) - linearPriorityRank(right.priority) ||
+		compareUpdated(left, right)
+	);
+}
+
 /** Localized name of a normalized workflow-state bucket. */
 export function getLinearStateBucketLabel(bucket: LinearStateBucket): string {
 	switch (bucket) {
@@ -215,8 +234,7 @@ function compareBy(
 		}
 
 		return (
-			linearPriorityRank(left.priority) - linearPriorityRank(right.priority) ||
-			compareUpdated(left, right) ||
+			compareByPriorityThenRecency(left, right) ||
 			left.identifier.localeCompare(right.identifier)
 		);
 	};
@@ -246,12 +264,15 @@ function comparePrimary(
 }
 
 /** Orders by last update, newest first, with never-updated issues last. */
-function compareUpdated(left: LinearIssueWire, right: LinearIssueWire): number {
+function compareUpdated(
+	left: Pick<LinearIssueWire, 'updatedAt'>,
+	right: Pick<LinearIssueWire, 'updatedAt'>,
+): number {
 	return updatedAtMs(right) - updatedAtMs(left);
 }
 
 /** Parses an issue's `updatedAt` into a comparable number. */
-function updatedAtMs(issue: LinearIssueWire): number {
+function updatedAtMs(issue: Pick<LinearIssueWire, 'updatedAt'>): number {
 	if (!issue.updatedAt) {
 		return Number.NEGATIVE_INFINITY;
 	}

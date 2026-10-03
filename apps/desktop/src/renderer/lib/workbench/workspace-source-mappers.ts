@@ -1,7 +1,12 @@
-import { buildWorkspaceSeedFromGithubIssue } from '@/renderer/lib/github';
+import {
+	buildWorkspaceSeedFromGithubIssue,
+	mapGithubIssuesToWorkspaceSources,
+} from '@/renderer/lib/github';
 import {
 	buildWorkspaceSeedFromLinearIssue,
+	compareByPriorityThenRecency,
 	isLinearIssueNotStarted,
+	mapLinearIssuesToWorkspaceSources,
 } from '@/renderer/lib/linear';
 import type {
 	ProjectShellModel,
@@ -23,6 +28,12 @@ import { toWorkspaceDisplayName } from '@/shared/workspace-name';
 interface StartableIssues {
 	githubIssues: RepositoryIssueWire[];
 	linearIssues: LinearIssueWire[];
+}
+
+/** A picker row paired with the priority and last-update time it sorts by. */
+interface RankedIssueSource {
+	rank: Pick<LinearIssueWire, 'priority' | 'updatedAt'>;
+	source: WorkspaceSource;
 }
 
 /** Stable picker-row id for a branch source. */
@@ -106,6 +117,36 @@ export function selectStartableIssues({
 			(issue) => isLinearIssueNotStarted(issue) && !linked.has(issue.id),
 		),
 	};
+}
+
+/**
+ * Maps the Issues tab's rows into picker sources, both providers in one list
+ * ordered by Linear priority (urgent first, "no priority" last), then by last
+ * update, newest first. GitHub has no priority, so its issues rank as "no
+ * priority" and interleave with unprioritized Linear issues by recency. Rows
+ * that tie keep their incoming order, GitHub ahead of Linear.
+ * @param issues - The startable rows per provider, as {@link selectStartableIssues} returns them.
+ * @returns The ordered picker sources.
+ */
+export function mapStartableIssuesToWorkspaceSources({
+	githubIssues,
+	linearIssues,
+}: StartableIssues): WorkspaceSource[] {
+	const githubSources = mapGithubIssuesToWorkspaceSources(githubIssues);
+	const linearSources = mapLinearIssuesToWorkspaceSources(linearIssues);
+	const ranked: RankedIssueSource[] = [
+		...githubIssues.map((issue, index) => ({
+			rank: { priority: null, updatedAt: issue.updatedAt },
+			source: githubSources[index],
+		})),
+		...linearIssues.map((issue, index) => ({
+			rank: issue,
+			source: linearSources[index],
+		})),
+	];
+	return ranked
+		.sort((left, right) => compareByPriorityThenRecency(left.rank, right.rank))
+		.map(({ source }) => source);
 }
 
 /**

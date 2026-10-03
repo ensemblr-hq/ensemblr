@@ -161,6 +161,48 @@ test('the Issues tab drops started and already-linked issues from live query dat
 	expect(result.current.itemsById.has('started')).toBe(false);
 });
 
+test('the Issues tab orders rows by priority, then by last update, across providers', async () => {
+	installBridge({
+		githubIssues: [
+			githubIssue({
+				number: 2,
+				title: 'Fresh GitHub issue',
+				updatedAt: '2026-10-02T00:00:00.000Z',
+				url: 'https://github.com/o/r/issues/2',
+			}),
+		],
+		linear: {
+			accountFailures: [],
+			issues: [
+				linearIssue({
+					id: 'stale-backlog',
+					priority: 0,
+					stateType: 'backlog',
+					title: 'Stale backlog issue',
+					updatedAt: '2026-09-01T00:00:00.000Z',
+				}),
+				linearIssue({
+					id: 'urgent-todo',
+					priority: 1,
+					title: 'Urgent todo issue',
+					updatedAt: '2026-08-01T00:00:00.000Z',
+				}),
+			],
+			source: 'remote',
+			status: 'ok',
+		},
+	});
+
+	const { result } = renderIssuesTab([]);
+
+	await waitFor(() => expect(result.current.sources).toHaveLength(3));
+	expect(result.current.sources.map((source) => source.title)).toEqual([
+		'Urgent todo issue',
+		'Fresh GitHub issue',
+		'Stale backlog issue',
+	]);
+});
+
 // Stale cached rows the filter empties out say nothing about what the running
 // refresh will bring, so "nothing to start" would be premature.
 test('an emptied Issues tab reads as loading while a Linear refresh runs', async () => {

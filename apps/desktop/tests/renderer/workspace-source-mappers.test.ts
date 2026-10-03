@@ -9,6 +9,7 @@ import {
 	collectLinkedIssueKeys,
 	mapPullRequestsToWorkspaceSources,
 	mapRepositoryBranchesToWorkspaceSources,
+	mapStartableIssuesToWorkspaceSources,
 	openableWorkspaceId,
 	pullRequestSourceId,
 	selectStartableIssues,
@@ -459,6 +460,97 @@ test('the issue picker keeps open GitHub issues whoever they are assigned to', (
 	});
 
 	expect(githubIssues).toHaveLength(1);
+});
+
+test('the issue picker puts urgent Linear issues ahead of stale backlog and GitHub rows', () => {
+	const sources = mapStartableIssuesToWorkspaceSources({
+		githubIssues: [
+			githubIssue({ number: 1, updatedAt: '2026-09-30T00:00:00.000Z' }),
+		],
+		linearIssues: [
+			linearIssue({
+				id: 'backlog-low',
+				priority: 4,
+				stateType: 'backlog',
+				updatedAt: '2026-09-01T00:00:00.000Z',
+			}),
+			linearIssue({
+				id: 'todo-urgent',
+				priority: 1,
+				updatedAt: '2026-08-01T00:00:00.000Z',
+			}),
+			linearIssue({
+				id: 'todo-high',
+				priority: 2,
+				updatedAt: '2026-09-02T00:00:00.000Z',
+			}),
+		],
+	});
+
+	expect(sources.map((source) => source.id)).toEqual([
+		'todo-urgent',
+		'todo-high',
+		'backlog-low',
+		githubIssueSourceId(1),
+	]);
+});
+
+// GitHub has no priority, so its issues rank with Linear's unprioritized ones.
+test('the issue picker interleaves GitHub issues with unprioritized Linear ones by last update', () => {
+	const sources = mapStartableIssuesToWorkspaceSources({
+		githubIssues: [
+			githubIssue({ number: 1, updatedAt: '2026-09-01T00:00:00.000Z' }),
+			githubIssue({ number: 2, updatedAt: '2026-09-20T00:00:00.000Z' }),
+			githubIssue({ number: 3, updatedAt: '' }),
+		],
+		linearIssues: [
+			linearIssue({
+				id: 'none-mid',
+				priority: 0,
+				updatedAt: '2026-09-10T00:00:00.000Z',
+			}),
+			linearIssue({ id: 'none-undated', priority: 0, updatedAt: null }),
+		],
+	});
+
+	expect(sources.map((source) => source.id)).toEqual([
+		githubIssueSourceId(2),
+		'none-mid',
+		githubIssueSourceId(1),
+		githubIssueSourceId(3),
+		'none-undated',
+	]);
+});
+
+test('the issue picker keeps each row mapped as its own provider renders it', () => {
+	const sources = mapStartableIssuesToWorkspaceSources({
+		githubIssues: [githubIssue({ number: 7, title: 'GitHub row' })],
+		linearIssues: [
+			linearIssue({
+				id: 'linear-row',
+				identifier: 'ENS-9',
+				priority: 3,
+				projectName: 'Desktop',
+				title: 'Linear row',
+			}),
+		],
+	});
+
+	expect(sources).toEqual([
+		expect.objectContaining({
+			id: 'linear-row',
+			provider: 'linear',
+			reference: 'ENS-9',
+			title: 'Linear row',
+			trackerProject: 'Desktop',
+		}),
+		expect.objectContaining({
+			id: githubIssueSourceId(7),
+			provider: 'github',
+			reference: '#7',
+			title: 'GitHub row',
+		}),
+	]);
 });
 
 test('linked-issue keys are collected across every project and skip unlinked workspaces', () => {
