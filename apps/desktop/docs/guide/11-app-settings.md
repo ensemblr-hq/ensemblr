@@ -142,7 +142,14 @@ How chats behave day to day, plus where Ensemblr keeps its repositories.
 
 **The compute queue is visible, and agents cannot edit it.** While a job waits or
 runs, a **Compute queue** panel appears at the bottom of the sidebar, listing
-every workspace's jobs with who started them, a cancel, and an open-log action.
+every workspace's jobs — a setup or run script by name, a command by its label —
+with who started them (`Agent`, `You`, or `Auto` for the app's own setup), how
+long a running job has run or where a waiting one stands in line, and its
+workspace, which opens on click. A running job offers **Stop**, a waiting one
+**Cancel**, and a command job an open-log action. The badge counts slots in use;
+a script you start yourself takes one at once, so it can read past the limit.
+Click the panel's header to collapse it to that summary; it stays collapsed
+across restarts.
 The numeric fields commit when you leave the field or press `↵`, and the four rows
 beneath the switch are disabled while the queue is off. The settings tools an agent
 uses refuse this section outright. Background: [ADR 0082](../adr/0082-queue-heavy-agent-commands-through-one-app-wide-queue.md).

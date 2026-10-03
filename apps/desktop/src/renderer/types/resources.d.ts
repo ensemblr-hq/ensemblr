@@ -3809,13 +3809,28 @@ export default interface Resources {
 				'cancel-failed': 'Could not cancel the job. It may have already finished.';
 				initiator: {
 					agent: 'Agent';
-					auto: 'Setup';
+					automatic: 'Auto';
 					user: 'You';
 				};
+				'initiator-hint': {
+					agent: 'Started by an agent';
+					auto: 'Started automatically by Ensemblr';
+					user: 'Started by you';
+				};
 				'open-log': 'Open log';
-				position: '#{{position}}';
-				slots: '{{inUse}}/{{slots}}';
-				'slots-hint': 'Slots in use';
+				'open-workspace': 'Open workspace';
+				'open-workspace-aria': 'Open workspace {{workspace}}';
+				'queue-position': '#{{position}} in queue';
+				script: {
+					archive: 'Archive script';
+					run: 'Run script';
+					'run-named': 'Run script: {{name}}';
+					setup: 'Setup script';
+				};
+				'slot-usage_one': '{{inUse}}/{{count}} slot';
+				'slot-usage_other': '{{inUse}}/{{count}} slots';
+				'slots-explainer': 'Slots in use out of the total. Heavy commands wait for a free slot; a script you start yourself takes one at once, even when all are busy.';
+				stop: 'Stop {{label}}';
 				summary: '{{running}} running · {{queued}} queued';
 				title: 'Compute queue';
 			};

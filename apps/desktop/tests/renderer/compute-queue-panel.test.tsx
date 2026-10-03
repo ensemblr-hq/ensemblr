@@ -2,9 +2,13 @@
 
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { createStore, Provider } from 'jotai';
+import type { ComponentProps } from 'react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { computeQueueSnapshotAtom } from '../../src/renderer/state/compute-queue';
+import {
+	computeQueuePanelCollapsedAtom,
+	computeQueueSnapshotAtom,
+} from '../../src/renderer/state/compute-queue';
 import type {
 	ComputeJobSnapshot,
 	ComputeQueueSnapshot,
@@ -44,6 +48,7 @@ function job(overrides: Partial<ComputeJobSnapshot>): ComputeJobSnapshot {
 		label: 'bun run test',
 		logPath: '/work/ws/.context/compute-queue/job-1.log',
 		position: null,
+		script: null,
 		sessionId: null,
 		signal: null,
 		startedAt: null,
@@ -60,38 +65,47 @@ function queue(jobs: ComputeJobSnapshot[]): ComputeQueueSnapshot {
 	return { enabled: true, inUse: 1, jobs, slots: 2 };
 }
 
+/** Renders the presentational panel expanded, with no-op actions unless a test overrides them. */
+function renderPanel(
+	snapshot: ComputeQueueSnapshot,
+	overrides: Partial<ComponentProps<typeof ComputeQueuePanel>> = {},
+) {
+	return renderWithProviders(
+		<ComputeQueuePanel
+			collapsed={false}
+			onCancel={() => undefined}
+			onCollapsedChange={() => undefined}
+			onOpenLog={() => undefined}
+			snapshot={snapshot}
+			{...overrides}
+		/>,
+	);
+}
+
 describe('ComputeQueuePanel', () => {
 	test('renders nothing when no job is queued or running', () => {
-		const { container } = renderWithProviders(
-			<ComputeQueuePanel
-				onCancel={() => undefined}
-				onOpenLog={() => undefined}
-				snapshot={queue([
-					job({ id: 'done', state: 'succeeded' }),
-					job({ id: 'bad', state: 'failed' }),
-				])}
-			/>,
+		const { container } = renderPanel(
+			queue([
+				job({ id: 'done', state: 'succeeded' }),
+				job({ id: 'bad', state: 'failed' }),
+			]),
 		);
 
 		expect(container.querySelector('[data-sidebar-compute-queue]')).toBeNull();
 	});
 
 	test('lists running jobs before queued ones, queued by position', () => {
-		const { container } = renderWithProviders(
-			<ComputeQueuePanel
-				onCancel={() => undefined}
-				onOpenLog={() => undefined}
-				snapshot={queue([
-					job({ id: 'q2', label: 'second', position: 2 }),
-					job({ id: 'q1', label: 'first', position: 1 }),
-					job({
-						id: 'r1',
-						label: 'running',
-						startedAt: Date.now(),
-						state: 'running',
-					}),
-				])}
-			/>,
+		const { container } = renderPanel(
+			queue([
+				job({ id: 'q2', label: 'second', position: 2 }),
+				job({ id: 'q1', label: 'first', position: 1 }),
+				job({
+					id: 'r1',
+					label: 'running',
+					startedAt: Date.now(),
+					state: 'running',
+				}),
+			]),
 		);
 
 		const rows = [...container.querySelectorAll('[data-compute-job-state]')];
@@ -103,48 +117,166 @@ describe('ComputeQueuePanel', () => {
 			expect.stringContaining('first'),
 			expect.stringContaining('second'),
 		]);
-		expect(screen.getByText('1/2')).toBeTruthy();
+		expect(screen.getByText('1/2 slots')).toBeTruthy();
+		expect(screen.getByText('#1 in queue')).toBeTruthy();
 	});
 
-	test('cancel reports the job id', () => {
+	test('a queued job offers cancel and reports its id', () => {
 		const onCancel = vi.fn();
-		renderWithProviders(
-			<ComputeQueuePanel
-				onCancel={onCancel}
-				onOpenLog={() => undefined}
-				snapshot={queue([job({ id: 'q1', label: 'bun build', position: 1 })])}
-			/>,
-		);
+		renderPanel(queue([job({ id: 'q1', label: 'bun build', position: 1 })]), {
+			onCancel,
+		});
 
 		fireEvent.click(screen.getByRole('button', { name: 'Cancel bun build' }));
 
 		expect(onCancel).toHaveBeenCalledWith('q1');
+		expect(screen.queryByRole('button', { name: /^Stop/ })).toBeNull();
+	});
+
+	test('a running job offers stop rather than cancel', () => {
+		const onCancel = vi.fn();
+		renderPanel(
+			queue([
+				job({
+					id: 'r1',
+					label: 'bun build',
+					startedAt: Date.now(),
+					state: 'running',
+				}),
+			]),
+			{ onCancel },
+		);
+
+		fireEvent.click(screen.getByRole('button', { name: 'Stop bun build' }));
+
+		expect(onCancel).toHaveBeenCalledWith('r1');
+		expect(screen.queryByRole('button', { name: /^Cancel/ })).toBeNull();
 	});
 
 	test('offers the log for command jobs only', () => {
 		const onOpenLog = vi.fn();
 		const command = job({ id: 'c', label: 'cmd', position: 1 });
-		renderWithProviders(
-			<ComputeQueuePanel
-				onCancel={() => undefined}
-				onOpenLog={onOpenLog}
-				snapshot={queue([
-					command,
-					job({
-						id: 's',
-						kind: 'script',
-						label: 'setup',
-						logPath: null,
-						position: 2,
-					}),
-				])}
-			/>,
+		renderPanel(
+			queue([
+				command,
+				job({
+					id: 's',
+					kind: 'script',
+					label: 'setup',
+					logPath: null,
+					position: 2,
+					script: { kind: 'setup', name: null },
+				}),
+			]),
+			{ onOpenLog },
 		);
 
 		const buttons = screen.getAllByRole('button', { name: 'Open log' });
 		expect(buttons).toHaveLength(1);
 		fireEvent.click(buttons[0] as HTMLElement);
 		expect(onOpenLog).toHaveBeenCalledWith(command);
+	});
+
+	test('names a script job by what it is rather than by its command', () => {
+		const { container } = renderPanel(
+			queue([
+				job({
+					command: 'scripts/setup.sh',
+					id: 'setup',
+					initiator: 'auto',
+					kind: 'script',
+					label: 'scripts/setup.sh',
+					logPath: null,
+					position: 1,
+					script: { kind: 'setup', name: null },
+				}),
+				job({
+					command: 'bun run dev',
+					id: 'run',
+					kind: 'script',
+					label: 'bun run dev',
+					logPath: null,
+					position: 2,
+					script: { kind: 'run', name: 'dev-server' },
+				}),
+			]),
+		);
+
+		const rows = [...container.querySelectorAll('[data-compute-job-state]')];
+		expect(rows[0]?.textContent).toContain('Setup script');
+		expect(rows[0]?.textContent).not.toContain('scripts/setup.sh');
+		expect(rows[1]?.textContent).toContain('Run script: Dev server');
+		expect(
+			screen.getByRole('button', { name: 'Cancel Setup script' }),
+		).toBeTruthy();
+	});
+
+	test('labels an app-started job as automatic', () => {
+		renderPanel(
+			queue([
+				job({
+					id: 'q1',
+					initiator: 'auto',
+					kind: 'script',
+					position: 1,
+					script: { kind: 'setup', name: null },
+				}),
+			]),
+		);
+
+		expect(screen.getByText('Auto')).toBeTruthy();
+	});
+
+	test('the workspace name opens the workspace when the host can navigate', () => {
+		const onOpenWorkspace = vi.fn();
+		const queued = job({ id: 'q1', position: 1 });
+		renderPanel(queue([queued]), { onOpenWorkspace });
+
+		fireEvent.click(
+			screen.getByRole('button', { name: 'Open workspace Workspace One' }),
+		);
+
+		expect(onOpenWorkspace).toHaveBeenCalledWith(queued);
+	});
+
+	test('the workspace name is plain text without a navigation host', () => {
+		renderPanel(queue([job({ id: 'q1', position: 1 })]));
+
+		expect(screen.getByText('Workspace One')).toBeTruthy();
+		expect(screen.queryByRole('button', { name: /Open workspace/ })).toBeNull();
+	});
+
+	test('collapsing keeps the summary and hides the jobs', () => {
+		const onCollapsedChange = vi.fn();
+		const snapshot = queue([
+			job({ id: 'q1', label: 'bun build', position: 1 }),
+		]);
+		const { container, rerender } = renderPanel(snapshot, {
+			onCollapsedChange,
+		});
+
+		const toggle = screen.getByRole('button', { name: /Compute queue/ });
+		expect(toggle.getAttribute('aria-expanded')).toBe('true');
+		fireEvent.click(toggle);
+		expect(onCollapsedChange).toHaveBeenCalledWith(true);
+
+		rerender(
+			<ComputeQueuePanel
+				collapsed
+				onCancel={() => undefined}
+				onCollapsedChange={onCollapsedChange}
+				onOpenLog={() => undefined}
+				snapshot={snapshot}
+			/>,
+		);
+
+		expect(container.querySelector('[data-compute-job-state]')).toBeNull();
+		expect(screen.getByText('0 running · 1 queued')).toBeTruthy();
+		expect(
+			screen
+				.getByRole('button', { name: /Compute queue/ })
+				.getAttribute('aria-expanded'),
+		).toBe('false');
 	});
 });
 
@@ -228,6 +360,24 @@ describe('SidebarComputeQueuePanel', () => {
 
 		await waitFor(() => expect(cancelComputeJob).toHaveBeenCalledWith('q1'));
 		expect(toastError).not.toHaveBeenCalled();
+	});
+
+	test('collapsing the panel is remembered in the store', () => {
+		const store = createStore();
+		store.set(
+			computeQueueSnapshotAtom,
+			queue([job({ id: 'q1', label: 'bun build', position: 1 })]),
+		);
+		const { container } = renderWithProviders(
+			<Provider store={store}>
+				<SidebarComputeQueuePanel />
+			</Provider>,
+		);
+
+		fireEvent.click(screen.getByRole('button', { name: /Compute queue/ }));
+
+		expect(store.get(computeQueuePanelCollapsedAtom)).toBe(true);
+		expect(container.querySelector('[data-compute-job-state]')).toBeNull();
 	});
 
 	test('shows no panel until a job is live', () => {

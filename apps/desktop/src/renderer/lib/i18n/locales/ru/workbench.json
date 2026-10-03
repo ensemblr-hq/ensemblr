@@ -1176,13 +1176,30 @@
 			"cancel-failed": "Не удалось отменить задание. Возможно, оно уже завершилось.",
 			"initiator": {
 				"agent": "Агент",
-				"auto": "Настройка",
+				"automatic": "Авто",
 				"user": "Вы"
 			},
+			"initiator-hint": {
+				"agent": "Запущено агентом",
+				"auto": "Запущено Ensemblr автоматически",
+				"user": "Запущено вами"
+			},
 			"open-log": "Открыть лог",
-			"position": "№{{position}}",
-			"slots": "{{inUse}}/{{slots}}",
-			"slots-hint": "Занято слотов",
+			"open-workspace": "Открыть рабочее пространство",
+			"open-workspace-aria": "Открыть рабочее пространство {{workspace}}",
+			"queue-position": "№{{position}} в очереди",
+			"script": {
+				"archive": "Скрипт архивирования",
+				"run": "Скрипт запуска",
+				"run-named": "Скрипт запуска: {{name}}",
+				"setup": "Скрипт настройки"
+			},
+			"slot-usage_one": "{{inUse}}/{{count}} слот",
+			"slot-usage_few": "{{inUse}}/{{count}} слота",
+			"slot-usage_many": "{{inUse}}/{{count}} слотов",
+			"slot-usage_other": "{{inUse}}/{{count}} слота",
+			"slots-explainer": "Занятые слоты из общего числа. Тяжёлые команды ждут свободного слота; скрипт, запущенный вами, занимает слот сразу, даже если все заняты.",
+			"stop": "Остановить {{label}}",
 			"summary": "{{running}} в работе · {{queued}} в очереди",
 			"title": "Очередь вычислений"
 		},

@@ -424,7 +424,7 @@ export function createComputeQueueService(
 		owner: ComputeJobOwner,
 		fields: Pick<
 			JobRecord,
-			'command' | 'cwd' | 'kind' | 'label' | 'workspacePath'
+			'command' | 'cwd' | 'kind' | 'label' | 'script' | 'workspacePath'
 		>,
 	): JobRecord {
 		sequence += 1;
@@ -651,6 +651,7 @@ export function createComputeQueueService(
 				cwd: null,
 				kind: 'script',
 				label: request.label,
+				script: request.script,
 				workspacePath: null,
 			});
 			const granted = new Promise<'cancelled' | 'granted'>((resolve) => {
@@ -678,6 +679,7 @@ export function createComputeQueueService(
 				cwd,
 				kind: 'command',
 				label: request.label?.trim() || request.command,
+				script: null,
 				workspacePath: workspace.path,
 			});
 			admit(record);

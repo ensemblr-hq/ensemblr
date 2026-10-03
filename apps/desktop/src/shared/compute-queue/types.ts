@@ -1,3 +1,5 @@
+import type { WorkspaceScriptKind } from '../ipc/contracts/workspace-scripts';
+
 /** Lifecycle state of one compute-queue job. */
 export type ComputeJobState =
 	| 'queued'
@@ -20,6 +22,16 @@ export type ComputeJobKind = 'command' | 'script';
  */
 export type ComputeJobInitiator = 'agent' | 'auto' | 'user';
 
+/**
+ * The repository script a script job launches, so a surface can name it by
+ * what it is rather than by its command. `name` is the configured run script's
+ * name, and null for setup and archive scripts, which have none.
+ */
+export interface ComputeJobScript {
+	kind: WorkspaceScriptKind;
+	name: string | null;
+}
+
 /** One job as the queue reports it to the renderer and to agents. */
 export interface ComputeJobSnapshot {
 	command: string;
@@ -36,6 +48,8 @@ export interface ComputeJobSnapshot {
 	logPath: string | null;
 	/** One-based place among queued jobs; null once the job has left the queue. */
 	position: number | null;
+	/** The script a script job launches; null for command jobs. */
+	script: ComputeJobScript | null;
 	sessionId: string | null;
 	signal: string | null;
 	/** Epoch milliseconds the job was granted a slot; null while queued. */

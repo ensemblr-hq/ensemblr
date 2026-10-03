@@ -33,6 +33,29 @@ export function formatTurnDuration(ms: number): string {
 }
 
 /**
+ * Formats a running timer that ticks once a second as whole units, e.g. `37s`,
+ * `2m 05s`, `1h 02m`. Seconds drop past an hour, where a per-second change is
+ * noise in a narrow column. Unlike {@link formatTurnDuration} it carries no
+ * decimal, which a one-second tick would only ever repaint as the same digit.
+ * @param ms - Elapsed milliseconds; negative values read as zero.
+ * @returns The compact elapsed label.
+ */
+export function formatElapsedSeconds(ms: number): string {
+	const totalSeconds = Math.floor(Math.max(0, ms) / 1000);
+	const seconds = totalSeconds % 60;
+	const minutes = Math.floor(totalSeconds / 60) % 60;
+	const hours = Math.floor(totalSeconds / 3600);
+
+	if (hours > 0) {
+		return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+	}
+	if (minutes > 0) {
+		return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+	}
+	return `${seconds}s`;
+}
+
+/**
  * Wall-clock time a turn ended, in the user's own locale and 12/24-hour
  * convention, for the footer line beside the turn's duration.
  * @param epochMs - Turn end timestamp

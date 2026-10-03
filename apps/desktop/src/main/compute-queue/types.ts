@@ -1,5 +1,6 @@
 import type {
 	ComputeJobInitiator,
+	ComputeJobScript,
 	ComputeJobSnapshot,
 	ComputeQueueSnapshot,
 } from '../../shared/compute-queue.ts';
@@ -51,6 +52,7 @@ export type EnqueueCommandOutcome =
 export interface ScriptLeaseRequest extends ComputeJobOwner {
 	command: string;
 	label: string;
+	script: ComputeJobScript;
 }
 
 /**

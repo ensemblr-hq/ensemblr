@@ -1,19 +1,26 @@
-import { useAtomValue } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { cancelComputeJob } from '@/renderer/api/ensemblr';
 import { SidebarFooter } from '@/renderer/components/ui/sidebar';
+import { useWorkbenchLayoutRouteModelOptional } from '@/renderer/components/workbench-shell/shell-contexts';
 import { useConciergeFilePreview } from '@/renderer/hooks/concierge/use-concierge-file-preview';
-import { computeQueueSnapshotAtom } from '@/renderer/state/compute-queue';
+import { findWorkspaceSelectionById } from '@/renderer/lib/workbench';
+import {
+	computeQueuePanelCollapsedAtom,
+	computeQueueSnapshotAtom,
+} from '@/renderer/state/compute-queue';
 import type { ComputeJobSnapshot } from '@/shared/compute-queue';
 
 import { ComputeQueuePanel } from './compute-queue-panel';
 
 /**
  * The compute queue panel wired to the running app: main's snapshot, the
- * cancel IPC, and the shared cross-workspace file opener for a job's log.
+ * cancel IPC, the shared cross-workspace file opener for a job's log, the
+ * workspace route a row's workspace name opens, and the remembered collapsed
+ * state.
  *
  * The footer chrome lives here rather than in the panel so an idle queue shows
  * no bordered strip where the panel would have been. A visually hidden live
@@ -25,7 +32,9 @@ import { ComputeQueuePanel } from './compute-queue-panel';
 export function SidebarComputeQueuePanel() {
 	const { t } = useTranslation();
 	const snapshot = useAtomValue(computeQueueSnapshotAtom);
+	const [collapsed, setCollapsed] = useAtom(computeQueuePanelCollapsedAtom);
 	const { openFilePreview } = useConciergeFilePreview(null);
+	const layoutModel = useWorkbenchLayoutRouteModelOptional();
 
 	const onCancel = useCallback(
 		(jobId: string) => {
@@ -57,6 +66,23 @@ export function SidebarComputeQueuePanel() {
 		},
 		[openFilePreview],
 	);
+	const onOpenWorkspace = useCallback(
+		(job: ComputeJobSnapshot) => {
+			const selection = layoutModel
+				? findWorkspaceSelectionById(
+						layoutModel.displayProjects,
+						job.workspaceId,
+					)
+				: null;
+			if (selection) {
+				layoutModel?.navigateToWorkspace(
+					selection.project.id,
+					selection.workspace.id,
+				);
+			}
+		},
+		[layoutModel],
+	);
 	const runningCount =
 		snapshot?.jobs.filter((job) => job.state === 'running').length ?? 0;
 	const queuedCount =
@@ -81,8 +107,11 @@ export function SidebarComputeQueuePanel() {
 			{snapshot && hasLiveJobs ? (
 				<SidebarFooter className='border-sidebar-border border-t p-2'>
 					<ComputeQueuePanel
+						collapsed={collapsed}
 						onCancel={onCancel}
+						onCollapsedChange={setCollapsed}
 						onOpenLog={onOpenLog}
+						onOpenWorkspace={layoutModel ? onOpenWorkspace : undefined}
 						snapshot={snapshot}
 					/>
 				</SidebarFooter>

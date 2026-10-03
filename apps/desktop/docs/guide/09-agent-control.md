@@ -108,9 +108,9 @@ shell refuses a heavy command and points it at three tools:
 A heavy setup or run script an agent starts with `ensemblr_start_terminal` does
 not launch at once: the answer is `queued` with a job id and position, and the
 script's terminal opens by itself once a slot frees. `ensemblr_wait_for_job` on
-that id waits until the script exits. You see every job, with a cancel and an
-open-log action, in the sidebar's **Compute queue** panel; the panel is absent
-while nothing is waiting or running. Slots, CPU priority, and which commands
+that id waits until the script exits. You see every job, with a stop or cancel
+and an open-log action, in the sidebar's **Compute queue** panel; the panel is
+absent while nothing is waiting or running. Slots, CPU priority, and which commands
 count as heavy are in [Settings → General](./11-app-settings.md#general), and
 agents cannot change them. The tools are withheld from the Concierge. See
 [`../agent-control.md`](../agent-control.md) for arguments and guardrails, and

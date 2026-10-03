@@ -1294,6 +1294,7 @@ test('an agent setup launch waits for a slot, then starts when granted', async (
 	const queuedJob = fixture.computeQueue.getJob(result.queuedJob.jobId);
 	assert.equal(queuedJob?.sessionId, 'agent-1');
 	assert.equal(queuedJob?.initiator, 'agent');
+	assert.deepEqual(queuedJob?.script, { kind: 'setup', name: null });
 
 	fixture.endSession(fixture.occupantId, 'exited');
 
@@ -1366,6 +1367,9 @@ test('a heavy run script waits for a slot like setup does', async (t) => {
 
 	assert.equal(result.session, null);
 	assert.ok(result.queuedJob);
+	const script = fixture.computeQueue.getJob(result.queuedJob.jobId)?.script;
+	assert.equal(script?.kind, 'run');
+	assert.equal(typeof script?.name, 'string');
 });
 
 test('a disabled queue starts agent launches at once without a job', async (t) => {
