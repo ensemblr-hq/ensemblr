@@ -46,6 +46,19 @@ function clampInteger(raw: string, min: number, max: number): number {
 	return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : min;
 }
 
+/** Props for {@link NumberSettingRow}. */
+interface NumberSettingRowProps {
+	ariaLabel: string;
+	defaultValue: number;
+	description: string;
+	disabled: boolean;
+	label: string;
+	max: number;
+	min: number;
+	onChange: (value: number) => void;
+	value: number;
+}
+
 /**
  * One numeric row of the compute queue section. Typing edits a string draft so
  * the field can be cleared and retyped; the clamped value is committed once, on
@@ -61,17 +74,7 @@ function NumberSettingRow({
 	min,
 	onChange,
 	value,
-}: {
-	ariaLabel: string;
-	defaultValue: number;
-	description: string;
-	disabled: boolean;
-	label: string;
-	max: number;
-	min: number;
-	onChange: (value: number) => void;
-	value: number;
-}) {
+}: NumberSettingRowProps) {
 	const [draft, setDraft] = useState<string | null>(null);
 
 	/** Writes the clamped draft, or drops it when the field was left empty. */
@@ -114,6 +117,17 @@ function NumberSettingRow({
 	);
 }
 
+/** Props for {@link PatternListRow}. */
+interface PatternListRowProps {
+	ariaLabel: string;
+	description: string;
+	disabled: boolean;
+	label: string;
+	onChange: (patterns: string[]) => void;
+	patterns: readonly string[];
+	placeholder: string;
+}
+
 /** One pattern-list row: a text area committed on blur as trimmed lines. */
 function PatternListRow({
 	ariaLabel,
@@ -123,15 +137,7 @@ function PatternListRow({
 	onChange,
 	patterns,
 	placeholder,
-}: {
-	ariaLabel: string;
-	description: string;
-	disabled: boolean;
-	label: string;
-	onChange: (patterns: string[]) => void;
-	patterns: readonly string[];
-	placeholder: string;
-}) {
+}: PatternListRowProps) {
 	const [draft, setDraft] = useState<string | null>(null);
 	const shown = draft ?? patterns.join('\n');
 

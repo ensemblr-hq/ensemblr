@@ -18,8 +18,12 @@
  *
  * While the session plans, a command Plan Mode refuses is left to Plan Mode, so
  * the model reads one refusal rather than two that disagree on what to do next
- * — the order Pi's `checkPlanModeTool` answers in. A command Plan Mode passes
- * as read-only is still classified here.
+ * — the order Pi's `checkPlanModeTool` answers in. A command Plan Mode passes,
+ * such as a `Monitor`'s, is still classified here, and refused in words that
+ * defer to the plan rather than pointing at a queue tool Plan Mode also blocks.
+ *
+ * A classifier failure is logged and passes the call: an exception escaping a
+ * hook fails the tool call with nothing the model can act on.
  */
 import type {
 	HookCallbackMatcher,
@@ -30,6 +34,7 @@ import type {
 import { CONTROL_SERVER_NAME } from '../../shared/agent-control.ts';
 import {
 	classifyHeavyCommandForSettings,
+	type HeavyCommandVerdict,
 	heavyCommandBlockReason,
 } from '../../shared/compute-queue.ts';
 import type { ComputeQueueSettings } from '../../shared/config.ts';
@@ -75,16 +80,51 @@ function deny(reason: string): HookJSONOutput {
 }
 
 /**
+ * Classifies a command, passing it if the classifier itself fails: the hook
+ * runs on every tool call, and an exception escaping it would fail the call
+ * outright rather than refuse it with a reason the model can act on.
+ * @param command - The command the tool would run.
+ * @param settings - The live compute-queue settings.
+ * @returns The verdict, or a pass when classification threw.
+ */
+function classifySafely(
+	command: string,
+	settings: ComputeQueueSettings,
+): HeavyCommandVerdict {
+	try {
+		return classifyHeavyCommandForSettings(command, settings);
+	} catch (cause) {
+		console.warn(
+			'[claude-agent] compute-queue classification failed; passing the call.',
+			{ cause, commandLength: command.length },
+		);
+		return { heavy: false };
+	}
+}
+
+/**
+ * Words the refusal for a heavy command while the session plans. Plan Mode
+ * blocks the queue tools as well, so pointing at them would contradict it.
+ * @param matched - The pattern the command matched.
+ * @returns The refusal.
+ */
+function planningRefusal(matched: string): string {
+	return `Plan Mode: this command is compute-heavy (it matches \`${matched}\`), and heavy commands cannot run until the plan is approved — not in a shell tool, and not through the compute queue. Put it in the plan as a step to run after approval.`;
+}
+
+/**
  * Decides one Claude tool call against the compute queue's policy.
  * @param toolName - The SDK tool name being called.
  * @param toolInput - The tool call's raw input object.
  * @param settings - The live compute-queue settings.
+ * @param planning - Whether the session is planning, which changes what the refusal advises.
  * @returns The refusal to hand the model, or null when the call passes.
  */
 function computeQueueDenial(
 	toolName: string,
 	toolInput: Record<string, unknown>,
 	settings: ComputeQueueSettings,
+	planning: boolean,
 ): string | null {
 	const command = toolInput.command;
 	if (
@@ -93,15 +133,18 @@ function computeQueueDenial(
 	) {
 		return null;
 	}
-	const verdict = classifyHeavyCommandForSettings(command, settings);
-	return verdict.heavy
-		? heavyCommandBlockReason({
+	const verdict = classifySafely(command, settings);
+	if (!verdict.heavy) {
+		return null;
+	}
+	return planning
+		? planningRefusal(verdict.matched)
+		: heavyCommandBlockReason({
 				command,
 				matched: verdict.matched,
 				queueToolName: QUEUE_TOOL_NAME,
 				waitToolName: WAIT_TOOL_NAME,
-			})
-		: null;
+			});
 }
 
 /**
@@ -139,13 +182,15 @@ function createComputeQueuePreToolUseHook(
 					return {};
 				}
 				const toolInput = (input.tool_input ?? {}) as Record<string, unknown>;
-				if (isPlanning() && planModeRefuses(input.tool_name, toolInput)) {
+				const planning = isPlanning();
+				if (planning && planModeRefuses(input.tool_name, toolInput)) {
 					return {};
 				}
 				const reason = computeQueueDenial(
 					input.tool_name,
 					toolInput,
 					readSettings(),
+					planning,
 				);
 				return reason === null ? {} : deny(reason);
 			},

@@ -66,6 +66,12 @@ export interface ScriptLease {
 	/** Ends a job whose launch opened no terminal: failed, or cancelled for a refusal. */
 	abandon: (outcome: { failed: boolean; note: string }) => void;
 	attachTerminal: (terminalId: string) => void;
+	/**
+	 * Updates the command and label the job reports, for a launch that re-read
+	 * its script after waiting. The job keeps its slot even if the new command
+	 * would no longer have needed one.
+	 */
+	describe: (description: { command: string; label: string }) => void;
 	granted: Promise<'cancelled' | 'granted'>;
 	jobId: string;
 	release: (outcome: {

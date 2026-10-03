@@ -1533,6 +1533,13 @@ test('a launch that waited re-reads its command when its slot comes', async (t) 
 	await eventually(() => fixture.createCalls.length === 2);
 
 	assert.equal(fixture.createCalls[1]?.command, 'cargo build --release');
+	assert.deepEqual(
+		{
+			command: fixture.computeQueue.getJob(queued.queuedJob.jobId)?.command,
+			label: fixture.computeQueue.getJob(queued.queuedJob.jobId)?.label,
+		},
+		{ command: 'cargo build --release', label: 'cargo build --release' },
+	);
 });
 
 test('a launch whose script disappeared while it waited fails its job with the reason', async (t) => {
@@ -1630,4 +1637,30 @@ test('a queued setup whose finalize fails is logged, not left unhandled', async 
 			String(call.arguments[0]).includes('could not finalize setup'),
 		),
 	);
+});
+
+test('a launch cancelled after its slot was granted never starts', async (t) => {
+	const fixture = await createBusyQueueFixture(t);
+
+	const queued = await fixture.service.runScript({
+		initiator: 'agent',
+		kind: 'setup',
+		workspaceId: WORKSPACE_ID,
+	});
+	assert.ok(queued.queuedJob);
+	const jobId = queued.queuedJob.jobId;
+	const unsubscribe = fixture.computeQueue.onChange(() => {
+		if (fixture.computeQueue.getJob(jobId)?.state === 'running') {
+			fixture.computeQueue.cancel(jobId);
+		}
+	});
+	t.after(unsubscribe);
+
+	fixture.endSession(fixture.occupantId, 'exited');
+	await eventually(
+		() => fixture.computeQueue.getJob(jobId)?.state === 'cancelled',
+	);
+	await settle();
+
+	assert.equal(fixture.createCalls.length, 1);
 });

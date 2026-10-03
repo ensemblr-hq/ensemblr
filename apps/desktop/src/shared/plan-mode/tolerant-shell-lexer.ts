@@ -7,11 +7,18 @@
  *
  * "Everything that runs a command" is the substance. A `$(…)` or backtick
  * substitution runs inside double quotes exactly as outside them, so
- * `out="$(bun run test)"` runs the suite; and a heredoc fed to a shell, as in
- * `bash <<EOF` or `cat <<EOF | sh`, is a script that shell runs. Each segment
- * therefore carries the text fed to its stdin and whether its output is piped
- * onward, so the classifier can follow a document into the shell reading it.
+ * `out="$(bun run test)"` runs the suite; a heredoc fed to a shell, as in
+ * `bash <<EOF` or `cat <<EOF | sh`, is a script that shell runs; and so is the
+ * output of a process substitution a shell sources, as in `bash <(…)`. Each
+ * segment therefore carries the text fed to its stdin, the process
+ * substitutions among its arguments, and whether its output is piped onward,
+ * so the classifier can follow a script into the shell reading it.
+ *
+ * The work is bounded: nested text past {@link MAX_NESTING_DEPTH} levels or
+ * {@link MAX_NESTED_LEX_CHARS} characters is left as literal text rather than
+ * lexed, so no input can exhaust the stack or stall the main process.
  */
+
 import {
 	BLANK,
 	createTokenSink,
@@ -23,21 +30,32 @@ import {
 	skipRedirectionBlanks,
 	type TokenSink,
 } from './shell-lexer.ts';
+import {
+	MAX_NESTED_SCAN_STEPS,
+	MAX_NESTING_DEPTH,
+	NESTING_PARENS,
+	nestedEnd,
+	readHeredocBody,
+	readHeredocOpener,
+	type ScanBudget,
+	type SubstitutionReader,
+	scanRedirectionTarget,
+	substitutionEnd,
+} from './shell-substitution-scan.ts';
 
 /** One simple command the tolerant lexer read. */
 export interface ShellSegment {
 	tokens: readonly string[];
 	/** The heredoc body or here-string fed to the command's stdin, or null. */
 	stdin: string | null;
+	/** The command text of each `<(…)` or `>(…)` among the command's arguments. */
+	processInputs: readonly string[];
 	/** Whether the command's output is piped into the segment after it. */
 	pipesOnward: boolean;
 }
 
-/**
- * Unquoted characters that open or close a nested command — a subshell, or the
- * `(` of a `$(…)` — which the tolerant lexer splits out as a segment of its own.
- */
-const NESTING_PARENS: ReadonlySet<string> = new Set(['(', ')']);
+/** How many characters of substitution text one lex reads into segments before leaving the rest literal. */
+const MAX_NESTED_LEX_CHARS = 64 * 1024;
 
 /** Bash's group delimiters, which are words to the lexer but name no command. */
 const GROUP_TOKENS: ReadonlySet<string> = new Set(['{', '}']);
@@ -48,15 +66,16 @@ const REDIRECTION_OPERATOR = /[<>&|]/;
 /** A pending token that names the descriptor a redirection applies to. */
 const FILE_DESCRIPTOR = /^\d+$/;
 
-/** A heredoc delimiter quoted or escaped anywhere, which keeps its body from expanding. */
-const QUOTED_DELIMITER = /['"\\]/;
+/** The work one lex may still spend, shared by every nested lex it starts. */
+interface LexBudget extends ScanBudget {
+	nestedChars: number;
+}
 
 /** A heredoc whose body starts on the next line and runs to its delimiter line. */
 interface HeredocMarker {
 	delimiter: string;
 	stripsTabs: boolean;
-	/** Whether substitutions in the body run, as they do under an unquoted delimiter. */
-	expands: boolean;
+	quoted: boolean;
 	/** The raw index of the segment whose stdin the body is. */
 	segment: number;
 }
@@ -64,6 +83,7 @@ interface HeredocMarker {
 /** The tolerant walk's state. */
 interface TolerantWalk {
 	sink: TokenSink;
+	budget: LexBudget;
 	heredocs: HeredocMarker[];
 	/** How many raw segments have closed, which is the raw index of the open one. */
 	closed: number;
@@ -71,116 +91,24 @@ interface TolerantWalk {
 	pipes: Set<number>;
 	/** Text fed to a segment's stdin, by raw index. */
 	stdin: Map<number, string>;
-	/** The text of every quoted or heredoc substitution, lexed after the walk. */
+	/** Process-substitution text among a segment's arguments, by raw index. */
+	processInputs: Map<number, readonly string[]>;
+	/** The text of every substitution lexed after the walk rather than in place. */
 	substitutions: string[];
-}
-
-/**
- * Finds the end of the nested construct starting at an index — a double-quoted
- * run, a backtick substitution, or a `$(…)` — without recording anything.
- * @param source - Text being read.
- * @param index - Index of the `"`, the backtick, or the `$` of a `$(`.
- * @returns Index just past the construct, or null when it never closes.
- */
-function nestedEnd(source: string, index: number): number | null {
-	if (source[index] === '"') {
-		const quoted = scanDoubleQuoted(source, index, (start) =>
-			nestedEnd(source, start),
-		);
-		return 'violation' in quoted ? null : quoted.next;
-	}
-	return source[index] === '`'
-		? backtickEnd(source, index)
-		: substitutionEnd(source, index);
-}
-
-/**
- * Finds the backtick closing a backtick substitution.
- * @param source - Text being read.
- * @param index - Index of the opening backtick.
- * @returns Index just past the closing backtick, or null when there is none.
- */
-function backtickEnd(source: string, index: number): number | null {
-	let cursor = index + 1;
-	while (cursor < source.length) {
-		if (source[cursor] === '\\') {
-			cursor += LINE_CONTINUATION_LENGTH;
-			continue;
-		}
-		if (source[cursor] === '`') {
-			return cursor + 1;
-		}
-		cursor += 1;
-	}
-	return null;
-}
-
-/**
- * Finds the parenthesis closing a `$(…)`, honouring the quotes and nested
- * substitutions inside it.
- * @param source - Text being read.
- * @param index - Index of the `$`.
- * @returns Index just past the closing parenthesis, or null when there is none.
- */
-function substitutionEnd(source: string, index: number): number | null {
-	let depth = 1;
-	let cursor = index + 2;
-	while (cursor < source.length) {
-		const char = source[cursor] as string;
-		if (char === '\\') {
-			cursor += LINE_CONTINUATION_LENGTH;
-			continue;
-		}
-		if (char === "'") {
-			const end = source.indexOf("'", cursor + 1);
-			if (end === -1) {
-				return null;
-			}
-			cursor = end + 1;
-			continue;
-		}
-		if (opensNested(source, cursor)) {
-			const end = nestedEnd(source, cursor);
-			if (end === null) {
-				return null;
-			}
-			cursor = end;
-			continue;
-		}
-		depth += char === '(' ? 1 : char === ')' ? -1 : 0;
-		if (depth === 0) {
-			return cursor + 1;
-		}
-		cursor += 1;
-	}
-	return null;
-}
-
-/**
- * Reports whether a nested construct {@link nestedEnd} reads starts at an index.
- * @param source - Text being read.
- * @param index - Index to inspect.
- * @returns True for a `"`, a backtick, or a `$(`.
- */
-function opensNested(source: string, index: number): boolean {
-	const char = source[index];
-	return (
-		char === '"' || char === '`' || (char === '$' && source[index + 1] === '(')
-	);
 }
 
 /**
  * Builds the reader that skips a substitution and records the command it runs.
  * @param source - Text being read.
  * @param walk - Walk state the substitution's command is recorded in.
- * @returns A reader answering where the substitution at an index ends, or null when it never closes.
+ * @returns A reader answering where the substitution at an index ends, or null when it does not close.
  */
 function substitutionReader(
 	source: string,
 	walk: TolerantWalk,
-): (start: number) => number | null {
+): SubstitutionReader {
 	return (start) => {
-		const end = nestedEnd(source, start);
+		const end = nestedEnd(source, start, walk.budget);
 		if (end !== null) {
 			walk.substitutions.push(
 				source[start] === '`'
@@ -206,7 +134,7 @@ function collectSubstitutions(body: string, walk: TolerantWalk): void {
 		if (char === '\\') {
 			cursor += LINE_CONTINUATION_LENGTH;
 		} else if (char === '`' || (char === '$' && body[cursor + 1] === '(')) {
-			cursor = read(cursor) ?? body.length;
+			cursor = read(cursor) ?? cursor + 1;
 		} else {
 			cursor += 1;
 		}
@@ -256,6 +184,34 @@ function nestingOpenerLength(command: string, index: number): number {
 }
 
 /**
+ * Reads a `<(…)` or `>(…)` whole: its command is lexed after the walk, and
+ * noted among the open segment's process inputs, since a shell or `source`
+ * handed one runs what it prints.
+ * @param command - Full command text.
+ * @param index - Index of the `<` or `>`.
+ * @param walk - Walk state the process substitution is recorded in.
+ * @returns Where to continue, or null when it does not close and is read in place instead.
+ */
+function stepProcessSubstitution(
+	command: string,
+	index: number,
+	walk: TolerantWalk,
+): number | null {
+	const end = substitutionEnd(command, index, walk.budget);
+	if (end === null) {
+		return null;
+	}
+	const text = command.slice(index + 2, end - 1);
+	walk.sink.endToken();
+	walk.substitutions.push(text);
+	walk.processInputs.set(walk.closed, [
+		...(walk.processInputs.get(walk.closed) ?? []),
+		text,
+	]);
+	return end;
+}
+
+/**
  * Reads a quoted run for the tolerant lexer. A substitution inside a
  * double-quoted run stays literal text of the token, and its command is
  * recorded to be lexed on its own.
@@ -275,61 +231,39 @@ function scanQuotedTolerantly(
 }
 
 /**
- * Reports whether a character ends a redirection's target word.
- * @param char - Character to test.
- * @returns True when the target stops before this character.
- */
-function endsRedirectionTarget(char: string): boolean {
-	return (
-		BLANK.test(char) ||
-		SEPARATORS.has(char) ||
-		char === '<' ||
-		char === '>' ||
-		NESTING_PARENS.has(char)
-	);
-}
-
-/**
- * Reads a redirection's target word with its quotes stripped, so the target
- * never reaches a segment and a heredoc delimiter compares as bash compares it.
+ * Queues the heredoc whose `<<` starts at an index, so its body on the
+ * following lines is read as the open segment's stdin.
  * @param command - Full command text.
- * @param start - Index of the target's first character.
- * @param walk - Walk state substitutions are recorded in.
- * @returns The target and where it ended, or the unbalanced-quote violation.
+ * @param index - Index of the first `<`.
+ * @param walk - Walk state holding the heredoc queue.
+ * @returns Where to continue, or null on an unbalanced quote in the delimiter.
  */
-function scanRedirectionTarget(
+function queueHeredoc(
 	command: string,
-	start: number,
+	index: number,
 	walk: TolerantWalk,
-): Scan {
-	let text = '';
-	let cursor = start;
-	while (cursor < command.length) {
-		const char = command[cursor] as string;
-		if (endsRedirectionTarget(char)) {
-			break;
-		}
-		if (char === "'" || char === '"') {
-			const quoted = scanQuotedTolerantly(command, cursor, walk);
-			if ('violation' in quoted) {
-				return quoted;
-			}
-			text += quoted.text;
-			cursor = quoted.next;
-			continue;
-		}
-		const escaped = char === '\\';
-		text += escaped ? (command[cursor + 1] ?? '') : char;
-		cursor += escaped ? LINE_CONTINUATION_LENGTH : 1;
+): number | null {
+	const opener = readHeredocOpener(
+		command,
+		index,
+		substitutionReader(command, walk),
+	);
+	if (opener === null) {
+		return null;
 	}
-	return { next: cursor, text };
+	walk.heredocs.push({
+		delimiter: opener.delimiter,
+		quoted: opener.quoted,
+		segment: walk.closed,
+		stripsTabs: opener.stripsTabs,
+	});
+	return opener.next;
 }
 
 /**
  * Skips a whole redirection — any descriptor prefix, the operator, and its
  * target — so none of it reaches the segment. A here-string becomes the open
- * segment's stdin, and a heredoc's delimiter is queued so the body on the
- * following lines is read as that stdin rather than as commands.
+ * segment's stdin, and a heredoc's body becomes it once its lines arrive.
  * @param command - Full command text.
  * @param index - Index of the operator's first character.
  * @param walk - Walk state holding any descriptor prefix and the heredoc queue.
@@ -346,60 +280,25 @@ function skipRedirection(
 		walk.sink.endToken();
 	}
 	const opensHereString = command.startsWith('<<<', index);
-	const opensHeredoc = command.startsWith('<<', index) && !opensHereString;
+	if (command.startsWith('<<', index) && !opensHereString) {
+		return queueHeredoc(command, index, walk);
+	}
 	let cursor = index;
 	while (REDIRECTION_OPERATOR.test(command[cursor] ?? '')) {
 		cursor += 1;
 	}
-	const stripsTabs = opensHeredoc && command[cursor] === '-';
-	const targetStart = skipRedirectionBlanks(
+	const target = scanRedirectionTarget(
 		command,
-		stripsTabs ? cursor + 1 : cursor,
+		skipRedirectionBlanks(command, cursor),
+		substitutionReader(command, walk),
 	);
-	const target = scanRedirectionTarget(command, targetStart, walk);
 	if ('violation' in target) {
 		return null;
-	}
-	if (opensHeredoc) {
-		walk.heredocs.push({
-			delimiter: target.text,
-			expands: !QUOTED_DELIMITER.test(command.slice(targetStart, target.next)),
-			segment: walk.closed,
-			stripsTabs,
-		});
 	}
 	if (opensHereString) {
 		walk.stdin.set(walk.closed, `${target.text}\n`);
 	}
 	return target.next;
-}
-
-/**
- * Reads one heredoc body: every line up to its delimiter line.
- * @param command - Full command text.
- * @param start - Index of the body's first line.
- * @param marker - The heredoc whose body starts here.
- * @returns The body, and the index just past the delimiter line or the end of input when it never closes.
- */
-function readHeredocBody(
-	command: string,
-	start: number,
-	marker: HeredocMarker,
-): { body: string; next: number } {
-	const lines: string[] = [];
-	let cursor = start;
-	while (cursor < command.length) {
-		const lineEnd = command.indexOf('\n', cursor);
-		const next = lineEnd === -1 ? command.length : lineEnd + 1;
-		const line = command.slice(cursor, lineEnd === -1 ? undefined : lineEnd);
-		const compared = marker.stripsTabs ? line.replace(/^\t+/, '') : line;
-		if (compared === marker.delimiter) {
-			return { body: lines.join('\n'), next };
-		}
-		lines.push(compared);
-		cursor = next;
-	}
-	return { body: lines.join('\n'), next: command.length };
 }
 
 /**
@@ -419,7 +318,7 @@ function readHeredocBodies(
 	const next = walk.heredocs.reduce((cursor, marker) => {
 		const read = readHeredocBody(command, cursor, marker);
 		walk.stdin.set(marker.segment, read.body);
-		if (marker.expands) {
+		if (!marker.quoted) {
 			collectSubstitutions(read.body, walk);
 		}
 		return read.next;
@@ -429,25 +328,19 @@ function readHeredocBodies(
 }
 
 /**
- * Consumes whatever starts at one index for the tolerant lexer, which turns
- * every construct the strict walk rejects into a boundary instead.
+ * Consumes a word character, a quote, an escape, or a comment.
  * @param command - Full command text.
  * @param index - Index to consume from.
  * @param walk - Walk state the step writes through.
  * @returns Where to continue, or null on an unbalanced quote.
  */
-function stepTolerant(
+function stepWord(
 	command: string,
 	index: number,
 	walk: TolerantWalk,
 ): number | null {
 	const { sink } = walk;
 	const char = command[index] as string;
-	const opener = nestingOpenerLength(command, index);
-	if (opener > 0) {
-		closeSegment(walk, false);
-		return index + opener;
-	}
 	if (char === "'" || char === '"') {
 		const quoted = scanQuotedTolerantly(command, index, walk);
 		if ('violation' in quoted) {
@@ -466,6 +359,37 @@ function stepTolerant(
 		const lineEnd = command.indexOf('\n', index);
 		return lineEnd === -1 ? command.length : lineEnd;
 	}
+	sink.push(char);
+	return index + 1;
+}
+
+/**
+ * Consumes whatever starts at one index for the tolerant lexer, which turns
+ * every construct the strict walk rejects into a boundary instead.
+ * @param command - Full command text.
+ * @param index - Index to consume from.
+ * @param walk - Walk state the step writes through.
+ * @returns Where to continue, or null on an unbalanced quote.
+ */
+function stepTolerant(
+	command: string,
+	index: number,
+	walk: TolerantWalk,
+): number | null {
+	const char = command[index] as string;
+	const opensProcess =
+		(char === '<' || char === '>') && command[index + 1] === '(';
+	const processEnd = opensProcess
+		? stepProcessSubstitution(command, index, walk)
+		: null;
+	if (processEnd !== null) {
+		return processEnd;
+	}
+	const opener = nestingOpenerLength(command, index);
+	if (opener > 0) {
+		closeSegment(walk, false);
+		return index + opener;
+	}
 	if (char === '<' || char === '>' || command.startsWith('&>', index)) {
 		return skipRedirection(command, index, walk);
 	}
@@ -476,28 +400,71 @@ function stepTolerant(
 			: index + 1;
 	}
 	if (BLANK.test(char)) {
-		sink.endToken();
+		walk.sink.endToken();
 		return index + 1;
 	}
-	sink.push(char);
-	return index + 1;
+	return stepWord(command, index, walk);
 }
 
 /**
- * Lexes a bash command into the simple commands it runs, without ever refusing
- * one. The inside of an unquoted `$(…)`, backticks, `<(…)` or a subshell is a
- * segment in its place; a substitution inside double quotes or an expanding
- * heredoc body keeps its literal text in the token and is lexed into segments
- * of its own after the rest. A heredoc body or here-string is the stdin of the
- * segment that opened it, never a command of its own.
- * @param command - The command the agent asked to run.
- * @returns The non-empty segments, or null when an unbalanced quote leaves the command unreadable.
+ * Reads the walk's segments out, dropping group braces and empty segments.
+ * @param walk - The finished walk.
+ * @returns The segments in command order.
  */
-export function lexShellSegments(command: string): ShellSegment[] | null {
+function segmentsOf(walk: TolerantWalk): ShellSegment[] {
+	return walk.sink
+		.finish()
+		.map((tokens, rawIndex) => ({
+			pipesOnward: walk.pipes.has(rawIndex),
+			processInputs: walk.processInputs.get(rawIndex) ?? [],
+			stdin: walk.stdin.get(rawIndex) ?? null,
+			tokens: tokens.filter((token) => !GROUP_TOKENS.has(token)),
+		}))
+		.filter((segment) => segment.tokens.length > 0);
+}
+
+/**
+ * Lexes the substitutions a walk recorded, within what the budget has left.
+ * @param texts - The substitutions' command text.
+ * @param depth - How deep the walk that recorded them sits.
+ * @param budget - The work the whole lex may still spend.
+ * @returns Their segments, in the order they were recorded.
+ */
+function lexNested(
+	texts: readonly string[],
+	depth: number,
+	budget: LexBudget,
+): ShellSegment[] {
+	if (depth >= MAX_NESTING_DEPTH) {
+		return [];
+	}
+	return texts.flatMap((text) => {
+		if (text.length > budget.nestedChars) {
+			return [];
+		}
+		budget.nestedChars -= text.length;
+		return lexWithin(text, depth + 1, budget) ?? [];
+	});
+}
+
+/**
+ * Lexes one command line, and then the substitutions inside it.
+ * @param command - The command line.
+ * @param depth - How many substitutions deep it sits.
+ * @param budget - The work the whole lex may still spend.
+ * @returns The segments, or null when an unbalanced quote leaves the line unreadable.
+ */
+function lexWithin(
+	command: string,
+	depth: number,
+	budget: LexBudget,
+): ShellSegment[] | null {
 	const walk: TolerantWalk = {
+		budget,
 		closed: 0,
 		heredocs: [],
 		pipes: new Set(),
+		processInputs: new Map(),
 		sink: createTokenSink(),
 		stdin: new Map(),
 		substitutions: [],
@@ -510,28 +477,22 @@ export function lexShellSegments(command: string): ShellSegment[] | null {
 		}
 		index = next;
 	}
-	const segments = walk.sink
-		.finish()
-		.map((tokens, rawIndex) => ({
-			pipesOnward: walk.pipes.has(rawIndex),
-			stdin: walk.stdin.get(rawIndex) ?? null,
-			tokens: tokens.filter((token) => !GROUP_TOKENS.has(token)),
-		}))
-		.filter((segment) => segment.tokens.length > 0);
-	const nested = walk.substitutions.flatMap(
-		(text) => lexShellSegments(text) ?? [],
-	);
-	return [...segments, ...nested];
+	return [...segmentsOf(walk), ...lexNested(walk.substitutions, depth, budget)];
 }
 
 /**
- * Lexes a bash command into the argv of every simple command it runs, as
- * {@link lexShellSegments} reads them, without what feeds or follows each.
+ * Lexes a bash command into the simple commands it runs, without ever refusing
+ * one. The inside of an unquoted `$(…)`, backticks or a subshell is a segment
+ * in its place; a substitution inside double quotes, a process substitution,
+ * or a substitution in an expanding heredoc body is lexed into segments of its
+ * own after the rest. A heredoc body or here-string is the stdin of the
+ * segment that opened it, never a command of its own.
  * @param command - The command the agent asked to run.
- * @returns The non-empty segments' tokens, or null when an unbalanced quote leaves the command unreadable.
+ * @returns The non-empty segments, or null when an unbalanced quote leaves the command unreadable.
  */
-export function lexCommandSegments(command: string): string[][] | null {
-	return (
-		lexShellSegments(command)?.map((segment) => [...segment.tokens]) ?? null
-	);
+export function lexShellSegments(command: string): ShellSegment[] | null {
+	return lexWithin(command, 0, {
+		nestedChars: MAX_NESTED_LEX_CHARS,
+		steps: MAX_NESTED_SCAN_STEPS,
+	});
 }

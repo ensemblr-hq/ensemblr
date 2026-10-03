@@ -669,6 +669,29 @@ describe('agent-control compute queue: Pi bash gate', () => {
 		expect(dataOf(await check(HEAVY, off))).toEqual({ blocked: false });
 	});
 
+	it('passes the call, and logs, when the classifier itself throws', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+		const queue = makeQueue();
+		const exploding = {
+			...DEFAULT_APP_SETTINGS.computeQueue,
+			get exemptPatterns(): string[] {
+				throw new Error('boom');
+			},
+		};
+		queue.port.readSettings = () => exploding;
+		try {
+			expect(
+				dataOf(await check(HEAVY, makePorts({ jobQueue: queue.port }))),
+			).toEqual({ blocked: false });
+			expect(warn).toHaveBeenCalledWith(
+				expect.stringContaining('compute-queue classification failed'),
+				expect.objectContaining({ commandLength: HEAVY.length }),
+			);
+		} finally {
+			warn.mockRestore();
+		}
+	});
+
 	it('leaves the Plan Mode verdict standing, and still records it', async () => {
 		const ports = makePorts({ jobQueue: makeQueue().port, planning: true });
 

@@ -25,9 +25,11 @@ import {
 } from '../../shared/agent-control.ts';
 import {
 	classifyHeavyCommandForSettings,
+	type HeavyCommandVerdict,
 	heavyCommandBlockReason,
 	isComputeJobFinished,
 } from '../../shared/compute-queue.ts';
+import type { ComputeQueueSettings } from '../../shared/config.ts';
 import type { ComputeJobResult } from '../compute-queue/index.ts';
 import type { Guardrails } from './guardrails.ts';
 import type { JobQueuePort } from './job-queue-ports.ts';
@@ -330,6 +332,29 @@ function submittedLines(
 }
 
 /**
+ * Classifies a command, passing it if the classifier itself fails: Pi asks on
+ * every `bash` call and blocks the call when the answer is an error, so an
+ * exception here would cost the agent its shell rather than one command.
+ * @param command - The command to classify.
+ * @param settings - The live compute-queue settings.
+ * @returns The verdict, or a pass when classification threw.
+ */
+function classifySafely(
+	command: string,
+	settings: ComputeQueueSettings,
+): HeavyCommandVerdict {
+	try {
+		return classifyHeavyCommandForSettings(command, settings);
+	} catch (cause) {
+		console.warn(
+			'[agent-control] compute-queue classification failed; passing the command.',
+			{ cause, commandLength: command.length },
+		);
+		return { heavy: false };
+	}
+}
+
+/**
  * Builds the compute-queue ops and gates.
  * @param options - The queue port and the guardrails that bound enqueues.
  * @returns The ops the agent-control service dispatches to.
@@ -361,10 +386,7 @@ export function createJobQueueOps({
 		if (!port) {
 			return null;
 		}
-		const verdict = classifyHeavyCommandForSettings(
-			command,
-			port.readSettings(),
-		);
+		const verdict = classifySafely(command, port.readSettings());
 		return verdict.heavy
 			? namespaceControlToolNames(
 					heavyCommandBlockReason({

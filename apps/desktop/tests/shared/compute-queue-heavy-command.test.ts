@@ -110,6 +110,25 @@ describe('classifyHeavyCommand', () => {
 		['zsh <<< "cargo test"', 'cargo test'],
 		['echo "bun run test" | bash', 'run test*'],
 		['cat <<EOF\n$(make)\nEOF', 'make'],
+		[
+			"git commit -m \"$(cat <<'EOF'\nit's fixed\nEOF\n)\" && bun run test",
+			'run test*',
+		],
+		[
+			"gh pr create --body \"$(cat <<'EOF'\nDon't break it\nEOF\n)\"; bun run build",
+			'run build*',
+		],
+		['echo "$(make"; bun run test', 'run test*'],
+		['eval "bun run test"', 'run test*'],
+		['eval bun run test', 'run test*'],
+		['source <(echo bun run test)', 'run test*'],
+		['. <(printf "make\\n")', 'make'],
+		['bash <(echo make)', 'make'],
+		['bash <(cat <<EOF\ntsc\nEOF\n)', 'tsc'],
+		['watch -n 5 bun run test', 'run test*'],
+		["watch 'bun run test'", 'run test*'],
+		['find . -name "*.rs" -exec cargo build \\;', 'cargo build'],
+		['find . -execdir ls \\; -exec tsc {} +', 'tsc'],
 		['cargo t', 'cargo t'],
 		['cargo b --release', 'cargo b'],
 	])('follows %j into the command it runs, via %j', (command, matched) => {
@@ -124,8 +143,31 @@ describe('classifyHeavyCommand', () => {
 		'cat <<EOF | grep x\nbun run test\nEOF',
 		'echo "bun run test" || bash',
 		'cargo add serde',
+		'diff <(echo make) <(echo tsc)',
+		'find . -name "*.ts" -exec grep -l vitest {} +',
+		'watch -n 1 git status',
+		'eval "$(ssh-agent -s)"',
 	])('still leaves %j alone', (command) => {
 		expect(classifyHeavyCommand(command)).toEqual({ heavy: false });
+	});
+
+	it('leaves variable indirection and filters into a shell unread, as documented', () => {
+		expect(classifyHeavyCommand('T=vitest; $T run')).toEqual({ heavy: false });
+		expect(
+			classifyHeavyCommand('echo bun run test | tee /dev/null | sh'),
+		).toEqual({ heavy: false });
+	});
+
+	it('classifies pathological nesting and huge documents without throwing or stalling', () => {
+		const deep = `echo ${'"$('.repeat(6000)}x${')"'.repeat(6000)}; bun run test`;
+		const huge = `bash <<EOF\n${'echo line\n'.repeat(200_000)}EOF\nls`;
+		const started = Date.now();
+		expect(classifyHeavyCommand(deep)).toEqual({
+			heavy: true,
+			matched: 'run test*',
+		});
+		expect(classifyHeavyCommand(huge)).toEqual({ heavy: false });
+		expect(Date.now() - started).toBeLessThan(2_000);
 	});
 
 	it('fails open on an unbalanced quote', () => {

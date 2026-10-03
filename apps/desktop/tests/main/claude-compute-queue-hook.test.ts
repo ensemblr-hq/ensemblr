@@ -4,7 +4,7 @@ import type {
 	Query,
 	SDKMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { withAfkHooks } from '../../src/main/claude-agent/claude-afk-mode.ts';
 import { createClaudeAgentAdapter } from '../../src/main/claude-agent/claude-agent-adapter.ts';
@@ -130,6 +130,31 @@ describe('compute-queue Claude hook', () => {
 			),
 		);
 		expect(verdict?.permissionDecision).toBe('deny');
+		const reason = String(verdict?.permissionDecisionReason);
+		expect(reason).toContain('until the plan is approved');
+		expect(reason).not.toContain('ensemblr_run_queued');
+		expect(reason).not.toContain('ensemblr_wait_for_job');
+	});
+
+	it('passes the call, and logs, when the classifier itself throws', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+		const exploding = {
+			...SETTINGS,
+			get extraPatterns(): string[] {
+				throw new Error('boom');
+			},
+		};
+		try {
+			expect(
+				await run(() => exploding, 'Bash', { command: 'bun run test' }),
+			).toEqual({});
+			expect(warn).toHaveBeenCalledWith(
+				expect.stringContaining('compute-queue classification failed'),
+				expect.objectContaining({ commandLength: 12 }),
+			);
+		} finally {
+			warn.mockRestore();
+		}
 	});
 
 	it('passes a light Bash command with no decision at all', async () => {

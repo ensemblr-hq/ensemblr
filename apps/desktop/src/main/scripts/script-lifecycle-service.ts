@@ -281,11 +281,22 @@ export function createScriptLifecycleService({
 			return unresolved;
 		}
 
-		const start: ScriptLaunchStarter = async ({ deferred }) => {
+		/**
+		 * Performs the launch once it may start. One that waited re-reads its
+		 * script, fails when it is gone, reports a changed command to its job,
+		 * and never restarts: the restart it asked for happened before it queued.
+		 * @param options - Whether it waited, and where to report its command.
+		 * @returns The terminal session create result or a typed failure.
+		 */
+		const start: ScriptLaunchStarter = async ({ deferred, describe }) => {
 			const current = deferred ? resolveLaunch(request) : { launch };
 
 			if (!current.launch) {
 				return asLaunchFailure(current.failure);
+			}
+
+			if (current.launch.command !== launch.command) {
+				describe?.(current.launch.command);
 			}
 
 			const result = await runExclusiveScript(

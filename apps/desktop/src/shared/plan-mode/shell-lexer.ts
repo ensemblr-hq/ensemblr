@@ -140,7 +140,7 @@ export function scanSingleQuoted(command: string, index: number): Scan {
  * still expands `$(…)` and backticks.
  * @param command - Full command text.
  * @param index - Index of the opening quote.
- * @param readSubstitution - For the tolerant lexer: reads the substitution starting at an index and answers where it ended, or null when it never closes. Absent, a substitution is reported as a violation.
+ * @param readSubstitution - For the tolerant lexer: reads the substitution starting at an index and answers where it ended, or null when it never closes, in which case its opening character is read as literal text. Absent, a substitution is reported as a violation.
  * @returns The quoted text and where it ended, or the violation that stopped it.
  */
 export function scanDoubleQuoted(
@@ -160,10 +160,7 @@ export function scanDoubleQuoted(
 			return { violation: expansion };
 		}
 		if (expansion && readSubstitution) {
-			const end = readSubstitution(cursor);
-			if (end === null) {
-				return { violation: UNBALANCED_QUOTE };
-			}
+			const end = readSubstitution(cursor) ?? cursor + 1;
 			text += command.slice(cursor, end);
 			cursor = end;
 			continue;

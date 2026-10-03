@@ -19,10 +19,11 @@ export interface ScriptLaunchOwner {
 /**
  * Performs a launch once it holds its slot. `deferred` is true when the launch
  * waited in the queue first, so the caller re-reads anything that may have
- * changed while it waited.
+ * changed while it waited and reports a changed command through `describe`.
  */
 export type ScriptLaunchStarter = (options: {
 	deferred: boolean;
+	describe?: (command: string) => void;
 }) => Promise<CreateTerminalSessionResult>;
 
 /** The slice of the compute queue the script gate drives. */
@@ -136,8 +137,19 @@ export function createScriptQueueGate({
 	): Promise<CreateTerminalSessionResult> {
 		let result: CreateTerminalSessionResult;
 
+		if (computeQueue.getJob(lease.jobId)?.state !== 'running') {
+			return failure(
+				'script-queue-cancelled',
+				'The script was cancelled before it started.',
+				'info',
+			);
+		}
+
 		try {
-			result = await start({ deferred });
+			result = await start({
+				deferred,
+				describe: (command) => lease.describe({ command, label: command }),
+			});
 		} catch (error) {
 			lease.abandon({ failed: true, note: describeLaunchError(error) });
 			throw error;
@@ -287,9 +299,30 @@ function isHeavyLaunch(
 		case 'archive':
 			return false;
 		case 'run':
-			return classifyHeavyCommandForSettings(launch.command, settings).heavy;
+			return isHeavyRunCommand(launch.command, settings);
 		case 'setup':
 			return true;
+	}
+}
+
+/**
+ * Classifies a run script's command, starting it outside the queue rather
+ * than failing the launch if the classifier throws — the same fail-open
+ * stance the shell gates take, since a script that will not start is worse
+ * than one that skips the queue.
+ * @param command - The run script's configured command.
+ * @param settings - The live compute-queue settings.
+ * @returns True when the command classifies heavy.
+ */
+function isHeavyRunCommand(
+	command: string,
+	settings: ComputeQueueSettings,
+): boolean {
+	try {
+		return classifyHeavyCommandForSettings(command, settings).heavy;
+	} catch (error) {
+		console.warn('[scripts] Could not classify a run script command:', error);
+		return false;
 	}
 }
 

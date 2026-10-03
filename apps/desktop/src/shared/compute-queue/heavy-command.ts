@@ -10,17 +10,26 @@
  * `env CI=1 npx -y vitest`, or `bash -lc 'bun run test'`, and a prefix match on
  * the raw text catches the first of those and none of the rest.
  *
- * The peeling lives in `command-normaliser.ts` and the default patterns in
- * `heavy-command-patterns.ts`; this module follows nested commands — a shell's
- * `-c`, a Nix shell's command, a script fed to a shell's stdin — and matches.
+ * The peeling lives in `command-normaliser.ts`, the nested commands a command
+ * runs — a shell's `-c`, a script fed to a shell, `eval`, `watch`, `find
+ * -exec` — in `nested-command.ts`, and the default patterns in
+ * `heavy-command-patterns.ts`; this module matches.
  *
- * Unreadable input fails open: a command whose quotes do not balance is not
- * classified heavy, because the shell would refuse to run it anyway.
+ * A line whose top-level quotes do not balance is not classified heavy: it is
+ * unreadable as a whole, and bash itself rejects such a line before running any
+ * of it. A nested construct that does not close is read as literal text
+ * instead, so the commands around it are still classified.
  */
 import type { ComputeQueueSettings } from '../config.ts';
-import { lexShellSegments, type ShellSegment } from '../plan-mode.ts';
+import { lexShellSegments } from '../plan-mode.ts';
 import { normaliseTokens, type Tokens } from './command-normaliser.ts';
 import { DEFAULT_HEAVY_COMMAND_PATTERNS } from './heavy-command-patterns.ts';
+import {
+	NO_FEED,
+	nestedCommands,
+	type SegmentFeed,
+	segmentFeed,
+} from './nested-command.ts';
 
 /** Whether a command must go through the queue, and the pattern that said so. */
 export type HeavyCommandVerdict =
@@ -45,179 +54,10 @@ interface CompiledRules {
 	exempt: readonly CompiledPattern[];
 }
 
-/** A command another command runs: a string to lex, or an argv to classify as-is. */
-type NestedCommand = { text: string } | { argv: Tokens };
-
 const NOT_HEAVY: HeavyCommandVerdict = { heavy: false };
 
-/** How many shells deep a `bash -c` or `nix develop -c` is followed. */
+/** How many levels of nested command — a `bash -c`, an `eval`, a fed script — are followed. */
 const MAX_NESTING_DEPTH = 3;
-
-/** A shell option cluster that carries `-c`, as in `-c`, `-lc`, `-ec`. */
-const SHELL_COMMAND_FLAG = /^-[A-Za-z]*c[A-Za-z]*$/;
-
-/** A shell option cluster that carries `-s`, which reads the script from stdin. */
-const STDIN_SCRIPT_FLAG = /^-[A-Za-z]*s[A-Za-z]*$/;
-
-/** `echo`'s own options, which it does not print. */
-const ECHO_FLAGS = /^-[neE]+$/;
-
-/** Shells whose `-c` argument, or stdin, is itself a command line. */
-const SHELLS: ReadonlySet<string> = new Set([
-	'bash',
-	'dash',
-	'fish',
-	'ksh',
-	'sh',
-	'zsh',
-]);
-
-/** Shell options that consume the next word, which is therefore not a script. */
-const SHELL_VALUE_FLAGS: ReadonlySet<string> = new Set([
-	'+O',
-	'+o',
-	'-O',
-	'-o',
-	'--init-file',
-	'--rcfile',
-]);
-
-/**
- * Finds the command string a shell's `-c` option runs.
- * @param rest - The shell's argv.
- * @returns The command string, or null when the shell runs a script or nothing.
- */
-function shellCommandString(rest: Tokens): string | null {
-	for (let index = 0; index < rest.length; index += 1) {
-		const token = rest[index] as string;
-		if (SHELL_COMMAND_FLAG.test(token) || token === '--command') {
-			return rest[index + 1] ?? null;
-		}
-		if (SHELL_VALUE_FLAGS.has(token)) {
-			index += 1;
-			continue;
-		}
-		if (!token.startsWith('-') && !token.startsWith('+')) {
-			return null;
-		}
-	}
-	return null;
-}
-
-/**
- * Finds the command a Nix development shell runs: the argv after `nix develop`
- * or `nix shell`'s `-c`/`--command`, or the string after `nix-shell --run`.
- * @param name - The normalised command name.
- * @param rest - Its argv.
- * @returns The nested command, or null when the shell runs nothing given here.
- */
-function nixShellCommand(name: string, rest: Tokens): NestedCommand | null {
-	if (name === 'nix') {
-		const verbAt = rest.findIndex(
-			(token) => token === 'develop' || token === 'shell',
-		);
-		const commandAt = rest.findIndex(
-			(token) => token === '-c' || token === '--command',
-		);
-		return verbAt !== -1 && commandAt > verbAt
-			? { argv: rest.slice(commandAt + 1) }
-			: null;
-	}
-	if (name === 'nix-shell') {
-		const runAt = rest.findIndex(
-			(token) => token === '--run' || token === '--command',
-		);
-		const text = runAt === -1 ? undefined : rest[runAt + 1];
-		return text === undefined ? null : { text };
-	}
-	return null;
-}
-
-/**
- * Reports whether a shell without `-c` reads its script from stdin: it names
- * no script file, or says `-s` or `-` outright.
- * @param rest - The shell's argv.
- * @returns True when the shell runs whatever is fed to its stdin.
- */
-function shellReadsStdin(rest: Tokens): boolean {
-	for (let index = 0; index < rest.length; index += 1) {
-		const token = rest[index] as string;
-		if (STDIN_SCRIPT_FLAG.test(token) || token === '-') {
-			return true;
-		}
-		if (token === '--') {
-			return rest[index + 1] === undefined;
-		}
-		if (SHELL_VALUE_FLAGS.has(token)) {
-			index += 1;
-			continue;
-		}
-		if (!token.startsWith('-') && !token.startsWith('+')) {
-			return false;
-		}
-	}
-	return true;
-}
-
-/**
- * Reads the text an `echo` or `printf` writes, for a pipe that feeds it to a shell.
- * @param tokens - The writing command's argv.
- * @returns The text written, or null when the command is neither.
- */
-function echoedText(tokens: Tokens): string | null {
-	const [name, ...args] = normaliseTokens(tokens);
-	if (name !== 'echo' && name !== 'printf') {
-		return null;
-	}
-	const operands =
-		name === 'echo' ? args.filter((arg) => !ECHO_FLAGS.test(arg)) : args;
-	return operands.join(' ').replaceAll('\\n', '\n');
-}
-
-/**
- * Finds the script a segment's stdin carries: its own heredoc or here-string,
- * or whatever the segment before it pipes in — that one's document, or the
- * text it echoes.
- * @param segments - Every segment of the command line.
- * @param index - The segment whose stdin to read.
- * @returns The text on its stdin, or null when none is known.
- */
-function stdinText(
-	segments: readonly ShellSegment[],
-	index: number,
-): string | null {
-	const segment = segments[index];
-	const feeder = index > 0 ? segments[index - 1] : undefined;
-	if (segment?.stdin != null) {
-		return segment.stdin;
-	}
-	return feeder?.pipesOnward
-		? (feeder.stdin ?? echoedText(feeder.tokens))
-		: null;
-}
-
-/**
- * Finds the command a normalised command runs inside itself, if any: a
- * shell's `-c` string, the script a shell reads from stdin, or a Nix shell's
- * command.
- * @param tokens - The normalised argv.
- * @param stdin - The text fed to the command's stdin, if known.
- * @returns The nested command, or null when there is none.
- */
-function nestedCommand(
-	tokens: Tokens,
-	stdin: string | null,
-): NestedCommand | null {
-	const [name = '', ...rest] = tokens;
-	if (!SHELLS.has(name)) {
-		return nixShellCommand(name, rest);
-	}
-	const text = shellCommandString(rest);
-	if (text !== null) {
-		return { text };
-	}
-	return stdin !== null && shellReadsStdin(rest) ? { text: stdin } : null;
-}
 
 /**
  * Lists the forms a normalised command is matched in. A `run <name>` may be a
@@ -285,14 +125,14 @@ function matchesPattern(pattern: CompiledPattern, tokens: Tokens): boolean {
  * @param tokens - The simple command's argv.
  * @param rules - The compiled pattern lists.
  * @param depth - How many shells deep this command sits.
- * @param stdin - The text fed to the command's stdin, if known.
+ * @param feed - What the command is fed: its stdin, and the scripts its process substitutions print.
  * @returns The verdict for this command.
  */
 function classifySegment(
 	tokens: Tokens,
 	rules: CompiledRules,
 	depth: number,
-	stdin: string | null,
+	feed: SegmentFeed,
 ): HeavyCommandVerdict {
 	const forms = candidateForms(normaliseTokens(tokens));
 	const exempt = forms.some((form) =>
@@ -302,12 +142,12 @@ function classifySegment(
 		return NOT_HEAVY;
 	}
 	const nested =
-		depth < MAX_NESTING_DEPTH ? nestedCommand(forms[0] ?? [], stdin) : null;
-	if (nested) {
+		depth < MAX_NESTING_DEPTH ? nestedCommands(forms[0] ?? [], feed) : [];
+	for (const command of nested) {
 		const inner =
-			'text' in nested
-				? classifyCommandText(nested.text, rules, depth + 1)
-				: classifySegment(nested.argv, rules, depth + 1, null);
+			'text' in command
+				? classifyCommandText(command.text, rules, depth + 1)
+				: classifySegment(command.argv, rules, depth + 1, NO_FEED);
 		if (inner.heavy) {
 			return inner;
 		}
@@ -339,7 +179,7 @@ function classifyCommandText(
 			segment.tokens,
 			rules,
 			depth,
-			stdinText(segments, index),
+			segmentFeed(segments, index),
 		);
 		if (verdict.heavy) {
 			return verdict;

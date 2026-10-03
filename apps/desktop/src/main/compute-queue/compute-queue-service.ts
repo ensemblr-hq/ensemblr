@@ -289,7 +289,16 @@ export function createComputeQueueService(
 			leaseResolvers.delete(id);
 			return;
 		}
-		const launch = launchCommand(record).finally(() => launches.delete(launch));
+		const launch = launchCommand(record)
+			.catch((error: unknown) => {
+				console.warn(`[compute-queue] launch of job ${id} failed`, error);
+				runs.delete(id);
+				finish(id, {
+					outputTail: `Could not start the command: ${describeError(error)}\n`,
+					state: 'failed',
+				});
+			})
+			.finally(() => launches.delete(launch));
 		launches.add(launch);
 	}
 
@@ -553,6 +562,10 @@ export function createComputeQueueService(
 		granted: ScriptLease['granted'],
 	): ScriptLease {
 		return {
+			/**
+			 * Ends a job whose launch opened no terminal, recording why.
+			 * @param outcome - Whether it failed or was refused, and the reason.
+			 */
 			abandon: ({ failed, note }) => {
 				const record = records.get(id);
 				if (record === undefined || isComputeJobFinished(record.state)) {
@@ -563,6 +576,11 @@ export function createComputeQueueService(
 					state: failed && !record.cancelRequested ? 'failed' : 'cancelled',
 				});
 			},
+			/**
+			 * Ties the job to the terminal its launch opened, stopping that
+			 * terminal at once when the job was cancelled in the meantime.
+			 * @param terminalId - The launched terminal.
+			 */
 			attachTerminal: (terminalId) => {
 				const record = update(id, { terminalId });
 				if (record?.cancelRequested || record?.state === 'cancelled') {
@@ -570,8 +588,25 @@ export function createComputeQueueService(
 				}
 				emit();
 			},
+			/**
+			 * Updates what the job says it runs, after a launch that waited
+			 * re-read its command; the job keeps the slot it was granted.
+			 * @param description - The command it now runs and its label.
+			 */
+			describe: ({ command, label }) => {
+				const record = records.get(id);
+				if (record === undefined || isComputeJobFinished(record.state)) {
+					return;
+				}
+				update(id, { command, label });
+				emit();
+			},
 			granted,
 			jobId: id,
+			/**
+			 * Frees the slot with the terminal's outcome; a no-op once finished.
+			 * @param outcome - The terminal's exit code and signal.
+			 */
 			release: ({ exitCode, signal }) => {
 				const record = records.get(id);
 				if (record === undefined || isComputeJobFinished(record.state)) {

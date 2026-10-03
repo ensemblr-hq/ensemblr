@@ -1,3 +1,9 @@
+import {
+	replaceAssignmentValues,
+	replaceJwts,
+	replacePrivateKeyBlocks,
+	replaceUrlPasswords,
+} from './redaction/secret-scanners.ts';
 import { SENSITIVE_KEY_PARTS } from './sensitive-key.ts';
 
 /** Placeholder every redactor substitutes for a secret. */
@@ -50,13 +56,14 @@ export interface SecretValuePattern {
 	id: string;
 	/** Global-flagged matcher for the secret's literal shape. */
 	pattern: RegExp;
+	/**
+	 * A linear-time replacement used instead of `pattern`, for a shape whose
+	 * regex backtracks quadratically on a long line. It must match exactly what
+	 * `pattern` matches; the corpus test holds the two to each other.
+	 */
+	redact?: (text: string) => string;
 	/** What the match is replaced with; defaults to {@link REDACTED}. */
 	replacement?: string;
-	/**
-	 * A substring every match contains. A text without it skips the pattern,
-	 * which keeps a backtracking-prone matcher off long lines it cannot match.
-	 */
-	requires?: string;
 }
 
 /**
@@ -72,6 +79,7 @@ export const SECRET_VALUE_PATTERNS: readonly SecretValuePattern[] = [
 		id: 'pem-private-key',
 		pattern:
 			/-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----[\s\S]*?-----END (?:[A-Z]+ )?PRIVATE KEY-----/g,
+		redact: (text) => replacePrivateKeyBlocks(text, REDACTED),
 	},
 	{
 		id: 'github-token',
@@ -85,12 +93,13 @@ export const SECRET_VALUE_PATTERNS: readonly SecretValuePattern[] = [
 	{
 		id: 'jwt',
 		pattern: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/g,
+		redact: (text) => replaceJwts(text, REDACTED),
 	},
 	{
 		id: 'url-userinfo',
 		pattern: /([a-z][a-z0-9+.-]*:\/\/[^\s/@:]+:)[^\s/@]+(@)/gi,
+		redact: (text) => replaceUrlPasswords(text, REDACTED),
 		replacement: `$1${REDACTED}$2`,
-		requires: '://',
 	},
 	{ id: 'hex-token', pattern: /\b[a-f0-9]{32,}\b/gi },
 ];
@@ -104,6 +113,9 @@ const HOME_PATH_PATTERNS: readonly RegExp[] = [
 	/\/home\/[^/\s'"]+/g,
 	/\/root\b/g,
 ];
+
+/** A key ending in `_KEY` or `-KEY` after any alphanumeric name, like `OPENAI_KEY`. */
+const SUFFIX_KEY_SOURCE = '[A-Z0-9]+[_-]KEY';
 
 /**
  * Key-name fragments the assignment scanner recognises inside a larger name, so
@@ -134,20 +146,20 @@ export const ASSIGNMENT_KEY_SOURCES: readonly string[] = [
 	'SESSION',
 	'SIGNING(?:[_-]?KEY)?',
 	'TOKEN',
-	'[A-Z0-9]+[_-]KEY',
+	SUFFIX_KEY_SOURCE,
 ];
 
 /**
- * Matches `SOME_TOKEN=value` and `apiKey: value` assignments in free text,
- * capturing the key, the separator, an opening quote, and the value.
- * @returns A fresh global-flagged matcher, so no `lastIndex` is shared.
+ * Tests whether a key run contains any key source. The suffix source is probed
+ * as an alphanumeric followed by `_KEY`, which is the same containment test
+ * without the leading `+` that would rescan an alphanumeric run at every offset.
  */
-function assignmentPattern(): RegExp {
-	return new RegExp(
-		`\\b([A-Z0-9_.-]*(?:${ASSIGNMENT_KEY_SOURCES.join('|')})[A-Z0-9_.-]*)(\\s*[=:]\\s*)(["']?)([^\\s"',;]+)`,
-		'gi',
-	);
-}
+const ASSIGNMENT_KEY_PROBE = new RegExp(
+	ASSIGNMENT_KEY_SOURCES.map((source) =>
+		source === SUFFIX_KEY_SOURCE ? '(?<=[A-Z0-9])[_-]KEY' : source,
+	).join('|'),
+	'i',
+);
 
 /** A character every assignment match contains: its separator. */
 const ASSIGNMENT_SEPARATOR_PATTERN = /[=:]/;
@@ -206,20 +218,20 @@ export function isRedactableKeyName(key: string): boolean {
 export function redactSecretShapes(text: string): string {
 	let redacted = text;
 
-	for (const { pattern, replacement, requires } of SECRET_VALUE_PATTERNS) {
-		if (requires === undefined || redacted.includes(requires)) {
-			redacted = redacted.replace(pattern, replacement ?? REDACTED);
-		}
+	for (const { pattern, redact, replacement } of SECRET_VALUE_PATTERNS) {
+		redacted = redact
+			? redact(redacted)
+			: redacted.replace(pattern, replacement ?? REDACTED);
 	}
 
 	return redacted;
 }
 
 /**
- * Replaces the value of every secret-named assignment in a text, keeping the
- * key and separator so a later grep still finds the line. A text with no
- * separator at all skips the scan, whose key alternation backtracks
- * quadratically over a long run of word characters.
+ * Replaces the value of every secret-named assignment in a text — a key
+ * containing one of {@link ASSIGNMENT_KEY_SOURCES}, `=` or `:`, then a value —
+ * keeping the key and separator so a later grep still finds the line. Runs in
+ * linear time; a text with no separator at all is returned untouched.
  * @param text - Text to scan.
  * @returns The text with secret-named assignment values replaced.
  */
@@ -228,11 +240,7 @@ export function redactSecretAssignments(text: string): string {
 		return text;
 	}
 
-	return text.replace(
-		assignmentPattern(),
-		(_match, key: string, separator: string, quote: string) =>
-			`${key}${separator}${quote}${REDACTED}`,
-	);
+	return replaceAssignmentValues(text, ASSIGNMENT_KEY_PROBE, REDACTED);
 }
 
 /**

@@ -104,9 +104,15 @@ code.
 ## Consequences
 
 - The gate is best effort, not a sandbox. A script file that wraps
-  `bun run test`, a `Makefile` target, or a command assembled from variables
-  is not recognised. The classifier errs towards recognising commands rather
-  than proving them safe, so `tsc --version` counts as heavy.
+  `bun run test`, a `Makefile` target, a command name held in a variable
+  (`T=vitest; $T run`), or a pipeline that reaches a shell through another
+  command (`… | tee /dev/null | sh`) is not recognised. The classifier errs
+  towards recognising commands rather than proving them safe, so
+  `tsc --version` counts as heavy.
+- The terminal gate classifies each submitted line on its own. A heredoc typed
+  into a terminal line by line (`cat <<EOF > notes.md`, then `bun run test`)
+  has its body line refused even though the shell would only write it to a
+  file.
 - Third-party harness TUIs (Claude Code, Codex, Vibe in a terminal tab) are not
   gated. Codex and Vibe expose no pre-execution hook; a Claude harness could be
   given one later through `--settings`. What `ensemblr_write_terminal` types

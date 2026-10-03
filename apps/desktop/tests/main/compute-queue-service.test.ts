@@ -69,10 +69,9 @@ async function flush(): Promise<void> {
 
 /** Builds a queue over the test's mutable settings and fake runner. */
 function buildQueue(
-	extra: { retainedTailLimit?: number } = {},
+	extra: { retainedTailLimit?: number; startCommand?: CommandStarter } = {},
 ): ComputeQueueService {
 	return createComputeQueueService({
-		...extra,
 		assembleEnvironment: (workspaceId) => assemble(workspaceId),
 		baseEnvironment: () => ({ PATH: '/usr/bin', BASE: 'yes' }),
 		createId: () => {
@@ -91,6 +90,7 @@ function buildQueue(
 		historyLimit: 4,
 		startCommand: fakeStarter,
 		stopScriptTerminal: (terminalId) => stopTerminal(terminalId),
+		...extra,
 	});
 }
 
@@ -692,5 +692,46 @@ describe('memory bounds', () => {
 		await flush();
 		expect(stateOf(job)).toBe('running');
 		expect(queue.snapshot().slots).toBe(1);
+	});
+});
+
+describe('launch failures and descriptions', () => {
+	it('fails a job whose run rejects instead of leaving the rejection unhandled', async () => {
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
+		queue = buildQueue({
+			startCommand: () => ({
+				done: Promise.reject(new Error('runner broke')),
+				kill: () => {},
+				logPath: null,
+				tail: () => ({ omittedChars: 0, text: '' }),
+				terminate: () => {},
+			}),
+		});
+		const job = await enqueue('a', 'broken');
+		await flush();
+		expect(queue.getJob(job)).toMatchObject({ state: 'failed' });
+		expect(queue.getJob(job)?.outputTail).toContain('runner broke');
+		expect(console.warn).toHaveBeenCalled();
+		await expect(queue.shutdown()).resolves.toBeUndefined();
+		vi.restoreAllMocks();
+	});
+
+	it('lets a lease update the command its job reports', async () => {
+		const lease = queue.acquireScriptLease({
+			command: 'cargo build',
+			initiator: 'agent',
+			label: 'cargo build',
+			workspaceId: 'a',
+		});
+		await lease.granted;
+		lease.describe({ command: 'cargo build --release', label: 'Build' });
+		expect(queue.getJob(lease.jobId)).toMatchObject({
+			command: 'cargo build --release',
+			label: 'Build',
+			state: 'running',
+		});
+		lease.release({ exitCode: 0 });
+		lease.describe({ command: 'later', label: 'later' });
+		expect(queue.getJob(lease.jobId)?.command).toBe('cargo build --release');
 	});
 });

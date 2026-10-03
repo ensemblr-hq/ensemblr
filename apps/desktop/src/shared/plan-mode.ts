@@ -36,10 +36,7 @@ export {
 export type { LexedCommand } from './plan-mode/shell-lexer.ts';
 export { lexCommand } from './plan-mode/shell-lexer.ts';
 export type { ShellSegment } from './plan-mode/tolerant-shell-lexer.ts';
-export {
-	lexCommandSegments,
-	lexShellSegments,
-} from './plan-mode/tolerant-shell-lexer.ts';
+export { lexShellSegments } from './plan-mode/tolerant-shell-lexer.ts';
 export type {
 	PlanModeToolRequest,
 	PlanModeToolVerdict,

@@ -59,7 +59,7 @@ const RUNNER_VALUE_FLAGS: ReadonlySet<string> = new Set([
  * @param skipsAssignments - Whether `NAME=value` words are skipped too, as `env` takes them.
  * @returns The argv from the first operand on.
  */
-function skipOptions(
+export function skipOptions(
 	tokens: Tokens,
 	valueFlags: ReadonlySet<string>,
 	skipsAssignments = false,

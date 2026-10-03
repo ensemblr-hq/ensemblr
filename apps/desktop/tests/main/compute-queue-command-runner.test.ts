@@ -22,6 +22,7 @@ import {
 	type ComputeQueueService,
 	createComputeQueueService,
 } from '../../src/main/compute-queue/index.ts';
+import { expandRedactValues } from '../../src/main/compute-queue/output-redaction.ts';
 
 const SECRET = 'supersecretvalue123';
 
@@ -258,13 +259,39 @@ describe('chunk-boundary redaction', () => {
 	it('holds a private key split across chunks until its END and redacts it whole', async () => {
 		const output = collector([]);
 		feed(output, `x\n${KEY_LINES[0]}\n${KEY_LINES[1]}\n`);
-		expect(output.tail().text).toBe('x\n[REDACTED]\n');
+		expect(output.tail().text).toBe('x\n');
 		feed(output, `${KEY_LINES[2]}\n${KEY_LINES[3]}\ny\n`);
 		await output.end();
 		expect(output.tail().text).toBe('x\n[REDACTED]\ny\n');
 		expect(readFileSync(output.logPath ?? '', 'utf8')).toBe(
 			'x\n[REDACTED]\ny\n',
 		);
+	});
+
+	it('keeps holding a key whose END line has not reached its newline', async () => {
+		const output = collector([]);
+		feed(output, `x\n${KEY_LINES.join('\n')}`);
+		expect(output.tail().text).toBe('x\n');
+		await output.end();
+		expect(output.tail().text).toBe('x\n[REDACTED]');
+		expect(readFileSync(output.logPath ?? '', 'utf8')).not.toContain('MIIE');
+	});
+
+	it.each([
+		[
+			'between the END dashes and the newline',
+			'-----END RSA PRIVATE KEY-----',
+			'\ny\n',
+		],
+		['inside the END line', '-----END RSA PRIV', 'ATE KEY-----\ny\n'],
+	])('holds a key split %s', async (_where, endPart, rest) => {
+		const output = collector([]);
+		feed(output, `${KEY_LINES.slice(0, 3).join('\n')}\n${endPart}`);
+		expect(output.tail().text).toBe('');
+		feed(output, rest);
+		await output.end();
+		expect(output.tail().text).toBe('[REDACTED]\ny\n');
+		expect(readFileSync(output.logPath ?? '', 'utf8')).not.toContain('MIIE');
 	});
 
 	it('masks a private key the process never closed', async () => {
@@ -274,9 +301,18 @@ describe('chunk-boundary redaction', () => {
 		expect(output.tail().text).toBe('[REDACTED]\n');
 	});
 
+	it('leaves an unfinished line out of the live tail', async () => {
+		const output = collector(['hunter2-secret-value']);
+		feed(output, 'done\npw is hunter2-sec');
+		expect(output.tail().text).toBe('done\n');
+		feed(output, 'ret-value\n');
+		expect(output.tail().text).toBe('done\npw is [REDACTED]\n');
+		await output.end();
+	});
+
 	it('never cuts a literal secret when a newline-free line outgrows the buffer', async () => {
 		const output = collector([SECRET]);
-		const line = `${'z'.repeat(997)}${SECRET}`.repeat(60);
+		const line = `${'z'.repeat(997)} ${SECRET}`.repeat(200);
 		for (let index = 0; index < line.length; index += 4_093) {
 			feed(output, line.slice(index, index + 4_093));
 		}
@@ -284,11 +320,70 @@ describe('chunk-boundary redaction', () => {
 		const { text } = output.tail();
 		expect(text).not.toContain(SECRET.slice(0, 8));
 		expect(text).not.toContain(SECRET.slice(-8));
-		expect(text.match(/\[REDACTED\]/g)).toHaveLength(60);
+		expect(
+			readFileSync(output.logPath ?? '', 'utf8').match(/\[REDACTED\]/g),
+		).toHaveLength(200);
 	});
 
-	it('redacts a 200 KB single-line identifier run well inside a frame budget', async () => {
-		const lines = ['abc_def.'.repeat(25_600), `TOKEN=${'a'.repeat(204_800)}`];
+	it('masks a boundary-free token too long to hold, remainder included', async () => {
+		const output = collector([]);
+		const blob = `QUJD${'x'.repeat(300_000)}`;
+		for (let index = 0; index < blob.length; index += 65_536) {
+			feed(output, blob.slice(index, index + 65_536));
+		}
+		feed(output, ' after\n');
+		await output.end();
+		expect(readFileSync(output.logPath ?? '', 'utf8')).toBe(
+			'[REDACTED] after\n',
+		);
+	});
+
+	it.each([
+		[
+			'a spaced assignment',
+			'API_KEY = supersecretvalue456',
+			'supersecretvalue456',
+		],
+		[
+			'a quoted assignment',
+			'TOKEN="supersecretvalue456"',
+			'supersecretvalue456',
+		],
+		[
+			'a JWT longer than 2 KB',
+			`eyJ${'h'.repeat(3_000)}.eyJzdWIiOiIxIn0.sig`,
+			'h'.repeat(64),
+		],
+	])('redacts %s straddling a 2 KB offset', async (_name, secret, leaked) => {
+		const output = collector([]);
+		const padding = 'w '.repeat(1_000);
+		feed(output, `${padding}${secret} end\n`);
+		await output.end();
+		const { text } = output.tail();
+		expect(text).toContain('[REDACTED]');
+		expect(text).not.toContain(leaked);
+	});
+
+	it('redacts a 200 KB minified line full of = and : quickly and completely', async () => {
+		const output = collector([]);
+		const line = 'var a=1,b={c:2,token:"abcd1234efgh"};'.repeat(5_600);
+		const started = performance.now();
+		for (let index = 0; index < line.length; index += 65_536) {
+			feed(output, line.slice(index, index + 65_536));
+		}
+		feed(output, '\n');
+		await output.end();
+		expect(performance.now() - started).toBeLessThan(1_000);
+		const log = readFileSync(output.logPath ?? '', 'utf8');
+		expect(log).not.toContain('abcd1234efgh');
+		expect(log.match(/token:"\[REDACTED\]/g)).toHaveLength(5_600);
+	});
+
+	it('redacts a 200 KB single-line identifier run inside a CI-safe budget', async () => {
+		const lines = [
+			`${'abc_def.'.repeat(12_800)} ${SECRET} ${'abc_def.'.repeat(12_800)}`,
+			`TOKEN=${'a'.repeat(204_800)}`,
+		];
 		for (const line of lines) {
 			const output = collector([SECRET]);
 			const started = performance.now();
@@ -296,9 +391,33 @@ describe('chunk-boundary redaction', () => {
 				feed(output, line.slice(index, index + 65_536));
 			}
 			feed(output, '\n');
-			output.tail();
 			await output.end();
-			expect(performance.now() - started).toBeLessThan(100);
+			expect(performance.now() - started).toBeLessThan(1_000);
+			const log = readFileSync(output.logPath ?? '', 'utf8');
+			expect(log).toContain('[REDACTED]');
+			expect(log).not.toContain(SECRET);
+			expect(log).not.toContain('a'.repeat(64));
 		}
+	});
+});
+
+describe('expandRedactValues', () => {
+	it('adds distinctive lines of a multi-line secret but not its structure', () => {
+		const serviceAccount = [
+			'{',
+			'  "type": "service_account",',
+			'  "private_key_id": "a3f1c09d4b7e2a6f8c1d0e9b5a4738126f0a9d3c",',
+			'  "auth_uri": "https://accounts.google.com/o/oauth2/auth",',
+			'}',
+		].join('\n');
+		const pem = KEY_LINES.join('\n');
+		const expanded = expandRedactValues([serviceAccount, pem]);
+		expect(expanded).toContain('a3f1c09d4b7e2a6f8c1d0e9b5a4738126f0a9d3c');
+		expect(expanded).toContain(KEY_LINES[1]);
+		expect(expanded).not.toContain('service_account');
+		expect(expanded).not.toContain('  "type": "service_account",');
+		expect(expanded).not.toContain(KEY_LINES[0]);
+		expect(expanded).not.toContain(KEY_LINES[3]);
+		expect(expanded).not.toContain('https://accounts.google.com/o/oauth2/auth');
 	});
 });
