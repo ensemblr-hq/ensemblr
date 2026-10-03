@@ -57,6 +57,11 @@ interface UseLivePullRequestModelInput {
  * an older verdict wearing a newer stamp. A stamp that moves alone re-runs the
  * choice, not the build.
  *
+ * Until a live snapshot is held there is no choice for the stamp to decide, so
+ * the hook reads it on render without subscribing to it. The sweeper re-stamps
+ * every pull request on every pass, and a subscription here would re-render
+ * every sidebar row that has one on every poll that carried a sweep.
+ *
  * `enabled` gates the queries, not the choice: an inactive row keeps rendering a
  * live snapshot it already holds for as long as that snapshot is the fresher of
  * the two, rather than regressing to the navigation poll's copy on blur.
@@ -95,7 +100,10 @@ export function useLivePullRequestModel({
 		() => workspacePrObservationQuery(workspaceId),
 		[workspaceId],
 	);
-	const { data: navigationObservation } = useQuery(observationQuery);
+	const { data: navigationObservation } = useQuery({
+		...observationQuery,
+		subscribed: prSnapshotData !== undefined,
+	});
 	const fallbackSyncedAt =
 		navigationObservation &&
 		statesPresentationVerdict(fallback, navigationObservation.presentation)

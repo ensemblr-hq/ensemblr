@@ -1,5 +1,6 @@
 import type { TFunction } from 'i18next';
 import { ArchiveIcon } from 'lucide-react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
@@ -105,8 +106,33 @@ function pendingLifecycleLabels(
 	};
 }
 
-/** Sidebar row for a single workspace, with state icon, diff stats and context menu. */
-export function WorkspaceSidebarItem({
+/**
+ * What a sidebar row is handed. Every callback takes the workspace (or its ids)
+ * rather than closing over it, so one stable function serves every row.
+ */
+interface WorkspaceSidebarItemProps {
+	isActive: boolean;
+	isPinned: boolean;
+	onArchiveSelect?: (workspace: WorkspaceShellModel) => void;
+	onDeleteSelect?: (workspace: WorkspaceShellModel) => void;
+	onPinToggle: (workspaceId: string) => void;
+	onRenameSelect?: (workspace: WorkspaceShellModel) => void;
+	onSelect: (projectId: string, workspaceId: string) => void;
+	resolveWorkspaceRouteSearch: (
+		workspace: WorkspaceShellModel,
+	) => WorkbenchRouteSearch;
+	workspace: WorkspaceShellModel;
+}
+
+/**
+ * Sidebar row for a single workspace, with state icon, diff stats and context menu.
+ *
+ * Memoized because the workbench shell re-renders on every navigation poll even
+ * when the poll changed nothing. The row only skips that render while its
+ * callers keep their callbacks stable and hand it the same `workspace` model,
+ * which the navigation mapping preserves across a poll that changed nothing.
+ */
+export const WorkspaceSidebarItem = memo(function WorkspaceSidebarItem({
 	isActive,
 	isPinned,
 	onArchiveSelect,
@@ -114,19 +140,9 @@ export function WorkspaceSidebarItem({
 	onPinToggle,
 	onRenameSelect,
 	onSelect,
-	routeSearch,
+	resolveWorkspaceRouteSearch,
 	workspace,
-}: {
-	isActive: boolean;
-	isPinned: boolean;
-	onArchiveSelect?: () => void;
-	onDeleteSelect?: () => void;
-	onPinToggle: () => void;
-	onRenameSelect?: () => void;
-	onSelect: () => void;
-	routeSearch: WorkbenchRouteSearch;
-	workspace: WorkspaceShellModel;
-}) {
+}: WorkspaceSidebarItemProps) {
 	const { t } = useTranslation();
 	const archiveBoundaryLabel = usePermissionBoundaryLabel(
 		archiveBoundary.boundary,
@@ -192,6 +208,15 @@ export function WorkspaceSidebarItem({
 		: t('workbench:workspace-item.open-aria', 'Open workspace {{workspace}}', {
 				workspace: workspace.name,
 			});
+	const selectArchive = onArchiveSelect
+		? () => onArchiveSelect(workspace)
+		: undefined;
+	const selectDelete = onDeleteSelect
+		? () => onDeleteSelect(workspace)
+		: undefined;
+	const selectRename = onRenameSelect
+		? () => onRenameSelect(workspace)
+		: undefined;
 
 	return (
 		<ContextMenu>
@@ -203,17 +228,24 @@ export function WorkspaceSidebarItem({
 						className='h-auto min-h-12 items-start gap-2 py-2'
 						data-workspace-sidebar-state={sidebarState.kind}
 						isActive={isActive}
-						onClick={renderWorkspaceLink ? undefined : onSelect}
+						onClick={
+							renderWorkspaceLink
+								? undefined
+								: () => onSelect(workspace.projectId, workspace.id)
+						}
 						tooltip={workspace.name}
 					>
 						{renderWorkspaceLink
 							? renderWorkspaceLink(
-									{ search: routeSearch, workspace },
+									{
+										search: resolveWorkspaceRouteSearch(workspace),
+										workspace,
+									},
 									buttonContent,
 								)
 							: buttonContent}
 					</SidebarMenuButton>
-					{onArchiveSelect ? (
+					{selectArchive ? (
 						<Button
 							aria-label={t(
 								'workbench:workspace-item.archive-aria',
@@ -224,7 +256,7 @@ export function WorkspaceSidebarItem({
 							data-permission-boundary={archiveBoundary.boundary}
 							onClick={(event) => {
 								event.stopPropagation();
-								onArchiveSelect();
+								selectArchive();
 							}}
 							onPointerDown={(event) => event.stopPropagation()}
 							size='icon-xs'
@@ -239,12 +271,12 @@ export function WorkspaceSidebarItem({
 			</ContextMenuTrigger>
 			<WorkspaceContextMenuContent
 				isPinned={isPinned}
-				onArchiveSelect={onArchiveSelect}
-				onDeleteSelect={onDeleteSelect}
-				onPinToggle={onPinToggle}
-				onRenameSelect={onRenameSelect}
+				onArchiveSelect={selectArchive}
+				onDeleteSelect={selectDelete}
+				onPinToggle={() => onPinToggle(workspace.id)}
+				onRenameSelect={selectRename}
 				workspace={workspace}
 			/>
 		</ContextMenu>
 	);
-}
+});

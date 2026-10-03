@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { prefetchWorkspaceSources } from '@/renderer/api/ensemblr';
@@ -90,6 +91,12 @@ export function ProjectNavigationGroups({
 	const archiveWorkspace = useArchiveWorkspaceAction({
 		activeWorkspaceId: activeWorkspace?.id ?? null,
 	});
+	const handleWorkspaceArchiveSelect = useCallback(
+		(workspace: WorkspaceShellModel) => {
+			void archiveWorkspace(workspace);
+		},
+		[archiveWorkspace],
+	);
 
 	const handleProjectDeleted = useDeleteProjectAction({
 		activeProjectId: activeProject?.id ?? null,
@@ -204,12 +211,8 @@ export function ProjectNavigationGroups({
 							onStaticNavigationSelect={onStaticNavigationSelect}
 							onWorkspacePinToggle={toggleWorkspacePinned}
 							onWorkspaceRenameSelect={onWorkspaceRenameSelect}
-							onWorkspaceArchiveSelect={(workspace) => {
-								void archiveWorkspace(workspace);
-							}}
-							onWorkspaceDeleteSelect={(workspace) =>
-								controller.openDeleteWorkspace(workspace)
-							}
+							onWorkspaceArchiveSelect={handleWorkspaceArchiveSelect}
+							onWorkspaceDeleteSelect={controller.openDeleteWorkspace}
 							onWorkspaceSelect={onWorkspaceSelect}
 							pinnedWorkspaceIdSet={pinnedWorkspaceIdSet}
 							project={project}
