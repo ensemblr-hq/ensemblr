@@ -60,6 +60,7 @@ const project: ProjectShellModel = {
 
 const baseNavigationSnapshot: RepositoryWorkspaceNavigationSnapshot = {
 	generatedAt: '2026-06-06T00:00:00.000Z',
+	pullRequestSyncedAt: {},
 	repositories: [
 		{
 			createdAt: '2026-06-06T00:00:00.000Z',

@@ -13,6 +13,7 @@ import {
 } from '../../src/renderer/lib/workbench';
 import type { WorkspaceShellModel } from '../../src/renderer/types/workbench';
 import type { GetPullRequestSnapshotResult } from '../../src/shared/ipc/contracts/github';
+import type { RepositoryWorkspaceNavigationSnapshot } from '../../src/shared/ipc/contracts/repository-navigation';
 import type { GetWorkspaceGitStatusResult } from '../../src/shared/ipc/contracts/workspace-git';
 import { createTestQueryClient } from './support/dom';
 
@@ -21,52 +22,58 @@ const WORKSPACE_CWD = '/repo/feature';
 const SYNCED_AT = '2026-07-15T09:00:00.000Z';
 
 /**
- * A navigation row for a workspace whose pushed pull request GitHub reports as
- * ready to merge, with the overview poll's reading folded in when given one —
- * the same path the workbench's project list takes.
+ * The navigation poll's view of one workspace whose pushed pull request GitHub
+ * reports as ready to merge.
+ */
+const NAVIGATION_SNAPSHOT: RepositoryWorkspaceNavigationSnapshot = {
+	generatedAt: SYNCED_AT,
+	pullRequestSyncedAt: { [WORKSPACE_ID]: SYNCED_AT },
+	repositories: [
+		{
+			createdAt: SYNCED_AT,
+			defaultBranch: 'main',
+			id: 'repo-1',
+			metadata: {},
+			name: 'repo',
+			path: '/repo',
+			slug: 'repo',
+			updatedAt: SYNCED_AT,
+			workspaces: [
+				{
+					archivedAt: null,
+					baseBranch: 'main',
+					branchName: 'feature',
+					createdAt: SYNCED_AT,
+					id: WORKSPACE_ID,
+					metadata: {},
+					name: 'Feature',
+					path: WORKSPACE_CWD,
+					pullRequest: {
+						branchSync: {
+							ahead: 0,
+							behind: 0,
+							branchName: 'feature',
+							hasUpstream: true,
+						},
+						number: 7,
+						status: 'ready',
+					},
+					repositoryId: 'repo-1',
+					slug: 'feature',
+					updatedAt: SYNCED_AT,
+				},
+			],
+		},
+	],
+};
+
+/**
+ * The navigation row for {@link NAVIGATION_SNAPSHOT}'s workspace, with the
+ * overview poll's reading folded in when given one — the same path the
+ * workbench's project list takes.
  */
 function readyWorkspace(uncommittedFiles?: number): WorkspaceShellModel {
-	const projects = mapNavigationSnapshotToProjects({
-		generatedAt: SYNCED_AT,
-		repositories: [
-			{
-				createdAt: SYNCED_AT,
-				defaultBranch: 'main',
-				id: 'repo-1',
-				metadata: {},
-				name: 'repo',
-				path: '/repo',
-				slug: 'repo',
-				updatedAt: SYNCED_AT,
-				workspaces: [
-					{
-						archivedAt: null,
-						baseBranch: 'main',
-						branchName: 'feature',
-						createdAt: SYNCED_AT,
-						id: WORKSPACE_ID,
-						metadata: {},
-						name: 'Feature',
-						path: WORKSPACE_CWD,
-						pullRequest: {
-							branchSync: {
-								ahead: 0,
-								behind: 0,
-								branchName: 'feature',
-								hasUpstream: true,
-							},
-							number: 7,
-							status: 'ready',
-							syncedAt: SYNCED_AT,
-						},
-						repositoryId: 'repo-1',
-						slug: 'feature',
-						updatedAt: SYNCED_AT,
-					},
-				],
-			},
-		],
-	});
+	const projects = mapNavigationSnapshotToProjects(NAVIGATION_SNAPSHOT);
 	const [project] =
 		uncommittedFiles === undefined
 			? projects
@@ -126,6 +133,10 @@ function renderRow(options: {
 	workspace: WorkspaceShellModel;
 }) {
 	const client = createTestQueryClient();
+	client.setQueryData(
+		ensemblrQueryKeys.repositoryWorkspaceNavigation(),
+		NAVIGATION_SNAPSHOT,
+	);
 	if (options.seedSnapshot) {
 		client.setQueryData(
 			ensemblrQueryKeys.pullRequestSnapshot(WORKSPACE_ID),

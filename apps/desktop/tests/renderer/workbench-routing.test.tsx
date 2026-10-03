@@ -34,6 +34,7 @@ function createNavigationSnapshot({
 }): RepositoryWorkspaceNavigationSnapshot {
 	return {
 		generatedAt: '2026-06-08T00:00:00.000Z',
+		pullRequestSyncedAt: {},
 		repositories: [
 			{
 				createdAt: '2026-06-08T00:00:00.000Z',
@@ -389,6 +390,7 @@ test('leaves workbench launch on welcome when no workspace exists', async () => 
 			ensemblr: {
 				repositoryWorkspaceNavigation: async () => ({
 					generatedAt: '2026-06-08T00:00:00.000Z',
+					pullRequestSyncedAt: {},
 					repositories: [],
 				}),
 			},
@@ -698,6 +700,7 @@ test('reads fresh navigation cache when parent loaderData lacks the workspace', 
 	const seededWorkspaceId = 'workspace-test-fresh-cache';
 	const seededSnapshot: RepositoryWorkspaceNavigationSnapshot = {
 		generatedAt: '2026-06-08T00:00:00.000Z',
+		pullRequestSyncedAt: {},
 		repositories: [
 			{
 				createdAt: '2026-06-08T00:00:00.000Z',

@@ -5,6 +5,7 @@ import {
 	isFresherPrObservation,
 	parseWorkspacePrPresentation,
 	parseWorkspacePrUnsettled,
+	type StampedWorkspacePrPresentation,
 } from '../../src/shared/github-pr-presentation';
 import type {
 	GitBranchSyncWire,
@@ -83,7 +84,14 @@ function presentationOf(
 	status: WorkspacePrPresentation['status'],
 	branchSync: GitBranchSyncWire | null = null,
 ): WorkspacePrPresentation {
-	return { branchSync, number: 7, status, syncedAt: SYNCED_AT };
+	return { branchSync, number: 7, status };
+}
+
+/** What a stored column of PR #7 parses to: the presentation and its stamp. */
+function stampedOf(
+	status: WorkspacePrPresentation['status'],
+): StampedWorkspacePrPresentation {
+	return { presentation: presentationOf(status), syncedAt: SYNCED_AT };
 }
 
 describe('deriveWorkspacePrPresentation', () => {
@@ -342,14 +350,20 @@ describe('deriveWorkspacePrPresentation', () => {
 		).toEqual(presentationOf('blocked'));
 	});
 
-	test('stamps the presentation with the snapshot it was derived from', () => {
-		expect(
-			deriveWorkspacePrPresentation({
-				branchSync: null,
-				pullRequest: pr({}),
-				syncedAt: '2026-07-15T09:30:00.000Z',
-			})?.syncedAt,
-		).toBe('2026-07-15T09:30:00.000Z');
+	test('carries no stamp, so a re-observed PR derives an equal presentation', () => {
+		const earlier = deriveWorkspacePrPresentation({
+			branchSync: null,
+			pullRequest: pr({}),
+			syncedAt: '2026-07-15T09:00:00.000Z',
+		});
+		const later = deriveWorkspacePrPresentation({
+			branchSync: null,
+			pullRequest: pr({}),
+			syncedAt: '2026-07-15T09:30:00.000Z',
+		});
+
+		expect(later).toEqual(earlier);
+		expect(later).not.toHaveProperty('syncedAt');
 	});
 });
 
@@ -369,7 +383,25 @@ describe('parseWorkspacePrPresentation', () => {
 			parseWorkspacePrPresentation(
 				JSON.stringify(snapshot(pr({ checks: [check('pending')] }))),
 			),
-		).toEqual(presentationOf('checking'));
+		).toEqual(stampedOf('checking'));
+	});
+
+	test('hands back the stamp of the snapshot the presentation came from', () => {
+		expect(
+			parseWorkspacePrPresentation(
+				JSON.stringify({
+					branchSync: null,
+					pullRequest: pr({}),
+					syncedAt: '2026-07-15T09:30:00.000Z',
+				}),
+			)?.syncedAt,
+		).toBe('2026-07-15T09:30:00.000Z');
+	});
+
+	test('yields no stamp for a snapshot that holds no pull request', () => {
+		expect(
+			parseWorkspacePrPresentation(JSON.stringify(snapshot(null))),
+		).toBeNull();
 	});
 
 	test('returns null for a row whose pull request cannot be derived from', () => {
@@ -411,7 +443,7 @@ describe('parseWorkspacePrPresentation', () => {
 					syncedAt: SYNCED_AT,
 				}),
 			),
-		).toEqual(presentationOf('checking'));
+		).toEqual(stampedOf('checking'));
 	});
 
 	test('drops a malformed branchSync without losing the PR status', () => {
@@ -423,7 +455,7 @@ describe('parseWorkspacePrPresentation', () => {
 					syncedAt: SYNCED_AT,
 				}),
 			),
-		).toEqual(presentationOf('checking'));
+		).toEqual(stampedOf('checking'));
 	});
 });
 

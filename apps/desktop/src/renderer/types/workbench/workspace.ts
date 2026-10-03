@@ -608,8 +608,6 @@ export interface WorkspaceShellModel {
 		status: PullRequestShellStatus;
 		/** Last refresh failure from the gh metadata service, already translated. */
 		syncError?: CommandFailureCopy;
-		/** ISO timestamp of the last successful gh snapshot refresh. */
-		syncedAt?: string;
 		title: string;
 		todos: PullRequestTodoSummary[];
 		url?: string;

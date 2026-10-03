@@ -11,6 +11,24 @@ import type { WorkspaceGitFileWire } from '@/shared/ipc/contracts/workspace-git'
  */
 export const DEMO_CLOCK = '2026-09-04T11:20:00.000Z';
 
+/**
+ * The observation stamps a navigation snapshot carries for a demo tree, keyed by
+ * workspace id: the shared clock for every workspace with a pull request, since
+ * the demo has no sweeper to re-observe one.
+ * @param repositories - The scenario's repository tree.
+ * @returns Each workspace with a pull request, mapped to {@link DEMO_CLOCK}.
+ */
+export function demoPullRequestSyncedAt(
+	repositories: readonly RepositoryWorkspaceNavigationRepository[],
+): Record<string, string> {
+	return Object.fromEntries(
+		repositories
+			.flatMap((repository) => repository.workspaces)
+			.filter((workspace) => workspace.pullRequest)
+			.map((workspace) => [workspace.id, DEMO_CLOCK]),
+	);
+}
+
 /** Workspace paths, exported so a scenario keys its git status off the same string. */
 export const WORKSPACE_PATHS = {
 	attachmentChips: '~/Code/workspaces/ensemblr/attachment-chips',
@@ -45,7 +63,7 @@ function workspace(
 		id: string;
 		name: string;
 		path: string;
-		pullRequest?: Omit<WorkspacePrPresentation, 'branchSync' | 'syncedAt'> & {
+		pullRequest?: Omit<WorkspacePrPresentation, 'branchSync'> & {
 			branchSync?: WorkspacePrPresentation['branchSync'];
 		};
 		slug: string;
@@ -70,7 +88,6 @@ function workspace(
 							branchName: options.branchName,
 							hasUpstream: true,
 						},
-						syncedAt: DEMO_CLOCK,
 					},
 				}
 			: {}),

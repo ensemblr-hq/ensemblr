@@ -98,6 +98,7 @@ export function getRepositoryWorkspaceNavigationSnapshot({
 	if (!database) {
 		return {
 			generatedAt,
+			pullRequestSyncedAt: {},
 			repositories: [],
 		};
 	}
@@ -112,6 +113,7 @@ export function getRepositoryWorkspaceNavigationSnapshot({
 		string,
 		RepositoryWorkspaceNavigationRepository
 	>();
+	const pullRequestSyncedAt: Record<string, string> = {};
 
 	for (const row of repositories) {
 		repositoriesById.set(row.id, {
@@ -134,6 +136,10 @@ export function getRepositoryWorkspaceNavigationSnapshot({
 			continue;
 		}
 
+		const stamped = parseWorkspacePrPresentation(row.pullRequestSnapshotJson);
+		if (stamped) {
+			pullRequestSyncedAt[row.id] = stamped.syncedAt;
+		}
 		repository.workspaces.push({
 			archivedAt: row.archivedAt,
 			baseBranch: row.baseBranch,
@@ -143,7 +149,7 @@ export function getRepositoryWorkspaceNavigationSnapshot({
 			metadata: parseMetadataJson(row.metadataJson),
 			name: row.name,
 			path: row.path,
-			pullRequest: parseWorkspacePrPresentation(row.pullRequestSnapshotJson),
+			pullRequest: stamped?.presentation ?? null,
 			repositoryId: row.repositoryId,
 			slug: row.slug,
 			updatedAt: row.updatedAt,
@@ -152,6 +158,7 @@ export function getRepositoryWorkspaceNavigationSnapshot({
 
 	return {
 		generatedAt,
+		pullRequestSyncedAt,
 		repositories: Array.from(repositoriesById.values()),
 	};
 }

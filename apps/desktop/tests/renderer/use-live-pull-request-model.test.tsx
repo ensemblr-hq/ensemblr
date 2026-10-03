@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { QueryClientProvider } from '@tanstack/react-query';
-import { renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { PropsWithChildren } from 'react';
 import { describe, expect, test } from 'vitest';
 
@@ -12,12 +12,28 @@ import type {
 	GetPullRequestSnapshotResult,
 	GithubPullRequestWire,
 } from '../../src/shared/ipc/contracts/github';
+import type {
+	RepositoryWorkspaceNavigationSnapshot,
+	WorkspacePrPresentation,
+	WorkspacePrPresentationStatus,
+} from '../../src/shared/ipc/contracts/repository-navigation';
 import { createTestQueryClient } from './support/dom';
 
 const WORKSPACE_ID = 'workspace-1';
 const WORKSPACE_CWD = '/repo/feature';
 const EARLIER = '2026-07-15T09:00:00.000Z';
+const MIDDLE = '2026-07-15T09:15:00.000Z';
 const LATER = '2026-07-15T09:30:00.000Z';
+
+/**
+ * A clean worktree, held as one object the way the hook's callers memoize it, so
+ * a re-render alone does not count as new input.
+ */
+const NO_CHANGES: WorkspaceShellModel['changeSummary'] = {
+	additions: 0,
+	deletions: 0,
+	files: 0,
+};
 
 /** A neutral fallback PR model standing in for the navigation snapshot's state. */
 const FALLBACK_PULL_REQUEST: WorkspaceShellModel['pullRequest'] = {
@@ -35,12 +51,87 @@ const FALLBACK_PULL_REQUEST: WorkspaceShellModel['pullRequest'] = {
 };
 
 /**
- * The same fallback as the navigation poll would deliver it once the background
- * sweeper has stamped a presentation — the case where the cached copy can be the
- * fresher of the two.
+ * The fallback as the navigation poll delivers it once the background sweeper
+ * has observed a ready pull request. Its stamp travels separately, in the
+ * snapshot's `pullRequestSyncedAt`, which is what `fallbackSyncedAt` seeds.
  */
-function stampedFallback(syncedAt: string): WorkspaceShellModel['pullRequest'] {
-	return { ...FALLBACK_PULL_REQUEST, status: 'ready-to-merge', syncedAt };
+const READY_FALLBACK: WorkspaceShellModel['pullRequest'] = {
+	...FALLBACK_PULL_REQUEST,
+	status: 'ready-to-merge',
+};
+
+/** The compact status each fallback status in these tests is mapped from. */
+const PRESENTATION_STATUS_OF: Partial<
+	Record<
+		WorkspaceShellModel['pullRequest']['status'],
+		WorkspacePrPresentationStatus
+	>
+> = {
+	blocked: 'blocked',
+	checking: 'checking',
+	idle: 'open',
+	'ready-to-merge': 'ready',
+};
+
+/**
+ * The presentation a navigation row would have mapped `pullRequest` from — what
+ * the cache holds when `pullRequest` is current rather than held.
+ * @param pullRequest - The fallback PR model the presentation should state.
+ * @returns The presentation stating that model's verdict.
+ */
+function presentationStating(
+	pullRequest: WorkspaceShellModel['pullRequest'],
+): WorkspacePrPresentation {
+	return {
+		branchSync: null,
+		number: pullRequest.number ?? 0,
+		status: PRESENTATION_STATUS_OF[pullRequest.status] ?? 'open',
+	};
+}
+
+/**
+ * A navigation snapshot holding this workspace's presentation observed at
+ * `syncedAt`, or holding no pull request for it when there is no stamp.
+ * @param syncedAt - When the presentation was observed, or undefined for none.
+ * @param presentation - The presentation the cached row holds.
+ * @returns The navigation snapshot to seed the query cache with.
+ */
+function navigationSnapshotStamped(
+	syncedAt: string | undefined,
+	presentation: WorkspacePrPresentation,
+): RepositoryWorkspaceNavigationSnapshot {
+	return {
+		generatedAt: syncedAt ?? EARLIER,
+		pullRequestSyncedAt: syncedAt ? { [WORKSPACE_ID]: syncedAt } : {},
+		repositories: [
+			{
+				createdAt: EARLIER,
+				defaultBranch: 'main',
+				id: 'repo-1',
+				metadata: {},
+				name: 'repo',
+				path: '/repo',
+				slug: 'repo',
+				updatedAt: EARLIER,
+				workspaces: [
+					{
+						archivedAt: null,
+						baseBranch: 'main',
+						branchName: 'feature',
+						createdAt: EARLIER,
+						id: WORKSPACE_ID,
+						metadata: {},
+						name: 'Feature',
+						path: WORKSPACE_CWD,
+						pullRequest: syncedAt ? presentation : null,
+						repositoryId: 'repo-1',
+						slug: 'feature',
+						updatedAt: EARLIER,
+					},
+				],
+			},
+		],
+	};
 }
 
 /** Builds a ready-to-merge PR wire record (open, clean, mergeable, approved). */
@@ -106,13 +197,28 @@ function conflictingSnapshotAt(syncedAt: string): GetPullRequestSnapshotResult {
 	};
 }
 
-/** Wraps a snapshot result into the query cache and renders the hook against it. */
+/**
+ * Seeds the navigation observation and the live snapshot into the query cache
+ * and renders the hook against them, handing back the client so a test can move
+ * either source afterwards. The cached presentation states `fallback`'s verdict
+ * unless `cachedPresentation` says otherwise — the held-render-state case.
+ */
 function renderLivePullRequest(options: {
+	cachedPresentation?: WorkspacePrPresentation;
 	enabled?: boolean;
 	fallback?: WorkspaceShellModel['pullRequest'];
+	fallbackSyncedAt?: string;
 	seed?: GetPullRequestSnapshotResult;
 }) {
+	const fallback = options.fallback ?? FALLBACK_PULL_REQUEST;
 	const client = createTestQueryClient();
+	client.setQueryData(
+		ensemblrQueryKeys.repositoryWorkspaceNavigation(),
+		navigationSnapshotStamped(
+			options.fallbackSyncedAt,
+			options.cachedPresentation ?? presentationStating(fallback),
+		),
+	);
 	if (options.seed) {
 		client.setQueryData(
 			ensemblrQueryKeys.pullRequestSnapshot(WORKSPACE_ID),
@@ -122,17 +228,21 @@ function renderLivePullRequest(options: {
 	const wrapper = ({ children }: PropsWithChildren) => (
 		<QueryClientProvider client={client}>{children}</QueryClientProvider>
 	);
-	return renderHook(
-		() =>
-			useLivePullRequestModel({
-				changeSummary: { additions: 0, deletions: 0, files: 0 },
+	let renders = 0;
+	const rendered = renderHook(
+		() => {
+			renders += 1;
+			return useLivePullRequestModel({
+				changeSummary: NO_CHANGES,
 				enabled: options.enabled ?? true,
-				fallback: options.fallback ?? FALLBACK_PULL_REQUEST,
+				fallback,
 				workspaceCwd: WORKSPACE_CWD,
 				workspaceId: WORKSPACE_ID,
-			}),
+			});
+		},
 		{ wrapper },
 	);
+	return { ...rendered, client, renderCount: () => renders };
 }
 
 describe('useLivePullRequestModel', () => {
@@ -158,16 +268,17 @@ describe('useLivePullRequestModel', () => {
 
 	test('keeps a fresher cached presentation over a stale live snapshot', () => {
 		const { result } = renderLivePullRequest({
-			fallback: stampedFallback(LATER),
+			fallback: READY_FALLBACK,
+			fallbackSyncedAt: LATER,
 			seed: checkingSnapshotAt(EARLIER),
 		});
 		expect(result.current.status).toBe('ready-to-merge');
-		expect(result.current.syncedAt).toBe(LATER);
 	});
 
 	test('a fresher cached verdict keeps the live snapshot body', () => {
 		const { result } = renderLivePullRequest({
-			fallback: stampedFallback(LATER),
+			fallback: READY_FALLBACK,
+			fallbackSyncedAt: LATER,
 			seed: checkingSnapshotAt(EARLIER),
 		});
 		expect(result.current.title).toBe('PR #7');
@@ -180,7 +291,8 @@ describe('useLivePullRequestModel', () => {
 
 	test('a fresher cached verdict off blocked denies a stale conflict', () => {
 		const { result } = renderLivePullRequest({
-			fallback: stampedFallback(LATER),
+			fallback: READY_FALLBACK,
+			fallbackSyncedAt: LATER,
 			seed: conflictingSnapshotAt(EARLIER),
 		});
 		expect(result.current.status).toBe('ready-to-merge');
@@ -189,7 +301,8 @@ describe('useLivePullRequestModel', () => {
 
 	test('a fresher cached verdict still blocked carries the conflict through', () => {
 		const { result } = renderLivePullRequest({
-			fallback: { ...stampedFallback(LATER), status: 'blocked' },
+			fallback: { ...READY_FALLBACK, status: 'blocked' },
+			fallbackSyncedAt: LATER,
 			seed: conflictingSnapshotAt(EARLIER),
 		});
 		expect(result.current.status).toBe('blocked');
@@ -197,9 +310,10 @@ describe('useLivePullRequestModel', () => {
 	});
 
 	test('a fresher cached verdict for another PR replaces the model outright', () => {
-		const cached = { ...stampedFallback(LATER), number: 43 };
+		const cached = { ...READY_FALLBACK, number: 43 };
 		const { result } = renderLivePullRequest({
 			fallback: cached,
+			fallbackSyncedAt: LATER,
 			seed: checkingSnapshotAt(EARLIER),
 		});
 		expect(result.current).toBe(cached);
@@ -208,7 +322,8 @@ describe('useLivePullRequestModel', () => {
 
 	test('a failed refresh with no snapshot never unseats a cached pull request', () => {
 		const { result } = renderLivePullRequest({
-			fallback: stampedFallback(LATER),
+			fallback: READY_FALLBACK,
+			fallbackSyncedAt: LATER,
 			seed: {
 				error: { code: 'gh-not-installed', message: 'gh is not installed.' },
 				fromCache: false,
@@ -234,7 +349,8 @@ describe('useLivePullRequestModel', () => {
 
 	test('takes the live snapshot once it observes GitHub later', () => {
 		const { result } = renderLivePullRequest({
-			fallback: stampedFallback(EARLIER),
+			fallback: READY_FALLBACK,
+			fallbackSyncedAt: EARLIER,
 			seed: checkingSnapshotAt(LATER),
 		});
 		expect(result.current.status).toBe('checking');
@@ -250,7 +366,8 @@ describe('useLivePullRequestModel', () => {
 	test('a disabled row still renders a live snapshot fresher than its fallback', () => {
 		const { result } = renderLivePullRequest({
 			enabled: false,
-			fallback: { ...stampedFallback(EARLIER), status: 'checking' },
+			fallback: { ...READY_FALLBACK, status: 'checking' },
+			fallbackSyncedAt: EARLIER,
 			seed: readySnapshotAt(LATER),
 		});
 		expect(result.current.status).toBe('ready-to-merge');
@@ -259,8 +376,103 @@ describe('useLivePullRequestModel', () => {
 	test('a disabled row falls back once the cached presentation overtakes it', () => {
 		const { result } = renderLivePullRequest({
 			enabled: false,
-			fallback: stampedFallback(LATER),
+			fallback: READY_FALLBACK,
+			fallbackSyncedAt: LATER,
 			seed: checkingSnapshotAt(EARLIER),
+		});
+		expect(result.current.status).toBe('ready-to-merge');
+	});
+
+	// The sequence that sank the content-signature attempt (#627): the sweeper
+	// observes the same status twice, so the navigation model stays the same
+	// object across both, and only the stamp beside it can say that the second
+	// observation came after the live snapshot read in between.
+	test('a re-stamped, unchanged presentation overtakes a live read made in between', async () => {
+		const checkingFallback = {
+			...READY_FALLBACK,
+			status: 'checking' as const,
+		};
+		const { client, result } = renderLivePullRequest({
+			enabled: false,
+			fallback: checkingFallback,
+			fallbackSyncedAt: EARLIER,
+		});
+		expect(result.current).toBe(checkingFallback);
+
+		act(() => {
+			client.setQueryData(
+				ensemblrQueryKeys.pullRequestSnapshot(WORKSPACE_ID),
+				readySnapshotAt(MIDDLE),
+			);
+		});
+		await waitFor(() => {
+			expect(result.current.status).toBe('ready-to-merge');
+		});
+
+		act(() => {
+			client.setQueryData(
+				ensemblrQueryKeys.repositoryWorkspaceNavigation(),
+				navigationSnapshotStamped(LATER, presentationStating(checkingFallback)),
+			);
+		});
+		await waitFor(() => {
+			expect(result.current.status).toBe('checking');
+		});
+		expect(result.current.title).toBe('PR #7');
+	});
+
+	test('a stamp that moves without changing the winner keeps the same model', async () => {
+		const checkingFallback = {
+			...READY_FALLBACK,
+			status: 'checking' as const,
+		};
+		const { client, renderCount, result } = renderLivePullRequest({
+			enabled: false,
+			fallback: checkingFallback,
+			fallbackSyncedAt: EARLIER,
+			seed: readySnapshotAt(LATER),
+		});
+		const before = result.current;
+		const rendersBefore = renderCount();
+		expect(before.status).toBe('ready-to-merge');
+
+		act(() => {
+			client.setQueryData(
+				ensemblrQueryKeys.repositoryWorkspaceNavigation(),
+				navigationSnapshotStamped(
+					MIDDLE,
+					presentationStating(checkingFallback),
+				),
+			);
+		});
+		await waitFor(() => {
+			expect(renderCount()).toBeGreaterThan(rendersBefore);
+		});
+		expect(result.current).toBe(before);
+	});
+
+	// While a fetch is in flight with no resolvable selection, the shell renders a
+	// project list held from an older snapshot. Its model must not borrow the
+	// newer stamp the cache holds for a different verdict, or an older status
+	// would outrank a live read made after it.
+	test('a fallback held from an older snapshot does not borrow the current stamp', () => {
+		const { result } = renderLivePullRequest({
+			cachedPresentation: { branchSync: null, number: 7, status: 'ready' },
+			enabled: false,
+			fallback: { ...READY_FALLBACK, status: 'checking' },
+			fallbackSyncedAt: LATER,
+			seed: readySnapshotAt(EARLIER),
+		});
+		expect(result.current.status).toBe('ready-to-merge');
+	});
+
+	test('a fallback for another pull request than the cached one competes unstamped', () => {
+		const { result } = renderLivePullRequest({
+			cachedPresentation: { branchSync: null, number: 8, status: 'checking' },
+			enabled: false,
+			fallback: { ...READY_FALLBACK, status: 'checking' },
+			fallbackSyncedAt: LATER,
+			seed: readySnapshotAt(EARLIER),
 		});
 		expect(result.current.status).toBe('ready-to-merge');
 	});

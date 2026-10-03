@@ -33,6 +33,7 @@ function snapshot(
 ): RepositoryWorkspaceNavigationSnapshot {
 	return {
 		generatedAt: '2026-08-19T00:00:00.000Z',
+		pullRequestSyncedAt: {},
 		repositories: [
 			{
 				createdAt: '2026-08-19T00:00:00.000Z',

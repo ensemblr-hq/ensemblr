@@ -80,7 +80,6 @@ export function buildPullRequestShellModel({
 			label: i18n.t('git:pull-request.label.no-pull-request', 'No PR'),
 			status: 'idle',
 			...(syncError ? { syncError } : {}),
-			...(snapshot ? { syncedAt: snapshot.syncedAt } : {}),
 			title: '',
 			todos: todoSummaries,
 		};
@@ -116,7 +115,6 @@ export function buildPullRequestShellModel({
 		state: pullRequest.state,
 		status,
 		...(syncError ? { syncError } : {}),
-		syncedAt: snapshot.syncedAt,
 		title: pullRequest.title,
 		todos: todoSummaries,
 		url: pullRequest.url,
@@ -175,7 +173,6 @@ export function withCachedPullRequestVerdict(
 		number: cached.number,
 		...(cached.state === undefined ? {} : { state: cached.state }),
 		status: cached.status,
-		...(cached.syncedAt === undefined ? {} : { syncedAt: cached.syncedAt }),
 	};
 }
 

@@ -60,6 +60,7 @@ test('returns the created workspace id when post-create navigation rejects', asy
 	queryClient.invalidateQueries.mockResolvedValue(undefined);
 	queryClient.fetchQuery.mockResolvedValue({
 		generatedAt: '2026-06-08T12:00:00.000Z',
+		pullRequestSyncedAt: {},
 		repositories: [
 			{
 				createdAt: '2026-06-08T12:00:00.000Z',

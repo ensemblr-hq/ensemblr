@@ -81,6 +81,7 @@ import {
 	DEMO_REPOSITORY_PULL_REQUESTS,
 } from './fixtures/repository-sources.ts';
 import { demoRootDirectory } from './fixtures/root-directory.ts';
+import { demoPullRequestSyncedAt } from './fixtures/workspaces.ts';
 import { DEMO_OPEN_TARGETS } from './open-targets.ts';
 import type { DemoChat, DemoScenario } from './scenario.ts';
 
@@ -692,6 +693,9 @@ export function createDemoHandlers(
 		repositoryWorkspaceNavigation:
 			(): RepositoryWorkspaceNavigationSnapshot => ({
 				generatedAt: getScenario().clock,
+				pullRequestSyncedAt: demoPullRequestSyncedAt(
+					getScenario().repositories,
+				),
 				repositories: [...getScenario().repositories],
 			}),
 		reportActiveChat: () => undefined,

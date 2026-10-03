@@ -62,6 +62,7 @@ function renderSettings(workspacesPath = '/Users/example/Ensemblr/workspaces') {
 		rootDirectory: vi.fn(async () => rootSnapshot(workspacesPath)),
 		repositoryWorkspaceNavigation: vi.fn(async () => ({
 			generatedAt: '2026-01-01T00:00:00.000Z',
+			pullRequestSyncedAt: {},
 			repositories: [
 				{
 					createdAt: '2026-01-01T00:00:00.000Z',

@@ -46,25 +46,25 @@ export type WorkspacePrPresentationStatus =
 	| 'open'
 	| 'ready';
 
-/** The compact PR presentation attached to a navigation workspace row. */
+/**
+ * The compact PR presentation attached to a navigation workspace row: what the
+ * row renders, and nothing about when it was observed. That stamp lives in
+ * {@link RepositoryWorkspaceNavigationSnapshot.pullRequestSyncedAt}, because the
+ * background sweeper advances it on every write — including the ones that find
+ * nothing changed — and a stamp inside the row would make every poll look like a
+ * new tree.
+ */
 export interface WorkspacePrPresentation {
 	/**
-	 * The branch's sync state as of `syncedAt`, so a row can say whether the
-	 * branch still holds commits the remote has not seen. Carried verbatim from
-	 * the cached snapshot rather than collapsed to a flag: the same fields decide
-	 * which git action publishes the work and how many commits it covers, and a
-	 * row that only knew "unsent" could not name either.
+	 * The branch's sync state as of the snapshot this was derived from, so a row
+	 * can say whether the branch still holds commits the remote has not seen.
+	 * Carried verbatim from the cached snapshot rather than collapsed to a flag:
+	 * the same fields decide which git action publishes the work and how many
+	 * commits it covers, and a row that only knew "unsent" could not name either.
 	 */
 	branchSync: GitBranchSyncWire | null;
 	number: number;
 	status: WorkspacePrPresentationStatus;
-	/**
-	 * ISO timestamp of the snapshot this status was derived from. Lets a consumer
-	 * that also holds the workspace's full snapshot tell which of the two observed
-	 * GitHub more recently, so navigating between workspaces cannot show an older
-	 * status than the one already on screen.
-	 */
-	syncedAt: string;
 }
 
 /** A workspace entry in the repository/workspace navigation tree. */
@@ -105,6 +105,20 @@ export interface RepositoryWorkspaceNavigationRepository {
 /** Full repository/workspace navigation tree snapshot. */
 export interface RepositoryWorkspaceNavigationSnapshot {
 	generatedAt: string;
+	/**
+	 * ISO timestamp of the cached GitHub snapshot each workspace's
+	 * `pullRequest` presentation was derived from, keyed by workspace id, with an
+	 * entry for every workspace that has one. Lets a consumer that also holds
+	 * the workspace's full snapshot tell which of the two observed GitHub more
+	 * recently, so navigating between workspaces cannot show an older status than
+	 * the one already on screen.
+	 *
+	 * Held apart from `repositories` because it moves on every sweep while the
+	 * presentations mostly do not: React Query's structural sharing then keeps
+	 * `repositories` by reference across a poll that changed nothing, which is
+	 * what the renderer's whole project-list memo chain keys on.
+	 */
+	pullRequestSyncedAt: Record<string, string>;
 	repositories: RepositoryWorkspaceNavigationRepository[];
 }
 

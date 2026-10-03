@@ -6,7 +6,9 @@ import {
 	pullRequestSnapshotQuery,
 	reviewCommentsQuery,
 	reviewTodosQuery,
+	workspacePrObservationQuery,
 } from '@/renderer/api/ensemblr-queries';
+import { statesPresentationVerdict } from '@/renderer/lib/workbench/navigation-model';
 import {
 	buildPullRequestShellModel,
 	withCachedPullRequestVerdict,
@@ -31,18 +33,29 @@ interface UseLivePullRequestModelInput {
  * icon in lockstep when a PR flips to ready-to-merge, instead of one lagging a
  * slower navigation poll.
  *
- * Which source states the *status* is decided by `syncedAt`, never by which is
- * loaded. The snapshot query only refreshes while a consumer is mounted on the
- * workspace, so its cache entry freezes the moment the user navigates away while
- * the background sweeper keeps the `fallback` presentation moving — and React
- * Query serves that frozen entry synchronously on the next mount. Preferring it
- * unconditionally is what walked a row back from ready-to-merge to
- * checks-running for the second a refetch took. So when the fallback observed
- * GitHub later, its verdict is grafted onto the live model rather than replacing
- * it: the status is the newer source's and the body — title, checks, comments,
- * branch sync — stays the live snapshot's, which is the only source that has one.
- * Before any snapshot lands there is no body to keep and `fallback` is returned
- * unchanged, by the same reference.
+ * Which source states the *status* is decided by when each observed GitHub,
+ * never by which is loaded. The snapshot query only refreshes while a consumer
+ * is mounted on the workspace, so its cache entry freezes the moment the user
+ * navigates away while the background sweeper keeps the `fallback` presentation
+ * moving — and React Query serves that frozen entry synchronously on the next
+ * mount. Preferring it unconditionally is what walked a row back from
+ * ready-to-merge to checks-running for the second a refetch took. So when the
+ * fallback observed GitHub later, its verdict is grafted onto the live model
+ * rather than replacing it: the status is the newer source's and the body —
+ * title, checks, comments, branch sync — stays the live snapshot's, which is the
+ * only source that has one. Before any snapshot lands there is no body to keep
+ * and `fallback` is returned unchanged, by the same reference.
+ *
+ * The fallback's stamp is read here, from the cached navigation snapshot, rather
+ * than off the model: the sweeper advances it on every write, and a stamp inside
+ * the model would either rebuild every row on every poll or, held still to avoid
+ * that, be compared against an observation the live query made in between. The
+ * cached stamp is the newest there is, so it is lent to `fallback` only while
+ * `fallback` still states the verdict the cache holds. A held render state can
+ * hand over a model mapped from an older snapshot, and that one is known to be
+ * superseded — it competes unstamped, which lets the live read win rather than
+ * an older verdict wearing a newer stamp. A stamp that moves alone re-runs the
+ * choice, not the build.
  *
  * `enabled` gates the queries, not the choice: an inactive row keeps rendering a
  * live snapshot it already holds for as long as that snapshot is the fresher of
@@ -53,9 +66,9 @@ interface UseLivePullRequestModelInput {
  *
  * @param changeSummary - Branch change counts folded into the PR git-status row.
  * @param enabled - Whether to fetch and poll the live queries; a false value still reads what they have cached.
- * @param fallback - PR model whose verdict wins while it is the fresher observation.
+ * @param fallback - The navigation model's PR, whose verdict wins while it is the fresher observation.
  * @param workspaceCwd - Worktree path used by the snapshot query function.
- * @param workspaceId - Workspace id the PR queries are keyed by.
+ * @param workspaceId - Workspace id the PR queries and the fallback's stamp are keyed by.
  * @returns The PR model, carrying whichever source saw GitHub last.
  */
 export function useLivePullRequestModel({
@@ -78,31 +91,47 @@ export function useLivePullRequestModel({
 		...reviewTodosQuery(workspaceId),
 		enabled: enabled && !!workspaceId,
 	});
+	const observationQuery = useMemo(
+		() => workspacePrObservationQuery(workspaceId),
+		[workspaceId],
+	);
+	const { data: navigationObservation } = useQuery(observationQuery);
+	const fallbackSyncedAt =
+		navigationObservation &&
+		statesPresentationVerdict(fallback, navigationObservation.presentation)
+			? navigationObservation.syncedAt
+			: undefined;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: the model builder translates through the i18n singleton, so the language is a real input Biome cannot see.
+	const live = useMemo(
+		() =>
+			prSnapshotData
+				? buildPullRequestShellModel({
+						changeSummary,
+						localComments: reviewCommentsData?.comments ?? [],
+						snapshot: prSnapshotData.snapshot,
+						...(prSnapshotData.error
+							? { syncFailure: prSnapshotData.error }
+							: {}),
+						todos: reviewTodosData?.todos ?? [],
+					})
+				: null,
+		[
+			changeSummary,
+			i18n.language,
+			prSnapshotData,
+			reviewCommentsData?.comments,
+			reviewTodosData?.todos,
+		],
+	);
+	const liveSyncedAt = prSnapshotData?.snapshot?.syncedAt;
+
 	return useMemo(() => {
-		if (!prSnapshotData) {
+		if (!live) {
 			return fallback;
 		}
-		const live = buildPullRequestShellModel({
-			changeSummary,
-			localComments: reviewCommentsData?.comments ?? [],
-			snapshot: prSnapshotData.snapshot,
-			...(prSnapshotData.error ? { syncFailure: prSnapshotData.error } : {}),
-			todos: reviewTodosData?.todos ?? [],
-		});
-		return isFresherPrObservation(
-			prSnapshotData.snapshot?.syncedAt,
-			fallback.syncedAt,
-		)
+		return isFresherPrObservation(liveSyncedAt, fallbackSyncedAt)
 			? live
 			: withCachedPullRequestVerdict(live, fallback);
-	}, [
-		changeSummary,
-		fallback,
-		i18n.language,
-		prSnapshotData,
-		reviewCommentsData?.comments,
-		reviewTodosData?.todos,
-	]);
+	}, [fallback, fallbackSyncedAt, live, liveSyncedAt]);
 }
