@@ -107,6 +107,7 @@
     "@electron/node-gyp": "10.2.0-electron.1",
     "extract-zip": "npm:@electron-internal/extract-zip@^1.0.5",
     "linkify-it": "^5.0.2",
+    "shiki": "^4.4.3",
     "tar": "^7.5.19",
     "tmp": "^0.2.7",
   },
@@ -3136,8 +3137,6 @@
     "dir-compare/minimatch/brace-expansion": ["brace-expansion@1.1.18", "", { "dependencies": { "balanced-match": "^1.0.0", "concat-map": "0.0.1" } }, "sha512-Edep/X9fGqVNmzKBVsDYIOtD+z1tuezV70LBjdCst9Tqu76lsnvRiZ6oTic1n+/BIwX6QDGAO94PN4N2SADvtw=="],
 
     "electron/@electron/get/env-paths": ["env-paths@3.0.0", "", {}, ""],
-
-    "electron/@types/node/undici-types": ["undici-types@7.18.2", "", {}, "sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w=="],
 
     "fs-minipass/minipass/yallist": ["yallist@4.0.0", "", {}, ""],
 
