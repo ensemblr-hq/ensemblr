@@ -107,6 +107,13 @@ reads `packageManager`. They stay outside Nix so the shipped AppImage's `node-pt
 links the runner's glibc and is portable, and so macOS signing has the runner's
 Xcode.
 
+**Amended (2026-10-03, THE-231).** The `/nix` cache is gone. On restore,
+`cache-nix-action` checkpoints the store database, and that checkpoint
+intermittently failed with "database is locked", failing Ubuntu jobs before any
+check ran, on `master` as well as on pull requests. Every run now substitutes the
+closure from cache.nixos.org, which trades some minutes per job for a job that
+starts reliably.
+
 **Unchanged:** `scripts/require-linux-host.mjs`, which refuses `make:linux` off
 Linux; `scripts/link-hoisted-packages.mjs` and
 `scripts/fix-node-pty-permissions.mjs`; the flake's `packages`, `master`,

@@ -86,11 +86,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      # Shard 1 of each OS is the one leg that saves the shell's Nix store, so
-      # both runner platforms get a cache and no two legs race to upload one.
       - uses: ./.github/actions/nix-dev-shell
-        with:
-          save-nix-cache: ${{ matrix.shard == 1 }}
       # Sharding is a Vitest flag, so this runs the desktop app's suite directly
       # rather than the root fan-out, which would hand it to every workspace.
       # `nix develop` finds the flake by searching up from apps/desktop.
