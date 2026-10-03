@@ -110,24 +110,12 @@ export function ProjectWorkspaceGroup({
 								}
 								isPinned={pinnedWorkspaceIdSet.has(workspace.id)}
 								key={workspace.id}
-								onArchiveSelect={
-									onWorkspaceArchiveSelect
-										? () => onWorkspaceArchiveSelect(workspace)
-										: undefined
-								}
-								onDeleteSelect={
-									onWorkspaceDeleteSelect
-										? () => onWorkspaceDeleteSelect(workspace)
-										: undefined
-								}
-								onPinToggle={() => onWorkspacePinToggle(workspace.id)}
-								onRenameSelect={
-									onWorkspaceRenameSelect
-										? () => onWorkspaceRenameSelect(workspace)
-										: undefined
-								}
-								onSelect={() => onWorkspaceSelect(project.id, workspace.id)}
-								routeSearch={resolveWorkspaceRouteSearch(workspace)}
+								onArchiveSelect={onWorkspaceArchiveSelect}
+								onDeleteSelect={onWorkspaceDeleteSelect}
+								onPinToggle={onWorkspacePinToggle}
+								onRenameSelect={onWorkspaceRenameSelect}
+								onSelect={onWorkspaceSelect}
+								resolveWorkspaceRouteSearch={resolveWorkspaceRouteSearch}
 								workspace={workspace}
 							/>
 						))}

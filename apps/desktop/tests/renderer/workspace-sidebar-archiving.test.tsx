@@ -36,7 +36,7 @@ function renderRow() {
 					onPinToggle={() => undefined}
 					onRenameSelect={() => undefined}
 					onSelect={() => undefined}
-					routeSearch={{} as WorkbenchRouteSearch}
+					resolveWorkspaceRouteSearch={() => ({}) as WorkbenchRouteSearch}
 					workspace={workspace}
 				/>
 			</NavigationProvider>

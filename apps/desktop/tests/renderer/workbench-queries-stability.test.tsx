@@ -1,10 +1,17 @@
 // @vitest-environment happy-dom
 
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, renderHook, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { act, renderHook, screen, waitFor } from '@testing-library/react';
+import { getDefaultStore } from 'jotai';
+import { Profiler } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ensemblrQueryKeys } from '@/renderer/api/ensemblr/query-keys';
+import { WorkbenchFrame } from '@/renderer/components/workbench-shell/frame';
+import { NavigationProvider } from '@/renderer/components/workbench-shell/shell-contexts';
+import { useWorkbenchLayoutModel } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-layout-model';
 import { useWorkbenchQueries } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-queries';
+import { pinnedWorkspaceIdsAtom } from '@/renderer/state/workspace';
+import type { WorkbenchShellRouteState } from '@/renderer/types/components';
 import type { WorkbenchShellData } from '@/renderer/types/workbench';
 import type {
 	RepositoryWorkspaceNavigationSnapshot,
@@ -15,7 +22,43 @@ import {
 	clearEnsemblrApi,
 	createTestQueryClient,
 	installEnsemblrApi,
+	renderWithProviders,
 } from './support/dom';
+
+const { rowRenders, stubRouter } = vi.hoisted(() => ({
+	rowRenders: [] as string[],
+	stubRouter: { navigate: () => Promise.resolve() },
+}));
+
+vi.mock('@tanstack/react-router', async () => {
+	const actual = await vi.importActual<typeof import('@tanstack/react-router')>(
+		'@tanstack/react-router',
+	);
+	return {
+		...actual,
+		useNavigate: () => stubRouter.navigate,
+		useRouter: () => stubRouter,
+	};
+});
+
+vi.mock(
+	'@/renderer/hooks/workbench-shell/navigation-sidebar/use-workspace-sidebar-row',
+	async (importOriginal) => {
+		const actual =
+			await importOriginal<
+				typeof import('@/renderer/hooks/workbench-shell/navigation-sidebar/use-workspace-sidebar-row')
+			>();
+		return {
+			...actual,
+			useWorkspaceSidebarRow: (
+				input: Parameters<typeof actual.useWorkspaceSidebarRow>[0],
+			) => {
+				rowRenders.push(input.workspace.id);
+				return actual.useWorkspaceSidebarRow(input);
+			},
+		};
+	},
+);
 
 const NOW = '2026-08-16T00:00:00.000Z';
 
@@ -60,21 +103,25 @@ function snapshot(
 }
 
 /**
- * A snapshot whose one workspace has a pull request in the given status,
+ * A snapshot whose workspaces each have a pull request in the given status,
  * observed at the given instant — what the navigation poll reads back after
  * each sweeper write.
- * @param status - Compact status the sweeper observed for the pull request.
+ * @param status - Compact status the sweeper observed for every pull request.
  * @param syncedAt - When the sweeper observed it; also the snapshot's `generatedAt`.
+ * @param workspaceIds - The workspaces the repository carries.
  * @returns The navigation snapshot the poll would answer with.
  */
 function sweptSnapshot(
 	status: WorkspacePrPresentationStatus,
 	syncedAt: string,
+	workspaceIds: string[] = ['ws-a'],
 ): RepositoryWorkspaceNavigationSnapshot {
-	const base = snapshot(['ws-a']);
+	const base = snapshot(workspaceIds);
 	return {
 		generatedAt: syncedAt,
-		pullRequestSyncedAt: { 'ws-a': syncedAt },
+		pullRequestSyncedAt: Object.fromEntries(
+			workspaceIds.map((workspaceId) => [workspaceId, syncedAt]),
+		),
 		repositories: base.repositories.map((repository) => ({
 			...repository,
 			workspaces: repository.workspaces.map((workspace) => ({
@@ -91,14 +138,16 @@ function loaderData(): WorkbenchShellData {
 }
 
 /**
- * Renders the workbench queries against a navigation poll that answers with
- * each of the given snapshots in turn, holding on the last one.
+ * A bridge whose navigation poll answers with each of the given snapshots in
+ * turn, holding on the last one.
  * @param polls - What successive navigation reads return.
- * @returns The rendered hook and the client whose cache it reads.
+ * @returns The bridge methods the workbench queries read.
  */
-function renderAgainstPolls(polls: RepositoryWorkspaceNavigationSnapshot[]) {
+function pollingApi(
+	polls: RepositoryWorkspaceNavigationSnapshot[],
+): Record<string, unknown> {
 	let calls = 0;
-	installEnsemblrApi({
+	return {
 		getWorkspaceGitStatus: () =>
 			Promise.resolve({
 				files: [],
@@ -112,7 +161,17 @@ function renderAgainstPolls(polls: RepositoryWorkspaceNavigationSnapshot[]) {
 			return Promise.resolve(poll);
 		},
 		setupDiagnostics: () => Promise.resolve({ checks: [], status: 'ok' }),
-	});
+	};
+}
+
+/**
+ * Renders the workbench queries against a navigation poll that answers with
+ * each of the given snapshots in turn, holding on the last one.
+ * @param polls - What successive navigation reads return.
+ * @returns The rendered hook and the client whose cache it reads.
+ */
+function renderAgainstPolls(polls: RepositoryWorkspaceNavigationSnapshot[]) {
+	installEnsemblrApi(pollingApi(polls));
 	const client = createTestQueryClient();
 	const rendered = renderHook(
 		() => useWorkbenchQueries({ loaderData: loaderData() }),
@@ -240,5 +299,161 @@ describe('useWorkbenchQueries projects identity', () => {
 		expect(result.current.projects[0]?.workspaces[0]?.pullRequest.status).toBe(
 			'ready-to-merge',
 		);
+	});
+});
+
+const SIDEBAR_WORKSPACE_IDS = ['ws-a', 'ws-b', 'ws-c'];
+const PINNED_WORKSPACE_ID = 'ws-c';
+const SWEPT_AT = '2026-08-16T00:02:00.000Z';
+const SIDEBAR_LOADER_DATA = loaderData();
+const SIDEBAR_ROUTE_STATE: WorkbenchShellRouteState = {
+	routeProjectId: 'repo-1',
+	routeWorkspaceId: 'ws-a',
+	view: 'workspace',
+};
+const NO_LINK_RENDERERS = {
+	renderStaticLink: undefined,
+	renderWorkspaceLink: undefined,
+};
+
+/**
+ * Lets the whole shell mount against a bridge that only stubs what the test
+ * cares about: an unstubbed subscription hands back an unsubscribe, and any
+ * other unstubbed call rejects, which a query settles into its error state.
+ * @param api - The methods the test does stub.
+ * @returns A bridge answering for every method the shell reaches for.
+ */
+function withInertFallbacks(
+	api: Record<string, unknown>,
+): Record<string, unknown> {
+	return new Proxy(api, {
+		get: (target, property) => {
+			if (typeof property !== 'string' || property in target) {
+				return Reflect.get(target, property);
+			}
+			return property.startsWith('on')
+				? () => () => {}
+				: () => Promise.reject(new Error(`${property} is not stubbed`));
+		},
+	});
+}
+
+/**
+ * The shell layout's own wiring, minus the router: the layout model built from
+ * the live queries feeds the frame exactly as `WorkbenchShellLayout` feeds it,
+ * so every callback a row receives is the production one.
+ */
+function SidebarShell() {
+	const { model } = useWorkbenchLayoutModel({
+		loaderData: SIDEBAR_LOADER_DATA,
+		routeState: SIDEBAR_ROUTE_STATE,
+	});
+
+	return (
+		<NavigationProvider value={NO_LINK_RENDERERS}>
+			<WorkbenchFrame
+				activeProject={model.activeProject}
+				activeView={SIDEBAR_ROUTE_STATE.view}
+				activeWorkspace={model.activeWorkspace}
+				addProjectMenu={model.addProjectMenu}
+				health={model.health}
+				onAddProject={model.onAddProject}
+				onStaticNavigationSelect={model.navigateToStaticRoute}
+				onWorkspaceSelect={model.navigateToWorkspace}
+				projects={model.displayProjects}
+				resolveWorkspaceRouteSearch={model.resolveWorkspaceRouteSearch}
+			>
+				<div />
+			</WorkbenchFrame>
+		</NavigationProvider>
+	);
+}
+
+/**
+ * Mounts the shell against the given polls, pins one workspace so both row call
+ * sites render, and waits until nothing is in flight.
+ * @param polls - What successive navigation reads return.
+ * @returns The client to poll through, and a reader for how often the shell has committed.
+ */
+async function renderSidebarShell(
+	polls: RepositoryWorkspaceNavigationSnapshot[],
+): Promise<{ client: QueryClient; shellCommits: () => number }> {
+	installEnsemblrApi(
+		withInertFallbacks({
+			...pollingApi(polls),
+			health: () =>
+				Promise.resolve({
+					appName: 'Ensemblr',
+					config: { blocksReadiness: false, diagnostics: [] },
+					database: { status: 'ok' },
+					status: 'ok',
+				}),
+			listTerminalSessions: () => Promise.resolve({ sessions: [] }),
+		}),
+	);
+	let commits = 0;
+	const { client } = renderWithProviders(
+		<Profiler
+			id='sidebar-shell'
+			onRender={() => {
+				commits += 1;
+			}}
+		>
+			<SidebarShell />
+		</Profiler>,
+	);
+	await screen.findByRole('button', { name: 'Open workspace ws-a' });
+	act(() => {
+		getDefaultStore().set(pinnedWorkspaceIdsAtom, [PINNED_WORKSPACE_ID]);
+	});
+	await screen.findByText('Pinned');
+	await waitFor(() => {
+		expect(client.isFetching()).toBe(0);
+	});
+	return { client, shellCommits: () => commits };
+}
+
+describe('workspace sidebar rows across a navigation poll', () => {
+	afterEach(() => {
+		getDefaultStore().set(pinnedWorkspaceIdsAtom, []);
+		rowRenders.length = 0;
+		clearEnsemblrApi();
+	});
+
+	// THE-219: the shell re-renders on every poll even when it brought nothing
+	// new, and a sweep moves every pull request's stamp. Neither may reach a row:
+	// the row is the memo boundary, so everything handed across it has to
+	// survive the shell's render, and the stamp has to stay out of its hooks.
+	it('re-renders no row when the poll only re-stamps', async () => {
+		const { client, shellCommits } = await renderSidebarShell([
+			sweptSnapshot('checking', NOW, SIDEBAR_WORKSPACE_IDS),
+			sweptSnapshot('checking', SWEPT_AT, SIDEBAR_WORKSPACE_IDS),
+		]);
+		const commitsBefore = shellCommits();
+		rowRenders.length = 0;
+
+		await pollNavigation(client, SWEPT_AT);
+		await waitFor(() => {
+			expect(client.isFetching()).toBe(0);
+		});
+
+		expect(shellCommits()).toBeGreaterThan(commitsBefore);
+		expect(rowRenders).toEqual([]);
+	});
+
+	it('still re-renders a row whose workspace the poll changed', async () => {
+		const { client } = await renderSidebarShell([
+			sweptSnapshot('checking', NOW, SIDEBAR_WORKSPACE_IDS),
+			sweptSnapshot('ready', SWEPT_AT, SIDEBAR_WORKSPACE_IDS),
+		]);
+		rowRenders.length = 0;
+
+		await pollNavigation(client, SWEPT_AT);
+
+		await waitFor(() => {
+			expect(rowRenders).toEqual(
+				expect.arrayContaining(['ws-b', PINNED_WORKSPACE_ID]),
+			);
+		});
 	});
 });

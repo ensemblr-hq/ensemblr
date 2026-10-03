@@ -1,5 +1,5 @@
 import { useAtom, useSetAtom } from 'jotai';
-import { type ReactElement, useEffect } from 'react';
+import { type ReactElement, useCallback, useEffect } from 'react';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type {
 	ProjectNavigationState,
@@ -208,16 +208,22 @@ export function useProjectNavigationState(
 				: [...currentProjectIds, projectId],
 		);
 	};
-	/** Toggles whether a workspace is pinned to the top of the sidebar. */
-	const toggleWorkspacePinned = (workspaceId: string) => {
-		setPinnedWorkspaceIds((currentWorkspaceIds) =>
-			currentWorkspaceIds.includes(workspaceId)
-				? currentWorkspaceIds.filter(
-						(currentWorkspaceId) => currentWorkspaceId !== workspaceId,
-					)
-				: [...currentWorkspaceIds, workspaceId],
-		);
-	};
+	/**
+	 * Toggles whether a workspace is pinned to the top of the sidebar. Stable for
+	 * the hook's lifetime, because every memoized sidebar row receives it.
+	 */
+	const toggleWorkspacePinned = useCallback(
+		(workspaceId: string) => {
+			setPinnedWorkspaceIds((currentWorkspaceIds) =>
+				currentWorkspaceIds.includes(workspaceId)
+					? currentWorkspaceIds.filter(
+							(currentWorkspaceId) => currentWorkspaceId !== workspaceId,
+						)
+					: [...currentWorkspaceIds, workspaceId],
+			);
+		},
+		[setPinnedWorkspaceIds],
+	);
 
 	return {
 		collapsedProjectIdSet,

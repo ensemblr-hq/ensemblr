@@ -60,14 +60,10 @@ export function PinnedWorkspaceGroup({
 							}
 							isPinned={pinnedWorkspaceIdSet.has(workspace.id)}
 							key={workspace.id}
-							onPinToggle={() => toggleWorkspacePinned(workspace.id)}
-							onRenameSelect={
-								onWorkspaceRenameSelect
-									? () => onWorkspaceRenameSelect(workspace)
-									: undefined
-							}
-							onSelect={() => onWorkspaceSelect(project.id, workspace.id)}
-							routeSearch={resolveWorkspaceRouteSearch(workspace)}
+							onPinToggle={toggleWorkspacePinned}
+							onRenameSelect={onWorkspaceRenameSelect}
+							onSelect={onWorkspaceSelect}
+							resolveWorkspaceRouteSearch={resolveWorkspaceRouteSearch}
 							workspace={workspace}
 						/>
 					))}
