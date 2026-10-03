@@ -18,6 +18,7 @@ export { DEFAULT_HEAVY_COMMAND_PATTERNS } from './compute-queue/heavy-command-pa
 export type {
 	ComputeJobInitiator,
 	ComputeJobKind,
+	ComputeJobScript,
 	ComputeJobSnapshot,
 	ComputeJobState,
 	ComputeQueueSnapshot,

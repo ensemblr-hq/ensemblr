@@ -44,6 +44,7 @@ const jobOf = (overrides: Partial<ComputeJobResult>): ComputeJobResult => ({
 	omittedChars: 0,
 	outputTail: '',
 	position: 1,
+	script: null,
 	sessionId: 'caller',
 	signal: null,
 	startedAt: null,

@@ -233,6 +233,7 @@ export function createScriptQueueGate({
 				...owner,
 				command: launch.command,
 				label: launch.command,
+				script: { kind: launch.kind, name: launch.scriptName },
 				workspaceId: launch.workspaceId,
 			});
 			const state = computeQueue.getJob(lease.jobId)?.state;

@@ -1294,6 +1294,7 @@ test('an agent setup launch waits for a slot, then starts when granted', async (
 	const queuedJob = fixture.computeQueue.getJob(result.queuedJob.jobId);
 	assert.equal(queuedJob?.sessionId, 'agent-1');
 	assert.equal(queuedJob?.initiator, 'agent');
+	assert.deepEqual(queuedJob?.script, { kind: 'setup', name: null });
 
 	fixture.endSession(fixture.occupantId, 'exited');
 
@@ -1366,6 +1367,9 @@ test('a heavy run script waits for a slot like setup does', async (t) => {
 
 	assert.equal(result.session, null);
 	assert.ok(result.queuedJob);
+	const script = fixture.computeQueue.getJob(result.queuedJob.jobId)?.script;
+	assert.equal(script?.kind, 'run');
+	assert.equal(typeof script?.name, 'string');
 });
 
 test('a disabled queue starts agent launches at once without a job', async (t) => {
@@ -1497,6 +1501,93 @@ test('a queued app setup still finalizes and auto-runs once it is granted', asyn
 			['run-script', WORKSPACE_ID],
 		],
 	);
+});
+
+/** A queue-on service whose terminal creation waits for the test to release it. */
+function createSlowCreateQueueFixture(t: TestContext) {
+	let releaseCreate: (() => void) | undefined;
+	const createGate = new Promise<void>((resolve) => {
+		releaseCreate = resolve;
+	});
+	const fixture = createServiceFixture(
+		t,
+		{ setup: 'bun install' },
+		{ beforeCreate: () => createGate },
+		{ enabled: true },
+	);
+
+	return { ...fixture, releaseCreate: () => releaseCreate?.() };
+}
+
+test('a workspace open while the create hook setup is still starting never queues a second setup', async (t) => {
+	const fixture = createSlowCreateQueueFixture(t);
+
+	const created = fixture.service.runSetupScriptWithAutoRun({
+		workspaceId: WORKSPACE_ID,
+	});
+	const opened = fixture.service.runSetupScriptIfNeeded({
+		initiator: 'auto',
+		workspaceId: WORKSPACE_ID,
+	});
+	fixture.releaseCreate();
+	const openResult = await opened;
+
+	assert.equal(openResult.queuedJob, undefined);
+	assert.equal(openResult.diagnostics[0]?.code, 'script-already-running');
+	assert.deepEqual(
+		fixture.computeQueue.listJobs().map((job) => job.state),
+		['running'],
+	);
+
+	fixture.endSession('session-1', 'exited');
+	await created;
+	await settle();
+
+	assert.equal(fixture.createCalls.length, 1);
+});
+
+test('a create hook setup arriving while an open setup is still starting never queues a second setup', async (t) => {
+	const fixture = createSlowCreateQueueFixture(t);
+
+	const opened = fixture.service.runSetupScriptIfNeeded({
+		initiator: 'auto',
+		workspaceId: WORKSPACE_ID,
+	});
+	const created = fixture.service.runSetupScriptWithAutoRun({
+		workspaceId: WORKSPACE_ID,
+	});
+	fixture.releaseCreate();
+	await Promise.all([opened, created]);
+
+	assert.equal(fixture.computeQueue.listJobs().length, 1);
+
+	fixture.endSession('session-1', 'exited');
+	await settle();
+
+	assert.equal(fixture.createCalls.length, 1);
+});
+
+test('a restart arriving while a queued setup is still starting replaces it once', async (t) => {
+	const fixture = createSlowCreateQueueFixture(t);
+
+	const first = fixture.service.runScript({
+		initiator: 'agent',
+		kind: 'setup',
+		workspaceId: WORKSPACE_ID,
+	});
+	const restarted = fixture.service.runScript({
+		initiator: 'user',
+		kind: 'setup',
+		restart: true,
+		workspaceId: WORKSPACE_ID,
+	});
+	fixture.releaseCreate();
+	await first;
+	const restartResult = await restarted;
+
+	assert.ok(restartResult.session);
+	assert.deepEqual(fixture.killedIds, ['session-1']);
+	assert.equal(fixture.createCalls.length, 2);
 });
 
 /** Script settings a test can rewrite between a launch queueing and its grant. */

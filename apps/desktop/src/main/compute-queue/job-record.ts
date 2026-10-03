@@ -47,6 +47,7 @@ export function toJobSnapshot(
 		label: record.label,
 		logPath: record.logPath,
 		position,
+		script: record.script,
 		sessionId: record.sessionId,
 		signal: record.signal,
 		startedAt: record.startedAt,

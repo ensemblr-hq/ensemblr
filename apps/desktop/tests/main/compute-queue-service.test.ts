@@ -206,6 +206,7 @@ describe('scheduling', () => {
 		const waiting = await enqueue('b', 'waiting');
 		const lease = queue.acquireScriptLease({
 			command: 'bun dev',
+			script: { kind: 'setup', name: null },
 			initiator: 'user',
 			label: 'Run',
 			workspaceId: 'c',
@@ -372,6 +373,7 @@ describe('script leases', () => {
 		await enqueue('a', 'busy');
 		const lease = queue.acquireScriptLease({
 			command: 'setup',
+			script: { kind: 'setup', name: null },
 			initiator: 'auto',
 			label: 'Setup',
 			workspaceId: 'b',
@@ -384,6 +386,7 @@ describe('script leases', () => {
 	it('stops the attached terminal on cancel and ends cancelled on release', async () => {
 		const lease = queue.acquireScriptLease({
 			command: 'setup',
+			script: { kind: 'setup', name: null },
 			initiator: 'auto',
 			label: 'Setup',
 			workspaceId: 'a',
@@ -405,6 +408,7 @@ describe('script leases', () => {
 	it('cancels at once without a terminal and stops one attached later', async () => {
 		const lease = queue.acquireScriptLease({
 			command: 'setup',
+			script: { kind: 'setup', name: null },
 			initiator: 'auto',
 			label: 'Setup',
 			workspaceId: 'a',
@@ -419,6 +423,7 @@ describe('script leases', () => {
 	it('ends failed on a non-zero exit', async () => {
 		const lease = queue.acquireScriptLease({
 			command: 'setup',
+			script: { kind: 'setup', name: null },
 			initiator: 'auto',
 			label: 'Setup',
 			workspaceId: 'a',
@@ -549,6 +554,7 @@ describe('fault tolerance', () => {
 		settings = { ...settings, enabled: false };
 		const lease = queue.acquireScriptLease({
 			command: 'setup',
+			script: { kind: 'setup', name: null },
 			initiator: 'auto',
 			label: 'Setup',
 			workspaceId: 'a',
@@ -575,6 +581,7 @@ describe('fault tolerance', () => {
 		};
 		const lease = queue.acquireScriptLease({
 			command: 'setup',
+			script: { kind: 'setup', name: null },
 			initiator: 'user',
 			label: 'Setup',
 			workspaceId: 'a',
@@ -608,6 +615,7 @@ describe('script lease abandon', () => {
 	it('records why a launch never opened a terminal', async () => {
 		const failed = queue.acquireScriptLease({
 			command: 'setup',
+			script: { kind: 'setup', name: null },
 			initiator: 'auto',
 			label: 'Setup',
 			workspaceId: 'a',
@@ -621,6 +629,7 @@ describe('script lease abandon', () => {
 
 		const refused = queue.acquireScriptLease({
 			command: 'run',
+			script: { kind: 'setup', name: null },
 			initiator: 'agent',
 			label: 'Run',
 			workspaceId: 'a',
@@ -638,6 +647,7 @@ describe('session release', () => {
 		await flush();
 		const running = queue.acquireScriptLease({
 			command: 'bun dev',
+			script: { kind: 'setup', name: null },
 			initiator: 'user',
 			label: 'Run',
 			sessionId: 's1',
@@ -645,6 +655,7 @@ describe('session release', () => {
 		});
 		const queued = queue.acquireScriptLease({
 			command: 'bun install',
+			script: { kind: 'setup', name: null },
 			initiator: 'agent',
 			label: 'Setup',
 			sessionId: 's1',
@@ -723,6 +734,7 @@ describe('launch failures and descriptions', () => {
 	it('lets a lease update the command its job reports', async () => {
 		const lease = queue.acquireScriptLease({
 			command: 'cargo build',
+			script: { kind: 'setup', name: null },
 			initiator: 'agent',
 			label: 'cargo build',
 			workspaceId: 'a',
