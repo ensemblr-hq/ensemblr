@@ -4,7 +4,6 @@ import {
 	GitPullRequestIcon,
 	TriangleAlertIcon,
 } from 'lucide-react';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LinearProjectBadge } from '@/renderer/components/linear/issue-project';
 import { Button } from '@/renderer/components/ui/button';
@@ -24,6 +23,7 @@ import {
 } from '@/renderer/components/ui/toggle-group';
 import { RepositoryPicker } from '@/renderer/components/workbench-shell/repository-picker';
 import { useWorkspaceSourcePicker } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-workspace-source-picker';
+import { useWorkspaceSourceSelection } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-workspace-source-selection';
 import { failureText } from '@/renderer/lib/failure-text';
 import {
 	getWorkspaceSourceActions,
@@ -86,9 +86,8 @@ export function CreateWorkspaceSourceDialog({
 	projects: ProjectShellModel[];
 }) {
 	const { t } = useTranslation();
-	const [kind, setKind] = useState<WorkspaceSourceKind>('pull-request');
-	const [repoId, setRepoId] = useState(project?.id ?? projects[0]?.id ?? '');
-	const [search, setSearch] = useState('');
+	const { kind, repoId, search, selectedRepo, setKind, setRepoId, setSearch } =
+		useWorkspaceSourceSelection({ open, project, projects });
 
 	const { error, isLoading, itemsById, linearGap, sources, startedSources } =
 		useWorkspaceSourcePicker({
@@ -98,8 +97,6 @@ export function CreateWorkspaceSourceDialog({
 			query: search,
 			repoId,
 		});
-	const selectedRepo =
-		projects.find((candidate) => candidate.id === repoId) ?? project ?? null;
 	const isEmpty = sources.length === 0 && startedSources.length === 0;
 	// cmdk reorders groups by best match while searching, so an unheaded group
 	// could land under the started heading and read as part of it.
@@ -107,20 +104,6 @@ export function CreateWorkspaceSourceDialog({
 		startedSources.length > 0
 			? t('workbench:board-status.backlog', 'Backlog')
 			: undefined;
-
-	// This component outlives the dialog's content, so each open starts over:
-	// an empty search, and the picker on the chosen repository.
-	const [wasOpen, setWasOpen] = useState(open);
-	if (open !== wasOpen) {
-		setWasOpen(open);
-		if (open) {
-			setSearch('');
-		}
-		if (open && project) {
-			setRepoId(project.id);
-			setKind('pull-request');
-		}
-	}
 
 	/** Turns a selected source into a create-or-open action, then closes. */
 	const dispatchAction = (
@@ -199,31 +182,49 @@ export function CreateWorkspaceSourceDialog({
 						kind={kind}
 						linearGap={linearGap}
 					/>
-					<CommandGroup heading={startableHeading}>
-						{sources.map((source) => (
-							<WorkspaceSourceRow
-								key={source.id}
-								onAction={dispatchAction}
-								source={source}
-							/>
-						))}
-					</CommandGroup>
-					{startedSources.length > 0 ? (
-						<CommandGroup
-							heading={t('linear:state-bucket.started', 'In progress')}
-						>
-							{startedSources.map((source) => (
-								<WorkspaceSourceRow
-									key={source.id}
-									onAction={dispatchAction}
-									source={source}
-								/>
-							))}
-						</CommandGroup>
-					) : null}
+					<SourceGroup
+						heading={startableHeading}
+						onAction={dispatchAction}
+						sources={sources}
+					/>
+					<SourceGroup
+						heading={t('linear:state-bucket.started', 'In progress')}
+						onAction={dispatchAction}
+						sources={startedSources}
+					/>
 				</CommandList>
 			</Command>
 		</CommandDialog>
+	);
+}
+
+/**
+ * One headed section of the picker list. Renders nothing without sources, so a
+ * section that has no rows leaves no heading behind.
+ */
+function SourceGroup({
+	heading,
+	onAction,
+	sources,
+}: {
+	heading: string | undefined;
+	onAction: (source: WorkspaceSource, action: WorkspaceSourceAction) => void;
+	sources: WorkspaceSource[];
+}) {
+	if (sources.length === 0) {
+		return null;
+	}
+
+	return (
+		<CommandGroup heading={heading}>
+			{sources.map((source) => (
+				<WorkspaceSourceRow
+					key={source.id}
+					onAction={onAction}
+					source={source}
+				/>
+			))}
+		</CommandGroup>
 	);
 }
 

@@ -10,11 +10,13 @@ import type {
 	WorkspaceSource,
 	WorkspaceSourceItem,
 } from '@/renderer/types/workbench';
+import type { GithubFailure } from '@/shared/ipc/contracts/github';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 import { renderWithProviders } from '../support/dom';
 
 // Hoisted so the vi.mock factory, lifted above the imports, can close over it.
 const pickerHolder = vi.hoisted(() => ({
+	error: null as GithubFailure | null,
 	isLoading: false,
 	itemsById: new Map<string, WorkspaceSourceItem>(),
 	linearGap: null as string | null,
@@ -26,7 +28,7 @@ vi.mock(
 	'@/renderer/hooks/workbench-shell/navigation-sidebar/use-workspace-source-picker',
 	() => ({
 		useWorkspaceSourcePicker: ({ query }: { query: string }) => ({
-			error: null,
+			error: pickerHolder.error,
 			isLoading: pickerHolder.isLoading,
 			itemsById: pickerHolder.itemsById,
 			linearGap: pickerHolder.linearGap,
@@ -70,6 +72,7 @@ const startedSource: WorkspaceSource = {
 };
 
 beforeEach(() => {
+	pickerHolder.error = null;
 	pickerHolder.isLoading = false;
 	pickerHolder.itemsById = new Map();
 	pickerHolder.linearGap = null;
@@ -292,6 +295,23 @@ test('reopening the dialog starts from an empty search', async () => {
 	expect(
 		screen.getByPlaceholderText('Search by title, number, or author'),
 	).toHaveValue('');
+});
+
+test('an empty tab whose GitHub read failed names the failure and its fix', async () => {
+	pickerHolder.error = {
+		code: 'gh-not-authenticated',
+		message: 'gh is not authenticated',
+		remediation: 'Run gh auth login.',
+	};
+	await openTab('Pull requests');
+
+	expect(
+		screen.getByText(
+			'GitHub CLI is not signed in. Run gh auth login, then retry.',
+		),
+	).toBeInTheDocument();
+	expect(screen.getByText('Run gh auth login.')).toBeInTheDocument();
+	expect(screen.queryByText(NO_MATCH)).not.toBeInTheDocument();
 });
 
 test('an empty Pull requests tab keeps the search-miss message', async () => {
