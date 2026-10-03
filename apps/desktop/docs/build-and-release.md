@@ -494,9 +494,15 @@ where Nix's glibc exists, so release AppImages come from CI.
 
 **CI splits on purpose.** The `lint`, `typecheck`, and `test` jobs in
 `.github/workflows/checks.yml` use the composite `.github/actions/nix-dev-shell`,
-which installs Nix and runs `nix develop -c bun ci`, and each step then runs as
-`nix develop -c …`. The release and nightly build legs keep
-`.github/actions/install-dependencies` and stay outside Nix: `setup-node` reads
+which installs Nix, restores `/nix` from the Actions cache, and runs
+`nix develop -c bun ci`; each step then runs as `nix develop -c …`. The Nix cache
+(`nix-community/cache-nix-action`) is keyed on the dev shell's derivation hash, so
+it turns over exactly when `flake.lock`, `dev-shell.nix`, or a Node or Electron
+major does. Only shard 1 of each OS's `test` leg saves it. Nothing purges a
+superseded key, because purging needs `actions: write` and `release.yml`'s call
+into `checks.yml` does not grant it; GitHub drops a cache unused for seven days.
+The release and nightly build legs keep `.github/actions/install-dependencies`
+and stay outside Nix: `setup-node` reads
 `engines.node` through `node-version-file: package.json` and `setup-bun` reads
 `packageManager`. They stay outside so the shipped AppImage's `node-pty` links the
 runner's glibc and is portable, and so macOS signing finds the runner's Xcode.

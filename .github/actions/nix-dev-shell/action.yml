@@ -1,16 +1,49 @@
 name: Install dependencies in the Nix dev shell
 description: >-
-  Install Nix, then install the locked dependency tree inside the flake's dev
-  shell (apps/desktop/nix/dev-shell.nix). Later steps run their commands as
+  Install Nix, restore the dev shell's store paths from the GitHub Actions
+  cache, then install the locked dependency tree inside the flake's dev shell
+  (apps/desktop/nix/dev-shell.nix). Later steps run their commands as
   `nix develop -c …`, so lint, typecheck and test use the same Node, Bun and
   native toolchain as every contributor's machine.
+
+inputs:
+  save-nix-cache:
+    description: >-
+      Save the Nix store to the cache when the job succeeds and no cache with
+      this shell's key exists yet. One job per runner OS passes true; every job
+      restores. Without a single saver, each job of a first run on a new key
+      would compress the whole store only to lose the race to upload it.
+    default: "false"
 
 runs:
   using: composite
   steps:
-    # Same pin as the nix-deps job. The shell's closure comes from
-    # cache.nixos.org, so it is substituted rather than built.
+    # Same pin as the nix-deps job.
     - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+
+    # The key is the shell's own derivation, so it moves exactly when what
+    # `nix develop` substitutes moves: a flake.lock bump, an edit to
+    # dev-shell.nix, or a new Node or Electron major in a manifest. Keying on
+    # the manifests instead would mint a new cache on every dependency bump.
+    - id: dev-shell
+      shell: bash
+      run: |
+        system=$(nix eval --impure --raw --expr builtins.currentSystem)
+        drv=$(nix eval --raw ".#devShells.$system.default.drvPath")
+        hash=$(basename "$drv" | cut -d- -f1)
+        echo "key=nix-dev-shell-$system-$hash" >>"$GITHUB_OUTPUT"
+
+    # Restores /nix in one archive rather than substituting the ~1.8 GiB Linux
+    # closure (Electron, gcc, Node) NAR by NAR from cache.nixos.org. No
+    # restore-prefix fallback: an older store plus the new closure would be
+    # saved as one growing cache, and a miss is one cold run per new key. No
+    # purge either, which needs `actions: write` that release.yml's call into
+    # checks.yml does not grant; a superseded key expires after seven days
+    # unused.
+    - uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
+      with:
+        primary-key: ${{ steps.dev-shell.outputs.key }}
+        save: ${{ inputs.save-nix-cache }}
 
     # The shell's Bun keeps the same global cache as any other Bun, so the
     # tarballs are restored by hand exactly as install-dependencies does.

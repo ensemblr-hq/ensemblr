@@ -95,6 +95,12 @@ outside the shell is unsupported rather than refused.
 **CI splits.** The `lint`, `typecheck`, and `test` jobs in
 `.github/workflows/checks.yml` use the new composite `.github/actions/nix-dev-shell`
 (install Nix, run `nix develop -c bun ci`) and run each step as `nix develop -c …`.
+The action restores `/nix` from the Actions cache through
+`nix-community/cache-nix-action`, keyed on the dev shell's derivation hash, so a
+warm run skips substituting the roughly 1.8 GiB Linux closure from
+cache.nixos.org. Only shard 1 of each OS's `test` leg saves, and nothing purges:
+purging needs `actions: write`, which `release.yml`'s call into `checks.yml` does
+not grant, so a superseded key expires after seven days unused.
 The release and nightly build legs keep `.github/actions/install-dependencies`,
 whose `setup-node` now reads `node-version-file: package.json` and whose `setup-bun`
 reads `packageManager`. They stay outside Nix so the shipped AppImage's `node-pty`

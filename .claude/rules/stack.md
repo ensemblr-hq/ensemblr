@@ -190,7 +190,9 @@ from the repository root or from `apps/desktop/`.
   would send `xcrun` to a toolchain without `codesign` or `notarytool`. The
   lazily downloaded Electron is used as is.
 - **CI:** the `lint`, `typecheck`, and `test` jobs run in the shell through
-  `.github/actions/nix-dev-shell`. The release and nightly build legs keep
+  `.github/actions/nix-dev-shell`. It restores `/nix` from the Actions cache with
+  `nix-community/cache-nix-action`, keyed on the shell's derivation hash, and only
+  shard 1 of each OS's `test` leg saves it. The release and nightly build legs keep
   `.github/actions/install-dependencies` and stay outside Nix, so the shipped
   AppImage's `node-pty` is portable and macOS signing has the runner's Xcode.
 
