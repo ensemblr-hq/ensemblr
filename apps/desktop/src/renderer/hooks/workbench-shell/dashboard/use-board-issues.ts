@@ -9,6 +9,7 @@ import {
 	linearIssuesQuery,
 	repositoryIssuesQuery,
 } from '@/renderer/api/ensemblr';
+import { collectLinkedIssueKeys } from '@/renderer/lib/workbench';
 import {
 	collectBacklogIssues,
 	type ProjectGithubIssues,
@@ -32,23 +33,6 @@ export interface BoardIssuesState {
 	 */
 	errors: BoardIssuesFailure[];
 	isLoading: boolean;
-}
-
-/**
- * Collects every workspace's linked-issue key so an issue that already produced
- * one never doubles up in Backlog.
- * @param projects - The projects currently on the board.
- * @returns The remote issue ids, which are Linear issue ids and GitHub issue URLs.
- */
-function collectLinkedIssueKeys(
-	projects: readonly ProjectShellModel[],
-): string[] {
-	return projects.flatMap((project) =>
-		project.workspaces.flatMap((workspace) => {
-			const remoteId = workspace.landingSummary?.linkedIssue?.remoteId;
-			return remoteId ? [remoteId] : [];
-		}),
-	);
 }
 
 /**

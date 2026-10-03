@@ -1,17 +1,29 @@
 import { buildWorkspaceSeedFromGithubIssue } from '@/renderer/lib/github';
-import { buildWorkspaceSeedFromLinearIssue } from '@/renderer/lib/linear';
+import {
+	buildWorkspaceSeedFromLinearIssue,
+	isLinearIssueNotStarted,
+} from '@/renderer/lib/linear';
 import type {
+	ProjectShellModel,
 	WorkspaceCreationSeed,
 	WorkspaceSource,
 	WorkspaceSourceActionId,
 	WorkspaceSourceItem,
 } from '@/renderer/types/workbench';
 import { originQualifiedRef } from '@/shared/branch-ref';
+import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 import type {
 	RepositoryBranchWire,
+	RepositoryIssueWire,
 	RepositoryPullRequestWire,
 } from '@/shared/ipc/contracts/workspace-sources';
 import { toWorkspaceDisplayName } from '@/shared/workspace-name';
+
+/** The issue rows the create-from picker's Issues tab offers, per provider. */
+interface StartableIssues {
+	githubIssues: RepositoryIssueWire[];
+	linearIssues: LinearIssueWire[];
+}
 
 /** Stable picker-row id for a branch source. */
 export function branchSourceId(name: string): string {
@@ -50,6 +62,50 @@ export function mapPullRequestsToWorkspaceSources(
 		subtitle: pullRequest.headRefName,
 		title: pullRequest.title,
 	}));
+}
+
+/**
+ * Collects every workspace's linked-issue key, so an issue that already
+ * produced a workspace is not offered as a fresh start a second time.
+ * @param projects - The projects whose workspaces to read.
+ * @returns The remote issue ids, which are Linear issue ids and GitHub issue URLs.
+ */
+export function collectLinkedIssueKeys(
+	projects: readonly ProjectShellModel[],
+): string[] {
+	return projects.flatMap((project) =>
+		project.workspaces.flatMap((workspace) => {
+			const remoteId = workspace.landingSummary?.linkedIssue?.remoteId;
+			return remoteId ? [remoteId] : [];
+		}),
+	);
+}
+
+/**
+ * Narrows the create-from picker's issue rows to work nobody has started:
+ * Linear issues still in Backlog or Todo, minus any issue that already produced
+ * a workspace. GitHub rows need no state test because `gh` lists open issues
+ * only, and they keep their assignees — an issue assigned to the user is one
+ * they would start from.
+ * @param input - Both providers' cached rows, plus every workspace's linked-issue key.
+ * @returns The rows the picker should list, per provider, in their original order.
+ */
+export function selectStartableIssues({
+	githubIssues,
+	linearIssues,
+	linkedIssueKeys,
+}: {
+	githubIssues: readonly RepositoryIssueWire[];
+	linearIssues: readonly LinearIssueWire[];
+	linkedIssueKeys: readonly string[];
+}): StartableIssues {
+	const linked = new Set(linkedIssueKeys);
+	return {
+		githubIssues: githubIssues.filter((issue) => !linked.has(issue.url)),
+		linearIssues: linearIssues.filter(
+			(issue) => isLinearIssueNotStarted(issue) && !linked.has(issue.id),
+		),
+	};
 }
 
 /**

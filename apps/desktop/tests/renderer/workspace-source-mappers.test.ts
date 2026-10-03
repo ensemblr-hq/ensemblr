@@ -6,13 +6,17 @@ import {
 } from '../../src/renderer/lib/github/issue-view.ts';
 import {
 	branchSourceId,
+	collectLinkedIssueKeys,
 	mapPullRequestsToWorkspaceSources,
 	mapRepositoryBranchesToWorkspaceSources,
 	openableWorkspaceId,
 	pullRequestSourceId,
+	selectStartableIssues,
 	workspaceSeedFromSourceItem,
 } from '../../src/renderer/lib/workbench/workspace-source-mappers.ts';
 import { getWorkspaceSourceActions } from '../../src/renderer/lib/workbench/workspace-sources.ts';
+import type { ProjectShellModel } from '../../src/renderer/types/workbench';
+import type { LinearIssueWire } from '../../src/shared/ipc/contracts/linear.ts';
 import type {
 	RepositoryBranchWire,
 	RepositoryIssueWire,
@@ -354,4 +358,114 @@ test('a free pull-request row offers the same take-over action as a branch', () 
 	expect(getWorkspaceSourceActions(pullRequestRow)[0]?.label).toBe(
 		'Use branch',
 	);
+});
+
+function linearIssue(over: Partial<LinearIssueWire> = {}): LinearIssueWire {
+	return {
+		accountId: 'acc-1',
+		archivedAt: null,
+		assigneeId: null,
+		assigneeName: null,
+		cycleId: null,
+		cycleName: null,
+		description: null,
+		dueDate: null,
+		id: 'linear-1',
+		identifier: 'ENS-1',
+		labels: [],
+		organizationName: 'Ensemblr',
+		priority: 2,
+		projectId: null,
+		projectName: null,
+		stateColor: null,
+		stateId: 's1',
+		stateName: 'Todo',
+		stateType: 'unstarted',
+		syncedAt: null,
+		teamId: 't1',
+		teamKey: 'ENS',
+		teamName: 'Ensemblr',
+		title: 'Wire the picker',
+		updatedAt: null,
+		url: 'https://linear.app/e/issue/ENS-1',
+		...over,
+	};
+}
+
+function projectLinkedTo(remoteIds: readonly (string | null)[]) {
+	return {
+		workspaces: remoteIds.map((remoteId) => ({
+			landingSummary: remoteId ? { linkedIssue: { remoteId } } : undefined,
+		})),
+	} as unknown as ProjectShellModel;
+}
+
+test('the issue picker lists Linear issues in Backlog or Todo only', () => {
+	const { linearIssues } = selectStartableIssues({
+		githubIssues: [],
+		linearIssues: [
+			linearIssue({ id: 'backlog', stateType: 'backlog' }),
+			linearIssue({ id: 'todo', stateType: 'unstarted' }),
+			linearIssue({ id: 'triage', stateType: 'triage' }),
+			linearIssue({ id: 'started', stateType: 'started' }),
+			linearIssue({ id: 'done', stateType: 'completed' }),
+			linearIssue({ id: 'canceled', stateType: 'canceled' }),
+			linearIssue({ id: 'unknown', stateType: null }),
+			linearIssue({
+				archivedAt: '2026-09-01T00:00:00.000Z',
+				id: 'archived',
+				stateType: 'backlog',
+			}),
+		],
+		linkedIssueKeys: [],
+	});
+
+	expect(linearIssues.map((issue) => issue.id)).toEqual(['backlog', 'todo']);
+});
+
+// A team renames its states freely, so "Ready" must match as a Todo state does.
+test('the issue picker matches Linear states by type, not by name', () => {
+	const { linearIssues } = selectStartableIssues({
+		githubIssues: [],
+		linearIssues: [
+			linearIssue({ id: 'ready', stateName: 'Ready', stateType: 'unstarted' }),
+			linearIssue({ id: 'todo', stateName: 'Todo', stateType: 'started' }),
+		],
+		linkedIssueKeys: [],
+	});
+
+	expect(linearIssues.map((issue) => issue.id)).toEqual(['ready']);
+});
+
+test('the issue picker hides issues that already produced a workspace', () => {
+	const { githubIssues, linearIssues } = selectStartableIssues({
+		githubIssues: [
+			githubIssue({ number: 1, url: 'https://github.com/o/r/issues/1' }),
+			githubIssue({ number: 2, url: 'https://github.com/o/r/issues/2' }),
+		],
+		linearIssues: [linearIssue({ id: 'a' }), linearIssue({ id: 'b' })],
+		linkedIssueKeys: ['https://github.com/o/r/issues/1', 'b'],
+	});
+
+	expect(githubIssues.map((issue) => issue.number)).toEqual([2]);
+	expect(linearIssues.map((issue) => issue.id)).toEqual(['a']);
+});
+
+test('the issue picker keeps open GitHub issues whoever they are assigned to', () => {
+	const { githubIssues } = selectStartableIssues({
+		githubIssues: [githubIssue({ assigneeLogins: ['octocat'] })],
+		linearIssues: [],
+		linkedIssueKeys: [],
+	});
+
+	expect(githubIssues).toHaveLength(1);
+});
+
+test('linked-issue keys are collected across every project and skip unlinked workspaces', () => {
+	expect(
+		collectLinkedIssueKeys([
+			projectLinkedTo(['linear-1', null]),
+			projectLinkedTo(['https://github.com/o/r/issues/7']),
+		]),
+	).toEqual(['linear-1', 'https://github.com/o/r/issues/7']);
 });

@@ -31,6 +31,7 @@ export type {
 export {
 	getLinearStateBucketLabel,
 	isLinearIssueClosed,
+	isLinearIssueNotStarted,
 	LINEAR_PRIORITY_ORDER,
 	linearPriorityRank,
 	orderLinearIssues,
@@ -41,6 +42,7 @@ export {
 	deriveLinearGateState,
 	describeLinearAccountFailures,
 	describeLinearFailure,
+	describeLinearListGap,
 	formatLinearIssueContext,
 	formatLinearIssueDocument,
 	getLinearPriorityLabel,

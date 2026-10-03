@@ -11,12 +11,10 @@
  * already are.
  */
 
+import { isLinearIssueNotStarted } from '@/renderer/lib/linear';
 import type { BoardIssueCard } from '@/renderer/types/workbench-shell';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 import type { RepositoryIssueWire } from '@/shared/ipc/contracts/workspace-sources';
-
-/** Linear workflow-state types that mean "not started yet". */
-const BACKLOG_STATE_TYPES: readonly string[] = ['backlog', 'unstarted'];
 
 /** One repository's GitHub issues, paired with the project they came from. */
 export interface ProjectGithubIssues {
@@ -33,19 +31,6 @@ export interface BacklogIssuesInput {
 	linearIssues: readonly LinearIssueWire[];
 	/** `linkedIssue.remoteId` of every existing workspace, so an issue that already produced one is not offered twice. */
 	linkedIssueKeys: readonly string[];
-}
-
-/**
- * Whether a Linear issue counts as backlog: not started, and not archived.
- * @param issue - The Linear issue to test.
- * @returns True when the issue belongs in the Backlog column.
- */
-function isLinearBacklogIssue(issue: LinearIssueWire): boolean {
-	return (
-		issue.archivedAt === null &&
-		issue.stateType !== null &&
-		BACKLOG_STATE_TYPES.includes(issue.stateType)
-	);
 }
 
 /**
@@ -143,7 +128,7 @@ export function collectBacklogIssues({
 	const collected: BoardIssueCard[] = [];
 
 	for (const issue of linearIssues) {
-		if (isLinearBacklogIssue(issue)) {
+		if (isLinearIssueNotStarted(issue)) {
 			collected.push(toLinearBoardIssue(issue));
 		}
 	}

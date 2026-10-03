@@ -699,6 +699,9 @@
 	},
 	"create-workspace-source": {
 		"description": "Choose a branch, pull request, or issue to start a workspace.",
+		"empty": {
+			"issue": "No issues waiting to be started. Open GitHub issues and Linear issues in Backlog or Todo appear here until a workspace is created from them."
+		},
 		"loading": "Loading {{sources}}…",
 		"no-match": "No {{sources}} match your search.",
 		"repository": {

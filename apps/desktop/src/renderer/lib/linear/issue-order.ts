@@ -57,6 +57,9 @@ export const LINEAR_PRIORITY_ORDER: readonly number[] = [1, 2, 3, 4, 0];
 
 const CLOSED_BUCKETS: readonly LinearStateBucket[] = ['canceled', 'completed'];
 
+/** Linear workflow-state types that mean "not started yet": Backlog and Todo. */
+const BACKLOG_STATE_TYPES: readonly string[] = ['backlog', 'unstarted'];
+
 const UNASSIGNED_GROUP_ID = 'unassigned';
 
 /**
@@ -89,6 +92,24 @@ export function isLinearIssueClosed(
 	issue: Pick<LinearIssueWire, 'stateType'>,
 ): boolean {
 	return CLOSED_BUCKETS.includes(resolveLinearStateBucket(issue));
+}
+
+/**
+ * Whether a Linear issue is work nobody has picked up: in a Backlog or Todo
+ * state, and not archived. Matched on `stateType` rather than the state's name,
+ * which every team renames freely; an issue with no known state does not count,
+ * unlike {@link resolveLinearStateBucket}, which buckets it as unstarted.
+ * @param issue - The issue to test
+ * @returns True when the issue has not been started
+ */
+export function isLinearIssueNotStarted(
+	issue: Pick<LinearIssueWire, 'archivedAt' | 'stateType'>,
+): boolean {
+	return (
+		issue.archivedAt === null &&
+		issue.stateType !== null &&
+		BACKLOG_STATE_TYPES.includes(issue.stateType)
+	);
 }
 
 /**
