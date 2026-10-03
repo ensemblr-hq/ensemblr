@@ -147,6 +147,7 @@ test('mapLinearIssuesToWorkspaceSources: produces linear issue picker sources', 
 			reference: 'ENG-143',
 			subtitle: 'Todo',
 			title: 'Linear OAuth PKCE and Token Lifecycle',
+			trackerProject: 'Ensemblr',
 		},
 		{
 			id: 'issue-2',
@@ -155,6 +156,15 @@ test('mapLinearIssuesToWorkspaceSources: produces linear issue picker sources', 
 			reference: 'ENG-150',
 			subtitle: undefined,
 			title: 'Terminal polish',
+			trackerProject: 'Ensemblr',
 		},
 	]);
+});
+
+test('mapLinearIssuesToWorkspaceSources: leaves trackerProject off an issue in no project', () => {
+	const [source] = mapLinearIssuesToWorkspaceSources([
+		createLinearIssueFixture({ projectId: null, projectName: null }),
+	]);
+
+	expect(source).not.toHaveProperty('trackerProject');
 });

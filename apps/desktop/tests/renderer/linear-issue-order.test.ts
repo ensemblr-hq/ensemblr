@@ -214,6 +214,43 @@ test('orderLinearIssues: assignee groups pin unassigned work to the end', () => 
 	expect(idsOf(board.groups.at(-1)?.issues ?? [])).toEqual(['none']);
 });
 
+test('orderLinearIssues: project groups sort alphabetically with no-project work last', () => {
+	const skrepka = createLinearIssueFixture({
+		id: 'skrepka',
+		identifier: 'ENG-6',
+		projectId: 'project-skrepka',
+		projectName: 'Skrepka',
+	});
+	const wye = createLinearIssueFixture({
+		id: 'wye',
+		identifier: 'ENG-7',
+		projectId: 'project-wye',
+		projectName: 'Wye',
+	});
+	const loose = createLinearIssueFixture({
+		id: 'loose',
+		identifier: 'ENG-8',
+		projectId: null,
+		projectName: null,
+	});
+	const board = orderLinearIssues({
+		grouping: 'project',
+		issues: [loose, wye, urgent, skrepka],
+		scope: 'all',
+		sort: 'priority',
+	});
+
+	expect(board.groups.map((group) => group.label)).toEqual([
+		'Ensemblr',
+		'Skrepka',
+		'Wye',
+		'No project',
+	]);
+	expect(board.groups.at(-1)?.id).toBe('no-project');
+	expect(idsOf(board.groups.at(-1)?.issues ?? [])).toEqual(['loose']);
+	expect(board.groups.every((group) => group.stateBucket === null)).toBe(true);
+});
+
 test('orderLinearIssues: an unparseable updatedAt sorts last instead of throwing', () => {
 	const broken = createLinearIssueFixture({
 		id: 'broken',

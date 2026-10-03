@@ -127,9 +127,11 @@
 			"assignee": "Исполнитель",
 			"none": "Без группировки",
 			"priority": "Приоритет",
+			"project": "Проект",
 			"status": "Статус"
 		},
 		"new-issue": "Новая задача",
+		"no-project": "Без проекта",
 		"refresh": "Обновить задачи",
 		"scope": {
 			"active": "Активные",
@@ -173,6 +175,9 @@
 		"medium": "Средний",
 		"none": "Без приоритета",
 		"urgent": "Срочный"
+	},
+	"project-marker": {
+		"label": "Проект Linear: {{project}}"
 	},
 	"state-bucket": {
 		"backlog": "Бэклог",

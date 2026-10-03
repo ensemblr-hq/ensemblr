@@ -18,6 +18,7 @@ import {
 	ALL_TEAMS,
 	describeLinearAccountFailures,
 	describeLinearFailure,
+	type LinearIssueBoard,
 	type LinearIssueGroup,
 	type LinearIssueScope,
 	orderLinearIssues,
@@ -96,6 +97,10 @@ export function LinearIssueList() {
 		[grouping, i18n.language, rows, scope, sort],
 	);
 	const showOrganization = useMemo(() => spansOrganizations(rows), [rows]);
+	const showProject = useMemo(
+		() => grouping !== 'project' && hasProjects(board),
+		[board, grouping],
+	);
 
 	return (
 		<div className='flex w-full flex-col gap-3'>
@@ -166,6 +171,7 @@ export function LinearIssueList() {
 								})
 							}
 							showOrganization={showOrganization}
+							showProject={showProject}
 						/>
 					))}
 				</div>
@@ -183,10 +189,12 @@ function LinearIssueGroupSection({
 	group,
 	onOpen,
 	showOrganization,
+	showProject,
 }: {
 	group: LinearIssueGroup;
 	onOpen: (issue: LinearIssueWire) => void;
 	showOrganization: boolean;
+	showProject: boolean;
 }) {
 	return (
 		<section className='flex flex-col gap-1.5'>
@@ -211,10 +219,24 @@ function LinearIssueGroupSection({
 						key={issue.id}
 						onOpen={() => onOpen(issue)}
 						showOrganization={showOrganization}
+						showProject={showProject}
 					/>
 				))}
 			</ul>
 		</section>
+	);
+}
+
+/**
+ * True when any issue the list is about to render is filed under a Linear
+ * project. When none is, the project column would be empty on every row, so it
+ * is left out rather than reserved.
+ * @param board - The grouped sections about to be rendered
+ * @returns Whether the project column carries information
+ */
+function hasProjects(board: LinearIssueBoard): boolean {
+	return board.groups.some((group) =>
+		group.issues.some((issue) => issue.projectName !== null),
 	);
 }
 

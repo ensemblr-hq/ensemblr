@@ -7,7 +7,12 @@ import { getLinearPriorityLabel } from './issue-view';
 export type LinearIssueSort = 'priority' | 'status' | 'title' | 'updated';
 
 /** Field the browse list buckets issues by before ordering them. */
-export type LinearIssueGrouping = 'assignee' | 'none' | 'priority' | 'status';
+export type LinearIssueGrouping =
+	| 'assignee'
+	| 'none'
+	| 'priority'
+	| 'project'
+	| 'status';
 
 /** Coarse completion filter applied before grouping and sorting. */
 export type LinearIssueScope = 'active' | 'all' | 'closed';
@@ -61,6 +66,20 @@ const CLOSED_BUCKETS: readonly LinearStateBucket[] = ['canceled', 'completed'];
 const BACKLOG_STATE_TYPES: readonly string[] = ['backlog', 'unstarted'];
 
 const UNASSIGNED_GROUP_ID = 'unassigned';
+
+const NO_PROJECT_GROUP_ID = 'no-project';
+
+/** A relation an issue may lack, such as its assignee or its project. */
+interface NamedRelation {
+	id: string | null;
+	name: string | null;
+}
+
+/** The section that collects every issue missing the relation being grouped on. */
+interface MissingRelationGroup {
+	id: string;
+	label: string;
+}
 
 /**
  * Normalizes an issue's Linear `stateType` into a bucket. Anything unrecognized
@@ -253,7 +272,23 @@ function groupIssues(
 		case 'priority':
 			return groupByPriority(issues);
 		case 'assignee':
-			return groupByAssignee(issues);
+			return groupByRelation(
+				issues,
+				(issue) => ({ id: issue.assigneeId, name: issue.assigneeName }),
+				{
+					id: UNASSIGNED_GROUP_ID,
+					label: i18n.t('linear:issue-list.unassigned', 'Unassigned'),
+				},
+			);
+		case 'project':
+			return groupByRelation(
+				issues,
+				(issue) => ({ id: issue.projectId, name: issue.projectName }),
+				{
+					id: NO_PROJECT_GROUP_ID,
+					label: i18n.t('linear:issue-list.no-project', 'No project'),
+				},
+			);
 		default:
 			return issues.length === 0
 				? []
@@ -347,14 +382,24 @@ function bucketIssues<TKey>(
 	return buckets;
 }
 
-/** One section per assignee, alphabetical, with unassigned work last. */
-function groupByAssignee(
+/**
+ * One section per value of a named relation — an assignee, a project — sorted
+ * alphabetically, with the issues that lack one collected in a section last.
+ * @param issues - The already-sorted issues to bucket
+ * @param relationOf - Reads the relation an issue is grouped on
+ * @param missing - Id and heading of the section for issues without one
+ * @returns The sections, alphabetical, with the missing-relation section last
+ */
+function groupByRelation(
 	issues: readonly LinearIssueWire[],
+	relationOf: (issue: LinearIssueWire) => NamedRelation,
+	missing: MissingRelationGroup,
 ): LinearIssueGroup[] {
 	const groups = new Map<string, LinearIssueGroup>();
 
 	for (const issue of issues) {
-		const id = issue.assigneeId ?? UNASSIGNED_GROUP_ID;
+		const relation = relationOf(issue);
+		const id = relation.id ?? missing.id;
 		const existing = groups.get(id);
 
 		if (existing) {
@@ -365,24 +410,32 @@ function groupByAssignee(
 		groups.set(id, {
 			id,
 			issues: [issue],
-			label:
-				issue.assigneeName ??
-				i18n.t('linear:issue-list.unassigned', 'Unassigned'),
+			label: relation.name ?? missing.label,
 			priority: null,
 			stateBucket: null,
 		});
 	}
 
-	return [...groups.values()].sort(compareAssigneeGroups);
+	return [...groups.values()].sort((left, right) =>
+		compareRelationGroups(left, right, missing.id),
+	);
 }
 
-/** Sorts assignee sections alphabetically, pinning unassigned work to the end. */
-function compareAssigneeGroups(
+/**
+ * Sorts relation sections alphabetically, pinning the missing-relation section
+ * to the end.
+ * @param left - One section
+ * @param right - The other section
+ * @param missingId - Id of the section holding issues without the relation
+ * @returns A comparator result
+ */
+function compareRelationGroups(
 	left: LinearIssueGroup,
 	right: LinearIssueGroup,
+	missingId: string,
 ): number {
-	if (left.id === UNASSIGNED_GROUP_ID || right.id === UNASSIGNED_GROUP_ID) {
-		return left.id === UNASSIGNED_GROUP_ID ? 1 : -1;
+	if (left.id === missingId || right.id === missingId) {
+		return left.id === missingId ? 1 : -1;
 	}
 
 	return (left.label ?? '').localeCompare(right.label ?? '');

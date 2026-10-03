@@ -8,20 +8,26 @@ import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 
 import { LinearAvatar } from './issue-avatar';
 import { LinearPriorityIcon, LinearStateIcon } from './issue-glyphs';
+import { LinearProjectLabel } from './issue-project';
 
 /**
  * One row of the Linear browse list. Every field sits in a fixed-width column so
- * status and assignee line up down the list — the flowing badge cluster this
- * replaced left a ragged right edge that read as noise rather than as data.
+ * project, status, and assignee line up down the list — the flowing badge
+ * cluster this replaced left a ragged right edge that read as noise rather than
+ * as data. The project column is reserved on every row while it is shown, so
+ * titles and due dates end at the same edge whether or not an issue has a
+ * project.
  */
 export function LinearIssueRow({
 	issue,
 	onOpen,
 	showOrganization,
+	showProject,
 }: {
 	issue: LinearIssueWire;
 	onOpen: () => void;
 	showOrganization: boolean;
+	showProject: boolean;
 }) {
 	const { t } = useTranslation();
 	const bucket = resolveLinearStateBucket(issue);
@@ -57,6 +63,13 @@ export function LinearIssueRow({
 				{issue.archivedAt ? (
 					<span className='shrink-0 text-muted-foreground text-xxs'>
 						{t('linear:issue-badges.archived', 'Archived')}
+					</span>
+				) : null}
+				{showProject ? (
+					<span className='flex w-32 shrink-0'>
+						{issue.projectName ? (
+							<LinearProjectLabel name={issue.projectName} />
+						) : null}
 					</span>
 				) : null}
 				<span className='flex w-28 shrink-0 items-center gap-1.5'>

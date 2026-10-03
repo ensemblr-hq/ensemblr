@@ -2,6 +2,7 @@ import type { TFunction } from 'i18next';
 import { GitBranchIcon, GitPullRequestIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { LinearProjectBadge } from '@/renderer/components/linear/issue-project';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Command,
@@ -184,7 +185,11 @@ export function CreateWorkspaceSourceDialog({
 								<CommandItem
 									className='h-11 gap-2 pr-1.5 pl-2'
 									key={source.id}
-									keywords={[source.title, source.reference ?? '']}
+									keywords={[
+										source.title,
+										source.reference ?? '',
+										source.trackerProject ?? '',
+									]}
 									onSelect={() => {
 										if (primaryAction) {
 											dispatchAction(source, primaryAction);
@@ -203,6 +208,9 @@ export function CreateWorkspaceSourceDialog({
 											{source.title}
 										</span>
 									</span>
+									{source.trackerProject ? (
+										<LinearProjectBadge name={source.trackerProject} />
+									) : null}
 									<WorkspaceSourceActions
 										actions={actions}
 										onAction={(action) => dispatchAction(source, action)}

@@ -264,7 +264,9 @@ export function formatLinearIssueDocument(
  * Maps cached Linear issues into create-workspace dialog sources so the
  * "Create from…" picker lists live issues instead of fixtures. The subtitle
  * names the organization when the rows span more than one, since `ENG-1` is
- * unique inside an organization but not between two.
+ * unique inside an organization but not between two. The Linear project rides
+ * along so a row says which project it belongs to, since one team's issues can
+ * span several.
  */
 export function mapLinearIssuesToWorkspaceSources(
 	issues: LinearIssueWire[],
@@ -282,6 +284,7 @@ export function mapLinearIssuesToWorkspaceSources(
 				.filter((part) => part !== null)
 				.join(' · ') || undefined,
 		title: issue.title,
+		...(issue.projectName ? { trackerProject: issue.projectName } : {}),
 	}));
 }
 

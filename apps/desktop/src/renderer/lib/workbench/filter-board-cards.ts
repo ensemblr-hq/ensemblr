@@ -45,6 +45,7 @@ function cardSearchFields(card: BoardCard): (string | null | undefined)[] {
 		card.issue.title,
 		card.issue.reference,
 		card.issue.subtitle,
+		card.issue.trackerProject,
 		...card.issue.labels,
 	];
 }
