@@ -46,6 +46,7 @@ function issueCard(overrides: Partial<BoardIssueCard> = {}): BoardCard {
 		projectId: null,
 		provider: 'linear',
 		reference: 'ENS-1',
+		scopeRepoIds: null,
 		stateColor: null,
 		stateName: 'Todo',
 		stateType: 'unstarted',
@@ -112,12 +113,39 @@ describe('filterBoardCards repository facet', () => {
 		expect(keysOf(filtered)).toEqual(['w2', 'gh', 'lin']);
 	});
 
-	test('keeps cards that belong to no repository, which Linear issues never do', () => {
+	test('keeps cards that belong to no repository, as an unscoped Linear issue does', () => {
 		const filtered = filterBoardCards(cards, {
 			...DEFAULT_BOARD_FILTERS,
 			repoIds: ['repo-1'],
 		});
 		expect(keysOf(filtered)).toEqual(['w1', 'lin']);
+	});
+
+	test('keeps a team-scoped Linear issue only under a repository that takes it', () => {
+		const scoped = [
+			issueCard({ key: 'ens', scopeRepoIds: ['repo-1', 'repo-3'] }),
+			issueCard({ key: 'mkt', scopeRepoIds: ['repo-2'] }),
+		];
+		expect(
+			keysOf(
+				filterBoardCards(scoped, {
+					...DEFAULT_BOARD_FILTERS,
+					repoIds: ['repo-3'],
+				}),
+			),
+		).toEqual(['ens']);
+		expect(
+			keysOf(
+				filterBoardCards(scoped, {
+					...DEFAULT_BOARD_FILTERS,
+					repoIds: ['repo-1', 'repo-2'],
+				}),
+			),
+		).toEqual(['ens', 'mkt']);
+		expect(keysOf(filterBoardCards(scoped, DEFAULT_BOARD_FILTERS))).toEqual([
+			'ens',
+			'mkt',
+		]);
 	});
 });
 

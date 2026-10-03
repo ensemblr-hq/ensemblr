@@ -447,6 +447,65 @@ test('resolves committed [prompts] review to actionPreferences.codeReview', (t) 
 	assert.equal(resolved.value, 'Focus on contracts.');
 });
 
+test('normalises [linear] teams onto linearTeams', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		'[linear]\nteams = ["THE", "ENG"]\n',
+	);
+
+	const loaded = loadRepositoryConfig({
+		repositoryPath: fixture.repositoryPath,
+	});
+	const source = getSource(loaded.snapshot, 'ensemblr-config');
+
+	assert.equal(source.status, 'loaded');
+	assert.deepEqual(source.settings, { linearTeams: ['THE', 'ENG'] });
+	assert.deepEqual(loaded.snapshot.diagnostics, []);
+});
+
+test('reports a [linear] block whose teams are not a list of strings', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		'[linear]\nteams = "THE"\nproject = "Ensemblr"\n',
+	);
+
+	const loaded = loadRepositoryConfig({
+		repositoryPath: fixture.repositoryPath,
+	});
+
+	assert.deepEqual(getSource(loaded.snapshot, 'ensemblr-config').settings, {});
+	assert.deepEqual(
+		loaded.snapshot.diagnostics.map((diagnostic) => [
+			diagnostic.code,
+			diagnostic.fieldPath,
+		]),
+		[
+			['invalid-repository-config-field', '$.linear.teams'],
+			['unsupported-repository-config-field', '$.linear.project'],
+		],
+	);
+});
+
+test('resolves committed [linear] teams as the repository linearTeams', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write('.ensemblr/settings.toml', '[linear]\nteams = ["THE"]\n');
+
+	const snapshot = resolveSettings({
+		config: createConfig(),
+		repository: {
+			repositoryId: 'repo-linear',
+			repositoryPath: fixture.repositoryPath,
+		},
+	});
+
+	assert.ok(snapshot.repository);
+	const resolved = getRepositorySetting(snapshot.repository, 'linearTeams');
+	assert.equal(resolved.source, 'ensemblr-config');
+	assert.deepEqual(resolved.value, ['THE']);
+});
+
 test('applies repositoryDefaults to every repository', (t) => {
 	const fixture = createRepositoryFixture(t);
 

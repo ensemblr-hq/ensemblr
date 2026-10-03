@@ -54,6 +54,7 @@ const TOML_FIELD_MAP: ReadonlyMap<string, string> = new Map([
 	['file_include_globs', 'filesToCopy'],
 	['git', 'git'],
 	['infisical', 'infisical'],
+	['linear', 'linear'],
 	['prompts', 'prompts'],
 	['spotlight_testing', 'spotlightTesting'],
 	['claude_executable_path', 'claudeExecutablePath'],
@@ -113,6 +114,15 @@ const PROMPT_FIELD_MAP: ReadonlyMap<string, string> = new Map([
 	['branch_rename', 'branchRename'],
 	['branchRename', 'branchRename'],
 	['general', 'general'],
+]);
+
+/**
+ * `[linear]` TOML sub-keys mapped onto the canonical resolver keys the renderer
+ * reads to scope Linear issues to the repository. `teams` names the Linear teams
+ * — by key such as `THE`, or by id — whose issues belong to this repository.
+ */
+const LINEAR_FIELD_MAP: ReadonlyMap<string, string> = new Map([
+	['teams', 'linearTeams'],
 ]);
 
 const OBJECT_SETTING_KEYS = new Set([
@@ -275,9 +285,27 @@ function normalizeTomlRepositoryConfig(
 }
 
 /**
- * Shared per-field normalisation loop for the TOML parser. Handles the special
- * `scripts` key, looks up the field map for the canonical key, and returns the
- * accumulated settings plus diagnostics.
+ * TOML tables whose sub-keys resolve onto canonical setting keys of their own
+ * rather than onto one setting holding the whole table.
+ */
+const BLOCK_NORMALIZERS: ReadonlyMap<
+	string,
+	(
+		value: unknown,
+		fieldPath: string,
+		source: SettingsResolutionSource,
+	) => NormalizedConfigSource
+> = new Map([
+	['git', normalizeGitBlock],
+	['linear', normalizeLinearBlock],
+	['prompts', normalizePromptsBlock],
+	['scripts', normalizeScripts],
+]);
+
+/**
+ * Shared per-field normalisation loop for the TOML parser. Hands each mapped
+ * table to its block normaliser, looks up the field map for every other key's
+ * canonical name, and returns the accumulated settings plus diagnostics.
  */
 function normalizeRepositoryConfigFields({
 	config,
@@ -292,28 +320,12 @@ function normalizeRepositoryConfigFields({
 	let settings: Record<string, unknown> = {};
 
 	for (const [key, value] of Object.entries(config)) {
-		if (key === 'scripts') {
-			const normalizedScripts = normalizeScripts(value, '$.scripts', source);
-			settings = mergeSettings(settings, normalizedScripts.settings);
-			diagnostics.push(...normalizedScripts.diagnostics);
-			continue;
-		}
+		const normalizeBlock = BLOCK_NORMALIZERS.get(key);
 
-		if (key === 'git') {
-			const normalizedGit = normalizeGitBlock(value, '$.git', source);
-			settings = mergeSettings(settings, normalizedGit.settings);
-			diagnostics.push(...normalizedGit.diagnostics);
-			continue;
-		}
-
-		if (key === 'prompts') {
-			const normalizedPrompts = normalizePromptsBlock(
-				value,
-				'$.prompts',
-				source,
-			);
-			settings = mergeSettings(settings, normalizedPrompts.settings);
-			diagnostics.push(...normalizedPrompts.diagnostics);
+		if (normalizeBlock) {
+			const normalizedBlock = normalizeBlock(value, `$.${key}`, source);
+			settings = mergeSettings(settings, normalizedBlock.settings);
+			diagnostics.push(...normalizedBlock.diagnostics);
 			continue;
 		}
 
@@ -367,11 +379,13 @@ const SCRIPT_BEHAVIOUR_FIELDS = new Map<
  */
 export const REPOSITORY_CONFIG_KEYS: {
 	git: string[];
+	linear: string[];
 	prompts: string[];
 	scripts: string[];
 	topLevel: string[];
 } = {
 	git: [...GIT_FIELD_MAP.keys()],
+	linear: [...LINEAR_FIELD_MAP.keys()],
 	prompts: [...PROMPT_FIELD_MAP.keys()],
 	scripts: [...SCRIPT_FIELD_MAP.keys(), ...SCRIPT_BEHAVIOUR_FIELDS.keys()],
 	topLevel: [...TOML_FIELD_MAP.keys(), 'scripts'],
@@ -585,6 +599,37 @@ function normalizePromptsBlock(
 				kind: 'accepted',
 				value: entry,
 			};
+		},
+	);
+}
+
+/**
+ * Normalises the `[linear]` block, mapping `teams` onto `linearTeams` so the
+ * renderer can scope Linear issues to the teams this repository names.
+ * @param value - Raw `linear` value to normalise.
+ * @param fieldPath - JSONPath used in diagnostic messages.
+ * @param source - Source identifier used in diagnostics.
+ * @returns Partial settings record of canonical keys plus accumulated diagnostics.
+ */
+function normalizeLinearBlock(
+	value: unknown,
+	fieldPath: string,
+	source: SettingsResolutionSource,
+): NormalizedConfigSource {
+	return normalizeMappedBlock(
+		'linear',
+		value,
+		fieldPath,
+		source,
+		(key, entry) => {
+			const canonicalKey = LINEAR_FIELD_MAP.get(key);
+			if (!canonicalKey) {
+				return { kind: 'unsupported' };
+			}
+			if (!isStringArray(entry)) {
+				return { expected: 'array of strings', kind: 'invalid' };
+			}
+			return { canonicalKey, kind: 'accepted', value: [...entry] };
 		},
 	);
 }

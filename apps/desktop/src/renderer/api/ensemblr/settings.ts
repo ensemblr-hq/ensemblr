@@ -49,6 +49,44 @@ export function settingsResolutionQuery(
 }
 
 /**
+ * Query options for the Linear teams a repository names in its committed
+ * `[linear]` block, which the create-from picker and the dashboard board hold
+ * its Linear issues to. Pass the repository root, the canonical committed
+ * config, so every surface scopes a repository the same way whichever workspace
+ * is open. Shares the resolution's cache entry, so a settings write that
+ * invalidates the repository's resolution refreshes this too.
+ * @param repository - The repository id and the path of its root checkout
+ */
+export function repositoryLinearTeamsQuery(repository: {
+	repositoryId: string;
+	repositoryPath: string;
+}) {
+	return queryOptions({
+		...settingsResolutionQuery(repository),
+		select: readLinearTeams,
+	});
+}
+
+/**
+ * Reads the `[linear] teams` list from a repository-scoped resolution. Blank
+ * entries are dropped, so a list of nothing but blanks scopes nothing.
+ * @param snapshot - The settings resolution scoped to the repository
+ * @returns The team keys and ids the repository names, empty when it names none
+ */
+function readLinearTeams(snapshot: SettingsResolutionSnapshot): string[] {
+	const value = snapshot.repository?.settings.find(
+		(setting) => setting.key === 'linearTeams',
+	)?.value;
+	if (!Array.isArray(value)) {
+		return [];
+	}
+	return value
+		.filter((team): team is string => typeof team === 'string')
+		.map((team) => team.trim())
+		.filter((team) => team.length > 0);
+}
+
+/**
  * Query options for the repository's resolved git lifecycle settings — the
  * archive-after-merge policy, whether archiving drops the local branch, and
  * whether a push sets upstream. Read by the merge flow and by the archive

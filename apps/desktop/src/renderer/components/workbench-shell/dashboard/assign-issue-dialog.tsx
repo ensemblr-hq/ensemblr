@@ -33,9 +33,10 @@ export interface AssignIssueRequest {
 /**
  * Confirmation dialog for turning a backlog issue into a workspace. A GitHub
  * issue already belongs to a repository, so that one is locked in; a Linear
- * issue is not repo-scoped and has to be pointed at one. Nothing is written back
- * to Linear or GitHub — the issue's own status is the user's to change (ADR
- * 0024).
+ * issue is not repo-scoped and has to be pointed at one — among the repositories
+ * whose `[linear]` team scope takes it, when any names its teams. Nothing is
+ * written back to Linear or GitHub — the issue's own status is the user's to
+ * change (ADR 0024).
  */
 export function AssignIssueDialog({
 	onAssigned,
@@ -55,8 +56,17 @@ export function AssignIssueDialog({
 	const [selectedRepoId, setSelectedRepoId] = useState<string | null>(null);
 
 	const lockedRepoId = request?.issue.projectId ?? null;
+	const scopeRepoIds = request?.issue.scopeRepoIds
+		? new Set(request.issue.scopeRepoIds)
+		: null;
+	const repoChoices = scopeRepoIds
+		? projects.filter((candidate) => scopeRepoIds.has(candidate.id))
+		: projects;
 	const repoId = lockedRepoId ?? selectedRepoId;
-	const project = projects.find((candidate) => candidate.id === repoId) ?? null;
+	const project =
+		(lockedRepoId ? projects : repoChoices).find(
+			(candidate) => candidate.id === repoId,
+		) ?? null;
 
 	/**
 	 * Creates the workspace from the issue, then hands its id back to the board.
@@ -141,7 +151,7 @@ export function AssignIssueDialog({
 					) : (
 						<RepositoryPicker
 							onSelect={setSelectedRepoId}
-							projects={projects}
+							projects={repoChoices}
 							selectedRepo={project}
 						/>
 					)}

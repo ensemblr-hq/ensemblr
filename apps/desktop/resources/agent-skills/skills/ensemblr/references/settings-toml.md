@@ -252,6 +252,28 @@ with the login shell's environment plus its control token, so an agent's own
 shell tool has none of them — a command needing one has to run through
 `ensemblr_start_terminal` and `ensemblr_write_terminal`.
 
+## `[linear]`
+
+Which Linear teams the repository's work is filed under. Linear issues carry no
+repository of their own, so without this block every connected account's
+issues show next to every repository.
+
+| Key | Type | What it does |
+| --- | --- | --- |
+| `teams` | array of strings | Teams whose issues belong to this repository, each by key (`THE`, matched case-insensitively) or by id. Omitted or empty scopes nothing. |
+
+```toml
+[linear]
+teams = ["THE"]
+```
+
+With a scope, the create-from picker's Issues tab lists only those teams' Linear
+issues for the repository. On the dashboard, the repository facet keeps only the
+Linear issues of the repositories it picks, and an issue whose team no
+repository on the board takes is left off the Backlog. The block narrows what
+the app *shows*; it does not narrow `ensemblr_linear_list_issues`, which still
+reads every team the connected account can see.
+
 ## `~/.config/ensemblr/config.json`
 
 The user-scope declarative config, a JSON file carrying a matching `$schema`

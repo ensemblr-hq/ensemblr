@@ -99,8 +99,9 @@ your file byte-for-byte intact.
 | `enterprise_data_privacy` | boolean | Accepted and validated; see below. |
 | `spotlight_testing` | table | Accepted and validated; see below. |
 
-Blocks — `[git]`, `[infisical]`, `[scripts]`, `[scripts.run.<name>]`,
-`[prompts]` — are documented in their own sections below.
+Blocks — `[git]`, `[infisical]`, `[linear]`, `[scripts]`,
+`[scripts.run.<name>]`, `[prompts]` — are documented in their own sections
+below.
 
 ### Keys that are accepted but do nothing
 
@@ -178,6 +179,46 @@ falls back to the `.infisical.json` the Infisical CLI writes, reading it but
 never writing to it. The rest of the integration — accounts, that resolution
 order, what happens when Infisical is unreachable — is in
 [10. Integrations](./10-integrations.md).
+
+---
+
+## `[linear]`
+
+Which Linear teams this repository's work is filed under. A Linear issue
+carries no repository of its own, so without this block every connected
+account's Backlog and Todo issues show next to every repository — a user with
+several teams or organizations sees unrelated work beside each one.
+
+| Key | Type | What it does |
+| --- | --- | --- |
+| `teams` | array of strings | Teams whose issues belong to this repository, each named by its key (`THE`, matched case-insensitively) or by its id. Omitted, or an empty list, scopes nothing. |
+
+```toml
+[linear]
+teams = ["THE"]
+```
+
+With a scope in place:
+
+- The **Issues** tab of the create-workspace dialog lists only those teams'
+  Linear issues while this repository is picked. GitHub issues are untouched;
+  they already belong to the repository.
+- On the dashboard, the **repository** facet keeps only the Linear issues of
+  the repositories it picks. A repository that names no teams still takes every
+  team's issues, so picking it shows them all.
+- An issue whose team no repository on the board takes is left off the Backlog
+  altogether. While any repository names no teams, that never happens.
+- Dragging a Linear issue out of Backlog offers only the repositories that take
+  it.
+
+Team keys are unique within one Linear organization, not across them. When two
+connected organizations use the same key, name the team by id to pin one.
+
+Ensemblr reads this block from the repository's own checkout — the copy the
+**Scripts** screen edits — rather than from whichever workspace is open, so
+every surface scopes a repository the same way. The block narrows what the app
+shows; it does not change what Ensemblr syncs from Linear, or what an agent's
+Linear tools can read.
 
 ---
 

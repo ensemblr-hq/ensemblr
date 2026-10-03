@@ -156,6 +156,13 @@ open GitHub issues nobody is assigned to. An issue card is not a workspace;
 **dragging one rightward is what creates the workspace from it**, with the same
 naming, branch, and seeded prompt the Issues tab of the create dialog produces.
 
+Linear issues belong to no repository until one says which teams it works in.
+A repository's `[linear]` block names those teams (see
+[12. Repository settings](./12-repository-settings.md#linear)); once one does,
+the repository facet keeps only the Linear issues of the repositories it picks,
+and dragging a Linear issue out of Backlog offers only the repositories that
+take it.
+
 Nothing on the board is ever written back to Linear or GitHub. Dropping an issue
 on **Canceled** dismisses it here and nowhere else — the issue's own status in
 the tracker stays yours to change.

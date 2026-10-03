@@ -163,6 +163,7 @@ describe('board Backlog card', () => {
 			projectId: null,
 			provider: 'linear',
 			reference: 'THE-227',
+			scopeRepoIds: null,
 			stateColor: null,
 			stateName: 'Backlog',
 			stateType: 'backlog',

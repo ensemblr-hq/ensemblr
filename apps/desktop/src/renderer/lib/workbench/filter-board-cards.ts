@@ -23,13 +23,19 @@ function cardSource(card: BoardCard): BoardCardSource {
 }
 
 /**
- * The repository a card belongs to, or null when it is not repo-scoped — which
- * a Linear issue never is.
+ * The repositories a card belongs to, or null when it is not repo-scoped — a
+ * Linear issue is not, unless some repository's `[linear]` block names its
+ * teams, and then it belongs to every repository whose scope takes it.
  * @param card - The card to locate.
- * @returns The repository id, or null.
+ * @returns The repository ids, or null.
  */
-function cardRepoId(card: BoardCard): string | null {
-	return card.kind === 'workspace' ? card.project.id : card.issue.projectId;
+function cardRepoIds(card: BoardCard): readonly string[] | null {
+	if (card.kind === 'workspace') {
+		return [card.project.id];
+	}
+	return card.issue.projectId === null
+		? card.issue.scopeRepoIds
+		: [card.issue.projectId];
 }
 
 /**
@@ -78,26 +84,44 @@ function cardPriorityRank(card: BoardCard): number {
 }
 
 /**
- * Whether a card survives the toolbar's facets. A repo filter never hides a card
- * that belongs to no repository — a Linear issue is not repo-scoped, and dropping
- * it would empty the Backlog column the moment any repository is picked.
+ * Whether a card survives the repository facet. The facet never hides a card
+ * that belongs to no repository — an unscoped Linear issue — since dropping it
+ * would empty the Backlog column the moment any repository is picked.
+ * @param card - The card to test.
+ * @param pickedRepoIds - The repositories the facet picks; empty when it picks none.
+ * @returns True when the card stays under the picked repositories.
+ */
+function matchesPickedRepos(
+	card: BoardCard,
+	pickedRepoIds: ReadonlySet<string>,
+): boolean {
+	const repoIds = cardRepoIds(card);
+	return (
+		pickedRepoIds.size === 0 ||
+		repoIds === null ||
+		repoIds.some((repoId) => pickedRepoIds.has(repoId))
+	);
+}
+
+/**
+ * Whether a card survives the toolbar's facets and search.
  * @param card - The card to test.
  * @param filters - The active toolbar state.
+ * @param pickedRepoIds - `filters.repoIds` as a set, built once per column.
  * @returns True when the card should stay on the board.
  */
-function matchesFilters(card: BoardCard, filters: BoardFilters): boolean {
+function matchesFilters(
+	card: BoardCard,
+	filters: BoardFilters,
+	pickedRepoIds: ReadonlySet<string>,
+): boolean {
 	if (
 		filters.sources.length > 0 &&
 		!filters.sources.includes(cardSource(card))
 	) {
 		return false;
 	}
-	const repoId = cardRepoId(card);
-	if (
-		filters.repoIds.length > 0 &&
-		repoId !== null &&
-		!filters.repoIds.includes(repoId)
-	) {
+	if (!matchesPickedRepos(card, pickedRepoIds)) {
 		return false;
 	}
 	const query = filters.query.trim().toLowerCase();
@@ -146,7 +170,8 @@ export function filterBoardCards(
 	cards: readonly BoardCard[],
 	filters: BoardFilters,
 ): BoardCard[] {
+	const pickedRepoIds = new Set(filters.repoIds);
 	return cards
-		.filter((card) => matchesFilters(card, filters))
+		.filter((card) => matchesFilters(card, filters, pickedRepoIds))
 		.sort((left, right) => compareCards(left, right, filters.sort));
 }
