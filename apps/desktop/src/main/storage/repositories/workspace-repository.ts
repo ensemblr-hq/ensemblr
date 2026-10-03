@@ -31,6 +31,24 @@ export function getWorkspacePathById({
 	return row?.path ?? null;
 }
 
+/**
+ * Returns an active workspace's display name and checkout path, or `null` when
+ * the row does not exist or the workspace is archived.
+ * @param options - Database handle and the workspace to look up.
+ * @returns The workspace's name and path, or null.
+ */
+export function selectActiveWorkspaceNameAndPath({
+	database,
+	workspaceId,
+}: GetWorkspacePathByIdOptions): { name: string; path: string } | null {
+	const row = database
+		.prepare(
+			`SELECT name, path FROM workspaces WHERE id = ? AND archived_at IS NULL`,
+		)
+		.get(workspaceId) as { name: string; path: string } | undefined;
+	return row ? { name: row.name, path: row.path } : null;
+}
+
 /** Inputs for {@link selectWorkspaceBaseBranchById}. */
 export interface SelectWorkspaceBaseBranchByIdOptions {
 	database: DatabaseSync;

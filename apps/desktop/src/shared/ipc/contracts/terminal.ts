@@ -152,6 +152,12 @@ export interface CreateTerminalSessionRequest {
 /** Result of creating a terminal session: the new session, or diagnostics on failure. */
 export interface CreateTerminalSessionResult {
 	diagnostics: TerminalDiagnostic[];
+	/**
+	 * Set when a heavy script launch is waiting in the compute queue instead of
+	 * starting: `session` is null, and the script launches in its terminal once
+	 * the job is granted a slot. `position` is its one-based place in the queue.
+	 */
+	queuedJob?: { jobId: string; position: number | null } | null;
 	session: TerminalSessionSnapshot | null;
 }
 

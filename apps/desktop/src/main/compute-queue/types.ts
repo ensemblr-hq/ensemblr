@@ -60,7 +60,10 @@ export interface ScriptLease {
 	attachTerminal: (terminalId: string) => void;
 	granted: Promise<'cancelled' | 'granted'>;
 	jobId: string;
-	release: (outcome: { exitCode: number | null; signal?: string | null }) => void;
+	release: (outcome: {
+		exitCode: number | null;
+		signal?: string | null;
+	}) => void;
 }
 
 /** Options for {@link ComputeQueueService.waitFor}. */
@@ -96,7 +99,9 @@ export interface ComputeQueueService {
 	/** Cancels a queued job, or stops a running one; false when unknown or already finished. */
 	cancel: (jobId: string) => boolean;
 	/** Queues a headless command; it starts when a slot is free. */
-	enqueueCommand: (request: EnqueueCommandRequest) => Promise<EnqueueCommandOutcome>;
+	enqueueCommand: (
+		request: EnqueueCommandRequest,
+	) => Promise<EnqueueCommandOutcome>;
 	/** One job with its output tail, finished or not; null when unknown or expired from history. */
 	getJob: (jobId: string) => ComputeJobResult | null;
 	/** Live and recent jobs matching the filter, oldest first. */
@@ -107,6 +112,11 @@ export interface ComputeQueueService {
 	releaseSession: (sessionId: string) => void;
 	/** Cancels every unfinished job in a workspace, used when it is archived or removed. */
 	releaseWorkspace: (workspaceId: string) => void;
+	/**
+	 * Re-reads settings and grants whatever they now allow; main calls it after
+	 * the compute-queue settings change, so a raised limit takes effect at once.
+	 */
+	refresh: () => void;
 	/** Cancels everything and kills running process groups; idempotent. */
 	shutdown: () => Promise<void>;
 	/** The queue as it stands now. */

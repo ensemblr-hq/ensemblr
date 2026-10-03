@@ -29,6 +29,7 @@ function buildPorts(
 		listTerminalIds: () => [],
 		readTerminalScrollbacks: () => [],
 		releaseAgentControl: vi.fn(),
+		releaseComputeJobs: vi.fn(),
 		stopAgentSession: vi.fn(async () => {}),
 		stopWatchingFiles: vi.fn(),
 		waitForTerminalExit: vi.fn(async () => true),
@@ -59,6 +60,24 @@ test('stops every session, kills every terminal, and drops the watcher', async (
 	expect(ports.stopAgentSession).toHaveBeenCalledWith('session-b');
 	expect(ports.killTerminal).toHaveBeenCalledWith('term-a');
 	expect(ports.stopWatchingFiles).toHaveBeenCalledWith(WORKSPACE.workspacePath);
+	expect(ports.releaseComputeJobs).toHaveBeenCalledWith(WORKSPACE.workspaceId);
+});
+
+test('reports a compute-queue release that throws and carries on', async () => {
+	const ports = buildPorts({
+		listTerminalIds: () => ['term-a'],
+		releaseComputeJobs: vi.fn(() => {
+			throw new Error('queue gone');
+		}),
+	});
+
+	const report =
+		await createWorkspaceTeardownService(ports).teardown(WORKSPACE);
+
+	expect(report.failures).toEqual([
+		"Could not cancel the workspace's compute jobs: queue gone",
+	]);
+	expect(ports.killTerminal).toHaveBeenCalledWith('term-a');
 });
 
 // Revoking a token first would leave a child that refused to stop making control

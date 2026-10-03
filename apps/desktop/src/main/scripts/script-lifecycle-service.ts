@@ -3,6 +3,7 @@ import type {
 	KillTerminalResult,
 	TerminalSessionSnapshot,
 } from '../../shared/ipc/contracts/terminal';
+import type { ComputeJobInitiator } from '../../shared/compute-queue.ts';
 import type { WorkspaceScriptKind } from '../../shared/ipc/contracts/workspace-scripts';
 import {
 	formatRunScriptLabel,
@@ -30,6 +31,12 @@ const ARCHIVE_EXIT_WAIT_TIMEOUT_MS = 60_000;
 
 /** Inputs for {@link ScriptLifecycleService.runScript}. */
 export interface RunScriptOptions {
+	/**
+	 * Who asked for the launch, which decides how a heavy script meets the
+	 * compute queue: an `agent` or `auto` launch waits for a slot, a `user`
+	 * launch starts at once and holds one. Defaults to `user`.
+	 */
+	initiator?: ComputeJobInitiator;
 	kind: WorkspaceScriptKind;
 	/** Stop the active session of this kind before starting a new one. */
 	restart?: boolean;
@@ -39,6 +46,10 @@ export interface RunScriptOptions {
 	 * falling back, so a stale selection never runs the wrong command.
 	 */
 	scriptName?: string | null;
+	/** Root of the requesting agent's delegation tree, for queue attribution. */
+	rootSessionId?: string | null;
+	/** Requesting agent session, so the queue can cancel the launch when it ends. */
+	sessionId?: string | null;
 	workspaceId: string;
 }
 
