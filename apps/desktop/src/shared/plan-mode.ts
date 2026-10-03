@@ -34,7 +34,7 @@ export {
 	planModeFollowUpDenial,
 } from './plan-mode/control-ops.ts';
 export type { LexedCommand } from './plan-mode/shell-lexer.ts';
-export { lexCommand } from './plan-mode/shell-lexer.ts';
+export { lexCommand, lexCommandSegments } from './plan-mode/shell-lexer.ts';
 export type {
 	PlanModeToolRequest,
 	PlanModeToolVerdict,

@@ -7,6 +7,7 @@ import {
 	type SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 
+import type { ComputeQueueSettings } from '../../shared/config.ts';
 import {
 	DEFAULT_PERMISSION_MODE,
 	type PermissionMode,
@@ -29,6 +30,7 @@ import type {
 import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 import { readCredentialEnvVars } from './api-retry-failure.ts';
 import { withAfkAutoApproval, withAfkHooks } from './claude-afk-mode.ts';
+import { withComputeQueueHooks } from './claude-compute-queue-guard.ts';
 import { createConciergeSessionGate } from './claude-concierge-guard.ts';
 import { resolveSystemPromptAppend } from './claude-edit-tool-directive.ts';
 import { buildClaudeMcpServers } from './claude-mcp-config.ts';
@@ -123,6 +125,13 @@ export interface CreateClaudeAgentAdapterOptions {
 	 * guards clear only their built-in lists.
 	 */
 	toolTrust?: ClaudeToolTrust;
+	/**
+	 * Reads the live compute-queue settings, so every workspace session refuses a
+	 * heavy `Bash` command and points the model at the queue tool instead. Read
+	 * per tool call; absent, no session is gated. The Concierge is never gated —
+	 * it has no workspace to queue a job in.
+	 */
+	readComputeQueueSettings?: () => ComputeQueueSettings;
 }
 
 /**
@@ -154,6 +163,7 @@ export function createClaudeAgentAdapter(
 	const readPluginDirectories = options.readPluginDirectories ?? (() => []);
 	const resolveConciergeHome = options.resolveConciergeHome ?? (() => null);
 	const toolTrust = options.toolTrust;
+	const readComputeQueueSettings = options.readComputeQueueSettings;
 
 	const openSessions = new Set<AgentAdapterSession>();
 
@@ -173,6 +183,7 @@ export function createClaudeAgentAdapter(
 				onPlanSubmitted,
 				pluginDirectories: readPluginDirectories(),
 				queryFn,
+				readComputeQueueSettings,
 				toolTrust,
 				turnIdFactory,
 			});
@@ -206,6 +217,7 @@ function createClaudeSession({
 	onPlanSubmitted,
 	pluginDirectories,
 	queryFn,
+	readComputeQueueSettings,
 	toolTrust,
 	turnIdFactory,
 }: {
@@ -218,6 +230,7 @@ function createClaudeSession({
 	onPlanSubmitted?: CreateClaudeAgentAdapterOptions['onPlanSubmitted'];
 	pluginDirectories: readonly string[];
 	queryFn: typeof query;
+	readComputeQueueSettings?: () => ComputeQueueSettings;
 	toolTrust?: ClaudeToolTrust;
 	turnIdFactory: () => string;
 }): AgentAdapterSession {
@@ -557,6 +570,7 @@ function createClaudeSession({
 					stderr = `${stderr}${chunk}`.slice(-STDERR_RING_BYTES);
 				},
 				pluginDirectories,
+				readComputeQueueSettings,
 				toolTrust,
 			}),
 			prompt: promptQueue.stream,
@@ -805,6 +819,7 @@ function buildQueryOptions({
 	isUnattended,
 	onStderr,
 	pluginDirectories,
+	readComputeQueueSettings,
 	toolTrust,
 }: {
 	canUseTool?: ClaudeCanUseTool;
@@ -818,6 +833,8 @@ function buildQueryOptions({
 	isUnattended: () => boolean;
 	onStderr: (chunk: string) => void;
 	pluginDirectories: readonly string[];
+	/** Reads the live compute-queue settings, for the hook that refuses heavy commands. */
+	readComputeQueueSettings?: () => ComputeQueueSettings;
 	/** The user's read-only tool list, for the Concierge gate and the Plan Mode hook. */
 	toolTrust?: ClaudeToolTrust;
 }): Options {
@@ -846,6 +863,16 @@ function buildQueryOptions({
 		permissionMode: permission.permissionMode,
 		systemPromptAppend: request.systemPromptAppend,
 	});
+	const planGuardedHooks = withPlanModeHooks(
+		concierge?.hooks,
+		isPlanning,
+		() => withholdsControlTools({ mode, planning: isPlanning() }),
+		toolTrust?.trustedTools,
+	);
+	const guardedHooks =
+		concierge || !readComputeQueueSettings
+			? planGuardedHooks
+			: withComputeQueueHooks(planGuardedHooks, readComputeQueueSettings);
 
 	return {
 		...permission,
@@ -860,19 +887,11 @@ function buildQueryOptions({
 			concierge?.canUseTool ??
 			withAfkAutoApproval(buildCanUseTool({ canUseTool, mode }), isUnattended),
 		cwd: metadata.cwd,
-		// The three compose: a session can be planning, unattended and a Concierge
+		// The guards compose: a session can be planning, unattended and a Concierge
 		// at once, and a deny from any of them stands. Only the plan-mode guard
-		// pre-approves, and only over the control tools the other two already wave
+		// pre-approves, and only over the control tools the others already wave
 		// past, so its allow cannot overturn one of their refusals.
-		hooks: withAfkHooks(
-			withPlanModeHooks(
-				concierge?.hooks,
-				isPlanning,
-				() => withholdsControlTools({ mode, planning: isPlanning() }),
-				toolTrust?.trustedTools,
-			),
-			isUnattended,
-		),
+		hooks: withAfkHooks(guardedHooks, isUnattended),
 		env,
 		// Without this the SDK forwards only a subagent's tool_use/tool_result
 		// blocks, so a `Task` card would nest tool rows with none of the prose that

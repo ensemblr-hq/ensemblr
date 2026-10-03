@@ -8,6 +8,13 @@
  * the app per intercepted call, and the Claude hook runs in main. One copy, two
  * callers, no parity test to police a second.
  */
+export { heavyCommandBlockReason } from './compute-queue/block-reason.ts';
+export type { HeavyCommandVerdict } from './compute-queue/heavy-command.ts';
+export {
+	classifyHeavyCommand,
+	classifyHeavyCommandForSettings,
+	DEFAULT_HEAVY_COMMAND_PATTERNS,
+} from './compute-queue/heavy-command.ts';
 export type {
 	ComputeJobInitiator,
 	ComputeJobKind,
