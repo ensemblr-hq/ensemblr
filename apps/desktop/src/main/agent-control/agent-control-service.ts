@@ -14,12 +14,14 @@ import type {
 	AgentControlErrorCode,
 	AgentControlModelInfo,
 	AgentControlOp,
+	AgentControlQueuedTerminal,
 	AgentControlResult,
 	AgentControlRole,
 	AgentControlStartedTerminal,
 	AgentControlTerminalInfo,
 	ArchitectureFailureReason,
 	AskUserQuestionArgs,
+	CancelJobArgs,
 	CheckPlanModeToolArgs,
 	CloseTabArgs,
 	ConciergeMessageSender,
@@ -60,6 +62,7 @@ import type {
 	RecallMemoryArgs,
 	ReportToolInventoryArgs,
 	ResolveDiffCommentsArgs,
+	RunQueuedArgs,
 	SendFollowUpArgs,
 	SetBranchNameArgs,
 	SetNameArgs,
@@ -79,6 +82,7 @@ import type {
 	WaitedAgent,
 	WaitForAgentsArgs,
 	WaitForAgentsResult,
+	WaitForJobArgs,
 	WaitMode,
 	WaitReportDetail,
 	WriteTerminalArgs,
@@ -134,6 +138,7 @@ import {
 	withDispatchDeadline,
 } from './dispatch-deadline.ts';
 import type { Guardrails } from './guardrails.ts';
+import { createJobQueueOps } from './job-queue-ops.ts';
 import type { OriginRegistry } from './origin-registry.ts';
 import {
 	type AgentControlOrigin,
@@ -547,6 +552,9 @@ function confirmationSummary(
 	args: unknown,
 ): string {
 	const head = `Agent requests ${op} in workspace ${origin.workspaceId}.`;
+	if (op === 'runQueued') {
+		return `${head}\n\n${(args as RunQueuedArgs).command}`;
+	}
 	if (op !== 'updateAppSettings') {
 		return head;
 	}
@@ -715,6 +723,23 @@ function describeStartTerminalRefusal(
 	return terminalId
 		? `${message} It is terminal ${terminalId}: read it with ensemblr_read_terminal_output, stop it with ensemblr_stop_terminal, or pass restart: true to replace it.`
 		: message;
+}
+
+/**
+ * Tells an agent whose script start was queued what happens next. Nothing is
+ * running yet, so a `read_terminal_output` now would find nothing, and the job
+ * id is the only handle on the script until it launches.
+ * @param kind - Which script was started.
+ * @param queued - The compute-queue job it is waiting in.
+ * @returns The note returned beside the job.
+ */
+function queuedScriptNote(
+	kind: StartTerminalArgs['kind'],
+	queued: AgentControlQueuedTerminal['queued'],
+): string {
+	const place =
+		queued.position === null ? '' : ` at position ${queued.position}`;
+	return `The ${kind} script is compute-heavy, so it is waiting in the compute queue${place} rather than starting now. It launches in its dock terminal on its own once a slot frees — do not start it again. ensemblr_wait_for_job with jobIds ["${queued.jobId}"] waits until the script exits; ensemblr_cancel_job drops it.`;
 }
 
 /**
@@ -935,6 +960,8 @@ export function createAgentControlService({
 	scheduler = REAL_SCHEDULER,
 	dispatchTimeoutMs = DISPATCH_TIMEOUT_MS,
 }: AgentControlServiceOptions): AgentControlService {
+	const jobQueue = createJobQueueOps({ guardrails, port: ports.jobQueue });
+
 	/** Latest pending signal per child session id, scoped to its immediate parent. */
 	const signalsByChild = new Map<
 		string,
@@ -2704,6 +2731,8 @@ export function createAgentControlService({
 				kind: args.kind,
 				...(args.scriptName ? { scriptName: args.scriptName } : {}),
 				...(args.restart ? { restart: true } : {}),
+				rootSessionId,
+				sessionId: origin.sessionId,
 			});
 		} catch (error) {
 			reservation.refund();
@@ -2715,6 +2744,13 @@ export function createAgentControlService({
 				startTerminalErrorCode(started.code),
 				describeStartTerminalRefusal(started.message, started.terminalId),
 			);
+		}
+		if ('queued' in started) {
+			reservation.settle();
+			return ok({
+				note: queuedScriptNote(args.kind, started.queued),
+				queued: started.queued,
+			} satisfies AgentControlQueuedTerminal);
 		}
 		// Recording and settling are one step: from here the terminal is in the
 		// listing that `countOpenTerminals` reads, so a hold held any longer would
@@ -2853,11 +2889,42 @@ export function createAgentControlService({
 		if (scoped) {
 			return scoped;
 		}
+		const refusal = await refuseHeavyTerminalInput(origin, args);
+		if (refusal) {
+			return fail('denied-scope', refusal);
+		}
 		await ports.terminals.writeTerminal({
 			terminalId: args.terminalId,
 			input: args.input,
 		});
 		return ok({ ok: true });
+	};
+
+	/**
+	 * Gates a write into a shell terminal on the compute queue: a heavy command
+	 * typed at a prompt loads the machine exactly as one run in the agent's own
+	 * shell does. Input typed into a harness terminal is not classified: it is a
+	 * prompt to another agent rather than a shell line, and a harness's own shell
+	 * is not gated (ADR 0082).
+	 * @param origin - Resolved caller identity.
+	 * @param args - The terminal and the input being written.
+	 * @returns The refusal, or null when the write may go through.
+	 */
+	const refuseHeavyTerminalInput = async (
+		origin: AgentControlOrigin,
+		args: WriteTerminalArgs,
+	): Promise<string | null> => {
+		const terminals = await ports.terminals.listTerminals({
+			workspaceId: origin.workspaceId,
+		});
+		const harness = terminals.some(
+			(terminal) =>
+				terminal.terminalId === args.terminalId &&
+				terminal.kind === HARNESS_TERMINAL_KIND,
+		);
+		return harness
+			? null
+			: jobQueue.admitTerminalInput(origin, args.terminalId, args.input);
 	};
 
 	const handleOpenTab = async (
@@ -3531,7 +3598,27 @@ export function createAgentControlService({
 		if (verdict.blocked && runtime && !trustedTools?.has(args.tool)) {
 			ports.toolTrust?.recordRefusal(runtime, args.tool);
 		}
-		return ok(verdict);
+		return ok(verdict.blocked ? verdict : classifyComputeTool(origin, args));
+	};
+
+	/**
+	 * Sends a heavy `bash` command to the compute queue. Asked only once the
+	 * Concierge and Plan Mode policies have passed the call, so neither of their
+	 * verdicts is ever shadowed — and a refusal here is not one the user can
+	 * vouch a tool past, so it is not recorded against the tool.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The tool name, and for `bash` its command.
+	 * @returns Whether the call is blocked, with the reason when it is.
+	 */
+	const classifyComputeTool = (
+		origin: AgentControlOrigin,
+		args: CheckPlanModeToolArgs,
+	): { blocked: boolean; reason?: string } => {
+		if (origin.concierge || args.tool !== 'bash' || !args.command) {
+			return { blocked: false };
+		}
+		const reason = jobQueue.shellCommandRefusal(origin, args.command);
+		return reason ? { blocked: true, reason } : { blocked: false };
 	};
 
 	/**
@@ -3973,6 +4060,12 @@ export function createAgentControlService({
 			handleStopTerminal(origin, args as StopTerminalArgs),
 		waitForAgents: ({ args, origin, signal }) =>
 			handleWaitForAgents(origin, args as WaitForAgentsArgs, signal),
+		runQueued: ({ args, origin, signal }) =>
+			jobQueue.runQueued(origin, args as RunQueuedArgs, signal),
+		waitForJob: ({ args, origin, signal }) =>
+			jobQueue.waitForJob(origin, args as WaitForJobArgs, signal),
+		cancelJob: ({ args, origin }) =>
+			jobQueue.cancelJob(origin, args as CancelJobArgs),
 		writeTerminal: ({ args, origin }) =>
 			handleWriteTerminal(origin, args as WriteTerminalArgs),
 	};
@@ -4111,6 +4204,7 @@ export function createAgentControlService({
 		ports.ask.releaseSession(sessionId);
 		ports.planMode.releaseSession(sessionId);
 		ports.afkMode.releaseSession(sessionId);
+		jobQueue.releaseSession(sessionId);
 		for (const [childSessionId, pending] of signalsByChild) {
 			if (pending.parentSessionId === sessionId) {
 				signalsByChild.delete(childSessionId);

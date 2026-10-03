@@ -4,6 +4,7 @@ import {
 	activeChatContextSchema,
 	addInfisicalAccountRequestSchema,
 	answerTerminalSecretPromptRequestSchema,
+	cancelComputeJobRequestSchema,
 	getWorkspaceFileDiffRequestSchema,
 	getWorkspaceGitStatusRequestSchema,
 	infisicalLinkScopeRequestSchema,
@@ -478,4 +479,12 @@ test.each([
 			terminalId: 'setup-1',
 		}).success,
 	).toBe(false);
+});
+
+test('cancelComputeJobRequestSchema requires a non-empty job id', () => {
+	expect(cancelComputeJobRequestSchema.parse({ jobId: 'job-1' })).toEqual({
+		jobId: 'job-1',
+	});
+	expect(() => cancelComputeJobRequestSchema.parse({ jobId: '' })).toThrow();
+	expect(() => cancelComputeJobRequestSchema.parse({})).toThrow();
 });

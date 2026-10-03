@@ -17,6 +17,7 @@ import {
 	type AgentControlOp,
 	ASK_USER_QUESTION_LIMITS,
 	ASK_USER_QUESTION_RESERVED_LABELS,
+	COMPUTE_QUEUE_OP_LIMITS,
 	DIFF_COMMENT_LIMITS,
 	EXIT_PLAN_MODE_LIMITS,
 	FOCUS_PANEL_NAMES,
@@ -478,6 +479,27 @@ const waitForAgentsSchema = z.strictObject({
 	timeoutMs: z.number().int().positive().optional(),
 });
 
+const runQueuedSchema = z.strictObject({
+	command: nonEmpty.max(COMPUTE_QUEUE_OP_LIMITS.maxCommandLength),
+	cwd: workspaceRelativePath.optional(),
+	label: nonEmpty.max(COMPUTE_QUEUE_OP_LIMITS.maxLabelLength).optional(),
+	wait: z.boolean().optional(),
+	timeoutMs: z.number().int().positive().optional(),
+});
+
+const waitForJobSchema = z.strictObject({
+	jobIds: z
+		.array(nonEmpty)
+		.min(1)
+		.max(COMPUTE_QUEUE_OP_LIMITS.maxWaitJobIds)
+		.optional(),
+	timeoutMs: z.number().int().positive().optional(),
+});
+
+const cancelJobSchema = z.strictObject({
+	jobId: nonEmpty,
+});
+
 const notifyOrchestratorSchema = z.strictObject({
 	reason: z.enum(['need_decision', 'blocked', 'progress', 'done']),
 	message: nonEmpty,
@@ -630,6 +652,9 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	listModels: emptySchema,
 	listRunScripts: emptySchema,
 	waitForAgents: waitForAgentsSchema,
+	runQueued: runQueuedSchema,
+	waitForJob: waitForJobSchema,
+	cancelJob: cancelJobSchema,
 	notifyOrchestrator: notifyOrchestratorSchema,
 	messageConcierge: messageConciergeSchema,
 	askUserQuestion: askUserQuestionSchema,

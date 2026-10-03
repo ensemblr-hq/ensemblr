@@ -71,6 +71,9 @@ export const AGENT_CONTROL_OPS = [
 	'listModels',
 	'listRunScripts',
 	'waitForAgents',
+	'runQueued',
+	'waitForJob',
+	'cancelJob',
 	'notifyOrchestrator',
 	'messageConcierge',
 	'askUserQuestion',
@@ -186,6 +189,8 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'linearUpdateIssue',
 	'updateAppSettings',
 	'messageConcierge',
+	'runQueued',
+	'cancelJob',
 ]);
 
 /**
@@ -779,6 +784,86 @@ export interface WaitForAgentsResult {
 	pending: readonly PendingAgent[];
 	timedOut: boolean;
 	note?: string;
+}
+
+/** Bounds on the compute-queue ops' arguments, shared by both bridges and the schema. */
+export const COMPUTE_QUEUE_OP_LIMITS = {
+	maxCommandLength: 8_000,
+	maxLabelLength: 120,
+	maxWaitJobIds: 20,
+} as const;
+
+/**
+ * Args for `runQueued`: run a compute-heavy shell command through the app-wide
+ * queue. `wait` defaults to true; `timeoutMs` is clamped to the app's wait
+ * timeout, and a wait that outlives it leaves the job queued or running.
+ */
+export interface RunQueuedArgs {
+	command: string;
+	/** Directory relative to the workspace root; defaults to the root. */
+	cwd?: string;
+	label?: string;
+	wait?: boolean;
+	timeoutMs?: number;
+}
+
+/**
+ * Args for `waitForJob`: block until queued jobs finish. `jobIds` defaults to
+ * every unfinished job the calling session owns.
+ */
+export interface WaitForJobArgs {
+	jobIds?: string[];
+	timeoutMs?: number;
+}
+
+/** Args for `cancelJob`: cancel a queued job, or stop a running one. */
+export interface CancelJobArgs {
+	jobId: string;
+}
+
+/**
+ * One compute-queue job as an agent reads it: where it stands, and once it has
+ * finished, how it ended and the end of what it printed.
+ */
+export interface QueuedJobReport {
+	jobId: string;
+	kind: 'command' | 'script';
+	state: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+	label: string;
+	command: string;
+	/** One-based place among queued jobs; null once the job has left the queue. */
+	position: number | null;
+	exitCode: number | null;
+	signal: string | null;
+	durationMs: number | null;
+	waitedMs: number | null;
+	/** The end of the job's combined output, secrets redacted; empty for a script job. */
+	outputTail: string;
+	/** Characters dropped from the front of `outputTail`. */
+	omittedChars: number;
+	/** The full output log, relative to the workspace root; null for a script job. */
+	logPath: string | null;
+}
+
+/** Result of `runQueued`: the job, and whether the wait ran out before it finished. */
+export interface RunQueuedResult {
+	job: QueuedJobReport;
+	timedOut: boolean;
+	note?: string;
+}
+
+/** Result of `waitForJob`: the jobs that finished, the ones still going, and why it returned. */
+export interface WaitForJobResult {
+	settled: readonly QueuedJobReport[];
+	pending: readonly QueuedJobReport[];
+	timedOut: boolean;
+	note?: string;
+}
+
+/** Result of `cancelJob`: whether anything was cancelled, and the job as it now stands. */
+export interface CancelJobResult {
+	cancelled: boolean;
+	job: QueuedJobReport | null;
 }
 
 /**
@@ -1837,6 +1922,20 @@ export interface AgentControlStartedTerminal {
 	 * that shell's syntax rather than in the caller's.
 	 */
 	shell: string;
+}
+
+/**
+ * What `startTerminal` answers with when a compute-heavy script is waiting for
+ * a compute-queue slot: no terminal exists yet, and the script launches in its
+ * dock terminal once the job is granted one.
+ */
+export interface AgentControlQueuedTerminal {
+	queued: {
+		jobId: string;
+		/** One-based place in the queue; null once it has left it. */
+		position: number | null;
+	};
+	note: string;
 }
 
 /** Lightweight workspace descriptor returned by `listWorkspaces`. */

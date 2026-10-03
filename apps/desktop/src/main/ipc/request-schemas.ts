@@ -70,6 +70,7 @@ export {
 	parseGithubRemoteBranchListRequest,
 	parseGithubRepositoryListRequest,
 } from './request-schemas/clone.ts';
+export { cancelComputeJobRequestSchema } from './request-schemas/compute-queue.ts';
 export {
 	clearConciergeContextRequestSchema,
 	listConciergeEventsRequestSchema,

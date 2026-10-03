@@ -5,6 +5,7 @@ import {
 	controlAck,
 } from './ensemblr-control-presenter-helpers';
 import { canonicalEnsemblrToolName } from './ensemblr-control-tool-registry';
+import { ENSEMBLR_JOB_TOOL_PRESENTERS } from './ensemblr-job-tool-presenters';
 import { ENSEMBLR_LINEAR_TOOL_PRESENTERS } from './ensemblr-linear-tool-presenters';
 import { ENSEMBLR_SESSION_TOOL_PRESENTERS } from './ensemblr-session-tool-presenters';
 import { ENSEMBLR_WORKSPACE_TOOL_PRESENTERS } from './ensemblr-workspace-tool-presenters';
@@ -35,6 +36,7 @@ const CONTROL_ROW_PRESENTERS: Record<
 	...ENSEMBLR_SESSION_TOOL_PRESENTERS,
 	...ENSEMBLR_WORKSPACE_TOOL_PRESENTERS,
 	...ENSEMBLR_LINEAR_TOOL_PRESENTERS,
+	...ENSEMBLR_JOB_TOOL_PRESENTERS,
 };
 
 /**

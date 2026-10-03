@@ -15,8 +15,9 @@ records the resolved versions. Re-check both before asserting an exact version.
 | --- | --- |
 | Target | macOS Ventura+ on arm64 **and** x64 (`.dmg`/`.zip` each), and Linux x64 (`.AppImage`); Linux arm64 is planned for the release after the one that adds macOS x64 |
 | Shell | Electron 44 (Node 24 runtime), Electron Forge 7 |
-| Node | **exactly 24.x** (`.nvmrc`, `mise.toml`, `engines: >=24 <25`) |
-| Package manager | Bun 1.4.2 (`packageManager`, `mise.toml` `bun = "1.4"`); Node stays the runtime |
+| Node | **exactly 24.x** (`engines: >=24 <25`); the dev shell supplies `nodejs_24` from nixpkgs |
+| Package manager | Bun 1.4.2 (`packageManager`; the dev shell supplies nixpkgs' `bun`); Node stays the runtime |
+| Dev environment | `nix develop`, from the flake's `devShells.default` (`apps/desktop/nix/dev-shell.nix`) |
 
 **Four targets, one build per architecture — not a universal binary.** darwin-arm64
 and darwin-x64 (the latter cross-built on `macos-15`), linux-x64, and linux-arm64
@@ -42,25 +43,18 @@ workspace file watcher (`linux-recursive-watch.ts`), the window chrome
 when its containing directory is writable; other Linux builds check and link
 instead — ADR 0065).
 
-**`node-pty` is the only thing that compiles, and the Linux preflight builds it
-rather than complaining about it.** It publishes prebuilds for darwin and win32
-only, so every Linux host compiles it — and Bun never does it at install time,
-because `node-pty` is deliberately not in `trustedDependencies` (it would compile
-against Node's ABI; the binding has to come from Forge's `@electron/rebuild`
-against Electron's). The hosts most likely to run this app
-(SteamOS, Silverblue, NixOS) ship no compiler at all.
-`apps/desktop/scripts/require-linux-toolchain.mjs` runs ahead of `dev`, `package:linux`, and
-`make:linux`; when the binding is missing or stamped for the wrong Electron ABI
-*and* the host cannot compile, it shells out to `apps/desktop/scripts/rebuild-native-linux.sh`
-rather than printing an instruction the contributor would only have to retype.
-Three things keep that from misfiring, and all three are load-bearing: `--report`
-never builds (it is a diagnostic, and it is also how the shell script verifies
-itself, which is what would recurse), `ENSEMBLR_NATIVE_AUTOBUILD` guards the
-re-entry, and `ENSEMBLR_SKIP_NATIVE_AUTOBUILD` is the opt-out for anywhere a
-silent image pull is unwelcome. A host that *has* a compiler is left to Forge,
-and an unportable binding — one linking a Homebrew or Nix prefix — is still
-refused rather than repaired, because that is a misconfigured host rather than a
-missing tool.
+**`node-pty` is the only thing that compiles, and Forge compiles it inside the dev
+shell.** It publishes prebuilds for darwin and win32 only, so every Linux host
+builds it — and Bun never does it at install time, because `node-pty` is
+deliberately not in `trustedDependencies` (it would compile against Node's ABI;
+the binding has to come from Forge's `@electron/rebuild` against Electron's).
+`start` and `package` run that rebuild with the shell's `gcc`, `make`, and
+`python3`, and nothing runs ahead of them to check the host. The binding links
+against Nix's glibc and loads in the nixpkgs Electron the shell points
+`ELECTRON_OVERRIDE_DIST_PATH` at, so a local build works on NixOS and on any other
+Linux alike. It is also not portable: an AppImage built locally from the shell has
+terminals that only work where that glibc exists, so release AppImages come from
+CI, which builds outside Nix.
 
 **`fs.watch(dir, { recursive: true })` is not portable performance.** macOS backs
 it with one FSEvents subscription over the whole tree; Linux has no such
@@ -81,11 +75,11 @@ forbid is a client reading or setting its own position, which is why
 `forbidsWindowPositioning` in `apps/desktop/src/main/app/window-state.ts` skips the `x`/`y`
 restore there.
 
-`apps/desktop/scripts/require-node-version.mjs` gates both `preinstall` and
-`build`/`package`/`make`. Do not route around it: installing under the wrong
-major compiles `macos-alias` (V8-ABI-bound, via `nan`) for that major, so a later
-Node 24 `make` dies on `NODE_MODULE_VERSION` mismatch. Node 24 is also the Active
-LTS line the Electron 44 runtime embeds.
+Nothing gates the Node major any more: the dev shell supplies Node 24, and a
+command run outside it is unsupported rather than refused. Installing under the
+wrong major still compiles `macos-alias` (V8-ABI-bound, via `nan`) for that
+major, so a later Node 24 `make` dies on `NODE_MODULE_VERSION` mismatch. Node 24 is
+also the Active LTS line the Electron 44 runtime embeds.
 
 **`@types/node` stays on `^24`, tracking the runtime rather than the latest
 release.** Electron 44.4.5 embeds Node 24.21.0, so typing against a newer major makes
@@ -144,17 +138,13 @@ the detail for each:
   list replaces Bun's built-in allowlist. `node-pty`, `@swc/core`, and
   `core-js-pure` stay blocked — the same three npm's old `allowScripts: false`
   entries named. Never run `bun pm trust --all`.
-- **Every setup and run script goes through `scripts/with-pinned-node.sh`.**
-  `createToolchainPathResolver` does capture a login shell's `PATH` for the
-  workspace directory (activating mise), and `workspace-environment.ts` injects it
-  into setup scripts, run scripts, and terminals — but mise's Node 24 being *on*
-  that `PATH` is not it being *first*. A startup file that prepends Homebrew
-  after `mise activate` (`brew shellenv` below it, the common order) leaves
-  Homebrew's Node 26 in front, and mise's hook re-applies only on a detected
-  change. The Bun migration deleted the wrapper as redundant and every
-  workspace's `bun ci` then died on the preinstall guard; do not delete it again
-  until the capture itself puts the pinned toolchain first. The resolver still
-  runs only when the environment has **no `PATH` key at all** — setting `PATH` in
+- **Every setup and run script goes through `nix develop -c`.** The dev shell
+  puts the pinned Node first on `PATH` itself, so a host startup file that
+  prepends Homebrew or another Node cannot outrank it. Ensemblr's own
+  login-shell `PATH` resolver (`createToolchainPathResolver`, injected by
+  `workspace-environment.ts`) is an app feature for users' repositories and is no
+  longer part of this repository's toolchain; it still runs only when the
+  environment has **no `PATH` key at all**, so setting `PATH` in
   `[environment_variables]`, even to an empty string, silently disables it.
 
 **`extract-zip` is aliased in `overrides` to
@@ -168,6 +158,43 @@ is the same swap Electron made upstream in
 Forge 8; it is a napi-rs module carrying prebuilds for every platform in the
 tarball, so nothing compiles at install time. Drop the alias once Forge 8 is
 stable.
+
+## Dev shell
+
+`nix develop` enters the only supported development environment, defined by
+`devShells.default` in `flake.nix` through `apps/desktop/nix/dev-shell.nix` for
+`x86_64-linux`, `aarch64-linux`, and `aarch64-darwin`. Intel Macs get no shell
+because nixpkgs 26.11 dropped `x86_64-darwin`. It needs Nix with
+`nix-command flakes` enabled, and `nix develop -c <cmd>` runs one command in it,
+from the repository root or from `apps/desktop/`.
+
+- **Versions come from the manifests.** `nodejs_<major>` takes its major from the
+  root `engines.node`, and `electron_<major>` from the desktop
+  `devDependencies.electron`; Bun is nixpkgs' build, which matches
+  `packageManager`.
+- **Everywhere:** Node, Bun, `gnumake`, `python3`.
+- **Linux only:** gcc through `mkShell`'s stdenv, `squashfs-tools` for
+  `make:linux`, and `ELECTRON_OVERRIDE_DIST_PATH` pointing at nixpkgs' Electron.
+  That build is a patch behind the `^44` pins (44.3.0 against 44.4.5 at the
+  current `flake.lock`) and is what runs in development; packaging and releases
+  ship the pinned one. Native modules are ABI-bound to the major alone, so the
+  skew is harmless. A `shellHook` unsets `LD_LIBRARY_PATH`, which a NixOS host can
+  export for ALSA and PipeWire's JACK shim built against a newer glibc, and which
+  kills Electron with `GLIBC_2.43 not found`. For the same reason **`flake.lock`
+  must not fall behind the NixOS system's nixpkgs**: Electron loads GPU drivers
+  from `/run/opengl-driver`, built against the system glibc, and an older flake
+  glibc rejects them (`MESA-LOADER … GLIBC_2.43 not found`), so the app renders in
+  software. `nix flake update nixpkgs` fixes it.
+- **macOS:** `mkShellNoCC`, so the compiler and SDK come from the Xcode Command
+  Line Tools. Nix's darwin stdenv exports `SDKROOT` and `DEVELOPER_DIR`, which
+  would send `xcrun` to a toolchain without `codesign` or `notarytool`. The
+  lazily downloaded Electron is used as is.
+- **CI:** the `lint`, `typecheck`, and `test` jobs run in the shell through
+  `.github/actions/nix-dev-shell`. It restores `/nix` from the Actions cache with
+  `nix-community/cache-nix-action`, keyed on the shell's derivation hash, and only
+  shard 1 of each OS's `test` leg saves it. The release and nightly build legs keep
+  `.github/actions/install-dependencies` and stay outside Nix, so the shipped
+  AppImage's `node-pty` is portable and macOS signing has the runner's Xcode.
 
 ## Language and build
 

@@ -92,6 +92,11 @@ const EXPECTED_DENIALS: Record<
 	updateAppSettings: [],
 	updateArchitectureDiagram: ['orchestrator', 'subagent'],
 	waitForAgents: [],
+	// A queued command is an arbitrary shell the read-only rules cannot see
+	// into; waiting on or cancelling one already queued changes nothing.
+	runQueued: ['orchestrator', 'subagent'],
+	waitForJob: [],
+	cancelJob: [],
 	writeTerminal: ['orchestrator', 'subagent'],
 };
 

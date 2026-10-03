@@ -36,3 +36,54 @@ export function fitRows<T>(
 	}
 	return { kept, omitted: rows.length - kept.length, spent };
 }
+
+/**
+ * What one string costs inside a serialized payload: its JSON-escaped length,
+ * without the quotes. Escaping is why the raw length undercounts — a newline is
+ * two characters on the wire, a control byte six.
+ * @param text - The string to measure.
+ * @returns Its serialized length.
+ */
+function serializedCost(text: string): number {
+	return JSON.stringify(text).length - 2;
+}
+
+/**
+ * Keeps the end of a text that fits the budget, dropping a contiguous head.
+ *
+ * The tail-first counterpart to {@link fitRows}, for output where the end is
+ * the half worth keeping: a test run's verdict and a build's failure summary
+ * both land last. A cut never splits a surrogate pair.
+ * @param text - The text to fit.
+ * @param budget - Serialized characters the kept text may occupy.
+ * @returns The kept tail and how many characters were dropped from the front.
+ */
+export function fitTail(
+	text: string,
+	budget: number,
+): { kept: string; omitted: number } {
+	if (serializedCost(text) <= budget) {
+		return { kept: text, omitted: 0 };
+	}
+	let low = 0;
+	let high = text.length;
+	while (low < high) {
+		const middle = Math.floor((low + high) / 2);
+		if (serializedCost(text.slice(middle)) <= budget) {
+			high = middle;
+		} else {
+			low = middle + 1;
+		}
+	}
+	const start = isLowSurrogate(text.charCodeAt(low)) ? low + 1 : low;
+	return { kept: text.slice(start), omitted: start };
+}
+
+/**
+ * Whether a UTF-16 code unit is the second half of a surrogate pair.
+ * @param code - The code unit.
+ * @returns True for a low surrogate.
+ */
+function isLowSurrogate(code: number): boolean {
+	return code >= 0xdc00 && code <= 0xdfff;
+}

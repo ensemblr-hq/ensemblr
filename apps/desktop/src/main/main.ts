@@ -40,6 +40,7 @@ import type {
 import type { AppSettingsChangedBroadcast } from '../shared/ipc/contracts/app-settings';
 import type { ArchitectureSnapshotChangedBroadcast } from '../shared/ipc/contracts/architecture';
 import type { CheckpointsChangedBroadcast } from '../shared/ipc/contracts/checkpoint';
+import type { ComputeQueueChangedBroadcast } from '../shared/ipc/contracts/compute-queue';
 import type { ConfigChangedBroadcast } from '../shared/ipc/contracts/health';
 import type {
 	TerminalLifecycleBroadcast,
@@ -129,6 +130,7 @@ import {
 } from './claude-agent';
 import { installClaudeToolApproval } from './claude-agent/claude-tool-approval-ipc.ts';
 import { createLocalCommandService } from './commands';
+import { createComputeQueueService } from './compute-queue';
 import {
 	createConciergeMemoryService,
 	createConciergeSessionService,
@@ -227,7 +229,10 @@ import {
 	resolveDefaultDatabasePath,
 } from './storage';
 import { getChatTabByAgentSessionId } from './storage/repositories/chat-tab-repository.ts';
-import { getWorkspacePathById } from './storage/repositories/workspace-repository.ts';
+import {
+	getWorkspacePathById,
+	selectActiveWorkspaceNameAndPath,
+} from './storage/repositories/workspace-repository.ts';
 import { createTerminalService } from './terminal';
 import { createAppUpdateService } from './updates';
 import {
@@ -834,6 +839,8 @@ const claudeAgentAdapter = createClaudeAgentAdapter({
 		/** Saves the plan, posts it into the chat, and raises the review panel. */
 		submitPlan: (input) => planSubmission.submit(input),
 	}),
+	/** Reads the compute-queue settings per tool call, so a toggle applies at once. */
+	readComputeQueueSettings: () => appSettingsService.read().computeQueue,
 	readPluginDirectories: () => readAgentSkillBundle().pluginDirectories,
 	resolveBaseEnv: resolveAgentSpawnEnv,
 	toolTrust: {
@@ -1111,6 +1118,9 @@ const workspaceTeardownService = createWorkspaceTeardownService({
 	releaseAgentControl: (sessionId) => {
 		agentControlService?.releaseSession(sessionId);
 	},
+	releaseComputeJobs: (workspaceId) => {
+		computeQueueService.releaseWorkspace(workspaceId);
+	},
 	stopAgentSession: (sessionId) =>
 		agentSessionService.stopSession({
 			reason: WORKSPACE_REMOVED_STOP_REASON,
@@ -1182,6 +1192,57 @@ const broadcastToAllWindows = (channel: string, payload: unknown): void => {
 		}
 	}
 };
+/**
+ * The one app-wide queue every heavy agent command, agent- or app-started
+ * script, and user-clicked heavy script holds a slot in. The terminal service
+ * is constructed further down, so cancelling a running script resolves it at
+ * call time.
+ */
+const computeQueueService = createComputeQueueService({
+	/**
+	 * Assembles a workspace's variables and secrets for one command launch.
+	 * @param workspaceId - Workspace the command runs in.
+	 * @returns The overlay and the literal values its output must not show.
+	 */
+	assembleEnvironment: async (workspaceId) => {
+		const assembly = await workspaceEnvironmentService.assemble({
+			includeSecrets: true,
+			workspaceId,
+		});
+		return { env: assembly.env, redactValues: assembly.redactValues };
+	},
+	/**
+	 * Resolves the login-shell environment a command inherits.
+	 * @returns The inherited environment.
+	 */
+	baseEnvironment: async () => (await localCommandService.getEnvironment()).env,
+	/** Reads the live compute-queue settings, so a change applies to the next grant. */
+	readSettings: () => appSettingsService.read().computeQueue,
+	/**
+	 * Looks up an active workspace's display name and root.
+	 * @param workspaceId - Workspace to look up.
+	 * @returns Its name and path, or null when unknown or SQLite is closed.
+	 */
+	resolveWorkspace: (workspaceId) => {
+		const database = databaseService.getConnection()?.database;
+		return database
+			? selectActiveWorkspaceNameAndPath({ database, workspaceId })
+			: null;
+	},
+	/**
+	 * Stops the dock terminal of a cancelled script job; throws for a terminal
+	 * the service no longer knows, which the queue logs and tolerates.
+	 * @param terminalId - Terminal to stop.
+	 */
+	stopScriptTerminal: (terminalId) => {
+		terminalService.kill(terminalId);
+	},
+});
+computeQueueService.onChange((snapshot) => {
+	broadcastToAllWindows(IPC_CHANNELS.computeQueueChanged, {
+		snapshot,
+	} satisfies ComputeQueueChangedBroadcast);
+});
 /**
  * Hands back the open SQLite connection, throwing when there is none. The
  * services below take it as a resolver rather than a handle so a root change
@@ -1370,7 +1431,9 @@ const terminalService = createTerminalService({
 	workspaceEnvironmentService,
 });
 const scriptLifecycleService = createScriptLifecycleService({
+	computeQueue: computeQueueService,
 	databaseService,
+	readComputeQueueSettings: () => appSettingsService.read().computeQueue,
 	settingsResolutionService,
 	terminalService,
 });
@@ -1627,6 +1690,7 @@ agentControlService = createAgentControlService({
 	ports: createAgentControlPorts({
 		architectureService,
 		augmentHarnessCommand,
+		computeQueueService,
 		conciergePorts,
 		boardStatusStore,
 		toolTrust: toolTrustService,
@@ -1973,6 +2037,7 @@ app.whenReady().then(() => {
 			settings,
 		} satisfies AppSettingsChangedBroadcast);
 		agentActivityMonitor.refresh();
+		computeQueueService.refresh();
 		updateService.settingsChanged();
 		refreshWindowBackgrounds();
 		rebuildMenu();
@@ -2019,6 +2084,7 @@ app.whenReady().then(() => {
 		architectureService,
 		archiveWorkspaceService: archiveWorkspaceServiceWithScript,
 		augmentHarnessCommand,
+		computeQueueService,
 		conciergeSessionService,
 		resolveConciergeHome: resolveConciergeHomePaths,
 		configService,
@@ -2157,7 +2223,11 @@ function beginAgentShutdown(exit: QuitExit): void {
 	claudeToolApproval.shutdown();
 	void (async () => {
 		await Promise.race([
-			Promise.allSettled([agentClient.shutdown(), terminalService.shutdown()]),
+			Promise.allSettled([
+				agentClient.shutdown(),
+				terminalService.shutdown(),
+				computeQueueService.shutdown(),
+			]),
 			new Promise((resolve) => setTimeout(resolve, 3000)),
 		]);
 		await Promise.race([
@@ -2213,6 +2283,7 @@ app.on('will-quit', () => {
 	// half (flush, detach, SIGHUP) still runs before this returns, and a shutdown
 	// already in flight is reused rather than restarted.
 	void terminalService.shutdown();
+	void computeQueueService.shutdown();
 	ipcHandlersHandle?.dispose();
 	workspaceFilesWatcher.stopAll();
 	databaseService.close();

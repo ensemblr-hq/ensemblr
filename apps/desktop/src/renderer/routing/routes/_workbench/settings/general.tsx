@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
+import { ComputeQueueRows } from '@/renderer/components/settings/compute-queue-rows';
 import { RootDirectoryRow } from '@/renderer/components/settings/root-directory-row';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
@@ -264,6 +265,7 @@ function GeneralSettings() {
 				onReset={() => setToolCalls(DEFAULTS.toolCallCollapse)}
 			/>
 
+			<ComputeQueueRows />
 			<RootDirectoryRow />
 			<SoftwareUpdateRows />
 		</SettingsSection>

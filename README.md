@@ -29,15 +29,17 @@ source.
 | [`apps/website/`](./apps/website) | The marketing and documentation site. Not started yet. |
 | [`packages/shared/`](./packages/shared) | Code the apps share, such as UI pieces lifted out of the desktop app. Not started yet. |
 
-The root holds only what every workspace shares: the Bun workspace manifest and lockfile, the toolchain pins,
+The root holds only what every workspace shares: the Bun workspace manifest and lockfile, the Nix flake and its dev shell,
 the house Biome config, CI, agent tooling, the Nix flake entrypoint, and the community files.
 
 ## Development
 
-Node **24.x** and [Bun](https://bun.sh) 1.4 — `mise install` sets up both. Bun installs packages and runs
-scripts; Node stays the runtime.
+Development happens inside the flake's dev shell, which provides Node **24.x**, [Bun](https://bun.sh) 1.4, and the
+native-module toolchain. It needs [Nix](https://nixos.org/download/) with flakes enabled and runs on Linux (x86-64 and
+arm64) and Apple-silicon Macs. Bun installs packages and runs scripts; Node stays the runtime.
 
 ```bash
+nix develop          # enter the dev shell (or prefix any command with `nix develop -c`)
 bun install          # every workspace, from one lockfile
 bun run check        # lockfile check, Biome, then every workspace's own checks
 bun run typecheck    # every workspace's type check

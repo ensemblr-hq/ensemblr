@@ -1495,12 +1495,13 @@ describe('Concierge role policy', () => {
 		}
 	});
 
-	// Both are settable app preferences that the control schema refuses, so the
+	// Each is a settable app preference that the control schema refuses, so the
 	// playbook has to place them among the controls the Concierge explains rather
 	// than among the ones it applies. `dictation.baseUrl` is where the user's
-	// stored transcription key is posted with every clip, and `automaticUpdates`
-	// decides whether a patched release installs.
-	it('places the two refused preferences among the awareness-only controls', () => {
+	// stored transcription key is posted with every clip, `automaticUpdates`
+	// decides whether a patched release installs, and `computeQueue` is the gate
+	// on agents' own heavy commands.
+	it('places the refused preferences among the awareness-only controls', () => {
 		for (const features of FEATURE_CORNERS) {
 			const guidance = conciergeAwareness(features);
 			const editable = guidance.slice(
@@ -1510,6 +1511,12 @@ describe('Concierge role policy', () => {
 			expect(editable).not.toContain('`dictation`');
 			expect(editable).not.toContain('`baseUrl`');
 			expect(editable).not.toContain('`automaticUpdates`');
+			expect(editable).not.toContain('`computeQueue`');
+			expect(
+				appSettingsControlPatchSchema.safeParse({
+					computeQueue: { enabled: false },
+				}).success,
+			).toBe(false);
 			expect(
 				appSettingsControlPatchSchema.safeParse({
 					dictation: { baseUrl: 'http://elsewhere.example/v1' },

@@ -6,7 +6,7 @@ overview; this is the runbook.
 The repository is a Bun workspaces monorepo, and Ensemblr — the desktop app — is
 the `apps/desktop` workspace. Install from the repository root; run everything
 else from `apps/desktop/`. Paths below are relative to `apps/desktop/` unless
-they name a repository-root file (`bun.lock`, `.nvmrc`, `mise.toml`,
+they name a repository-root file (`bun.lock`, `flake.nix`,
 `AGENTS.md`, `.claude/rules/`).
 
 ## 1. Prerequisites
@@ -18,16 +18,16 @@ is declared per platform rather than branched inline — the secret store, the
 "Open in…" registry, the battery reader, the window chrome, and updates — so
 developing on either is the same loop.
 
-Linux has one extra setup step, because `node-pty` publishes no Linux
-prebuild and has to be compiled: see
+Linux has no extra setup step. `node-pty` publishes no Linux prebuild, so Forge
+compiles it, and the dev shell supplies the compiler it needs: see
 [*Developing on Linux*](./build-and-release.md#developing-on-linux), which also
-covers hosts with no compiler at all. `bun run diagnose:linux` reports where you
-stand.
+covers hosts with no compiler at all and NixOS.
 
 | Requirement | Why | Check |
 | --- | --- | --- |
-| **Node 24.x** (exactly) | Native modules compile against the running major | `node -v` |
-| **Bun 1.4** | The enforced package manager and script runner — Node stays the runtime | `bun --version` |
+| **Nix**, with flakes enabled | Supplies the whole toolchain through `nix develop`; Intel Macs are unsupported | `nix --version` |
+| **Node 24.x** (exactly), from the dev shell | Native modules compile against the running major | `nix develop -c node -v` |
+| **Bun 1.4**, from the dev shell | The enforced package manager and script runner — Node stays the runtime | `nix develop -c bun --version` |
 | **git** | Worktrees back every workspace | `git --version` |
 | **Pi CLI** | Agent runtime, spawned in RPC mode | `pi --version` |
 | **Claude Code CLI** | The other agent runtime, driven through `@anthropic-ai/claude-agent-sdk` against *your* binary — Ensemblr ships none | `claude --version` |
@@ -48,41 +48,42 @@ check's `blocking` flag, and the onboarding wizard
 whole group under an `any` gate in `src/renderer/lib/onboarding/gates.ts`, so the
 wizard cannot call a machine ready that diagnostics still blocks.
 
-### The Node 24 pin is load-bearing
+### Everything runs inside the dev shell
 
-The root `.nvmrc` and `mise.toml`, and `package.json#engines`, all pin Node 24, and
-`scripts/require-node-version.mjs` enforces it at three gates (`preinstall`, `dev`,
-and `build`/`package`/`make`). Bun does not stand in for Node: `node` in a
-`bun run` script and in a lifecycle script is still the real Node on PATH. Ignoring it fails in ways that do not look like a Node
-problem:
+The flake's dev shell (`nix/dev-shell.nix`, exposed as `devShells.default` in the
+root `flake.nix`) is the only supported development environment. It supplies
+Node 24 (its major read from `package.json#engines`), Bun 1.4, `make`, and
+`python3`, and on Linux also gcc, `mksquashfs`, and the Electron that
+`bun run dev` launches. Enter it with `nix develop`, or run one command as
+`nix develop -c <command>`; it works from `apps/desktop/` too, because Nix
+searches upward for `flake.nix`.
+
+Nothing checks the Node version or the host's toolchain any more, and Bun does
+not stand in for Node: `node` in a `bun run` script and in a lifecycle script is
+still the real Node on PATH. Running outside the shell is unsupported, and it
+fails in ways that do not look like a Node problem:
 
 - On Node 26, `electron-forge package` **exits 0 and produces no artifacts**.
 - Installing under the wrong major compiles `macos-alias` / `fs-xattr` for that
   major, so a later Node 24 `make` dies on a `NODE_MODULE_VERSION` mismatch —
   long after the mistake.
 
-`mise` users get the pin — Node 24 and Bun 1.4 — with `mise install`, since
-`mise.toml` declares both. Otherwise `nvm use` reads `.nvmrc`, and Bun installs
-from <https://bun.sh> (`curl -fsSL https://bun.sh/install | bash`).
-
 Inside Ensemblr the setup and run scripts need no action: they go through
-`scripts/with-pinned-node.sh`, which puts Node 24 first on `PATH` even when your
-shell startup leaves Homebrew's Node in front of mise's — see
-[Why the Node wrapper stays](./build-and-release.md#why-the-node-wrapper-stays).
-In a terminal, check `command -v node`; if it is Homebrew's while mise is active,
-move `brew shellenv` above `mise activate` in your shell startup file. Never set
-`PATH` in `[environment_variables]` in `.ensemblr/settings.toml`.
+`nix develop -c`. Never set `PATH` in `[environment_variables]` in
+`.ensemblr/settings.toml`. See
+[The dev shell](./build-and-release.md#the-dev-shell) for what the shell
+provides and why CI's release legs stay outside it.
 
 ## 2. Install
 
 ```bash
+nix develop        # enter the dev shell, once per terminal
 bun install        # from the repository root (or from apps/desktop — Bun installs the whole monorepo)
 cd apps/desktop
 ```
 
-Three things happen that are worth knowing about:
+Two things happen that are worth knowing about:
 
-- **`preinstall`** runs the Node-version gate above.
 - **`postinstall`** (run on every install, through the root manifest's own)
   runs `scripts/link-hoisted-packages.mjs`, which links
   Electron and the packages the packaged app keeps from the root

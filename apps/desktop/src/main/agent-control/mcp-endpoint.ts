@@ -34,6 +34,7 @@ import {
 	ARCHITECTURE_DIAGRAM_LIMITS,
 	ASK_USER_QUESTION_LIMITS,
 	awarenessForAudience,
+	COMPUTE_QUEUE_OP_LIMITS,
 	CONCIERGE_MESSAGE_LIMITS,
 	CONCIERGE_MESSAGE_REASONS,
 	CONTEXT_PRESSURE_PERCENT,
@@ -283,7 +284,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_start_terminal',
 		op: 'startTerminal',
 		description:
-			"Start a dock terminal: the setup script, a run script, or an interactive spawn terminal. Answers with the terminalId and the `shell` that terminal runs, which is the user's own login shell for kind=spawn and may not be POSIX — compose anything you then write into it in that shell's syntax. What you start is brought forward in the dock for the user, so you never need to follow this with ensemblr_focus_dock_tab. With kind=spawn, call ensemblr_list_terminals FIRST and reuse an existing idle terminal (kind `terminal`, status `running`, foregroundCommand null) instead of starting another: the tab you open stays in the user's dock until they close it themselves. A repository can configure several named run scripts (a dev server, a playground, an unsigned build), so with kind=run call ensemblr_list_run_scripts FIRST and pass the scriptName you actually want — omitting it silently starts whichever one the repository marks default, which is rarely the one you meant. Only one script of a kind runs per workspace at a time: a second start is refused with `conflict`, and that refusal names the terminal already holding the slot so you can read or stop it without listing anything. Pass restart: true to replace it instead.",
+			"Start a dock terminal: the setup script, a run script, or an interactive spawn terminal. Answers with the terminalId and the `shell` that terminal runs, which is the user's own login shell for kind=spawn and may not be POSIX — compose anything you then write into it in that shell's syntax. What you start is brought forward in the dock for the user, so you never need to follow this with ensemblr_focus_dock_tab. With kind=spawn, call ensemblr_list_terminals FIRST and reuse an existing idle terminal (kind `terminal`, status `running`, foregroundCommand null) instead of starting another: the tab you open stays in the user's dock until they close it themselves. A repository can configure several named run scripts (a dev server, a playground, an unsigned build), so with kind=run call ensemblr_list_run_scripts FIRST and pass the scriptName you actually want — omitting it silently starts whichever one the repository marks default, which is rarely the one you meant. Only one script of a kind runs per workspace at a time: a second start is refused with `conflict`, and that refusal names the terminal already holding the slot so you can read or stop it without listing anything. Pass restart: true to replace it instead. A compute-heavy setup or run script (a build, a test suite) does not start at once: the answer carries `queued` — a jobId and its position — instead of a terminalId, the script launches in its dock terminal on its own once a compute-queue slot frees, and ensemblr_wait_for_job on that jobId waits until it exits.",
 		shape: {
 			kind: z.enum(['setup', 'run', 'spawn']),
 			scriptName: z.string().optional(),
@@ -312,7 +313,7 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_write_terminal',
 		op: 'writeTerminal',
 		description:
-			"Write input into an existing terminal. Compose it in that terminal's own shell syntax, which ensemblr_start_terminal and ensemblr_list_terminals both report as `shell` — a login shell may be fish, where `VAR=x cmd` and `export` are errors rather than syntax. Input is typed at the prompt, not executed for you, so end a command with a newline.",
+			"Write input into an existing terminal. Compose it in that terminal's own shell syntax, which ensemblr_start_terminal and ensemblr_list_terminals both report as `shell` — a login shell may be fish, where `VAR=x cmd` and `export` are errors rather than syntax. Input is typed at the prompt, not executed for you, so end a command with a newline. A compute-heavy command — a test suite, a build, a typecheck — is refused here, even typed across several writes: run it with ensemblr_run_queued instead.",
 		shape: { terminalId: z.string(), input: z.string() },
 	},
 	{
@@ -625,6 +626,39 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 			timeoutMs: z.number().optional(),
 			reports: z.enum(['full', 'brief']).optional(),
 		},
+	},
+	{
+		name: 'ensemblr_run_queued',
+		op: 'runQueued',
+		description:
+			"Run a compute-heavy shell command — a test suite, a build, a typecheck, a compile, a nix build — through Ensemblr's compute queue, which every agent in every workspace shares so the user's machine stays usable. Ensemblr refuses these commands in your own shell, in an Ensemblr terminal, and as a script, so this is the one place they run. The job waits for a free slot, then runs in this workspace (`cwd` is a directory relative to its root) with the full Ensemblr environment — environment variables and Infisical secrets included. The result carries its exit code, how long it waited and ran, the end of its output with secrets redacted, and `logPath`, the whole output under `.context/compute-queue/`. By default the call blocks until the job finishes. That wait is capped: `timedOut: true` is a lap, not a failure — the job keeps its place and keeps running, so call ensemblr_wait_for_job with its jobId. Pass wait=false to queue it now and collect it later. Queue a command once: a duplicate takes a second slot. A delegation tree may hold only a few unfinished jobs at once.",
+		shape: {
+			command: z.string().max(COMPUTE_QUEUE_OP_LIMITS.maxCommandLength),
+			cwd: z.string().optional(),
+			label: z.string().max(COMPUTE_QUEUE_OP_LIMITS.maxLabelLength).optional(),
+			wait: z.boolean().optional(),
+			timeoutMs: z.number().optional(),
+		},
+	},
+	{
+		name: 'ensemblr_wait_for_job',
+		op: 'waitForJob',
+		description:
+			"Block until compute-queue jobs finish, then return each finished one's exit code and output tail in `settled`, and where the rest stand — running, or queued at a position — in `pending`. jobIds defaults to every job this session queued that has not finished. The wait is capped: `timedOut: true` with jobs in `pending` is a lap of the loop, not a fault — they keep their place and keep running, so wait again on the same ids rather than queueing them again. A job from another workspace is `not-found`.",
+		shape: {
+			jobIds: z
+				.array(z.string())
+				.max(COMPUTE_QUEUE_OP_LIMITS.maxWaitJobIds)
+				.optional(),
+			timeoutMs: z.number().optional(),
+		},
+	},
+	{
+		name: 'ensemblr_cancel_job',
+		op: 'cancelJob',
+		description:
+			'Cancel a compute-queue job in this workspace: a queued one leaves the queue, a running one is stopped. Use it for a job you no longer need, so its slot goes to the next one waiting. Answers with whether anything was cancelled and the job as it now stands; cancelling a job that already finished changes nothing.',
+		shape: { jobId: z.string() },
 	},
 	{
 		name: 'ensemblr_message_concierge',

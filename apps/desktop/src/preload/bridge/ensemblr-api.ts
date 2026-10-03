@@ -24,6 +24,7 @@ import type { AppSettingsChangedBroadcast } from '../../shared/ipc/contracts/app
 import type { ArchitectureSnapshotChangedBroadcast } from '../../shared/ipc/contracts/architecture';
 import type { CheckpointsChangedBroadcast } from '../../shared/ipc/contracts/checkpoint';
 import type { CloneGithubRepositoryProgressEvent } from '../../shared/ipc/contracts/clone';
+import type { ComputeQueueChangedBroadcast } from '../../shared/ipc/contracts/compute-queue';
 import type { ConciergeEventBroadcastWire } from '../../shared/ipc/contracts/concierge';
 import type { ConfigChangedBroadcast } from '../../shared/ipc/contracts/health';
 import type {
@@ -71,6 +72,7 @@ type InvokeKey = Exclude<
 	| 'onTerminalOutput'
 	| 'onTextContextMenu'
 	| 'onUpdateStatusChanged'
+	| 'onComputeQueueChanged'
 	| 'onWindowChromeChanged'
 	| 'onWindowMaximizedChanged'
 	| 'onWorkspaceFilesChanged'
@@ -212,6 +214,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 		health: () => invoke('health'),
 		compactDatabase: () => invoke('compactDatabase'),
 		updateStatus: () => invoke('updateStatus'),
+		getComputeQueueSnapshot: () => invoke('getComputeQueueSnapshot'),
+		cancelComputeJob: (request) => invoke('cancelComputeJob', request),
 		checkForUpdates: () => invoke('checkForUpdates'),
 		installUpdate: () => invoke('installUpdate'),
 		infisicalAccounts: () => invoke('infisicalAccounts'),
@@ -282,6 +286,11 @@ export function createEnsemblrApi(): EnsemblrApi {
 			),
 		onConfigChanged: (listener) =>
 			subscribe<ConfigChangedBroadcast>(IPC_CHANNELS.configChanged, listener),
+		onComputeQueueChanged: (listener) =>
+			subscribe<ComputeQueueChangedBroadcast>(
+				IPC_CHANNELS.computeQueueChanged,
+				listener,
+			),
 		onUpdateStatusChanged: (listener) =>
 			subscribe<UpdateStatusChangedBroadcast>(
 				IPC_CHANNELS.updateStatusChanged,

@@ -62,6 +62,77 @@ const PRESERVED_CORPUS: readonly string[] = [
 	'https://github.com/ensemblr-hq/ensemblr.git',
 ];
 
+/** Inputs the original regexes backtracked quadratically (or worse) on. */
+const BACKTRACKING_UNITS: readonly string[] = [
+	'a',
+	'a.',
+	'sk-',
+	'eyJ-',
+	'KEY.',
+	'TOKEN-',
+	'TOKEN.',
+	'AIza-',
+	'x://a:',
+	'9http://u:',
+	'-----BEGIN PRIVATE KEY-----\n',
+];
+
+/** Fragments the equivalence fuzzing assembles text from. */
+const FUZZ_FRAGMENTS: readonly string[] = [
+	'a',
+	'Z',
+	'9',
+	'_',
+	'.',
+	'-',
+	'=',
+	':',
+	' ',
+	'"',
+	"'",
+	',',
+	';',
+	'/',
+	'@',
+	'+',
+	'\n',
+	'x://',
+	'eyJ',
+	'TOKEN',
+	'KEY',
+	'pass',
+	'http',
+	'abcdefghijk',
+	'-----BEGIN PRIVATE KEY-----',
+	'-----END PRIVATE KEY-----',
+];
+
+/**
+ * A deterministic pseudo-random source, so a fuzz failure reproduces.
+ * @param seed - Starting state.
+ * @returns A function giving an integer below its bound.
+ */
+function seededRandom(seed: number): (bound: number) => number {
+	let state = seed;
+	return (bound) => {
+		state = (state * 1_103_515_245 + 12_345) & 0x7fffffff;
+		return state % bound;
+	};
+}
+
+/**
+ * Assembles a short text out of secret-shaped fragments.
+ * @param random - The pseudo-random source.
+ * @returns The text.
+ */
+function randomText(random: (bound: number) => number): string {
+	const length = 1 + random(16);
+	return Array.from(
+		{ length },
+		() => FUZZ_FRAGMENTS[random(FUZZ_FRAGMENTS.length)],
+	).join('');
+}
+
 describe('secret value shapes', () => {
 	it.each(VALUE_SHAPE_CORPUS)('redacts $id: $sample', ({ sample }) => {
 		expect(redactSecretShapes(`prefix ${sample} suffix`)).not.toContain(sample);
@@ -85,6 +156,35 @@ describe('secret value shapes', () => {
 	it.each(PRESERVED_CORPUS)('leaves %s alone', (sample) => {
 		expect(createTextRedactor()(sample)).toBe(sample);
 	});
+
+	it.each(BACKTRACKING_UNITS)(
+		'redacts 200 KB of %j repeated in linear time',
+		(unit) => {
+			const line = unit.repeat(Math.ceil(200_000 / unit.length));
+			const started = performance.now();
+			createTextRedactor(['supersecretvalue123'])(line);
+			expect(performance.now() - started).toBeLessThan(1_000);
+		},
+	);
+
+	it('matches every linear scanner to the regex it replaces', () => {
+		const random = seededRandom(7);
+		const scanned = SECRET_VALUE_PATTERNS.filter((entry) => entry.redact);
+		expect(scanned.map((entry) => entry.id)).toEqual([
+			'pem-private-key',
+			'jwt',
+			'url-userinfo',
+		]);
+		for (let round = 0; round < 20_000; round += 1) {
+			const text = randomText(random);
+			for (const entry of scanned) {
+				expect(
+					entry.redact?.(text),
+					`${entry.id}: ${JSON.stringify(text)}`,
+				).toBe(text.replace(entry.pattern, entry.replacement ?? REDACTED));
+			}
+		}
+	});
 });
 
 describe('secret-named assignments', () => {
@@ -103,6 +203,24 @@ describe('secret-named assignments', () => {
 
 		expect(redacted).toContain(REDACTED);
 		expect(redacted.split(/[=:]/)[0]).toBe(sample.split(/[=:]/)[0]);
+	});
+
+	it('matches the assignment regex it replaces', () => {
+		const reference = new RegExp(
+			`\\b([A-Z0-9_.-]*(?:${ASSIGNMENT_KEY_SOURCES.join('|')})[A-Z0-9_.-]*)(\\s*[=:]\\s*)(["']?)([^\\s"',;]+)`,
+			'gi',
+		);
+		const random = seededRandom(11);
+		for (let round = 0; round < 20_000; round += 1) {
+			const text = randomText(random);
+			expect(redactSecretAssignments(text), JSON.stringify(text)).toBe(
+				text.replace(
+					reference,
+					(_match, key: string, separator: string, quote: string) =>
+						`${key}${separator}${quote}${REDACTED}`,
+				),
+			);
+		}
 	});
 
 	it('matches every redaction key part with an assignment source', () => {

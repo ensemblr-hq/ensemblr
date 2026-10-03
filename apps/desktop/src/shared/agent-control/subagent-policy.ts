@@ -266,6 +266,18 @@ const CONCIERGE_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 		'listRunScripts',
 		'A run script exists to be started, and starting one is a shell in a workspace you may not write to. Read a script terminal that is already up with `ensemblr_read_terminal_output`, or ask the orchestrator working there what it runs.',
 	],
+	[
+		'runQueued',
+		'The compute queue runs a shell command inside a workspace, and you have no workspace of your own to run one in. Brief the orchestrator working there with `ensemblr_start_conversation` to run it and report what it printed.',
+	],
+	[
+		'waitForJob',
+		'Compute-queue jobs belong to the workspace agent that queued them, and you have no workspace of your own to have queued one in. Wait on that agent with `ensemblr_wait_for_agents` instead — its report carries the outcome.',
+	],
+	[
+		'cancelJob',
+		'Compute-queue jobs belong to the workspace agent that queued them, and you have no workspace of your own to cancel one in. Steer that agent with `ensemblr_send_follow_up` if a job should stop.',
+	],
 ]);
 
 /** Every op the Concierge's tool list omits. */

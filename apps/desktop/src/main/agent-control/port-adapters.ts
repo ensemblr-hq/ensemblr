@@ -70,6 +70,7 @@ import type { HarnessDetectionService } from '../agents/index.ts';
 import type { ArchitectureService } from '../architecture/index.ts';
 import { readDiagramUpkeep } from '../architecture/index.ts';
 import type { ChatTabService } from '../chat-tabs/chat-tab-service.ts';
+import type { ComputeQueueService } from '../compute-queue/index.ts';
 import type { AppSettingsService } from '../config';
 import type { LinearService } from '../linear';
 import type { PiExecutableService } from '../pi-runtime';
@@ -97,6 +98,7 @@ import {
 import type { WorkspaceGitService } from '../workspace-git';
 import { makeArchitecturePort } from './architecture-ports.ts';
 import type { BoardStatusStore } from './board-status-store.ts';
+import { createJobQueuePort } from './job-queue-ports.ts';
 import { makeLinearPort } from './linear-ports.ts';
 import {
 	type AfkModePort,
@@ -194,6 +196,12 @@ export interface PortAdapterDeps {
 	listLinearAccounts: () => Promise<readonly LinearAccountRef[]>;
 	/** Names a workspace and its git branch together, for `setBranchName`. */
 	renameWorkspace: RenameWorkspaceService['rename'];
+	/**
+	 * The app-wide compute queue. Omitted, the queue ops are refused and no
+	 * shell command is gated on it — which is what a fixture that never reaches
+	 * the queue wants.
+	 */
+	computeQueueService?: ComputeQueueService;
 	/**
 	 * The three Concierge-only ports, or null when the Concierge is not composed
 	 * in. Nullable rather than optional so the composition root has to state which
@@ -1534,7 +1542,8 @@ function messagePayloadText(payload: AgentWireMessagePayload): string {
 
 /**
  * Reads a terminal-service create result as a port outcome, keeping the
- * lifecycle diagnostic that explains a launch nobody got. The services report a
+ * lifecycle diagnostic that explains a launch nobody got, and the compute-queue
+ * job a heavy script is waiting in before it gets a terminal at all. The services report a
  * refusal as a session-less result rather than by throwing, so dropping the
  * diagnostics here is what would turn "no run script named playground" into a
  * successful-looking empty terminal id.
@@ -1552,6 +1561,9 @@ function toStartTerminalOutcome(
 			shell: result.session.shell,
 			terminalId: result.session.id,
 		};
+	}
+	if (result.queuedJob) {
+		return { ok: true, queued: result.queuedJob };
 	}
 
 	const diagnostic = result.diagnostics.at(0);
@@ -1599,7 +1611,14 @@ function toStopTerminalOutcome(
  */
 function makeTerminalPort(deps: PortAdapterDeps): TerminalPort {
 	return {
-		startTerminal: async ({ workspaceId, kind, scriptName, restart }) => {
+		startTerminal: async ({
+			workspaceId,
+			kind,
+			scriptName,
+			restart,
+			sessionId,
+			rootSessionId,
+		}) => {
 			if (kind === 'spawn') {
 				return toStartTerminalOutcome(
 					await deps.terminalService.create({
@@ -1612,9 +1631,12 @@ function makeTerminalPort(deps: PortAdapterDeps): TerminalPort {
 
 			return toStartTerminalOutcome(
 				await deps.scriptLifecycleService.runScript({
+					initiator: 'agent',
 					kind,
 					restart: restart === true,
+					rootSessionId: rootSessionId ?? null,
 					scriptName: scriptName ?? null,
+					sessionId: sessionId ?? null,
 					workspaceId,
 				}),
 				`The ${kind} script could not be started.`,
@@ -1953,6 +1975,14 @@ export function createAgentControlPorts(
 		planMode: deps.planMode,
 		afkMode: deps.afkMode,
 		toolTrust: deps.toolTrust,
+		...(deps.computeQueueService
+			? {
+					jobQueue: createJobQueuePort(
+						deps.computeQueueService,
+						() => deps.appSettingsService.read().computeQueue,
+					),
+				}
+			: {}),
 		...(deps.conciergePorts ?? {}),
 	};
 }

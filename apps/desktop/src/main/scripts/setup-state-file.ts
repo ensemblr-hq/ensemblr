@@ -11,6 +11,7 @@ import {
 } from '../config/context-directory.ts';
 import { ENSEMBLR_DIRECTORY } from '../config/repository-paths.ts';
 import { writeFileAtomicExclusive } from '../safe-fs/index.ts';
+import { computeSetupFingerprint } from './setup-fingerprint.ts';
 
 /**
  * Filename of the machine-local per-worktree setup marker, written inside the
@@ -111,4 +112,44 @@ export function clearSetupStateFile(worktreePath: string): void {
 			rmSync(markerPath, { force: true });
 		} catch {}
 	}
+}
+
+/**
+ * Records that setup just completed cleanly for the worktree's current inputs.
+ * @param worktreePath - Absolute path of the workspace worktree.
+ * @param command - The setup command that completed.
+ */
+export function recordSetupFingerprint(
+	worktreePath: string,
+	command: string,
+): void {
+	writeSetupStateFile(worktreePath, {
+		command,
+		completedAt: new Date().toISOString(),
+		fingerprint: computeSetupFingerprint({ command, worktreePath }),
+	});
+}
+
+/**
+ * Reports whether a prior clean setup run still covers the current inputs, so
+ * setup can be skipped. Matches on both the command and the worktree
+ * fingerprint; the fingerprint (which reads lockfiles) is only computed when
+ * the recorded command matches.
+ * @param worktreePath - Absolute path of the workspace worktree.
+ * @param command - The resolved setup command to compare against the record.
+ * @returns True when the recorded fingerprint matches the current inputs.
+ */
+export function isSetupFingerprintCurrent(
+	worktreePath: string,
+	command: string,
+): boolean {
+	const persisted = readSetupStateFile(worktreePath);
+
+	if (!persisted || persisted.command !== command) {
+		return false;
+	}
+
+	return (
+		persisted.fingerprint === computeSetupFingerprint({ command, worktreePath })
+	);
 }

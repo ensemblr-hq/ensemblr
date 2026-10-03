@@ -8,7 +8,7 @@ than shared with Pi.
 This is the Claude counterpart of [`../pi/rpc-protocol.md`](../pi/rpc-protocol.md),
 but it documents a different kind of thing. Pi is a CLI spoken to over JSONL on
 stdin/stdout, so its guide is a wire protocol. Claude Code is reached through
-`@anthropic-ai/claude-agent-sdk` (pinned `^0.3.267` in `package.json`), driven
+`@anthropic-ai/claude-agent-sdk` (pinned `^0.3.288` in `package.json`), driven
 **in-process from main** against the binary the user installed themselves. There
 is no Ensemblr-owned wire format to document — there is an SDK surface, and the
 translation from it to Ensemblr's provider-neutral event stream.

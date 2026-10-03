@@ -418,6 +418,10 @@
 			"more_many": "… и ещё {{count}}",
 			"more_other": "… и ещё {{count}}"
 		},
+		"cancel-job": {
+			"done": "Отменил задание из очереди",
+			"running": "Отменяет задание из очереди"
+		},
 		"close-tab": {
 			"done": "Закрыл вкладку",
 			"running": "Закрывает вкладку"
@@ -493,6 +497,21 @@
 		"get-workspace-status": {
 			"done": "Прочитал статус на доске",
 			"running": "Читает статус на доске"
+		},
+		"job": {
+			"cancelled": "отменено",
+			"exit-code": "код {{code}}",
+			"log": "Полный лог: {{path}}",
+			"nothing-to-cancel": "уже завершено",
+			"pending-heading": "Ещё в очереди или выполняются",
+			"position": "№{{position}}",
+			"state": {
+				"cancelled": "отменено",
+				"failed": "с ошибкой",
+				"queued": "в очереди",
+				"running": "выполняется",
+				"succeeded": "успешно"
+			}
 		},
 		"launch-harness": {
 			"done": "Запустил харнесс",
@@ -593,6 +612,14 @@
 			"issues_few": "{{count}} задачи",
 			"issues_many": "{{count}} задач",
 			"issues_other": "{{count}} задач",
+			"jobs-pending_one": "{{count}} задание ещё идёт",
+			"jobs-pending_few": "{{count}} задания ещё идут",
+			"jobs-pending_many": "{{count}} заданий ещё идут",
+			"jobs-pending_other": "{{count}} задания ещё идут",
+			"jobs-settled_one": "{{count}} задание завершено",
+			"jobs-settled_few": "{{count}} задания завершены",
+			"jobs-settled_many": "{{count}} заданий завершено",
+			"jobs-settled_other": "{{count}} задания завершено",
 			"memories_one": "{{count}} воспоминание",
 			"memories_few": "{{count}} воспоминания",
 			"memories_many": "{{count}} воспоминаний",
@@ -653,6 +680,10 @@
 			"by-agent": "Агент",
 			"by-user": "Вы",
 			"not-found-heading": "Не найдены"
+		},
+		"run-queued": {
+			"done": "Выполнил команду через очередь",
+			"running": "Выполняет команду через очередь"
 		},
 		"send-follow-up": {
 			"chat": {
@@ -745,6 +776,10 @@
 			},
 			"done": "Дождался суб-агентов",
 			"running": "Ожидает суб-агентов"
+		},
+		"wait-for-job": {
+			"done": "Дождался заданий из очереди",
+			"running": "Ожидает задания из очереди"
 		},
 		"with-detail": "{{action}}: {{detail}}",
 		"write-terminal": {
@@ -1136,6 +1171,21 @@
 		"unselected": "Выбрать модель"
 	},
 	"navigation-sidebar": {
+		"compute-queue": {
+			"cancel": "Отменить {{label}}",
+			"cancel-failed": "Не удалось отменить задание. Возможно, оно уже завершилось.",
+			"initiator": {
+				"agent": "Агент",
+				"auto": "Настройка",
+				"user": "Вы"
+			},
+			"open-log": "Открыть лог",
+			"position": "№{{position}}",
+			"slots": "{{inUse}}/{{slots}}",
+			"slots-hint": "Занято слотов",
+			"summary": "{{running}} в работе · {{queued}} в очереди",
+			"title": "Очередь вычислений"
+		},
 		"footer": {
 			"repositories_one": "{{count}} репозиторий",
 			"repositories_few": "{{count}} репозитория",

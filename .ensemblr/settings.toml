@@ -1,44 +1,42 @@
 #:schema ../apps/desktop/schemas/settings.schema.json
 
-# Node 24 is pinned by apps/desktop/scripts/require-node-version.mjs, so every
-# command goes through the wrapper. Ensemblr does inject the workspace directory's login-shell
-# PATH, and that capture activates mise — but a startup file that prepends
-# Homebrew after activating mise leaves Homebrew's Node ahead of Node 24, so
-# on PATH is not the same as first on PATH. See scripts/with-pinned-node.sh.
-# Never add PATH to [environment_variables]: the resolver is gated on the key
-# being absent, so configuring one silently disables it.
+# Every command runs inside the flake's dev shell (apps/desktop/nix/dev-shell.nix),
+# which puts Node, Bun, and the native-module toolchain first on PATH. That makes
+# the result independent of whatever the login-shell PATH Ensemblr captured has
+# in front. Never add PATH to [environment_variables]: the resolver is gated on
+# the key being absent, so configuring one silently disables it.
 #
 # The install is the monorepo's and runs at the repository root; every run
 # script below belongs to the desktop app, so each one runs from apps/desktop.
 [scripts]
-setup = "./scripts/with-pinned-node.sh bun ci"
+setup = "nix develop -c bun ci"
 
 # Electron dev server.
 [scripts.run.dev]
-command = "./scripts/with-pinned-node.sh bun run --cwd apps/desktop dev"
+command = "nix develop -c bun run --cwd apps/desktop dev"
 icon = "play"
 default = true
 available_in = ["local"]
 
 [scripts.run.checks]
-command = "./scripts/with-pinned-node.sh bun run check && ./scripts/with-pinned-node.sh bun run typecheck"
+command = "nix develop -c sh -c 'bun run check && bun run typecheck'"
 icon = "list-checks"
 available_in = ["local"]
 
 [scripts.run.test]
-command = "./scripts/with-pinned-node.sh bun run --cwd apps/desktop test"
+command = "nix develop -c bun run --cwd apps/desktop test"
 icon = "test-tube"
 available_in = ["local"]
 
 [scripts.run.playground]
-command = "./scripts/with-pinned-node.sh bun run --cwd apps/desktop dev:playground"
+command = "nix develop -c bun run --cwd apps/desktop dev:playground"
 icon = "play"
 available_in = ["local"]
 
 # Screenshot host: a second Electron entrypoint rendering the real UI over
 # scripted fixtures. See apps/desktop/demo/README.md. Never touches the app's own state.
 [scripts.run.demo]
-command = "./scripts/with-pinned-node.sh bun run --cwd apps/desktop dev:demo"
+command = "nix develop -c bun run --cwd apps/desktop dev:demo"
 icon = "monitor"
 available_in = ["local"]
 
@@ -46,28 +44,14 @@ available_in = ["local"]
 # is macOS-only, so this one does nothing useful on a Linux host — build
 # `appimage` there.
 [scripts.run.unsigned]
-command = "./scripts/with-pinned-node.sh bun run --cwd apps/desktop make:unsigned && open apps/desktop/out"
+command = "nix develop -c bun run --cwd apps/desktop make:unsigned && open apps/desktop/out"
 icon = "package"
 available_in = ["local"]
 
-# Linux artifact, built for the host architecture. Needs mksquashfs;
-# `diagnose` reports whether this host has it.
+# Linux artifact, built for the host architecture. For local testing only: the
+# shell compiles node-pty against Nix's glibc, so this AppImage's terminals work
+# only where that glibc exists. The release AppImage is built by CI.
 [scripts.run.appimage]
-command = "./scripts/with-pinned-node.sh bun run --cwd apps/desktop make:linux"
+command = "nix develop -c bun run --cwd apps/desktop make:linux"
 icon = "package"
-available_in = ["local"]
-
-# Read-only: compiler, make, python3, mksquashfs, and what pty.node linked
-# against. Never builds, so it always describes the tree as it stands.
-[scripts.run.diagnose]
-command = "./scripts/with-pinned-node.sh bun run --cwd apps/desktop diagnose:linux"
-icon = "microscope"
-available_in = ["local"]
-
-# Rebuilds node-pty in a throwaway Debian container. `dev` does this by itself
-# when the binding is missing or stamped for the wrong Electron ABI; this is for
-# replacing one without waiting for a preflight to notice.
-[scripts.run.rebuild-native]
-command = "./scripts/with-pinned-node.sh bun run --cwd apps/desktop rebuild:native"
-icon = "hammer"
 available_in = ["local"]

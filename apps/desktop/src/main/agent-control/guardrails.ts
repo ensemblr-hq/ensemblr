@@ -42,6 +42,12 @@ export interface GuardrailConfig {
 	 */
 	maxConciergeMessagesPerSession: number;
 	maxConciergeMessagesPerMinute: number;
+	/**
+	 * Compute-queue jobs one root tree may have unfinished at once. Concurrent
+	 * for the reason terminals are: a finished job gives its place back.
+	 */
+	maxUnfinishedJobs: number;
+	maxJobEnqueuesPerMinute: number;
 	waitTimeoutMs: number;
 }
 
@@ -54,6 +60,8 @@ export const DEFAULT_GUARDRAIL_CONFIG: GuardrailConfig = {
 	maxTerminalStartsPerMinute: 10,
 	maxConciergeMessagesPerSession: 10,
 	maxConciergeMessagesPerMinute: 3,
+	maxUnfinishedJobs: 6,
+	maxJobEnqueuesPerMinute: 20,
 	waitTimeoutMs: 300_000,
 };
 
@@ -89,6 +97,13 @@ export type TerminalStartReservation =
 			refund: () => void;
 	  };
 
+/**
+ * Capacity held by one compute-queue enqueue, observed against the jobs the
+ * queue already holds for the tree — the same shape as a terminal start, and
+ * for the same reason: the hold has to last until the job is one of them.
+ */
+export type JobEnqueueReservation = TerminalStartReservation;
+
 /** Guardrail surface consumed by the agent-control service. */
 export interface Guardrails {
 	readonly waitTimeoutMs: number;
@@ -106,11 +121,25 @@ export interface Guardrails {
 		origin: AgentControlOrigin,
 		openTerminals: number,
 	) => TerminalStartReservation;
+	/**
+	 * Checks the unfinished-job cap, then holds a place and rate capacity for one
+	 * compute-queue enqueue. Unlike a spawn it is open at every depth: a leaf is
+	 * exactly the agent that runs the tests.
+	 * @param origin - Resolved caller identity.
+	 * @param unfinishedJobs - How many jobs this root tree already has queued or running.
+	 */
+	reserveJobEnqueue: (
+		origin: AgentControlOrigin,
+		unfinishedJobs: number,
+	) => JobEnqueueReservation;
 	/** Quota + rate check for a message to the Concierge; does not mutate counters. */
 	evaluateConciergeMessage: (sessionId: string) => GuardrailResult;
 	/** Record a message to the Concierge once it has actually been delivered. */
 	recordConciergeMessage: (sessionId: string) => void;
-	/** Drops only per-session message counters; root-tree spawn budgets are lifetime. */
+	/**
+	 * Drops per-session message counters and, for a root, its enqueue rate log;
+	 * root-tree spawn budgets are lifetime.
+	 */
 	release: (sessionId: string) => void;
 	/** Refuse a blocking wait whose target is an ancestor of the caller. */
 	evaluateWaitTarget: (
@@ -136,6 +165,8 @@ export function createGuardrails(
 	const lifetimeSpawns = new Map<string, number>();
 	const terminalTimestamps = new Map<string, readonly number[]>();
 	const terminalStartsInFlight = new Map<string, number>();
+	const jobEnqueueTimestamps = new Map<string, readonly number[]>();
+	const jobEnqueuesInFlight = new Map<string, number>();
 	const messageTimestamps = new Map<string, readonly number[]>();
 	const lifetimeMessages = new Map<string, number>();
 
@@ -309,25 +340,35 @@ export function createGuardrails(
 	};
 
 	/**
+	 * Claims one in-flight slot in a per-tree counter, so a concurrent attempt
+	 * reads the claim rather than the same stale observed count.
+	 * @param counter - The in-flight counter to charge.
+	 * @param rootSessionId - Delegation tree the attempt is charged to.
+	 * @returns The release for exactly this claim.
+	 */
+	const holdInFlight = (
+		counter: Map<string, number>,
+		rootSessionId: string,
+	): (() => void) => {
+		counter.set(rootSessionId, (counter.get(rootSessionId) ?? 0) + 1);
+		return () => {
+			const held = (counter.get(rootSessionId) ?? 0) - 1;
+			if (held > 0) {
+				counter.set(rootSessionId, held);
+			} else {
+				counter.delete(rootSessionId);
+			}
+		};
+	};
+
+	/**
 	 * Claims one slot for a start that has not produced a terminal yet, so a
 	 * concurrent start reads the claim rather than the same stale open count.
 	 * @param rootSessionId - Delegation tree the start is charged to.
 	 * @returns The release for exactly this claim.
 	 */
-	const holdTerminalStart = (rootSessionId: string): (() => void) => {
-		terminalStartsInFlight.set(
-			rootSessionId,
-			(terminalStartsInFlight.get(rootSessionId) ?? 0) + 1,
-		);
-		return () => {
-			const held = (terminalStartsInFlight.get(rootSessionId) ?? 0) - 1;
-			if (held > 0) {
-				terminalStartsInFlight.set(rootSessionId, held);
-			} else {
-				terminalStartsInFlight.delete(rootSessionId);
-			}
-		};
-	};
+	const holdTerminalStart = (rootSessionId: string): (() => void) =>
+		holdInFlight(terminalStartsInFlight, rootSessionId);
 
 	const reserveTerminalStart = (
 		origin: AgentControlOrigin,
@@ -372,6 +413,42 @@ export function createGuardrails(
 		};
 	};
 
+	const reserveJobEnqueue = (
+		origin: AgentControlOrigin,
+		unfinishedJobs: number,
+	): JobEnqueueReservation => {
+		const rootSessionId = origin.rootSessionId ?? origin.sessionId;
+		const claimed =
+			unfinishedJobs + (jobEnqueuesInFlight.get(rootSessionId) ?? 0);
+		if (claimed >= limits.maxUnfinishedJobs) {
+			return {
+				ok: false,
+				code: 'denied-quota',
+				reason: `This delegation tree already has ${claimed} compute-queue jobs queued or running, which is the limit of ${limits.maxUnfinishedJobs}. Only unfinished jobs count against it: wait for one with \`ensemblr_wait_for_job\`, or cancel one you no longer need with \`ensemblr_cancel_job\`, and the place is yours again.`,
+			};
+		}
+		if (
+			withinWindow(jobEnqueueTimestamps, rootSessionId).length >=
+			limits.maxJobEnqueuesPerMinute
+		) {
+			return {
+				ok: false,
+				code: 'denied-rate',
+				reason: `Compute-queue enqueue rate limit of ${limits.maxJobEnqueuesPerMinute}/min exceeded. Wait for the jobs you already queued with \`ensemblr_wait_for_job\` before queueing more.`,
+			};
+		}
+		const release = once(holdInFlight(jobEnqueuesInFlight, rootSessionId));
+		const uncharge = chargeRate(jobEnqueueTimestamps, rootSessionId, now());
+		return {
+			ok: true,
+			settle: release,
+			refund: once(() => {
+				release();
+				uncharge();
+			}),
+		};
+	};
+
 	const evaluateConciergeMessage = (sessionId: string): GuardrailResult => {
 		if (
 			(lifetimeMessages.get(sessionId) ?? 0) >=
@@ -404,6 +481,7 @@ export function createGuardrails(
 	const release = (sessionId: string): void => {
 		messageTimestamps.delete(sessionId);
 		lifetimeMessages.delete(sessionId);
+		jobEnqueueTimestamps.delete(sessionId);
 	};
 
 	const evaluateWaitTarget = (
@@ -424,6 +502,7 @@ export function createGuardrails(
 		waitTimeoutMs: limits.waitTimeoutMs,
 		reserveSpawn,
 		reserveTerminalStart,
+		reserveJobEnqueue,
 		evaluateConciergeMessage,
 		recordConciergeMessage,
 		release,

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { lexCommand } from '@/shared/plan-mode';
+import { lexCommand, lexShellSegments } from '@/shared/plan-mode';
+
+/** Reads the tolerant lexer's segments as bare argv lists, or null when it found the line unreadable. */
+function tokensOf(command: string): (readonly string[])[] | null {
+	return lexShellSegments(command)?.map((segment) => segment.tokens) ?? null;
+}
 
 /** Reads the segments of a command the lexer accepted, failing the test if it did not. */
 function segmentsOf(command: string): readonly (readonly string[])[] {
@@ -192,5 +197,211 @@ describe('word boundaries are bash s blanks, not JavaScript s whitespace', () =>
 	it('still splits on a space and a tab', () => {
 		expect(segmentsOf('cat\ta\tb')).toEqual([['cat', 'a', 'b']]);
 		expect(segmentsOf('cat  a   b')).toEqual([['cat', 'a', 'b']]);
+	});
+});
+
+describe('lexShellSegments', () => {
+	it('splits chained commands on every separator', () => {
+		expect(tokensOf('cd x && bun run test; ls | wc -l & echo hi')).toEqual([
+			['cd', 'x'],
+			['bun', 'run', 'test'],
+			['ls'],
+			['wc', '-l'],
+			['echo', 'hi'],
+		]);
+	});
+
+	it('drops redirections and their targets instead of refusing them', () => {
+		expect(tokensOf('bun run test > out.log 2>&1')).toEqual([
+			['bun', 'run', 'test'],
+		]);
+		expect(tokensOf('make &>build.log')).toEqual([['make']]);
+		expect(tokensOf('make >>"my log" 2> err < in')).toEqual([['make']]);
+		expect(tokensOf('tsc 2>&1| tail -5')).toEqual([['tsc'], ['tail', '-5']]);
+	});
+
+	it('splits command substitutions and subshells into their own segments', () => {
+		expect(tokensOf('echo $(date) && make')).toEqual([
+			['echo'],
+			['date'],
+			['make'],
+		]);
+		expect(tokensOf('x=`git rev-parse HEAD` vitest')).toEqual([
+			['x='],
+			['git', 'rev-parse', 'HEAD'],
+			['vitest'],
+		]);
+		expect(tokensOf('diff <(ls a) <(ls b)')).toEqual([
+			['diff'],
+			['ls', 'a'],
+			['ls', 'b'],
+		]);
+		expect(tokensOf('(cd x; make -j8)')).toEqual([
+			['cd', 'x'],
+			['make', '-j8'],
+		]);
+	});
+
+	it('drops bare group braces', () => {
+		expect(tokensOf('{ make; }')).toEqual([['make']]);
+	});
+
+	it('keeps quoted text as one literal token and lexes its substitutions after it', () => {
+		expect(tokensOf('echo "bun run test; $(make)"')).toEqual([
+			['echo', 'bun run test; $(make)'],
+			['make'],
+		]);
+		expect(tokensOf('x="$(echo ")" && tsc)" ls')).toEqual([
+			['x=$(echo ")" && tsc)', 'ls'],
+			['echo', ')'],
+			['tsc'],
+		]);
+		expect(tokensOf('echo "a `make` b"')).toEqual([
+			['echo', 'a `make` b'],
+			['make'],
+		]);
+		expect(tokensOf("echo '$(make)'")).toEqual([['echo', '$(make)']]);
+	});
+
+	it('reads an ANSI-C quoted run whole, escaped quote and all', () => {
+		expect(tokensOf("echo $'it\\'s\\tok' && make")).toEqual([
+			['echo', "it's\tok"],
+			['make'],
+		]);
+		expect(tokensOf("x=\"$(echo $'a\\')b'; tsc)\"")).toEqual([
+			["x=$(echo $'a\\')b'; tsc)"],
+			['echo', "a')b"],
+			['tsc'],
+		]);
+	});
+
+	it('reads `<<` inside arithmetic as a shift, never a heredoc', () => {
+		expect(tokensOf('echo $((1<<2))\nmake')).toEqual([
+			['echo'],
+			['1<<2'],
+			['make'],
+		]);
+		expect(tokensOf('((x <<= 2))\nmake')).toEqual([
+			['x', '<<=', '2'],
+			['make'],
+		]);
+	});
+
+	it('reads a never-closed substitution in quotes as literal text', () => {
+		expect(tokensOf('echo "$(make"; ls')).toEqual([['echo', '$(make'], ['ls']]);
+	});
+
+	it('skips heredoc bodies inside a quoted substitution, apostrophes and all', () => {
+		expect(
+			tokensOf(
+				`git commit -m "$(cat <<'EOF'\nit's fixed\nEOF\n)" && bun run test`,
+			),
+		).toEqual([
+			['git', 'commit', '-m', "$(cat <<'EOF'\nit's fixed\nEOF\n)"],
+			['bun', 'run', 'test'],
+			['cat'],
+		]);
+		expect(tokensOf('x="$(cat <<-END\n\tdon\'t )\n\tEND\n)"; make')).toEqual([
+			["x=$(cat <<-END\n\tdon't )\n\tEND\n)"],
+			['make'],
+			['cat'],
+		]);
+	});
+
+	it('skips a comment inside a quoted substitution', () => {
+		expect(tokensOf('x="$(ls # it\'s )\n)"; make')).toEqual([
+			["x=$(ls # it's )\n)"],
+			['make'],
+			['ls'],
+		]);
+	});
+
+	it('reads a process substitution whole and notes it on its command', () => {
+		expect(lexShellSegments('source <(echo make) x')).toEqual([
+			{
+				pipesOnward: false,
+				processInputs: ['echo make'],
+				stdin: null,
+				tokens: ['source', 'x'],
+			},
+			{
+				pipesOnward: false,
+				processInputs: [],
+				stdin: null,
+				tokens: ['echo', 'make'],
+			},
+		]);
+	});
+
+	it('stays within its bounds on pathological nesting instead of throwing', () => {
+		const deep = `echo ${'"$('.repeat(6000)}make${')"'.repeat(6000)}; make`;
+		expect(() => lexShellSegments(deep)).not.toThrow();
+		const unclosed = `echo ${'"$('.repeat(6000)} ; make`;
+		expect(() => lexShellSegments(unclosed)).not.toThrow();
+	});
+
+	it('skips heredoc bodies and comments', () => {
+		expect(
+			tokensOf("cat <<'EOF' > notes\nbun run test\nEOF\nls # make"),
+		).toEqual([['cat'], ['ls']]);
+		expect(tokensOf('cat <<-END\n\tmake\n\tEND\npwd')).toEqual([
+			['cat'],
+			['pwd'],
+		]);
+	});
+
+	it('reads a here-string as a redirection rather than a heredoc', () => {
+		expect(tokensOf('grep x <<< "make"\nls')).toEqual([['grep', 'x'], ['ls']]);
+	});
+
+	it('hands each heredoc body and here-string to the stdin of the command that opened it', () => {
+		expect(lexShellSegments('cat <<EOF | sh\nbun run test\nEOF\nls')).toEqual([
+			{
+				pipesOnward: true,
+				processInputs: [],
+				stdin: 'bun run test',
+				tokens: ['cat'],
+			},
+			{ pipesOnward: false, processInputs: [], stdin: null, tokens: ['sh'] },
+			{ pipesOnward: false, processInputs: [], stdin: null, tokens: ['ls'] },
+		]);
+		expect(lexShellSegments('bash <<-END\n\tmake\n\tEND')).toEqual([
+			{
+				pipesOnward: false,
+				processInputs: [],
+				stdin: 'make',
+				tokens: ['bash'],
+			},
+		]);
+		expect(lexShellSegments('zsh <<< "make"')).toEqual([
+			{
+				pipesOnward: false,
+				processInputs: [],
+				stdin: 'make\n',
+				tokens: ['zsh'],
+			},
+		]);
+	});
+
+	it('reads `||` as a chain rather than a pipe', () => {
+		expect(
+			lexShellSegments('a || b')?.map((segment) => segment.pipesOnward),
+		).toEqual([false, false]);
+	});
+
+	it('lexes substitutions in an unquoted heredoc body, and none in a quoted one', () => {
+		expect(tokensOf('cat <<EOF\n$(make)\nEOF')).toEqual([['cat'], ['make']]);
+		expect(tokensOf("cat <<'EOF'\n$(make)\nEOF")).toEqual([['cat']]);
+	});
+
+	it('returns null only for an unbalanced quote', () => {
+		expect(tokensOf('echo "oops')).toBeNull();
+		expect(tokensOf("make 'x")).toBeNull();
+		expect(tokensOf('')).toEqual([]);
+	});
+
+	it('leaves the strict lexer refusing what the tolerant one reads', () => {
+		expect(lexCommand('echo $(date)').violation).not.toBeNull();
+		expect(lexCommand('make > out').violation).not.toBeNull();
 	});
 });

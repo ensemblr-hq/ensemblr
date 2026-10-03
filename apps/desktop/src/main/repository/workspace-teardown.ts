@@ -48,6 +48,12 @@ export interface WorkspaceTeardownPorts {
 		workspaceId: string,
 	) => readonly TerminalScrollbackCapture[];
 	releaseAgentControl: (sessionId: string) => void;
+	/**
+	 * Cancels the workspace's queued and running compute-queue jobs, so a heavy
+	 * command or a script waiting for a slot never starts in a directory that is
+	 * about to be removed.
+	 */
+	releaseComputeJobs: (workspaceId: string) => void;
 	stopAgentSession: (sessionId: string) => Promise<void>;
 	stopWatchingFiles: (workspaceCwd: string) => void;
 	waitForTerminalExit: (
@@ -96,6 +102,14 @@ export function createWorkspaceTeardownService(
 				ports,
 				workspaceId,
 			});
+
+			try {
+				ports.releaseComputeJobs(workspaceId);
+			} catch (error) {
+				failures.push(
+					`Could not cancel the workspace's compute jobs: ${errorMessage(error)}`,
+				);
+			}
 
 			const terminalsKilled = await killTerminals({
 				failures,

@@ -432,6 +432,44 @@
 						}
 					}
 				},
+				"computeQueue": {
+					"type": "object",
+					"description": "The app-wide queue heavy agent commands (test runners, builds, typechecks, nix rebuilds) wait in, so parallel agents across workspaces cannot saturate the machine. Agent settings tools cannot change this section.",
+					"additionalProperties": false,
+					"properties": {
+						"enabled": {
+							"type": "boolean",
+							"default": true,
+							"description": "Route heavy agent commands through the queue. Off, every gate passes through and queued work starts at once."
+						},
+						"concurrency": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 16,
+							"default": 1,
+							"description": "How many heavy jobs run at once across every workspace."
+						},
+						"niceness": {
+							"type": "integer",
+							"minimum": 0,
+							"maximum": 19,
+							"default": 10,
+							"description": "CPU priority (`nice` value) queued jobs run at. `0` is normal priority; higher yields more to interactive work."
+						},
+						"extraPatterns": {
+							"type": "array",
+							"items": { "type": "string" },
+							"default": [],
+							"description": "Additional heavy-command patterns: whitespace-separated token prefixes, `*` allowed within a token (for example `just build*`). Package-manager scripts match as `run <script>`."
+						},
+						"exemptPatterns": {
+							"type": "array",
+							"items": { "type": "string" },
+							"default": [],
+							"description": "Patterns that are never treated as heavy, overriding both the built-in list and `extraPatterns`."
+						}
+					}
+				},
 				"onboarding": {
 					"type": "object",
 					"description": "First-run state, not a preference.",

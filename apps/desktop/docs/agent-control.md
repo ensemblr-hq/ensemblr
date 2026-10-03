@@ -318,7 +318,7 @@ harness.
 
 ## Tool reference
 
-Fifty tools, enumerated from `TOOL_DEFS` in
+Fifty-three tools, enumerated from `TOOL_DEFS` in
 `src/main/agent-control/mcp-endpoint.ts`. The argument names and types below are
 the authoritative Zod schemas in `src/shared/agent-control/schemas.ts` — every
 schema is a `strictObject`, so an argument not listed here is rejected as
@@ -518,6 +518,67 @@ rewriting its line, and the backspaces a spinner or percentage counter walks bac
 over. One thing that rendering cannot recover is the head of a filled buffer: the
 scrollback trims from the front, so a long-running script's first line is a
 fragment and a colour code cut before its `ESC` reads as ordinary text.
+
+A compute-heavy setup or run script does not start at once when an agent starts
+it: `ensemblr_start_terminal` answers with `queued: { jobId, position }` and a
+note instead of a `terminalId`, and the script launches in its dock terminal on
+its own once the compute queue grants it a slot. `ensemblr_wait_for_job` on that
+`jobId` waits until the script's terminal exits. `ensemblr_write_terminal`
+refuses a heavy command typed at a shell prompt with `denied-scope` and the same
+paragraph the agent's own shell gets — see the next section.
+
+### The compute queue
+
+| Tool | Arguments | Gate | Withheld from |
+| --- | --- | --- | --- |
+| `ensemblr_run_queued` | **`command: string`**, `cwd?: string`, `label?: string`, `wait?: boolean`, `timeoutMs?: number` | write | Concierge |
+| `ensemblr_wait_for_job` | `jobIds?: string[]`, `timeoutMs?: number` | read | Concierge |
+| `ensemblr_cancel_job` | **`jobId: string`** | write | Concierge |
+
+Heavy commands — test suites, builds, typechecks, compiles, nix builds — from
+every agent in every workspace wait for a few app-wide slots, so a fan-out of
+agents each running its own test suite cannot make the user's machine unusable.
+The queue itself is `src/main/compute-queue/`; what counts as heavy is
+`classifyHeavyCommandForSettings` in `src/shared/compute-queue.ts`, read live
+from Settings → General, so turning the queue off or exempting a pattern applies
+to the next command.
+
+**Enforcement is in three places, all answering with one paragraph**
+(`heavyCommandBlockReason`): Claude Code's `Bash` through a `PreToolUse` hook
+(`src/main/claude-agent/claude-compute-queue-guard.ts`), Pi's `bash` through the
+`checkPlanModeTool` round trip it already makes for every guarded call — asked
+only after the Concierge and Plan Mode verdicts have passed the call, so neither
+is shadowed — and `ensemblr_write_terminal`, which keeps the input each shell
+terminal has been typed but not submitted, so a command split across several
+writes is classified whole. A harness terminal is left alone: what is typed
+there is a prompt to another agent.
+
+`ensemblr_run_queued` runs the command in the caller's workspace (`cwd` is
+relative to its root and may not leave it) with the full Ensemblr environment,
+Infisical secrets included, which makes it the right tool for any one-shot
+command that needs the workspace's secrets. It blocks until the job finishes by
+default, under the same capped wait as `ensemblr_wait_for_agents`; `wait: false`
+queues and returns at once. Every result carries `QueuedJobReport`s: state,
+queue position, exit code and signal, how long the job waited and ran, the end
+of its output with secrets redacted, `omittedChars`, and `logPath` — the whole
+output under `.context/compute-queue/`, workspace-relative. The payload is fitted
+to the shared ceiling by cutting each tail from the front, because the verdict
+lands last. A `timedOut` answer is a lap, and the note says so and names each
+job's position.
+
+`ensemblr_wait_for_job` defaults to every unfinished job the calling session
+queued; every id must belong to the caller's workspace or the call is
+`not-found`. Both blocking ops are exempt from the dispatch deadline, and all
+three return command output verbatim — the bridge does not rewrite tool names
+inside a result, so the notes are spelled for the caller's tool list at the
+source.
+
+Guardrails bound the enqueue per delegation tree: at most six unfinished jobs
+(`denied-quota`, freed by a job finishing or `ensemblr_cancel_job`) and twenty
+enqueues a minute (`denied-rate`). Unlike a spawn, an enqueue is open at every
+depth — a leaf is exactly the agent that runs the tests. `ensemblr_run_queued`
+is refused in Plan Mode; waiting on and cancelling a job are not. Ending a
+session cancels every job it still has queued or running.
 
 ### Tabs, focus, and the board
 
@@ -1386,18 +1447,20 @@ rather than inheriting it: `MCP_TOOL_CALL_TIMEOUT_MS` in
 launch config — `claude-mcp-config.ts` for the Agent SDK,
 `harness-launch-config.ts` for the three terminal harnesses. It is per server
 rather than per tool, which no client exposes, so the same constant covers the
-other two blocking ops a harness *does* hold: `waitForAgents`, capped at five
-minutes by its own guardrail, and a `wait: true` spawn.
+other blocking ops a harness *does* hold: `waitForAgents`, capped at five
+minutes by its own guardrail, a `wait: true` spawn, and the two compute-queue
+waits, `runQueued` and `waitForJob`, under the same cap — a test suite or a
+build routinely outlives two minutes.
 
 **Raising it per server means the app owes a bound per op.** A day is the right
-answer for the four ops that block by design and the wrong one for the other
-forty-eight: before, a wedged port surfaced to the agent as its client's
+answer for the six ops that block by design and the wrong one for the other
+forty-nine: before, a wedged port surfaced to the agent as its client's
 60-second timeout and the turn carried on; after, the same wedge would hold the
 agent for a day while the heartbeat reported it healthy. Port coverage does not
 close that on its own — `linear-client.ts` and `workspace-git-status.ts` bound
 themselves, the terminal, harness-launch and tab ports do not — so `invoke`
 applies `DISPATCH_TIMEOUT_MS` (`src/main/agent-control/dispatch-deadline.ts`) to
-every op except those four. A timed-out op is abandoned rather than cancelled,
+every op except those six. A timed-out op is abandoned rather than cancelled,
 and the envelope says so: the effect may still land, so the agent is told to
 check the state rather than to retry.
 

@@ -1,9 +1,11 @@
 name: Install dependencies
 description: >-
-  Select the Node version .nvmrc pins, install the Bun version package.json
-  pins, and install the locked dependency tree. Every check job installs
-  identically, so the steps live here rather than being repeated four times — a
-  change to how CI installs is then one edit, not four.
+  Select the Node major package.json's engines allows, install the Bun version
+  package.json pins, and install the locked dependency tree. The release and
+  nightly build legs install this way rather than through the Nix dev shell:
+  node-pty compiled against Nix's glibc would ship an AppImage whose terminals
+  work only where that glibc exists, and macOS signing needs the Xcode tools
+  on the runner.
 
 runs:
   using: composite
@@ -11,9 +13,11 @@ runs:
     # Bun is the package manager, not the runtime: Electron, Forge and Vitest all
     # run under a real Node 24, so `setup-node` stays and `bun run` only
     # dispatches scripts to it.
+    # Reads `engines.node` (`>=24 <25`), the same field the dev shell takes its
+    # Node major from, and resolves the newest 24.x.
     - uses: actions/setup-node@v7
       with:
-        node-version-file: .nvmrc
+        node-version-file: package.json
 
     # Third-party, so pinned by commit rather than by tag. No version input: the
     # action's documented default is to read `packageManager` from package.json,

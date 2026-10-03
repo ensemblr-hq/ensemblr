@@ -390,6 +390,10 @@
 			"more_one": "… και {{count}} ακόμη",
 			"more_other": "… και {{count}} ακόμη"
 		},
+		"cancel-job": {
+			"done": "Ακύρωσε μια διεργασία της ουράς",
+			"running": "Ακυρώνει μια διεργασία της ουράς"
+		},
 		"close-tab": {
 			"done": "Έκλεισε μια καρτέλα",
 			"running": "Κλείνει μια καρτέλα"
@@ -465,6 +469,21 @@
 		"get-workspace-status": {
 			"done": "Διάβασε την κατάσταση του πίνακα εργασιών",
 			"running": "Διαβάζει την κατάσταση του πίνακα εργασιών"
+		},
+		"job": {
+			"cancelled": "ακυρώθηκε",
+			"exit-code": "κωδικός {{code}}",
+			"log": "Πλήρης καταγραφή: {{path}}",
+			"nothing-to-cancel": "έχει ήδη ολοκληρωθεί",
+			"pending-heading": "Ακόμη στην ουρά ή σε εκτέλεση",
+			"position": "θέση {{position}}",
+			"state": {
+				"cancelled": "ακυρώθηκε",
+				"failed": "απέτυχε",
+				"queued": "στην ουρά",
+				"running": "σε εκτέλεση",
+				"succeeded": "πέτυχε"
+			}
 		},
 		"launch-harness": {
 			"done": "Εκκίνησε ένα harness",
@@ -551,6 +570,10 @@
 			"entries_other": "{{count}} καταχωρίσεις",
 			"issues_one": "{{count}} ζήτημα",
 			"issues_other": "{{count}} ζητήματα",
+			"jobs-pending_one": "{{count}} διεργασία συνεχίζεται",
+			"jobs-pending_other": "{{count}} διεργασίες συνεχίζονται",
+			"jobs-settled_one": "{{count}} διεργασία ολοκληρώθηκε",
+			"jobs-settled_other": "{{count}} διεργασίες ολοκληρώθηκαν",
 			"memories_one": "{{count}} μνήμη",
 			"memories_other": "{{count}} μνήμες",
 			"models_one": "{{count}} μοντέλο",
@@ -597,6 +620,10 @@
 			"by-agent": "Πράκτορας",
 			"by-user": "Εσείς",
 			"not-found-heading": "Δεν βρέθηκαν"
+		},
+		"run-queued": {
+			"done": "Εκτέλεσε μια εντολή μέσω της ουράς",
+			"running": "Εκτελεί μια εντολή μέσω της ουράς"
 		},
 		"send-follow-up": {
 			"chat": {
@@ -687,6 +714,10 @@
 			},
 			"done": "Περίμενε τους υποπράκτορες",
 			"running": "Περιμένει τους υποπράκτορες"
+		},
+		"wait-for-job": {
+			"done": "Περίμενε διεργασίες της ουράς",
+			"running": "Περιμένει διεργασίες της ουράς"
 		},
 		"with-detail": "{{action}}: {{detail}}",
 		"write-terminal": {
@@ -1066,6 +1097,21 @@
 		"unselected": "Επιλογή μοντέλου"
 	},
 	"navigation-sidebar": {
+		"compute-queue": {
+			"cancel": "Ακύρωση {{label}}",
+			"cancel-failed": "Δεν ήταν δυνατή η ακύρωση της διεργασίας. Ίσως έχει ήδη ολοκληρωθεί.",
+			"initiator": {
+				"agent": "Πράκτορας",
+				"auto": "Εγκατάσταση",
+				"user": "Εσείς"
+			},
+			"open-log": "Άνοιγμα καταγραφής",
+			"position": "#{{position}}",
+			"slots": "{{inUse}}/{{slots}}",
+			"slots-hint": "Θέσεις σε χρήση",
+			"summary": "{{running}} σε εκτέλεση · {{queued}} στην ουρά",
+			"title": "Ουρά υπολογισμών"
+		},
 		"footer": {
 			"repositories_one": "{{count}} αποθετήριο",
 			"repositories_other": "{{count}} αποθετήρια",

@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Development runs inside a Nix dev shell.** `nix develop` (from `flake.nix`, defined in
+  `apps/desktop/nix/dev-shell.nix`) supplies Node, Bun, `make`, `python3`, and on Linux gcc and
+  nixpkgs' Electron. It reads every version from the manifests. Setup and run scripts, and CI's
+  lint, typecheck, and test jobs, all run through `nix develop -c`. This retires the layers that
+  existed to compensate for an uncontrolled toolchain: `scripts/with-pinned-node.sh`, `mise.toml`,
+  `.nvmrc`, the Node-version gate, and the Linux toolchain preflight with its container autobuild
+  (`rebuild:native`, `diagnose:linux`). `bun run dev` now works on NixOS, where that preflight
+  refused every binding and the container path could not succeed. Release and nightly build legs
+  stay outside Nix so the shipped AppImage's `node-pty` is portable. Intel Macs have no dev shell,
+  because nixpkgs dropped `x86_64-darwin`. [ADR 0083](./docs/adr/0083-develop-inside-a-nix-dev-shell.md). (#714)
+
 ## [0.2.2] - 2026-10-02
 
 Ensemblr 0.2.2 lets you steer an agent past its follow-up queue, resume a stopped sub-agent, and fixes file tree indentation, checkpoint restores and markdown image previews.

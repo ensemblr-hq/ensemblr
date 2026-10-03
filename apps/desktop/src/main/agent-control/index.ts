@@ -43,6 +43,7 @@ export {
 	type HarnessLaunchContext,
 	type HarnessLaunchDecoration,
 } from './harness-launch-config.ts';
+export type { JobQueuePort } from './job-queue-ports.ts';
 export {
 	type AgentControlIntegration,
 	createAgentControlIntegration,

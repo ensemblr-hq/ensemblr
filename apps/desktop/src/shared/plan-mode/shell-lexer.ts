@@ -5,6 +5,9 @@
  * plain string replace of `>/dev/null` let `>/dev/nullx` through as a discard and
  * wrote a file. Lexing once, honouring quotes, removes both classes before any
  * classification runs.
+ *
+ * The quoting primitives are exported for `tolerant-shell-lexer.ts`, the sibling
+ * that reads what a command runs rather than policing what it may touch.
  */
 
 /** The command split into its chained segments, or the construct that disqualifies it. */
@@ -14,7 +17,7 @@ export interface LexedCommand {
 }
 
 /** Characters that chain one command into the next when unquoted. */
-const SEPARATORS: ReadonlySet<string> = new Set([';', '|', '&', '\n']);
+export const SEPARATORS: ReadonlySet<string> = new Set([';', '|', '&', '\n']);
 
 /** File descriptors a redirection may name without creating a file. */
 const DISCARDABLE_FDS: ReadonlySet<string> = new Set(['', '1', '2']);
@@ -47,7 +50,7 @@ const DOUBLE_QUOTE_ESCAPABLE: ReadonlySet<string> = new Set([
  * arguments, and `git \`⏎`status` came back denied as "`git \n status` is not a
  * read-only git subcommand".
  */
-const LINE_CONTINUATION_LENGTH = 2;
+export const LINE_CONTINUATION_LENGTH = 2;
 
 /**
  * Bash's own blanks, which are space and tab alone.
@@ -58,18 +61,18 @@ const LINE_CONTINUATION_LENGTH = 2;
  * the command that was provably not the shell's. The `\n` that really does
  * separate is a member of {@link SEPARATORS} and is tested before this.
  */
-const BLANK = /[ \t]/;
+export const BLANK = /[ \t]/;
 
 const REDIRECTION_VIOLATION = 'output redirection `>` can write files';
 
-const UNBALANCED_QUOTE =
+export const UNBALANCED_QUOTE =
 	'an unbalanced quote leaves the command impossible to classify';
 
 /** Where the walk continues from, or why the command is disqualified. */
 type Step = { next: number } | { violation: string };
 
 /** A scanned stretch of input: its text and where it ended, or why it was rejected. */
-type Scan = { next: number; text: string } | { violation: string };
+export type Scan = { next: number; text: string } | { violation: string };
 
 /**
  * Reports whether a character ends an unquoted word.
@@ -125,7 +128,7 @@ function expansionAt(command: string, index: number): string | null {
  * @param index - Index of the opening quote.
  * @returns The quoted text and where it ended, or an unbalanced-quote violation.
  */
-function scanSingleQuoted(command: string, index: number): Scan {
+export function scanSingleQuoted(command: string, index: number): Scan {
 	const end = command.indexOf("'", index + 1);
 	return end === -1
 		? { violation: UNBALANCED_QUOTE }
@@ -137,9 +140,14 @@ function scanSingleQuoted(command: string, index: number): Scan {
  * still expands `$(…)` and backticks.
  * @param command - Full command text.
  * @param index - Index of the opening quote.
+ * @param readSubstitution - For the tolerant lexer: reads the substitution starting at an index and answers where it ended, or null when it never closes, in which case its opening character is read as literal text. Absent, a substitution is reported as a violation.
  * @returns The quoted text and where it ended, or the violation that stopped it.
  */
-function scanDoubleQuoted(command: string, index: number): Scan {
+export function scanDoubleQuoted(
+	command: string,
+	index: number,
+	readSubstitution?: (start: number) => number | null,
+): Scan {
 	let text = '';
 	let cursor = index + 1;
 	while (cursor < command.length) {
@@ -148,8 +156,14 @@ function scanDoubleQuoted(command: string, index: number): Scan {
 			return { next: cursor + 1, text };
 		}
 		const expansion = expansionAt(command, cursor);
-		if (expansion) {
+		if (expansion && !readSubstitution) {
 			return { violation: expansion };
+		}
+		if (expansion && readSubstitution) {
+			const end = readSubstitution(cursor) ?? cursor + 1;
+			text += command.slice(cursor, end);
+			cursor = end;
+			continue;
 		}
 		const escaped = command[cursor + 1];
 		if (char === '\\' && escaped === '\n') {
@@ -179,7 +193,7 @@ function scanDoubleQuoted(command: string, index: number): Scan {
  * @param index - Index just past the operator.
  * @returns Index of the target's first character.
  */
-function skipRedirectionBlanks(command: string, index: number): number {
+export function skipRedirectionBlanks(command: string, index: number): number {
 	let cursor = index;
 	while (cursor < command.length && BLANK.test(command[cursor] as string)) {
 		cursor += 1;
@@ -215,7 +229,7 @@ function scanRedirection(command: string, index: number): Step {
 }
 
 /** Accumulates lexed characters into tokens and tokens into chained segments. */
-interface TokenSink {
+export interface TokenSink {
 	/** Appends text to the token being built, starting one if there is none. */
 	push: (text: string) => void;
 	/** The token being built, or null when none is open. */
@@ -235,7 +249,7 @@ interface TokenSink {
  * few lines of intent rather than index and buffer bookkeeping.
  * @returns A fresh sink with no tokens or segments.
  */
-function createTokenSink(): TokenSink {
+export function createTokenSink(): TokenSink {
 	const segments: string[][] = [];
 	let tokens: string[] = [];
 	let token: string | null = null;

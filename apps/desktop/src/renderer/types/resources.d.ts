@@ -1877,6 +1877,32 @@ export default interface Resources {
 				description: 'Prevent automatic system sleep while an in-app agent works. The display may sleep. Pauses below 10% battery when unplugged.';
 				label: 'Caffeinate while agents are running';
 			};
+			'compute-queue': {
+				concurrency: {
+					'aria-label': 'Compute queue slots';
+					description: 'How many queued commands may run at the same time. Heavy scripts you start yourself run at once and hold a slot.';
+					label: 'Concurrent slots';
+				};
+				enabled: {
+					description: 'Heavy commands agents run, such as builds, tests, and typechecks, wait for a free slot across all workspaces instead of starting together. Keeps the machine responsive when several agents work at once.';
+					label: 'Compute queue';
+				};
+				'exempt-patterns': {
+					'aria-label': 'Exempt command patterns, one per line';
+					description: 'Commands that never wait in the queue, one pattern per line, using the same syntax. Exemptions win over heavy patterns.';
+					label: 'Exempt commands';
+				};
+				'extra-patterns': {
+					'aria-label': 'Extra heavy command patterns, one per line';
+					description: 'Commands to queue in addition to the built-in list, one pattern per line. A pattern is a command prefix split on spaces; * matches within a word. Package scripts match as run <script>, for example run test*.';
+					label: 'Extra heavy commands';
+				};
+				niceness: {
+					'aria-label': 'Compute queue CPU priority';
+					description: 'CPU priority of queued commands, from 0 to 19. A higher value yields more CPU to your own apps.';
+					label: 'CPU priority (niceness)';
+				};
+			};
 			'context-usage': {
 				description: 'Always show context usage. By default, only shown when more than 70% is used.';
 				label: 'Always show context usage';
@@ -3071,6 +3097,10 @@ export default interface Resources {
 				more_one: '… and {{count}} more';
 				more_other: '… and {{count}} more';
 			};
+			'cancel-job': {
+				done: 'Cancelled a queued job';
+				running: 'Cancelling a queued job';
+			};
 			'close-tab': {
 				done: 'Closed a tab';
 				running: 'Closing a tab';
@@ -3146,6 +3176,21 @@ export default interface Resources {
 			'get-workspace-status': {
 				done: 'Read board status';
 				running: 'Reading board status';
+			};
+			job: {
+				cancelled: 'cancelled';
+				'exit-code': 'exit {{code}}';
+				log: 'Full log: {{path}}';
+				'nothing-to-cancel': 'already finished';
+				'pending-heading': 'Still queued or running';
+				position: 'position {{position}}';
+				state: {
+					cancelled: 'cancelled';
+					failed: 'failed';
+					queued: 'queued';
+					running: 'running';
+					succeeded: 'succeeded';
+				};
 			};
 			'launch-harness': {
 				done: 'Launched a harness';
@@ -3232,6 +3277,10 @@ export default interface Resources {
 				entries_other: '{{count}} entries';
 				issues_one: '{{count}} issue';
 				issues_other: '{{count}} issues';
+				'jobs-pending_one': '{{count}} job still going';
+				'jobs-pending_other': '{{count}} jobs still going';
+				'jobs-settled_one': '{{count}} job finished';
+				'jobs-settled_other': '{{count}} jobs finished';
 				memories_one: '{{count}} memory';
 				memories_other: '{{count}} memories';
 				models_one: '{{count}} model';
@@ -3278,6 +3327,10 @@ export default interface Resources {
 				'by-agent': 'Agent';
 				'by-user': 'You';
 				'not-found-heading': 'Not found';
+			};
+			'run-queued': {
+				done: 'Ran a queued command';
+				running: 'Running a queued command';
 			};
 			'send-follow-up': {
 				chat: {
@@ -3368,6 +3421,10 @@ export default interface Resources {
 				};
 				done: 'Waited for sub-agents';
 				running: 'Waiting for sub-agents';
+			};
+			'wait-for-job': {
+				done: 'Waited for queued jobs';
+				running: 'Waiting for queued jobs';
 			};
 			'with-detail': '{{action}}: {{detail}}';
 			'write-terminal': {
@@ -3747,6 +3804,21 @@ export default interface Resources {
 			unselected: 'Select model';
 		};
 		'navigation-sidebar': {
+			'compute-queue': {
+				cancel: 'Cancel {{label}}';
+				'cancel-failed': 'Could not cancel the job. It may have already finished.';
+				initiator: {
+					agent: 'Agent';
+					auto: 'Setup';
+					user: 'You';
+				};
+				'open-log': 'Open log';
+				position: '#{{position}}';
+				slots: '{{inUse}}/{{slots}}';
+				'slots-hint': 'Slots in use';
+				summary: '{{running}} running · {{queued}} queued';
+				title: 'Compute queue';
+			};
 			footer: {
 				repositories_one: '{{count}} repo';
 				repositories_other: '{{count}} repos';

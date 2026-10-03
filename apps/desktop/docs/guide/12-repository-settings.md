@@ -404,40 +404,38 @@ The action buttons themselves: [8. Reviewing changes](./08-reviewing-changes.md)
 
 This shortened example is drawn from Ensemblr's committed
 [`.ensemblr/settings.toml`](../../../../.ensemblr/settings.toml). See that file for the
-full run-script list, including the demo host and Linux build/diagnostic scripts.
+full run-script list, including the demo host and the Linux build script.
 
 ```toml
-#:schema ../schemas/settings.schema.json
+#:schema ../apps/desktop/schemas/settings.schema.json
 
-# Node 24 is pinned by scripts/require-node-version.mjs, so every command goes
-# through the wrapper. Ensemblr does inject the workspace directory's login-shell
-# PATH, and that capture activates mise — but a startup file that prepends
-# Homebrew after activating mise leaves Homebrew's Node ahead of Node 24, so
-# on PATH is not the same as first on PATH. See scripts/with-pinned-node.sh.
-# Never add PATH to [environment_variables]: the resolver is gated on the key
-# being absent, so configuring one silently disables it.
+# Every command runs inside the flake's dev shell, which puts Node, Bun, and the
+# native-module toolchain first on PATH. That makes the result independent of
+# whatever the login-shell PATH Ensemblr captured has in front. Never add PATH
+# to [environment_variables]: the resolver is gated on the key being absent, so
+# configuring one silently disables it.
 [scripts]
-setup = "./scripts/with-pinned-node.sh bun ci"
+setup = "nix develop -c bun ci"
 
 # Electron dev server.
 [scripts.run.dev]
-command = "./scripts/with-pinned-node.sh bun run dev"
+command = "nix develop -c bun run --cwd apps/desktop dev"
 icon = "play"
 default = true
 available_in = ["local"]
 
 [scripts.run.checks]
-command = "./scripts/with-pinned-node.sh bun run check && ./scripts/with-pinned-node.sh bun run typecheck"
+command = "nix develop -c sh -c 'bun run check && bun run typecheck'"
 icon = "list-checks"
 available_in = ["local"]
 
 [scripts.run.test]
-command = "./scripts/with-pinned-node.sh bun run test"
+command = "nix develop -c bun run --cwd apps/desktop test"
 icon = "test-tube"
 available_in = ["local"]
 
 [scripts.run.playground]
-command = "./scripts/with-pinned-node.sh bun run dev:playground"
+command = "nix develop -c bun run --cwd apps/desktop dev:playground"
 icon = "play"
 available_in = ["local"]
 
@@ -445,7 +443,7 @@ available_in = ["local"]
 # is macOS-only, so this one does nothing useful on a Linux host — build
 # `appimage` there.
 [scripts.run.unsigned]
-command = "./scripts/with-pinned-node.sh bun run make:unsigned && open out"
+command = "nix develop -c bun run --cwd apps/desktop make:unsigned && open apps/desktop/out"
 icon = "package"
 available_in = ["local"]
 ```
@@ -453,7 +451,7 @@ available_in = ["local"]
 Reading it line by line:
 
 - **`[scripts] setup`** — every new workspace runs `bun ci` on creation,
-  through the Node-pinning wrapper. It is a frozen install from `bun.lock`, and
+  inside the dev shell. It is a frozen install from `bun.lock`, and
   because Bun keeps a global package cache and clones from it, a fresh
   worktree's `node_modules` costs seconds rather than a full extraction. No
   `archive` script, so nothing runs on the way out.
@@ -475,18 +473,17 @@ Reading it line by line:
 - **Every script declares `available_in = ["local"]`** — explicit rather than
   omitted. Same effect here, since `local` is the only environment Ensemblr
   launches, but it documents intent.
-- **The comment above `[scripts]`** explains why every command is wrapped in a
-  Node-pinning script. Ensemblr captures a **login shell's** `PATH` for the
-  workspace directory — which activates mise — and injects it into setup
-  scripts, run scripts, and terminals. But mise's Node being *on* that `PATH` is
-  not it being *first*: a shell startup file that prepends Homebrew after
-  `mise activate` leaves Homebrew's Node in front, and the install's preinstall
-  guard then refuses it. The wrapper puts the pinned Node first and is a no-op
-  when it already is. The capture itself runs only when
-  `[environment_variables]` does *not* define `PATH`: the presence of the key,
-  even set to an empty string, switches it off. So never set `PATH` there. The
-  comment does not survive a save from the Scripts pane; the leading `#:schema`
-  directive does.
+- **The comment above `[scripts]`** explains why every command is wrapped in
+  `nix develop -c`. Ensemblr captures a **login shell's** `PATH` for the
+  workspace directory and injects it into setup scripts, run scripts, and
+  terminals, but what leads that `PATH` depends on the order of the user's shell
+  startup files — a file that prepends Homebrew after activating a version
+  manager leaves Homebrew's Node in front. The dev shell puts the pinned tools
+  first itself, so the result no longer depends on the capture. The capture
+  itself runs only when `[environment_variables]` does *not* define `PATH`: the
+  presence of the key, even set to an empty string, switches it off. So never set
+  `PATH` there. The comment does not survive a save from the Scripts pane; the
+  leading `#:schema` directive does.
 - **No `[git]`, `[prompts]`, `environment_variables`, or
   `file_include_globs`** — those all fall through to personal settings, then to
   user defaults. `file_include_globs` therefore resolves to its built-in

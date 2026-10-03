@@ -53,6 +53,7 @@
 		"src/shared/afk-mode.ts",
 		"src/shared/agent-failure.ts",
 		"src/shared/architecture-diagram.ts",
+		"src/shared/compute-queue.ts",
 		"src/shared/plan-mode.ts",
 		"src/shared/review-brief.ts",
 		"src/shared/scripts.ts",
@@ -113,12 +114,6 @@
 	// devDependencies is correct and the renderer bundle needs none at runtime.
 	// i18next-cli is invoked only through the `i18n:*` npm scripts, so there is
 	// no import edge for fallow to follow.
-	// node-abi is required at build time by scripts/require-linux-toolchain.mjs,
-	// which resolves the ABI @electron/rebuild stamps into node-pty's
-	// `.forge-meta` so the guard can tell an Electron-built binding from a
-	// Node-built one. Fallow reads `scripts/**` as production and wants it in
-	// `dependencies`, but nothing under `scripts/` is packaged — it runs from the
-	// repo checkout, before `electron-forge` does.
 	// The two @iconify-json collections are the *input* to
 	// scripts/generate-icon-subset.mjs, not a runtime dependency: it reads their
 	// icons.json and emits the 77 glyphs the renderer actually draws into
@@ -129,7 +124,6 @@
 		"@electron-forge/shared-types",
 		"@iconify-json/logos",
 		"@iconify-json/vscode-icons",
-		"node-abi",
 		"@tailwindcss/typography",
 		"i18next-cli",
 		"class-variance-authority",
