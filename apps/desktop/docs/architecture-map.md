@@ -141,8 +141,8 @@ The only code both processes may import. Two shapes coexist:
   - `<concern>/index.ts` — `ipc/` (47 contract modules under `ipc/contracts/`,
     plus `channels.ts` and `handler-map.ts`), `pi-rpc/`, `keymap/`.
   - `<concern>.ts` + `<concern>/` — `afk-mode`, `agent-control`, `agent-failure`,
-    `architecture-diagram`, `compute-queue`, `plan-mode`, `review-brief`, `scripts`, `terminal`,
-    `tool-presentation`. This is the form
+    `architecture-diagram`, `compute-queue`, `plan-mode`, `redaction`,
+    `review-brief`, `scripts`, `terminal`, `tool-presentation`. This is the form
     `electron --test` can resolve, so prefer it for anything the main-process
     suites import.
 
