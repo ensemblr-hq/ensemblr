@@ -254,7 +254,9 @@ export function createScriptLifecycleService({
 	/**
 	 * Resolves a launch and starts it, through the compute queue when it is heavy.
 	 * A conflict or a restart is settled before the launch queues, so a waiting
-	 * launch never sits behind the very session it was asked to replace. A launch
+	 * launch never sits behind the very session it was asked to replace — and
+	 * settled only once any launch of the same script still opening its terminal
+	 * has done so, so a duplicate request is refused rather than queued. A launch
 	 * that waited re-reads its command from the current settings when its slot
 	 * comes, starts without a restart (the one it asked for already happened),
 	 * and fails its job when the script is no longer configured.
@@ -315,6 +317,14 @@ export function createScriptLifecycleService({
 			return start({ deferred: false });
 		}
 
+		const pendingStart = pendingExclusiveScriptStarts.get(
+			exclusiveLaunchKey(launch),
+		);
+
+		if (pendingStart) {
+			await settlePendingStarts(launch, pendingStart);
+		}
+
 		const blocked = hasActiveSession(launch)
 			? await clearActiveSession(launch, restart)
 			: null;
@@ -360,6 +370,32 @@ export function createScriptLifecycleService({
 			if (pendingExclusiveScriptStarts.get(key) === started) {
 				pendingExclusiveScriptStarts.delete(key);
 			}
+		}
+	}
+
+	/**
+	 * Waits out every in-flight launch sharing this launch's lock, so a queued
+	 * launch decides against the session another launch is still opening rather
+	 * than against the empty dock it left a moment ago. Without it, a second
+	 * request arriving while the first one's terminal is being created passes the
+	 * conflict check and queues a duplicate behind the slot the first one holds.
+	 * Callers only reach this with a launch in flight, so a request with nothing
+	 * to wait for never yields and concurrent requests stay ordered.
+	 * @param launch - The resolved launch.
+	 * @param firstPendingStart - The in-flight launch found under its lock.
+	 */
+	async function settlePendingStarts(
+		launch: ScriptLaunch,
+		firstPendingStart: Promise<CreateTerminalSessionResult>,
+	): Promise<void> {
+		const key = exclusiveLaunchKey(launch);
+		let pendingStart: Promise<CreateTerminalSessionResult> | undefined =
+			firstPendingStart;
+
+		while (pendingStart) {
+			await pendingStart.catch(() => undefined);
+			const next = pendingExclusiveScriptStarts.get(key);
+			pendingStart = next === pendingStart ? undefined : next;
 		}
 	}
 
