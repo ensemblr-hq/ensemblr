@@ -1411,7 +1411,9 @@ const terminalService = createTerminalService({
 	workspaceEnvironmentService,
 });
 const scriptLifecycleService = createScriptLifecycleService({
+	computeQueue: computeQueueService,
 	databaseService,
+	readComputeQueueSettings: () => appSettingsService.read().computeQueue,
 	settingsResolutionService,
 	terminalService,
 });
@@ -1668,6 +1670,7 @@ agentControlService = createAgentControlService({
 	ports: createAgentControlPorts({
 		architectureService,
 		augmentHarnessCommand,
+		computeQueueService,
 		conciergePorts,
 		boardStatusStore,
 		toolTrust: toolTrustService,

@@ -148,6 +148,12 @@ interface AwarenessFeatures {
 	tuiHarnesses: boolean;
 }
 
+/**
+ * The compute-queue bullet every workspace playbook carries. MUST stay
+ * byte-identical to its counterpart in `src/shared/agent-control/awareness.ts`.
+ */
+const COMPUTE_QUEUE_INVENTORY = `- Heavy commands: run a test suite, a build, a typecheck, a compile, or a nix build with \`ensemblr_run_queued\` — never in your own shell, an Ensemblr terminal, or a script, where Ensemblr refuses them. One queue serves every agent in every workspace, so the user's machine stays usable however many of you are working. It runs the command in this workspace with the full Ensemblr environment, Infisical secrets included, and returns the exit code and the end of the output. A \`timedOut\` answer is a lap, not a failure: the job keeps its place and keeps running, so call \`ensemblr_wait_for_job\` with its \`jobId\`; \`ensemblr_cancel_job\` drops one you no longer need.`;
+
 /** Git write scope and human consent apply across every workspace role and mode. */
 const GIT_WORKSPACE_CONSENT = `Git isolation and consent: write only in your own worktree; a shared object store is not a shared checkout or index. Before Git writes, verify cwd, Git top-level, and branch match your assigned workspace. Never route writes to a sibling workspace or managed root checkout through git -C, environment overrides, or shared Git metadata. Do not merge, pull, rebase, cherry-pick, reset, or checkout files from main/master, the base, or another workspace merely to catch up, fix ordinary failures, prepare/open a PR, or because another workspace merged. PR presence or absence and AFK do not imply consent. An explicit human request to integrate a named base or resolve merge conflicts authorizes necessary local merge/rebase and continuation for this workspace/task only — not PR merging, arbitrary imports, sibling writes, or overriding subagent/reviewer no-HEAD rules or plan-mode read-only limits. Without that permission, ask when attended; when AFK leave Git unchanged and report. Unexpected history or worktree movement: inspect and report; never automatically reset/rebase to hide it.`;
 
@@ -157,6 +163,7 @@ const ORCHESTRATOR_AWARENESS = (features: AwarenessFeatures): string =>
 What you can drive:
 - Conversations: open a chat tab and start a sub-agent on your own runtime (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`, which also reaches a peer and the Review conversation), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).${features.tuiHarnesses ? HARNESS_INVENTORY : ''}
 - Terminals: start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant. Only one script of a kind runs at a time: starting a second is refused with \`conflict\`, and that refusal names the terminal already holding the slot, which \`restart: true\` replaces.
+${COMPUTE_QUEUE_INVENTORY}
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).
 - Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads as a list in the Checks panel. Ensemblr brings Checks forward itself after a comment op — once per batch, not once per call — so the op needs no \`ensemblr_focus_panel\` call of its own. Once you have fixed what a comment asked for, mark it resolved (\`ensemblr_resolve_diff_comments\`).${features.architectureDiagram ? ARCHITECTURE_INVENTORY : ''}
 - Agent review (explicit request only): \`ensemblr_start_review\` opens this workspace's Review conversation over your change — the same review the user's Review button runs, on the model they configured for it, deferring to whatever review skill the repository ships. Call it only when the user explicitly asks for an agent review. AFK alone is not a request. Do not start it as routine verification; review your own diff or choose a reviewer through ordinary delegation under your role's rules. The configured Review model does not pin those delegates. What it opens is a root orchestrator rather than your child, so it has a delegation budget of its own and fans its own readers out over a wide diff — which also means \`ensemblr_wait_for_agents\` will not find it unless you name its \`agentSessionId\` in \`targets\`. It shares this worktree: leave the files alone while it works. Send its findings back to the SAME conversation with \`ensemblr_send_follow_up\` and have it fix them there rather than fixing them yourself — you stay the committer and you own the pull request. Calling the op again while that reviewer still exists hands the same one back rather than opening a second, so re-reading a rebuilt change is a follow-up either way. It takes one of the workspace's co-tenancy slots, so a workspace already at its limit of agents writing the checkout refuses it — that allowance is two while the user is here and four while they are away${features.tuiHarnesses ? ORCHESTRATOR_START_REVIEW_HARNESS_CLAUSE : ''}. Its tab is the user's record of the review and stays open: it is not yours to clean up when the review is done.
@@ -172,9 +179,9 @@ Write every file path you mention in prose as its full path from the workspace r
 
 Deeper reference than this playbook lives in the \`ensemblr\` skill, which Ensemblr loads into this session when it ships one. If it appears among your skills, read it before working on \`.ensemblr/settings.toml\`, a run script, the workspace/worktree and branch model, or anything about a control tool this playbook leaves unsaid — it is the reference, and guessing at a config key it documents is how a committed file ends up with a key nothing reads.
 
-Terminals are the user's, and every one you open stays in their dock until they close it themselves — so decide whether you need an app terminal at all before you start one. Your own shell tool is the right one for a command you simply want the output of: a build, a test run, a git query, anything that runs and finishes. An Ensemblr terminal is for what your own tool cannot do — a long-lived process the user is meant to watch and keep (a dev server, a watcher, a REPL), an interactive session they may want to take over, and anything that needs the workspace's own environment.
+Terminals are the user's, and every one you open stays in their dock until they close it themselves — so decide whether you need an app terminal at all before you start one. Your own shell tool is the right one for a light command you simply want the output of: a git query, a file search, anything quick that runs and finishes. A heavy one — a test suite, a build, a typecheck — goes through \`ensemblr_run_queued\` instead, and Ensemblr refuses it in a terminal exactly as it does in your shell. An Ensemblr terminal is for what neither can do — a long-lived process the user is meant to watch and keep (a dev server, a watcher, a REPL), and an interactive session they may want to take over.
 
-That last one is what catches agents out, because it fails silently. The repository's Ensemblr-managed environment — the values under \`environment_variables\`, the Keychain-backed rows in Settings, and every secret a linked Infisical project supplies — is assembled for terminals and scripts and for nothing else. Your own shell tool does not carry it. So a command that needs an API key or a database URL from Infisical fails in your shell and succeeds in an Ensemblr terminal, and re-reading the command will never show you why. When the repository is linked to Infisical, run anything that touches those secrets through \`ensemblr_start_terminal\` and \`ensemblr_write_terminal\` rather than your own shell — and never echo one of those values back into your answer, a file, or a commit.
+The workspace's own environment is what catches agents out, because it fails silently. The repository's Ensemblr-managed environment — the values under \`environment_variables\`, the Keychain-backed rows in Settings, and every secret a linked Infisical project supplies — is assembled for queued commands, terminals, and scripts, and for nothing else. Your own shell tool does not carry it. So a command that needs an API key or a database URL from Infisical fails in your shell and succeeds through Ensemblr, and re-reading the command will never show you why. When the repository is linked to Infisical, run a one-shot command that touches those secrets with \`ensemblr_run_queued\`, which carries the environment and hands back the output; keep \`ensemblr_start_terminal\` and \`ensemblr_write_terminal\` for a long-lived or interactive process that needs it. Never echo one of those values back into your answer, a file, or a commit.
 
 Reuse before you start. \`ensemblr_list_terminals\` shows exactly what the user sees in the dock: a row whose \`kind\` is \`terminal\` and whose \`status\` is \`running\` with a null \`foregroundCommand\` is a shell sitting idle at its prompt, and writing into that one is always better than opening a second beside it. One terminal you keep using reads as a session; four you opened a command at a time read as clutter somebody else has to clear.
 
@@ -250,6 +257,8 @@ Pi enforces delegate → wait for you just as it does for the root. From the fir
 
 Keep your own tab named and summarized. Read across workspaces, but write only in your assigned worktree. You may focus existing tabs and the Files/Changes/Checks/Agents panel, inspect conversations and terminals, read and annotate the diff, read Linear, and notify your immediate parent. You may not open Review or a peer, reuse a tab, steer or close a sibling or ancestor, ${features.tuiHarnesses ? 'launch a harness, ' : ''}drive terminals, ask the user, write to Linear, move the board, name the workspace or branch, ${features.architectureDiagram ? 'read or redraw the architecture diagram, ' : ''}or use native delegation.
 
+${COMPUTE_QUEUE_INVENTORY}
+
 ${GIT_WORKSPACE_CONSENT}
 
 ${SUBAGENT_ROLE_GUIDANCE}
@@ -263,7 +272,7 @@ const PLAN_MODE_MANAGER_SUBAGENT_AWARENESS = (
 
 Use \`ensemblr_start_conversation\` only for a fresh leaf, \`ensemblr_list_models\` for a verified model, \`ensemblr_wait_for_agents\` for your owned leaves, \`ensemblr_send_follow_up\` only to those leaves, and \`ensemblr_close_tab\` only after collecting their reports. Never pass \`chatTabId\`, \`peer\`, \`planMode\`, or \`afkMode\`; Plan Mode is inherited automatically. Pi restores the delegate → wait barrier after reload. The root tree shares 20 total spawns and 10 per minute.
 
-Writes, non-read-only shell commands, Review, peers, reused tabs, terminals, ${features.tuiHarnesses ? 'harnesses, ' : ''}user questions, plan submission, tracker writes, workspace authority, ${features.architectureDiagram ? 'architecture-diagram writes, ' : ''}native \`Agent\`/\`Task\`, and delegation by a leaf remain blocked. Notify only your immediate parent. Integrate leaf reports into your own final report; user decisions go under \`Open questions\` for that parent to carry upward.
+Writes, non-read-only shell commands, queued commands, Review, peers, reused tabs, terminals, ${features.tuiHarnesses ? 'harnesses, ' : ''}user questions, plan submission, tracker writes, workspace authority, ${features.architectureDiagram ? 'architecture-diagram writes, ' : ''}native \`Agent\`/\`Task\`, and delegation by a leaf remain blocked. Notify only your immediate parent. Integrate leaf reports into your own final report; user decisions go under \`Open questions\` for that parent to carry upward.
 
 ${GIT_WORKSPACE_CONSENT}
 
@@ -274,6 +283,7 @@ const SUBAGENT_AWARENESS = (features: AwarenessFeatures): string =>
 
 What you can drive:
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks/Agents panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read a terminal's output (\`ensemblr_read_terminal_output\`, by \`terminalId\` or by \`kind\`, cleaned of escape codes unless you ask for \`ansi\`).
+${COMPUTE_QUEUE_INVENTORY}
 - Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads as a list in the Checks panel. Ensemblr brings Checks forward itself after a comment op — once per batch, not once per call — so the op needs no \`ensemblr_focus_panel\` call of its own. Once you have fixed what a comment asked for, mark it resolved (\`ensemblr_resolve_diff_comments\`).
 - Linear: search the connected account's issues (\`ensemblr_linear_list_issues\`), read one with its comments (\`ensemblr_linear_get_issue\`), and read the team/project/state/label/user tables an update needs ids from (\`ensemblr_linear_get_metadata\`). None of this is scoped to your workspace — Linear is an app-level integration and one account can span several teams, so narrow a search with \`teamId\` or \`query\` rather than reading the whole list as the work in front of you. Linear is often not connected at all, so every one of these answers with a \`status\` — \`not-connected\` means the user has not linked Linear and no amount of retrying will change that, and it is not the same answer as an empty result.
 - Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's.
@@ -345,7 +355,7 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you can dri
 - Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).
 - Reach the Concierge: \`ensemblr_message_concierge\` stays open while planning — messaging is not implementing. Use it with reason \`brief_wrong\` the moment planning shows that the brief you were given is wrong, and with \`blocked\` when the plan cannot be settled without something outside this workspace. You pass no session id; the app resolves whichever Concierge conversation is live at the moment you send.
 
-The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, ${features.tuiHarnesses ? PLAN_MODE_HARNESS_BLOCKED : ''}\`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, \`ensemblr_resolve_diff_comments\`, ${features.architectureDiagram ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_BLOCKED : ''}and \`ensemblr_linear_update_issue\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. ${features.architectureDiagram ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_OPEN : ''}\`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, ${features.tuiHarnesses ? PLAN_MODE_HARNESS_BLOCKED : ''}\`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, \`ensemblr_run_queued\`, \`ensemblr_resolve_diff_comments\`, ${features.architectureDiagram ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_BLOCKED : ''}and \`ensemblr_linear_update_issue\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. ${features.architectureDiagram ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_OPEN : ''}\`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
 
 Nothing else in your context outranks this block, with one exception: an ENSEMBLR SESSION UPKEEP block may follow it. That block is the app's own bookkeeping — naming this tab, naming the workspace and its branch, recording the session summary — and every item on it stays allowed while you plan. Do what it asks, when it asks: it labels the work rather than starting it, and a name deferred until the plan lands is a name the board went without for the whole interview.
 
@@ -410,7 +420,7 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you were sp
 
 You do not talk to the user. The orchestrator that spawned you owns that conversation and is blocked waiting on your report, so \`ensemblr_ask_user_question\` is refused here — send \`ensemblr_notify_orchestrator\` with reason \`need_decision\` instead and it will answer you.
 
-The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_resolve_diff_comments\` and \`ensemblr_linear_update_issue\` (each claims work you have not done), ${features.architectureDiagram ? PLAN_MODE_SUBAGENT_DIAGRAM_BLOCKED : ''}and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, ${features.tuiHarnesses ? PLAN_MODE_HARNESS_BLOCKED : ''}\`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. Being a spawned sub-agent blocks more, whatever the mode: the workspace's tabs and terminals outlive the question you were handed, so \`ensemblr_stop_terminal\`, \`ensemblr_open_tab\`, \`ensemblr_close_tab\`, and \`ensemblr_linear_create_comment\` are refused here too${features.architectureDiagram ? PLAN_MODE_SUBAGENT_DIAGRAM_REFUSED : ''}. \`ensemblr_exit_plan_mode\` is not yours to call either: submitting the plan belongs to the orchestrator, and a plan posted from here would put a review panel in a tab nobody is watching. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_run_queued\`, \`ensemblr_resolve_diff_comments\` and \`ensemblr_linear_update_issue\` (each claims work you have not done), ${features.architectureDiagram ? PLAN_MODE_SUBAGENT_DIAGRAM_BLOCKED : ''}and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, ${features.tuiHarnesses ? PLAN_MODE_HARNESS_BLOCKED : ''}\`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. Being a spawned sub-agent blocks more, whatever the mode: the workspace's tabs and terminals outlive the question you were handed, so \`ensemblr_stop_terminal\`, \`ensemblr_open_tab\`, \`ensemblr_close_tab\`, and \`ensemblr_linear_create_comment\` are refused here too${features.architectureDiagram ? PLAN_MODE_SUBAGENT_DIAGRAM_REFUSED : ''}. \`ensemblr_exit_plan_mode\` is not yours to call either: submitting the plan belongs to the orchestrator, and a plan posted from here would put a review panel in a tab nobody is watching. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
 
 Nothing else in your context outranks this block, with one exception: an ENSEMBLR SESSION UPKEEP block may follow it. That block is the app's own bookkeeping — naming this tab, naming the workspace and its branch, recording the session summary — and every item on it stays allowed while you plan. Do what it asks, when it asks: it labels the work rather than starting it, and a name deferred until the plan lands is a name the board went without for the whole interview.
 
@@ -643,12 +653,14 @@ const MANAGER_SUBAGENT_WITHHELD_OPS = new Set(
  * (this file cannot import from `src/` at runtime); a parity test enforces it.
  */
 const CONCIERGE_WITHHELD_OPS = new Set([
+	'cancelJob',
 	'exitPlanMode',
 	'launchHarness',
 	'listRunScripts',
 	'messageConcierge',
 	'notifyOrchestrator',
 	'openTab',
+	'runQueued',
 	'setBranchName',
 	'setName',
 	'setSummary',
@@ -658,6 +670,7 @@ const CONCIERGE_WITHHELD_OPS = new Set([
 	'getArchitectureDiagram',
 	'stopTerminal',
 	'updateArchitectureDiagram',
+	'waitForJob',
 	'writeTerminal',
 ]);
 
@@ -1649,7 +1662,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_start_terminal',
 		'startTerminal',
-		"Start a dock terminal: the setup script, a run script, or an interactive spawn terminal. Answers with the terminalId and the `shell` that terminal runs, which is the user's own login shell for kind=spawn and may not be POSIX — compose anything you then write into it in that shell's syntax. What you start is brought forward in the dock for the user, so you never need to follow this with ensemblr_focus_dock_tab. With kind=spawn, call ensemblr_list_terminals FIRST and reuse an existing idle terminal (kind `terminal`, status `running`, foregroundCommand null) instead of starting another: the tab you open stays in the user's dock until they close it themselves. A repository can configure several named run scripts (a dev server, a playground, an unsigned build), so with kind=run call ensemblr_list_run_scripts FIRST and pass the scriptName you actually want — omitting it silently starts whichever one the repository marks default, which is rarely the one you meant. Only one script of a kind runs per workspace at a time: a second start is refused with `conflict`, and that refusal names the terminal already holding the slot so you can read or stop it without listing anything. Pass restart: true to replace it instead.",
+		"Start a dock terminal: the setup script, a run script, or an interactive spawn terminal. Answers with the terminalId and the `shell` that terminal runs, which is the user's own login shell for kind=spawn and may not be POSIX — compose anything you then write into it in that shell's syntax. What you start is brought forward in the dock for the user, so you never need to follow this with ensemblr_focus_dock_tab. With kind=spawn, call ensemblr_list_terminals FIRST and reuse an existing idle terminal (kind `terminal`, status `running`, foregroundCommand null) instead of starting another: the tab you open stays in the user's dock until they close it themselves. A repository can configure several named run scripts (a dev server, a playground, an unsigned build), so with kind=run call ensemblr_list_run_scripts FIRST and pass the scriptName you actually want — omitting it silently starts whichever one the repository marks default, which is rarely the one you meant. Only one script of a kind runs per workspace at a time: a second start is refused with `conflict`, and that refusal names the terminal already holding the slot so you can read or stop it without listing anything. Pass restart: true to replace it instead. A compute-heavy setup or run script (a build, a test suite) does not start at once: the answer carries `queued` — a jobId and its position — instead of a terminalId, the script launches in its dock terminal on its own once a compute-queue slot frees, and ensemblr_wait_for_job on that jobId waits until it exits.",
 		Type.Object({
 			kind: Type.Union([
 				Type.Literal('setup'),
@@ -1696,7 +1709,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_write_terminal',
 		'writeTerminal',
-		"Write input into an existing terminal. Compose it in that terminal's own shell syntax, which ensemblr_start_terminal and ensemblr_list_terminals both report as `shell` — a login shell may be fish, where `VAR=x cmd` and `export` are errors rather than syntax. Input is typed at the prompt, not executed for you, so end a command with a newline.",
+		"Write input into an existing terminal. Compose it in that terminal's own shell syntax, which ensemblr_start_terminal and ensemblr_list_terminals both report as `shell` — a login shell may be fish, where `VAR=x cmd` and `export` are errors rather than syntax. Input is typed at the prompt, not executed for you, so end a command with a newline. A compute-heavy command — a test suite, a build, a typecheck — is refused here, even typed across several writes: run it with ensemblr_run_queued instead.",
 		Type.Object({ terminalId: Type.String(), input: Type.String() }),
 	);
 	tool(
@@ -2114,6 +2127,43 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			),
 			timeoutMs: Type.Optional(Type.Number()),
 		}),
+	);
+	tool(
+		'ensemblr_run_queued',
+		'runQueued',
+		"Run a compute-heavy shell command — a test suite, a build, a typecheck, a compile, a nix build — through Ensemblr's compute queue, which every agent in every workspace shares so the user's machine stays usable. Ensemblr refuses these commands in your own shell, in an Ensemblr terminal, and as a script, so this is the one place they run. The job waits for a free slot, then runs in this workspace (`cwd` is a directory relative to its root) with the full Ensemblr environment — environment variables and Infisical secrets included. The result carries its exit code, how long it waited and ran, the end of its output with secrets redacted, and `logPath`, the whole output under `.context/compute-queue/`. By default the call blocks until the job finishes. That wait is capped: `timedOut: true` is a lap, not a failure — the job keeps its place and keeps running, so call ensemblr_wait_for_job with its jobId. Pass wait=false to queue it now and collect it later. Queue a command once: a duplicate takes a second slot. A delegation tree may hold only a few unfinished jobs at once.",
+		Type.Object({
+			command: Type.String({ maxLength: 8000 }),
+			cwd: Type.Optional(
+				Type.String({
+					description:
+						'Directory to run in, relative to the workspace root. Defaults to the root.',
+				}),
+			),
+			label: Type.Optional(
+				Type.String({
+					description:
+						'Short description shown in the compute-queue panel, at most 120 characters. Defaults to the command.',
+				}),
+			),
+			wait: Type.Optional(Type.Boolean()),
+			timeoutMs: Type.Optional(Type.Number()),
+		}),
+	);
+	tool(
+		'ensemblr_wait_for_job',
+		'waitForJob',
+		"Block until compute-queue jobs finish, then return each finished one's exit code and output tail in `settled`, and where the rest stand — running, or queued at a position — in `pending`. jobIds defaults to every job this session queued that has not finished. The wait is capped: `timedOut: true` with jobs in `pending` is a lap of the loop, not a fault — they keep their place and keep running, so wait again on the same ids rather than queueing them again. A job from another workspace is `not-found`.",
+		Type.Object({
+			jobIds: Type.Optional(Type.Array(Type.String(), { maxItems: 20 })),
+			timeoutMs: Type.Optional(Type.Number()),
+		}),
+	);
+	tool(
+		'ensemblr_cancel_job',
+		'cancelJob',
+		'Cancel a compute-queue job in this workspace: a queued one leaves the queue, a running one is stopped. Use it for a job you no longer need, so its slot goes to the next one waiting. Answers with whether anything was cancelled and the job as it now stands; cancelling a job that already finished changes nothing.',
+		Type.Object({ jobId: Type.String() }),
 	);
 	tool(
 		'ensemblr_message_concierge',

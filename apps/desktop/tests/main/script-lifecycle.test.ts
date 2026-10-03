@@ -7,6 +7,7 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import test, { type TestContext } from 'node:test';
 
+import { createComputeQueueService } from '../../src/main/compute-queue/compute-queue-service.ts';
 import type { EnsemblrConfigResolutionService } from '../../src/main/config/config-resolution.ts';
 import { createScriptLifecycleService } from '../../src/main/scripts/script-lifecycle-service.ts';
 import { computeSetupFingerprint } from '../../src/main/scripts/setup-fingerprint.ts';
@@ -18,6 +19,7 @@ import type {
 	CreateTerminalSessionOptions,
 	TerminalService,
 } from '../../src/main/terminal';
+import type { ComputeQueueSettings } from '../../src/shared/config.ts';
 import type {
 	SettingsResolutionRequest,
 	TerminalSessionSnapshot,
@@ -287,20 +289,65 @@ function createTerminalServiceFake({
 	};
 }
 
+/** Compute-queue settings with the queue off, which every pre-queue test runs under. */
+const QUEUE_OFF: ComputeQueueSettings = {
+	concurrency: 1,
+	enabled: false,
+	exemptPatterns: [],
+	extraPatterns: [],
+	niceness: 10,
+};
+
+/** Queue dependencies for a service whose queue is off and must never be reached. */
+function queueOffDeps(): Pick<
+	Parameters<typeof createScriptLifecycleService>[0],
+	'computeQueue' | 'readComputeQueueSettings'
+> {
+	const unreachable = (): never => {
+		throw new Error('The compute queue is off; nothing may reach it.');
+	};
+
+	return {
+		computeQueue: {
+			acquireScriptLease: unreachable,
+			cancel: unreachable,
+			getJob: unreachable,
+		},
+		readComputeQueueSettings: () => QUEUE_OFF,
+	};
+}
+
 function createServiceFixture(
 	t: TestContext,
 	settings: Parameters<typeof createSettingsStub>[0],
 	fakeOptions?: Parameters<typeof createTerminalServiceFake>[0],
+	queueSettings?: Partial<ComputeQueueSettings>,
 ) {
 	const database = createDatabaseFixture(t);
 	const fake = createTerminalServiceFake(fakeOptions);
+	const computeQueueSettings: ComputeQueueSettings = {
+		...QUEUE_OFF,
+		...queueSettings,
+	};
+	const computeQueue = createComputeQueueService({
+		assembleEnvironment: async () => ({ env: {}, redactValues: [] }),
+		baseEnvironment: () => ({}),
+		readSettings: () => computeQueueSettings,
+		resolveWorkspace: () => null,
+		stopScriptTerminal: (terminalId) => {
+			fake.terminalService.kill(terminalId);
+		},
+	});
+	t.after(() => computeQueue.shutdown());
 	const service = createScriptLifecycleService({
+		computeQueue,
 		databaseService: createDatabaseServiceStub(database),
+		readComputeQueueSettings: () => computeQueueSettings,
 		settingsResolutionService: createSettingsStub(settings),
 		terminalService: fake.terminalService,
 	});
 
-	return { ...fake, service };
+	return { ...fake, computeQueue, service };
 }
 
 test('runScript starts the configured setup script in a workspace PTY', async (t) => {
@@ -324,6 +371,7 @@ test('runScript resolves committed config from the workspace worktree', async (t
 	const fake = createTerminalServiceFake();
 	const requests: unknown[] = [];
 	const service = createScriptLifecycleService({
+		...queueOffDeps(),
 		databaseService: createDatabaseServiceStub(database),
 		settingsResolutionService: createSettingsStub(
 			{ setup: 'bun install' },
@@ -1045,6 +1093,7 @@ test('runSetupScriptIfNeeded re-runs setup when the command changes', async (t) 
 	const database = createDatabaseFixture(t);
 	const first = createTerminalServiceFake();
 	const serviceA = createScriptLifecycleService({
+		...queueOffDeps(),
 		databaseService: createDatabaseServiceStub(database),
 		settingsResolutionService: createSettingsStub({ setup: 'npm install' }),
 		terminalService: first.terminalService,
@@ -1055,6 +1104,7 @@ test('runSetupScriptIfNeeded re-runs setup when the command changes', async (t) 
 
 	const second = createTerminalServiceFake();
 	const serviceB = createScriptLifecycleService({
+		...queueOffDeps(),
 		databaseService: createDatabaseServiceStub(database),
 		settingsResolutionService: createSettingsStub({ setup: 'npm ci' }),
 		terminalService: second.terminalService,
@@ -1134,6 +1184,7 @@ test('computeSetupFingerprint reflects every present lockfile', (t) => {
 test('runSetupScriptIfNeeded reports database-unavailable without a connection', async () => {
 	const fake = createTerminalServiceFake();
 	const service = createScriptLifecycleService({
+		...queueOffDeps(),
 		databaseService: {
 			getConnection: () => null,
 		} as unknown as EnsemblrDatabaseService,
@@ -1175,4 +1226,267 @@ test('runSetupScriptIfNeeded reports workspace-not-found for an unknown id', asy
 	assert.equal(result.session, null);
 	assert.equal(result.diagnostics[0]?.code, 'workspace-not-found');
 	assert.equal(createCalls.length, 0);
+});
+
+/** Polls until a condition holds, failing the test once the deadline passes. */
+async function eventually(
+	condition: () => boolean,
+	timeoutMs = 1_500,
+): Promise<void> {
+	const start = Date.now();
+
+	while (!condition()) {
+		if (Date.now() - start > timeoutMs) {
+			assert.fail('condition never held');
+		}
+
+		await new Promise((resolve) => setTimeout(resolve, 10));
+	}
+}
+
+/** Lets pending exit polls and queue grants run without asserting on them. */
+function settle(ms = 80): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** A service with the queue on and its one slot held by a user setup in the sibling workspace. */
+async function createBusyQueueFixture(
+	t: TestContext,
+	settings: Parameters<typeof createSettingsStub>[0] = { setup: 'bun install' },
+) {
+	const fixture = createServiceFixture(t, settings, undefined, {
+		enabled: true,
+	});
+	const occupant = await fixture.service.runScript({
+		initiator: 'user',
+		kind: 'setup',
+		workspaceId: SIBLING_WORKSPACE_ID,
+	});
+	assert.ok(occupant.session);
+
+	return { ...fixture, occupantId: occupant.session.id };
+}
+
+test('an agent setup launch waits for a slot, then starts when granted', async (t) => {
+	const fixture = await createBusyQueueFixture(t);
+
+	const result = await fixture.service.runScript({
+		initiator: 'agent',
+		kind: 'setup',
+		rootSessionId: 'root-1',
+		sessionId: 'agent-1',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(result.session, null);
+	assert.deepEqual(result.diagnostics, []);
+	assert.ok(result.queuedJob);
+	assert.equal(result.queuedJob.position, 1);
+	assert.equal(fixture.createCalls.length, 1);
+	const queuedJob = fixture.computeQueue.getJob(result.queuedJob.jobId);
+	assert.equal(queuedJob?.sessionId, 'agent-1');
+	assert.equal(queuedJob?.initiator, 'agent');
+
+	fixture.endSession(fixture.occupantId, 'exited');
+
+	await eventually(() => fixture.createCalls.length === 2);
+	assert.equal(fixture.createCalls[1]?.workspaceId, WORKSPACE_ID);
+	assert.equal(fixture.createCalls[1]?.kind, 'setup-script');
+	await eventually(
+		() =>
+			fixture.computeQueue.getJob(result.queuedJob?.jobId ?? '')?.terminalId ===
+			'session-2',
+	);
+	assert.equal(
+		fixture.computeQueue.getJob(result.queuedJob.jobId)?.state,
+		'running',
+	);
+});
+
+test('a user launch starts at once and holds its slot until the terminal exits', async (t) => {
+	const fixture = createServiceFixture(t, { setup: 'bun install' }, undefined, {
+		enabled: true,
+	});
+
+	const result = await fixture.service.runScript({
+		kind: 'setup',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.ok(result.session);
+	assert.equal(result.queuedJob, undefined);
+	const [job] = fixture.computeQueue.listJobs();
+	assert.equal(job?.state, 'running');
+	assert.equal(job?.initiator, 'user');
+	assert.equal(job?.command, 'bun install');
+
+	fixture.endSession(result.session.id, 'failed');
+
+	await eventually(
+		() => fixture.computeQueue.getJob(job?.id ?? '')?.state === 'failed',
+	);
+	assert.equal(fixture.computeQueue.getJob(job?.id ?? '')?.exitCode, 1);
+});
+
+test('a light run script bypasses the compute queue', async (t) => {
+	const fixture = await createBusyQueueFixture(t, {
+		run: 'echo serving',
+		setup: 'bun install',
+	});
+
+	const result = await fixture.service.runScript({
+		initiator: 'agent',
+		kind: 'run',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.ok(result.session);
+	assert.equal(fixture.computeQueue.listJobs().length, 1);
+});
+
+test('a heavy run script waits for a slot like setup does', async (t) => {
+	const fixture = await createBusyQueueFixture(t, {
+		run: 'cargo build --release',
+		setup: 'bun install',
+	});
+
+	const result = await fixture.service.runScript({
+		initiator: 'agent',
+		kind: 'run',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(result.session, null);
+	assert.ok(result.queuedJob);
+});
+
+test('a disabled queue starts agent launches at once without a job', async (t) => {
+	const fixture = createServiceFixture(t, { setup: 'bun install' });
+
+	const result = await fixture.service.runScript({
+		initiator: 'agent',
+		kind: 'setup',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.ok(result.session);
+	assert.equal(fixture.computeQueue.listJobs().length, 0);
+});
+
+test('a second start of a queued launch returns the job already waiting', async (t) => {
+	const fixture = await createBusyQueueFixture(t);
+
+	const first = await fixture.service.runScript({
+		initiator: 'agent',
+		kind: 'setup',
+		workspaceId: WORKSPACE_ID,
+	});
+	const second = await fixture.service.runSetupScriptIfNeeded({
+		initiator: 'auto',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.ok(first.queuedJob);
+	assert.equal(second.queuedJob?.jobId, first.queuedJob.jobId);
+	assert.equal(
+		fixture.computeQueue.listJobs().filter((job) => job.state === 'queued')
+			.length,
+		1,
+	);
+});
+
+test('a user start replaces a launch the app or an agent left waiting', async (t) => {
+	const fixture = await createBusyQueueFixture(t);
+
+	const queued = await fixture.service.runScript({
+		initiator: 'agent',
+		kind: 'setup',
+		workspaceId: WORKSPACE_ID,
+	});
+	const clicked = await fixture.service.runScript({
+		initiator: 'user',
+		kind: 'setup',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.ok(clicked.session);
+	assert.equal(
+		fixture.computeQueue.getJob(queued.queuedJob?.jobId ?? '')?.state,
+		'cancelled',
+	);
+});
+
+test('stopScript cancels a launch still waiting for a slot', async (t) => {
+	const fixture = await createBusyQueueFixture(t);
+
+	const queued = await fixture.service.runScript({
+		initiator: 'agent',
+		kind: 'setup',
+		workspaceId: WORKSPACE_ID,
+	});
+	const stopped = await fixture.service.stopScript({
+		kind: 'setup',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(stopped.diagnostics[0]?.code, 'script-queue-cancelled');
+	assert.equal(
+		fixture.computeQueue.getJob(queued.queuedJob?.jobId ?? '')?.state,
+		'cancelled',
+	);
+
+	fixture.endSession(fixture.occupantId, 'exited');
+	await settle();
+
+	assert.equal(fixture.createCalls.length, 1);
+});
+
+test('a lease cancelled from the queue never launches its script', async (t) => {
+	const fixture = await createBusyQueueFixture(t);
+
+	const queued = await fixture.service.runScript({
+		initiator: 'agent',
+		kind: 'setup',
+		workspaceId: WORKSPACE_ID,
+	});
+	assert.ok(queued.queuedJob);
+	assert.equal(fixture.computeQueue.cancel(queued.queuedJob.jobId), true);
+
+	fixture.endSession(fixture.occupantId, 'exited');
+	await settle();
+
+	assert.equal(fixture.createCalls.length, 1);
+	const requeued = await fixture.service.runScript({
+		initiator: 'agent',
+		kind: 'setup',
+		workspaceId: WORKSPACE_ID,
+	});
+	assert.ok(requeued.session);
+});
+
+test('a queued app setup still finalizes and auto-runs once it is granted', async (t) => {
+	const fixture = await createBusyQueueFixture(t, {
+		autoRunAfterSetup: true,
+		run: 'echo serving',
+		setup: 'bun install',
+	});
+
+	await fixture.service.runSetupScriptWithAutoRun({
+		workspaceId: WORKSPACE_ID,
+	});
+	assert.equal(fixture.createCalls.length, 1);
+
+	fixture.endSession(fixture.occupantId, 'exited');
+	await eventually(() => fixture.createCalls.length === 2);
+	fixture.endSession('session-2', 'exited');
+
+	await eventually(() => fixture.createCalls.length === 3);
+	assert.deepEqual(
+		fixture.createCalls.map((call) => [call.kind, call.workspaceId]),
+		[
+			['setup-script', SIBLING_WORKSPACE_ID],
+			['setup-script', WORKSPACE_ID],
+			['run-script', WORKSPACE_ID],
+		],
+	);
 });

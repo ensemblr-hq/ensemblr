@@ -175,7 +175,12 @@ describe('agent-control MCP endpoint', () => {
 		expect(names).not.toContain('ensemblr_set_summary');
 		expect(names).not.toContain('ensemblr_ask_user_question');
 		expect(names).not.toContain('ensemblr_exit_plan_mode');
-		expect(tools).toHaveLength(40);
+		// The compute queue is how a harness runs a heavy command at all, so a
+		// harness root holds all three of its ops.
+		expect(names).toContain('ensemblr_run_queued');
+		expect(names).toContain('ensemblr_wait_for_job');
+		expect(names).toContain('ensemblr_cancel_job');
+		expect(tools).toHaveLength(43);
 		await client.close();
 	});
 

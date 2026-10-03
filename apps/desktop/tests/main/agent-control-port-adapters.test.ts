@@ -2195,6 +2195,48 @@ describe('agent-control port adapters: run scripts', () => {
 		).toEqual({ ok: true, shell: '/bin/zsh', terminalId: 'term-1' });
 	});
 
+	// An agent's start is attributed to it, so a heavy script waits in the
+	// compute queue under its name rather than taking a slot the way a click does.
+	it('starts a script as the agent, and reports one waiting for a slot', async () => {
+		const runScriptSpy = vi.fn(
+			async (): Promise<CreateTerminalSessionResult> => ({
+				diagnostics: [],
+				queuedJob: { jobId: 'job-3', position: 2 },
+				session: null,
+			}),
+		);
+		const { deps } = makeDeps();
+		const ports = createAgentControlPorts({
+			...deps,
+			scriptLifecycleService: {
+				listRunScripts: () => [],
+				runScript: runScriptSpy,
+			},
+		} as unknown as PortAdapterDeps);
+
+		const outcome = await ports.terminals.startTerminal({
+			kind: 'setup',
+			rootSessionId: 'root',
+			sessionId: 'leaf',
+			workspaceCwd: '/tmp/ws',
+			workspaceId: 'ws',
+		});
+
+		expect(runScriptSpy).toHaveBeenCalledWith({
+			initiator: 'agent',
+			kind: 'setup',
+			restart: false,
+			rootSessionId: 'root',
+			scriptName: null,
+			sessionId: 'leaf',
+			workspaceId: 'ws',
+		});
+		expect(outcome).toEqual({
+			ok: true,
+			queued: { jobId: 'job-3', position: 2 },
+		});
+	});
+
 	// A launch that starts nothing used to answer with an empty terminal id,
 	// which reads as success to every caller that only checks for a throw.
 	it('surfaces the lifecycle diagnostic when no session starts', async () => {

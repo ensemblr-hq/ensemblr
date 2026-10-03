@@ -35,14 +35,18 @@ export const DISPATCH_TIMEOUT_MS = 120_000;
  * Ops exempt from the deadline because blocking *is* their contract:
  * `askUserQuestion` waits on a human with no timeout at all, `waitForAgents`
  * waits on a child, and `startConversation`/`sendFollowUp` do the same whenever
- * the caller passed `wait: true`. The last three are already bounded by
- * `guardrails.waitTimeoutMs`, so exempting them removes no protection.
+ * the caller passed `wait: true`. `runQueued` and `waitForJob` wait on a
+ * compute-queue job — a test suite or a build routinely outlives two minutes.
+ * Every one but the question is already bounded by `guardrails.waitTimeoutMs`,
+ * so exempting them removes no protection.
  */
 const BLOCKING_CONTROL_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'askUserQuestion',
+	'runQueued',
 	'sendFollowUp',
 	'startConversation',
 	'waitForAgents',
+	'waitForJob',
 ]);
 
 /**

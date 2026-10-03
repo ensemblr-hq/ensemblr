@@ -16,6 +16,9 @@ Control adds no capability of its own — it is a gate, not a feature.
 `ensemblr_write_terminal`, `ensemblr_read_terminal_output`,
 `ensemblr_list_run_scripts`.
 
+**The compute queue** — `ensemblr_run_queued`, `ensemblr_wait_for_job`,
+`ensemblr_cancel_job`.
+
 **Tabs, focus, the board** — `ensemblr_open_tab`, `ensemblr_focus_tab`,
 `ensemblr_focus_dock_tab`, `ensemblr_focus_panel`, `ensemblr_get_workspace_status`,
 `ensemblr_set_workspace_status`.
@@ -141,19 +144,21 @@ first, then read what you actually need.
 A terminal you open is a tab in the user's dock, and only they can take it away
 unless you close it yourself. Four habits keep that surface honest.
 
-**Know when you need one.** Your own shell tool is right for a command you just
-want the output of. An Ensemblr terminal is for a long-lived process the user
-should watch and keep, an interactive session they may take over, and anything
-needing the workspace's own environment.
+**Know when you need one.** Your own shell tool is right for a light command you
+just want the output of. A heavy one goes through the compute queue (below). An
+Ensemblr terminal is for a long-lived process the user should watch and keep,
+and an interactive session they may take over.
 
-**The workspace environment lives in terminals and nowhere else.** The values
-under `environment_variables`, the Keychain-backed rows in Settings, and every
-secret a linked Infisical project supplies are assembled for terminals and
-scripts. They are *not* in the environment your own shell tool runs under — an
-agent session is spawned with the login shell's environment plus its control
-token, and nothing else. So a command needing an Infisical secret fails in your
-shell and succeeds in an Ensemblr terminal. Run it there, and never echo a
-resolved secret into an answer, a file, or a commit.
+**The workspace environment lives in queued commands, terminals and scripts,
+and nowhere else.** The values under `environment_variables`, the
+Keychain-backed rows in Settings, and every secret a linked Infisical project
+supplies are assembled for those three. They are *not* in the environment your
+own shell tool runs under — an agent session is spawned with the login shell's
+environment plus its control token, and nothing else. So a command needing an
+Infisical secret fails in your shell and succeeds through Ensemblr. Run a
+one-shot command with `ensemblr_run_queued`, which carries the environment and
+hands back the output; keep a terminal for a long-lived or interactive process.
+Never echo a resolved secret into an answer, a file, or a commit.
 
 **Reuse before you start.** `ensemblr_list_terminals` reports each terminal's
 `kind`, `status`, `scriptName`, the `shell` it runs, and `foregroundCommand` —
@@ -177,6 +182,29 @@ close on any terminal your session did not itself start: that one comes back
 stop is recoverable and is not gated that way, so it is still on you not to stop
 a terminal somebody else is using.
 
+## The compute queue
+
+Test suites, builds, typechecks, compiles and nix builds go through
+`ensemblr_run_queued` — never your own shell, an Ensemblr terminal, or a script.
+Ensemblr refuses them in all three with a paragraph naming the queue tools, and
+`ensemblr_write_terminal` classifies a command typed across several writes
+whole. One queue serves every agent in every workspace, so the machine stays
+usable however many agents are working; the user sets the slot count and which
+commands count as heavy in Settings → General.
+
+`ensemblr_run_queued` takes `command`, an optional `cwd` relative to the
+workspace root, a `label` for the queue panel, and `wait` (default true). It
+runs in the workspace with the full Ensemblr environment and answers with a
+`job`: `state`, `position` while queued, `exitCode`, `durationMs`, `waitedMs`,
+`outputTail` — the end of the output, secrets redacted, `omittedChars` cut from
+its front — and `logPath`, the whole output under `.context/compute-queue/`.
+`timedOut: true` is a lap, not a failure: the job keeps its place, so call
+`ensemblr_wait_for_job` with its `jobId` (`jobIds` defaults to every unfinished
+job your session queued). `ensemblr_cancel_job` drops one you no longer need.
+An agent-started setup or run script that is heavy answers `queued` with a
+`jobId` instead of a `terminalId`, launches on its own when a slot frees, and
+`ensemblr_wait_for_job` waits for it to exit.
+
 ## Delegation
 
 **Your own context window is precious, subagents are cheap.** Delegate for
@@ -197,6 +225,8 @@ The guardrails, so you know what a denial means:
 | Spawns per minute | 10 |
 | Terminals open at once, per root tree | 8 (terminal starts are not spawns and never spend the spawn budget) |
 | Terminal starts per minute | 10 |
+| Unfinished compute-queue jobs, per root tree | 6 (open at every depth; a job finishing or `ensemblr_cancel_job` frees a place) |
+| Compute-queue enqueues per minute | 20 |
 | One blocking wait | 300 s, then it returns `timedOut` |
 
 A blocking wait whose target is an ancestor of the caller is refused

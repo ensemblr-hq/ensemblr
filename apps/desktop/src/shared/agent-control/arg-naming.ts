@@ -40,7 +40,9 @@ export const CANONICAL_ARG_KEYS = {
 	chatTabId: 'Identifier of a chat tab in the workspace.',
 	close:
 		'Take the tab away as well as stopping what it holds, rather than leaving it for its output to stay readable.',
-	command: 'Shell command a guarded tool call is about to run.',
+	command:
+		'Shell command a guarded tool call is about to run, or that a queued job runs.',
+	cwd: 'Working directory relative to the workspace root, which it may not leave.',
 	commentBody: 'Markdown body of a comment an op writes or opens a tab on.',
 	commentIds: 'Ids of review comments an op acts on.',
 	comments: 'Batch of review comments to file against the diff.',
@@ -54,6 +56,8 @@ export const CANONICAL_ARG_KEYS = {
 	git: 'Git preference section.',
 	harnessId: 'Identifier of a third-party agent harness.',
 	input: 'Raw text written into a terminal, keystrokes included.',
+	jobId: 'Identifier of a compute-queue job.',
+	jobIds: 'Compute-queue jobs an op acts on.',
 	issueId: 'Identifier of a tracker issue, or its human key such as ENG-106.',
 	kind: 'Which of a fixed set of variants an op acts on.',
 	labelIds: 'Identifiers of the labels a tracker issue carries.',
@@ -63,6 +67,8 @@ export const CANONICAL_ARG_KEYS = {
 	hiddenModels: 'Model ids hidden from spawn choices.',
 	alwaysShowContextUsage: 'Whether context usage stays visible in the UI.',
 	archiveAfterMerge: 'Whether merged workspaces are archived automatically.',
+	label:
+		'Short human description of a queued job, shown in the compute-queue panel.',
 	language: 'App interface and agent reply language preference.',
 	markdownStyle: 'Markdown rendering style.',
 	models: 'Model preference section.',
@@ -140,7 +146,7 @@ export const CANONICAL_ARG_KEYS = {
 	userRequested:
 		'Whether the user asked for this action in so many words, lifting a gate that otherwise only opens once.',
 	variant: 'Which kind of non-chat tab to open.',
-	wait: 'Block until the conversation being addressed goes idle.',
+	wait: 'Block until what is being addressed settles — a conversation going idle, or a queued job finishing.',
 	workspaceId: 'Identifier of an open workspace.',
 } as const satisfies Record<string, string>;
 

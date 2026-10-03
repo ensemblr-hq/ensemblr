@@ -237,6 +237,7 @@ export default defineConfig({
 						'tests/main/agent-control-harness-playbook-file.test.ts',
 						'tests/main/agent-control-model-resolution.test.ts',
 						'tests/main/agent-control-wait.test.ts',
+						'tests/main/agent-control-job-queue.test.ts',
 						'tests/main/pi-delegation-barrier.test.ts',
 						'tests/main/agent-control-awareness-parity.test.ts',
 						'tests/main/agent-control-arg-naming.test.ts',

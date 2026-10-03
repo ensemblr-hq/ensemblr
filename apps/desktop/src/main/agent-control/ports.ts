@@ -60,6 +60,7 @@ import { controlToolNamingForRuntime } from '../../shared/agent-control.ts';
 import type { AgentProviderId } from '../../shared/agent-provider.ts';
 import type { AppLanguage } from '../../shared/i18n.ts';
 import type { PermissionMode } from '../../shared/permissions.ts';
+import type { JobQueuePort } from './job-queue-ports.ts';
 
 /**
  * Which agent runtime a control command originated from. `pi` and `claude` are
@@ -448,6 +449,11 @@ export type StartTerminalOutcome =
 			shell: string;
 	  }
 	| {
+			ok: true;
+			/** A heavy script waiting for a compute-queue slot; no terminal exists yet. */
+			queued: { jobId: string; position: number | null };
+	  }
+	| {
 			ok: false;
 			code: string;
 			message: string;
@@ -473,6 +479,9 @@ export interface TerminalPort {
 		scriptName?: string;
 		/** Replace a script of this kind that is already running. */
 		restart?: boolean;
+		/** The agent asking, so a heavy script it starts queues under its name. */
+		sessionId?: string;
+		rootSessionId?: string | null;
 	}) => Promise<StartTerminalOutcome>;
 	/** The run scripts the workspace's repository offers, in declaration order. */
 	listRunScripts: (input: {
@@ -985,6 +994,11 @@ export interface AgentControlPorts {
 	 * built-in lists, and a reported inventory goes nowhere.
 	 */
 	toolTrust?: ToolTrustPort;
+	/**
+	 * The app-wide compute queue. Absent when none is wired: the queue ops are
+	 * then refused and no shell command is gated on it.
+	 */
+	jobQueue?: JobQueuePort;
 	diff: DiffPort;
 	review: ReviewPort;
 	reviewLaunch: ReviewLaunchPort;

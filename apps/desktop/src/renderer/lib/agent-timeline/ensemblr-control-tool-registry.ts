@@ -205,6 +205,21 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 				),
 		],
 	},
+	ensemblr_cancel_job: {
+		glyph: 'circle-x',
+		title: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.cancel-job.done',
+					'Cancelled a queued job',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.cancel-job.running',
+					'Cancelling a queued job',
+				),
+		],
+	},
 	ensemblr_get_app_settings: {
 		glyph: 'eye',
 		title: [
@@ -965,6 +980,22 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		],
 		workspaceKeys: ['workspaceId'],
 	},
+	ensemblr_run_queued: {
+		detailKeys: ['label', 'command'],
+		glyph: 'square-terminal',
+		title: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.run-queued.done',
+					'Ran a queued command',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.run-queued.running',
+					'Running a queued command',
+				),
+		],
+	},
 	ensemblr_start_terminal: {
 		detailKeys: ['scriptName', 'kind'],
 		glyph: 'play',
@@ -1036,6 +1067,21 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 				i18n.t(
 					'workbench:control-tool.wait-for-agents.running',
 					'Waiting for sub-agents',
+				),
+		],
+	},
+	ensemblr_wait_for_job: {
+		glyph: 'hourglass',
+		title: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.wait-for-job.done',
+					'Waited for queued jobs',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.wait-for-job.running',
+					'Waiting for queued jobs',
 				),
 		],
 	},

@@ -11,6 +11,7 @@ export {
 export * from './chat-tabs';
 export * from './checkpoints';
 export * from './clone';
+export * from './compute-queue';
 export * from './concierge';
 export * from './dictation';
 export * from './environment';
@@ -38,7 +39,6 @@ export * from './secrets';
 export * from './settings';
 export * from './settings-publication';
 export * from './setup';
-export * from './compute-queue';
 export * from './updates';
 export * from './window-controls';
 export * from './workspace-files';

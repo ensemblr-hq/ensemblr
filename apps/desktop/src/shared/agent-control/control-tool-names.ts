@@ -185,8 +185,9 @@ export function namespaceControlToolNames(
  * applied to them.
  *
  * The rewrite is for prose the app wrote: guidance naming the next op to call.
- * These ops return a git patch, terminal scrollback, a transcript, a stored
- * document, or a ticket somebody else typed — where a control tool name is a
+ * These ops return a git patch, terminal scrollback, a queued command's output,
+ * a transcript, a stored document, or a ticket somebody else typed — where a
+ * control tool name is a
  * fact about that content rather than a recommendation to the reader. Rewriting
  * one hands an agent a diff that disagrees with the file on disk, or a transcript
  * naming a tool the child never called, and a stored diagram read through the
@@ -199,6 +200,7 @@ export function namespaceControlToolNames(
  * wrapped form.
  */
 export const VERBATIM_RESULT_OPS: ReadonlySet<AgentControlOp> = new Set([
+	'cancelJob',
 	'getArchitectureDiagram',
 	'getDiffComments',
 	'getWorkspaceDiff',
@@ -207,4 +209,6 @@ export const VERBATIM_RESULT_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'readConversation',
 	'readTerminalOutput',
 	'recallMemory',
+	'runQueued',
+	'waitForJob',
 ]);

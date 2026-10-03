@@ -1,24 +1,37 @@
+import type { ComputeJobInitiator } from '../../shared/compute-queue.ts';
+import type { ComputeQueueSettings } from '../../shared/config.ts';
 import type {
 	CreateTerminalSessionResult,
 	KillTerminalResult,
 	TerminalSessionSnapshot,
 } from '../../shared/ipc/contracts/terminal';
-import type { ComputeJobInitiator } from '../../shared/compute-queue.ts';
 import type { WorkspaceScriptKind } from '../../shared/ipc/contracts/workspace-scripts';
 import {
-	formatRunScriptLabel,
 	parseWorkspaceScriptSettings,
 	type RunScriptDefinition,
-	resolveRunScript,
 	type WorkspaceScriptSettings,
 } from '../../shared/scripts.ts';
 import type { EnsemblrConfigResolutionService } from '../config';
-import { isRecord, isString } from '../repository/row-guards.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import { selectWorkspaceWithRepositoryById } from '../storage/repositories/workspace-repository.ts';
 import type { TerminalService } from '../terminal';
-import { computeSetupFingerprint } from './setup-fingerprint.ts';
-import { readSetupStateFile, writeSetupStateFile } from './setup-state-file.ts';
+import {
+	describeMissingScript,
+	describeRunningScript,
+	exclusiveLaunchKey,
+	failure,
+	isWorkspaceRow,
+	resolveScriptLaunch,
+	type ScriptLaunch,
+} from './script-launch.ts';
+import {
+	createScriptQueueGate,
+	type ScriptComputeQueue,
+} from './script-queue-gate.ts';
+import {
+	isSetupFingerprintCurrent,
+	recordSetupFingerprint,
+} from './setup-state-file.ts';
 
 const RESTART_WAIT_TIMEOUT_MS = 7_000;
 
@@ -59,20 +72,6 @@ export interface StopScriptOptions {
 	workspaceId: string;
 }
 
-/** One resolved script launch: everything needed to spawn its session. */
-interface ScriptLaunch {
-	command: string;
-	kind: WorkspaceScriptKind;
-	/** Repository the target workspace belongs to. */
-	repositoryId: string;
-	/** Configured run-script name, or null for setup/archive. */
-	scriptName: string | null;
-	/** True when `nonconcurrent` run mode must clear the repository's siblings first. */
-	stopSiblingWorkspaces: boolean;
-	title: string;
-	workspaceId: string;
-}
-
 /** Public surface of the script lifecycle service. */
 export interface ScriptLifecycleService {
 	/**
@@ -98,6 +97,8 @@ export interface ScriptLifecycleService {
 	 * workspace never re-runs setup when nothing that affects it changed.
 	 */
 	runSetupScriptIfNeeded: (options: {
+		/** Who asked; see {@link RunScriptOptions.initiator}. Defaults to `user`. */
+		initiator?: ComputeJobInitiator;
 		workspaceId: string;
 	}) => Promise<CreateTerminalSessionResult>;
 	/**
@@ -108,12 +109,20 @@ export interface ScriptLifecycleService {
 	runSetupScriptWithAutoRun: (options: {
 		workspaceId: string;
 	}) => Promise<void>;
+	/**
+	 * Stops the active script session of a kind and cancels any launch of that
+	 * kind still waiting in the compute queue.
+	 */
 	stopScript: (options: StopScriptOptions) => Promise<KillTerminalResult>;
 }
 
 /** Options for {@link createScriptLifecycleService}. */
 export interface CreateScriptLifecycleServiceOptions {
+	/** The app-wide queue heavy setup and run scripts hold a slot in. */
+	computeQueue: ScriptComputeQueue;
 	databaseService: EnsemblrDatabaseService;
+	/** Live compute-queue settings, read on every launch. */
+	readComputeQueueSettings: () => ComputeQueueSettings;
 	settingsResolutionService: EnsemblrConfigResolutionService;
 	terminalService: TerminalService;
 }
@@ -121,13 +130,16 @@ export interface CreateScriptLifecycleServiceOptions {
 /**
  * Builds the service that runs repository setup/run/archive scripts inside
  * workspace PTY sessions: resolves the configured command per repository
- * config precedence, enforces the resolved `runScriptMode`, and exposes
- * stop/restart controls. Output streams through the terminal dock.
+ * config precedence, enforces the resolved `runScriptMode`, puts heavy
+ * launches behind the compute queue, and exposes stop/restart controls.
+ * Output streams through the terminal dock.
  * @param options - Service dependencies.
  * @returns A fresh {@link ScriptLifecycleService}.
  */
 export function createScriptLifecycleService({
+	computeQueue,
 	databaseService,
+	readComputeQueueSettings,
 	settingsResolutionService,
 	terminalService,
 }: CreateScriptLifecycleServiceOptions): ScriptLifecycleService {
@@ -135,6 +147,11 @@ export function createScriptLifecycleService({
 		string,
 		Promise<CreateTerminalSessionResult>
 	>();
+	const queueGate = createScriptQueueGate({
+		computeQueue,
+		readComputeQueueSettings,
+		terminalService,
+	});
 
 	/**
 	 * Resolves the configured command and run mode from the workspace worktree,
@@ -210,16 +227,37 @@ export function createScriptLifecycleService({
 	 * kind runs per workspace at a time, so launches are serialized and a second
 	 * request is refused unless it asks for a restart. In `nonconcurrent` run
 	 * mode a run launch additionally stops run scripts in the repository's other
-	 * workspaces.
-	 * @param options - Script kind, target workspace, requested run script, and whether to restart.
-	 * @returns The terminal session create result, or a typed failure diagnostic.
+	 * workspaces. A launch that has to wait for a compute slot answers at once
+	 * with its queued job and starts once the slot is granted.
+	 * @param options - Script kind, target workspace, requested run script, whether to restart, and who asked.
+	 * @returns The terminal session create result, a queued job, or a typed failure diagnostic.
 	 */
-	async function runScript({
-		kind,
-		restart = false,
-		scriptName,
-		workspaceId,
-	}: RunScriptOptions): Promise<CreateTerminalSessionResult> {
+	function runScript(
+		options: RunScriptOptions,
+	): Promise<CreateTerminalSessionResult> {
+		return startScript(options);
+	}
+
+	/**
+	 * Resolves a launch and starts it, through the compute queue when it is heavy.
+	 * A conflict or a restart is settled before the launch queues, so a waiting
+	 * launch never sits behind the very session it was asked to replace.
+	 * @param options - The launch request.
+	 * @param onSessionStarted - Called with the session id whenever the launch opens one, now or after a queue wait.
+	 * @returns The terminal session create result, a queued job, or a typed failure diagnostic.
+	 */
+	async function startScript(
+		{
+			initiator = 'user',
+			kind,
+			restart = false,
+			rootSessionId,
+			scriptName,
+			sessionId,
+			workspaceId,
+		}: RunScriptOptions,
+		onSessionStarted?: (terminalId: string) => void,
+	): Promise<CreateTerminalSessionResult> {
 		const resolved = resolveScriptConfig(workspaceId);
 
 		if (resolved.error) {
@@ -242,57 +280,33 @@ export function createScriptLifecycleService({
 			);
 		}
 
-		return runExclusiveScript(launch, restart);
-	}
+		const start = async (): Promise<CreateTerminalSessionResult> => {
+			const result = await runExclusiveScript(launch, restart);
 
-	/**
-	 * Resolves which command a launch request runs, mapping the run kind onto one
-	 * of the repository's named run scripts.
-	 * @param options - Script kind, requested run-script name, resolved settings, and workspace.
-	 * @returns The launch record, or null when nothing is configured for it.
-	 */
-	function resolveScriptLaunch({
-		kind,
-		repositoryId,
-		requestedName,
-		settings,
-		workspaceId,
-	}: {
-		kind: WorkspaceScriptKind;
-		repositoryId: string;
-		requestedName: string | null | undefined;
-		settings: WorkspaceScriptSettings;
-		workspaceId: string;
-	}): ScriptLaunch | null {
-		if (kind !== 'run') {
-			const command = settings.scripts[kind];
+			if (result.session) {
+				onSessionStarted?.(result.session.id);
+			}
 
-			return command
-				? {
-						command,
-						kind,
-						repositoryId,
-						scriptName: null,
-						stopSiblingWorkspaces: false,
-						title: defaultScriptTitle(kind),
-						workspaceId,
-					}
-				: null;
+			return result;
+		};
+
+		if (!queueGate.requiresSlot(launch)) {
+			return start();
 		}
 
-		const runScript = resolveRunScript(settings.runScripts, requestedName);
-
-		return runScript
-			? {
-					command: runScript.command,
-					kind,
-					repositoryId,
-					scriptName: runScript.name,
-					stopSiblingWorkspaces: settings.runScriptMode === 'nonconcurrent',
-					title: formatRunScriptLabel(runScript.name),
-					workspaceId,
-				}
+		const blocked = hasActiveSession(launch)
+			? await clearActiveSession(launch, restart)
 			: null;
+
+		if (blocked) {
+			return blocked;
+		}
+
+		return queueGate.admit({
+			launch,
+			owner: { initiator, rootSessionId, sessionId },
+			start,
+		});
 	}
 
 	/**
@@ -329,6 +343,63 @@ export function createScriptLifecycleService({
 	}
 
 	/**
+	 * Reports whether a session of the launch's kind is running in its workspace.
+	 * Checked before {@link clearActiveSession} so a launch with nothing to clear
+	 * reaches its spawn without yielding, which keeps concurrent requests ordered.
+	 * @param launch - The resolved launch.
+	 * @returns True when a session would block or be replaced.
+	 */
+	function hasActiveSession(launch: ScriptLaunch): boolean {
+		return findActiveScriptSession(launch.workspaceId, launch.kind) !== null;
+	}
+
+	/**
+	 * Clears the way for a launch: refuses when a session of its kind is already
+	 * running, unless restart is set, in which case it stops that session and
+	 * waits for it to exit.
+	 * @param launch - The resolved launch.
+	 * @param restart - Whether to replace a session that is already running.
+	 * @returns A failure that blocks the launch, or null when it may proceed.
+	 */
+	async function clearActiveSession(
+		launch: ScriptLaunch,
+		restart: boolean,
+	): Promise<CreateTerminalSessionResult | null> {
+		const activeSession = findActiveScriptSession(
+			launch.workspaceId,
+			launch.kind,
+		);
+
+		if (!activeSession) {
+			return null;
+		}
+
+		if (!restart) {
+			return failure(
+				'script-already-running',
+				describeRunningScript(launch.kind, activeSession.scriptName),
+				'warning',
+				activeSession.id,
+			);
+		}
+
+		terminalService.kill(activeSession.id);
+		const exited = await terminalService.waitForExit(
+			activeSession.id,
+			RESTART_WAIT_TIMEOUT_MS,
+		);
+
+		return exited
+			? null
+			: failure(
+					'script-restart-timeout',
+					`The running ${launch.kind} script did not stop in time; the restart was aborted.`,
+					'warning',
+					activeSession.id,
+				);
+	}
+
+	/**
 	 * Decides and performs one exclusive launch: fails when a session is already
 	 * running unless restart is set, in which case it stops the active session
 	 * and waits for it to exit before starting the replacement.
@@ -340,35 +411,12 @@ export function createScriptLifecycleService({
 		launch: ScriptLaunch,
 		restart: boolean,
 	): Promise<CreateTerminalSessionResult> {
-		const activeSession = findActiveScriptSession(
-			launch.workspaceId,
-			launch.kind,
-		);
+		const blocked = hasActiveSession(launch)
+			? await clearActiveSession(launch, restart)
+			: null;
 
-		if (activeSession) {
-			if (!restart) {
-				return failure(
-					'script-already-running',
-					describeRunningScript(launch.kind, activeSession.scriptName),
-					'warning',
-					activeSession.id,
-				);
-			}
-
-			terminalService.kill(activeSession.id);
-			const exited = await terminalService.waitForExit(
-				activeSession.id,
-				RESTART_WAIT_TIMEOUT_MS,
-			);
-
-			if (!exited) {
-				return failure(
-					'script-restart-timeout',
-					`The running ${launch.kind} script did not stop in time; the restart was aborted.`,
-					'warning',
-					activeSession.id,
-				);
-			}
+		if (blocked) {
+			return blocked;
 		}
 
 		if (launch.stopSiblingWorkspaces) {
@@ -475,14 +523,16 @@ export function createScriptLifecycleService({
 	 * PTY, so `finalizeSession` — the only place waiters are drained — does not
 	 * run for a setup still going when the app closes. Both cost at most one
 	 * redundant setup run on the next open.
-	 * @param options - The setup command, its session id, and the target workspace.
+	 * @param options - The setup command, who started it, its session id, and the target workspace.
 	 */
 	async function finalizeSetup({
 		command,
+		initiator,
 		sessionId,
 		workspaceId,
 	}: {
 		command: string;
+		initiator: ComputeJobInitiator;
 		sessionId: string;
 		workspaceId: string;
 	}): Promise<void> {
@@ -504,7 +554,7 @@ export function createScriptLifecycleService({
 			return;
 		}
 
-		await runScript({ kind: 'run', workspaceId }).catch(() => {});
+		await runScript({ initiator, kind: 'run', workspaceId }).catch(() => {});
 	}
 
 	/**
@@ -533,36 +583,7 @@ export function createScriptLifecycleService({
 			return;
 		}
 
-		writeSetupStateFile(row.path, {
-			command,
-			completedAt: new Date().toISOString(),
-			fingerprint: computeSetupFingerprint({
-				command,
-				worktreePath: row.path,
-			}),
-		});
-	}
-
-	/**
-	 * Reports whether a prior clean setup run still covers the current inputs, so
-	 * setup can be skipped. Matches on both the command and the worktree
-	 * fingerprint; the fingerprint (which reads lockfiles) is only computed when
-	 * the recorded command matches.
-	 * @param row - Workspace join row carrying the worktree `path`.
-	 * @param command - The resolved setup command to compare against the record.
-	 * @returns True when the recorded fingerprint matches the current inputs.
-	 */
-	function setupIsCurrent(row: { path: string }, command: string): boolean {
-		const persisted = readSetupStateFile(row.path);
-
-		if (!persisted || persisted.command !== command) {
-			return false;
-		}
-
-		return (
-			persisted.fingerprint ===
-			computeSetupFingerprint({ command, worktreePath: row.path })
-		);
+		recordSetupFingerprint(row.path, command);
 	}
 
 	/**
@@ -571,7 +592,9 @@ export function createScriptLifecycleService({
 	 * so a caller that awaits this awaits the setup session itself: since
 	 * {@link finalizeSetup} waits for that exit without a bound, the returned
 	 * promise settles when setup does and not before. Call it without awaiting
-	 * unless blocking for the whole of setup is the intent.
+	 * unless blocking for the whole of setup is the intent. The app starts it on
+	 * its own, so setup waits for a compute slot; a setup that has to wait
+	 * settles this at once and finalizes in the background once it runs.
 	 */
 	async function runSetupScriptWithAutoRun({
 		workspaceId,
@@ -580,14 +603,24 @@ export function createScriptLifecycleService({
 	}): Promise<void> {
 		const resolved = resolveScriptConfig(workspaceId);
 		const command = resolved.error ? null : resolved.settings.scripts.setup;
-		const setupResult = await runScript({ kind: 'setup', workspaceId });
-		const setupSessionId = setupResult.session?.id;
 
-		if (!command || !setupSessionId) {
+		if (!command) {
 			return;
 		}
 
-		await finalizeSetup({ command, sessionId: setupSessionId, workspaceId });
+		let finalized: Promise<void> | undefined;
+		await startScript(
+			{ initiator: 'auto', kind: 'setup', workspaceId },
+			(sessionId) => {
+				finalized = finalizeSetup({
+					command,
+					initiator: 'auto',
+					sessionId,
+					workspaceId,
+				});
+			},
+		);
+		await finalized;
 	}
 
 	/**
@@ -595,13 +628,15 @@ export function createScriptLifecycleService({
 	 * fingerprint differs from the last recorded successful run. A match returns
 	 * an info diagnostic without starting a session; otherwise setup starts and
 	 * its fingerprint is recorded in the background once it exits cleanly.
-	 * @param options - The target workspace.
-	 * @returns The launched setup session result, an info diagnostic when setup
-	 *   is already current, or a typed failure.
+	 * @param options - The target workspace and who asked.
+	 * @returns The launched setup session result, its queued job, an info
+	 *   diagnostic when setup is already current, or a typed failure.
 	 */
 	async function runSetupScriptIfNeeded({
+		initiator = 'user',
 		workspaceId,
 	}: {
+		initiator?: ComputeJobInitiator;
 		workspaceId: string;
 	}): Promise<CreateTerminalSessionResult> {
 		const database = databaseService.getConnection()?.database ?? null;
@@ -638,7 +673,7 @@ export function createScriptLifecycleService({
 			);
 		}
 
-		if (setupIsCurrent(row, command)) {
+		if (isSetupFingerprintCurrent(row.path, command)) {
 			return {
 				diagnostics: [
 					{
@@ -652,18 +687,17 @@ export function createScriptLifecycleService({
 			};
 		}
 
-		const result = await runScript({ kind: 'setup', workspaceId });
-		const sessionId = result.session?.id;
-
-		if (sessionId) {
-			void finalizeSetup({ command, sessionId, workspaceId });
-		}
-
-		return result;
+		return startScript(
+			{ initiator, kind: 'setup', workspaceId },
+			(sessionId) => {
+				void finalizeSetup({ command, initiator, sessionId, workspaceId });
+			},
+		);
 	}
 
 	/**
-	 * Stop the active script session of a given kind for a workspace.
+	 * Stop the active script session of a given kind for a workspace, and cancel
+	 * any launch of that kind still waiting in the compute queue.
 	 * @param options - Script kind and target workspace
 	 * @returns The kill result, or an info diagnostic when no session is running
 	 */
@@ -671,16 +705,23 @@ export function createScriptLifecycleService({
 		kind,
 		workspaceId,
 	}: StopScriptOptions): Promise<KillTerminalResult> {
+		const cancelledQueued = queueGate.cancelQueued(workspaceId, kind);
 		const activeSession = findActiveScriptSession(workspaceId, kind);
 
 		if (!activeSession) {
 			return {
 				diagnostics: [
-					{
-						code: 'script-not-running',
-						message: `No ${kind} script is currently running.`,
-						severity: 'info',
-					},
+					cancelledQueued
+						? {
+								code: 'script-queue-cancelled',
+								message: `The queued ${kind} script was cancelled before it started.`,
+								severity: 'info',
+							}
+						: {
+								code: 'script-not-running',
+								message: `No ${kind} script is currently running.`,
+								severity: 'info',
+							},
 				],
 				session: null,
 			};
@@ -721,115 +762,4 @@ export function createScriptLifecycleService({
 		runSetupScriptWithAutoRun,
 		stopScript,
 	};
-}
-
-/**
- * Builds a failed create-result with one diagnostic.
- * @param code - Stable diagnostic code.
- * @param message - Human-readable reason no session started.
- * @param severity - How loudly the dock should report it.
- * @param terminalId - Session the refusal is about, when one already holds the slot.
- * @returns A session-less create result carrying that diagnostic.
- */
-function failure(
-	code: string,
-	message: string,
-	severity: 'error' | 'info' | 'warning' = 'error',
-	terminalId?: string,
-): CreateTerminalSessionResult {
-	return {
-		diagnostics: [
-			{ code, message, severity, ...(terminalId && { terminalId }) },
-		],
-		session: null,
-	};
-}
-
-/**
- * Lock a launch is serialized behind. Run launches lock on the repository, not
- * the workspace: `nonconcurrent` mode stops the launching workspace's siblings,
- * and it can only see a sibling whose session already exists. Two workspaces of
- * one repository starting at once would otherwise each find no sibling and both
- * survive, which is the port collision the mode exists to prevent. Setup and
- * archive stay per-workspace — they never reach outside their own worktree.
- * @param launch - The resolved launch.
- * @returns The key its start promise is held under.
- */
-function exclusiveLaunchKey(launch: ScriptLaunch): string {
-	return launch.kind === 'run'
-		? `repository:${launch.repositoryId}:run`
-		: `workspace:${launch.workspaceId}:${launch.kind}`;
-}
-
-/** Default dock title per script kind; named run scripts title themselves. */
-function defaultScriptTitle(kind: WorkspaceScriptKind): string {
-	switch (kind) {
-		case 'archive':
-			return 'Archive';
-		case 'run':
-			return 'Run';
-		case 'setup':
-			return 'Setup';
-	}
-}
-
-/**
- * Explains why a launch found no command, distinguishing a repository with no
- * script of that kind from a request naming a run script that no longer exists.
- * A stale name is answered with the names that do exist, so an agent that
- * guessed can correct itself without a second round trip.
- * @param kind - The requested script kind.
- * @param scriptName - The requested run-script name, when one was given.
- * @param runScripts - The run scripts the repository actually configures.
- * @returns The diagnostic message.
- */
-function describeMissingScript(
-	kind: WorkspaceScriptKind,
-	scriptName: string | null | undefined,
-	runScripts: readonly RunScriptDefinition[],
-): string {
-	if (kind !== 'run' || !scriptName) {
-		return `No ${kind} script is configured for this repository.`;
-	}
-
-	const configured = runScripts.map((script) => script.name).join(', ');
-
-	return configured
-		? `No run script named "${scriptName}" is configured for this repository. Configured run scripts: ${configured}.`
-		: `No run script named "${scriptName}" is configured for this repository, which configures none at all.`;
-}
-
-/**
- * Explains which session already holds the workspace, naming the run script by
- * name. A caller that asked for one of several run scripts cannot otherwise tell
- * whether the session already up is the one it wanted or a different one it has
- * to stop first.
- * @param kind - The requested script kind.
- * @param activeScriptName - Name of the run script already running, when it has one.
- * @returns The diagnostic message.
- */
-function describeRunningScript(
-	kind: WorkspaceScriptKind,
-	activeScriptName: string | null,
-): string {
-	const subject =
-		kind === 'run' && activeScriptName
-			? `The run script "${activeScriptName}"`
-			: `The ${kind} script`;
-
-	return `${subject} is already running. Stop it or restart explicitly.`;
-}
-
-/** Type guard for the workspace join-row fields this service reads. */
-function isWorkspaceRow(row: unknown): row is {
-	metadataJson: string;
-	path: string;
-	repositoryId: string;
-} {
-	return (
-		isRecord(row) &&
-		isString(row.path) &&
-		isString(row.repositoryId) &&
-		isString(row.metadataJson)
-	);
 }

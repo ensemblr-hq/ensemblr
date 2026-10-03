@@ -21,7 +21,10 @@ import { parseUpdateRepositoryScriptsRequest } from '../request-schemas.ts';
 /**
  * Registers the IPC handlers that run and stop repository setup/run/archive
  * scripts inside workspace terminal sessions, plus the Scripts-settings writer
- * that rewrites the repository's committed `.ensemblr/settings.toml`.
+ * that rewrites the repository's committed `.ensemblr/settings.toml`. The
+ * renderer asks for setup on every workspace open without a click, so that
+ * launch waits in the compute queue as the app's own; a script launch is a
+ * click and starts at once.
  * @param options - Required services.
  */
 export function registerWorkspaceScriptHandlers({
@@ -38,6 +41,7 @@ export function registerWorkspaceScriptHandlers({
 			request: EnsureWorkspaceSetupRequest,
 		): Promise<EnsureWorkspaceSetupResult> =>
 			scriptLifecycleService.runSetupScriptIfNeeded({
+				initiator: 'auto',
 				workspaceId: request.workspaceId,
 			}),
 	);
@@ -49,6 +53,7 @@ export function registerWorkspaceScriptHandlers({
 			request: RunWorkspaceScriptRequest,
 		): Promise<RunWorkspaceScriptResult> =>
 			scriptLifecycleService.runScript({
+				initiator: 'user',
 				kind: request.kind,
 				restart: request.restart,
 				scriptName: request.scriptName,
