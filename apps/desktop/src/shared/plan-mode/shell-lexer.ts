@@ -5,6 +5,9 @@
  * plain string replace of `>/dev/null` let `>/dev/nullx` through as a discard and
  * wrote a file. Lexing once, honouring quotes, removes both classes before any
  * classification runs.
+ *
+ * The quoting primitives are exported for `tolerant-shell-lexer.ts`, the sibling
+ * that reads what a command runs rather than policing what it may touch.
  */
 
 /** The command split into its chained segments, or the construct that disqualifies it. */
@@ -14,7 +17,7 @@ export interface LexedCommand {
 }
 
 /** Characters that chain one command into the next when unquoted. */
-const SEPARATORS: ReadonlySet<string> = new Set([';', '|', '&', '\n']);
+export const SEPARATORS: ReadonlySet<string> = new Set([';', '|', '&', '\n']);
 
 /** File descriptors a redirection may name without creating a file. */
 const DISCARDABLE_FDS: ReadonlySet<string> = new Set(['', '1', '2']);
@@ -47,7 +50,7 @@ const DOUBLE_QUOTE_ESCAPABLE: ReadonlySet<string> = new Set([
  * arguments, and `git \`⏎`status` came back denied as "`git \n status` is not a
  * read-only git subcommand".
  */
-const LINE_CONTINUATION_LENGTH = 2;
+export const LINE_CONTINUATION_LENGTH = 2;
 
 /**
  * Bash's own blanks, which are space and tab alone.
@@ -58,18 +61,18 @@ const LINE_CONTINUATION_LENGTH = 2;
  * the command that was provably not the shell's. The `\n` that really does
  * separate is a member of {@link SEPARATORS} and is tested before this.
  */
-const BLANK = /[ \t]/;
+export const BLANK = /[ \t]/;
 
 const REDIRECTION_VIOLATION = 'output redirection `>` can write files';
 
-const UNBALANCED_QUOTE =
+export const UNBALANCED_QUOTE =
 	'an unbalanced quote leaves the command impossible to classify';
 
 /** Where the walk continues from, or why the command is disqualified. */
 type Step = { next: number } | { violation: string };
 
 /** A scanned stretch of input: its text and where it ended, or why it was rejected. */
-type Scan = { next: number; text: string } | { violation: string };
+export type Scan = { next: number; text: string } | { violation: string };
 
 /**
  * Reports whether a character ends an unquoted word.
@@ -125,7 +128,7 @@ function expansionAt(command: string, index: number): string | null {
  * @param index - Index of the opening quote.
  * @returns The quoted text and where it ended, or an unbalanced-quote violation.
  */
-function scanSingleQuoted(command: string, index: number): Scan {
+export function scanSingleQuoted(command: string, index: number): Scan {
 	const end = command.indexOf("'", index + 1);
 	return end === -1
 		? { violation: UNBALANCED_QUOTE }
@@ -137,13 +140,13 @@ function scanSingleQuoted(command: string, index: number): Scan {
  * still expands `$(…)` and backticks.
  * @param command - Full command text.
  * @param index - Index of the opening quote.
- * @param keepsExpansions - Whether an expansion is kept as literal text rather than reported, for the tolerant lexer.
+ * @param readSubstitution - For the tolerant lexer: reads the substitution starting at an index and answers where it ended, or null when it never closes. Absent, a substitution is reported as a violation.
  * @returns The quoted text and where it ended, or the violation that stopped it.
  */
-function scanDoubleQuoted(
+export function scanDoubleQuoted(
 	command: string,
 	index: number,
-	keepsExpansions = false,
+	readSubstitution?: (start: number) => number | null,
 ): Scan {
 	let text = '';
 	let cursor = index + 1;
@@ -152,9 +155,18 @@ function scanDoubleQuoted(
 		if (char === '"') {
 			return { next: cursor + 1, text };
 		}
-		const expansion = keepsExpansions ? null : expansionAt(command, cursor);
-		if (expansion) {
+		const expansion = expansionAt(command, cursor);
+		if (expansion && !readSubstitution) {
 			return { violation: expansion };
+		}
+		if (expansion && readSubstitution) {
+			const end = readSubstitution(cursor);
+			if (end === null) {
+				return { violation: UNBALANCED_QUOTE };
+			}
+			text += command.slice(cursor, end);
+			cursor = end;
+			continue;
 		}
 		const escaped = command[cursor + 1];
 		if (char === '\\' && escaped === '\n') {
@@ -184,7 +196,7 @@ function scanDoubleQuoted(
  * @param index - Index just past the operator.
  * @returns Index of the target's first character.
  */
-function skipRedirectionBlanks(command: string, index: number): number {
+export function skipRedirectionBlanks(command: string, index: number): number {
 	let cursor = index;
 	while (cursor < command.length && BLANK.test(command[cursor] as string)) {
 		cursor += 1;
@@ -220,7 +232,7 @@ function scanRedirection(command: string, index: number): Step {
 }
 
 /** Accumulates lexed characters into tokens and tokens into chained segments. */
-interface TokenSink {
+export interface TokenSink {
 	/** Appends text to the token being built, starting one if there is none. */
 	push: (text: string) => void;
 	/** The token being built, or null when none is open. */
@@ -240,7 +252,7 @@ interface TokenSink {
  * few lines of intent rather than index and buffer bookkeeping.
  * @returns A fresh sink with no tokens or segments.
  */
-function createTokenSink(): TokenSink {
+export function createTokenSink(): TokenSink {
 	const segments: string[][] = [];
 	let tokens: string[] = [];
 	let token: string | null = null;
@@ -397,274 +409,4 @@ export function lexCommand(command: string): LexedCommand {
 		index = consumed.next;
 	}
 	return { segments: sink.finish(), violation: null };
-}
-
-/**
- * Unquoted characters that open or close a nested command — a subshell, or the
- * `(` of a `$(…)` — which the tolerant lexer splits out as a segment of its own.
- */
-const NESTING_PARENS: ReadonlySet<string> = new Set(['(', ')']);
-
-/** Bash's group delimiters, which are words to the lexer but name no command. */
-const GROUP_TOKENS: ReadonlySet<string> = new Set(['{', '}']);
-
-/** The characters a redirection operator is spelled with: `>`, `2>&1`, `&>>`, `>|`, `<<<`. */
-const REDIRECTION_OPERATOR = /[<>&|]/;
-
-/** A pending token that names the descriptor a redirection applies to. */
-const FILE_DESCRIPTOR = /^\d+$/;
-
-/** A heredoc whose body starts on the next line and runs to its delimiter line. */
-interface HeredocMarker {
-	delimiter: string;
-	stripsTabs: boolean;
-}
-
-/** The tolerant walk's state: the token accumulator and the heredocs awaiting a body. */
-interface TolerantWalk {
-	sink: TokenSink;
-	heredocs: HeredocMarker[];
-}
-
-/**
- * Measures the nested-command opener at an index — `$(`, `<(`, `>(`, a
- * backtick, or a bare parenthesis.
- * @param command - Full command text.
- * @param index - Index to inspect.
- * @returns The opener's width, or 0 when none starts here.
- */
-function nestingOpenerLength(command: string, index: number): number {
-	const char = command[index] ?? '';
-	if ('$<>'.includes(char) && command[index + 1] === '(') {
-		return 2;
-	}
-	return char === '`' || NESTING_PARENS.has(char) ? 1 : 0;
-}
-
-/**
- * Reads a quoted run for the tolerant lexer, keeping any expansion inside a
- * double-quoted run as literal text.
- * @param command - Full command text.
- * @param index - Index of the opening quote.
- * @returns The quoted text and where it ended, or the unbalanced-quote violation.
- */
-function scanQuotedTolerantly(command: string, index: number): Scan {
-	return command[index] === "'"
-		? scanSingleQuoted(command, index)
-		: scanDoubleQuoted(command, index, true);
-}
-
-/**
- * Reports whether a character ends a redirection's target word.
- * @param char - Character to test.
- * @returns True when the target stops before this character.
- */
-function endsRedirectionTarget(char: string): boolean {
-	return (
-		BLANK.test(char) ||
-		SEPARATORS.has(char) ||
-		char === '<' ||
-		char === '>' ||
-		NESTING_PARENS.has(char)
-	);
-}
-
-/**
- * Reads a redirection's target word with its quotes stripped, so the target
- * never reaches a segment and a heredoc delimiter compares as bash compares it.
- * @param command - Full command text.
- * @param start - Index of the target's first character.
- * @returns The target and where it ended, or the unbalanced-quote violation.
- */
-function scanRedirectionTarget(command: string, start: number): Scan {
-	let text = '';
-	let cursor = start;
-	while (cursor < command.length) {
-		const char = command[cursor] as string;
-		if (endsRedirectionTarget(char)) {
-			break;
-		}
-		if (char === "'" || char === '"') {
-			const quoted = scanQuotedTolerantly(command, cursor);
-			if ('violation' in quoted) {
-				return quoted;
-			}
-			text += quoted.text;
-			cursor = quoted.next;
-			continue;
-		}
-		const escaped = char === '\\';
-		text += escaped ? (command[cursor + 1] ?? '') : char;
-		cursor += escaped ? LINE_CONTINUATION_LENGTH : 1;
-	}
-	return { next: cursor, text };
-}
-
-/**
- * Skips a whole redirection — any descriptor prefix, the operator, and its
- * target — so none of it reaches the segment. A heredoc's delimiter is queued
- * so the body on the following lines is skipped too.
- * @param command - Full command text.
- * @param index - Index of the operator's first character.
- * @param walk - Walk state holding any descriptor prefix and the heredoc queue.
- * @returns Where to continue, or null on an unbalanced quote in the target.
- */
-function skipRedirection(
-	command: string,
-	index: number,
-	walk: TolerantWalk,
-): number | null {
-	if (FILE_DESCRIPTOR.test(walk.sink.pending() ?? '')) {
-		walk.sink.dropPending();
-	} else {
-		walk.sink.endToken();
-	}
-	const opensHeredoc =
-		command.startsWith('<<', index) && command[index + 2] !== '<';
-	let cursor = index;
-	while (REDIRECTION_OPERATOR.test(command[cursor] ?? '')) {
-		cursor += 1;
-	}
-	const stripsTabs = opensHeredoc && command[cursor] === '-';
-	const target = scanRedirectionTarget(
-		command,
-		skipRedirectionBlanks(command, stripsTabs ? cursor + 1 : cursor),
-	);
-	if ('violation' in target) {
-		return null;
-	}
-	if (opensHeredoc) {
-		walk.heredocs.push({ delimiter: target.text, stripsTabs });
-	}
-	return target.next;
-}
-
-/**
- * Skips one heredoc body: every line up to and including its delimiter line.
- * @param command - Full command text.
- * @param start - Index of the body's first line.
- * @param marker - The heredoc whose body starts here.
- * @returns Index just past the delimiter line, or the end of input when it never closes.
- */
-function skipHeredocBody(
-	command: string,
-	start: number,
-	marker: HeredocMarker,
-): number {
-	let cursor = start;
-	while (cursor < command.length) {
-		const lineEnd = command.indexOf('\n', cursor);
-		const next = lineEnd === -1 ? command.length : lineEnd + 1;
-		const line = command.slice(cursor, lineEnd === -1 ? undefined : lineEnd);
-		const compared = marker.stripsTabs ? line.replace(/^\t+/, '') : line;
-		if (compared === marker.delimiter) {
-			return next;
-		}
-		cursor = next;
-	}
-	return command.length;
-}
-
-/**
- * Skips the bodies of every heredoc opened on the line that just ended, so a
- * document's text is never read as commands.
- * @param command - Full command text.
- * @param start - Index just past the newline.
- * @param walk - Walk state whose heredoc queue is drained.
- * @returns Where the next command line starts.
- */
-function skipHeredocBodies(
-	command: string,
-	start: number,
-	walk: TolerantWalk,
-): number {
-	const next = walk.heredocs.reduce(
-		(cursor, marker) => skipHeredocBody(command, cursor, marker),
-		start,
-	);
-	walk.heredocs = [];
-	return next;
-}
-
-/**
- * Consumes whatever starts at one index for the tolerant lexer, which turns
- * every construct the strict walk rejects into a boundary instead.
- * @param command - Full command text.
- * @param index - Index to consume from.
- * @param walk - Walk state the step writes through.
- * @returns Where to continue, or null on an unbalanced quote.
- */
-function stepTolerant(
-	command: string,
-	index: number,
-	walk: TolerantWalk,
-): number | null {
-	const { sink } = walk;
-	const char = command[index] as string;
-	const opener = nestingOpenerLength(command, index);
-	if (opener > 0) {
-		sink.endSegment();
-		return index + opener;
-	}
-	if (char === "'" || char === '"') {
-		const quoted = scanQuotedTolerantly(command, index);
-		if ('violation' in quoted) {
-			return null;
-		}
-		sink.push(quoted.text);
-		return quoted.next;
-	}
-	if (char === '\\') {
-		if (command[index + 1] !== '\n') {
-			sink.push(command[index + 1] ?? '');
-		}
-		return index + LINE_CONTINUATION_LENGTH;
-	}
-	if (char === '#' && sink.pending() === null) {
-		const lineEnd = command.indexOf('\n', index);
-		return lineEnd === -1 ? command.length : lineEnd;
-	}
-	if (char === '<' || char === '>' || command.startsWith('&>', index)) {
-		return skipRedirection(command, index, walk);
-	}
-	if (SEPARATORS.has(char)) {
-		sink.endSegment();
-		return char === '\n'
-			? skipHeredocBodies(command, index + 1, walk)
-			: index + 1;
-	}
-	if (BLANK.test(char)) {
-		sink.endToken();
-		return index + 1;
-	}
-	sink.push(char);
-	return index + 1;
-}
-
-/**
- * Lexes a bash command into the simple commands it runs, each a list of
- * quote-stripped tokens, without ever refusing one.
- *
- * The tolerant sibling of {@link lexCommand}, for callers that classify what a
- * command runs rather than police what it may touch: redirections and their
- * targets are dropped, heredoc bodies and comments are skipped, and the inside
- * of `$(…)`, backticks, `<(…)` and a subshell becomes a segment of its own. An
- * expansion inside double quotes stays literal text of the token it sits in.
- * @param command - The command the agent asked to run.
- * @returns The non-empty segments, or null when an unbalanced quote leaves the command unreadable.
- */
-export function lexCommandSegments(command: string): string[][] | null {
-	const walk: TolerantWalk = { heredocs: [], sink: createTokenSink() };
-	let index = 0;
-	while (index < command.length) {
-		const next = stepTolerant(command, index, walk);
-		if (next === null) {
-			return null;
-		}
-		index = next;
-	}
-	return walk.sink
-		.finish()
-		.map((segment) => segment.filter((token) => !GROUP_TOKENS.has(token)))
-		.filter((segment) => segment.length > 0);
 }

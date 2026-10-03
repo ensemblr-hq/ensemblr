@@ -85,6 +85,13 @@ describe('secret value shapes', () => {
 	it.each(PRESERVED_CORPUS)('leaves %s alone', (sample) => {
 		expect(createTextRedactor()(sample)).toBe(sample);
 	});
+
+	it('skips the backtracking matchers on a long line they cannot match', () => {
+		const line = 'x'.repeat(200_000);
+		const started = performance.now();
+		expect(createTextRedactor(['supersecretvalue123'])(line)).toBe(line);
+		expect(performance.now() - started).toBeLessThan(100);
+	});
 });
 
 describe('secret-named assignments', () => {

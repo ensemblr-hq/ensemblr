@@ -224,21 +224,41 @@ function describePending(report: QueuedJobReport): string {
 }
 
 /**
+ * How a wait for unfinished jobs ended: none was asked for, its window
+ * expired, or the calling turn was interrupted before either.
+ */
+type WaitEnding = 'none' | 'expired' | 'aborted';
+
+/** The sentence a resume note opens with, for each way a wait can end. */
+const WAIT_ENDING_OPENINGS: Readonly<Record<WaitEnding, string>> = {
+	aborted: 'The wait stopped because this turn was interrupted. ',
+	expired: 'Not a failure: the wait window expired first. ',
+	none: '',
+};
+
+/**
+ * Names how a wait that returned with jobs unfinished ended.
+ * @param signal - The calling turn's abort signal, if any.
+ * @returns `aborted` when the turn was interrupted, else `expired`.
+ */
+function waitEnding(signal: AbortSignal | undefined): WaitEnding {
+	return signal?.aborted ? 'aborted' : 'expired';
+}
+
+/**
  * Tells the caller how to collect jobs that have not finished, naming the ids
  * and where each stands. After a wait it is the reminder that a timed-out wait
  * is a lap rather than a fault.
  * @param pending - Jobs still queued or running.
- * @param waited - Whether a wait ran and expired, rather than none being asked for.
+ * @param ending - How the wait ended, if one ran.
  * @returns The note.
  */
 function resumeNote(
 	pending: readonly QueuedJobReport[],
-	waited: boolean,
+	ending: WaitEnding,
 ): string {
 	const ids = pending.map((report) => `"${report.jobId}"`).join(', ');
-	const opening = waited
-		? 'Not a failure: the wait window expired first. '
-		: '';
+	const opening = WAIT_ENDING_OPENINGS[ending];
 	return `${opening}${pending.map(describePending).join('; ')}. Every job keeps its place and keeps running. Collect the result with ensemblr_wait_for_job({ jobIds: [${ids}] }), or drop a job you no longer need with ensemblr_cancel_job.`;
 }
 
@@ -267,8 +287,21 @@ function joinNotes(notes: readonly (string | null)[]): string | null {
 }
 
 /**
+ * Reports whether a typed line ends in an unescaped backslash, which makes the
+ * shell read the newline after it as a continuation rather than a submit.
+ * @param line - The line typed so far.
+ * @returns True when the line continues onto the next.
+ */
+function continuesLine(line: string): boolean {
+	const trailing = line.length - line.replace(/\\+$/, '').length;
+	return trailing % 2 === 1;
+}
+
+/**
  * Feeds one write into a terminal's unsubmitted line, collecting every line the
- * write would submit to the shell.
+ * write would submit to the shell. A line ending in an unescaped backslash
+ * continues into the next, as the shell joins them, so the joined command is
+ * what is classified.
  * @param pending - What earlier writes typed and did not submit.
  * @param input - The write being admitted.
  * @returns The lines submitted, and what is left typed but unsubmitted.
@@ -284,6 +317,8 @@ function submittedLines(
 			line = '';
 		} else if (ERASE_KEYS.has(key)) {
 			line = Array.from(line).slice(0, -1).join('');
+		} else if (SUBMIT_KEYS.has(key) && continuesLine(line)) {
+			line = line.slice(0, -1);
 		} else if (SUBMIT_KEYS.has(key)) {
 			lines.push(line);
 			line = '';
@@ -452,7 +487,7 @@ export function createJobQueueOps({
 				origin,
 				finished
 					? truncatedLogNote([report])
-					: resumeNote([report], waited !== null),
+					: resumeNote([report], waited ? waitEnding(signal) : 'none'),
 			),
 		} satisfies RunQueuedResult);
 	};
@@ -512,7 +547,7 @@ export function createJobQueueOps({
 			...noteFor(
 				origin,
 				joinNotes([
-					pending.length > 0 ? resumeNote(pending, true) : null,
+					pending.length > 0 ? resumeNote(pending, waitEnding(signal)) : null,
 					truncatedLogNote(settled),
 				]),
 			),
@@ -520,10 +555,35 @@ export function createJobQueueOps({
 	};
 
 	/**
-	 * Cancels a queued job, or stops a running one, in the caller's workspace.
+	 * Reports whether the caller may cancel a job: one an agent queued in the
+	 * caller's own delegation tree. A job the user started, one the app started
+	 * on its own, and another tree's are not the caller's to drop.
+	 * @param queue - The queue port.
+	 * @param origin - Resolved caller identity.
+	 * @param job - A job already known to be in the caller's workspace.
+	 * @returns True when the job is the caller's tree's.
+	 */
+	const cancellable = (
+		queue: JobQueuePort,
+		origin: AgentControlOrigin,
+		job: ComputeJobResult,
+	): boolean => {
+		if (job.initiator !== 'agent') {
+			return false;
+		}
+		const rootSessionId = origin.rootSessionId ?? origin.sessionId;
+		return (
+			job.sessionId === origin.sessionId ||
+			queue.listJobs({ rootSessionId }).some((tree) => tree.id === job.id)
+		);
+	};
+
+	/**
+	 * Cancels a queued job, or stops a running one, that the caller's own
+	 * delegation tree queued.
 	 * @param origin - Resolved caller identity.
 	 * @param args - The job to cancel.
-	 * @returns Whether anything was cancelled, and the job as it now stands.
+	 * @returns Whether anything was cancelled and the job as it now stands, or why it is not the caller's to cancel.
 	 */
 	const cancelJob = (
 		origin: AgentControlOrigin,
@@ -535,6 +595,12 @@ export function createJobQueueOps({
 		const owned = ownJob(port, origin, args.jobId);
 		if ('ok' in owned) {
 			return owned;
+		}
+		if (!cancellable(port, origin, owned)) {
+			return fail(
+				'denied-scope',
+				`Compute-queue job ${args.jobId} was not queued by your delegation tree — the user, the app, or another agent's tree started it — so it is not yours to cancel.`,
+			);
 		}
 		const cancelled = port.cancel(args.jobId);
 		const job = port.getJob(args.jobId);

@@ -12,7 +12,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { OUTPUT_TAIL_CHARS } from '../../src/main/compute-queue/command-output.ts';
+import {
+	type CommandOutput,
+	createCommandOutput,
+	OUTPUT_TAIL_CHARS,
+} from '../../src/main/compute-queue/command-output.ts';
 import {
 	type ComputeJobResult,
 	type ComputeQueueService,
@@ -189,5 +193,112 @@ describe('command runner', () => {
 		expect(log).toBe(job.outputTail);
 		expect(statSync(path.dirname(job.logPath ?? '')).mode & 0o777).toBe(0o700);
 		expect(statSync(job.logPath ?? '').mode & 0o777).toBe(0o600);
+	});
+});
+
+describe('backgrounded children', () => {
+	it('kills a child that left the pipes once the job itself exits', async () => {
+		const job = await run(
+			'sleep 30 >/dev/null 2>&1 & echo $! > background.pid',
+		);
+		expect(job.state).toBe('succeeded');
+		const pid = Number.parseInt(
+			readFileSync(path.join(workspacePath, 'background.pid'), 'utf8'),
+			10,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		expect(isAlive(pid)).toBe(false);
+	});
+});
+
+/** A multi-line secret as an environment variable would hold it. */
+const MULTI_LINE_SECRET = 'first-line-of-secret\nsecond-line-of-secret';
+
+/** A PEM private key body split over two pipe chunks in the test below. */
+const KEY_LINES = [
+	'-----BEGIN RSA PRIVATE KEY-----',
+	'MIIEowIBAAKCAQEAu1SU1LfVLPHCozMxH2Mo4lgOEePzNm0tRgeLezV6ffAt0gun',
+	'VTLw7onLRnrq0/IzW7yWR7QkrmBL7jTKEn5u+qKhbwKfBstIs+bMY2Zkp18gnTxK',
+	'-----END RSA PRIVATE KEY-----',
+];
+
+/**
+ * Builds a collector for a direct output test.
+ * @param redactValues - Literal secrets to redact.
+ * @returns The collector.
+ */
+function collector(redactValues: readonly string[]): CommandOutput {
+	return createCommandOutput({
+		jobId: `direct-${Math.random().toString(36).slice(2)}`,
+		redactValues,
+		workspacePath,
+	});
+}
+
+/**
+ * Feeds text to a collector's stdout.
+ * @param output - The collector.
+ * @param text - Text to write as one chunk.
+ */
+function feed(output: CommandOutput, text: string): void {
+	output.write('stdout', Buffer.from(text));
+}
+
+describe('chunk-boundary redaction', () => {
+	it('redacts a multi-line secret whose lines arrive in different chunks', async () => {
+		const output = collector([MULTI_LINE_SECRET]);
+		feed(output, 'before first-line-of-secret\n');
+		feed(output, 'second-line-of-secret after\n');
+		await output.end();
+		const { text } = output.tail();
+		expect(text).toBe('before [REDACTED]\n[REDACTED] after\n');
+		expect(readFileSync(output.logPath ?? '', 'utf8')).toBe(text);
+	});
+
+	it('holds a private key split across chunks until its END and redacts it whole', async () => {
+		const output = collector([]);
+		feed(output, `x\n${KEY_LINES[0]}\n${KEY_LINES[1]}\n`);
+		expect(output.tail().text).toBe('x\n[REDACTED]\n');
+		feed(output, `${KEY_LINES[2]}\n${KEY_LINES[3]}\ny\n`);
+		await output.end();
+		expect(output.tail().text).toBe('x\n[REDACTED]\ny\n');
+		expect(readFileSync(output.logPath ?? '', 'utf8')).toBe(
+			'x\n[REDACTED]\ny\n',
+		);
+	});
+
+	it('masks a private key the process never closed', async () => {
+		const output = collector([]);
+		feed(output, `${KEY_LINES[0]}\n${KEY_LINES[1]}\n`);
+		await output.end();
+		expect(output.tail().text).toBe('[REDACTED]\n');
+	});
+
+	it('never cuts a literal secret when a newline-free line outgrows the buffer', async () => {
+		const output = collector([SECRET]);
+		const line = `${'z'.repeat(997)}${SECRET}`.repeat(60);
+		for (let index = 0; index < line.length; index += 4_093) {
+			feed(output, line.slice(index, index + 4_093));
+		}
+		await output.end();
+		const { text } = output.tail();
+		expect(text).not.toContain(SECRET.slice(0, 8));
+		expect(text).not.toContain(SECRET.slice(-8));
+		expect(text.match(/\[REDACTED\]/g)).toHaveLength(60);
+	});
+
+	it('redacts a 200 KB single-line identifier run well inside a frame budget', async () => {
+		const lines = ['abc_def.'.repeat(25_600), `TOKEN=${'a'.repeat(204_800)}`];
+		for (const line of lines) {
+			const output = collector([SECRET]);
+			const started = performance.now();
+			for (let index = 0; index < line.length; index += 65_536) {
+				feed(output, line.slice(index, index + 65_536));
+			}
+			feed(output, '\n');
+			output.tail();
+			await output.end();
+			expect(performance.now() - started).toBeLessThan(100);
+		}
 	});
 });

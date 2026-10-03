@@ -52,6 +52,11 @@ export interface SecretValuePattern {
 	pattern: RegExp;
 	/** What the match is replaced with; defaults to {@link REDACTED}. */
 	replacement?: string;
+	/**
+	 * A substring every match contains. A text without it skips the pattern,
+	 * which keeps a backtracking-prone matcher off long lines it cannot match.
+	 */
+	requires?: string;
 }
 
 /**
@@ -85,6 +90,7 @@ export const SECRET_VALUE_PATTERNS: readonly SecretValuePattern[] = [
 		id: 'url-userinfo',
 		pattern: /([a-z][a-z0-9+.-]*:\/\/[^\s/@:]+:)[^\s/@]+(@)/gi,
 		replacement: `$1${REDACTED}$2`,
+		requires: '://',
 	},
 	{ id: 'hex-token', pattern: /\b[a-f0-9]{32,}\b/gi },
 ];
@@ -143,6 +149,9 @@ function assignmentPattern(): RegExp {
 	);
 }
 
+/** A character every assignment match contains: its separator. */
+const ASSIGNMENT_SEPARATOR_PATTERN = /[=:]/;
+
 /**
  * Shortest value worth redacting. Below it a match is as likely to be a flag or
  * a placeholder as a credential, and blanking it only costs readability.
@@ -197,8 +206,10 @@ export function isRedactableKeyName(key: string): boolean {
 export function redactSecretShapes(text: string): string {
 	let redacted = text;
 
-	for (const { pattern, replacement } of SECRET_VALUE_PATTERNS) {
-		redacted = redacted.replace(pattern, replacement ?? REDACTED);
+	for (const { pattern, replacement, requires } of SECRET_VALUE_PATTERNS) {
+		if (requires === undefined || redacted.includes(requires)) {
+			redacted = redacted.replace(pattern, replacement ?? REDACTED);
+		}
 	}
 
 	return redacted;
@@ -206,11 +217,17 @@ export function redactSecretShapes(text: string): string {
 
 /**
  * Replaces the value of every secret-named assignment in a text, keeping the
- * key and separator so a later grep still finds the line.
+ * key and separator so a later grep still finds the line. A text with no
+ * separator at all skips the scan, whose key alternation backtracks
+ * quadratically over a long run of word characters.
  * @param text - Text to scan.
  * @returns The text with secret-named assignment values replaced.
  */
 export function redactSecretAssignments(text: string): string {
+	if (!ASSIGNMENT_SEPARATOR_PATTERN.test(text)) {
+		return text;
+	}
+
 	return text.replace(
 		assignmentPattern(),
 		(_match, key: string, separator: string, quote: string) =>

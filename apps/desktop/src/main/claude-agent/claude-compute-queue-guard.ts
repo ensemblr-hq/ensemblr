@@ -14,6 +14,12 @@
  *
  * `run_in_background` is not an escape: a backgrounded build loads the machine
  * exactly as a foreground one does, so the same command is refused either way.
+ * Nor is `Monitor`, whose `command` runs in a shell just as `Bash`'s does.
+ *
+ * While the session plans, a command Plan Mode refuses is left to Plan Mode, so
+ * the model reads one refusal rather than two that disagree on what to do next
+ * — the order Pi's `checkPlanModeTool` answers in. A command Plan Mode passes
+ * as read-only is still classified here.
  */
 import type {
 	HookCallbackMatcher,
@@ -27,9 +33,19 @@ import {
 	heavyCommandBlockReason,
 } from '../../shared/compute-queue.ts';
 import type { ComputeQueueSettings } from '../../shared/config.ts';
+import { isReadOnlyBashCommand } from '../../shared/plan-mode.ts';
 
-/** Claude Code's shell tool, the one surface a heavy command reaches through. */
+/** Claude Code's shell tool, the one Plan Mode classifies. */
 const CLAUDE_SHELL_TOOL = 'Bash';
+
+/**
+ * Every Claude Code tool whose input carries a `command` it runs in a shell:
+ * `Bash`, and `Monitor`, which runs one and streams its stdout as events.
+ */
+const CLAUDE_SHELL_COMMAND_TOOLS: ReadonlySet<string> = new Set([
+	CLAUDE_SHELL_TOOL,
+	'Monitor',
+]);
 
 /**
  * The queue tools under the name Claude's tool list carries them: the SDK
@@ -70,10 +86,13 @@ function computeQueueDenial(
 	toolInput: Record<string, unknown>,
 	settings: ComputeQueueSettings,
 ): string | null {
-	if (toolName !== CLAUDE_SHELL_TOOL || typeof toolInput.command !== 'string') {
+	const command = toolInput.command;
+	if (
+		!CLAUDE_SHELL_COMMAND_TOOLS.has(toolName) ||
+		typeof command !== 'string'
+	) {
 		return null;
 	}
-	const command = toolInput.command;
 	const verdict = classifyHeavyCommandForSettings(command, settings);
 	return verdict.heavy
 		? heavyCommandBlockReason({
@@ -86,12 +105,32 @@ function computeQueueDenial(
 }
 
 /**
- * Builds the `PreToolUse` matcher that refuses a heavy `Bash` command.
+ * Reports whether Plan Mode's own hook refuses this call, which it does to any
+ * `Bash` command that is not read-only while the session plans.
+ * @param toolName - The SDK tool name being called.
+ * @param toolInput - The tool call's raw input object.
+ * @returns True when Plan Mode answers the call itself.
+ */
+function planModeRefuses(
+	toolName: string,
+	toolInput: Record<string, unknown>,
+): boolean {
+	const command = toolInput.command;
+	return (
+		toolName === CLAUDE_SHELL_TOOL &&
+		!isReadOnlyBashCommand(typeof command === 'string' ? command : '').ok
+	);
+}
+
+/**
+ * Builds the `PreToolUse` matcher that refuses a heavy shell command.
  * @param readSettings - Reads the live compute-queue settings at tool-call time.
+ * @param isPlanning - Reads the session's live Plan Mode flag at tool-call time.
  * @returns The matcher to register under `PreToolUse`.
  */
 function createComputeQueuePreToolUseHook(
 	readSettings: () => ComputeQueueSettings,
+	isPlanning: () => boolean,
 ): HookCallbackMatcher {
 	return {
 		hooks: [
@@ -99,9 +138,13 @@ function createComputeQueuePreToolUseHook(
 				if (input.hook_event_name !== 'PreToolUse') {
 					return {};
 				}
+				const toolInput = (input.tool_input ?? {}) as Record<string, unknown>;
+				if (isPlanning() && planModeRefuses(input.tool_name, toolInput)) {
+					return {};
+				}
 				const reason = computeQueueDenial(
 					input.tool_name,
-					(input.tool_input ?? {}) as Record<string, unknown>,
+					toolInput,
 					readSettings(),
 				);
 				return reason === null ? {} : deny(reason);
@@ -116,17 +159,19 @@ function createComputeQueuePreToolUseHook(
  * deny from any hook stands, and this one never allows.
  * @param base - Hooks the session's other surfaces registered, if any.
  * @param readSettings - Reads the live compute-queue settings at tool-call time.
+ * @param isPlanning - Reads the session's live Plan Mode flag at tool-call time.
  * @returns The combined hook map to hand the SDK.
  */
 export function withComputeQueueHooks(
 	base: ClaudeHookMap | undefined,
 	readSettings: () => ComputeQueueSettings,
+	isPlanning: () => boolean = () => false,
 ): ClaudeHookMap {
 	return {
 		...base,
 		PreToolUse: [
 			...(base?.PreToolUse ?? []),
-			createComputeQueuePreToolUseHook(readSettings),
+			createComputeQueuePreToolUseHook(readSettings, isPlanning),
 		],
 	};
 }

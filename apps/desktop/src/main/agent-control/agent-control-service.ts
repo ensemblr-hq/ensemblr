@@ -2731,7 +2731,7 @@ export function createAgentControlService({
 				kind: args.kind,
 				...(args.scriptName ? { scriptName: args.scriptName } : {}),
 				...(args.restart ? { restart: true } : {}),
-				rootSessionId: origin.rootSessionId,
+				rootSessionId,
 				sessionId: origin.sessionId,
 			});
 		} catch (error) {
@@ -2903,8 +2903,9 @@ export function createAgentControlService({
 	/**
 	 * Gates a write into a shell terminal on the compute queue: a heavy command
 	 * typed at a prompt loads the machine exactly as one run in the agent's own
-	 * shell does. A harness terminal is left alone — what is typed there is a
-	 * prompt to another agent, and that agent's own shell is gated where it runs.
+	 * shell does. Input typed into a harness terminal is not classified: it is a
+	 * prompt to another agent rather than a shell line, and a harness's own shell
+	 * is not gated (ADR 0082).
 	 * @param origin - Resolved caller identity.
 	 * @param args - The terminal and the input being written.
 	 * @returns The refusal, or null when the write may go through.

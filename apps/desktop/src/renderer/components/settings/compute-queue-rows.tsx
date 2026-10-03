@@ -46,11 +46,16 @@ function clampInteger(raw: string, min: number, max: number): number {
 	return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : min;
 }
 
-/** One numeric row of the compute queue section. */
+/**
+ * One numeric row of the compute queue section. Typing edits a string draft so
+ * the field can be cleared and retyped; the clamped value is committed once, on
+ * blur or Enter, which also keeps each keystroke from being a settings write.
+ */
 function NumberSettingRow({
 	ariaLabel,
 	defaultValue,
 	description,
+	disabled,
 	label,
 	max,
 	min,
@@ -60,29 +65,51 @@ function NumberSettingRow({
 	ariaLabel: string;
 	defaultValue: number;
 	description: string;
+	disabled: boolean;
 	label: string;
 	max: number;
 	min: number;
 	onChange: (value: number) => void;
 	value: number;
 }) {
+	const [draft, setDraft] = useState<string | null>(null);
+
+	/** Writes the clamped draft, or drops it when the field was left empty. */
+	const commit = () => {
+		if (draft !== null && draft.trim() !== '') {
+			onChange(clampInteger(draft, min, max));
+		}
+		setDraft(null);
+	};
+
 	return (
 		<SettingRow
 			control={
 				<Input
 					aria-label={ariaLabel}
 					className='h-7 w-20 text-right font-mono text-xs'
+					disabled={disabled}
+					inputMode='numeric'
 					max={max}
 					min={min}
-					onChange={(e) => onChange(clampInteger(e.target.value, min, max))}
+					onBlur={commit}
+					onChange={(e) => setDraft(e.target.value)}
+					onKeyDown={(e) => {
+						if (e.key === 'Enter') {
+							commit();
+						}
+					}}
 					type='number'
-					value={value}
+					value={draft ?? String(value)}
 				/>
 			}
 			description={description}
 			label={label}
 			modified={value !== defaultValue}
-			onReset={() => onChange(defaultValue)}
+			onReset={() => {
+				setDraft(null);
+				onChange(defaultValue);
+			}}
 		/>
 	);
 }
@@ -91,6 +118,7 @@ function NumberSettingRow({
 function PatternListRow({
 	ariaLabel,
 	description,
+	disabled,
 	label,
 	onChange,
 	patterns,
@@ -98,6 +126,7 @@ function PatternListRow({
 }: {
 	ariaLabel: string;
 	description: string;
+	disabled: boolean;
 	label: string;
 	onChange: (patterns: string[]) => void;
 	patterns: readonly string[];
@@ -120,6 +149,7 @@ function PatternListRow({
 			<Textarea
 				aria-label={ariaLabel}
 				className='mt-2 min-h-16 font-mono text-xs'
+				disabled={disabled}
 				onBlur={() => {
 					if (draft !== null) {
 						onChange(parsePatterns(draft));
@@ -159,7 +189,7 @@ export function ComputeQueueRows() {
 				control={<Switch checked={enabled} onCheckedChange={setEnabled} />}
 				description={t(
 					'settings:general.compute-queue.enabled.description',
-					'Heavy commands agents run, such as builds, tests, and installs, wait for a free slot across all workspaces instead of starting together. Keeps the machine responsive when several agents work at once.',
+					'Heavy commands agents run, such as builds, tests, and typechecks, wait for a free slot across all workspaces instead of starting together. Keeps the machine responsive when several agents work at once.',
 				)}
 				label={t(
 					'settings:general.compute-queue.enabled.label',
@@ -176,12 +206,13 @@ export function ComputeQueueRows() {
 				defaultValue={DEFAULTS.concurrency}
 				description={t(
 					'settings:general.compute-queue.concurrency.description',
-					'How many queued commands may run at the same time. Scripts you start yourself always run at once and hold a slot.',
+					'How many queued commands may run at the same time. Heavy scripts you start yourself run at once and hold a slot.',
 				)}
 				label={t(
 					'settings:general.compute-queue.concurrency.label',
 					'Concurrent slots',
 				)}
+				disabled={!enabled}
 				max={MAX_CONCURRENCY}
 				min={1}
 				onChange={setConcurrency}
@@ -201,6 +232,7 @@ export function ComputeQueueRows() {
 					'settings:general.compute-queue.niceness.label',
 					'CPU priority (niceness)',
 				)}
+				disabled={!enabled}
 				max={MAX_NICENESS}
 				min={0}
 				onChange={setNiceness}
@@ -219,6 +251,7 @@ export function ComputeQueueRows() {
 					'settings:general.compute-queue.extra-patterns.label',
 					'Extra heavy commands',
 				)}
+				disabled={!enabled}
 				onChange={setExtraPatterns}
 				patterns={extraPatterns}
 				placeholder='cargo build*'
@@ -236,6 +269,7 @@ export function ComputeQueueRows() {
 					'settings:general.compute-queue.exempt-patterns.label',
 					'Exempt commands',
 				)}
+				disabled={!enabled}
 				onChange={setExemptPatterns}
 				patterns={exemptPatterns}
 				placeholder='run lint*'

@@ -1099,6 +1099,7 @@
 	"navigation-sidebar": {
 		"compute-queue": {
 			"cancel": "Cancel {{label}}",
+			"cancel-failed": "Could not cancel the job. It may have already finished.",
 			"initiator": {
 				"agent": "Agent",
 				"auto": "Setup",

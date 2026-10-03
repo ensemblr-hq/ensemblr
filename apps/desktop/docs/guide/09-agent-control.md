@@ -91,6 +91,32 @@ code, so a prompt cannot talk its way past them:
 A refusal comes back to the agent as a modelled answer naming the recovery, not
 as a crash, so it can correct course rather than retry blindly.
 
+## The compute queue
+
+Heavy commands — test suites, builds, typechecks, compiles — wait for a few
+app-wide slots shared by every agent in every workspace, so a fan-out of agents
+each running its own test suite cannot make your machine unusable. An agent's own
+shell refuses a heavy command and points it at three tools:
+
+- `ensemblr_run_queued` queues a command, runs it in the agent's workspace with
+  its full Ensemblr environment (secrets included), and returns the exit code and
+  the end of its output. By default it waits; `wait: false` returns at once.
+- `ensemblr_wait_for_job` picks a wait back up. A wait that times out keeps the
+  job's place in line.
+- `ensemblr_cancel_job` removes a job from the queue or stops it.
+
+A heavy setup or run script an agent starts with `ensemblr_start_terminal` does
+not launch at once: the answer is `queued` with a job id and position, and the
+script's terminal opens by itself once a slot frees. `ensemblr_wait_for_job` on
+that id waits until the script exits. You see every job, with a cancel and an
+open-log action, in the sidebar's **Compute queue** panel; the panel is absent
+while nothing is waiting or running. Slots, CPU priority, and which commands
+count as heavy are in [Settings → General](./11-app-settings.md#general), and
+agents cannot change them. The tools are withheld from the Concierge. See
+[`../agent-control.md`](../agent-control.md) for arguments and guardrails, and
+[ADR 0082](../adr/0082-queue-heavy-agent-commands-through-one-app-wide-queue.md)
+for the design.
+
 ## Guardrails
 
 Delegation is bounded so a runaway agent cannot fill your machine with children:

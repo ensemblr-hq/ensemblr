@@ -561,6 +561,76 @@ describe('agent-control compute queue: waitForJob and cancelJob', () => {
 		});
 	});
 
+	it('cancels a job another agent in its own delegation tree queued', async () => {
+		const queue = makeQueue({
+			seed: [
+				{
+					job: jobOf({ id: 'sibling', sessionId: 'leaf' }),
+					rootSessionId: 'caller',
+				},
+			],
+		});
+		const { invoke } = setup(makePorts({ jobQueue: queue.port }));
+
+		const result = await invoke('cancelJob', { jobId: 'sibling' });
+
+		expect(result.ok).toBe(true);
+		expect(queue.port.cancel).toHaveBeenCalledWith('sibling');
+	});
+
+	it.each([
+		[
+			'the user started',
+			jobOf({ id: 'x', initiator: 'user', kind: 'script', sessionId: null }),
+			null,
+		],
+		[
+			'the app started',
+			jobOf({ id: 'x', initiator: 'auto', kind: 'script', sessionId: null }),
+			null,
+		],
+		['another tree queued', jobOf({ id: 'x', sessionId: 'stranger' }), 'other'],
+	])('refuses to cancel a job %s in its workspace', async (_who, job, root) => {
+		const queue = makeQueue({ seed: [{ job, rootSessionId: root }] });
+		const { invoke } = setup(makePorts({ jobQueue: queue.port }));
+
+		const result = await invoke('cancelJob', { jobId: 'x' });
+
+		expect(result).toMatchObject({ code: 'denied-scope', ok: false });
+		expect(queue.port.cancel).not.toHaveBeenCalled();
+	});
+
+	it('words a wait the turn interrupted as an interruption, not an expiry', async () => {
+		const queue = makeQueue({
+			seed: [{ job: jobOf({ id: 'mine' }), rootSessionId: 'caller' }],
+		});
+		const { service } = setup(makePorts({ jobQueue: queue.port }));
+		const aborted = new AbortController();
+		aborted.abort();
+
+		const waited = dataOf<WaitForJobResult>(
+			await service.invoke({
+				op: 'waitForJob',
+				rawArgs: { jobIds: ['mine'] },
+				signal: aborted.signal,
+				token: 'tok-caller',
+			}),
+		);
+		const ran = dataOf<RunQueuedResult>(
+			await service.invoke({
+				op: 'runQueued',
+				rawArgs: { command: HEAVY },
+				signal: aborted.signal,
+				token: 'tok-caller',
+			}),
+		);
+
+		for (const note of [waited.note, ran.note]) {
+			expect(note).toContain('this turn was interrupted');
+			expect(note).not.toContain('wait window expired');
+		}
+	});
+
 	it('cancels the jobs a session owns when the session is released', () => {
 		const queue = makeQueue();
 		const { service } = setup(makePorts({ jobQueue: queue.port }));
@@ -687,6 +757,27 @@ describe('agent-control compute queue: terminal gate', () => {
 		expect(result.ok).toBe(true);
 	});
 
+	it('joins a line continued with a backslash across writes before classifying', async () => {
+		const ports = makePorts({ jobQueue: makeQueue().port });
+		const send = write(ports);
+
+		const first = await send('bun run \\\r');
+		const second = await send('test\r');
+
+		expect(first.ok).toBe(true);
+		expect(second).toMatchObject({ code: 'denied-scope', ok: false });
+	});
+
+	it('submits a line ending in an escaped backslash rather than continuing it', async () => {
+		const ports = makePorts({ jobQueue: makeQueue().port });
+		const send = write(ports);
+
+		await send('echo \\\\\r');
+		const result = await send('test\r');
+
+		expect(result.ok).toBe(true);
+	});
+
 	it('honours backspace when reading the submitted line', async () => {
 		const ports = makePorts({ jobQueue: makeQueue().port });
 
@@ -726,6 +817,24 @@ describe('agent-control compute queue: queued script start', () => {
 		expect(data.note).toContain('position 2');
 		expect(data.note).toContain('ensemblr_wait_for_job');
 		expect(ports.focus.focusDockTab).not.toHaveBeenCalled();
+	});
+
+	it("counts the tree's queued scripts against its unfinished-job cap", async () => {
+		const queue = makeQueue({
+			seed: [
+				{
+					job: jobOf({ id: 'setup', initiator: 'agent', kind: 'script' }),
+					rootSessionId: 'caller',
+				},
+			],
+		});
+		const { invoke } = setup(makePorts({ jobQueue: queue.port }), {
+			maxUnfinishedJobs: 1,
+		});
+
+		const result = await invoke('runQueued', { command: HEAVY, wait: false });
+
+		expect(result).toMatchObject({ code: 'denied-quota', ok: false });
 	});
 });
 

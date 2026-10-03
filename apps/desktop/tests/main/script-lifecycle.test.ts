@@ -322,6 +322,9 @@ function createServiceFixture(
 	settings: Parameters<typeof createSettingsStub>[0],
 	fakeOptions?: Parameters<typeof createTerminalServiceFake>[0],
 	queueSettings?: Partial<ComputeQueueSettings>,
+	settingsService: EnsemblrConfigResolutionService = createSettingsStub(
+		settings,
+	),
 ) {
 	const database = createDatabaseFixture(t);
 	const fake = createTerminalServiceFake(fakeOptions);
@@ -343,7 +346,7 @@ function createServiceFixture(
 		computeQueue,
 		databaseService: createDatabaseServiceStub(database),
 		readComputeQueueSettings: () => computeQueueSettings,
-		settingsResolutionService: createSettingsStub(settings),
+		settingsResolutionService: settingsService,
 		terminalService: fake.terminalService,
 	});
 
@@ -1253,10 +1256,15 @@ function settle(ms = 80): Promise<void> {
 async function createBusyQueueFixture(
 	t: TestContext,
 	settings: Parameters<typeof createSettingsStub>[0] = { setup: 'bun install' },
+	settingsService?: EnsemblrConfigResolutionService,
 ) {
-	const fixture = createServiceFixture(t, settings, undefined, {
-		enabled: true,
-	});
+	const fixture = createServiceFixture(
+		t,
+		settings,
+		undefined,
+		{ enabled: true },
+		settingsService,
+	);
 	const occupant = await fixture.service.runScript({
 		initiator: 'user',
 		kind: 'setup',
@@ -1488,5 +1496,138 @@ test('a queued app setup still finalizes and auto-runs once it is granted', asyn
 			['setup-script', WORKSPACE_ID],
 			['run-script', WORKSPACE_ID],
 		],
+	);
+});
+
+/** Script settings a test can rewrite between a launch queueing and its grant. */
+function createMutableSettings(
+	initial: Parameters<typeof createSettingsStub>[0],
+): {
+	service: EnsemblrConfigResolutionService;
+	set: (next: Parameters<typeof createSettingsStub>[0]) => void;
+} {
+	let current = createSettingsStub(initial);
+
+	return {
+		service: { resolve: (request) => current.resolve(request) },
+		set: (next) => {
+			current = createSettingsStub(next);
+		},
+	};
+}
+
+test('a launch that waited re-reads its command when its slot comes', async (t) => {
+	const initial = { run: 'cargo build', setup: 'bun install' };
+	const settings = createMutableSettings(initial);
+	const fixture = await createBusyQueueFixture(t, initial, settings.service);
+
+	const queued = await fixture.service.runScript({
+		initiator: 'agent',
+		kind: 'run',
+		workspaceId: WORKSPACE_ID,
+	});
+	assert.ok(queued.queuedJob);
+	settings.set({ run: 'cargo build --release', setup: 'bun install' });
+
+	fixture.endSession(fixture.occupantId, 'exited');
+	await eventually(() => fixture.createCalls.length === 2);
+
+	assert.equal(fixture.createCalls[1]?.command, 'cargo build --release');
+});
+
+test('a launch whose script disappeared while it waited fails its job with the reason', async (t) => {
+	const warn = t.mock.method(console, 'warn', () => {});
+	const initial = { run: 'cargo build', setup: 'bun install' };
+	const settings = createMutableSettings(initial);
+	const fixture = await createBusyQueueFixture(t, initial, settings.service);
+
+	const queued = await fixture.service.runScript({
+		initiator: 'agent',
+		kind: 'run',
+		workspaceId: WORKSPACE_ID,
+	});
+	assert.ok(queued.queuedJob);
+	const jobId = queued.queuedJob.jobId;
+	settings.set({ setup: 'bun install' });
+
+	fixture.endSession(fixture.occupantId, 'exited');
+	await eventually(
+		() => fixture.computeQueue.getJob(jobId)?.state === 'failed',
+	);
+
+	assert.equal(fixture.createCalls.length, 1);
+	assert.match(
+		fixture.computeQueue.getJob(jobId)?.outputTail ?? '',
+		/No run script is configured/,
+	);
+	assert.ok(warn.mock.callCount() > 0);
+});
+
+test('a launch that waited does not restart a session started in the meantime', async (t) => {
+	const settings = {
+		runScripts: [
+			{ command: 'echo serving', default: true, name: 'dev' },
+			{ command: 'cargo build --release', name: 'build' },
+		],
+		setup: 'bun install',
+	};
+	const fixture = await createBusyQueueFixture(t, settings);
+
+	const queued = await fixture.service.runScript({
+		initiator: 'agent',
+		kind: 'run',
+		restart: true,
+		scriptName: 'build',
+		workspaceId: WORKSPACE_ID,
+	});
+	assert.ok(queued.queuedJob);
+	const dev = await fixture.service.runScript({
+		kind: 'run',
+		scriptName: 'dev',
+		workspaceId: WORKSPACE_ID,
+	});
+	assert.ok(dev.session);
+
+	fixture.endSession(fixture.occupantId, 'exited');
+	const jobId = queued.queuedJob.jobId;
+	await eventually(
+		() => fixture.computeQueue.getJob(jobId)?.state === 'cancelled',
+	);
+
+	assert.equal(fixture.killedIds.includes(dev.session.id), false);
+	assert.match(
+		fixture.computeQueue.getJob(jobId)?.outputTail ?? '',
+		/already running/,
+	);
+});
+
+test('a queued setup whose finalize fails is logged, not left unhandled', async (t) => {
+	const warn = t.mock.method(console, 'warn', () => {});
+	const unhandled: unknown[] = [];
+	const onUnhandled = (reason: unknown) => unhandled.push(reason);
+	process.on('unhandledRejection', onUnhandled);
+	t.after(() => process.off('unhandledRejection', onUnhandled));
+	const fixture = await createBusyQueueFixture(t);
+	const getSnapshot = fixture.terminalService.getSnapshot;
+	fixture.terminalService.getSnapshot = (terminalId) => {
+		if (terminalId === 'session-2') {
+			throw new Error('snapshot unavailable');
+		}
+		return getSnapshot(terminalId);
+	};
+
+	await fixture.service.runSetupScriptWithAutoRun({
+		workspaceId: WORKSPACE_ID,
+	});
+	fixture.endSession(fixture.occupantId, 'exited');
+	await eventually(() => fixture.createCalls.length === 2);
+	fixture.endSession('session-2', 'exited');
+	await settle(150);
+
+	assert.deepEqual(unhandled, []);
+	assert.ok(
+		warn.mock.calls.some((call) =>
+			String(call.arguments[0]).includes('could not finalize setup'),
+		),
 	);
 });

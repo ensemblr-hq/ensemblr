@@ -1,19 +1,35 @@
 // @vitest-environment happy-dom
 
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { createStore, Provider } from 'jotai';
-import { describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-import {
-	ComputeQueuePanel,
-	SidebarComputeQueuePanel,
-} from '../../src/renderer/components/workbench-shell/navigation-sidebar/compute-queue-panel';
 import { computeQueueSnapshotAtom } from '../../src/renderer/state/compute-queue';
 import type {
 	ComputeJobSnapshot,
 	ComputeQueueSnapshot,
 } from '../../src/shared/compute-queue';
 import { renderWithProviders } from './support/dom';
+
+const cancelComputeJob = vi.fn();
+const toastError = vi.fn();
+
+vi.mock('sonner', () => ({ toast: { error: (m: string) => toastError(m) } }));
+vi.mock('@/renderer/api/ensemblr', async (importOriginal) => {
+	const actual =
+		await importOriginal<typeof import('@/renderer/api/ensemblr')>();
+	return {
+		...actual,
+		cancelComputeJob: (id: string) => cancelComputeJob(id),
+	};
+});
+vi.mock('@/renderer/hooks/concierge/use-concierge-file-preview', () => ({
+	useConciergeFilePreview: () => ({ openFilePreview: undefined }),
+}));
+
+const { ComputeQueuePanel, SidebarComputeQueuePanel } = await import(
+	'../../src/renderer/components/workbench-shell/navigation-sidebar/compute-queue-panel'
+);
 
 /** Builds a job with sensible defaults; tests override only what they assert on. */
 function job(overrides: Partial<ComputeJobSnapshot>): ComputeJobSnapshot {
@@ -133,6 +149,87 @@ describe('ComputeQueuePanel', () => {
 });
 
 describe('SidebarComputeQueuePanel', () => {
+	beforeEach(() => {
+		cancelComputeJob.mockReset();
+		toastError.mockReset();
+	});
+
+	/** Renders the wired panel against a store holding the given snapshot. */
+	function renderSidebar(snapshot: ComputeQueueSnapshot) {
+		const store = createStore();
+		store.set(computeQueueSnapshotAtom, snapshot);
+		return renderWithProviders(
+			<Provider store={store}>
+				<SidebarComputeQueuePanel />
+			</Provider>,
+		);
+	}
+
+	test('announces only the summary through a hidden live node', () => {
+		const { container } = renderSidebar(
+			queue([
+				job({ id: 'r', startedAt: Date.now(), state: 'running' }),
+				job({ id: 'q', position: 1 }),
+			]),
+		);
+
+		const live = container.querySelector('[aria-live]');
+		expect(live?.textContent).toBe('1 running · 1 queued');
+		expect(live?.className).toContain('sr-only');
+		expect(
+			container
+				.querySelector('[data-sidebar-compute-queue]')
+				?.closest('[aria-live]'),
+		).toBeNull();
+		const timer = container.querySelector(
+			'[data-compute-job-state="running"] .tabular-nums',
+		);
+		expect(timer?.getAttribute('aria-hidden')).toBe('true');
+		expect(
+			container
+				.querySelector('[data-compute-job-state="running"] [role="status"]')
+				?.getAttribute('aria-hidden'),
+		).toBe('true');
+	});
+
+	test('the live node stays mounted and empty when the queue is idle', () => {
+		const { container } = renderSidebar(queue([]));
+
+		expect(container.querySelector('[aria-live]')?.textContent).toBe('');
+	});
+
+	test('a cancel the queue refuses surfaces a toast', async () => {
+		cancelComputeJob.mockResolvedValue({ cancelled: false });
+		renderSidebar(queue([job({ id: 'q1', label: 'bun build', position: 1 })]));
+
+		fireEvent.click(screen.getByRole('button', { name: 'Cancel bun build' }));
+
+		await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
+	});
+
+	test('a cancel that throws surfaces a toast', async () => {
+		const error = vi
+			.spyOn(console, 'error')
+			.mockImplementation(() => undefined);
+		cancelComputeJob.mockRejectedValue(new Error('ipc down'));
+		renderSidebar(queue([job({ id: 'q1', label: 'bun build', position: 1 })]));
+
+		fireEvent.click(screen.getByRole('button', { name: 'Cancel bun build' }));
+
+		await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
+		error.mockRestore();
+	});
+
+	test('a successful cancel stays quiet', async () => {
+		cancelComputeJob.mockResolvedValue({ cancelled: true });
+		renderSidebar(queue([job({ id: 'q1', label: 'bun build', position: 1 })]));
+
+		fireEvent.click(screen.getByRole('button', { name: 'Cancel bun build' }));
+
+		await waitFor(() => expect(cancelComputeJob).toHaveBeenCalledWith('q1'));
+		expect(toastError).not.toHaveBeenCalled();
+	});
+
 	test('shows no panel until a job is live', () => {
 		const store = createStore();
 		store.set(computeQueueSnapshotAtom, queue([job({ state: 'succeeded' })]));

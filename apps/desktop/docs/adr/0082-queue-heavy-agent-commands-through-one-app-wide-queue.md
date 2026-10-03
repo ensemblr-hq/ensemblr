@@ -53,8 +53,8 @@ main and the Pi extension asks the app per tool call, so there is one copy.
 - A heavy setup or run script started by an agent, or by the app on workspace
   creation, waits for a slot before its terminal launches and holds it until
   the terminal exits. Every setup script counts as heavy.
-- A script the user clicks starts at once but takes a slot, so agents queue
-  behind the human rather than beside them.
+- A heavy script the user clicks starts at once but takes a slot, so agents
+  queue behind the human rather than beside them.
 
 **The refusal redirects rather than rewrites.** The refusal names
 `ensemblr_run_queued` with the command to pass. That tool queues the command,
@@ -109,7 +109,16 @@ code.
   than proving them safe, so `tsc --version` counts as heavy.
 - Third-party harness TUIs (Claude Code, Codex, Vibe in a terminal tab) are not
   gated. Codex and Vibe expose no pre-execution hook; a Claude harness could be
-  given one later through `--settings`.
+  given one later through `--settings`. What `ensemblr_write_terminal` types
+  into a harness terminal is not classified either: it is a prompt to another
+  agent, not a command line.
+- A command recalled from shell history in a terminal (the up arrow) is not
+  seen: the gate reads only the text written through `ensemblr_write_terminal`,
+  so a recalled line submitted with a bare newline reaches the shell
+  unclassified.
+- A queued command runs in its own process group, and the whole group is
+  signalled when the job ends, so a child the command backgrounded does not
+  outlive it. A command that deliberately daemonises is killed with it.
 - An agent can still edit `~/.config/ensemblr/config.json` directly with its
   file tools. The settings tools refuse the section, but the file is outside
   any workspace's guard.

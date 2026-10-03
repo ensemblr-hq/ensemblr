@@ -57,10 +57,11 @@ each exposing its public surface through `index.ts`.
 | Checkpoints | `checkpoints/` | Git-backed per-turn checkpoints (ADR&nbsp;0012) |
 | Process execution | `commands/` | Local process and shell execution |
 | Concierge | `concierge/` | App-level agent session service, its home-folder layout under the Ensemblr root, the memory index and background memory pass, the artifact lister the panel's reader reads through, and the wire that retires a session while it finishes writing memories |
+| Compute queue | `compute-queue/` | The app-wide queue heavy agent commands wait in (ADR&nbsp;0082): the service that grants a few global slots round-robin across workspaces, the headless command runner behind `ensemblr_run_queued`, the wait loop, and the job records the sidebar panel reads. Scripts reach it through the gate in `scripts/` |
 | Config | `config/` | Declarative config loading, settings resolution, repository config |
 | Dictation | `dictation/` | The transcription service behind the composer's mic control, its endpoint policy, and the Keychain-held key it authenticates with |
 | Environment | `environment/` | Environment-variable catalogue and layered assembly, Infisical joining as its own layer |
-| IPC | `ipc/` | Handler registration (`handlers/`, 41 modules), request validation (`request-schemas/`, 27 modules), permission gate |
+| IPC | `ipc/` | Handler registration (`handlers/`, 42 modules), request validation (`request-schemas/`, 28 modules), permission gate |
 | Integrations | `github/`, `linear/`, `infisical/` | `gh` CLI wrapper, PR snapshots, cached issue backlog; Linear OAuth + client + per-account store; Infisical account store, REST boundary, token-caching client, per-scope cache, link store |
 | Linked directories | `linked-directories/` | Read grants for directories outside a workspace, plus the app-global recents list behind them |
 | Merge close-out | `merge-close-out/` | What a merged pull request sets in motion: the workspace's board card to Done, and the Linear or GitHub issue it was created from closed. Fed by `github/`, which reports every merge it observes (ADR&nbsp;0082) |
@@ -69,7 +70,7 @@ each exposing its public surface through `index.ts`.
 | Repositories | `repository/` | Registration, git probing, lifecycle |
 | Review | `review/` | Ensemblr-local review comments and todos |
 | Root directory | `root/` | Managed root resolution and reconciliation |
-| Scripts | `scripts/` | Named run-script lifecycle, setup/archive hooks, setup fingerprint and state file |
+| Scripts | `scripts/` | Named run-script lifecycle, setup/archive hooks, setup fingerprint and state file, and the queue gate that holds a heavy script's terminal launch until `compute-queue/` grants a slot |
 | Secrets | `secrets/` | One store behind two backends — the macOS Keychain (ADR&nbsp;0018), or Electron `safeStorage` ciphertext in SQLite off darwin (ADR&nbsp;0056) — plus the metadata rows and the keyring-health probe the Linux setup check reads |
 | Setup | `setup/` | Setup diagnostics orchestration |
 | Storage | `storage/` | SQLite connection (`database.ts`), migrations, `repositories/`, `tx.ts` |
@@ -106,7 +107,7 @@ A new feature is split across these buckets, not given a folder of its own.
 | `lib/` | Runtime helpers grouped by concern | `workbench/`, `agents/` (conversation model, session-tab bookkeeping), `agent-timeline/`, `conversation/`, `diff/`, `code/`, `github/`, `linear/`, `pi/`, `pi-replay/`, `terminal/`, `dictation/`, `i18n/` (i18next instance + bundled `locales/`), `onboarding/`, `instrumentation/`, `ask-user-question/`, `welcome/`, `notification-sound/` (the bundled chime and its player), `concierge/`, `architecture-diagram/` (the layout engine that compiles the stored document into a drawn canvas), `external-url/` (the renderer-side allowlist for URLs from outside the app), plus the code→`t()` mappers `failure-text/`, `agent-failure-text/`, `setup-check-text/`, `provider-check-text/`, `plan-limit-text/`, `github-owner-text/` |
 | `fixtures/` | Fixture/demo data production code may still consume | `workbench/` |
 | `routing/` | TanStack Router file routes + generated tree | `routes/` |
-| `state/` | Durable Jotai state | `workspace/`, `agents/`, `composer/`, `pi/`, `plan-mode/`, `afk-mode/`, `preferences/`, `dialogs/`, `recents/`, `sidebar/`, `settings-ui/`, `slash-commands/`, `tool-approval/`, `ask-user-question/`, `conversation-scroll/`, `menu-commands/`, `linear/`, `review-launch/`, `unread/`, `updates/`, `window-chrome/`, `concierge/` |
+| `state/` | Durable Jotai state | `workspace/`, `agents/`, `composer/`, `pi/`, `plan-mode/`, `afk-mode/`, `preferences/`, `dialogs/`, `recents/`, `sidebar/`, `settings-ui/`, `slash-commands/`, `tool-approval/`, `ask-user-question/`, `conversation-scroll/`, `menu-commands/`, `linear/`, `review-launch/`, `unread/`, `updates/`, `window-chrome/`, `concierge/`, `compute-queue/` |
 | `styles/` | CSS entrypoint (`index.css`) and font assets | — |
 | `types/` | Exported renderer types and ambient declarations | `workbench/`, `workbench-shell/`, `components/`, `onboarding/` |
 
@@ -134,13 +135,13 @@ The only code both processes may import. Two shapes coexist:
 
 - **Single-file concerns** — plain root modules (`config.ts`, `permissions.ts`,
   `github.ts`, `slug.ts`, `menu-commands.ts`, `concierge-references.ts`,
-  `window-chrome.ts`, …); 49 `.ts` files sit at the shared root in total.
+  `window-chrome.ts`, …); 51 `.ts` files sit at the shared root in total.
 - **Multi-file concerns** — an implementation directory behind a stable
   entrypoint, in one of two forms:
-  - `<concern>/index.ts` — `ipc/` (46 contract modules under `ipc/contracts/`,
+  - `<concern>/index.ts` — `ipc/` (47 contract modules under `ipc/contracts/`,
     plus `channels.ts` and `handler-map.ts`), `pi-rpc/`, `keymap/`.
   - `<concern>.ts` + `<concern>/` — `afk-mode`, `agent-control`, `agent-failure`,
-    `architecture-diagram`, `plan-mode`, `review-brief`, `scripts`, `terminal`,
+    `architecture-diagram`, `compute-queue`, `plan-mode`, `review-brief`, `scripts`, `terminal`,
     `tool-presentation`. This is the form
     `electron --test` can resolve, so prefer it for anything the main-process
     suites import.

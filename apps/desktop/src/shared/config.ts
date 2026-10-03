@@ -8,7 +8,7 @@ import { MODEL_ROLES } from './model-role.ts';
  * Schema + defaults for the user-facing **App settings** persisted in
  * `~/.config/ensemblr/config.json` under the `app` key (`app.general`,
  * `app.models`, `app.providers`, `app.git`, `app.appearance`,
- * `app.experimental`). This is the
+ * `app.experimental`, `app.computeQueue`). This is the
  * single source of truth shared by the main process (read/validate/write) and
  * the renderer (defaults + types).
  *

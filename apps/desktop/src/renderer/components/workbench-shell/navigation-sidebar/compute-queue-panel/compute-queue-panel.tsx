@@ -89,7 +89,7 @@ export function ComputeQueuePanel({
 				</div>
 				<Tooltip>
 					<TooltipTrigger asChild>
-						<Badge variant='outline'>
+						<Badge className='shrink-0' variant='outline'>
 							{t(
 								'workbench:navigation-sidebar.compute-queue.slots',
 								'{{inUse}}/{{slots}}',
@@ -141,7 +141,10 @@ function ComputeJobRow({
 			data-compute-job-state={job.state}
 		>
 			{job.state === 'running' ? (
-				<Spinner className='size-3.5 shrink-0 text-muted-foreground' />
+				<Spinner
+					aria-hidden='true'
+					className='size-3.5 shrink-0 text-muted-foreground'
+				/>
 			) : (
 				<ListOrderedIcon
 					aria-hidden='true'
@@ -243,13 +246,9 @@ function InitiatorBadge({ initiator }: { initiator: ComputeJobInitiator }) {
 /** Queue position for a waiting job, live elapsed time for a running one. */
 function JobTiming({ job }: { job: ComputeJobSnapshot }) {
 	const { t } = useTranslation();
-	const startMs = job.startedAt ?? job.enqueuedAt;
-	const elapsedMs = useElapsedMs(startMs, ELAPSED_TICK_MS);
 
 	if (job.state === 'running') {
-		return (
-			<span className='tabular-nums'>{formatTurnDuration(elapsedMs)}</span>
-		);
+		return <RunningElapsed startedAt={job.startedAt ?? job.enqueuedAt} />;
 	}
 	return (
 		<span className='tabular-nums'>
@@ -258,6 +257,20 @@ function JobTiming({ job }: { job: ComputeJobSnapshot }) {
 				'#{{position}}',
 				{ position: job.position ?? 0 },
 			)}
+		</span>
+	);
+}
+
+/**
+ * A running job's elapsed time. Only running rows mount it, so a queued row
+ * holds no interval. Hidden from assistive tech: a ticking timer is noise.
+ */
+function RunningElapsed({ startedAt }: { startedAt: number }) {
+	const elapsedMs = useElapsedMs(startedAt, ELAPSED_TICK_MS);
+
+	return (
+		<span aria-hidden='true' className='tabular-nums'>
+			{formatTurnDuration(elapsedMs)}
 		</span>
 	);
 }

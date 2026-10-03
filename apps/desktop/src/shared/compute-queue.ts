@@ -13,8 +13,8 @@ export type { HeavyCommandVerdict } from './compute-queue/heavy-command.ts';
 export {
 	classifyHeavyCommand,
 	classifyHeavyCommandForSettings,
-	DEFAULT_HEAVY_COMMAND_PATTERNS,
 } from './compute-queue/heavy-command.ts';
+export { DEFAULT_HEAVY_COMMAND_PATTERNS } from './compute-queue/heavy-command-patterns.ts';
 export type {
 	ComputeJobInitiator,
 	ComputeJobKind,

@@ -29,7 +29,11 @@ export interface ComputeJobResult extends ComputeJobSnapshot {
 	durationMs: number | null;
 	/** Characters dropped from the front of `outputTail`. */
 	omittedChars: number;
-	/** The last part of combined stdout/stderr, with workspace secrets redacted. Empty for script jobs. */
+	/**
+	 * The last part of combined stdout/stderr, with workspace secrets redacted.
+	 * A script job's output lives in its terminal, so its tail is empty unless
+	 * the launch never opened one, when it says why.
+	 */
 	outputTail: string;
 	/** Milliseconds spent queued before the job started; null while still queued. */
 	waitedMs: number | null;
@@ -55,8 +59,12 @@ export interface ScriptLeaseRequest extends ComputeJobOwner {
  * cancelled before then, and the caller must not launch. Once launched, the
  * caller reports the terminal and, when the terminal exits, the outcome —
  * `release` is what frees the slot, and calling it more than once is harmless.
+ * A launch that never opens a terminal frees it with `abandon` instead, whose
+ * note becomes the job's output tail so the queue can say why.
  */
 export interface ScriptLease {
+	/** Ends a job whose launch opened no terminal: failed, or cancelled for a refusal. */
+	abandon: (outcome: { failed: boolean; note: string }) => void;
 	attachTerminal: (terminalId: string) => void;
 	granted: Promise<'cancelled' | 'granted'>;
 	jobId: string;
@@ -102,13 +110,21 @@ export interface ComputeQueueService {
 	enqueueCommand: (
 		request: EnqueueCommandRequest,
 	) => Promise<EnqueueCommandOutcome>;
-	/** One job with its output tail, finished or not; null when unknown or expired from history. */
+	/**
+	 * One job with its output tail, finished or not; null when unknown or expired
+	 * from history. Only the most recently finished jobs keep their tail in
+	 * memory; an older one answers with an empty tail and its log path.
+	 */
 	getJob: (jobId: string) => ComputeJobResult | null;
 	/** Live and recent jobs matching the filter, oldest first. */
 	listJobs: (filter?: ComputeJobFilter) => readonly ComputeJobSnapshot[];
 	/** Subscribes to queue changes; returns the unsubscribe function. */
 	onChange: (listener: (snapshot: ComputeQueueSnapshot) => void) => () => void;
-	/** Cancels every unfinished job a session owns, used when the session ends. */
+	/**
+	 * Cancels every unfinished command job a session owns, used when the session
+	 * ends. Script jobs it started are left alone, queued or running: a script an
+	 * agent launched outlives the agent, as it did before the queue existed.
+	 */
 	releaseSession: (sessionId: string) => void;
 	/** Cancels every unfinished job in a workspace, used when it is archived or removed. */
 	releaseWorkspace: (workspaceId: string) => void;
@@ -117,7 +133,10 @@ export interface ComputeQueueService {
 	 * the compute-queue settings change, so a raised limit takes effect at once.
 	 */
 	refresh: () => void;
-	/** Cancels everything and kills running process groups; idempotent. */
+	/**
+	 * Cancels everything and waits for in-flight launches; a second call kills
+	 * running process groups and returns the first call's promise. Never throws.
+	 */
 	shutdown: () => Promise<void>;
 	/** The queue as it stands now. */
 	snapshot: () => ComputeQueueSnapshot;

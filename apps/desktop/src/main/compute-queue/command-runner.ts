@@ -6,10 +6,11 @@ import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 import { createCommandOutput, type OutputTail } from './command-output.ts';
 
 /**
- * How long a process that has exited is given for its pipes to reach EOF. A
- * grandchild still holding them past this is treated as part of the job and
- * its process group is signalled, so a backgrounded child cannot keep burning
- * CPU after the queue has handed its slot to the next job.
+ * How long a process that has exited is given for its pipes to reach EOF.
+ * Whenever the run settles — pipes closed or this grace spent — the job's
+ * whole process group is sent SIGKILL, so a backgrounded child, whether or not
+ * it still holds the pipes, cannot keep burning CPU after the queue has handed
+ * its slot to the next job.
  */
 const STREAM_DRAIN_GRACE_MS = 1_000;
 
@@ -167,12 +168,13 @@ export function startCommandProcess(launch: CommandLaunch): CommandRun {
 		let outcome: CommandRunOutcome = { exitCode: null, signal: null };
 		let settled = false;
 
-		/** Flushes output and resolves exactly once. */
+		/** Reaps the process group, flushes output, and resolves exactly once. */
 		const settle = (): void => {
 			if (settled) {
 				return;
 			}
 			settled = true;
+			signalGroup(pid, 'SIGKILL');
 			void output.end().then(() => resolve(outcome));
 		};
 
@@ -198,7 +200,6 @@ export function startCommandProcess(launch: CommandLaunch): CommandRun {
 				outcome = { exitCode, signal };
 				setTimeout(() => {
 					if (!settled) {
-						signalGroup(pid, 'SIGKILL');
 						child.stdout?.destroy();
 						child.stderr?.destroy();
 						settle();

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { lexCommand, lexCommandSegments } from '@/shared/plan-mode';
+import {
+	lexCommand,
+	lexCommandSegments,
+	lexShellSegments,
+} from '@/shared/plan-mode';
 
 /** Reads the segments of a command the lexer accepted, failing the test if it did not. */
 function segmentsOf(command: string): readonly (readonly string[])[] {
@@ -248,10 +252,25 @@ describe('lexCommandSegments', () => {
 		expect(lexCommandSegments('{ make; }')).toEqual([['make']]);
 	});
 
-	it('keeps quoted text as one literal token, expansions included', () => {
+	it('keeps quoted text as one literal token and lexes its substitutions after it', () => {
 		expect(lexCommandSegments('echo "bun run test; $(make)"')).toEqual([
 			['echo', 'bun run test; $(make)'],
+			['make'],
 		]);
+		expect(lexCommandSegments('x="$(echo ")" && tsc)" ls')).toEqual([
+			['x=$(echo ")" && tsc)', 'ls'],
+			['echo', ')'],
+			['tsc'],
+		]);
+		expect(lexCommandSegments('echo "a `make` b"')).toEqual([
+			['echo', 'a `make` b'],
+			['make'],
+		]);
+		expect(lexCommandSegments("echo '$(make)'")).toEqual([['echo', '$(make)']]);
+	});
+
+	it('reads a never-closed substitution in quotes as unbalanced', () => {
+		expect(lexCommandSegments('echo "$(make"')).toBeNull();
 	});
 
 	it('skips heredoc bodies and comments', () => {
@@ -269,6 +288,34 @@ describe('lexCommandSegments', () => {
 			['grep', 'x'],
 			['ls'],
 		]);
+	});
+
+	it('hands each heredoc body and here-string to the stdin of the command that opened it', () => {
+		expect(lexShellSegments('cat <<EOF | sh\nbun run test\nEOF\nls')).toEqual([
+			{ pipesOnward: true, stdin: 'bun run test', tokens: ['cat'] },
+			{ pipesOnward: false, stdin: null, tokens: ['sh'] },
+			{ pipesOnward: false, stdin: null, tokens: ['ls'] },
+		]);
+		expect(lexShellSegments('bash <<-END\n\tmake\n\tEND')).toEqual([
+			{ pipesOnward: false, stdin: 'make', tokens: ['bash'] },
+		]);
+		expect(lexShellSegments('zsh <<< "make"')).toEqual([
+			{ pipesOnward: false, stdin: 'make\n', tokens: ['zsh'] },
+		]);
+	});
+
+	it('reads `||` as a chain rather than a pipe', () => {
+		expect(
+			lexShellSegments('a || b')?.map((segment) => segment.pipesOnward),
+		).toEqual([false, false]);
+	});
+
+	it('lexes substitutions in an unquoted heredoc body, and none in a quoted one', () => {
+		expect(lexCommandSegments('cat <<EOF\n$(make)\nEOF')).toEqual([
+			['cat'],
+			['make'],
+		]);
+		expect(lexCommandSegments("cat <<'EOF'\n$(make)\nEOF")).toEqual([['cat']]);
 	});
 
 	it('returns null only for an unbalanced quote', () => {

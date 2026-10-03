@@ -36,6 +36,12 @@ const DEFAULT_HISTORY_LIMIT = 200;
 /** Finished jobs a snapshot lists alongside the live ones. */
 const DEFAULT_SNAPSHOT_FINISHED_LIMIT = 20;
 
+/**
+ * Most recently finished jobs that keep their output tail in memory. Older
+ * history keeps its metadata and log path; the tail is dropped to bound memory.
+ */
+const DEFAULT_RETAINED_TAIL_LIMIT = 50;
+
 /** The workspace overlay a command launch merges onto the inherited environment. */
 export interface AssembledComputeEnvironment {
 	env: Record<string, string>;
@@ -58,13 +64,15 @@ export interface CreateComputeQueueServiceOptions {
 	now?: () => number;
 	/** Current compute-queue settings; read on every scheduling decision. */
 	readSettings: () => ComputeQueueSettings;
+	/** Finished jobs that keep their output tail; see {@link DEFAULT_RETAINED_TAIL_LIMIT}. */
+	retainedTailLimit?: number;
 	resolveWorkspace: (
 		workspaceId: string,
 	) => { name: string; path: string } | null;
 	snapshotFinishedLimit?: number;
 	/** Spawns a granted command; replaced by a fake in scheduler tests. */
 	startCommand?: CommandStarter;
-	/** Stops the dock terminal running a script job that was cancelled. */
+	/** Stops the dock terminal running a script job that was cancelled; may throw. */
 	stopScriptTerminal?: (terminalId: string) => void;
 }
 
@@ -84,6 +92,8 @@ export function createComputeQueueService(
 	const historyLimit = options.historyLimit ?? DEFAULT_HISTORY_LIMIT;
 	const finishedLimit =
 		options.snapshotFinishedLimit ?? DEFAULT_SNAPSHOT_FINISHED_LIMIT;
+	const retainedTailLimit =
+		options.retainedTailLimit ?? DEFAULT_RETAINED_TAIL_LIMIT;
 	const startCommand = options.startCommand ?? startCommandProcess;
 
 	const records = new Map<string, JobRecord>();
@@ -159,9 +169,13 @@ export function createComputeQueueService(
 	/**
 	 * Builds the agent-facing result for a job, reading a live run's tail.
 	 * @param id - Job id.
+	 * @param positions - Queue positions, when the caller already computed them.
 	 * @returns The result, or null when unknown.
 	 */
-	function resultOf(id: string): ComputeJobResult | null {
+	function resultOf(
+		id: string,
+		positions?: ReadonlyMap<string, number>,
+	): ComputeJobResult | null {
 		const record = records.get(id);
 		if (record === undefined) {
 			return null;
@@ -171,13 +185,21 @@ export function createComputeQueueService(
 			omittedChars: record.omittedChars,
 			text: record.outputTail,
 		};
-		return toJobResult(snapshotOf(record, currentPositions()), output);
+		return toJobResult(
+			snapshotOf(record, positions ?? currentPositions()),
+			output,
+		);
 	}
 
-	/** The queue as it stands now. */
-	function snapshot(): ComputeQueueSnapshot {
+	/**
+	 * The queue as it stands now.
+	 * @param positions - Queue positions, when the caller already computed them.
+	 * @returns The snapshot.
+	 */
+	function snapshot(
+		positions: ReadonlyMap<string, number> = currentPositions(),
+	): ComputeQueueSnapshot {
 		const settings = options.readSettings();
-		const positions = currentPositions();
 		const recentFinished = new Set(finishedOrder.slice(-finishedLimit));
 		const jobs = Array.from(records.values())
 			.filter(
@@ -191,23 +213,36 @@ export function createComputeQueueService(
 			enabled: settings.enabled,
 			inUse: countInUse(),
 			jobs,
-			slots: settings.concurrency,
+			slots: effectiveSlots(settings),
 		};
 	}
 
 	/** Notifies subscribers and re-checks pending waits. */
 	function emit(): void {
-		const current = snapshot();
+		const positions = currentPositions();
+		const current = snapshot(positions);
 		for (const listener of listeners) {
 			try {
 				listener(current);
 			} catch {}
 		}
-		waiters.check(resultOf);
+		waiters.check((id) => resultOf(id, positions));
 	}
 
-	/** Drops the oldest finished jobs beyond the history limit. */
+	/**
+	 * Drops the output tail of the finished job that just left the retained
+	 * window, and the oldest finished jobs beyond the history limit.
+	 */
 	function pruneHistory(): void {
+		const leavingTail = finishedOrder.at(-(retainedTailLimit + 1));
+		const leaving =
+			leavingTail === undefined ? undefined : records.get(leavingTail);
+		if (leaving !== undefined && leaving.outputTail !== '') {
+			update(leaving.id, {
+				omittedChars: leaving.omittedChars + leaving.outputTail.length,
+				outputTail: '',
+			});
+		}
 		while (finishedOrder.length > historyLimit) {
 			const expired = finishedOrder.shift();
 			if (expired !== undefined) {
@@ -272,7 +307,7 @@ export function createComputeQueueService(
 				grant(record.id);
 			}
 		}
-		const slots = Math.max(1, settings.concurrency);
+		const slots = effectiveSlots(settings);
 		while (countInUse() < slots) {
 			const next = queuedInGrantOrder()[0];
 			if (next === undefined) {
@@ -316,9 +351,8 @@ export function createComputeQueueService(
 				finish(record.id, { state: 'cancelled' });
 				return;
 			}
-			const reason = error instanceof Error ? error.message : String(error);
 			finish(record.id, {
-				outputTail: `Could not assemble the workspace environment: ${reason}\n`,
+				outputTail: `Could not assemble the workspace environment: ${describeError(error)}\n`,
 				state: 'failed',
 			});
 			return;
@@ -329,17 +363,26 @@ export function createComputeQueueService(
 			return;
 		}
 
-		const run = startCommand({
-			baseEnv,
-			command: record.command,
-			cwd: record.cwd ?? record.workspacePath ?? '',
-			jobId: record.id,
-			killGraceMs,
-			niceness: options.readSettings().niceness,
-			overlay: assembled.env,
-			redactValues: assembled.redactValues,
-			workspacePath: record.workspacePath ?? '',
-		});
+		let run: CommandRun;
+		try {
+			run = startCommand({
+				baseEnv,
+				command: record.command,
+				cwd: record.cwd ?? record.workspacePath ?? '',
+				jobId: record.id,
+				killGraceMs,
+				niceness: options.readSettings().niceness,
+				overlay: assembled.env,
+				redactValues: assembled.redactValues,
+				workspacePath: record.workspacePath ?? '',
+			});
+		} catch (error) {
+			finish(record.id, {
+				outputTail: `Could not start the command: ${describeError(error)}\n`,
+				state: 'failed',
+			});
+			return;
+		}
 		runs.set(record.id, run);
 		update(record.id, { logPath: run.logPath });
 		emit();
@@ -412,12 +455,22 @@ export function createComputeQueueService(
 	}
 
 	/**
-	 * Stops a running script's terminal if both the stopper and the terminal exist.
+	 * Stops a running script's terminal if both the stopper and the terminal
+	 * exist. A terminal the service already forgot throws; that is logged rather
+	 * than allowed to abort the cancel that asked for it.
 	 * @param terminalId - Terminal to stop.
 	 */
 	function stopTerminal(terminalId: string | null): void {
-		if (terminalId !== null) {
+		if (terminalId === null) {
+			return;
+		}
+		try {
 			options.stopScriptTerminal?.(terminalId);
+		} catch (error) {
+			console.warn(
+				`[compute-queue] could not stop terminal ${terminalId}`,
+				error,
+			);
 		}
 	}
 
@@ -436,9 +489,10 @@ export function createComputeQueueService(
 			return true;
 		}
 		update(id, { cancelRequested: true });
-		if (record.kind === 'command') {
-			runs.get(id)?.terminate();
-		} else if (record.terminalId === null) {
+		const run = runs.get(id);
+		if (record.kind === 'command' && run !== undefined) {
+			run.terminate();
+		} else if (record.kind === 'command' || record.terminalId === null) {
 			finish(id, { state: 'cancelled' });
 			return true;
 		} else {
@@ -449,15 +503,43 @@ export function createComputeQueueService(
 	}
 
 	/**
-	 * Cancels every unfinished job matching a predicate.
+	 * Cancels every unfinished job matching a predicate. One job whose cancel
+	 * throws is logged and skipped, so it cannot spare the rest.
 	 * @param matches - Selects the jobs to cancel.
 	 */
 	function cancelWhere(matches: (record: JobRecord) => boolean): void {
 		for (const record of Array.from(records.values())) {
-			if (!isComputeJobFinished(record.state) && matches(record)) {
+			if (isComputeJobFinished(record.state) || !matches(record)) {
+				continue;
+			}
+			try {
 				cancel(record.id);
+			} catch (error) {
+				console.warn(
+					`[compute-queue] could not cancel job ${record.id}`,
+					error,
+				);
 			}
 		}
+	}
+
+	/**
+	 * Cancels everything and waits for in-flight launches; a later call kills
+	 * whatever is still running. Never throws, and every call returns the
+	 * promise of the first.
+	 * @returns Settles once every launch has finished.
+	 */
+	function shutdown(): Promise<void> {
+		if (shutdownPromise !== null) {
+			for (const run of runs.values()) {
+				run.kill();
+			}
+			return shutdownPromise;
+		}
+		shutdownPromise = Promise.resolve();
+		cancelWhere(() => true);
+		shutdownPromise = Promise.all(Array.from(launches)).then(() => undefined);
+		return shutdownPromise;
 	}
 
 	/**
@@ -471,6 +553,16 @@ export function createComputeQueueService(
 		granted: ScriptLease['granted'],
 	): ScriptLease {
 		return {
+			abandon: ({ failed, note }) => {
+				const record = records.get(id);
+				if (record === undefined || isComputeJobFinished(record.state)) {
+					return;
+				}
+				finish(id, {
+					outputTail: note.endsWith('\n') ? note : `${note}\n`,
+					state: failed && !record.cancelRequested ? 'failed' : 'cancelled',
+				});
+			},
 			attachTerminal: (terminalId) => {
 				const record = update(id, { terminalId });
 				if (record?.cancelRequested || record?.state === 'cancelled') {
@@ -558,7 +650,7 @@ export function createComputeQueueService(
 				ok: true,
 			};
 		},
-		getJob: resultOf,
+		getJob: (jobId) => resultOf(jobId),
 		listJobs: (filter) => {
 			const positions = currentPositions();
 			return Array.from(records.values())
@@ -572,27 +664,37 @@ export function createComputeQueueService(
 		},
 		refresh: pumpAndEmit,
 		releaseSession: (sessionId) =>
-			cancelWhere((record) => record.sessionId === sessionId),
+			cancelWhere(
+				(record) => record.kind === 'command' && record.sessionId === sessionId,
+			),
 		releaseWorkspace: (workspaceId) =>
 			cancelWhere((record) => record.workspaceId === workspaceId),
-		shutdown: () => {
-			if (shutdownPromise !== null) {
-				for (const run of runs.values()) {
-					run.kill();
-				}
-				return shutdownPromise;
-			}
-			shutdownPromise = Promise.resolve();
-			cancelWhere(() => true);
-			shutdownPromise = Promise.all(Array.from(launches)).then(() => undefined);
-			return shutdownPromise;
-		},
-		snapshot,
+		shutdown,
+		snapshot: () => snapshot(),
 		waitFor: (jobIds, waitOptions) =>
 			waiters.add(
 				jobIds.filter((id) => records.has(id)),
 				waitOptions,
-				resultOf,
+				(jobId) => resultOf(jobId),
 			),
 	};
+}
+
+/**
+ * The slot count scheduling actually enforces: at least one, whatever the
+ * settings say, so a zero never stalls the queue.
+ * @param settings - Current compute-queue settings.
+ * @returns The effective number of slots.
+ */
+function effectiveSlots(settings: ComputeQueueSettings): number {
+	return Math.max(1, settings.concurrency);
+}
+
+/**
+ * Formats a thrown value for a job's output tail.
+ * @param error - What was thrown.
+ * @returns Its message.
+ */
+function describeError(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }

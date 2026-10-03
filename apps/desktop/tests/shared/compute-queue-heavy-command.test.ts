@@ -97,6 +97,37 @@ describe('classifyHeavyCommand', () => {
 		expect(classifyHeavyCommand(command)).toEqual({ heavy: false });
 	});
 
+	it.each([
+		['out="$(bun run test 2>&1)"; echo "$out"', 'run test*'],
+		['echo "$(bunx tsc --noEmit)"', 'tsc'],
+		['x=`make`', 'make'],
+		['echo "built: `cargo build`"', 'cargo build'],
+		['echo "$(echo "$(make)")"', 'make'],
+		['bash <<EOF\nbun run test\nEOF', 'run test*'],
+		["sh -s <<'EOF'\nmake -j8\nEOF", 'make'],
+		['cat <<EOF | sh\nbun run build\nEOF', 'run build*'],
+		['bash -s -- arg <<EOF\ntsc\nEOF', 'tsc'],
+		['zsh <<< "cargo test"', 'cargo test'],
+		['echo "bun run test" | bash', 'run test*'],
+		['cat <<EOF\n$(make)\nEOF', 'make'],
+		['cargo t', 'cargo t'],
+		['cargo b --release', 'cargo b'],
+	])('follows %j into the command it runs, via %j', (command, matched) => {
+		expect(classifyHeavyCommand(command)).toEqual({ heavy: true, matched });
+	});
+
+	it.each([
+		'git commit -m "run tests"',
+		'echo "bun run test" > notes.txt',
+		"cat <<'EOF'\n$(make)\nEOF",
+		'bash script.sh <<EOF\nbun run test\nEOF',
+		'cat <<EOF | grep x\nbun run test\nEOF',
+		'echo "bun run test" || bash',
+		'cargo add serde',
+	])('still leaves %j alone', (command) => {
+		expect(classifyHeavyCommand(command)).toEqual({ heavy: false });
+	});
+
 	it('fails open on an unbalanced quote', () => {
 		expect(classifyHeavyCommand('bun run test "oops')).toEqual({
 			heavy: false,

@@ -16,6 +16,15 @@ export interface ScriptLaunchOwner {
 	sessionId?: string | null;
 }
 
+/**
+ * Performs a launch once it holds its slot. `deferred` is true when the launch
+ * waited in the queue first, so the caller re-reads anything that may have
+ * changed while it waited.
+ */
+export type ScriptLaunchStarter = (options: {
+	deferred: boolean;
+}) => Promise<CreateTerminalSessionResult>;
+
 /** The slice of the compute queue the script gate drives. */
 export type ScriptComputeQueue = Pick<
 	ComputeQueueService,
@@ -36,7 +45,7 @@ export interface ScriptQueueGate {
 	admit: (request: {
 		launch: ScriptLaunch;
 		owner: ScriptLaunchOwner;
-		start: () => Promise<CreateTerminalSessionResult>;
+		start: ScriptLaunchStarter;
 	}) => Promise<CreateTerminalSessionResult>;
 	/** Cancels every launch of a kind still waiting for a slot in a workspace; true when one was. */
 	cancelQueued: (workspaceId: string, kind: WorkspaceScriptKind) => boolean;
@@ -85,9 +94,10 @@ export function createScriptQueueGate({
 	}
 
 	/**
-	 * Frees the slot of a launch that never produced a terminal: a spawn error
-	 * counts as a failed job, a refusal such as a running-script conflict as a
-	 * cancelled one.
+	 * Frees the slot of a launch that never produced a terminal, recording why on
+	 * the job: a spawn error counts as a failed job, a refusal such as a
+	 * running-script conflict as a cancelled one. A failure is logged too, since
+	 * a launch that waited in the queue has no caller left to report it to.
 	 * @param lease - The lease the launch held.
 	 * @param result - What the launch answered.
 	 */
@@ -95,14 +105,20 @@ export function createScriptQueueGate({
 		lease: ScriptLease,
 		result: CreateTerminalSessionResult,
 	): void {
-		if (
-			result.diagnostics.some((diagnostic) => diagnostic.severity === 'error')
-		) {
-			lease.release({ exitCode: null });
-			return;
+		const failed = result.diagnostics.some(
+			(diagnostic) => diagnostic.severity === 'error',
+		);
+		const note = result.diagnostics
+			.map((diagnostic) => diagnostic.message)
+			.join('\n');
+
+		if (failed) {
+			console.warn(
+				`[scripts] script job ${lease.jobId} did not start: ${note}`,
+			);
 		}
 
-		computeQueue.cancel(lease.jobId);
+		lease.abandon({ failed, note });
 	}
 
 	/**
@@ -110,18 +126,20 @@ export function createScriptQueueGate({
 	 * the slot with the terminal's exit code once it ends.
 	 * @param lease - The granted lease.
 	 * @param start - Performs the launch.
+	 * @param deferred - Whether the launch waited in the queue first.
 	 * @returns The launch's result.
 	 */
 	async function launchHolding(
 		lease: ScriptLease,
-		start: () => Promise<CreateTerminalSessionResult>,
+		start: ScriptLaunchStarter,
+		deferred: boolean,
 	): Promise<CreateTerminalSessionResult> {
 		let result: CreateTerminalSessionResult;
 
 		try {
-			result = await start();
+			result = await start({ deferred });
 		} catch (error) {
-			lease.release({ exitCode: null });
+			lease.abandon({ failed: true, note: describeLaunchError(error) });
 			throw error;
 		}
 
@@ -133,12 +151,21 @@ export function createScriptQueueGate({
 		}
 
 		lease.attachTerminal(terminalId);
-		void terminalService.waitForExit(terminalId).then(() =>
-			lease.release({
-				exitCode:
-					terminalService.getSnapshot(terminalId).session?.exitCode ?? null,
-			}),
-		);
+		void terminalService
+			.waitForExit(terminalId)
+			.then(() =>
+				lease.release({
+					exitCode:
+						terminalService.getSnapshot(terminalId).session?.exitCode ?? null,
+				}),
+			)
+			.catch((error: unknown) => {
+				console.warn(
+					`[scripts] lost track of terminal ${terminalId}; freeing its slot`,
+					error,
+				);
+				lease.release({ exitCode: null });
+			});
 
 		return result;
 	}
@@ -155,7 +182,7 @@ export function createScriptQueueGate({
 		key: string,
 		entry: QueuedLaunch,
 		lease: ScriptLease,
-		start: () => Promise<CreateTerminalSessionResult>,
+		start: ScriptLaunchStarter,
 	): void {
 		queuedLaunches.set(key, entry);
 		void lease.granted
@@ -164,9 +191,16 @@ export function createScriptQueueGate({
 					queuedLaunches.delete(key);
 				}
 
-				return outcome === 'granted' ? launchHolding(lease, start) : undefined;
+				return outcome === 'granted'
+					? launchHolding(lease, start, true)
+					: undefined;
 			})
-			.catch(() => {});
+			.catch((error: unknown) => {
+				console.warn(
+					`[scripts] queued ${entry.kind} script job ${entry.jobId} failed to launch`,
+					error,
+				);
+			});
 	}
 
 	return {
@@ -192,7 +226,7 @@ export function createScriptQueueGate({
 			const state = computeQueue.getJob(lease.jobId)?.state;
 
 			if (state === 'running') {
-				return launchHolding(lease, start);
+				return launchHolding(lease, start, false);
 			}
 
 			if (state !== 'queued') {
@@ -267,4 +301,13 @@ function isHeavyLaunch(
  */
 function queueKey(launch: ScriptLaunch): string {
 	return `${launch.workspaceId}:${launch.kind}:${launch.scriptName ?? ''}`;
+}
+
+/**
+ * Formats a thrown launch error for the job's output tail.
+ * @param error - What the launch threw.
+ * @returns A one-line description.
+ */
+function describeLaunchError(error: unknown): string {
+	return `The script could not start: ${error instanceof Error ? error.message : String(error)}`;
 }

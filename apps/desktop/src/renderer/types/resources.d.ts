@@ -1880,11 +1880,11 @@ export default interface Resources {
 			'compute-queue': {
 				concurrency: {
 					'aria-label': 'Compute queue slots';
-					description: 'How many queued commands may run at the same time. Scripts you start yourself always run at once and hold a slot.';
+					description: 'How many queued commands may run at the same time. Heavy scripts you start yourself run at once and hold a slot.';
 					label: 'Concurrent slots';
 				};
 				enabled: {
-					description: 'Heavy commands agents run, such as builds, tests, and installs, wait for a free slot across all workspaces instead of starting together. Keeps the machine responsive when several agents work at once.';
+					description: 'Heavy commands agents run, such as builds, tests, and typechecks, wait for a free slot across all workspaces instead of starting together. Keeps the machine responsive when several agents work at once.';
 					label: 'Compute queue';
 				};
 				'exempt-patterns': {
@@ -3806,6 +3806,7 @@ export default interface Resources {
 		'navigation-sidebar': {
 			'compute-queue': {
 				cancel: 'Cancel {{label}}';
+				'cancel-failed': 'Could not cancel the job. It may have already finished.';
 				initiator: {
 					agent: 'Agent';
 					auto: 'Setup';

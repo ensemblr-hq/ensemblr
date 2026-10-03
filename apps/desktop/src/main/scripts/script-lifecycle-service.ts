@@ -16,17 +16,20 @@ import type { EnsemblrDatabaseService } from '../storage';
 import { selectWorkspaceWithRepositoryById } from '../storage/repositories/workspace-repository.ts';
 import type { TerminalService } from '../terminal';
 import {
-	describeMissingScript,
+	asLaunchFailure,
 	describeRunningScript,
 	exclusiveLaunchKey,
 	failure,
 	isWorkspaceRow,
-	resolveScriptLaunch,
+	launchFromConfig,
+	type ResolvedLaunch,
 	type ScriptLaunch,
+	type ScriptLaunchRequest,
 } from './script-launch.ts';
 import {
 	createScriptQueueGate,
 	type ScriptComputeQueue,
+	type ScriptLaunchStarter,
 } from './script-queue-gate.ts';
 import {
 	isSetupFingerprintCurrent,
@@ -239,9 +242,22 @@ export function createScriptLifecycleService({
 	}
 
 	/**
+	 * Resolves the launch a request names from the repository's current script
+	 * settings.
+	 * @param request - Script kind, requested run-script name, and target workspace.
+	 * @returns The launch, or the failure that stops it.
+	 */
+	function resolveLaunch(request: ScriptLaunchRequest): ResolvedLaunch {
+		return launchFromConfig(resolveScriptConfig(request.workspaceId), request);
+	}
+
+	/**
 	 * Resolves a launch and starts it, through the compute queue when it is heavy.
 	 * A conflict or a restart is settled before the launch queues, so a waiting
-	 * launch never sits behind the very session it was asked to replace.
+	 * launch never sits behind the very session it was asked to replace. A launch
+	 * that waited re-reads its command from the current settings when its slot
+	 * comes, starts without a restart (the one it asked for already happened),
+	 * and fails its job when the script is no longer configured.
 	 * @param options - The launch request.
 	 * @param onSessionStarted - Called with the session id whenever the launch opens one, now or after a queue wait.
 	 * @returns The terminal session create result, a queued job, or a typed failure diagnostic.
@@ -258,30 +274,24 @@ export function createScriptLifecycleService({
 		}: RunScriptOptions,
 		onSessionStarted?: (terminalId: string) => void,
 	): Promise<CreateTerminalSessionResult> {
-		const resolved = resolveScriptConfig(workspaceId);
+		const request = { kind, scriptName, workspaceId };
+		const { failure: unresolved, launch } = resolveLaunch(request);
 
-		if (resolved.error) {
-			return resolved.error;
+		if (unresolved) {
+			return unresolved;
 		}
 
-		const launch = resolveScriptLaunch({
-			kind,
-			repositoryId: resolved.repositoryId,
-			requestedName: scriptName,
-			settings: resolved.settings,
-			workspaceId,
-		});
+		const start: ScriptLaunchStarter = async ({ deferred }) => {
+			const current = deferred ? resolveLaunch(request) : { launch };
 
-		if (!launch) {
-			return failure(
-				'script-not-configured',
-				describeMissingScript(kind, scriptName, resolved.settings.runScripts),
-				'info',
+			if (!current.launch) {
+				return asLaunchFailure(current.failure);
+			}
+
+			const result = await runExclusiveScript(
+				current.launch,
+				deferred ? false : restart,
 			);
-		}
-
-		const start = async (): Promise<CreateTerminalSessionResult> => {
-			const result = await runExclusiveScript(launch, restart);
 
 			if (result.session) {
 				onSessionStarted?.(result.session.id);
@@ -291,7 +301,7 @@ export function createScriptLifecycleService({
 		};
 
 		if (!queueGate.requiresSlot(launch)) {
-			return start();
+			return start({ deferred: false });
 		}
 
 		const blocked = hasActiveSession(launch)
@@ -617,6 +627,11 @@ export function createScriptLifecycleService({
 					initiator: 'auto',
 					sessionId,
 					workspaceId,
+				}).catch((error: unknown) => {
+					console.warn(
+						`[scripts] could not finalize setup in workspace ${workspaceId}`,
+						error,
+					);
 				});
 			},
 		);

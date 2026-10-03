@@ -131,9 +131,21 @@ How chats behave day to day, plus where Ensemblr keeps its repositories.
 | Always show context usage | Show the context meter at all times instead of only past 70% used. | On / off | On |
 | Auto-convert long text | Turn pasted text over 5,000 characters into a text attachment instead of inlining it. | On / off | On |
 | Don't collapse tool calls | Show tool calls expanded by default. Toggle per session with `⌃O`. | On / off | Off (collapsed) |
+| Compute queue | Heavy commands agents run, such as builds, tests, and typechecks, wait for a free slot across all workspaces instead of starting together. Off lets every command start at once. | On / off | On |
+| Concurrent slots | How many queued commands may run at the same time. Heavy scripts you start yourself run at once and hold a slot. | 1–16 | 1 |
+| CPU priority (niceness) | CPU priority of queued commands. A higher value yields more CPU to your own apps. | 0–19 | 10 |
+| Extra heavy commands | Commands to queue in addition to the built-in list, one pattern per line. A pattern is a command prefix split on spaces; `*` matches within a word; package scripts match as `run <script>`. | Patterns | None |
+| Exempt commands | Commands that never wait, same syntax. Exemptions win over heavy patterns. | Patterns | None |
 | Ensemblr root directory | Where Ensemblr stores repositories, workspaces, and archived workspace context. | Any directory | `~/Ensemblr` |
 | Update Ensemblr automatically | Check for a newer build, download it, and offer to restart into it. Off is a hard off — no check, no download, no install. | On / off | On |
 | Ensemblr version | The running build, its channel, and what the updater is doing. `Check for updates` runs a check now; once a build is downloaded the button becomes `Restart to update`. | — | — |
+
+**The compute queue is visible, and agents cannot edit it.** While a job waits or
+runs, a **Compute queue** panel appears at the bottom of the sidebar, listing
+every workspace's jobs with who started them, a cancel, and an open-log action.
+The numeric fields commit when you leave the field or press `↵`, and the four rows
+beneath the switch are disabled while the queue is off. The settings tools an agent
+uses refuse this section outright. Background: [ADR 0082](../adr/0082-queue-heavy-agent-commands-through-one-app-wide-queue.md).
 
 **Caffeinate prevents idle sleep, not every kind of sleep.** It does not override
 closing a laptop lid, explicitly choosing Sleep, or critical-battery shutdown.

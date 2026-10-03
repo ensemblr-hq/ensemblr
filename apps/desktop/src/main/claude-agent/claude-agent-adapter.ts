@@ -7,6 +7,7 @@ import {
 	type SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 
+import { CONTROL_SERVER_NAME } from '../../shared/agent-control.ts';
 import type { ComputeQueueSettings } from '../../shared/config.ts';
 import {
 	DEFAULT_PERMISSION_MODE,
@@ -869,10 +870,15 @@ function buildQueryOptions({
 		() => withholdsControlTools({ mode, planning: isPlanning() }),
 		toolTrust?.trustedTools,
 	);
+	const servesQueueTool = CONTROL_SERVER_NAME in mcpServers;
 	const guardedHooks =
-		concierge || !readComputeQueueSettings
+		concierge || !readComputeQueueSettings || !servesQueueTool
 			? planGuardedHooks
-			: withComputeQueueHooks(planGuardedHooks, readComputeQueueSettings);
+			: withComputeQueueHooks(
+					planGuardedHooks,
+					readComputeQueueSettings,
+					isPlanning,
+				);
 
 	return {
 		...permission,

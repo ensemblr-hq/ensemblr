@@ -504,7 +504,7 @@
 			"log": "Полный лог: {{path}}",
 			"nothing-to-cancel": "уже завершено",
 			"pending-heading": "Ещё в очереди или выполняются",
-			"position": "место {{position}}",
+			"position": "№{{position}}",
 			"state": {
 				"cancelled": "отменено",
 				"failed": "с ошибкой",
@@ -1173,6 +1173,7 @@
 	"navigation-sidebar": {
 		"compute-queue": {
 			"cancel": "Отменить {{label}}",
+			"cancel-failed": "Не удалось отменить задание. Возможно, оно уже завершилось.",
 			"initiator": {
 				"agent": "Агент",
 				"auto": "Настройка",

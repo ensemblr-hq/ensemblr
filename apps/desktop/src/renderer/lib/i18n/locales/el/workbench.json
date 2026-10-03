@@ -391,8 +391,8 @@
 			"more_other": "… και {{count}} ακόμη"
 		},
 		"cancel-job": {
-			"done": "Ακύρωσε μια εργασία της ουράς",
-			"running": "Ακυρώνει μια εργασία της ουράς"
+			"done": "Ακύρωσε μια διεργασία της ουράς",
+			"running": "Ακυρώνει μια διεργασία της ουράς"
 		},
 		"close-tab": {
 			"done": "Έκλεισε μια καρτέλα",
@@ -570,10 +570,10 @@
 			"entries_other": "{{count}} καταχωρίσεις",
 			"issues_one": "{{count}} ζήτημα",
 			"issues_other": "{{count}} ζητήματα",
-			"jobs-pending_one": "{{count}} εργασία συνεχίζεται",
-			"jobs-pending_other": "{{count}} εργασίες συνεχίζονται",
-			"jobs-settled_one": "{{count}} εργασία ολοκληρώθηκε",
-			"jobs-settled_other": "{{count}} εργασίες ολοκληρώθηκαν",
+			"jobs-pending_one": "{{count}} διεργασία συνεχίζεται",
+			"jobs-pending_other": "{{count}} διεργασίες συνεχίζονται",
+			"jobs-settled_one": "{{count}} διεργασία ολοκληρώθηκε",
+			"jobs-settled_other": "{{count}} διεργασίες ολοκληρώθηκαν",
 			"memories_one": "{{count}} μνήμη",
 			"memories_other": "{{count}} μνήμες",
 			"models_one": "{{count}} μοντέλο",
@@ -716,8 +716,8 @@
 			"running": "Περιμένει τους υποπράκτορες"
 		},
 		"wait-for-job": {
-			"done": "Περίμενε εργασίες της ουράς",
-			"running": "Περιμένει εργασίες της ουράς"
+			"done": "Περίμενε διεργασίες της ουράς",
+			"running": "Περιμένει διεργασίες της ουράς"
 		},
 		"with-detail": "{{action}}: {{detail}}",
 		"write-terminal": {
@@ -1099,6 +1099,7 @@
 	"navigation-sidebar": {
 		"compute-queue": {
 			"cancel": "Ακύρωση {{label}}",
+			"cancel-failed": "Δεν ήταν δυνατή η ακύρωση της διεργασίας. Ίσως έχει ήδη ολοκληρωθεί.",
 			"initiator": {
 				"agent": "Πράκτορας",
 				"auto": "Εγκατάσταση",

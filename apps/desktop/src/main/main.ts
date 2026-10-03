@@ -1199,6 +1199,11 @@ const broadcastToAllWindows = (channel: string, payload: unknown): void => {
  * call time.
  */
 const computeQueueService = createComputeQueueService({
+	/**
+	 * Assembles a workspace's variables and secrets for one command launch.
+	 * @param workspaceId - Workspace the command runs in.
+	 * @returns The overlay and the literal values its output must not show.
+	 */
 	assembleEnvironment: async (workspaceId) => {
 		const assembly = await workspaceEnvironmentService.assemble({
 			includeSecrets: true,
@@ -1206,14 +1211,29 @@ const computeQueueService = createComputeQueueService({
 		});
 		return { env: assembly.env, redactValues: assembly.redactValues };
 	},
+	/**
+	 * Resolves the login-shell environment a command inherits.
+	 * @returns The inherited environment.
+	 */
 	baseEnvironment: async () => (await localCommandService.getEnvironment()).env,
+	/** Reads the live compute-queue settings, so a change applies to the next grant. */
 	readSettings: () => appSettingsService.read().computeQueue,
+	/**
+	 * Looks up an active workspace's display name and root.
+	 * @param workspaceId - Workspace to look up.
+	 * @returns Its name and path, or null when unknown or SQLite is closed.
+	 */
 	resolveWorkspace: (workspaceId) => {
 		const database = databaseService.getConnection()?.database;
 		return database
 			? selectActiveWorkspaceNameAndPath({ database, workspaceId })
 			: null;
 	},
+	/**
+	 * Stops the dock terminal of a cancelled script job; throws for a terminal
+	 * the service no longer knows, which the queue logs and tolerates.
+	 * @param terminalId - Terminal to stop.
+	 */
 	stopScriptTerminal: (terminalId) => {
 		terminalService.kill(terminalId);
 	},

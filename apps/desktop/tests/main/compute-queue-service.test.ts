@@ -25,6 +25,7 @@ let workspaces: Record<string, string>;
 let settings: ComputeQueueSettings;
 let runs: FakeRun[];
 let stopped: string[];
+let stopTerminal: (terminalId: string) => void;
 let assemble: (workspaceId: string) => Promise<{
 	env: Record<string, string>;
 	redactValues: readonly string[];
@@ -67,8 +68,11 @@ async function flush(): Promise<void> {
 }
 
 /** Builds a queue over the test's mutable settings and fake runner. */
-function buildQueue(): ComputeQueueService {
+function buildQueue(
+	extra: { retainedTailLimit?: number } = {},
+): ComputeQueueService {
 	return createComputeQueueService({
+		...extra,
 		assembleEnvironment: (workspaceId) => assemble(workspaceId),
 		baseEnvironment: () => ({ PATH: '/usr/bin', BASE: 'yes' }),
 		createId: () => {
@@ -86,7 +90,7 @@ function buildQueue(): ComputeQueueService {
 		snapshotFinishedLimit: 2,
 		historyLimit: 4,
 		startCommand: fakeStarter,
-		stopScriptTerminal: (terminalId) => stopped.push(terminalId),
+		stopScriptTerminal: (terminalId) => stopTerminal(terminalId),
 	});
 }
 
@@ -138,6 +142,9 @@ beforeEach(() => {
 	};
 	runs = [];
 	stopped = [];
+	stopTerminal = (terminalId) => {
+		stopped.push(terminalId);
+	};
 	assemble = async () => ({ env: { SECRET: 'shh' }, redactValues: ['shh'] });
 	clock = 1_000;
 	ids = 0;
@@ -509,5 +516,181 @@ describe('waitFor', () => {
 		const result = await wait;
 		expect(result).toMatchObject({ timedOut: false });
 		expect(result.pending).toHaveLength(1);
+	});
+});
+
+describe('fault tolerance', () => {
+	it('cancels a command still assembling its environment at once and never spawns it', async () => {
+		let resolveAssembly: () => void = () => {};
+		assemble = () =>
+			new Promise((resolve) => {
+				resolveAssembly = () => resolve({ env: {}, redactValues: [] });
+			});
+		const assembling = await enqueue('a', 'assembling');
+		const next = await enqueue('b', 'next');
+		await flush();
+		expect(stateOf(assembling)).toBe('running');
+
+		expect(queue.cancel(assembling)).toBe(true);
+		expect(stateOf(assembling)).toBe('cancelled');
+		expect(stateOf(next)).toBe('running');
+
+		resolveAssembly();
+		await flush();
+		expect(stateOf(assembling)).toBe('cancelled');
+		expect(runs.map((run) => run.launch.command)).not.toContain('assembling');
+	});
+
+	it('cancels the rest when stopping one script terminal throws', async () => {
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
+		stopTerminal = () => {
+			throw new Error('session-not-found');
+		};
+		settings = { ...settings, enabled: false };
+		const lease = queue.acquireScriptLease({
+			command: 'setup',
+			initiator: 'auto',
+			label: 'Setup',
+			workspaceId: 'a',
+		});
+		await lease.granted;
+		lease.attachTerminal('forgotten');
+		const command = await enqueue('a', 'command');
+		await flush();
+
+		expect(() => queue.cancel(lease.jobId)).not.toThrow();
+		expect(() => queue.releaseWorkspace('a')).not.toThrow();
+		expect(runFor('command').terminated).toBe(1);
+		expect(console.warn).toHaveBeenCalled();
+		vi.restoreAllMocks();
+		runFor('command').finish(null, 'SIGTERM');
+		await flush();
+		expect(stateOf(command)).toBe('cancelled');
+	});
+
+	it('shuts down without throwing and hands a second call the same pending promise', async () => {
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
+		stopTerminal = () => {
+			throw new Error('session-not-found');
+		};
+		const lease = queue.acquireScriptLease({
+			command: 'setup',
+			initiator: 'user',
+			label: 'Setup',
+			workspaceId: 'a',
+		});
+		await lease.granted;
+		lease.attachTerminal('forgotten');
+		settings = { ...settings, concurrency: 2 };
+		await enqueue('b', 'running');
+		await flush();
+
+		let first: Promise<void> | undefined;
+		expect(() => {
+			first = queue.shutdown();
+		}).not.toThrow();
+		let settled = false;
+		void first?.then(() => {
+			settled = true;
+		});
+		await flush();
+		expect(settled).toBe(false);
+
+		const second = queue.shutdown();
+		expect(second).toBe(first);
+		expect(runFor('running').killed).toBe(1);
+		await second;
+		vi.restoreAllMocks();
+	});
+});
+
+describe('script lease abandon', () => {
+	it('records why a launch never opened a terminal', async () => {
+		const failed = queue.acquireScriptLease({
+			command: 'setup',
+			initiator: 'auto',
+			label: 'Setup',
+			workspaceId: 'a',
+		});
+		await failed.granted;
+		failed.abandon({ failed: true, note: 'No setup script is configured.' });
+		expect(queue.getJob(failed.jobId)).toMatchObject({
+			outputTail: 'No setup script is configured.\n',
+			state: 'failed',
+		});
+
+		const refused = queue.acquireScriptLease({
+			command: 'run',
+			initiator: 'agent',
+			label: 'Run',
+			workspaceId: 'a',
+		});
+		await refused.granted;
+		refused.abandon({ failed: false, note: 'Already running.' });
+		expect(stateOf(refused.jobId)).toBe('cancelled');
+		expect(queue.getJob(refused.jobId)?.outputTail).toBe('Already running.\n');
+	});
+});
+
+describe('session release', () => {
+	it('cancels a session’s commands but leaves the scripts it started', async () => {
+		const command = await enqueue('a', 'command', { sessionId: 's1' });
+		await flush();
+		const running = queue.acquireScriptLease({
+			command: 'bun dev',
+			initiator: 'user',
+			label: 'Run',
+			sessionId: 's1',
+			workspaceId: 'b',
+		});
+		const queued = queue.acquireScriptLease({
+			command: 'bun install',
+			initiator: 'agent',
+			label: 'Setup',
+			sessionId: 's1',
+			workspaceId: 'c',
+		});
+		await running.granted;
+		running.attachTerminal('term-run');
+
+		queue.releaseSession('s1');
+		expect(runFor('command').terminated).toBe(1);
+		expect(stateOf(running.jobId)).toBe('running');
+		expect(stateOf(queued.jobId)).toBe('queued');
+		expect(stopped).toEqual([]);
+
+		queue.releaseWorkspace('c');
+		expect(stateOf(queued.jobId)).toBe('cancelled');
+		runFor('command').finish(null, 'SIGTERM');
+		await flush();
+		expect(stateOf(command)).toBe('cancelled');
+	});
+});
+
+describe('memory bounds', () => {
+	it('drops the tail of finished jobs beyond the retained window but keeps their metadata', async () => {
+		queue = buildQueue({ retainedTailLimit: 1 });
+		settings = { ...settings, enabled: false };
+		const jobs: string[] = [];
+		for (const command of ['t1', 't2']) {
+			jobs.push(await enqueue('a', command));
+			await flush();
+			runFor(command).finish(0);
+			await flush();
+		}
+		expect(queue.getJob(jobs[0])).toMatchObject({
+			omittedChars: 'tail of t1'.length,
+			outputTail: '',
+			state: 'succeeded',
+		});
+		expect(queue.getJob(jobs[1])?.outputTail).toBe('tail of t2');
+	});
+
+	it('reports the slot count scheduling actually enforces', async () => {
+		settings = { ...settings, concurrency: 0 };
+		const job = await enqueue('a', 'one');
+		await flush();
+		expect(stateOf(job)).toBe('running');
+		expect(queue.snapshot().slots).toBe(1);
 	});
 });

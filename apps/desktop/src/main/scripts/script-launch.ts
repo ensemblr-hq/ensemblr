@@ -95,6 +95,76 @@ export function failure(
 }
 
 /**
+ * Escalates a launch's diagnostics to errors, for a launch that waited in the
+ * queue and can no longer start: its job then ends failed, carrying the reason.
+ * @param result - The failure that stopped the launch.
+ * @returns The same result with every diagnostic at error severity.
+ */
+export function asLaunchFailure(
+	result: CreateTerminalSessionResult,
+): CreateTerminalSessionResult {
+	return {
+		...result,
+		diagnostics: result.diagnostics.map((diagnostic) => ({
+			...diagnostic,
+			severity: 'error' as const,
+		})),
+	};
+}
+
+/** What names a launch: its kind, the requested run script, and the workspace. */
+export interface ScriptLaunchRequest {
+	kind: WorkspaceScriptKind;
+	scriptName?: string | null;
+	workspaceId: string;
+}
+
+/** A resolved launch, or the failure that stops it. */
+export type ResolvedLaunch =
+	| { failure: CreateTerminalSessionResult; launch: null }
+	| { failure: null; launch: ScriptLaunch };
+
+/**
+ * Resolves the launch a request names from a workspace's script config.
+ * @param config - The workspace's resolved script config, or the error reading it.
+ * @param request - Script kind, requested run-script name, and target workspace.
+ * @returns The launch, or the failure that stops it.
+ */
+export function launchFromConfig(
+	config:
+		| { error: CreateTerminalSessionResult }
+		| {
+				error: null;
+				repositoryId: string;
+				settings: WorkspaceScriptSettings;
+		  },
+	{ kind, scriptName, workspaceId }: ScriptLaunchRequest,
+): ResolvedLaunch {
+	if (config.error) {
+		return { failure: config.error, launch: null };
+	}
+
+	const launch = resolveScriptLaunch({
+		kind,
+		repositoryId: config.repositoryId,
+		requestedName: scriptName,
+		settings: config.settings,
+		workspaceId,
+	});
+
+	return launch
+		? { failure: null, launch }
+		: {
+				failure: failure(
+					'script-not-configured',
+					describeMissingScript(kind, scriptName, config.settings.runScripts),
+					'info',
+				),
+				launch: null,
+			};
+}
+
+/**
  * Lock a launch is serialized behind. Run launches lock on the repository, not
  * the workspace: `nonconcurrent` mode stops the launching workspace's siblings,
  * and it can only see a sibling whose session already exists. Two workspaces of

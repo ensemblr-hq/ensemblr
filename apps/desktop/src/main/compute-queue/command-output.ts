@@ -8,23 +8,30 @@ import {
 import path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 
-import {
-	createTextRedactor,
-	type TextRedactor,
-} from '../../shared/redaction.ts';
 import { ensureContextPath } from '../config/context-directory.ts';
+import {
+	createOutputRedactor,
+	maskOpenPrivateKey,
+	openPrivateKeyLineStart,
+	partialLineCut,
+} from './output-redaction.ts';
 
 /** Characters of cleaned output kept in memory for an agent to read. */
 export const OUTPUT_TAIL_CHARS = 64 * 1024;
 
 /**
- * Longest partial line held back waiting for its newline. Redaction runs per
- * line so a secret is never split across two redaction passes; a line longer
- * than this is cleaned in pieces rather than buffered without bound. Kept
- * small because the shared redactor's URL-credential pattern is quadratic on a
- * long run of word characters, and it runs on the main process's event loop.
+ * Longest partial line held back waiting for its newline, beyond the longest
+ * literal secret. Redaction runs on whole lines so a secret is never split
+ * across two passes; a line longer than this is cut where no literal can
+ * straddle the cut rather than buffered without bound.
  */
-const MAX_PENDING_LINE_CHARS = 2 * 1024;
+const MAX_PENDING_LINE_CHARS = 16 * 1024;
+
+/**
+ * Longest private-key block held back waiting for its END line. A real key is
+ * a few kilobytes; a block that outgrows this is masked rather than released.
+ */
+const MAX_HELD_PRIVATE_KEY_CHARS = 16 * 1024;
 
 /** Subdirectory of a worktree's `.context` holding one log per command job. */
 const LOG_SUBDIR = 'compute-queue';
@@ -143,7 +150,9 @@ function createTailBuffer(): {
 /**
  * Builds the collector a running command streams into: output is decoded per
  * stream, split into lines, stripped of ANSI, redacted, then appended to both
- * the log and the in-memory tail. Output volume only ever trims the tail.
+ * the log and the in-memory tail. Output volume only ever trims the tail. An
+ * unclosed private-key block is held back until its END line so the whole
+ * block is redacted at once, whichever pipe chunks it arrived in.
  * @param input - Workspace root, job id, and the literal values to redact.
  * @returns The collector for the job's combined output.
  */
@@ -152,7 +161,7 @@ export function createCommandOutput(input: {
 	redactValues: readonly string[];
 	workspacePath: string;
 }): CommandOutput {
-	const redact: TextRedactor = createTextRedactor(input.redactValues);
+	const redactor = createOutputRedactor(input.redactValues);
 	const log = openJobLog(input.workspacePath, input.jobId);
 	const tail = createTailBuffer();
 	const decoders = {
@@ -169,36 +178,58 @@ export function createCommandOutput(input: {
 		if (text === '') {
 			return;
 		}
-		const cleaned = redact(stripAnsi(text));
+		const cleaned = redactor.redact(stripAnsi(text));
 		log?.stream.write(cleaned);
 		tail.append(cleaned);
 	}
 
 	/**
-	 * Adds decoded text to a stream's held-back line and emits complete lines.
+	 * Decides how much of a stream's held-back text may stay held: an open key
+	 * block up to its bound, else a partial line up to its bound. Whatever
+	 * outgrows its bound is emitted — a key block masked, a long line cut where
+	 * no literal secret straddles the cut.
+	 * @param held - Text after the last emitted line.
+	 * @param holdsKey - Whether it contains an unclosed private-key block.
+	 * @returns The text that stays held.
+	 */
+	function boundHeld(held: string, holdsKey: boolean): string {
+		if (holdsKey) {
+			if (held.length <= MAX_HELD_PRIVATE_KEY_CHARS) {
+				return held;
+			}
+			emit(maskOpenPrivateKey(held));
+			return '';
+		}
+		if (held.length <= MAX_PENDING_LINE_CHARS + redactor.literalHoldChars) {
+			return held;
+		}
+		const safe = redactor.redactLiterals(held);
+		const cut = partialLineCut(safe, safe.length - redactor.literalHoldChars);
+		emit(safe.slice(0, cut));
+		return safe.slice(cut);
+	}
+
+	/**
+	 * Adds decoded text to a stream's held-back text and emits complete lines,
+	 * stopping short of any private-key block still waiting for its END.
 	 * @param stream - Which stream the text came from.
 	 * @param text - Newly decoded text.
 	 */
 	function accept(stream: 'stderr' | 'stdout', text: string): void {
 		const combined = pending[stream] + text;
-		const lastNewline = combined.lastIndexOf('\n');
-		const complete =
-			lastNewline === -1 ? '' : combined.slice(0, lastNewline + 1);
-		const rest = combined.slice(lastNewline + 1);
-		emit(complete);
-		if (rest.length > MAX_PENDING_LINE_CHARS) {
-			emit(rest);
-			pending[stream] = '';
-			return;
-		}
-		pending[stream] = rest;
+		const completeEnd = combined.lastIndexOf('\n') + 1;
+		const keyStart = openPrivateKeyLineStart(combined);
+		const holdStart =
+			keyStart === -1 ? completeEnd : Math.min(completeEnd, keyStart);
+		emit(combined.slice(0, holdStart));
+		pending[stream] = boundHeld(combined.slice(holdStart), keyStart !== -1);
 	}
 
 	return {
 		end: async () => {
 			for (const stream of ['stdout', 'stderr'] as const) {
 				accept(stream, decoders[stream].end());
-				emit(pending[stream]);
+				emit(maskOpenPrivateKey(pending[stream]));
 				pending[stream] = '';
 			}
 			const stream = log?.stream;
@@ -208,7 +239,15 @@ export function createCommandOutput(input: {
 		},
 		logPath: log?.path ?? null,
 		note: (text) => emit(text.endsWith('\n') ? text : `${text}\n`),
-		tail: () => tail.read(redact(stripAnsi(pending.stdout + pending.stderr))),
+		tail: () =>
+			tail.read(
+				redactor.redact(
+					stripAnsi(
+						maskOpenPrivateKey(pending.stdout) +
+							maskOpenPrivateKey(pending.stderr),
+					),
+				),
+			),
 		write: (stream, chunk) => accept(stream, decoders[stream].write(chunk)),
 	};
 }
