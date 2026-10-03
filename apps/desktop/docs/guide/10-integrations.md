@@ -156,6 +156,13 @@ move — In Review would claim an implementation that does not exist yet. That i
 enforced at the control boundary, not merely instructed — see
 [`./09-agent-control.md`](./09-agent-control.md).
 
+The one move Ensemblr makes on its own is the last one. When the pull request of
+a workspace created from an issue merges, Ensemblr moves that issue to its
+team's completed state, preferring a state named Done. A GitHub issue is closed
+as completed instead. The merge is your decision that the work is finished, so
+the app records it even when an agent ran the merge
+([ADR 0082](../adr/0082-close-out-a-workspace-when-its-pull-request-merges.md)).
+
 Nothing on the board writes back to Linear. Dismissing an issue from the board
 hides it locally; the issue's own status stays yours to change
 ([ADR 0024](../adr/0024-use-linear-oauth-for-v1-issue-integration.md)).

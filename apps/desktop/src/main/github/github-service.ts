@@ -35,6 +35,7 @@ import {
 	writeCachedPullRequestSnapshot,
 } from './pr-cache.ts';
 import {
+	observedMergeNumber,
 	PR_VIEW_JSON_FIELDS,
 	parseDeployments,
 	parsePullRequestView,
@@ -119,6 +120,12 @@ interface WorkspaceBranchState {
 	remoteHeadRef: string | null;
 }
 
+/** A workspace's pull request, seen to have merged. */
+export interface PullRequestMergedEvent {
+	pullRequestNumber: number;
+	workspaceId: string;
+}
+
 /** Public surface for git review-flow operations and all `gh`-backed GitHub calls. */
 export interface GithubService {
 	commitWorkspaceChanges: (
@@ -147,11 +154,20 @@ export function createGithubService({
 	databaseService,
 	localCommandService,
 	now = () => new Date(),
+	onPullRequestMerged = () => undefined,
 	readCoAuthorEnabled = () => true,
 }: {
 	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
 	now?: () => Date;
+	/**
+	 * Told when a workspace's pull request is seen to merge — by the in-app merge,
+	 * or by a refresh catching a merge made anywhere else, an agent's
+	 * `gh pr merge` included. Every cached snapshot is written here, so this is
+	 * the one place both paths pass through. Called synchronously and must not
+	 * block; a listener that throws is logged rather than failing the refresh.
+	 */
+	onPullRequestMerged?: (event: PullRequestMergedEvent) => void;
 	/**
 	 * Whether to credit Ensemblr as a co-author on commits this service makes.
 	 * Read here rather than taken from the request so no caller can forget it,
@@ -180,6 +196,30 @@ export function createGithubService({
 			maxOutputBytes: MAX_OUTPUT_BYTES,
 			timeoutMs: command === 'gh' ? GH_TIMEOUT_MS : GIT_TIMEOUT_MS,
 		});
+	}
+
+	/**
+	 * Tells the merge listener about a merged pull request, without letting a
+	 * listener failure escape into the snapshot read that observed it.
+	 * @param workspaceId - The workspace whose pull request merged.
+	 * @param pullRequestNumber - The merged pull request, or null when none merged.
+	 */
+	function announceMerge(
+		workspaceId: string,
+		pullRequestNumber: number | null,
+	): void {
+		if (pullRequestNumber === null) {
+			return;
+		}
+		try {
+			onPullRequestMerged({ pullRequestNumber, workspaceId });
+		} catch (cause) {
+			console.warn('[github] the pull-request merged listener threw.', {
+				cause,
+				pullRequestNumber,
+				workspaceId,
+			});
+		}
 	}
 
 	/**
@@ -862,6 +902,10 @@ export function createGithubService({
 					snapshot,
 					workspaceId: request.workspaceId,
 				});
+				announceMerge(
+					request.workspaceId,
+					observedMergeNumber(cached, snapshot),
+				);
 			}
 			return { fromCache: false, snapshot };
 		},
@@ -904,6 +948,10 @@ export function createGithubService({
 						),
 						workspaceId: request.workspaceId,
 					});
+					announceMerge(
+						request.workspaceId,
+						mergedPullRequestNumber(refreshed.snapshot),
+					);
 				}
 			}
 			return { merged: true };
@@ -922,6 +970,22 @@ export function createGithubService({
 			Number.isFinite(parsed) && current.getTime() - parsed < SNAPSHOT_TTL_MS
 		);
 	}
+}
+
+/**
+ * The pull request an in-app merge actually merged, read off the snapshot taken
+ * right after it. A successful `gh pr merge` is not proof on its own: on a
+ * repository with a merge queue it only enqueues the pull request, and that one
+ * is left for a later refresh to see merge.
+ * @param snapshot - The snapshot fetched after `gh pr merge` returned.
+ * @returns The merged pull request's number, or null when it does not read as merged yet.
+ */
+function mergedPullRequestNumber(
+	snapshot: GithubPullRequestSnapshotWire,
+): number | null {
+	return snapshot.pullRequest?.state === 'merged'
+		? snapshot.pullRequest.number
+		: null;
 }
 
 /**

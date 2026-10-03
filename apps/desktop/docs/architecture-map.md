@@ -63,6 +63,7 @@ each exposing its public surface through `index.ts`.
 | IPC | `ipc/` | Handler registration (`handlers/`, 41 modules), request validation (`request-schemas/`, 27 modules), permission gate |
 | Integrations | `github/`, `linear/`, `infisical/` | `gh` CLI wrapper, PR snapshots, cached issue backlog; Linear OAuth + client + per-account store; Infisical account store, REST boundary, token-caching client, per-scope cache, link store |
 | Linked directories | `linked-directories/` | Read grants for directories outside a workspace, plus the app-global recents list behind them |
+| Merge close-out | `merge-close-out/` | What a merged pull request sets in motion: the workspace's board card to Done, and the Linear or GitHub issue it was created from closed. Fed by `github/`, which reports every merge it observes (ADR&nbsp;0082) |
 | Native menus | `menu/` | One builder per menu behind `createMenuItemFactory`, driven by the renderer's command report and the localized `menu-strings.ts` table |
 | Open targets | `open-target/` | External editor/app detection and launch |
 | Repositories | `repository/` | Registration, git probing, lifecycle |

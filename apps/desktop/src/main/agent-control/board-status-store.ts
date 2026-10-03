@@ -4,7 +4,8 @@
  * the main process has no source of truth for it. The renderer reports its full
  * map here on startup and on every change; agent-control reads
  * (`getWorkspaceStatus`, `listWorkspaces`) serve from this mirror, and a write
- * (`setWorkspaceStatus`) updates it optimistically before the renderer confirms.
+ * (`setWorkspaceStatus`, or the merge close-out moving a merged workspace to
+ * Done) updates it optimistically before the renderer confirms.
  */
 import {
 	WORKSPACE_BOARD_STATUSES,

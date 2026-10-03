@@ -10,6 +10,7 @@ import type {
 import {
 	createGithubService,
 	type GithubService,
+	type PullRequestMergedEvent,
 } from '../../src/main/github/github-service.ts';
 import {
 	PR_VIEW_JSON_FIELDS,
@@ -114,6 +115,7 @@ function createService(
 	respond: (request: LocalCommandRequest) => LocalCommandResult,
 	database = createTestDatabase(),
 	coAuthorEnabled = false,
+	onPullRequestMerged?: (event: PullRequestMergedEvent) => void,
 ): { calls: LocalCommandRequest[]; service: GithubService } {
 	const { calls, service } = stubCommandService(respond);
 	return {
@@ -122,6 +124,7 @@ function createService(
 			databaseService: stubDatabaseService(database),
 			localCommandService: service,
 			now: fixedNow,
+			...(onPullRequestMerged ? { onPullRequestMerged } : {}),
 			readCoAuthorEnabled: () => coAuthorEnabled,
 		}),
 	};
@@ -1860,4 +1863,137 @@ test('getPullRequestSnapshot surfaces a transient failure of the fork lookup', a
 	});
 
 	assert.equal(result.error?.code, 'command-failed');
+});
+
+/**
+ * Answers a branch whose pull request #7 is in whatever state `readState`
+ * names, with its head reachable so a merged one is kept, and lets
+ * `gh pr merge` succeed.
+ */
+function respondWithPullRequestState(
+	readState: () => string,
+): (request: LocalCommandRequest) => LocalCommandResult {
+	return (request) => {
+		if (request.command === 'git') {
+			if (request.args?.[0] === 'rev-parse') {
+				return buildResult({ stdout: 'feature/x\n' });
+			}
+			if (request.args?.[0] === 'merge-base') {
+				return buildResult({ exitCode: 0 });
+			}
+			return buildResult({ stdout: '0\t0\n' });
+		}
+		if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+			return buildResult({
+				stdout: JSON.stringify({
+					...JSON.parse(PR_VIEW_JSON),
+					headRefOid: 'branch-tip',
+					state: readState(),
+				}),
+			});
+		}
+		if (request.args?.[0] === 'pr' && request.args?.[1] === 'merge') {
+			return buildResult();
+		}
+		return buildResult({ exitCode: 1, status: 'failure', stderr: 'HTTP 404' });
+	};
+}
+
+const REFRESH_WS_1 = {
+	refresh: true,
+	workspaceCwd: '/tmp/ws',
+	workspaceId: 'ws-1',
+} as const;
+
+test('getPullRequestSnapshot announces a pull request it saw merge, once', async () => {
+	let state = 'OPEN';
+	const events: PullRequestMergedEvent[] = [];
+	const { service } = createService(
+		respondWithPullRequestState(() => state),
+		createTestDatabase(),
+		false,
+		(event) => events.push(event),
+	);
+
+	await service.getPullRequestSnapshot(REFRESH_WS_1);
+	assert.deepEqual(events, []);
+
+	state = 'MERGED';
+	await service.getPullRequestSnapshot(REFRESH_WS_1);
+	await service.getPullRequestSnapshot(REFRESH_WS_1);
+
+	assert.deepEqual(events, [{ pullRequestNumber: 7, workspaceId: 'ws-1' }]);
+});
+
+test('getPullRequestSnapshot does not announce a pull request first seen merged', async () => {
+	const events: PullRequestMergedEvent[] = [];
+	const { service } = createService(
+		respondWithPullRequestState(() => 'MERGED'),
+		createTestDatabase(),
+		false,
+		(event) => events.push(event),
+	);
+
+	await service.getPullRequestSnapshot(REFRESH_WS_1);
+
+	assert.deepEqual(events, []);
+});
+
+test('mergePullRequest announces a merge the refreshed snapshot confirms', async () => {
+	const events: PullRequestMergedEvent[] = [];
+	const { service } = createService(
+		respondWithPullRequestState(() => 'MERGED'),
+		createTestDatabase(),
+		false,
+		(event) => events.push(event),
+	);
+
+	const result = await service.mergePullRequest({
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.merged, true);
+	assert.deepEqual(events, [{ pullRequestNumber: 7, workspaceId: 'ws-1' }]);
+});
+
+test('mergePullRequest leaves a queued merge for the refresh that sees it land', async () => {
+	let state = 'OPEN';
+	const events: PullRequestMergedEvent[] = [];
+	const { service } = createService(
+		respondWithPullRequestState(() => state),
+		createTestDatabase(),
+		false,
+		(event) => events.push(event),
+	);
+
+	await service.mergePullRequest({
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+	assert.deepEqual(events, []);
+
+	state = 'MERGED';
+	await service.getPullRequestSnapshot(REFRESH_WS_1);
+
+	assert.deepEqual(events, [{ pullRequestNumber: 7, workspaceId: 'ws-1' }]);
+});
+
+test('a throwing merge listener does not fail the refresh that observed the merge', async () => {
+	let state = 'OPEN';
+	const { service } = createService(
+		respondWithPullRequestState(() => state),
+		createTestDatabase(),
+		false,
+		() => {
+			throw new Error('listener exploded');
+		},
+	);
+
+	await service.getPullRequestSnapshot(REFRESH_WS_1);
+	state = 'MERGED';
+	const result = await service.getPullRequestSnapshot(REFRESH_WS_1);
+
+	assert.equal(result.snapshot?.pullRequest?.state, 'merged');
+	assert.equal(result.error, undefined);
 });
