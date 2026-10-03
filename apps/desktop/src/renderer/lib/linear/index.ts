@@ -51,3 +51,4 @@ export {
 	linearInitials,
 	mapLinearIssuesToWorkspaceSources,
 } from './issue-view';
+export { isLinearIssueInTeamScope } from './team-scope';

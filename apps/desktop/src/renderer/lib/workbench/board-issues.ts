@@ -11,7 +11,10 @@
  * already are.
  */
 
-import { isLinearIssueNotStarted } from '@/renderer/lib/linear';
+import {
+	isLinearIssueInTeamScope,
+	isLinearIssueNotStarted,
+} from '@/renderer/lib/linear';
 import type { BoardIssueCard } from '@/renderer/types/workbench-shell';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 import type { RepositoryIssueWire } from '@/shared/ipc/contracts/workspace-sources';
@@ -23,12 +26,20 @@ export interface ProjectGithubIssues {
 	projectName: string;
 }
 
+/** The Linear teams one repository's `[linear]` block names; empty when it names none. */
+export interface ProjectLinearTeams {
+	projectId: string;
+	teams: readonly string[];
+}
+
 /** Everything {@link collectBacklogIssues} needs to decide the Backlog column. */
 export interface BacklogIssuesInput {
 	/** Keys of issues the user dropped on Canceled; they stay off the board until restored. */
 	dismissedKeys: readonly string[];
 	githubIssuesByProject: readonly ProjectGithubIssues[];
 	linearIssues: readonly LinearIssueWire[];
+	/** Every repository on the board with its Linear team scope. */
+	linearTeamsByProject: readonly ProjectLinearTeams[];
 	/** `linkedIssue.remoteId` of every existing workspace, so an issue that already produced one is not offered twice. */
 	linkedIssueKeys: readonly string[];
 }
@@ -46,11 +57,35 @@ function isGithubBacklogIssue(issue: RepositoryIssueWire): boolean {
 }
 
 /**
+ * The repositories whose team scope takes a Linear issue: those naming its team
+ * and those naming none. Null when no repository names a team, which leaves the
+ * issue unscoped exactly as it was before any repository could name one.
+ * @param issue - The Linear issue to place.
+ * @param linearTeamsByProject - Every repository on the board with its team scope.
+ * @returns The ids of the repositories that take it, or null when none scopes.
+ */
+function linearScopeRepoIds(
+	issue: LinearIssueWire,
+	linearTeamsByProject: readonly ProjectLinearTeams[],
+): string[] | null {
+	if (linearTeamsByProject.every((project) => project.teams.length === 0)) {
+		return null;
+	}
+	return linearTeamsByProject
+		.filter((project) => isLinearIssueInTeamScope(issue, project.teams))
+		.map((project) => project.projectId);
+}
+
+/**
  * Normalizes a Linear issue onto the board card shape.
  * @param issue - The Linear issue to map.
+ * @param scopeRepoIds - The repositories whose team scope takes it, or null when unscoped.
  * @returns The board card for it.
  */
-function toLinearBoardIssue(issue: LinearIssueWire): BoardIssueCard {
+function toLinearBoardIssue(
+	issue: LinearIssueWire,
+	scopeRepoIds: string[] | null,
+): BoardIssueCard {
 	return {
 		item: { issue, kind: 'linear-issue' },
 		key: issue.id,
@@ -59,6 +94,7 @@ function toLinearBoardIssue(issue: LinearIssueWire): BoardIssueCard {
 		projectId: null,
 		provider: 'linear',
 		reference: issue.identifier,
+		scopeRepoIds,
 		stateColor: issue.stateColor,
 		stateName: issue.stateName,
 		stateType: issue.stateType,
@@ -90,6 +126,7 @@ function toGithubBoardIssue(
 		projectId: project.projectId,
 		provider: 'github',
 		reference: `#${issue.number}`,
+		scopeRepoIds: null,
 		stateColor: null,
 		stateName: null,
 		stateType: null,
@@ -106,22 +143,40 @@ export interface BacklogIssues {
 	backlog: BoardIssueCard[];
 	/** Issues the user dropped on Canceled; shown there so the dismissal can be undone. */
 	dismissed: BoardIssueCard[];
+	/**
+	 * Key of every issue still waiting for a workspace, including the ones left
+	 * off the board because no repository's team scope takes them. Dismissal
+	 * pruning keeps these, so narrowing a scope never forgets a dismissal.
+	 */
+	liveKeys: string[];
+}
+
+/**
+ * Whether a card has a repository on the board to belong to. Only a Linear
+ * issue that every repository's team scope turns away has none.
+ * @param card - The card to test.
+ * @returns True when the card belongs on the board.
+ */
+function hasBoardRepository(card: BoardIssueCard): boolean {
+	return card.scopeRepoIds === null || card.scopeRepoIds.length > 0;
 }
 
 /**
  * Collects the issues with no workspace yet: unstarted Linear issues plus
  * unassigned open GitHub issues, minus anything that already produced a
- * workspace. Dismissed issues are subtracted from Backlog and returned
- * separately rather than dropped, so the Canceled column can offer to restore
- * them. Linear issues come first, then each repository's in the order given —
- * the toolbar's sort is what reorders them for display.
- * @param input - Issue sources plus the two subtraction sets.
- * @returns The backlog and dismissed cards, deduplicated by key.
+ * workspace and any Linear issue whose team no repository on the board takes.
+ * Dismissed issues are subtracted from Backlog and returned separately rather
+ * than dropped, so the Canceled column can offer to restore them. Linear issues
+ * come first, then each repository's in the order given — the toolbar's sort is
+ * what reorders them for display.
+ * @param input - Issue sources, the repositories' team scopes, and the two subtraction sets.
+ * @returns The backlog and dismissed cards, deduplicated by key, plus every live key.
  */
 export function collectBacklogIssues({
 	dismissedKeys,
 	githubIssuesByProject,
 	linearIssues,
+	linearTeamsByProject,
 	linkedIssueKeys,
 }: BacklogIssuesInput): BacklogIssues {
 	const linked = new Set(linkedIssueKeys);
@@ -131,7 +186,12 @@ export function collectBacklogIssues({
 
 	for (const issue of linearIssues) {
 		if (isLinearIssueNotStarted(issue)) {
-			collected.push(toLinearBoardIssue(issue));
+			collected.push(
+				toLinearBoardIssue(
+					issue,
+					linearScopeRepoIds(issue, linearTeamsByProject),
+				),
+			);
 		}
 	}
 	for (const project of githubIssuesByProject) {
@@ -150,8 +210,11 @@ export function collectBacklogIssues({
 		return true;
 	});
 
+	const onBoard = unlinked.filter(hasBoardRepository);
+
 	return {
-		backlog: unlinked.filter((card) => !dismissed.has(card.key)),
-		dismissed: unlinked.filter((card) => dismissed.has(card.key)),
+		backlog: onBoard.filter((card) => !dismissed.has(card.key)),
+		dismissed: onBoard.filter((card) => dismissed.has(card.key)),
+		liveKeys: unlinked.map((card) => card.key),
 	};
 }

@@ -30,6 +30,13 @@ export interface BoardIssueCard {
 	provider: WorkspaceLinkedIssueProvider;
 	/** Human reference: a Linear identifier (`ENS-42`) or a GitHub number (`#42`). */
 	reference: string;
+	/**
+	 * Repositories whose `[linear]` team scope takes this Linear issue — those
+	 * naming its team, plus those naming no team at all. Null when no repository
+	 * on the board names a team, and always null for GitHub, which `projectId`
+	 * already places.
+	 */
+	scopeRepoIds: string[] | null;
 	stateColor: string | null;
 	stateName: string | null;
 	stateType: string | null;

@@ -5,10 +5,14 @@ import {
 	linearIssuesQuery,
 	repositoryBranchesQuery,
 	repositoryIssuesQuery,
+	repositoryLinearTeamsQuery,
 	repositoryPullRequestsQuery,
 } from '@/renderer/api/ensemblr';
 import { githubIssueSourceId } from '@/renderer/lib/github';
-import { describeLinearListGap } from '@/renderer/lib/linear';
+import {
+	describeLinearListGap,
+	isLinearIssueInTeamScope,
+} from '@/renderer/lib/linear';
 import {
 	branchSourceId,
 	collectLinkedIssueKeys,
@@ -47,13 +51,14 @@ const LINKED_KEY_SEPARATOR = '\n';
 /**
  * Fetches the create-from picker rows for one repository and the active tab,
  * lazily: only the query for `kind` runs, and only while the dialog is `open`.
- * Linear issues are global (pulled regardless of repo); branches, pull requests,
- * and GitHub issues are scoped to `repoId`. The Issues tab lists only work
- * nobody has started — Linear issues in Backlog or Todo, and no issue any of
- * `projects`' workspaces is already linked to — ordered by priority, then by
- * last update, and reads as loading while a Linear refresh is running behind
- * cached rows. Returns display sources plus a map back to the raw rows so a
- * selection can be turned into a creation seed.
+ * Linear issues come from one global list, narrowed to the teams the
+ * repository's committed `[linear]` block names when it names any; branches,
+ * pull requests, and GitHub issues are scoped to `repoId`. The Issues tab lists
+ * only work nobody has started — Linear issues in Backlog or Todo, and no issue
+ * any of `projects`' workspaces is already linked to — ordered by priority, then
+ * by last update, and reads as loading while the team scope loads or a Linear
+ * refresh is running behind cached rows. Returns display sources plus a map
+ * back to the raw rows so a selection can be turned into a creation seed.
  */
 export function useWorkspaceSourcePicker({
 	kind,
@@ -98,6 +103,14 @@ export function useWorkspaceSourcePicker({
 		...linearIssuesQuery({ notStarted: true }),
 		enabled: open,
 	});
+	const repository = projects.find((project) => project.id === repoId);
+	const linearTeams = useQuery({
+		...repositoryLinearTeamsQuery({
+			repositoryId: repoId,
+			repositoryPath: repository?.pathLabel ?? '',
+		}),
+		enabled: open && repository !== undefined,
+	});
 
 	const rows = useMemo<Omit<WorkspaceSourcePickerState, 'linearGap'>>(() => {
 		if (kind === 'branch') {
@@ -135,7 +148,9 @@ export function useWorkspaceSourcePicker({
 		const { githubIssues, linearIssues: linearIssueRows } =
 			selectStartableIssues({
 				githubIssues: githubIssuesQuery.data?.issues ?? [],
-				linearIssues: linearIssues.data?.issues ?? [],
+				linearIssues: (linearIssues.data?.issues ?? []).filter((issue) =>
+					isLinearIssueInTeamScope(issue, linearTeams.data ?? []),
+				),
 				linkedIssueKeys,
 			});
 		const itemsById = new Map<string, WorkspaceSourceItem>();
@@ -153,6 +168,7 @@ export function useWorkspaceSourcePicker({
 			isLoading:
 				githubIssuesQuery.isLoading ||
 				linearIssues.isLoading ||
+				linearTeams.isLoading ||
 				isLinearSyncing(linearIssues.data),
 			itemsById,
 			sources: mapStartableIssuesToWorkspaceSources({
@@ -170,6 +186,8 @@ export function useWorkspaceSourcePicker({
 		githubIssuesQuery.isLoading,
 		linearIssues.data,
 		linearIssues.isLoading,
+		linearTeams.data,
+		linearTeams.isLoading,
 		linkedIssueKeys,
 	]);
 

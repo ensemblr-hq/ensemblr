@@ -11,6 +11,7 @@ import type {
 	LinearIssueWire,
 	ListLinearIssuesResult,
 } from '@/shared/ipc/contracts/linear';
+import type { SettingsResolutionSnapshot } from '@/shared/ipc/contracts/settings-resolution';
 import type {
 	ListRepositoryIssuesResult,
 	RepositoryIssueWire,
@@ -80,19 +81,44 @@ function projectLinkedTo(remoteId: string): ProjectShellModel {
 	} as unknown as ProjectShellModel;
 }
 
+/** A repository whose settings live at `/repos/copland`, with no workspaces. */
+function projectAtRoot(): ProjectShellModel {
+	return {
+		id: 'repo-1',
+		pathLabel: '/repos/copland',
+		workspaces: [],
+	} as unknown as ProjectShellModel;
+}
+
 /** Installs a bridge answering every list the picker reads. */
 function installBridge({
 	githubIssues = [],
 	linear,
+	linearTeams,
 }: {
 	githubIssues?: RepositoryIssueWire[];
 	linear: ListLinearIssuesResult;
+	linearTeams?: string[];
 }): void {
 	const githubResult: ListRepositoryIssuesResult = {
 		issues: githubIssues,
 		source: 'remote',
 		status: 'ok',
 		syncedAt: '2026-10-03T00:00:00.000Z',
+	};
+	const repositorySettings: SettingsResolutionSnapshot['repository'] = {
+		diagnostics: [],
+		settings: linearTeams
+			? [
+					{
+						candidates: [],
+						key: 'linearTeams',
+						locked: false,
+						source: 'ensemblr-config',
+						value: linearTeams,
+					},
+				]
+			: [],
 	};
 	installEnsemblrApi({
 		linearListIssues: async () => linear,
@@ -101,6 +127,10 @@ function installBridge({
 		listRepositoryPullRequests: async () => ({
 			pullRequests: [],
 			status: 'ok',
+		}),
+		resolveSettings: async (): Promise<SettingsResolutionSnapshot> => ({
+			app: { diagnostics: [], settings: [] },
+			repository: repositorySettings,
 		}),
 	});
 }
@@ -201,6 +231,53 @@ test('the Issues tab orders rows by priority, then by last update, across provid
 		'Fresh GitHub issue',
 		'Stale backlog issue',
 	]);
+});
+
+test('the Issues tab keeps only the Linear teams the repository names', async () => {
+	installBridge({
+		linear: {
+			accountFailures: [],
+			issues: [
+				linearIssue({ id: 'ens', teamKey: 'ENS', title: 'Ensemblr issue' }),
+				linearIssue({
+					id: 'mkt',
+					teamId: 't-mkt',
+					teamKey: 'MKT',
+					title: 'Marketing issue',
+				}),
+			],
+			source: 'remote',
+			status: 'ok',
+		},
+		linearTeams: ['ens'],
+	});
+
+	const { result } = renderIssuesTab([projectAtRoot()]);
+
+	await waitFor(() => expect(result.current.isLoading).toBe(false));
+	expect(result.current.sources.map((source) => source.title)).toEqual([
+		'Ensemblr issue',
+	]);
+	expect(result.current.itemsById.has('mkt')).toBe(false);
+});
+
+test('the Issues tab keeps every Linear team when the repository names none', async () => {
+	installBridge({
+		linear: {
+			accountFailures: [],
+			issues: [
+				linearIssue({ id: 'ens', teamKey: 'ENS', title: 'Ensemblr issue' }),
+				linearIssue({ id: 'mkt', teamKey: 'MKT', title: 'Marketing issue' }),
+			],
+			source: 'remote',
+			status: 'ok',
+		},
+	});
+
+	const { result } = renderIssuesTab([projectAtRoot()]);
+
+	await waitFor(() => expect(result.current.sources).toHaveLength(2));
+	expect(result.current.isLoading).toBe(false);
 });
 
 // Stale cached rows the filter empties out say nothing about what the running

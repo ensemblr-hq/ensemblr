@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest';
 
-import { collectBacklogIssues } from '../../src/renderer/lib/workbench/board-issues';
+import {
+	collectBacklogIssues,
+	type ProjectLinearTeams,
+} from '../../src/renderer/lib/workbench/board-issues';
 import type { LinearIssueWire } from '../../src/shared/ipc/contracts/linear';
 import type { RepositoryIssueWire } from '../../src/shared/ipc/contracts/workspace-sources';
 
@@ -59,11 +62,13 @@ function collect({
 	dismissedKeys = [],
 	githubIssues = [],
 	linearIssues = [],
+	linearTeamsByProject = [{ projectId: 'repo-1', teams: [] }],
 	linkedIssueKeys = [],
 }: {
 	dismissedKeys?: string[];
 	githubIssues?: RepositoryIssueWire[];
 	linearIssues?: LinearIssueWire[];
+	linearTeamsByProject?: ProjectLinearTeams[];
 	linkedIssueKeys?: string[];
 } = {}) {
 	return collectBacklogIssues({
@@ -72,6 +77,7 @@ function collect({
 			{ issues: githubIssues, projectId: 'repo-1', projectName: 'copland' },
 		],
 		linearIssues,
+		linearTeamsByProject,
 		linkedIssueKeys,
 	});
 }
@@ -206,5 +212,64 @@ describe('collectBacklogIssues subtraction', () => {
 			linearIssues: [linearIssue(), linearIssue()],
 		});
 		expect(result.backlog).toHaveLength(1);
+	});
+});
+
+describe('collectBacklogIssues Linear team scope', () => {
+	const ensemblr = linearIssue({ id: 'ens', teamId: 't-ens', teamKey: 'ENS' });
+	const marketing = linearIssue({
+		id: 'mkt',
+		teamId: 't-mkt',
+		teamKey: 'MKT',
+	});
+
+	test('leaves Linear issues unscoped when no repository names a team', () => {
+		const result = collect({
+			linearIssues: [ensemblr, marketing],
+			linearTeamsByProject: [
+				{ projectId: 'repo-1', teams: [] },
+				{ projectId: 'repo-2', teams: [] },
+			],
+		});
+		expect(result.backlog.map((card) => card.scopeRepoIds)).toEqual([
+			null,
+			null,
+		]);
+	});
+
+	test('places an issue in the repositories naming its team and those naming none', () => {
+		const result = collect({
+			linearIssues: [ensemblr, marketing],
+			linearTeamsByProject: [
+				{ projectId: 'repo-1', teams: ['ens'] },
+				{ projectId: 'repo-2', teams: [] },
+				{ projectId: 'repo-3', teams: ['t-mkt'] },
+			],
+		});
+		expect(result.backlog.map((card) => [card.key, card.scopeRepoIds])).toEqual(
+			[
+				['ens', ['repo-1', 'repo-2']],
+				['mkt', ['repo-2', 'repo-3']],
+			],
+		);
+	});
+
+	test('keeps an issue no repository takes off the board but live for pruning', () => {
+		const result = collect({
+			dismissedKeys: ['mkt'],
+			linearIssues: [ensemblr, marketing],
+			linearTeamsByProject: [{ projectId: 'repo-1', teams: ['ENS'] }],
+		});
+		expect(result.backlog.map((card) => card.key)).toEqual(['ens']);
+		expect(result.dismissed).toEqual([]);
+		expect(result.liveKeys).toEqual(['ens', 'mkt']);
+	});
+
+	test('never scopes a GitHub issue by team', () => {
+		const [card] = collect({
+			githubIssues: [githubIssue()],
+			linearTeamsByProject: [{ projectId: 'repo-1', teams: ['ENS'] }],
+		}).backlog;
+		expect(card?.scopeRepoIds).toBeNull();
 	});
 });

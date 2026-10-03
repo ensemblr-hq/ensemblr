@@ -8,11 +8,13 @@ import { useEffect, useMemo } from 'react';
 import {
 	linearIssuesQuery,
 	repositoryIssuesQuery,
+	repositoryLinearTeamsQuery,
 } from '@/renderer/api/ensemblr';
 import { collectLinkedIssueKeys } from '@/renderer/lib/workbench';
 import {
 	collectBacklogIssues,
 	type ProjectGithubIssues,
+	type ProjectLinearTeams,
 } from '@/renderer/lib/workbench/board-issues';
 import { useBoardIssueDismissals } from '@/renderer/state/workspace';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
@@ -58,11 +60,30 @@ function combineRepositoryIssues(
 }
 
 /**
+ * Folds the per-repository Linear team scopes into one structurally stable
+ * value, for the same reason {@link combineRepositoryIssues} does.
+ * @param results - One team-scope result per repository, in `projects` order.
+ * @returns The per-repository team lists and whether any is still loading.
+ */
+function combineLinearTeams(results: readonly UseQueryResult<string[]>[]): {
+	data: (string[] | undefined)[];
+	isLoading: boolean;
+} {
+	return {
+		data: results.map((result) => result.data),
+		isLoading: results.some((result) => result.isLoading),
+	};
+}
+
+/**
  * Loads the Backlog column: one `gh issue list` per repository plus the merged
- * Linear list, folded into board cards. Every source is degradable — a repository
- * whose `gh` call failed contributes nothing and is named in `errors`, so the
- * column can say which repositories the list is short of rather than reading as
- * "nothing to do".
+ * Linear list, folded into board cards. Each repository's committed `[linear]`
+ * team scope places the Linear cards, so the repo filter can keep a repository's
+ * own teams and an issue no repository takes stays off the board. Every source
+ * is degradable — a repository whose `gh` call failed contributes nothing and is
+ * named in `errors`, so the column can say which repositories the list is short
+ * of rather than reading as "nothing to do"; one whose settings could not be
+ * read is treated as naming no teams.
  * @param projects - The projects whose repositories to list issues for.
  * @returns The backlog and dismissed issue cards, with loading and failure state.
  */
@@ -73,6 +94,15 @@ export function useBoardIssues(
 	const github = useQueries({
 		combine: combineRepositoryIssues,
 		queries: projects.map((project) => repositoryIssuesQuery(project.id, true)),
+	});
+	const linearTeams = useQueries({
+		combine: combineLinearTeams,
+		queries: projects.map((project) =>
+			repositoryLinearTeamsQuery({
+				repositoryId: project.id,
+				repositoryPath: project.pathLabel,
+			}),
+		),
 	});
 	const linearResult = useQuery(linearIssuesQuery({ notStarted: true }));
 
@@ -93,7 +123,16 @@ export function useBoardIssues(
 			}),
 		[projects, github.data],
 	);
-	const isLoading = linearResult.isLoading || github.isLoading;
+	const linearTeamsByProject = useMemo<ProjectLinearTeams[]>(
+		() =>
+			projects.map((project, index) => ({
+				projectId: project.id,
+				teams: linearTeams.data[index] ?? [],
+			})),
+		[projects, linearTeams.data],
+	);
+	const isLoading =
+		linearResult.isLoading || github.isLoading || linearTeams.isLoading;
 
 	const issues = useMemo(
 		() =>
@@ -101,9 +140,16 @@ export function useBoardIssues(
 				dismissedKeys,
 				githubIssuesByProject,
 				linearIssues: linearResult.data?.issues ?? [],
+				linearTeamsByProject,
 				linkedIssueKeys: collectLinkedIssueKeys(projects),
 			}),
-		[dismissedKeys, githubIssuesByProject, linearResult.data, projects],
+		[
+			dismissedKeys,
+			githubIssuesByProject,
+			linearResult.data,
+			linearTeamsByProject,
+			projects,
+		],
 	);
 
 	// A dismissed key outlives the issue it names — closed on GitHub, or turned
@@ -118,10 +164,7 @@ export function useBoardIssues(
 		!github.hasPending;
 	useEffect(() => {
 		if (canPrune) {
-			prune([
-				...issues.backlog.map((issue) => issue.key),
-				...issues.dismissed.map((issue) => issue.key),
-			]);
+			prune(issues.liveKeys);
 		}
 	}, [canPrune, issues, prune]);
 

@@ -310,6 +310,9 @@ const settingsFixture = {
 		recursive: false,
 		site_url: 'https://app.infisical.com',
 	},
+	linear: {
+		teams: ['THE'],
+	},
 	prompts: {
 		branchNaming: 'a',
 		branchRename: 'b',
@@ -360,6 +363,11 @@ describe('settings.schema.json', () => {
 	test.each([
 		['top-level', settingsSchema, REPOSITORY_CONFIG_KEYS.topLevel],
 		['[git]', settingsSchema.properties.git, REPOSITORY_CONFIG_KEYS.git],
+		[
+			'[linear]',
+			settingsSchema.properties.linear,
+			REPOSITORY_CONFIG_KEYS.linear,
+		],
 		[
 			'[prompts]',
 			settingsSchema.properties.prompts,

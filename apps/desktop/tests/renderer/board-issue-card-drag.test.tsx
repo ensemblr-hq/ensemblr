@@ -33,6 +33,7 @@ function issue(overrides: Partial<BoardIssueCard> = {}): BoardIssueCard {
 		projectId: null,
 		provider: 'linear',
 		reference: 'ENS-1',
+		scopeRepoIds: null,
 		stateColor: null,
 		stateName: 'Todo',
 		stateType: 'unstarted',
