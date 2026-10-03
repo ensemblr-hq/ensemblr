@@ -56,6 +56,21 @@ async function run(command: string, cwd?: string): Promise<ComputeJobResult> {
 }
 
 /**
+ * Reads the niceness a queued job's shell runs at. `nice -n` is relative to the
+ * parent's, and the macOS CI runner starts from a negative one, so the test
+ * compares against this baseline rather than against zero.
+ * `ps -o nice=` reads the same on BSD and procps, where a bare `nice` prints
+ * nothing on macOS.
+ * @returns The job shell's niceness, or NaN when `ps` printed none.
+ */
+async function readJobNiceness(): Promise<number> {
+	return Number.parseInt(
+		(await run('ps -o nice= -p $$')).outputTail.trim(),
+		10,
+	);
+}
+
+/**
  * Whether a pid still names a live process.
  * @param pid - Process id.
  * @returns True while the process exists.
@@ -114,10 +129,11 @@ describe('command runner', () => {
 	});
 
 	it('runs under nice when a niceness is configured', async () => {
+		const baseline = await readJobNiceness();
 		niceness = 5;
-		const before = Number.parseInt((await run('nice')).outputTail, 10);
-		expect(Number.isNaN(before)).toBe(false);
-		expect(before).toBeGreaterThanOrEqual(5);
+		const lowered = await readJobNiceness();
+		expect(Number.isNaN(baseline)).toBe(false);
+		expect(lowered).toBe(baseline + 5);
 	});
 
 	it('runs in the requested cwd and refuses one outside the workspace', async () => {
