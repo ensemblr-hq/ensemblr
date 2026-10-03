@@ -22,6 +22,8 @@ const ALL_STATUSES: WorkspacePrPresentationStatus[] = [
 /**
  * Maps one workspace carrying `presentation` through the same path the sidebar
  * takes, and returns the PR model that row would hand `useLivePullRequestModel`.
+ * @param presentation - The row's presentation, or null for a row with no pull request.
+ * @returns The mapped PR model.
  */
 function mappedPullRequest(
 	presentation: WorkspacePrPresentation | null,
@@ -61,7 +63,12 @@ function mappedPullRequest(
 	return pullRequest;
 }
 
-/** A presentation of PR #7 in the given status. */
+/**
+ * A presentation of a pull request in the given status.
+ * @param status - Compact status to present.
+ * @param number - Pull request number, PR #7 unless given.
+ * @returns The presentation.
+ */
 function presentationOf(
 	status: WorkspacePrPresentationStatus,
 	number = 7,

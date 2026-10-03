@@ -63,6 +63,9 @@ function snapshot(
  * A snapshot whose one workspace has a pull request in the given status,
  * observed at the given instant — what the navigation poll reads back after
  * each sweeper write.
+ * @param status - Compact status the sweeper observed for the pull request.
+ * @param syncedAt - When the sweeper observed it; also the snapshot's `generatedAt`.
+ * @returns The navigation snapshot the poll would answer with.
  */
 function sweptSnapshot(
 	status: WorkspacePrPresentationStatus,

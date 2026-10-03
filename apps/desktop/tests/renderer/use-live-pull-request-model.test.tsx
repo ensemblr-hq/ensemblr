@@ -76,6 +76,8 @@ const PRESENTATION_STATUS_OF: Partial<
 /**
  * The presentation a navigation row would have mapped `pullRequest` from — what
  * the cache holds when `pullRequest` is current rather than held.
+ * @param pullRequest - The fallback PR model the presentation should state.
+ * @returns The presentation stating that model's verdict.
  */
 function presentationStating(
 	pullRequest: WorkspaceShellModel['pullRequest'],
@@ -90,6 +92,9 @@ function presentationStating(
 /**
  * A navigation snapshot holding this workspace's presentation observed at
  * `syncedAt`, or holding no pull request for it when there is no stamp.
+ * @param syncedAt - When the presentation was observed, or undefined for none.
+ * @param presentation - The presentation the cached row holds.
+ * @returns The navigation snapshot to seed the query cache with.
  */
 function navigationSnapshotStamped(
 	syncedAt: string | undefined,
