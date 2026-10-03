@@ -77,10 +77,15 @@ describe('refreshBoardIssues', () => {
 		prefetchBoardIssues(queryClient, [REPOSITORY_ID]);
 		await settleFetches(queryClient);
 		expect(linearListIssues).toHaveBeenCalledTimes(1);
+		expect(linearListIssues).toHaveBeenLastCalledWith({ notStarted: true });
 
 		await refreshBoardIssues(queryClient, [REPOSITORY_ID]);
 
 		expect(linearListIssues).toHaveBeenCalledTimes(2);
+		expect(linearListIssues).toHaveBeenLastCalledWith({
+			notStarted: true,
+			refresh: true,
+		});
 	});
 
 	// One repository rejecting must not settle the caller early, or the toolbar

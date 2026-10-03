@@ -99,7 +99,7 @@ export function useWorkspaceSourcePicker({
 		enabled: open && hasRepo,
 	});
 	const linearIssues = useQuery({
-		...linearIssuesQuery({}),
+		...linearIssuesQuery({ notStarted: true }),
 		enabled: open,
 	});
 

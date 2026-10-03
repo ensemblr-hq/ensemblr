@@ -74,7 +74,7 @@ export function useBoardIssues(
 		combine: combineRepositoryIssues,
 		queries: projects.map((project) => repositoryIssuesQuery(project.id, true)),
 	});
-	const linearResult = useQuery(linearIssuesQuery({}));
+	const linearResult = useQuery(linearIssuesQuery({ notStarted: true }));
 
 	const githubIssuesByProject = useMemo<ProjectGithubIssues[]>(
 		() =>

@@ -120,6 +120,15 @@ What the integration powers:
 | Agent reads | agents can list and read issues and the metadata tables (teams, projects, states, labels, users) through Ensemblr Control |
 | Agent writes | agents can update an issue and comment on it |
 
+**The board backlog and the workspace-from-issue picker ask Linear for
+not-started issues directly.** The general issue sync pulls a bounded window of
+each account's issues across every state, so on a team with a long closed
+history a Backlog or Todo issue can fall outside it. These two surfaces sync
+Backlog and Todo issues with their own state-filtered query instead, most
+recently updated first, up to 500 per account. When that sync reaches the end of
+the list, a cached issue it did not return — closed, archived, or deleted in
+Linear since — leaves the board rather than lingering as unstarted work.
+
 **Images embedded in an issue or a comment load.** A `uploads.linear.app` URL is
 unauthenticated and the signed URL Linear hands back expires five minutes later,
 so the fetch happens in the main process against the owning account's token

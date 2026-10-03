@@ -191,6 +191,56 @@ test('listIssues: sends bearer auth and the team filter, maps nodes', async () =
 	);
 });
 
+test('listIssues: sends the state-type filter beside the team filter, with the order', async () => {
+	const { client, requests } = createClientFixture(() =>
+		Response.json({
+			data: {
+				issues: {
+					nodes: [ISSUE_NODE],
+					pageInfo: { endCursor: null, hasNextPage: false },
+				},
+			},
+		}),
+	);
+
+	await client.listIssues({
+		orderBy: 'updatedAt',
+		stateTypes: ['backlog', 'unstarted'],
+		teamId: 'team-1',
+	});
+
+	const variables = requests[0]?.body.variables as
+		| Record<string, unknown>
+		| undefined;
+	assert.deepStrictEqual(variables?.filter, {
+		state: { type: { in: ['backlog', 'unstarted'] } },
+		team: { id: { eq: 'team-1' } },
+	});
+	assert.strictEqual(variables?.orderBy, 'updatedAt');
+	assert.match(String(requests[0]?.body.query), /orderBy: \$orderBy/);
+});
+
+test('listIssues: leaves the filter and order to Linear when none is asked for', async () => {
+	const { client, requests } = createClientFixture(() =>
+		Response.json({
+			data: {
+				issues: {
+					nodes: [],
+					pageInfo: { endCursor: null, hasNextPage: false },
+				},
+			},
+		}),
+	);
+
+	await client.listIssues();
+
+	const variables = requests[0]?.body.variables as
+		| Record<string, unknown>
+		| undefined;
+	assert.strictEqual(variables?.filter, null);
+	assert.ok(variables && !('orderBy' in variables));
+});
+
 test('getIssue: maps a missing issue to not-found', async () => {
 	const { client } = createClientFixture(() =>
 		Response.json({ data: { issue: null } }),

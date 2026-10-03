@@ -85,12 +85,28 @@ type LinearCommentUpsert = Omit<LinearCommentRecord, 'accountId' | 'syncedAt'>;
  * every connected account, which is what the merged browse list wants. `query`
  * matches identifier, title, and description, so it agrees with what Linear's
  * own `searchIssues` returns rather than discarding the hits it found.
+ * `stateTypes` keeps only issues whose cached workflow state has one of those
+ * types.
  */
 interface LinearIssueListFilter {
 	accountId?: string;
 	includeArchived?: boolean;
 	limit?: number;
 	query?: string;
+	stateTypes?: readonly string[];
+	teamId?: string;
+}
+
+/**
+ * Filter for {@link LinearStore.deleteUnconfirmedIssues}: one account's slice of
+ * issues in the given state types, optionally narrowed to a team, that is not
+ * among `keepIds` and that no write has touched since `syncedBefore`.
+ */
+interface LinearIssuePruneFilter {
+	accountId: string;
+	keepIds: readonly string[];
+	stateTypes: readonly string[];
+	syncedBefore: string;
 	teamId?: string;
 }
 
@@ -103,6 +119,7 @@ interface LinearResourceListFilter {
 /** SQLite-backed cache DAO for Linear issues, resources, and comments. */
 export interface LinearStore {
 	deleteIssue: (id: string) => void;
+	deleteUnconfirmedIssues: (filter: LinearIssuePruneFilter) => void;
 	getIssue: (id: string) => LinearIssueRecord | null;
 	getIssueByIdentifier: (
 		accountId: string,
@@ -167,6 +184,44 @@ export function createLinearStore({
 				.prepare('DELETE FROM linear_comments WHERE issue_id = ?')
 				.run(id);
 			database.prepare('DELETE FROM linear_issues WHERE id = ?').run(id);
+		},
+
+		deleteUnconfirmedIssues: ({
+			accountId,
+			keepIds,
+			stateTypes,
+			syncedBefore,
+			teamId,
+		}) => {
+			const clauses = [
+				'account_id = ?',
+				stateTypeClause(stateTypes),
+				'synced_at < ?',
+				'id NOT IN (SELECT value FROM json_each(?))',
+			];
+			const parameters = [
+				accountId,
+				...stateTypes,
+				syncedBefore,
+				JSON.stringify(keepIds),
+			];
+
+			if (teamId) {
+				clauses.push('team_id = ?');
+				parameters.push(teamId);
+			}
+
+			const where = clauses.join(' AND ');
+
+			database
+				.prepare(
+					`DELETE FROM linear_comments
+					 WHERE issue_id IN (SELECT id FROM linear_issues WHERE ${where})`,
+				)
+				.run(...parameters);
+			database
+				.prepare(`DELETE FROM linear_issues WHERE ${where}`)
+				.run(...parameters);
 		},
 
 		getIssue: (id) => {
@@ -235,6 +290,11 @@ export function createLinearStore({
 			if (filter.teamId) {
 				clauses.push('team_id = ?');
 				parameters.push(filter.teamId);
+			}
+
+			if (filter.stateTypes) {
+				clauses.push(stateTypeClause(filter.stateTypes));
+				parameters.push(...filter.stateTypes);
 			}
 
 			if (filter.query) {
@@ -561,4 +621,17 @@ function parseJsonRecord(json: string): Record<string, unknown> {
  */
 function escapeLikePattern(input: string): string {
 	return input.replaceAll(/[%_]/g, (match) => `\\${match}`);
+}
+
+/**
+ * The `WHERE` clause matching an issue row's cached workflow-state type against
+ * a list, with one placeholder per type. The type lives only in `data_json`,
+ * which is why the clause reads it from there.
+ * @param stateTypes - Workflow-state types to match; bind them in order.
+ * @returns The SQL clause.
+ */
+function stateTypeClause(stateTypes: readonly string[]): string {
+	const placeholders = stateTypes.map(() => '?').join(', ');
+
+	return `json_extract(data_json, '$.state.type') IN (${placeholders})`;
 }

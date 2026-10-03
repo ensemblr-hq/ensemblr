@@ -105,6 +105,19 @@ export type LinearIssueUpdateInput = Partial<
 	projectId?: string | null;
 };
 
+/**
+ * Options for {@link LinearClient.listIssues}. `stateTypes` narrows the page to
+ * issues whose workflow state has one of those types, and `orderBy` replaces
+ * Linear's default `createdAt` order; both go to Linear rather than being
+ * applied to the page afterwards.
+ */
+export interface LinearIssueListOptions {
+	after?: string | null;
+	orderBy?: 'createdAt' | 'updatedAt';
+	stateTypes?: readonly string[];
+	teamId?: string;
+}
+
 /** Boundary over the Linear GraphQL API with typed error mapping. */
 export interface LinearClient {
 	createComment: (input: {
@@ -120,10 +133,9 @@ export interface LinearClient {
 		kind: 'cycle' | 'label' | 'project' | 'state' | 'team' | 'user',
 		after?: string | null,
 	) => Promise<LinearPage<LinearResourceData>>;
-	listIssues: (options?: {
-		after?: string | null;
-		teamId?: string;
-	}) => Promise<LinearPage<LinearIssueData>>;
+	listIssues: (
+		options?: LinearIssueListOptions,
+	) => Promise<LinearPage<LinearIssueData>>;
 	searchIssues: (term: string) => Promise<LinearPage<LinearIssueData>>;
 	updateIssue: (
 		id: string,
@@ -424,18 +436,19 @@ export function createLinearClient({
 			};
 		},
 
-		listIssues: async ({ after = null, teamId } = {}) => {
+		listIssues: async ({ after = null, orderBy, stateTypes, teamId } = {}) => {
 			return fetchIssuePage(
-				`query Issues($first: Int!, $after: String, $filter: IssueFilter) {
-					issues(first: $first, after: $after, filter: $filter) {
+				`query Issues($first: Int!, $after: String, $filter: IssueFilter, $orderBy: PaginationOrderBy) {
+					issues(first: $first, after: $after, filter: $filter, orderBy: $orderBy) {
 						nodes { ${ISSUE_FIELDS} }
 						${PAGE_INFO_FIELDS}
 					}
 				}`,
 				{
 					after,
-					filter: teamId ? { team: { id: { eq: teamId } } } : null,
+					filter: issueFilter(teamId, stateTypes),
 					first: PAGE_SIZE,
+					...(orderBy ? { orderBy } : {}),
 				},
 				'issues',
 			);
@@ -537,6 +550,25 @@ interface MetadataNode {
 	name?: string | null;
 	team?: { id: string } | null;
 	[key: string]: unknown;
+}
+
+/**
+ * Build the `IssueFilter` for an issue-list page from the narrowing it asked
+ * for, or null when it asked for none.
+ * @param teamId - Team to keep, if any.
+ * @param stateTypes - Workflow-state types to keep, if any.
+ * @returns The filter variable for the `issues` query.
+ */
+function issueFilter(
+	teamId: string | undefined,
+	stateTypes: readonly string[] | undefined,
+): Record<string, unknown> | null {
+	const filter = {
+		...(teamId ? { team: { id: { eq: teamId } } } : {}),
+		...(stateTypes ? { state: { type: { in: stateTypes } } } : {}),
+	};
+
+	return Object.keys(filter).length > 0 ? filter : null;
 }
 
 /**
