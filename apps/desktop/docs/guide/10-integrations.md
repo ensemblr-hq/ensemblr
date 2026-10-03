@@ -129,6 +129,12 @@ recently updated first, up to 500 per account. When that sync reaches the end of
 the list, a cached issue it did not return — closed, archived, or deleted in
 Linear since — leaves the board rather than lingering as unstarted work.
 
+A search in the picker's Issues tab reaches started issues — In Progress, In
+Review — the same way: they sync with a query of their own, up to 500 per
+account, only while that tab is searched, and an issue that has since been
+finished, archived, or deleted drops out of the results once that sync reaches
+the end of the list.
+
 **Images embedded in an issue or a comment load.** A `uploads.linear.app` URL is
 unauthenticated and the signed URL Linear hands back expires five minutes later,
 so the fetch happens in the main process against the owning account's token

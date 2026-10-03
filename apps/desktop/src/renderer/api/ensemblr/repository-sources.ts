@@ -110,7 +110,9 @@ export function prefetchBoardIssues(
 	queryClient: QueryClient,
 	repositoryIds: readonly string[],
 ): void {
-	void queryClient.prefetchQuery(linearIssuesQuery({ notStarted: true }));
+	void queryClient.prefetchQuery(
+		linearIssuesQuery({ stateScope: 'not-started' }),
+	);
 	for (const repositoryId of repositoryIds) {
 		if (repositoryId) {
 			void queryClient.prefetchQuery(repositoryIssuesQuery(repositoryId, true));
@@ -135,7 +137,7 @@ export async function refreshBoardIssues(
 	// state on its own query, and racing the rest to a rejection would drop the
 	// caller's pending flag while the other repositories are still listing.
 	await Promise.allSettled([
-		refreshLinearIssues(queryClient, { notStarted: true }),
+		refreshLinearIssues(queryClient, { stateScope: 'not-started' }),
 		...repositoryIds.filter(Boolean).map((repositoryId) =>
 			queryClient.fetchQuery({
 				...repositoryIssuesQuery(repositoryId, true),
@@ -176,5 +178,7 @@ export function prefetchWorkspaceSources(
 	void queryClient.prefetchQuery(repositoryBranchesQuery(repositoryId));
 	void queryClient.prefetchQuery(repositoryPullRequestsQuery(repositoryId));
 	void queryClient.prefetchQuery(repositoryIssuesQuery(repositoryId));
-	void queryClient.prefetchQuery(linearIssuesQuery({ notStarted: true }));
+	void queryClient.prefetchQuery(
+		linearIssuesQuery({ stateScope: 'not-started' }),
+	);
 }

@@ -247,6 +247,7 @@ export type {
 	LinearDisconnectResult,
 	LinearIssueFieldsInput,
 	LinearIssueLabelWire,
+	LinearIssueStateScope,
 	LinearIssueWire,
 	LinearLoginResult,
 	LinearMetadataWire,

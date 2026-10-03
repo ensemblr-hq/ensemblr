@@ -64,10 +64,10 @@ const LINKED_KEY_SEPARATOR = '\n';
  * by last update, and reads as loading while the team scope loads or a Linear
  * refresh is running behind cached rows. A non-blank `query` on that tab also
  * reaches unlinked Linear issues already in progress, in the same team scope,
- * returned apart from the startable rows. Those come from the all-states browse
- * list, read only while the tab is searched, because the not-started list holds
- * none. Returns display sources plus a map back to the raw rows so a selection
- * can be turned into a creation seed.
+ * returned apart from the startable rows. Those come from the started list,
+ * synced with its own state-filtered query and read only while the tab is
+ * searched. Returns display sources plus a map back to the raw rows so a
+ * selection can be turned into a creation seed.
  */
 export function useWorkspaceSourcePicker({
 	kind,
@@ -112,7 +112,7 @@ export function useWorkspaceSourcePicker({
 		enabled: open && hasRepo,
 	});
 	const linearIssues = useQuery({
-		...linearIssuesQuery({ notStarted: true }),
+		...linearIssuesQuery({ stateScope: 'not-started' }),
 		enabled: open,
 	});
 	const repository = projects.find((project) => project.id === repoId);
@@ -123,17 +123,18 @@ export function useWorkspaceSourcePicker({
 		}),
 		enabled: open && repository !== undefined,
 	});
-	// Only a search shows started issues, so their all-states sync waits for one.
-	const browseLinearIssues = useQuery({
-		...linearIssuesQuery({}),
+	// Only a search shows started issues, so their sync waits for one.
+	const startedLinearIssues = useQuery({
+		...linearIssuesQuery({ stateScope: 'started' }),
 		enabled: open && reachesStartedIssues,
 	});
 	const startedLinearResult = reachesStartedIssues
-		? browseLinearIssues.data
+		? startedLinearIssues.data
 		: undefined;
 	const isStartedLinearLoading =
 		reachesStartedIssues &&
-		(browseLinearIssues.isLoading || isLinearSyncing(browseLinearIssues.data));
+		(startedLinearIssues.isLoading ||
+			isLinearSyncing(startedLinearIssues.data));
 
 	const rows = useMemo<Omit<WorkspaceSourcePickerState, 'linearGap'>>(() => {
 		if (kind === 'branch') {

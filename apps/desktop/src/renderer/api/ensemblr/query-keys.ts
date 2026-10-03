@@ -1,5 +1,6 @@
 import type { AgentProviderId } from '@/shared/agent-provider';
 import type { EnsemblrApi } from '@/shared/ipc/contracts/api';
+import type { LinearIssueStateScope } from '@/shared/ipc/contracts/linear';
 
 /** Hierarchical TanStack Query keys for every Ensemblr IPC-backed query. */
 export const ensemblrQueryKeys = {
@@ -95,8 +96,8 @@ export const ensemblrQueryKeys = {
 	/** Query key for a filtered Linear issue list. */
 	linearIssues: (filter: {
 		accountId?: string;
-		notStarted?: boolean;
 		query?: string;
+		stateScope?: LinearIssueStateScope;
 		teamId?: string;
 	}) =>
 		[
@@ -104,7 +105,7 @@ export const ensemblrQueryKeys = {
 			'linear-issues',
 			filter.teamId ?? '',
 			filter.query ?? '',
-			filter.notStarted ? 'not-started' : '',
+			filter.stateScope ?? '',
 			filter.accountId ?? '',
 		] as const,
 	/** Prefix matching every cached issue list regardless of filter. */
