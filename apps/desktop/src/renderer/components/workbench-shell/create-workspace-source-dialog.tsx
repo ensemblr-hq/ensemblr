@@ -1,5 +1,9 @@
 import type { TFunction } from 'i18next';
-import { GitBranchIcon, GitPullRequestIcon } from 'lucide-react';
+import {
+	GitBranchIcon,
+	GitPullRequestIcon,
+	TriangleAlertIcon,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LinearProjectBadge } from '@/renderer/components/linear/issue-project';
@@ -94,6 +98,7 @@ export function CreateWorkspaceSourceDialog({
 		});
 	const selectedRepo =
 		projects.find((candidate) => candidate.id === repoId) ?? project ?? null;
+	const isEmpty = sources.length === 0;
 
 	// Reset the picker to the chosen repository each time the dialog opens.
 	const [wasOpen, setWasOpen] = useState(open);
@@ -168,10 +173,11 @@ export function CreateWorkspaceSourceDialog({
 					/>
 				</div>
 				<CommandSeparator alwaysRender />
+				{linearGap && !isEmpty ? <LinearGapNote message={linearGap} /> : null}
 				<CommandList className='max-h-80'>
 					<SourceListPlaceholder
 						error={error}
-						isEmpty={sources.length === 0}
+						isEmpty={isEmpty}
 						isLoading={isLoading}
 						kind={kind}
 						linearGap={linearGap}
@@ -308,6 +314,25 @@ function SourceListPlaceholder({
 				{ sources },
 			)}
 		</CommandEmpty>
+	);
+}
+
+/**
+ * Names the Linear rows a populated Issues tab is missing, pinned above the
+ * list so it stays in view while the rows scroll. An empty tab says the same
+ * thing through {@link SourceListPlaceholder} instead, so the two never show
+ * together. It sits outside the list, whose `listbox` role admits only options
+ * and groups.
+ */
+function LinearGapNote({ message }: { message: string }) {
+	return (
+		<p className='flex items-start gap-1.5 px-3 pt-2 pb-1 text-muted-foreground text-xs leading-5'>
+			<TriangleAlertIcon
+				aria-hidden='true'
+				className='mt-0.5 size-3.5 shrink-0 text-status-warning'
+			/>
+			<span className='min-w-0'>{message}</span>
+		</p>
 	);
 }
 

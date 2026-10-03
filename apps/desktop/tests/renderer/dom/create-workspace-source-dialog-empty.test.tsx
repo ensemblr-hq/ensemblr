@@ -108,6 +108,45 @@ test('an empty Issues tab names the Linear gap instead of claiming nothing waits
 	expect(screen.queryByText(NOTHING_TO_START)).not.toBeInTheDocument();
 });
 
+// GitHub rows alone would read as the whole backlog while Linear is unreadable.
+test('an Issues tab with rows names the Linear gap above them', async () => {
+	pickerHolder.linearGap = 'The Linear connection expired.';
+	pickerHolder.sources = [
+		{
+			id: 'github-issue-7',
+			kind: 'issue',
+			provider: 'github',
+			reference: '#7',
+			title: 'Fix the sidebar',
+		},
+	];
+	await openTab('Issues');
+
+	const note = screen.getByText('The Linear connection expired.');
+	const row = screen.getByText('Fix the sidebar');
+	expect(
+		note.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING,
+	).toBeTruthy();
+	expect(screen.getByRole('listbox')).not.toContainElement(note);
+	expect(screen.queryByText(NOTHING_TO_START)).not.toBeInTheDocument();
+});
+
+test('an Issues tab with rows and a complete Linear list shows no gap note', async () => {
+	pickerHolder.sources = [
+		{
+			id: 'github-issue-7',
+			kind: 'issue',
+			provider: 'github',
+			reference: '#7',
+			title: 'Fix the sidebar',
+		},
+	];
+	await openTab('Issues');
+
+	expect(screen.getByText('Fix the sidebar')).toBeInTheDocument();
+	expect(screen.queryByText(/Linear/)).not.toBeInTheDocument();
+});
+
 test('an empty Pull requests tab keeps the search-miss message', async () => {
 	await openTab('Pull requests');
 
