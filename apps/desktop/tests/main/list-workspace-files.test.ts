@@ -110,6 +110,63 @@ function readWorkspaceFile(cwd: string, filePath: string) {
 	return workspaceFilesService().read({ path: filePath, workspaceCwd: cwd });
 }
 
+/**
+ * Parks each run that calls `hold` until the test lets it go, so a build stays
+ * mid-listing for exactly as long as the test needs. Every wait is on an event
+ * rather than a sleep, so a git spawn slowed by a saturated worker pool
+ * arrives late but never misses its release.
+ */
+function createBuildGate() {
+	const parked: Array<() => void> = [];
+	const arrivalWaiters: Array<() => void> = [];
+	let open = false;
+
+	const releaseParked = () => {
+		for (const release of parked.splice(0)) {
+			release();
+		}
+	};
+	const nextParked = () =>
+		parked.length > 0
+			? Promise.resolve()
+			: new Promise<void>((resolve) => {
+					arrivalWaiters.push(resolve);
+				});
+
+	return {
+		hold: () =>
+			open
+				? Promise.resolve()
+				: new Promise<void>((resolve) => {
+						parked.push(resolve);
+						for (const notify of arrivalWaiters.splice(0)) {
+							notify();
+						}
+					}),
+		nextParked,
+		/**
+		 * Releases every parked run, and each one that parks after it, until
+		 * `settled` settles; then opens the gate so nothing is left parked.
+		 */
+		async releaseUntil<T>(settled: Promise<T>): Promise<T> {
+			let isSettled = false;
+			const tracked = settled.finally(() => {
+				isSettled = true;
+			});
+			try {
+				while (!isSettled) {
+					releaseParked();
+					await Promise.race([tracked, nextParked()]);
+				}
+				return await tracked;
+			} finally {
+				open = true;
+				releaseParked();
+			}
+		},
+	};
+}
+
 describe('createListWorkspaceFilesService.list', () => {
 	test('identifies file, directory, broken and cyclic symlinks without traversing them', async () => {
 		const cwd = seedRepo();
@@ -484,10 +541,10 @@ describe('createListWorkspaceFilesService.list caching', () => {
 	test('never runs builds concurrently under repeated invalidation', async () => {
 		const cwd = seedRepo();
 		const real = createLocalCommandService();
+		const gate = createBuildGate();
 		let activeBuilds = 0;
 		let maxActiveBuilds = 0;
 		let primaryBuilds = 0;
-		const releases: Array<() => void> = [];
 		const service = createListWorkspaceFilesService({
 			localCommandService: {
 				...real,
@@ -499,23 +556,15 @@ describe('createListWorkspaceFilesService.list caching', () => {
 					primaryBuilds += 1;
 					maxActiveBuilds = Math.max(maxActiveBuilds, activeBuilds);
 					const result = await real.run(request);
-					await new Promise<void>((resolve) => releases.push(resolve));
+					await gate.hold();
 					activeBuilds -= 1;
 					return result;
 				},
 			},
 		});
-		const settleBuilds = async () => {
-			for (let round = 0; round < 10; round += 1) {
-				await new Promise((resolve) => setTimeout(resolve, 20));
-				releases.splice(0).forEach((release) => {
-					release();
-				});
-			}
-		};
 
 		const first = service.list({ workspaceCwd: cwd });
-		await new Promise((resolve) => setTimeout(resolve, 100));
+		await gate.nextParked();
 		const callers = [];
 		for (let index = 0; index < 5; index += 1) {
 			service.invalidate(cwd);
@@ -524,9 +573,7 @@ describe('createListWorkspaceFilesService.list caching', () => {
 		writeFileSync(path.join(cwd, 'fresh.ts'), 'export {};\n');
 		service.invalidate(cwd);
 		callers.push(service.list({ workspaceCwd: cwd }));
-		await settleBuilds();
-		const results = await Promise.all([first, ...callers]);
-		await settleBuilds();
+		const results = await gate.releaseUntil(Promise.all([first, ...callers]));
 
 		expect(maxActiveBuilds).toBe(1);
 		expect(primaryBuilds).toBeLessThanOrEqual(2);
