@@ -32,6 +32,14 @@ updates:
         patterns:
           - lexical
           - "@lexical/*"
+      # @tanstack/react-router and @tanstack/router-plugin each pin an exact
+      # @tanstack/router-core, and every release moves that pin. The plugin is a
+      # development dependency and the router is not, so ungrouped they arrive
+      # in different pull requests and leave two router-cores in the tree.
+      tanstack-router:
+        patterns:
+          - "@tanstack/react-router*"
+          - "@tanstack/router-*"
       # A group without `applies-to` covers version updates only, so an advisory
       # on one of these families would still arrive as one pull request per
       # package — which for lexical and react is the split this file exists to
@@ -55,11 +63,16 @@ updates:
           - react-dom
           - "@types/react"
           - "@types/react-dom"
-      # The two @types packages are development dependencies, so this group
-      # would claim them back out of `react` and split the family across two
-      # pull requests again. Dependabot resolves that overlap by pattern
-      # specificity, but the electron entries below have always declared it
-      # rather than leaning on the tiebreak.
+      tanstack-router-security:
+        applies-to: security-updates
+        patterns:
+          - "@tanstack/react-router*"
+          - "@tanstack/router-*"
+      # The two @types packages and @tanstack/router-plugin are development
+      # dependencies, so this group would claim them back out of their families
+      # and split each across two pull requests again. Dependabot hands an
+      # update to the first group in this file that matches it, but the entries
+      # below declare the overlap rather than leaning on that ordering.
       dev-dependencies:
         dependency-type: development
         exclude-patterns:
@@ -68,6 +81,8 @@ updates:
           - "@electron-forge/*"
           - "@types/react"
           - "@types/react-dom"
+          - "@tanstack/react-router*"
+          - "@tanstack/router-*"
     ignore:
       # @types/node mirrors the Node major that Electron embeds (24), not the
       # latest release; a newer major type-checks green and fails at runtime.
