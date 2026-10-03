@@ -7,19 +7,14 @@ import {
 	repositoryIssuesQuery,
 	repositoryPullRequestsQuery,
 } from '@/renderer/api/ensemblr';
-import {
-	githubIssueSourceId,
-	mapGithubIssuesToWorkspaceSources,
-} from '@/renderer/lib/github';
-import {
-	describeLinearListGap,
-	mapLinearIssuesToWorkspaceSources,
-} from '@/renderer/lib/linear';
+import { githubIssueSourceId } from '@/renderer/lib/github';
+import { describeLinearListGap } from '@/renderer/lib/linear';
 import {
 	branchSourceId,
 	collectLinkedIssueKeys,
 	mapPullRequestsToWorkspaceSources,
 	mapRepositoryBranchesToWorkspaceSources,
+	mapStartableIssuesToWorkspaceSources,
 	pullRequestSourceId,
 	selectStartableIssues,
 } from '@/renderer/lib/workbench';
@@ -55,9 +50,10 @@ const LINKED_KEY_SEPARATOR = '\n';
  * Linear issues are global (pulled regardless of repo); branches, pull requests,
  * and GitHub issues are scoped to `repoId`. The Issues tab lists only work
  * nobody has started — Linear issues in Backlog or Todo, and no issue any of
- * `projects`' workspaces is already linked to — and reads as loading while a
- * Linear refresh is running behind cached rows. Returns display sources plus a
- * map back to the raw rows so a selection can be turned into a creation seed.
+ * `projects`' workspaces is already linked to — ordered by priority, then by
+ * last update, and reads as loading while a Linear refresh is running behind
+ * cached rows. Returns display sources plus a map back to the raw rows so a
+ * selection can be turned into a creation seed.
  */
 export function useWorkspaceSourcePicker({
 	kind,
@@ -159,10 +155,10 @@ export function useWorkspaceSourcePicker({
 				linearIssues.isLoading ||
 				isLinearSyncing(linearIssues.data),
 			itemsById,
-			sources: [
-				...mapGithubIssuesToWorkspaceSources(githubIssues),
-				...mapLinearIssuesToWorkspaceSources(linearIssueRows),
-			],
+			sources: mapStartableIssuesToWorkspaceSources({
+				githubIssues,
+				linearIssues: linearIssueRows,
+			}),
 		};
 	}, [
 		kind,

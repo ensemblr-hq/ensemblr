@@ -78,6 +78,7 @@ export {
 	collectLinkedIssueKeys,
 	mapPullRequestsToWorkspaceSources,
 	mapRepositoryBranchesToWorkspaceSources,
+	mapStartableIssuesToWorkspaceSources,
 	openableWorkspaceId,
 	pullRequestSourceId,
 	selectStartableIssues,

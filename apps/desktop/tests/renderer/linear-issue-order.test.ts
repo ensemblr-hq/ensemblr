@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 
 import {
+	compareByPriorityThenRecency,
 	isLinearIssueClosed,
 	linearPriorityRank,
 	orderLinearIssues,
@@ -87,6 +88,28 @@ test('linearPriorityRank: urgent leads and "no priority" sorts last', () => {
 			(a, b) => linearPriorityRank(a) - linearPriorityRank(b),
 		),
 	).toEqual([1, 2, 4, 0, null]);
+});
+
+test('compareByPriorityThenRecency: priority leads, then the newest update, undated last', () => {
+	const rows = [
+		{ id: 'none-old', priority: 0, updatedAt: '2026-06-01T00:00:00.000Z' },
+		{ id: 'none-undated', priority: null, updatedAt: null },
+		{ id: 'low', priority: 4, updatedAt: '2026-06-01T00:00:00.000Z' },
+		{ id: 'none-garbled', priority: 0, updatedAt: 'not a date' },
+		{ id: 'none-new', priority: null, updatedAt: '2026-06-09T00:00:00.000Z' },
+		{ id: 'urgent-old', priority: 1, updatedAt: '2026-05-01T00:00:00.000Z' },
+		{ id: 'urgent-new', priority: 1, updatedAt: '2026-06-02T00:00:00.000Z' },
+	];
+
+	expect(idsOf([...rows].sort(compareByPriorityThenRecency))).toEqual([
+		'urgent-new',
+		'urgent-old',
+		'low',
+		'none-new',
+		'none-old',
+		'none-undated',
+		'none-garbled',
+	]);
 });
 
 test('orderLinearIssues: the active scope hides done and canceled work', () => {

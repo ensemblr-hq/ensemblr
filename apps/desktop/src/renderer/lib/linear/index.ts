@@ -29,6 +29,7 @@ export type {
 	LinearStateBucket,
 } from './issue-order';
 export {
+	compareByPriorityThenRecency,
 	getLinearStateBucketLabel,
 	isLinearIssueClosed,
 	isLinearIssueNotStarted,
