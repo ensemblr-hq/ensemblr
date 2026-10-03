@@ -6,6 +6,7 @@ import {
 	buildWorkspaceSeedFromLinearIssue,
 	compareByPriorityThenRecency,
 	isLinearIssueNotStarted,
+	isLinearIssueStarted,
 	mapLinearIssuesToWorkspaceSources,
 } from '@/renderer/lib/linear';
 import type {
@@ -147,6 +148,28 @@ export function mapStartableIssuesToWorkspaceSources({
 	return ranked
 		.sort((left, right) => compareByPriorityThenRecency(left.rank, right.rank))
 		.map(({ source }) => source);
+}
+
+/**
+ * Narrows Linear rows to work somebody has already started — In Progress, In
+ * Review — that no workspace is linked to, so a search in the create-from
+ * picker can reach a teammate's started ticket. Done and canceled issues stay
+ * out, and so does an issue that already produced a workspace here. The rows
+ * follow the startable list's order: priority, then last update.
+ * @param input - The cached Linear rows, plus every workspace's linked-issue key.
+ * @returns The started rows, most urgent and most recently updated first.
+ */
+export function selectStartedLinearIssues({
+	linearIssues,
+	linkedIssueKeys,
+}: {
+	linearIssues: readonly LinearIssueWire[];
+	linkedIssueKeys: readonly string[];
+}): LinearIssueWire[] {
+	const linked = new Set(linkedIssueKeys);
+	return linearIssues
+		.filter((issue) => isLinearIssueStarted(issue) && !linked.has(issue.id))
+		.sort(compareByPriorityThenRecency);
 }
 
 /**

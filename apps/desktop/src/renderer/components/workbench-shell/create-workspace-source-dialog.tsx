@@ -88,22 +88,34 @@ export function CreateWorkspaceSourceDialog({
 	const { t } = useTranslation();
 	const [kind, setKind] = useState<WorkspaceSourceKind>('pull-request');
 	const [repoId, setRepoId] = useState(project?.id ?? projects[0]?.id ?? '');
+	const [search, setSearch] = useState('');
 
-	const { error, isLoading, itemsById, linearGap, sources } =
+	const { error, isLoading, itemsById, linearGap, sources, startedSources } =
 		useWorkspaceSourcePicker({
 			kind,
 			open,
 			projects,
+			query: search,
 			repoId,
 		});
 	const selectedRepo =
 		projects.find((candidate) => candidate.id === repoId) ?? project ?? null;
-	const isEmpty = sources.length === 0;
+	const isEmpty = sources.length === 0 && startedSources.length === 0;
+	// cmdk reorders groups by best match while searching, so an unheaded group
+	// could land under the started heading and read as part of it.
+	const startableHeading =
+		startedSources.length > 0
+			? t('workbench:board-status.backlog', 'Backlog')
+			: undefined;
 
-	// Reset the picker to the chosen repository each time the dialog opens.
+	// This component outlives the dialog's content, so each open starts over:
+	// an empty search, and the picker on the chosen repository.
 	const [wasOpen, setWasOpen] = useState(open);
 	if (open !== wasOpen) {
 		setWasOpen(open);
+		if (open) {
+			setSearch('');
+		}
 		if (open && project) {
 			setRepoId(project.id);
 			setKind('pull-request');
@@ -145,7 +157,11 @@ export function CreateWorkspaceSourceDialog({
 			)}
 		>
 			<Command className='rounded-xl border-0'>
-				<CommandInput placeholder={searchPlaceholder(t, kind)} />
+				<CommandInput
+					onValueChange={setSearch}
+					placeholder={searchPlaceholder(t, kind)}
+					value={search}
+				/>
 				<div className='flex items-center justify-between gap-2 px-1.5 py-1'>
 					<ToggleGroup
 						onValueChange={(next) => {
@@ -179,52 +195,32 @@ export function CreateWorkspaceSourceDialog({
 						error={error}
 						isEmpty={isEmpty}
 						isLoading={isLoading}
+						isSearching={search.trim().length > 0}
 						kind={kind}
 						linearGap={linearGap}
 					/>
-					<CommandGroup>
-						{sources.map((source) => {
-							const actions = getWorkspaceSourceActions(source);
-							const primaryAction = actions[0];
-
-							return (
-								<CommandItem
-									className='h-11 gap-2 pr-1.5 pl-2'
-									key={source.id}
-									keywords={[
-										source.title,
-										source.reference ?? '',
-										source.trackerProject ?? '',
-									]}
-									onSelect={() => {
-										if (primaryAction) {
-											dispatchAction(source, primaryAction);
-										}
-									}}
-									value={source.id}
-								>
-									<WorkspaceSourceIcon source={source} />
-									<span className='flex min-w-0 flex-1 items-center gap-1 p-1.5'>
-										{source.reference ? (
-											<span className='shrink-0 font-mono text-muted-foreground text-xxs'>
-												[{source.reference}]
-											</span>
-										) : null}
-										<span className='truncate text-[0.8125rem] leading-5'>
-											{source.title}
-										</span>
-									</span>
-									{source.trackerProject ? (
-										<LinearProjectBadge name={source.trackerProject} />
-									) : null}
-									<WorkspaceSourceActions
-										actions={actions}
-										onAction={(action) => dispatchAction(source, action)}
-									/>
-								</CommandItem>
-							);
-						})}
+					<CommandGroup heading={startableHeading}>
+						{sources.map((source) => (
+							<WorkspaceSourceRow
+								key={source.id}
+								onAction={dispatchAction}
+								source={source}
+							/>
+						))}
 					</CommandGroup>
+					{startedSources.length > 0 ? (
+						<CommandGroup
+							heading={t('linear:state-bucket.started', 'In progress')}
+						>
+							{startedSources.map((source) => (
+								<WorkspaceSourceRow
+									key={source.id}
+									onAction={dispatchAction}
+									source={source}
+								/>
+							))}
+						</CommandGroup>
+					) : null}
 				</CommandList>
 			</Command>
 		</CommandDialog>
@@ -237,6 +233,8 @@ interface SourceListPlaceholderProps {
 	error: GithubFailure | null;
 	isEmpty: boolean;
 	isLoading: boolean;
+	/** Whether the search input holds a query, which widens the Issues tab. */
+	isSearching: boolean;
 	kind: WorkspaceSourceKind;
 	/** Why Linear rows may be missing from the Issues tab, already localized. */
 	linearGap: string | null;
@@ -246,16 +244,18 @@ interface SourceListPlaceholderProps {
  * What the source list shows in place of rows. The failure and loading banners
  * appear only while there is nothing to show yet — once cached rows exist they
  * render and a refetch happens silently, so the list never flashes a loading
- * state over real data. An empty Issues tab is an ordinary state, because it
- * lists only work nobody has started, so it says so rather than blaming a
- * search nobody typed — unless Linear could not be read, when "nothing to
- * start" would be a false claim. Every other empty list falls to the
- * search-miss message.
+ * state over real data. An empty, unsearched Issues tab is an ordinary state,
+ * because it lists only work nobody has started, so it says so rather than
+ * blaming a search nobody typed — unless Linear could not be read, when
+ * "nothing to start" would be a false claim. A search also reaches started
+ * issues, so a searched list with no rows falls to the search-miss message,
+ * as every other empty list does.
  */
 function SourceListPlaceholder({
 	error,
 	isEmpty,
 	isLoading,
+	isSearching,
 	kind,
 	linearGap,
 }: SourceListPlaceholderProps) {
@@ -295,12 +295,12 @@ function SourceListPlaceholder({
 		);
 	}
 
-	if (isEmpty && kind === 'issue') {
+	if (isEmpty && kind === 'issue' && !isSearching) {
 		return (
 			<div className='px-6 py-8 text-center text-muted-foreground text-xs'>
 				{t(
 					'workbench:create-workspace-source.empty.issue',
-					'No issues waiting to be started. Open GitHub issues and Linear issues in Backlog or Todo appear here until a workspace is created from them.',
+					'No issues waiting to be started. Open GitHub issues and Linear issues in Backlog or Todo appear here until a workspace is created from them. Search to find Linear issues already in progress.',
 				)}
 			</div>
 		);
@@ -333,6 +333,58 @@ function LinearGapNote({ message }: { message: string }) {
 			/>
 			<span className='min-w-0'>{message}</span>
 		</p>
+	);
+}
+
+/**
+ * One selectable source in the picker list. Selecting the row runs its primary
+ * action; the trailing buttons run any action. Matched on its title, reference,
+ * and tracker project as well as its id.
+ */
+function WorkspaceSourceRow({
+	onAction,
+	source,
+}: {
+	onAction: (source: WorkspaceSource, action: WorkspaceSourceAction) => void;
+	source: WorkspaceSource;
+}) {
+	const actions = getWorkspaceSourceActions(source);
+	const primaryAction = actions[0];
+
+	return (
+		<CommandItem
+			className='h-11 gap-2 pr-1.5 pl-2'
+			keywords={[
+				source.title,
+				source.reference ?? '',
+				source.trackerProject ?? '',
+			]}
+			onSelect={() => {
+				if (primaryAction) {
+					onAction(source, primaryAction);
+				}
+			}}
+			value={source.id}
+		>
+			<WorkspaceSourceIcon source={source} />
+			<span className='flex min-w-0 flex-1 items-center gap-1 p-1.5'>
+				{source.reference ? (
+					<span className='shrink-0 font-mono text-muted-foreground text-xxs'>
+						[{source.reference}]
+					</span>
+				) : null}
+				<span className='truncate text-[0.8125rem] leading-5'>
+					{source.title}
+				</span>
+			</span>
+			{source.trackerProject ? (
+				<LinearProjectBadge name={source.trackerProject} />
+			) : null}
+			<WorkspaceSourceActions
+				actions={actions}
+				onAction={(action) => onAction(source, action)}
+			/>
+		</CommandItem>
 	);
 }
 

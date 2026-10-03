@@ -9,6 +9,7 @@ import { useWorkspaceSourcePicker } from '@/renderer/hooks/workbench-shell/navig
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type {
 	LinearIssueWire,
+	ListLinearIssuesRequest,
 	ListLinearIssuesResult,
 } from '@/shared/ipc/contracts/linear';
 import type { SettingsResolutionSnapshot } from '@/shared/ipc/contracts/settings-resolution';
@@ -16,6 +17,7 @@ import type {
 	ListRepositoryIssuesResult,
 	RepositoryIssueWire,
 } from '@/shared/ipc/contracts/workspace-sources';
+import { LINEAR_NOT_STARTED_STATE_TYPES } from '@/shared/linear-issue-state';
 import {
 	clearEnsemblrApi,
 	createTestQueryClient,
@@ -90,16 +92,40 @@ function projectAtRoot(): ProjectShellModel {
 	} as unknown as ProjectShellModel;
 }
 
-/** Installs a bridge answering every list the picker reads. */
+/**
+ * Narrows a Linear answer the way main answers a `notStarted` read, so a test
+ * sees which read a row came from.
+ */
+function notStartedAnswer(
+	answer: ListLinearIssuesResult,
+): ListLinearIssuesResult {
+	return {
+		...answer,
+		issues: answer.issues.filter(
+			(issue) =>
+				issue.stateType !== null &&
+				LINEAR_NOT_STARTED_STATE_TYPES.includes(issue.stateType),
+		),
+	};
+}
+
+/**
+ * Installs a bridge answering every list the picker reads. A `notStarted`
+ * Linear read gets the Backlog and Todo rows of `linear`; any other read gets
+ * `browse`, or all of `linear`.
+ * @returns Every Linear list request the picker made, in order
+ */
 function installBridge({
+	browse,
 	githubIssues = [],
 	linear,
 	linearTeams,
 }: {
+	browse?: ListLinearIssuesResult;
 	githubIssues?: RepositoryIssueWire[];
 	linear: ListLinearIssuesResult;
 	linearTeams?: string[];
-}): void {
+}): ListLinearIssuesRequest[] {
 	const githubResult: ListRepositoryIssuesResult = {
 		issues: githubIssues,
 		source: 'remote',
@@ -120,8 +146,12 @@ function installBridge({
 				]
 			: [],
 	};
+	const linearRequests: ListLinearIssuesRequest[] = [];
 	installEnsemblrApi({
-		linearListIssues: async () => linear,
+		linearListIssues: async (request: ListLinearIssuesRequest) => {
+			linearRequests.push(request);
+			return request.notStarted ? notStartedAnswer(linear) : (browse ?? linear);
+		},
 		listRepositoryBranches: async () => ({ branches: [], status: 'ok' }),
 		listRepositoryIssues: async () => githubResult,
 		listRepositoryPullRequests: async () => ({
@@ -133,29 +163,52 @@ function installBridge({
 			repository: repositorySettings,
 		}),
 	});
+	return linearRequests;
 }
 
-/** Renders the picker hook on the Issues tab of `repo-1`. */
-function renderIssuesTab(projects: ProjectShellModel[]) {
+/** Renders the picker hook on the Issues tab of `repo-1`, searched for `query`. */
+function renderIssuesTab(projects: ProjectShellModel[], query = '') {
 	const client = createTestQueryClient();
 	const wrapper = ({ children }: { children: ReactNode }) => (
 		<QueryClientProvider client={client}>{children}</QueryClientProvider>
 	);
 	const rendered = renderHook(
-		() =>
+		({ search }: { search: string }) =>
 			useWorkspaceSourcePicker({
 				kind: 'issue',
 				open: true,
 				projects,
+				query: search,
 				repoId: 'repo-1',
 			}),
-		{ wrapper },
+		{ initialProps: { search: query }, wrapper },
 	);
 	return { ...rendered, client };
 }
 
+/** A Linear answer holding one issue per state the started search must sort out. */
+const MIXED_STATE_LINEAR: ListLinearIssuesResult = {
+	accountFailures: [],
+	issues: [
+		linearIssue({ id: 'todo', title: 'Todo issue' }),
+		linearIssue({
+			id: 'in-progress',
+			stateType: 'started',
+			title: 'In progress issue',
+		}),
+		linearIssue({
+			id: 'linked-started',
+			stateType: 'started',
+			title: 'Linked started issue',
+		}),
+		linearIssue({ id: 'done', stateType: 'completed', title: 'Done issue' }),
+	],
+	source: 'remote',
+	status: 'ok',
+};
+
 test('the Issues tab drops started and already-linked issues from live query data', async () => {
-	installBridge({
+	const linearRequests = installBridge({
 		githubIssues: [
 			githubIssue({ number: 1, title: 'Linked GitHub issue' }),
 			githubIssue({
@@ -189,6 +242,72 @@ test('the Issues tab drops started and already-linked issues from live query dat
 		'Todo issue',
 	]);
 	expect(result.current.itemsById.has('started')).toBe(false);
+	expect(result.current.startedSources).toEqual([]);
+	expect(linearRequests.every((request) => request.notStarted)).toBe(true);
+});
+
+// The not-started read holds no started issue, so they come from the browse read.
+test('a search on the Issues tab also reaches unlinked Linear issues in progress', async () => {
+	const linearRequests = installBridge({ linear: MIXED_STATE_LINEAR });
+
+	const { result } = renderIssuesTab(
+		[projectLinkedTo('linked-started')],
+		'issue',
+	);
+
+	await waitFor(() => expect(result.current.startedSources).toHaveLength(1));
+	expect(result.current.startedSources[0]?.title).toBe('In progress issue');
+	expect(result.current.sources.map((source) => source.title)).toEqual([
+		'Todo issue',
+	]);
+	expect(result.current.itemsById.get('in-progress')).toMatchObject({
+		kind: 'linear-issue',
+	});
+	expect(result.current.itemsById.has('linked-started')).toBe(false);
+	expect(result.current.itemsById.has('done')).toBe(false);
+	expect(linearRequests.some((request) => !request.notStarted)).toBe(true);
+});
+
+test('a search names the Linear gap when the started issues could not be read', async () => {
+	installBridge({
+		browse: {
+			accountFailures: [],
+			failure: {
+				code: 'reconnect-required',
+				message: 'expired',
+				retryAfterSeconds: null,
+			},
+			issues: [],
+			status: 'error',
+		},
+		linear: MIXED_STATE_LINEAR,
+	});
+
+	const { rerender, result } = renderIssuesTab([]);
+	await waitFor(() => expect(result.current.sources).toHaveLength(1));
+	expect(result.current.linearGap).toBeNull();
+
+	rerender({ search: 'issue' });
+
+	await waitFor(() =>
+		expect(result.current.linearGap).toMatch(/Reconnect from integration/),
+	);
+	expect(result.current.startedSources).toEqual([]);
+});
+
+test('clearing the search drops the started issues again', async () => {
+	installBridge({ linear: MIXED_STATE_LINEAR });
+
+	const { rerender, result } = renderIssuesTab([], 'issue');
+	await waitFor(() => expect(result.current.startedSources).toHaveLength(2));
+
+	rerender({ search: '   ' });
+
+	expect(result.current.startedSources).toEqual([]);
+	expect(result.current.itemsById.has('in-progress')).toBe(false);
+	expect(result.current.sources.map((source) => source.title)).toEqual([
+		'Todo issue',
+	]);
 });
 
 test('the Issues tab orders rows by priority, then by last update, across providers', async () => {
@@ -278,6 +397,40 @@ test('the Issues tab keeps every Linear team when the repository names none', as
 
 	await waitFor(() => expect(result.current.sources).toHaveLength(2));
 	expect(result.current.isLoading).toBe(false);
+});
+
+test('a search reaches started issues only in the teams the repository names', async () => {
+	installBridge({
+		linear: {
+			accountFailures: [],
+			issues: [
+				linearIssue({
+					id: 'ens-started',
+					stateType: 'started',
+					teamKey: 'ENS',
+					title: 'Ensemblr started issue',
+				}),
+				linearIssue({
+					id: 'mkt-started',
+					stateType: 'started',
+					teamId: 't-mkt',
+					teamKey: 'MKT',
+					title: 'Marketing started issue',
+				}),
+			],
+			source: 'remote',
+			status: 'ok',
+		},
+		linearTeams: ['ens'],
+	});
+
+	const { result } = renderIssuesTab([projectAtRoot()], 'issue');
+
+	await waitFor(() => expect(result.current.startedSources).toHaveLength(1));
+	expect(result.current.startedSources[0]?.title).toBe(
+		'Ensemblr started issue',
+	);
+	expect(result.current.itemsById.has('mkt-started')).toBe(false);
 });
 
 // Stale cached rows the filter empties out say nothing about what the running

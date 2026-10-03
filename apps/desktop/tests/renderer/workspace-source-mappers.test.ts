@@ -13,6 +13,7 @@ import {
 	openableWorkspaceId,
 	pullRequestSourceId,
 	selectStartableIssues,
+	selectStartedLinearIssues,
 	workspaceSeedFromSourceItem,
 } from '../../src/renderer/lib/workbench/workspace-source-mappers.ts';
 import { getWorkspaceSourceActions } from '../../src/renderer/lib/workbench/workspace-sources.ts';
@@ -550,6 +551,85 @@ test('the issue picker keeps each row mapped as its own provider renders it', ()
 			reference: '#7',
 			title: 'GitHub row',
 		}),
+	]);
+});
+
+test('a picker search reaches Linear issues in a started state only', () => {
+	const started = selectStartedLinearIssues({
+		linearIssues: [
+			linearIssue({ id: 'backlog', stateType: 'backlog' }),
+			linearIssue({ id: 'todo', stateType: 'unstarted' }),
+			linearIssue({ id: 'triage', stateType: 'triage' }),
+			linearIssue({
+				id: 'in-progress',
+				stateName: 'In Progress',
+				stateType: 'started',
+			}),
+			linearIssue({
+				id: 'in-review',
+				stateName: 'In Review',
+				stateType: 'started',
+			}),
+			linearIssue({ id: 'done', stateType: 'completed' }),
+			linearIssue({ id: 'canceled', stateType: 'canceled' }),
+			linearIssue({ id: 'unknown', stateType: null }),
+			linearIssue({
+				archivedAt: '2026-09-01T00:00:00.000Z',
+				id: 'archived',
+				stateType: 'started',
+			}),
+		],
+		linkedIssueKeys: [],
+	});
+
+	expect(started.map((issue) => issue.id)).toEqual([
+		'in-progress',
+		'in-review',
+	]);
+});
+
+// A started issue may be started because a workspace here is already on it.
+test('a picker search does not reach a started issue that produced a workspace', () => {
+	const started = selectStartedLinearIssues({
+		linearIssues: [
+			linearIssue({ id: 'a', stateType: 'started' }),
+			linearIssue({ id: 'b', stateType: 'started' }),
+		],
+		linkedIssueKeys: ['b'],
+	});
+
+	expect(started.map((issue) => issue.id)).toEqual(['a']);
+});
+
+test('started issues follow the startable order: priority, then last update', () => {
+	const started = selectStartedLinearIssues({
+		linearIssues: [
+			linearIssue({
+				id: 'low-recent',
+				priority: 4,
+				stateType: 'started',
+				updatedAt: '2026-10-02T00:00:00.000Z',
+			}),
+			linearIssue({
+				id: 'urgent-old',
+				priority: 1,
+				stateType: 'started',
+				updatedAt: '2026-09-01T00:00:00.000Z',
+			}),
+			linearIssue({
+				id: 'urgent-recent',
+				priority: 1,
+				stateType: 'started',
+				updatedAt: '2026-10-01T00:00:00.000Z',
+			}),
+		],
+		linkedIssueKeys: [],
+	});
+
+	expect(started.map((issue) => issue.id)).toEqual([
+		'urgent-recent',
+		'urgent-old',
+		'low-recent',
 	]);
 });
 
