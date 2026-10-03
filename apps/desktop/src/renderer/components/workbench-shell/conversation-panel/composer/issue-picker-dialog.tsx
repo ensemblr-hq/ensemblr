@@ -7,6 +7,7 @@ import {
 	linearIssuesQuery,
 	repositoryIssuesQuery,
 } from '@/renderer/api/ensemblr';
+import { LinearProjectBadge } from '@/renderer/components/linear/issue-project';
 import { LinearStateBadge } from '@/renderer/components/linear/issue-state-badge';
 import {
 	Command,
@@ -169,6 +170,9 @@ export function IssuePickerDialog({
 										<span className='shrink-0 truncate text-muted-foreground text-xxs'>
 											{issue.organizationName}
 										</span>
+									) : null}
+									{issue.projectName ? (
+										<LinearProjectBadge name={issue.projectName} />
 									) : null}
 									<LinearStateBadge
 										color={issue.stateColor}

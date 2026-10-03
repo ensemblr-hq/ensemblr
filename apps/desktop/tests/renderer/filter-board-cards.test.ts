@@ -51,6 +51,7 @@ function issueCard(overrides: Partial<BoardIssueCard> = {}): BoardCard {
 		stateType: 'unstarted',
 		subtitle: 'Ensemblr',
 		title: 'Wire the board',
+		trackerProject: null,
 		updatedAt: null,
 		url: 'https://linear.app/e/issue/ENS-1',
 		...overrides,
@@ -159,6 +160,21 @@ describe('filterBoardCards free-text query', () => {
 				}),
 			),
 		).toEqual(['gh']);
+	});
+
+	test('matches a Linear issue on its project', () => {
+		const withProject = [
+			...cards,
+			issueCard({ key: 'skrepka', trackerProject: 'Skrepka' }),
+		];
+		expect(
+			keysOf(
+				filterBoardCards(withProject, {
+					...DEFAULT_BOARD_FILTERS,
+					query: 'skrep',
+				}),
+			),
+		).toEqual(['skrepka']);
 	});
 
 	test('ignores surrounding whitespace and keeps everything when blank', () => {

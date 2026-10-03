@@ -1372,9 +1372,11 @@ export default interface Resources {
 				assignee: 'Assignee';
 				none: 'No grouping';
 				priority: 'Priority';
+				project: 'Project';
 				status: 'Status';
 			};
 			'new-issue': 'New issue';
+			'no-project': 'No project';
 			refresh: 'Refresh issues';
 			scope: {
 				active: 'Active';
@@ -1418,6 +1420,9 @@ export default interface Resources {
 			medium: 'Medium';
 			none: 'No priority';
 			urgent: 'Urgent';
+		};
+		'project-marker': {
+			label: 'Linear project: {{project}}';
 		};
 		'state-bucket': {
 			backlog: 'Backlog';

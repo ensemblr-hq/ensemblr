@@ -121,6 +121,21 @@ describe('collectBacklogIssues Linear state filter', () => {
 		});
 		expect(card?.item).toMatchObject({ kind: 'linear-issue' });
 	});
+
+	test('carries the Linear project the issue is filed under', () => {
+		const [inProject, inNone] = collect({
+			linearIssues: [
+				linearIssue({
+					id: 'a',
+					projectId: 'project-skrepka',
+					projectName: 'Skrepka',
+				}),
+				linearIssue({ id: 'b' }),
+			],
+		}).backlog;
+		expect(inProject?.trackerProject).toBe('Skrepka');
+		expect(inNone?.trackerProject).toBeNull();
+	});
 });
 
 describe('collectBacklogIssues GitHub unassigned filter', () => {
@@ -151,6 +166,7 @@ describe('collectBacklogIssues GitHub unassigned filter', () => {
 			projectId: 'repo-1',
 			provider: 'github',
 			subtitle: 'copland',
+			trackerProject: null,
 		});
 	});
 });

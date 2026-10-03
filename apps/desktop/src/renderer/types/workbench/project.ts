@@ -53,6 +53,11 @@ export interface WorkspaceSource {
 	reference?: string;
 	subtitle?: string;
 	title: string;
+	/**
+	 * Name of the tracker-side project an issue is filed under, such as a Linear
+	 * project. Not an Ensemblr project: those are repositories.
+	 */
+	trackerProject?: string;
 }
 
 /**

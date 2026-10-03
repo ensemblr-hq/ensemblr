@@ -38,6 +38,7 @@ function issue(overrides: Partial<BoardIssueCard> = {}): BoardIssueCard {
 		stateType: 'unstarted',
 		subtitle: 'Ensemblr',
 		title: 'Wire the board',
+		trackerProject: null,
 		updatedAt: null,
 		url: 'https://linear.app/e/issue/ENS-1',
 		...overrides,

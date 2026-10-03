@@ -64,6 +64,7 @@ function toLinearBoardIssue(issue: LinearIssueWire): BoardIssueCard {
 		stateType: issue.stateType,
 		subtitle: issue.teamName ?? issue.teamKey,
 		title: issue.title,
+		trackerProject: issue.projectName,
 		updatedAt: issue.updatedAt,
 		url: issue.url,
 	};
@@ -94,6 +95,7 @@ function toGithubBoardIssue(
 		stateType: null,
 		subtitle: project.projectName,
 		title: issue.title,
+		trackerProject: null,
 		updatedAt: issue.updatedAt,
 		url: issue.url,
 	};

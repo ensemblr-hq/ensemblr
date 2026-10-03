@@ -123,9 +123,11 @@
 			"assignee": "Υπεύθυνος",
 			"none": "Χωρίς ομαδοποίηση",
 			"priority": "Προτεραιότητα",
+			"project": "Έργο",
 			"status": "Κατάσταση"
 		},
 		"new-issue": "Νέο ζήτημα",
+		"no-project": "Χωρίς έργο",
 		"refresh": "Ανανέωση ζητημάτων",
 		"scope": {
 			"active": "Ενεργά",
@@ -169,6 +171,9 @@
 		"medium": "Μεσαία",
 		"none": "Χωρίς προτεραιότητα",
 		"urgent": "Επείγουσα"
+	},
+	"project-marker": {
+		"label": "Έργο Linear: {{project}}"
 	},
 	"state-bucket": {
 		"backlog": "Εκκρεμότητες",

@@ -36,6 +36,8 @@ export interface BoardIssueCard {
 	/** Repository or Linear team name, shown as the card's secondary line. */
 	subtitle: string | null;
 	title: string;
+	/** Linear project the issue is filed under; null for GitHub and for an issue in no project. */
+	trackerProject: string | null;
 	updatedAt: string | null;
 	url: string;
 }

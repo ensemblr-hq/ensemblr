@@ -53,6 +53,7 @@ const SORTS: readonly LinearIssueSort[] = [
 const GROUPINGS: readonly LinearIssueGrouping[] = [
 	'status',
 	'priority',
+	'project',
 	'assignee',
 	'none',
 ];
@@ -366,6 +367,8 @@ function groupingLabel(
 			return t('linear:issue-list.group-by.assignee', 'Assignee');
 		case 'priority':
 			return t('linear:issue-list.group-by.priority', 'Priority');
+		case 'project':
+			return t('linear:issue-list.group-by.project', 'Project');
 		case 'status':
 			return t('linear:issue-list.group-by.status', 'Status');
 		default:

@@ -3,6 +3,7 @@ import { PlusIcon, Undo2Icon, XIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { LinearProjectBadge } from '@/renderer/components/linear/issue-project';
 import { LinearStateBadge } from '@/renderer/components/linear/issue-state-badge';
 import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
@@ -210,7 +211,10 @@ function IssueCardLink({
 	);
 }
 
-/** Workflow-state badge for a Linear issue, or the label chips for a GitHub one. */
+/**
+ * Workflow-state and project badges for a Linear issue, then the label chips
+ * either provider carries.
+ */
 function IssueCardMeta({ issue }: { issue: BoardIssueCard }) {
 	const { t } = useTranslation();
 	const visibleLabels = issue.labels.slice(0, MAX_VISIBLE_LABELS);
@@ -224,6 +228,9 @@ function IssueCardMeta({ issue }: { issue: BoardIssueCard }) {
 					name={issue.stateName}
 					stateType={issue.stateType}
 				/>
+			) : null}
+			{issue.trackerProject ? (
+				<LinearProjectBadge name={issue.trackerProject} />
 			) : null}
 			{visibleLabels.map((label) => (
 				<Badge className='max-w-28 truncate' key={label} variant='outline'>
