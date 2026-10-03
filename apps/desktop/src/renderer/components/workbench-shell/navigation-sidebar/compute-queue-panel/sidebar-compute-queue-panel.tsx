@@ -66,7 +66,7 @@ export function SidebarComputeQueuePanel() {
 		},
 		[openFilePreview],
 	);
-	const onOpenWorkspace = useCallback(
+	const workspaceOpener = useCallback(
 		(job: ComputeJobSnapshot) => {
 			const selection = layoutModel
 				? findWorkspaceSelectionById(
@@ -74,12 +74,14 @@ export function SidebarComputeQueuePanel() {
 						job.workspaceId,
 					)
 				: null;
-			if (selection) {
-				layoutModel?.navigateToWorkspace(
+			if (!layoutModel || !selection) {
+				return null;
+			}
+			return () =>
+				layoutModel.navigateToWorkspace(
 					selection.project.id,
 					selection.workspace.id,
 				);
-			}
 		},
 		[layoutModel],
 	);
@@ -111,8 +113,8 @@ export function SidebarComputeQueuePanel() {
 						onCancel={onCancel}
 						onCollapsedChange={setCollapsed}
 						onOpenLog={onOpenLog}
-						onOpenWorkspace={layoutModel ? onOpenWorkspace : undefined}
 						snapshot={snapshot}
+						workspaceOpener={workspaceOpener}
 					/>
 				</SidebarFooter>
 			) : null}

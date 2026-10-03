@@ -227,20 +227,31 @@ describe('ComputeQueuePanel', () => {
 		expect(screen.getByText('Auto')).toBeTruthy();
 	});
 
-	test('the workspace name opens the workspace when the host can navigate', () => {
-		const onOpenWorkspace = vi.fn();
+	test('the workspace name opens the workspace when the host resolves it', () => {
+		const openWorkspace = vi.fn();
+		const workspaceOpener = vi.fn(() => openWorkspace);
 		const queued = job({ id: 'q1', position: 1 });
-		renderPanel(queue([queued]), { onOpenWorkspace });
+		renderPanel(queue([queued]), { workspaceOpener });
 
 		fireEvent.click(
 			screen.getByRole('button', { name: 'Open workspace Workspace One' }),
 		);
 
-		expect(onOpenWorkspace).toHaveBeenCalledWith(queued);
+		expect(workspaceOpener).toHaveBeenCalledWith(queued);
+		expect(openWorkspace).toHaveBeenCalledTimes(1);
 	});
 
 	test('the workspace name is plain text without a navigation host', () => {
 		renderPanel(queue([job({ id: 'q1', position: 1 })]));
+
+		expect(screen.getByText('Workspace One')).toBeTruthy();
+		expect(screen.queryByRole('button', { name: /Open workspace/ })).toBeNull();
+	});
+
+	test('the workspace name is plain text when the host cannot resolve it', () => {
+		renderPanel(queue([job({ id: 'q1', position: 1 })]), {
+			workspaceOpener: () => null,
+		});
 
 		expect(screen.getByText('Workspace One')).toBeTruthy();
 		expect(screen.queryByRole('button', { name: /Open workspace/ })).toBeNull();

@@ -26,8 +26,12 @@ const ELAPSED_TICK_MS = 1000;
 export interface ComputeJobRowActions {
 	onCancel: (jobId: string) => void;
 	onOpenLog: (job: ComputeJobSnapshot) => void;
-	/** Opens the job's workspace; absent where there is no workspace route to move to. */
-	onOpenWorkspace?: (job: ComputeJobSnapshot) => void;
+	/**
+	 * Resolves how to open a job's workspace, or null when it cannot be opened
+	 * from here — no workspace route to move to, or a workspace the route does
+	 * not list — so the row never offers a link that goes nowhere.
+	 */
+	workspaceOpener?: (job: ComputeJobSnapshot) => (() => void) | null;
 }
 
 /**
@@ -118,7 +122,7 @@ export function ComputeJobRow({
 					</TooltipContent>
 				</Tooltip>
 				<span className='flex min-w-0 items-center gap-1 text-muted-foreground text-xxs leading-4'>
-					<WorkspaceName job={job} onOpenWorkspace={actions.onOpenWorkspace} />
+					<WorkspaceName job={job} workspaceOpener={actions.workspaceOpener} />
 					<InitiatorBadge initiator={job.initiator} />
 					<JobTiming job={job} />
 				</span>
@@ -163,19 +167,20 @@ export function ComputeJobRow({
 
 /**
  * The job's workspace, as a link-styled button that opens it when the host can
- * navigate, and as plain text when it cannot.
+ * resolve it to a workspace route, and as plain text when it cannot.
  */
 function WorkspaceName({
 	job,
-	onOpenWorkspace,
+	workspaceOpener,
 }: {
 	job: ComputeJobSnapshot;
-	onOpenWorkspace?: (job: ComputeJobSnapshot) => void;
+	workspaceOpener?: ComputeJobRowActions['workspaceOpener'];
 }) {
 	const { t } = useTranslation();
 	const name = job.workspaceName ?? '';
+	const openWorkspace = workspaceOpener?.(job) ?? null;
 
-	if (!onOpenWorkspace || !name) {
+	if (!openWorkspace || !name) {
 		return <span className='min-w-0 truncate'>{name}</span>;
 	}
 
@@ -189,7 +194,7 @@ function WorkspaceName({
 						{ workspace: name },
 					)}
 					className='min-w-0 truncate rounded-sm text-left underline-offset-2 outline-none hover:text-sidebar-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring'
-					onClick={() => onOpenWorkspace(job)}
+					onClick={openWorkspace}
 					type='button'
 				>
 					{name}
