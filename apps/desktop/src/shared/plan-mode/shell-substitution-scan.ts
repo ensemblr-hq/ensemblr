@@ -17,6 +17,7 @@ import {
 	scanDoubleQuoted,
 	scanSingleQuoted,
 	skipRedirectionBlanks,
+	UNBALANCED_QUOTE,
 } from './shell-lexer.ts';
 
 /** How deep a scan follows nested quotes and substitutions before reading the rest as literal text. */
@@ -53,6 +54,93 @@ const QUOTED_DELIMITER = /['"\\]/;
 /** Characters after which a `#` opens a comment inside a substitution. */
 const COMMENT_PRECEDERS = /[ \t\n;&|(]/;
 
+/** What an ANSI-C escape stands for, where that is not the escaped character itself. */
+const ANSI_C_ESCAPES: Readonly<Record<string, string>> = {
+	a: '\x07',
+	b: '\b',
+	E: '\x1b',
+	e: '\x1b',
+	f: '\f',
+	n: '\n',
+	r: '\r',
+	t: '\t',
+	v: '\v',
+};
+
+/**
+ * Reports whether an ANSI-C quoted run, `$'…'`, starts at an index.
+ * @param source - Text being read.
+ * @param index - Index to inspect.
+ * @returns True for the `$` of a `$'`.
+ */
+export function opensAnsiCQuote(source: string, index: number): boolean {
+	return source[index] === '$' && source[index + 1] === "'";
+}
+
+/**
+ * Reads an ANSI-C quoted run, `$'…'`. Unlike a plain single-quoted run, a
+ * backslash escapes inside it, so `$'it\'s'` is one word rather than a quote
+ * that closes early and leaves the line unbalanced.
+ * @param source - Text being read.
+ * @param index - Index of the `$`.
+ * @returns The quoted text with its escapes read, and where it ended, or the unbalanced-quote violation.
+ */
+export function scanAnsiCQuoted(source: string, index: number): Scan {
+	let text = '';
+	let cursor = index + 2;
+	while (cursor < source.length) {
+		const char = source[cursor] as string;
+		if (char === "'") {
+			return { next: cursor + 1, text };
+		}
+		if (char === '\\') {
+			const escaped = source[cursor + 1] ?? '';
+			text += ANSI_C_ESCAPES[escaped] ?? escaped;
+			cursor += LINE_CONTINUATION_LENGTH;
+			continue;
+		}
+		text += char;
+		cursor += 1;
+	}
+	return { violation: UNBALANCED_QUOTE };
+}
+
+/**
+ * Finds the end of an arithmetic expression, `$((…))` or `((…))`, in which
+ * `<<` and `>>` are shifts rather than a heredoc or a redirection.
+ * @param source - Text being read.
+ * @param index - Index to inspect.
+ * @param budget - The lex's remaining scan budget.
+ * @returns Index just past the closing parentheses, or null when no arithmetic opens here or it does not close.
+ */
+export function arithmeticEnd(
+	source: string,
+	index: number,
+	budget: ScanBudget,
+): number | null {
+	const openerLength = source.startsWith('$((', index)
+		? 3
+		: source.startsWith('((', index)
+			? 2
+			: 0;
+	if (openerLength === 0) {
+		return null;
+	}
+	let parens = 2;
+	for (
+		let cursor = index + openerLength;
+		cursor < source.length && budget.steps > 0;
+		cursor += 1
+	) {
+		budget.steps -= 1;
+		parens += source[cursor] === '(' ? 1 : source[cursor] === ')' ? -1 : 0;
+		if (parens === 0) {
+			return cursor + 1;
+		}
+	}
+	return null;
+}
+
 /**
  * Reports whether a character ends a redirection's target word.
  * @param char - Character to test.
@@ -88,9 +176,11 @@ export function scanRedirectionTarget(
 		if (endsRedirectionTarget(char)) {
 			break;
 		}
-		if (char === "'" || char === '"') {
-			const quoted =
-				char === "'"
+		const ansiC = opensAnsiCQuote(command, cursor);
+		if (ansiC || char === "'" || char === '"') {
+			const quoted = ansiC
+				? scanAnsiCQuoted(command, cursor)
+				: char === "'"
 					? scanSingleQuoted(command, cursor)
 					: scanDoubleQuoted(command, cursor, readSubstitution);
 			if ('violation' in quoted) {
@@ -229,7 +319,8 @@ function backtickEnd(
 
 /**
  * Finds the end of the nested construct starting at an index — a double-quoted
- * run, a backtick substitution, or a `$(…)` — without recording anything.
+ * run, a backtick substitution, a `$((…))`, or a `$(…)` — without recording
+ * anything.
  * @param source - Text being read.
  * @param index - Index of the `"`, the backtick, or the `$` of a `$(`.
  * @param budget - The lex's remaining scan budget.
@@ -244,6 +335,10 @@ export function nestedEnd(
 ): number | null {
 	const char = source[index];
 	const tooDeep = depth >= MAX_NESTING_DEPTH;
+	const arithmetic = arithmeticEnd(source, index, budget);
+	if (arithmetic !== null) {
+		return arithmetic;
+	}
 	if (char === '`') {
 		return backtickEnd(source, index, budget);
 	}
@@ -261,7 +356,8 @@ export function nestedEnd(
 
 /**
  * Skips a construct inside a substitution that cannot close it: an escape, a
- * single-quoted run, a comment, or a nested quote or substitution. A nested
+ * single-quoted or ANSI-C quoted run, a comment, or a nested quote,
+ * arithmetic expression, or substitution. A nested
  * substitution that does not close is literal text, so only its opening
  * character is skipped.
  * @param source - Text being read.
@@ -279,6 +375,10 @@ function skipInert(
 	const char = source[cursor] as string;
 	if (char === '\\') {
 		return cursor + LINE_CONTINUATION_LENGTH;
+	}
+	if (opensAnsiCQuote(source, cursor)) {
+		const quoted = scanAnsiCQuoted(source, cursor);
+		return 'violation' in quoted ? null : quoted.next;
 	}
 	if (char === "'") {
 		const end = source.indexOf("'", cursor + 1);
@@ -318,7 +418,7 @@ function skipHeredocBodies(
 
 /**
  * Finds the parenthesis closing a `$(…)`, honouring the quotes, comments,
- * heredocs and nested substitutions inside it — so an apostrophe in a heredoc
+ * arithmetic, heredocs and nested substitutions inside it — so an apostrophe in a heredoc
  * body, as in the `git commit -m "$(cat <<'EOF' …)"` form, never reads as an
  * unclosed quote.
  * @param source - Text being read.
@@ -342,6 +442,11 @@ export function substitutionEnd(
 		if (char === '\n' && heredocs.length > 0) {
 			cursor = skipHeredocBodies(source, cursor + 1, heredocs);
 			heredocs = [];
+			continue;
+		}
+		const arithmetic = arithmeticEnd(source, cursor, budget);
+		if (arithmetic !== null) {
+			cursor = arithmetic;
 			continue;
 		}
 		if (source.startsWith('<<<', cursor)) {

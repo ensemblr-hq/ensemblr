@@ -698,19 +698,23 @@ describe('memory bounds', () => {
 describe('launch failures and descriptions', () => {
 	it('fails a job whose run rejects instead of leaving the rejection unhandled', async () => {
 		vi.spyOn(console, 'warn').mockImplementation(() => {});
+		let terminated = 0;
 		queue = buildQueue({
 			startCommand: () => ({
 				done: Promise.reject(new Error('runner broke')),
 				kill: () => {},
 				logPath: null,
 				tail: () => ({ omittedChars: 0, text: '' }),
-				terminate: () => {},
+				terminate: () => {
+					terminated += 1;
+				},
 			}),
 		});
 		const job = await enqueue('a', 'broken');
 		await flush();
 		expect(queue.getJob(job)).toMatchObject({ state: 'failed' });
 		expect(queue.getJob(job)?.outputTail).toContain('runner broke');
+		expect(terminated).toBe(1);
 		expect(console.warn).toHaveBeenCalled();
 		await expect(queue.shutdown()).resolves.toBeUndefined();
 		vi.restoreAllMocks();

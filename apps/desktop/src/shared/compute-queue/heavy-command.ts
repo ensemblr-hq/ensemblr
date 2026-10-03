@@ -57,7 +57,7 @@ interface CompiledRules {
 const NOT_HEAVY: HeavyCommandVerdict = { heavy: false };
 
 /** How many levels of nested command — a `bash -c`, an `eval`, a fed script — are followed. */
-const MAX_NESTING_DEPTH = 3;
+const MAX_SHELL_NESTING = 3;
 
 /**
  * Lists the forms a normalised command is matched in. A `run <name>` may be a
@@ -142,7 +142,7 @@ function classifySegment(
 		return NOT_HEAVY;
 	}
 	const nested =
-		depth < MAX_NESTING_DEPTH ? nestedCommands(forms[0] ?? [], feed) : [];
+		depth < MAX_SHELL_NESTING ? nestedCommands(forms[0] ?? [], feed) : [];
 	for (const command of nested) {
 		const inner =
 			'text' in command

@@ -25,8 +25,11 @@ const MINIMUM_LINE_LITERAL_LENGTH = 16;
 /** A `"key": value` member line of a JSON document, capturing the value. */
 const JSON_MEMBER_LINE = /^"[^"]*"\s*:\s*(.*?)\s*,?$/;
 
-/** Characters a partial line may be cut just after. */
-const CUT_AFTER_CHARACTERS = /[\s,;]/;
+/**
+ * Characters a partial line may be cut just after: whitespace only. A `,` or
+ * `;` can sit inside URL userinfo or an ANSI escape, so neither ends a token.
+ */
+const CUT_AFTER_CHARACTERS = /\s/;
 
 /** Characters an assignment or quoted value hangs on, never cut beside. */
 const CUT_FORBIDDEN_NEIGHBOURS = new Set(['=', ':', '"', "'", '`']);
@@ -128,12 +131,14 @@ export function maskOpenPrivateKey(text: string): string {
 }
 
 /**
- * Reports whether a cut just before `index` is safe: the character before it
- * ends a token, `index` starts one, and neither the nearest visible character
- * on the left nor the one on the right is a separator or quote a secret hangs on.
- * @param text - The held text.
+ * Reports whether a cut just before `index` is safe: whitespace ends the token
+ * before it, `index` starts one, and neither the nearest visible character on
+ * the left nor the one on the right is a separator or quote an assignment
+ * hangs on. No single-line shape the redactor knows contains whitespace
+ * except around an assignment's separator, which that rule excludes.
+ * @param text - The held text, ANSI already stripped.
  * @param index - Candidate cut offset.
- * @returns True when no secret shape can span the cut.
+ * @returns True when the cut falls between two whitespace-separated tokens.
  */
 function isSafeCut(text: string, index: number): boolean {
 	const right = text.charAt(index);
@@ -153,10 +158,10 @@ function isSafeCut(text: string, index: number): boolean {
 
 /**
  * Cuts a partial line that outgrew its bound, at or before `limit`. It prefers
- * a safe token boundary; failing one, it masks the whole token that straddles
- * `limit`, reporting when that token runs on past the held text so the caller
- * drops its remainder too.
- * @param text - The held partial line, literals already redacted.
+ * a safe whitespace boundary; failing one, it masks the whole
+ * whitespace-delimited token that straddles `limit`, reporting when that token
+ * runs on past the held text so the caller drops its remainder too.
+ * @param text - The held partial line, ANSI stripped and literals redacted.
  * @param limit - Furthest offset the cut may take.
  * @returns What to emit, what to keep, and whether to keep dropping.
  */
@@ -186,8 +191,9 @@ export function cutPartialLine(text: string, limit: number): PartialLineCut {
 
 /**
  * Builds the redactor a job's output runs through: the shared redactor over
- * the expanded literals. Every pattern it runs is linear-time, so whole lines
- * are redacted in one call and no secret is ever split between two.
+ * the expanded literals. Every pattern it runs is linear-time, so a whole line
+ * is redacted in one call; only a line too long to hold is cut, and then only
+ * at whitespace (see {@link cutPartialLine}).
  * @param values - Literal secret values for the job.
  * @returns The redactor.
  */

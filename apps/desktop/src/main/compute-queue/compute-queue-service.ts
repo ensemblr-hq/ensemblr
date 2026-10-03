@@ -292,6 +292,7 @@ export function createComputeQueueService(
 		const launch = launchCommand(record)
 			.catch((error: unknown) => {
 				console.warn(`[compute-queue] launch of job ${id} failed`, error);
+				runs.get(id)?.terminate();
 				runs.delete(id);
 				finish(id, {
 					outputTail: `Could not start the command: ${describeError(error)}\n`,

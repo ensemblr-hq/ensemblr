@@ -129,6 +129,13 @@ describe('classifyHeavyCommand', () => {
 		["watch 'bun run test'", 'run test*'],
 		['find . -name "*.rs" -exec cargo build \\;', 'cargo build'],
 		['find . -execdir ls \\; -exec tsc {} +', 'tsc'],
+		["echo $'it\\'s' && bun run test", 'run test*'],
+		["git commit -m $'don\\'t' && make", 'make'],
+		["x=\"$(echo $'a\\')b'; make)\"", 'make'],
+		['echo $((1<<2))\nbun run test', 'run test*'],
+		['(( x <<= 2 ))\nmake', 'make'],
+		['echo "$((1<<2))"\nbun run test', 'run test*'],
+		['x="$(echo $((3<<1)); y)"\ntsc', 'tsc'],
 		['cargo t', 'cargo t'],
 		['cargo b --release', 'cargo b'],
 	])('follows %j into the command it runs, via %j', (command, matched) => {

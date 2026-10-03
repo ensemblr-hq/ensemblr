@@ -263,6 +263,30 @@ describe('lexShellSegments', () => {
 		expect(tokensOf("echo '$(make)'")).toEqual([['echo', '$(make)']]);
 	});
 
+	it('reads an ANSI-C quoted run whole, escaped quote and all', () => {
+		expect(tokensOf("echo $'it\\'s\\tok' && make")).toEqual([
+			['echo', "it's\tok"],
+			['make'],
+		]);
+		expect(tokensOf("x=\"$(echo $'a\\')b'; tsc)\"")).toEqual([
+			["x=$(echo $'a\\')b'; tsc)"],
+			['echo', "a')b"],
+			['tsc'],
+		]);
+	});
+
+	it('reads `<<` inside arithmetic as a shift, never a heredoc', () => {
+		expect(tokensOf('echo $((1<<2))\nmake')).toEqual([
+			['echo'],
+			['1<<2'],
+			['make'],
+		]);
+		expect(tokensOf('((x <<= 2))\nmake')).toEqual([
+			['x', '<<=', '2'],
+			['make'],
+		]);
+	});
+
 	it('reads a never-closed substitution in quotes as literal text', () => {
 		expect(tokensOf('echo "$(make"; ls')).toEqual([['echo', '$(make'], ['ls']]);
 	});

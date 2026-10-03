@@ -16,7 +16,11 @@
  *
  * The work is bounded: nested text past {@link MAX_NESTING_DEPTH} levels or
  * {@link MAX_NESTED_LEX_CHARS} characters is left as literal text rather than
- * lexed, so no input can exhaust the stack or stall the main process.
+ * lexed, so no input can exhaust the stack or stall the main process. Both
+ * caps fail open: a command nested past the depth cap, or in a quoted or
+ * process substitution recorded after the line has spent its 64 KiB of
+ * substitution text, is not classified. The commands at the top level of the
+ * line always are.
  */
 
 import {
@@ -31,14 +35,17 @@ import {
 	type TokenSink,
 } from './shell-lexer.ts';
 import {
+	arithmeticEnd,
 	MAX_NESTED_SCAN_STEPS,
 	MAX_NESTING_DEPTH,
 	NESTING_PARENS,
 	nestedEnd,
+	opensAnsiCQuote,
 	readHeredocBody,
 	readHeredocOpener,
 	type ScanBudget,
 	type SubstitutionReader,
+	scanAnsiCQuoted,
 	scanRedirectionTarget,
 	substitutionEnd,
 } from './shell-substitution-scan.ts';
@@ -95,6 +102,8 @@ interface TolerantWalk {
 	processInputs: Map<number, readonly string[]>;
 	/** The text of every substitution lexed after the walk rather than in place. */
 	substitutions: string[];
+	/** Index up to which the walk is inside an arithmetic `$((…))` or `((…))`, where `<` and `>` are operators. */
+	arithmeticUntil: number;
 }
 
 /**
@@ -109,7 +118,7 @@ function substitutionReader(
 ): SubstitutionReader {
 	return (start) => {
 		const end = nestedEnd(source, start, walk.budget);
-		if (end !== null) {
+		if (end !== null && !source.startsWith('$((', start)) {
 			walk.substitutions.push(
 				source[start] === '`'
 					? source.slice(start + 1, end - 1).replace(/\\([`$\\])/g, '$1')
@@ -328,7 +337,8 @@ function readHeredocBodies(
 }
 
 /**
- * Consumes a word character, a quote, an escape, or a comment.
+ * Consumes a word character, a quoted run — plain, double, or ANSI-C `$'…'` —
+ * an escape, or a comment.
  * @param command - Full command text.
  * @param index - Index to consume from.
  * @param walk - Walk state the step writes through.
@@ -341,8 +351,11 @@ function stepWord(
 ): number | null {
 	const { sink } = walk;
 	const char = command[index] as string;
-	if (char === "'" || char === '"') {
-		const quoted = scanQuotedTolerantly(command, index, walk);
+	const ansiC = opensAnsiCQuote(command, index);
+	if (ansiC || char === "'" || char === '"') {
+		const quoted = ansiC
+			? scanAnsiCQuoted(command, index)
+			: scanQuotedTolerantly(command, index, walk);
 		if ('violation' in quoted) {
 			return null;
 		}
@@ -377,6 +390,14 @@ function stepTolerant(
 	walk: TolerantWalk,
 ): number | null {
 	const char = command[index] as string;
+	if (index >= walk.arithmeticUntil) {
+		walk.arithmeticUntil =
+			arithmeticEnd(command, index, walk.budget) ?? walk.arithmeticUntil;
+	}
+	if (index < walk.arithmeticUntil && (char === '<' || char === '>')) {
+		walk.sink.push(char);
+		return index + 1;
+	}
 	const opensProcess =
 		(char === '<' || char === '>') && command[index + 1] === '(';
 	const processEnd = opensProcess
@@ -460,6 +481,7 @@ function lexWithin(
 	budget: LexBudget,
 ): ShellSegment[] | null {
 	const walk: TolerantWalk = {
+		arithmeticUntil: 0,
 		budget,
 		closed: 0,
 		heredocs: [],

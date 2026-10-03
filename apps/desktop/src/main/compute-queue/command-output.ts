@@ -22,13 +22,13 @@ export const OUTPUT_TAIL_CHARS = 64 * 1024;
 /**
  * Longest partial line held back waiting for its newline, beyond the longest
  * literal secret. Redaction runs on whole lines so a secret is never split
- * across two passes; a line longer than this is cut at a token boundary no
- * secret can span rather than buffered without bound.
+ * across two passes; a line longer than this is cut at whitespace (or has the
+ * token across the cut masked) rather than buffered without bound.
  */
 const MAX_PENDING_LINE_CHARS = 128 * 1024;
 
-/** Characters that end the token a forced cut masked. */
-const TOKEN_BOUNDARY = /[\s,;]/;
+/** Characters that end the token a forced cut masked: whitespace, as for the cut itself. */
+const TOKEN_BOUNDARY = /\s/;
 
 /**
  * Longest private-key block held back waiting for its END line. A real key is
@@ -192,8 +192,8 @@ export function createCommandOutput(input: {
 	/**
 	 * Decides how much of a stream's held-back text may stay held: an open key
 	 * block up to its bound, else a partial line up to its bound. Whatever
-	 * outgrows its bound is emitted — a key block masked, a long line cut where
-	 * no secret can span the cut.
+	 * outgrows its bound is emitted — a key block masked, a long line stripped of
+	 * ANSI (so no cut lands inside an escape) and cut at whitespace.
 	 * @param stream - Which stream the text belongs to.
 	 * @param held - Text after the last emitted line.
 	 * @param holdsKey - Whether it contains an unclosed private-key block.
@@ -214,7 +214,7 @@ export function createCommandOutput(input: {
 		if (held.length <= MAX_PENDING_LINE_CHARS + redactor.literalHoldChars) {
 			return held;
 		}
-		const safe = redactor.redactLiterals(held);
+		const safe = redactor.redactLiterals(stripAnsi(held));
 		const cut = cutPartialLine(safe, safe.length - redactor.literalHoldChars);
 		emit(cut.emit);
 		dropping[stream] = cut.dropping;

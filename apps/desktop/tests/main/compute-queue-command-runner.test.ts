@@ -401,6 +401,37 @@ describe('chunk-boundary redaction', () => {
 	});
 });
 
+describe('forced cuts of an over-long line', () => {
+	it.each([
+		[
+			'URL userinfo with a comma in the user',
+			'https://us,er:hunter2pass@host',
+			'hunter2pass',
+		],
+		[
+			'URL userinfo with a semicolon in the password',
+			'https://user:hunt;er2pass@host',
+			'er2pass',
+		],
+		[
+			'an assignment behind an ANSI escape',
+			'TOKEN=\u001B[1;31mhunter2secret',
+			'hunter2secret',
+		],
+	])('never splits %s', async (_name, secret, leaked) => {
+		const output = collector([]);
+		const line = `${'x '.repeat(70_000)}${secret}`;
+		for (let index = 0; index < line.length; index += 65_536) {
+			feed(output, line.slice(index, index + 65_536));
+		}
+		await output.end();
+		const log = readFileSync(output.logPath ?? '', 'utf8');
+		expect(log).toContain('[REDACTED]');
+		expect(log).not.toContain(leaked);
+		expect(output.tail().text).not.toContain(leaked);
+	});
+});
+
 describe('expandRedactValues', () => {
 	it('adds distinctive lines of a multi-line secret but not its structure', () => {
 		const serviceAccount = [
