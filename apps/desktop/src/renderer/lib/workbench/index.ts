@@ -75,10 +75,12 @@ export { isPreviewableWorkspaceFile } from './workspace-file-preview';
 export { getWorkspaceSidebarState } from './workspace-sidebar-state';
 export {
 	branchSourceId,
+	collectLinkedIssueKeys,
 	mapPullRequestsToWorkspaceSources,
 	mapRepositoryBranchesToWorkspaceSources,
 	openableWorkspaceId,
 	pullRequestSourceId,
+	selectStartableIssues,
 	workspaceSeedFromSourceItem,
 } from './workspace-source-mappers';
 export {

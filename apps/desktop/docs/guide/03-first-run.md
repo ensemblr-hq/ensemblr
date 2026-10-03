@@ -176,7 +176,7 @@ offers three sources:
 | --- | --- |
 | **Branches** | A workspace on an existing branch — either taking it over, or duplicating it into a new one. |
 | **Pull requests** | A workspace on an open PR's head branch, for reviewing or continuing it. |
-| **Issues** | A workspace for a GitHub or Linear issue, with the issue linked to it. |
+| **Issues** | A workspace for an issue nobody has started — an open GitHub issue, or a Linear issue in Backlog or Todo — with the issue linked to it. An issue that already has a workspace is not offered again — unless that workspace is archived and the issue is still open or not yet started. |
 
 Each is searchable: branches by name, pull requests by title, number, or author,
 issues by number, title, or description.

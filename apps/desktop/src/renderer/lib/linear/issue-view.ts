@@ -11,6 +11,7 @@ import type {
 	LinearConnectionSummary,
 	LinearIssueWire,
 	LinearServiceFailure,
+	ListLinearIssuesResult,
 } from '@/shared/ipc/contracts/linear';
 
 /**
@@ -141,6 +142,26 @@ export function describeLinearAccountFailures(
 				.join('; '),
 		},
 	);
+}
+
+/**
+ * Says why a Linear issue list may be short, for a surface that would
+ * otherwise read an empty list as "there is nothing". A Linear nobody has
+ * connected is not a gap: that user simply has no Linear issues.
+ * @param result - The list answer, or undefined while none has arrived
+ * @returns The localized reason, or null when the list is complete
+ */
+export function describeLinearListGap(
+	result: ListLinearIssuesResult | undefined,
+): string | null {
+	if (result?.status === 'error') {
+		return result.failure.code === 'not-connected'
+			? null
+			: describeLinearFailure(result.failure);
+	}
+	return result && result.accountFailures.length > 0
+		? describeLinearAccountFailures(result.accountFailures)
+		: null;
 }
 
 /**

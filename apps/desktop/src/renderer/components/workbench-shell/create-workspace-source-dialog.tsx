@@ -34,6 +34,7 @@ import type {
 	WorkspaceSourceAction,
 	WorkspaceSourceKind,
 } from '@/renderer/types/workbench';
+import type { GithubFailure } from '@/shared/ipc/contracts/github';
 import { GithubLogo, LinearLogo } from './source-provider-logo';
 
 /**
@@ -83,11 +84,13 @@ export function CreateWorkspaceSourceDialog({
 	const [kind, setKind] = useState<WorkspaceSourceKind>('pull-request');
 	const [repoId, setRepoId] = useState(project?.id ?? projects[0]?.id ?? '');
 
-	const { error, isLoading, itemsById, sources } = useWorkspaceSourcePicker({
-		kind,
-		open,
-		repoId,
-	});
+	const { error, isLoading, itemsById, linearGap, sources } =
+		useWorkspaceSourcePicker({
+			kind,
+			open,
+			projects,
+			repoId,
+		});
 	const selectedRepo =
 		projects.find((candidate) => candidate.id === repoId) ?? project ?? null;
 
@@ -165,35 +168,13 @@ export function CreateWorkspaceSourceDialog({
 				</div>
 				<CommandSeparator alwaysRender />
 				<CommandList className='max-h-80'>
-					{/* Banners only when there is nothing to show yet — once cached rows
-					    exist we render them and let a refetch happen silently, so the
-					    list never flashes a loading state over real data. */}
-					{sources.length === 0 && error ? (
-						<div className='px-3 py-8 text-destructive text-xs'>
-							<p>{failureText(t, error)}</p>
-							{error.remediation ? (
-								<p className='mt-1 text-muted-foreground'>
-									{error.remediation}
-								</p>
-							) : null}
-						</div>
-					) : sources.length === 0 && isLoading ? (
-						<div className='py-8 text-center text-muted-foreground text-xs'>
-							{t(
-								'workbench:create-workspace-source.loading',
-								'Loading {{sources}}…',
-								{ sources: getWorkspaceSourceKindLabel(kind).toLowerCase() },
-							)}
-						</div>
-					) : (
-						<CommandEmpty className='py-8 text-muted-foreground text-xs'>
-							{t(
-								'workbench:create-workspace-source.no-match',
-								'No {{sources}} match your search.',
-								{ sources: getWorkspaceSourceKindLabel(kind).toLowerCase() },
-							)}
-						</CommandEmpty>
-					)}
+					<SourceListPlaceholder
+						error={error}
+						isEmpty={sources.length === 0}
+						isLoading={isLoading}
+						kind={kind}
+						linearGap={linearGap}
+					/>
 					<CommandGroup>
 						{sources.map((source) => {
 							const actions = getWorkspaceSourceActions(source);
@@ -233,6 +214,92 @@ export function CreateWorkspaceSourceDialog({
 				</CommandList>
 			</Command>
 		</CommandDialog>
+	);
+}
+
+/** What {@link SourceListPlaceholder} needs to decide what an empty list says. */
+interface SourceListPlaceholderProps {
+	/** The GitHub failure behind the active tab's list, if its read failed. */
+	error: GithubFailure | null;
+	isEmpty: boolean;
+	isLoading: boolean;
+	kind: WorkspaceSourceKind;
+	/** Why Linear rows may be missing from the Issues tab, already localized. */
+	linearGap: string | null;
+}
+
+/**
+ * What the source list shows in place of rows. The failure and loading banners
+ * appear only while there is nothing to show yet — once cached rows exist they
+ * render and a refetch happens silently, so the list never flashes a loading
+ * state over real data. An empty Issues tab is an ordinary state, because it
+ * lists only work nobody has started, so it says so rather than blaming a
+ * search nobody typed — unless Linear could not be read, when "nothing to
+ * start" would be a false claim. Every other empty list falls to the
+ * search-miss message.
+ */
+function SourceListPlaceholder({
+	error,
+	isEmpty,
+	isLoading,
+	kind,
+	linearGap,
+}: SourceListPlaceholderProps) {
+	const { t } = useTranslation();
+	const sources = getWorkspaceSourceKindLabel(kind).toLowerCase();
+
+	if (isEmpty && error) {
+		return (
+			<div className='px-3 py-8 text-destructive text-xs'>
+				<p>{failureText(t, error)}</p>
+				{error.remediation ? (
+					<p className='mt-1 text-muted-foreground'>{error.remediation}</p>
+				) : null}
+			</div>
+		);
+	}
+
+	if (isEmpty && isLoading) {
+		return (
+			<div className='py-8 text-center text-muted-foreground text-xs'>
+				{t(
+					'workbench:create-workspace-source.loading',
+					'Loading {{sources}}…',
+					{
+						sources,
+					},
+				)}
+			</div>
+		);
+	}
+
+	if (isEmpty && linearGap) {
+		return (
+			<div className='px-3 py-8 text-destructive text-xs'>
+				<p>{linearGap}</p>
+			</div>
+		);
+	}
+
+	if (isEmpty && kind === 'issue') {
+		return (
+			<div className='px-6 py-8 text-center text-muted-foreground text-xs'>
+				{t(
+					'workbench:create-workspace-source.empty.issue',
+					'No issues waiting to be started. Open GitHub issues and Linear issues in Backlog or Todo appear here until a workspace is created from them.',
+				)}
+			</div>
+		);
+	}
+
+	return (
+		<CommandEmpty className='py-8 text-muted-foreground text-xs'>
+			{t(
+				'workbench:create-workspace-source.no-match',
+				'No {{sources}} match your search.',
+				{ sources },
+			)}
+		</CommandEmpty>
 	);
 }
 
