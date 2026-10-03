@@ -339,7 +339,6 @@ function WorkspaceSourceActions({
 					}}
 					size='sm'
 					variant='ghost'
-					text-xxs
 				>
 					{action.label}
 					<span className='text-xxs opacity-70'>{action.shortcut}</span>
