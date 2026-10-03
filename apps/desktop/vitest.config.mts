@@ -246,6 +246,7 @@ export default defineConfig({
 						'tests/main/agent-control-session-naming.test.ts',
 						'tests/main/agent-control-ask-user-question.test.ts',
 						'tests/main/board-status-store.test.ts',
+						'tests/main/merge-close-out.test.ts',
 						'tests/main/afk-claude-hook.test.ts',
 						'tests/main/afk-claude-approval.test.ts',
 						'tests/main/afk-mode-registry.test.ts',

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+	observedMergeNumber,
 	parseReviewThreads,
 	retainCheckObservation,
 	retainKnownMergeability,
@@ -347,4 +348,56 @@ test('retainCheckObservation passes through when there is no pull request', () =
 	const fetched = snapshot(null);
 
 	assert.equal(retainCheckObservation(fetched, null), fetched);
+});
+
+test('observedMergeNumber reports a pull request last seen open and now merged', () => {
+	assert.equal(
+		observedMergeNumber(
+			snapshot({ state: 'open' }),
+			snapshot({ state: 'merged' }),
+		),
+		327,
+	);
+});
+
+test('observedMergeNumber ignores a pull request that was already merged', () => {
+	assert.equal(
+		observedMergeNumber(
+			snapshot({ state: 'merged' }),
+			snapshot({ state: 'merged' }),
+		),
+		null,
+	);
+});
+
+test('observedMergeNumber ignores a first-ever read of a merged pull request', () => {
+	assert.equal(observedMergeNumber(null, snapshot({ state: 'merged' })), null);
+	assert.equal(
+		observedMergeNumber(snapshot(null), snapshot({ state: 'merged' })),
+		null,
+	);
+});
+
+test('observedMergeNumber ignores a merge of a different pull request', () => {
+	assert.equal(
+		observedMergeNumber(
+			snapshot({ number: 326, state: 'open' }),
+			snapshot({ state: 'merged' }),
+		),
+		null,
+	);
+});
+
+test('observedMergeNumber ignores a pull request that is still open', () => {
+	assert.equal(
+		observedMergeNumber(
+			snapshot({ state: 'open' }),
+			snapshot({ state: 'open' }),
+		),
+		null,
+	);
+	assert.equal(
+		observedMergeNumber(snapshot({ state: 'open' }), snapshot(null)),
+		null,
+	);
 });

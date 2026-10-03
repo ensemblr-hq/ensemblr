@@ -67,6 +67,8 @@ workspace. Treat that shape as managed — never rearrange it by hand.
 3. **You take work as far as In Review.** Never move a Linear issue to a
    `completed` or `canceled` state — the port refuses it whatever you pass — and
    never open a pull request unless the user asked for one in the current task.
+   Done belongs to the merge: when the workspace's pull request merges, the app
+   moves its board card and its linked Linear or GitHub issue to Done itself.
 4. **`.ensemblr/settings.toml` is read from *your* worktree**, so a branch that
    edits it changes behaviour for that workspace and nowhere else.
 

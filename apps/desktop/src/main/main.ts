@@ -10,7 +10,10 @@ import {
 	nativeTheme,
 	safeStorage,
 } from 'electron';
-import type { DelegationInitiative } from '../shared/agent-control.ts';
+import type {
+	BoardStatusBroadcast,
+	DelegationInitiative,
+} from '../shared/agent-control.ts';
 import {
 	awarenessForAudience,
 	buildCoAuthorDirective,
@@ -168,6 +171,7 @@ import {
 	registerPrivilegedSchemes,
 } from './linear';
 import { installApplicationMenu, MenuBarStore, MenuContextStore } from './menu';
+import { createMergeCloseOutService } from './merge-close-out';
 import { createOpenTargetService } from './open-target';
 import { createPiCliRpcAdapter, resolvePiSlashCommands } from './pi-agent';
 import {
@@ -1518,6 +1522,21 @@ const linearService = createLinearService({
 	/** Lists every connected Linear account for merged reads. */
 	listAccounts: () => linearAuthService.listAccounts(),
 });
+const mergeCloseOutService = createMergeCloseOutService({
+	linearService,
+	localCommandService,
+	/** Reads the issue a merged workspace was created from. */
+	readLinkedIssue: (workspaceId) =>
+		readWorkspaceLinkedIssue({ databaseService, workspaceId }),
+	/** Moves a merged workspace's card in main's mirror, then on every window's board. */
+	setBoardStatus: (workspaceId, status) => {
+		boardStatusStore.setOne(workspaceId, status);
+		broadcastToAllWindows(IPC_CHANNELS.agentControlBoardStatus, {
+			status,
+			workspaceId,
+		} satisfies BoardStatusBroadcast);
+	},
+});
 /**
  * The three ports only the Concierge holds. Built here rather than inside the
  * adapters because each wraps a service the composition root already owns, and
@@ -2038,6 +2057,10 @@ app.whenReady().then(() => {
 		// above; without this rebuild the menu keeps the previous language until
 		// the next restart.
 		onAppSettingsUpdated: notifyAppSettingsUpdated,
+		/** Closes out a merged workspace in the background, off the refresh that saw it. */
+		onPullRequestMerged: (event) => {
+			void mergeCloseOutService.closeOut(event);
+		},
 		menuBarStore,
 		menuContextStore,
 		rebuildMenu,

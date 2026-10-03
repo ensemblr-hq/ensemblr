@@ -102,6 +102,30 @@ function emptyRollupObservation({
 		: fetchedAt;
 }
 
+/**
+ * Whether a refresh is the moment a workspace's pull request was seen to merge:
+ * the cache last held this same pull request unmerged, and GitHub now reports it
+ * merged. Requiring an earlier unmerged observation is what keeps a first-ever
+ * read — a fresh install, or `gh` signing in after a long outage — from treating
+ * every pull request that merged long ago as news.
+ * @param cached - The snapshot persisted before this refresh, if any.
+ * @param fetched - The snapshot this refresh produced.
+ * @returns The merged pull request's number, or null when this refresh observed no merge.
+ */
+export function observedMergeNumber(
+	cached: GithubPullRequestSnapshotWire | null,
+	fetched: GithubPullRequestSnapshotWire,
+): number | null {
+	const before = cached?.pullRequest;
+	const after = fetched.pullRequest;
+	if (!before || !after || after.state !== 'merged') {
+		return null;
+	}
+	return before.number === after.number && before.state !== 'merged'
+		? after.number
+		: null;
+}
+
 /** The mergeability fields {@link retainKnownMergeability} grafts onto a snapshot. */
 type MergeabilityFields = Pick<
 	GithubPullRequestWire,

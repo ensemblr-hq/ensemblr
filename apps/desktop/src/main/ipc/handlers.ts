@@ -29,6 +29,7 @@ import {
 	createWorkspacePrStatusSweeper,
 	type GithubService,
 	listSweepableWorkspaces,
+	type PullRequestMergedEvent,
 } from '../github/index.ts';
 import type { InfisicalService } from '../infisical';
 import type { LinearAuthService, LinearService } from '../linear';
@@ -170,6 +171,8 @@ interface RegisterIpcHandlersOptions {
 	rebuildMenu: () => void;
 	/** Fired after an in-app App-settings write so renderer and side-effects refresh. */
 	onAppSettingsUpdated?: (settings: AppSettings) => void;
+	/** Told when a workspace's pull request is seen to merge, by any path. */
+	onPullRequestMerged?: (event: PullRequestMergedEvent) => void;
 	openTargetService: OpenTargetService;
 	piExecutableService: PiExecutableService;
 	/** Merged per-runtime model catalog, shared with the agent-control spawn path. */
@@ -246,6 +249,7 @@ export function registerIpcHandlers({
 	menuBarStore,
 	menuContextStore,
 	onAppSettingsUpdated,
+	onPullRequestMerged,
 	activeChatStore,
 	openTargetService,
 	rebuildMenu,
@@ -431,6 +435,7 @@ export function registerIpcHandlers({
 			const service = createGithubService({
 				databaseService,
 				localCommandService,
+				onPullRequestMerged,
 				readCoAuthorEnabled: () =>
 					appSettingsService.read().git.coAuthorEnsemblr,
 			});

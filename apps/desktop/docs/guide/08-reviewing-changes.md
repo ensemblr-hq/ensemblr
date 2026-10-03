@@ -258,6 +258,16 @@ the workspace afterwards. Merging with checks still failing or pending is
 possible, but it is an explicitly warned override that only succeeds if
 repository policy allows it. The final step runs `gh pr merge`.
 
+A merge also closes the work out
+([ADR 0082](../adr/0082-close-out-a-workspace-when-its-pull-request-merges.md)).
+The workspace's card moves to **Done** on the board. If the workspace was
+created from an issue, that issue is closed too: a Linear issue moves to its
+team's completed state, and a GitHub issue is closed as completed. This happens
+however the pull request merged. It can be the Merge button, an agent running
+`gh pr merge`, or a merge on GitHub itself; Ensemblr notices the last two the
+next time it refreshes the pull request. An issue that is already done, or
+canceled, is left as it is.
+
 **Settings → Git → Archive on merge** decides what happens next: with it on, the
 workspace is archived as soon as the merge lands (and its local branch dropped,
 if you also enabled that); with it off, the workspace stays open and archiving
