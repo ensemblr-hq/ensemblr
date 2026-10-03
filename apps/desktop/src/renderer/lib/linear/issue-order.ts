@@ -1,5 +1,6 @@
 import { i18n } from '@/renderer/lib/i18n';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
+import { LINEAR_NOT_STARTED_STATE_TYPES } from '@/shared/linear-issue-state';
 
 import { getLinearPriorityLabel } from './issue-view';
 
@@ -61,9 +62,6 @@ const STATE_BUCKET_ORDER: readonly LinearStateBucket[] = [
 export const LINEAR_PRIORITY_ORDER: readonly number[] = [1, 2, 3, 4, 0];
 
 const CLOSED_BUCKETS: readonly LinearStateBucket[] = ['canceled', 'completed'];
-
-/** Linear workflow-state types that mean "not started yet": Backlog and Todo. */
-const BACKLOG_STATE_TYPES: readonly string[] = ['backlog', 'unstarted'];
 
 const UNASSIGNED_GROUP_ID = 'unassigned';
 
@@ -127,7 +125,7 @@ export function isLinearIssueNotStarted(
 	return (
 		issue.archivedAt === null &&
 		issue.stateType !== null &&
-		BACKLOG_STATE_TYPES.includes(issue.stateType)
+		LINEAR_NOT_STARTED_STATE_TYPES.includes(issue.stateType)
 	);
 }
 

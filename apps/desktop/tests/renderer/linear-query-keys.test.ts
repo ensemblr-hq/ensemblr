@@ -23,6 +23,12 @@ test('linearIssues: team and query still separate entries within one account', (
 	);
 });
 
+test('linearIssues: the not-started list never shares an entry with the browse list', () => {
+	expect(ensemblrQueryKeys.linearIssues({ notStarted: true })).not.toEqual(
+		ensemblrQueryKeys.linearIssues({}),
+	);
+});
+
 test('linearIssuesAll: prefixes every filtered issue-list entry', () => {
 	const prefix = ensemblrQueryKeys.linearIssuesAll();
 

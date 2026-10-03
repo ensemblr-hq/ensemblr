@@ -180,10 +180,14 @@ export interface LinearMetadataWire {
 
 /**
  * Request for {@link LinearApi.linearListIssues}. Omitting `accountId` merges
- * every connected account; naming one narrows the read to it.
+ * every connected account; naming one narrows the read to it. `notStarted`
+ * narrows the answer to Backlog and Todo issues and syncs them with their own
+ * state-filtered query, so a team's closed history cannot crowd them out of
+ * the bounded browse window.
  */
 export interface ListLinearIssuesRequest {
 	accountId?: string;
+	notStarted?: boolean;
 	query?: string;
 	refresh?: boolean;
 	teamId?: string;

@@ -219,7 +219,9 @@ test('an emptied Issues tab reads as loading while a Linear refresh runs', async
 	const { client, result } = renderIssuesTab([]);
 
 	await waitFor(() =>
-		expect(client.getQueryData(linearIssuesQuery({}).queryKey)).toBeDefined(),
+		expect(
+			client.getQueryData(linearIssuesQuery({ notStarted: true }).queryKey),
+		).toBeDefined(),
 	);
 	expect(result.current.isLoading).toBe(true);
 	expect(result.current.sources).toEqual([]);

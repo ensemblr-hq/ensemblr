@@ -7,6 +7,7 @@ import test, { type TestContext } from 'node:test';
 import {
 	type LinearClient,
 	type LinearIssueData,
+	type LinearIssueListOptions,
 	type LinearPage,
 	type LinearResourceData,
 	LinearServiceError,
@@ -116,6 +117,7 @@ function page<T>(nodes: T[], endCursor: string | null = null): LinearPage<T> {
 interface FakeClientOptions {
 	issuePages?: LinearPage<LinearIssueData>[];
 	listIssuesError?: LinearServiceError;
+	notStartedPages?: LinearPage<LinearIssueData>[];
 	searchResults?: LinearIssueData[];
 	metadata?: Partial<
 		Record<
@@ -127,8 +129,11 @@ interface FakeClientOptions {
 
 function createFakeClient(options: FakeClientOptions = {}) {
 	const calls: string[] = [];
+	const issueRequests: LinearIssueListOptions[] = [];
 	const issuePages = options.issuePages ?? [page([createIssueData()])];
+	const notStartedPages = options.notStartedPages ?? [page([])];
 	let issuePageIndex = 0;
+	let notStartedPageIndex = 0;
 
 	const client: LinearClient = {
 		createComment: async ({ body }) => {
@@ -162,7 +167,21 @@ function createFakeClient(options: FakeClientOptions = {}) {
 				issue: createIssueData({ id }),
 			};
 		},
-		listIssues: async ({ after } = {}) => {
+		listIssues: async (request = {}) => {
+			const { after, stateTypes } = request;
+			issueRequests.push(request);
+			if (stateTypes) {
+				calls.push(`listNotStarted:${after ?? ''}`);
+				const notStarted =
+					notStartedPages[
+						Math.min(notStartedPageIndex, notStartedPages.length - 1)
+					];
+				notStartedPageIndex += 1;
+				if (!notStarted) {
+					throw new Error('No fake not-started page configured.');
+				}
+				return notStarted;
+			}
 			calls.push(`listIssues:${after ?? ''}`);
 			if (options.listIssuesError) {
 				throw options.listIssuesError;
@@ -202,7 +221,7 @@ function createFakeClient(options: FakeClientOptions = {}) {
 		},
 	};
 
-	return { calls, client };
+	return { calls, client, issueRequests };
 }
 
 function createServiceFixture(t: TestContext, options: FakeClientOptions = {}) {
@@ -518,6 +537,160 @@ test('listIssues: filters cached rows by query', async (t) => {
 		result.issues.map((issue) => issue.id),
 		['issue-1'],
 	);
+});
+
+/** An issue fixture whose workflow state has the given type. */
+function issueInState(id: string, type: string): LinearIssueData {
+	return createIssueData({
+		id,
+		identifier: id.toUpperCase(),
+		state: { color: null, id: `state-${type}`, name: type, type },
+	});
+}
+
+/**
+ * A service sharing another fixture's database ten minutes later, so every
+ * scope the first one synced is stale and every row it wrote predates this
+ * one's syncs.
+ */
+function createLaterService(
+	databaseService: EnsemblrDatabaseService,
+	options: FakeClientOptions,
+	maxNotStartedSyncPages?: number,
+) {
+	const fake = createFakeClient(options);
+
+	return {
+		...fake,
+		service: createLinearService({
+			clientFactory: () => fake.client,
+			databaseService,
+			listAccounts: async () => [accountSnapshot(ACCOUNT, 'Example Org')],
+			...(maxNotStartedSyncPages === undefined
+				? {}
+				: { maxNotStartedSyncPages }),
+			now: () => new Date(NOW.getTime() + 10 * 60 * 1000),
+		}),
+	};
+}
+
+test('listIssues: a not-started read syncs Backlog and Todo with their own query', async (t) => {
+	const { calls, databaseService, issueRequests, service } =
+		createServiceFixture(t, {
+			issuePages: [page([issueInState('done-1', 'completed')])],
+			notStartedPages: [
+				page([issueInState('backlog-1', 'backlog')], 'cursor-1'),
+				page([issueInState('todo-1', 'unstarted')]),
+			],
+		});
+
+	await service.listIssues();
+	const result = await service.listIssues({ notStarted: true });
+
+	assert.ok(result.status === 'ok');
+	assert.strictEqual(result.source, 'remote');
+	assert.deepStrictEqual(result.issues.map((issue) => issue.id).sort(), [
+		'backlog-1',
+		'todo-1',
+	]);
+	assert.deepStrictEqual(calls, [
+		'listIssues:',
+		'listNotStarted:',
+		'listNotStarted:cursor-1',
+	]);
+	assert.deepStrictEqual(issueRequests[1], {
+		after: null,
+		orderBy: 'updatedAt',
+		stateTypes: ['backlog', 'unstarted'],
+	});
+
+	const database = databaseService.getConnection()?.database;
+	assert.ok(database);
+	const scopes = database
+		.prepare('SELECT scope FROM linear_sync_state ORDER BY scope')
+		.all() as unknown as Array<{ scope: string }>;
+	assert.deepStrictEqual(
+		scopes.map((row) => row.scope),
+		['issues', 'not-started'],
+	);
+});
+
+test('listIssues: a not-started read narrowed to a team syncs and records that team', async (t) => {
+	const { databaseService, issueRequests, service } = createServiceFixture(t, {
+		notStartedPages: [page([issueInState('todo-1', 'unstarted')])],
+	});
+
+	await service.listIssues({ notStarted: true, teamId: 'team-1' });
+
+	assert.strictEqual(issueRequests[0]?.teamId, 'team-1');
+	const database = databaseService.getConnection()?.database;
+	assert.ok(database);
+	const scopes = database
+		.prepare('SELECT scope FROM linear_sync_state')
+		.all() as unknown as Array<{ scope: string }>;
+	assert.deepStrictEqual(
+		scopes.map((row) => row.scope),
+		['not-started:team-1'],
+	);
+});
+
+test('listIssues: a complete not-started sync drops cached rows that left Backlog and Todo', async (t) => {
+	const { databaseService, service } = createServiceFixture(t, {
+		notStartedPages: [
+			page([
+				issueInState('closed-elsewhere', 'backlog'),
+				issueInState('todo-1', 'unstarted'),
+			]),
+		],
+	});
+	await service.listIssues({ notStarted: true });
+
+	const later = createLaterService(databaseService, {
+		notStartedPages: [page([issueInState('todo-1', 'unstarted')])],
+	});
+	const result = await later.service.listIssues({
+		notStarted: true,
+		refresh: true,
+	});
+
+	assert.ok(result.status === 'ok');
+	assert.deepStrictEqual(
+		result.issues.map((issue) => issue.id),
+		['todo-1'],
+	);
+	const everything = await later.service.listIssues();
+	assert.ok(everything.status === 'ok');
+	assert.ok(
+		!everything.issues.some((issue) => issue.id === 'closed-elsewhere'),
+	);
+});
+
+test('listIssues: a capped not-started sync drops nothing it did not reach', async (t) => {
+	const { databaseService, service } = createServiceFixture(t, {
+		notStartedPages: [page([issueInState('older-backlog', 'backlog')])],
+	});
+	await service.listIssues({ notStarted: true });
+
+	const later = createLaterService(
+		databaseService,
+		{
+			notStartedPages: [
+				page([issueInState('todo-1', 'unstarted')], 'cursor-1'),
+			],
+		},
+		1,
+	);
+	const result = await later.service.listIssues({
+		notStarted: true,
+		refresh: true,
+	});
+
+	assert.ok(result.status === 'ok');
+	assert.deepStrictEqual(result.issues.map((issue) => issue.id).sort(), [
+		'older-backlog',
+		'todo-1',
+	]);
+	assert.deepStrictEqual(later.calls, ['listNotStarted:']);
 });
 
 test('getIssue: serves the remote payload and caches comments', async (t) => {

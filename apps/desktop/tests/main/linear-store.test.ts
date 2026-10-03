@@ -178,6 +178,125 @@ test('listIssues: escapes SQL LIKE wildcards in the query', (t) => {
 	);
 });
 
+/** An issue upsert whose cached workflow state has the given type. */
+function issueInState(
+	id: string,
+	stateType: string | null,
+	overrides: Partial<LinearIssueUpsert> = {},
+): LinearIssueUpsert {
+	return createIssue({
+		data: {
+			state:
+				stateType === null
+					? null
+					: {
+							color: null,
+							id: `state-${stateType}`,
+							name: stateType,
+							type: stateType,
+						},
+		},
+		id,
+		identifier: id.toUpperCase(),
+		...overrides,
+	});
+}
+
+test('listIssues: narrows to the cached workflow-state types it is given', (t) => {
+	const { store } = createFixture(t);
+
+	store.upsertIssues(ACCOUNT, [
+		issueInState('backlog-1', 'backlog'),
+		issueInState('todo-1', 'unstarted'),
+		issueInState('done-1', 'completed'),
+		issueInState('no-state-1', null),
+	]);
+
+	assert.deepStrictEqual(
+		store
+			.listIssues({ stateTypes: ['backlog', 'unstarted'] })
+			.map((issue) => issue.id)
+			.sort(),
+		['backlog-1', 'todo-1'],
+	);
+	assert.strictEqual(store.listIssues().length, 4);
+});
+
+test('deleteUnconfirmedIssues: drops only the slice no write touched since the cutoff', (t) => {
+	const { database, store } = createFixture(t);
+	const later = new Date(NOW.getTime() + 10 * 60 * 1000);
+	const laterStore = createLinearStore({ database, now: () => later });
+
+	store.upsertIssues(ACCOUNT, [
+		issueInState('stale-backlog', 'backlog'),
+		issueInState('done', 'completed'),
+		issueInState('other-team-todo', 'unstarted', { teamId: 'team-2' }),
+	]);
+	store.upsertIssues(OTHER_ACCOUNT, [
+		issueInState('other-account-backlog', 'backlog'),
+	]);
+	store.upsertComments(ACCOUNT, 'stale-backlog', [
+		{
+			authorName: 'Alice',
+			body: 'Old thread',
+			data: {},
+			id: 'comment-stale',
+			issueId: 'stale-backlog',
+			remoteCreatedAt: null,
+		},
+	]);
+	laterStore.upsertIssues(ACCOUNT, [
+		issueInState('confirmed-todo', 'unstarted'),
+	]);
+
+	laterStore.deleteUnconfirmedIssues({
+		accountId: ACCOUNT,
+		keepIds: [],
+		stateTypes: ['backlog', 'unstarted'],
+		syncedBefore: later.toISOString(),
+		teamId: 'team-1',
+	});
+
+	assert.strictEqual(store.getIssue('stale-backlog'), null);
+	assert.deepStrictEqual(store.listComments('stale-backlog'), []);
+	assert.ok(store.getIssue('confirmed-todo'));
+	assert.ok(store.getIssue('done'));
+	assert.ok(store.getIssue('other-team-todo'));
+	assert.ok(store.getIssue('other-account-backlog'));
+
+	laterStore.deleteUnconfirmedIssues({
+		accountId: ACCOUNT,
+		keepIds: [],
+		stateTypes: ['backlog', 'unstarted'],
+		syncedBefore: later.toISOString(),
+	});
+
+	assert.strictEqual(store.getIssue('other-team-todo'), null);
+	assert.ok(store.getIssue('other-account-backlog'));
+});
+
+test('deleteUnconfirmedIssues: keeps a row the sync returned whatever its timestamp says', (t) => {
+	const { store } = createFixture(t);
+	const later = new Date(NOW.getTime() + 10 * 60 * 1000);
+
+	store.upsertIssues(ACCOUNT, [
+		issueInState('returned-backlog', 'backlog'),
+		issueInState('unreturned-backlog', 'backlog'),
+	]);
+
+	// A clock stepped backwards mid-sync stamps a confirmed row before the
+	// cutoff; the returned ids are what keep it.
+	store.deleteUnconfirmedIssues({
+		accountId: ACCOUNT,
+		keepIds: ['returned-backlog'],
+		stateTypes: ['backlog', 'unstarted'],
+		syncedBefore: later.toISOString(),
+	});
+
+	assert.ok(store.getIssue('returned-backlog'));
+	assert.strictEqual(store.getIssue('unreturned-backlog'), null);
+});
+
 test('upsertResources: stores metadata by kind and lists team-scoped entries', (t) => {
 	const { store } = createFixture(t);
 

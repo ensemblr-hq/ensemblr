@@ -95,6 +95,7 @@ export const ensemblrQueryKeys = {
 	/** Query key for a filtered Linear issue list. */
 	linearIssues: (filter: {
 		accountId?: string;
+		notStarted?: boolean;
 		query?: string;
 		teamId?: string;
 	}) =>
@@ -103,6 +104,7 @@ export const ensemblrQueryKeys = {
 			'linear-issues',
 			filter.teamId ?? '',
 			filter.query ?? '',
+			filter.notStarted ? 'not-started' : '',
 			filter.accountId ?? '',
 		] as const,
 	/** Prefix matching every cached issue list regardless of filter. */
