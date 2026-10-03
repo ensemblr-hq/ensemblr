@@ -20,13 +20,14 @@ and no DCO sign-off.
 first PR, and which test runner a new test belongs to. [`apps/desktop/docs/architecture-map.md`](./apps/desktop/docs/architecture-map.md)
 is the directory-level index of which subtree owns which concern.
 
-The short version: macOS (Apple silicon or Intel) or Linux on x86-64, Node **exactly 24.x**, Bun 1.4 (Node stays the runtime; `mise install` sets up both).
+The short version: macOS on Apple silicon, or Linux on x86-64 or arm64, with [Nix](https://nixos.org/download/) and flakes enabled (`experimental-features = nix-command flakes`). The flake's dev shell supplies Node 24, Bun 1.4, and the native-module toolchain, and it is the only supported development environment. Intel Macs are not supported, because nixpkgs dropped `x86_64-darwin`.
 
 This is a Bun workspaces monorepo. The desktop app lives in [`apps/desktop/`](./apps/desktop); `apps/website/` and
-`packages/shared/` are reserved for the site and for code the two share. Install once from the root, then work
-inside the app's directory:
+`packages/shared/` are reserved for the site and for code the two share. Enter the shell, install once from the root, then work
+inside the app's directory (or prefix any command with `nix develop -c` instead of entering the shell):
 
 ```bash
+nix develop              # enter the dev shell: Node 24, Bun, and the native-module toolchain
 bun install              # installs every workspace; the desktop postinstall links Forge's packages and fixes node-pty permissions
 cd apps/desktop
 bun run dev              # the app

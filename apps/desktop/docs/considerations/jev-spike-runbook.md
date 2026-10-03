@@ -4,10 +4,10 @@ This runbook reproduces the Jev decision-layer spike against a newer Jev model. 
 [`jev-decision-layer.md`](./jev-decision-layer.md) first: that proposal defines the features,
 boundaries, and current no-go decision.
 
-> **Note (2026-09-21):** the `./scripts/with-pinned-node.sh` prefix on the commands below is
-> still correct after the move to Bun — the wrapper stays, because Ensemblr's login-shell
-> `PATH` can carry mise's Node 24 behind Homebrew's. See
-> [ADR 0073](../adr/0073-move-the-package-manager-from-npm-to-bun.md).
+> **Note (2026-10-03):** the commands below run through `nix develop -c`, which supplies the
+> pinned Node 24 from the flake's dev shell. They used `./scripts/with-pinned-node.sh` until
+> that wrapper was deleted. See
+> [ADR 0083](../adr/0083-develop-inside-a-nix-dev-shell.md).
 
 The durable artifact is this method, not the private corpus. Spawn briefs, questionnaires, and
 child reports may contain repository paths, code snippets, or terminal output, so the dataset,
@@ -99,9 +99,9 @@ shasum -a 256 \
 Run the local checks:
 
 ```bash
-./scripts/with-pinned-node.sh node --check .context/jev/harness.mjs
-./scripts/with-pinned-node.sh node .context/jev/harness.mjs self-test
-./scripts/with-pinned-node.sh node .context/jev/harness.mjs dry-run
+nix develop -c node --check .context/jev/harness.mjs
+nix develop -c node .context/jev/harness.mjs self-test
+nix develop -c node .context/jev/harness.mjs dry-run
 ```
 
 `self-test` must prove generic secret assignments and URL credentials are redacted, surviving
@@ -135,7 +135,7 @@ Run:
 set -e
 umask 077
 corpus_id="$(date -u +%Y%m%dT%H%M%SZ)-$(
-  ./scripts/with-pinned-node.sh node -e 'console.log(require("node:crypto").randomUUID())'
+  nix develop -c node -e 'console.log(require("node:crypto").randomUUID())'
 )"
 dataset_path=".context/jev/dataset-${corpus_id}.json"
 sample_path=".context/jev/label-sample-${corpus_id}.json"
@@ -143,10 +143,10 @@ if [ -e "$dataset_path" ] || [ -e "$sample_path" ]; then
   printf 'Refusing to overwrite an existing corpus artifact.\n' >&2
   exit 1
 fi
-./scripts/with-pinned-node.sh node .context/jev/harness.mjs extract \
+nix develop -c node .context/jev/harness.mjs extract \
   --out "$dataset_path" \
   --sample "$sample_path"
-./scripts/with-pinned-node.sh node .context/jev/harness.mjs dry-run \
+nix develop -c node .context/jev/harness.mjs dry-run \
   --dataset "$dataset_path"
 printf 'dataset=%s\nsample=%s\n' "$dataset_path" "$sample_path"
 ```
@@ -225,7 +225,7 @@ set -e
 umask 077
 model=jev-latest
 run_id="$(date -u +%Y%m%dT%H%M%SZ)-$(
-  ./scripts/with-pinned-node.sh node -e 'console.log(require("node:crypto").randomUUID())'
+  nix develop -c node -e 'console.log(require("node:crypto").randomUUID())'
 )"
 results_path=".context/jev/results-${model}-${run_id}.json"
 report_path=".context/jev/report-${model}-${run_id}.json"
@@ -237,7 +237,7 @@ fi
 
 set +e
 env JEV_MODEL="$model" \
-  ./scripts/with-pinned-node.sh node --env-file=.env \
+  nix develop -c node --env-file=.env \
   .context/jev/harness.mjs evaluate \
   --dataset .context/jev/dataset-v2.json \
   --gold .context/jev/gold-v2.json \
@@ -250,7 +250,7 @@ if [ "$evaluate_status" -ne 0 ] && [ "$evaluate_status" -ne 2 ]; then
 fi
 
 set +e
-./scripts/with-pinned-node.sh node .context/jev/harness.mjs report \
+nix develop -c node .context/jev/harness.mjs report \
   --results "$results_path" > "$report_tmp"
 report_status=$?
 set -e

@@ -38,10 +38,7 @@ if (
  * Reports whether a command exists on PATH, so the suggested fix names a tool
  * the machine actually has rather than one more thing to install. Walks PATH
  * directly rather than shelling out to `command -v`, which needs
- * `execFileSync(…, { shell: true })` — deprecated as of Node 26, and the same
- * walk `require-linux-toolchain.mjs` does. It is duplicated rather than shared
- * because that script exits at module scope, so importing from it here would
- * end this process before it could refuse.
+ * `execFileSync(…, { shell: true })` — deprecated as of Node 26.
  * @param command - Bare command name to probe.
  * @returns True when the command resolves.
  */

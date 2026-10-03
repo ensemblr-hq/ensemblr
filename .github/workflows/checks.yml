@@ -33,14 +33,18 @@ jobs:
   # They are separate jobs now: the wall clock is the slowest single job rather
   # than the sum, and only the suite that actually reads `process.platform` pays
   # for a second operating system.
+  #
+  # All three run inside the flake's dev shell, the toolchain every contributor
+  # develops in, so a check that passes locally is the check CI ran. The build
+  # legs in release.yml and nightly.yml stay off it — see install-dependencies.
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/install-dependencies
+      - uses: ./.github/actions/nix-dev-shell
       - name: Biome, Tailwind scale, i18n lint, hardcoded strings
-        run: bun run check
+        run: nix develop -c bun run check
 
   # `bun run typecheck` fans out to every workspace; the desktop app's runs its
   # four tsconfig projects concurrently (apps/desktop/scripts/typecheck.mjs).
@@ -51,9 +55,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/install-dependencies
+      - uses: ./.github/actions/nix-dev-shell
       - name: Type check
-        run: bun run typecheck
+        run: nix develop -c bun run typecheck
 
   # Both platforms Ensemblr ships for. The keymap suites resolve `mod` to ⌘ on
   # darwin and Ctrl elsewhere and assert whichever the runner is, so the Linux
@@ -68,7 +72,7 @@ jobs:
   # apiece. A third shard costs nothing extra on the clock and spreads that tail.
   #
   # Not four or more, for two reasons. The install is a fixed cost that every
-  # shard pays (`node-pty` alone compiles on Linux), so the marginal gain shrinks
+  # shard pays (Nix, the shell's closure, then `bun ci`), so the marginal gain shrinks
   # fast; and GitHub caps concurrent macOS runners far lower than Linux ones, so
   # a wide macOS fan-out starts queueing against any second run in flight —
   # which costs more wall clock than it saves.
@@ -82,12 +86,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/install-dependencies
+      - uses: ./.github/actions/nix-dev-shell
       # Sharding is a Vitest flag, so this runs the desktop app's suite directly
       # rather than the root fan-out, which would hand it to every workspace.
+      # `nix develop` finds the flake by searching up from apps/desktop.
       - name: Vitest (shard ${{ matrix.shard }} of 3)
         working-directory: apps/desktop
-        run: bun run test --shard=${{ matrix.shard }}/3
+        run: nix develop -c bun run test --shard=${{ matrix.shard }}/3
 
   scan:
     # `inputs` is null on push/pull_request, so those keep running the scan; only

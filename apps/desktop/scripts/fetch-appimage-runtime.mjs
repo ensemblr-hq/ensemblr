@@ -3,8 +3,7 @@
 // and accepts whatever comes back on an HTTP 200, despite a comment in its
 // types claiming the download is checksum-verified. `continuous` is a mutable
 // tag, so that is an unreviewed third-party binary prepended to every AppImage
-// this project ships. Fetch it here instead, against a pinned digest, the way
-// scripts/rebuild-native-linux.sh pins its container image — and let
+// this project ships. Fetch it here instead, against a pinned digest, and let
 // forge.config.ts hand the maker the verified local file.
 //
 // Refresh a runtime by downloading it, checking what changed upstream, and

@@ -6,6 +6,13 @@ Date: 2026-09-21
 
 Accepted
 
+**Partly superseded by [ADR 0083](0083-develop-inside-a-nix-dev-shell.md)
+(2026-10-03).** The Node wrapper `scripts/with-pinned-node.sh`, `mise.toml`,
+`.nvmrc`, `scripts/require-node-version.mjs`, and the Linux toolchain preflight
+`scripts/require-linux-toolchain.mjs` with its container rebuild are deleted:
+development now runs inside the flake's Nix dev shell. The package-manager choice
+below stands.
+
 Supersedes [0038](./0038-migrate-package-manager-bun-to-npm.md), which moved the
 repository from Bun to npm and enforced it with hooks. The parts of 0038 that are
 not about the package manager stand: Node 24 is still pinned by

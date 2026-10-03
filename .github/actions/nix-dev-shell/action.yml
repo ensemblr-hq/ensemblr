@@ -1,0 +1,27 @@
+name: Install dependencies in the Nix dev shell
+description: >-
+  Install Nix, then install the locked dependency tree inside the flake's dev
+  shell (apps/desktop/nix/dev-shell.nix). Later steps run their commands as
+  `nix develop -c …`, so lint, typecheck and test use the same Node, Bun and
+  native toolchain as every contributor's machine.
+
+runs:
+  using: composite
+  steps:
+    # Same pin as the nix-deps job. The shell's closure comes from
+    # cache.nixos.org, so it is substituted rather than built.
+    - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+
+    # The shell's Bun keeps the same global cache as any other Bun, so the
+    # tarballs are restored by hand exactly as install-dependencies does.
+    - uses: actions/cache@v6
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          bun-${{ runner.os }}-${{ runner.arch }}-
+
+    # `bun ci` is `bun install --frozen-lockfile`: it installs exactly bun.lock
+    # and fails if package.json has drifted from it.
+    - run: nix develop -c bun ci
+      shell: bash

@@ -32,14 +32,16 @@ sequence is ordered.
   `node-pty/build/Release/pty.node` both report `x86_64` under `lipo -archs`.
   (`node-pty` also ships `prebuilds/darwin-x64`, but that is not what the
   packaged app loads — the rebuilt binding is.)
-- **Bun 1.4** (`packageManager` is `bun@1.4.2`; `mise.toml` pins `bun = "1.4"`)
-  and **Node `>=24 <25`**. Bun installs and runs scripts; Node is still the
-  runtime everything else executes on — see [Bun and Node](#bun-and-node).
-- **`mksquashfs`** for the Linux build (`apt install squashfs-tools`). The
-  AppImage maker declares it as a required external binary and refuses to run
-  without it.
-- **Node `>=24 <25`** — enforced by `scripts/require-node-version.mjs`, which
-  `preinstall`, `dev`, and `package`/`make` run first.
+- **Nix with flakes enabled** (`experimental-features = nix-command flakes`).
+  `nix develop` enters the flake's dev shell, which supplies **Bun 1.4**
+  (`packageManager` is `bun@1.4.2`), **Node `>=24 <25`**, and on Linux the C++
+  toolchain and `mksquashfs` — see [Bun and Node](#bun-and-node) and
+  [The dev shell](#the-dev-shell). Every command in this guide runs inside it,
+  either in an interactive `nix develop` or as `nix develop -c <command>`. Intel
+  Macs get no shell, because nixpkgs 26.11 dropped `x86_64-darwin`.
+- **`mksquashfs`** for the Linux build. The dev shell provides it
+  (`squashfs-tools`); the AppImage maker declares it as a required external
+  binary and refuses to run without it. CI installs it on the runner.
 - **An authenticated `gh`** — the whole release ritual is `gh release create`,
   and a nightly is dispatched with `gh workflow run`. The runner ships `gh`
   preinstalled, so the workflow's own `gh api` calls — the Homebrew cask bump
@@ -59,8 +61,7 @@ Signing entitlements are in `entitlements.plist` (hardened runtime).
 These run from `apps/desktop/`, the desktop app's directory in the monorepo; from
 the repository root, prefix each with `bun run --cwd apps/desktop`. Paths in this
 document are relative to `apps/desktop/` unless they name a repository-root file
-(`bun.lock`, `bunfig.toml`, `.nvmrc`, `mise.toml`, `flake.nix`, `.github/`,
-`.ensemblr/settings.toml`, `scripts/with-pinned-node.sh`,
+(`bun.lock`, `bunfig.toml`, `flake.nix`, `.github/`, `.ensemblr/settings.toml`,
 `scripts/check-lockfile-version.mjs`).
 
 ```bash
@@ -72,9 +73,6 @@ bun run verify:signing # assert what make just produced is signed and notarized
 
 bun run package:linux  # build an unpacked Linux directory under out/ (host architecture)
 bun run make:linux     # build the .AppImage under out/make/
-
-bun run diagnose:linux # report the Linux native-module toolchain and pty.node's linkage
-bun run rebuild:native # compile node-pty in a container by hand (dev/make:linux do it themselves)
 ```
 
 The Linux artifact is never signed, notarized, or stapled — there is no
@@ -127,8 +125,7 @@ caches into the gitignored `.appimage-runtime/` and records the verified path in
 `.appimage-runtime/resolved.json`, which `forge.config.ts` hands to the maker so
 the maker reads the local file instead of reaching for the network. Refreshing a
 runtime means downloading it, reviewing what moved upstream, and updating the
-digest in the same commit — the same discipline as the pinned
-`node:24-bookworm` digest in `scripts/rebuild-native-linux.sh`.
+digest in the same commit.
 
 ### The Linux build has to run on Linux
 
@@ -142,15 +139,15 @@ for darwin and win32 only, so Linux compiles it from source, and
 
 It does not fail. It reports `Preparing native dependencies: 1 / 1` and packages
 the Mach-O `pty.node` already sitting in `node_modules`. The AppImage builds,
-launches, and has a dead terminal in every tab — the same shape of silent
-breakage `require-node-version.mjs` exists to prevent, discovered a release
-later.
+launches, and has a dead terminal in every tab — silent breakage, discovered a
+release later.
 
 Three ways to get one:
 
 1. **CI.** Push the tag; `build-linux` in `release.yml` builds and attaches it.
-2. **A container**, to iterate locally. Under emulation on Apple silicon this is
-   slow but correct:
+2. **A container**, to iterate locally on a portable build. It runs outside the
+   dev shell on purpose: its `node-pty` links the container's glibc, not Nix's.
+   Under emulation on Apple silicon this is slow but correct:
 
    From the repository root, so the container sees the whole monorepo install:
 
@@ -176,88 +173,70 @@ Three ways to get one:
 
 ### Developing on Linux
 
-On a Linux desktop that already has a compiler, there is nothing to know: pin
-Node and run `bun run dev`. On one that has none — which on Linux is a larger
-share than it sounds, since every immutable distribution (SteamOS, Silverblue,
-NixOS) ships without one — there is still nothing to know, as long as `podman` or
-`docker` is installed. `dev`, `package:linux`, and `make:linux` all run
-`require-linux-toolchain.mjs` first, and it builds `node-pty` in a container
-itself rather than telling you to. The rest of this section is what it is doing
-on your behalf, and what to reach for when it cannot.
+Enter the dev shell and run `bun run dev`. That is the whole procedure on every
+Linux host, NixOS included, and on a host with no compiler at all — which on
+Linux is a larger share than it sounds, since every immutable distribution
+(SteamOS, Silverblue, NixOS) ships without one. The shell brings its own `gcc`,
+`make`, and `python3`, so there is nothing to install on the host but Nix.
 
 ```bash
-bun run diagnose:linux   # compiler, make, python3, mksquashfs, pty.node + its linkage
-bun run rebuild:native   # run that same container build by hand
+nix develop            # an interactive shell with Node 24, Bun, gcc, make, python3
+bun ci
+cd apps/desktop
+bun run dev
 ```
 
-`diagnose:linux` is the read-only view of the same checks — it never builds, so
-it always describes the tree as it stands. `ENSEMBLR_SKIP_NATIVE_AUTOBUILD=1`
-turns the automatic build back into the old refusal-with-instructions, for an
-environment that would rather not have an image pulled on its behalf.
+`nix develop -c bun run dev` does the same without entering the shell, and it
+works from `apps/desktop/` too, because Nix searches upward for `flake.nix`.
+Nothing runs ahead of `dev`, `package:linux`, or `make:linux` to check the Node
+major or the host's toolchain. Running outside the shell is unsupported rather
+than refused, and what you get there is whatever your host happens to have.
 
-**Pin Node first.** `.nvmrc`, `mise.toml`, and `engines` all say 24, but a plain
-shell does not necessarily have it on PATH and distro packages are usually
-something else. With mise installed, `mise install` reads `mise.toml` and gives
-you both Node 24 and Bun 1.4, and mise's shims (or its shell activation) put
-them on PATH:
-
-```bash
-mise install                                     # Node 24 + Bun 1.4 from mise.toml
-export PATH="$(brew --prefix node@24)/bin:$PATH" # or put Node 24 on PATH yourself
-```
-
-`dev` **warns** on the wrong major rather than refusing, because Forge rebuilds
-native modules against Electron's own ABI either way — the mismatch degrades the
-dev loop instead of corrupting an artifact. `package`/`make`/`install` still
-refuse outright.
-
-**`node-pty` is the only thing that compiles, and it compiles once.** It
+**`node-pty` is the only thing that compiles, and Forge compiles it.** It
 publishes prebuilds for darwin and win32 only, so on Linux there is nothing to
 download. `node-pty` is deliberately **not** in `package.json`'s
 `trustedDependencies`, so `bun install` never runs its `install` script — the
-`node-gyp rebuild` that used to fire during `npm ci`, against *Node's* ABI, does
-not happen at all. That leaves the one build that matters: Forge rebuilds it
-against Electron's ABI inside `start` and `package`, and when the host cannot
-compile it surfaces as nothing more useful than:
+`node-gyp rebuild` against *Node's* ABI does not happen at all. That leaves the
+one build that matters: Forge rebuilds it against Electron's ABI inside `start`
+and `package`, using the shell's compiler. The binding links against Nix's
+glibc.
 
-```text
-Error: node-gyp failed to rebuild '.../node_modules/node-pty'
-```
+**The shell supplies Electron too, on Linux.** `ELECTRON_OVERRIDE_DIST_PATH`
+points at nixpkgs' `electron_44`, because the Electron that Bun installs is a
+generic-Linux binary: on NixOS it cannot find its libraries (it dies on
+`libglib-2.0.so.0`), and on any Linux it would run against the host's glibc while
+`node-pty` was linked against Nix's. nixpkgs' build runs everywhere and loads
+that binding. It is a patch release behind the pinned one — 44.3.0 against 44.4.5
+at the current `flake.lock` — which does not matter for native modules, since
+they are ABI-bound to the major. Packaging and release builds still ship the
+pinned Electron. On macOS nothing is overridden and the lazily downloaded
+Electron is used as is.
 
-`scripts/require-linux-toolchain.mjs` runs ahead of `dev`, `package:linux`, and
-`make:linux` and turns that into a message naming the missing tool. It also
-reads `pty.node`'s linkage back with `ldd` and refuses a binding whose libraries
-resolve outside `/usr` or `/lib` — see the Deck section below for why a
-Homebrew-linked one is worse than no binding at all.
+**The shell clears `LD_LIBRARY_PATH`.** A NixOS host can export one for ALSA and
+PipeWire's JACK shim, built against a newer glibc than Nix's, and a library from
+a newer glibc kills Electron at load with `GLIBC_2.43 not found`. A shell that
+leaves it set cannot start the app.
 
-**Without a host compiler, compile in a container and run on the host.** The
-container needs to exist only for the compile:
+**Keep `flake.lock` no older than your NixOS system.** Electron loads its GPU
+drivers from `/run/opengl-driver`, which NixOS builds against the system's
+glibc. When the flake's nixpkgs is older, that glibc is too, and the GPU process
+dies with `MESA-LOADER: failed to open dri: … version 'GLIBC_2.43' not found`.
+The window still opens, but everything renders in software, including the
+terminal's WebGL renderer. `nix flake update nixpkgs` fixes it; a newer lock
+than the system is fine. On a Linux that is not NixOS, nixpkgs' Electron cannot
+see the host's drivers at all and always renders in software.
 
-```bash
-# Install the dependencies on the host, then the binding, which is what
-# bun run rebuild:native wraps.
-bun ci
-bun run rebuild:native
-```
+**A local AppImage is for testing only.** `make:linux` from the shell packs a
+`node-pty` linked against Nix's glibc, so the terminals in that AppImage work
+only on a machine where that glibc exists. Release AppImages come from CI, which
+builds outside Nix (see [The dev shell](#the-dev-shell)). If you need a portable
+build by hand, use the container recipe in *The Linux build has to run on Linux*.
 
-Both leave their output in the host's `node_modules`, where Forge finds the
-binding already built and skips its own rebuild. Rootless podman maps container
-root to you, so the files come back owned correctly; rootful docker does not,
-and `rebuild:native` says so with the `chown` to fix it.
-
-**Do not try to run the app in that container.** Electron needs the whole
-Chromium runtime — a bare `debian:bookworm` gets as far as
+**Do not try to run the app in a container.** Electron needs the whole Chromium
+runtime — a bare `debian:bookworm` gets as far as
 `error while loading shared libraries: libnspr4.so` — plus the session's Wayland
-socket and GPU nodes. Installing that set into a container to reach a desktop
-you are already sitting in front of is work for no gain, and it puts a second
-glibc between the app and the compositor whose behavior you are trying to
-verify. The compile is the only part that wants isolation, and it is the only
-part that is host-independent.
-
-`debian:bookworm` is also not arbitrary: it links an older glibc than any
-desktop host, and old-built-runs-on-new is the safe direction for a binary that
-ends up inside a shipped AppImage. Override with
-`ENSEMBLR_NATIVE_REBUILD_IMAGE` only toward an *older* base, never a newer one.
+socket and GPU nodes. A container is for the compile only; the app runs on the
+host, in the shell.
 
 ### Building and verifying on a Steam Deck
 
@@ -265,120 +244,22 @@ The Deck is the reference Linux host: Wayland, KDE Plasma, fractional scaling, a
 battery, an immutable root, and no package manager to speak of. Everything below
 assumes **Desktop Mode**.
 
-**Toolchain.** Four things are needed, and they do not all come from the same
-place. `bun run diagnose:linux` reports all of them, plus whether `pty.node` is
-built and what it links against:
+**Toolchain.** One thing is needed: Nix with flakes enabled, installed in a way
+that survives a SteamOS update, which restores the read-only root. Everything
+else — Node 24, Bun, a compiler, `mksquashfs`, and Electron — comes from the dev
+shell, so none of it touches the root filesystem and no sudo password is needed
+for it.
 
-```text
-node         24.20.0 (electron rebuild target)
-compiler     MISSING
-make         MISSING
-python3      /home/linuxbrew/.linuxbrew/bin/python3
-mksquashfs   /home/linuxbrew/.linuxbrew/bin/mksquashfs
-pty.node     .../node_modules/node-pty/build/Release/pty.node
-
-linkage
-  libstdc++.so.6     /usr/lib/libstdc++.so.6
-  libc.so.6          /usr/lib/libc.so.6
-```
-
-That output is the steady state on a Deck set up the way this section
-describes, and it is worth reading twice: **`compiler MISSING` is fine** once
-`pty.node` exists and links under `/usr`. The compiler is needed to produce the
-binding, not to use it.
-
-**Node 24 and `mksquashfs`: Homebrew covers both.** Each has an `x86_64_linux`
-bottle, so nothing compiles and nothing touches the read-only root. `node@24` is
-keg-only, as every versioned formula is, so it has to be put on PATH by hand —
-plain `node` is far past 24 and `scripts/require-node-version.mjs` enforces the
-major exactly.
-
-```bash
-brew install node@24 squashfs
-export PATH="$(brew --prefix node@24)/bin:$PATH"
-node -v   # must print v24.x
-```
-
-`nvm` works just as well for the Node half if you would rather not go through
-Homebrew; it also installs entirely under `$HOME`.
-
-**Bun goes under `$HOME` too.** The official installer
-(`curl -fsSL https://bun.sh/install | bash`) writes to `~/.bun` and touches
-nothing on the read-only root, so it needs no sudo and survives a SteamOS update.
-Add `~/.bun/bin` to PATH. `mise install` is the other route and covers Node and
-Bun in one step.
-
-**A C++ compiler: Homebrew is the wrong tool.** Forge compiles `node-pty` — it
-publishes no linux-x64 prebuild — and node-gyp looks for `g++`/`c++`/`cc` on
-PATH. Homebrew's `gcc` formula installs *versioned* binaries (`g++-16`), so
-node-gyp will not find it and will fall through to the system compiler, or fail
-loudly if there is none. That failure is the good outcome.
-
-Pointing `CXX` at Homebrew's `g++-16` to force it is the bad one: the resulting
-`pty.node` links Homebrew's libstdc++ and carries an rpath into
-`/home/linuxbrew/.linuxbrew/lib`. It runs on the machine that built it and on no
-other — the same shape of silent, ships-anyway breakage
-`require-linux-host.mjs` exists to prevent, just one layer down.
-
-So if `g++` is MISSING above, the shortest way through is not to install one at
-all — the one module that needs it compiles in a throwaway `node:24-bookworm`
-container, and the binding lands in `node_modules` where Forge finds it already
-built. The Deck ships `podman`, so this needs no installation and no sudo
-password, and `bun run dev` does it unprompted the first time it finds the
-binding missing or stamped for the wrong ABI. Run it by hand when you want to
-replace a binding without waiting for a preflight to notice:
-
-```bash
-bun run rebuild:native   # ~1 GB image pull the first time, seconds after that
-```
-
-Reach for a real toolchain only if you want one on the host anyway:
-
-```bash
-# Native. Needs a sudo password set (`passwd` — the Deck ships without one),
-# and lasts only until the next SteamOS update, which restores the image.
-sudo steamos-readonly disable
-sudo pacman-key --init && sudo pacman-key --populate archlinux holo
-sudo pacman -S --needed base-devel python
-```
-
-Or keep a persistent Debian shell, if you would rather have the install and the
-build tools in one place than reach for a one-shot container each time:
-
-```bash
-distrobox create --name ensemblr --image debian:bookworm
-distrobox enter ensemblr
-sudo apt-get update && sudo apt-get install -y git curl python3 build-essential squashfs-tools
-```
-
-It shares `$HOME`, so the repo is the same tree from both sides — but note that
-it does **not** share `/home/linuxbrew`, so Homebrew's `node@24` is invisible
-inside it and Node has to be installed in the container too. Compile there, then
-leave: the app itself has to run on the host (see *Developing on Linux* above).
-
-**Whichever route, check what `pty.node` actually linked.** For the tree you are
-developing against, `bun run diagnose:linux` does it and the `dev`/`package:linux`
-guards do it automatically. After a build, check what actually got packaged:
-
-```bash
-ldd out/Ensemblr-linux-x64/resources/app.asar.unpacked/node_modules/node-pty/build/Release/pty.node
-```
-
-Every entry should resolve under `/usr/lib` or `/lib`. A `/home/linuxbrew` path
-means the artifact only runs on this Deck, and `not found` means it will not run
-anywhere.
-
-**Build.** Budget ~2 GB for `node_modules` plus the Electron download.
+**Build.** Budget ~2 GB for `node_modules` plus the Electron closure.
 
 ```bash
 git clone https://github.com/ensemblr-hq/ensemblr.git && cd ensemblr
-export PATH="$(brew --prefix node@24)/bin:$PATH"
-export PATH="$HOME/.bun/bin:$PATH"
+nix develop             # Node 24, Bun, gcc, make, python3, squashfs-tools
 
 bun ci                  # installs the tree; node-pty's install script is deliberately not run
 
-bun run dev             # the dev loop — builds node-pty in a container first if it has to
-bun run diagnose:linux  # after that build: confirm pty.node exists and links under /usr
+cd apps/desktop
+bun run dev             # the dev loop; Forge builds node-pty with the shell's gcc
 
 bun run package:linux   # unpacked build — needs no mksquashfs
 ./out/Ensemblr-linux-x64/Ensemblr
@@ -393,6 +274,11 @@ bun run make:linux
 chmod +x out/make/AppImage/x64/*.AppImage
 ./out/make/AppImage/x64/*.AppImage
 ```
+
+That AppImage carries a `node-pty` linked against Nix's glibc, which the Deck
+does not have, so its terminals will not work there. Use it to check the
+wrapper — the `.desktop` file, the icons, startup — and take the artifact for
+terminals from a release or nightly built in CI.
 
 If the app dies at startup with a sandbox error, the kernel is refusing
 unprivileged user namespaces — an AppImage is a FUSE mount and cannot carry a
@@ -447,8 +333,7 @@ Ensemblr does. The chime is unaffected either way: it is `new Audio()` in the
 renderer, and the notification itself is posted `silent` so no daemon ever
 plays a second tone over it.
 
-`bun run build` is an alias for `bun run package`. All three of `build`,
-`package`, and `make` run `scripts/require-node-version.mjs` first.
+`bun run build` is an alias for `bun run package`.
 
 `make` and `package` cover the common cases; the channel/skip variants below
 wrap them with environment variables:
@@ -472,14 +357,15 @@ into an error (see below).
 Bun is the package manager and script runner. **Node 24 is still the runtime**:
 every `node scripts/*.mjs` in `package.json`, Vite, Forge, Vitest, and the
 `electron --test` suites run on it. Bun does **not** shim itself as `node` — in
-both `bun run <script>` and `preinstall`/`postinstall`, `node` resolves to the
-real Node on PATH and `process.versions.bun` is `undefined`. The desktop
-workspace's `preinstall` and `postinstall` run on every `bun install` and
-`bun ci`, which is what lets `scripts/require-node-version.mjs` refuse a wrong
-Node major at install time. Bun itself runs a workspace's lifecycle scripts only
+both `bun run <script>` and `postinstall`, `node` resolves to the real Node on
+PATH and `process.versions.bun` is `undefined`. Both come from the dev shell (see
+[The dev shell](#the-dev-shell)): `nodejs_24` and nixpkgs' `bun`, at the version
+`packageManager` names. The desktop workspace's `postinstall` runs on every
+`bun install` and `bun ci`. Bun itself runs a workspace's lifecycle scripts only
 when it first installs that workspace, so the root `package.json`'s
 `preinstall` and `postinstall` run every workspace's on each install (a first
-install runs them twice; both are idempotent).
+install runs them twice; both are idempotent). The desktop workspace has no
+`preinstall` of its own: nothing checks the Node major at install time any more.
 
 ### The monorepo layout
 
@@ -531,8 +417,8 @@ complete set of packages whose install scripts run.
 and `prebuilds/darwin-x64` it ships, and nothing needs to run. On Linux there is no
 prebuild, and the binding has to come from Forge's `@electron/rebuild` against
 *Electron's* ABI. If Bun ran node-pty's install script on Linux it would compile
-against *Node's* ABI instead — the mismatch `scripts/require-linux-toolchain.mjs`
-exists to catch. The three scripts that stay blocked are `node-pty`, `@swc/core`,
+against *Node's* ABI instead, and the binding would fail to load in Electron. The
+three scripts that stay blocked are `node-pty`, `@swc/core`,
 and `core-js-pure`, which are exactly the entries npm's old `allowScripts: false`
 listed.
 
@@ -569,34 +455,57 @@ Every later install preserves the version it loaded, under either Bun. The pin i
 temporary: raise `SUPPORTED_LOCKFILE_VERSION` in `scripts/check-lockfile-version.mjs`
 in the same change that regenerates the lockfile once dependabot-core moves.
 
-### Why the Node wrapper stays
+### The dev shell
 
-Every setup and run script in `.ensemblr/settings.toml` goes through
-`scripts/with-pinned-node.sh`, which puts the Node pinned in `.nvmrc` **first**
-on `PATH` and then hands the command over.
+`nix develop` is the only supported development environment, and every setup and
+run script in `.ensemblr/settings.toml` goes through `nix develop -c`. The shell
+is `devShells.default` in `flake.nix`, defined in `nix/dev-shell.nix`, for
+`x86_64-linux`, `aarch64-linux`, and `aarch64-darwin`. It needs Nix with
+`nix-command flakes` enabled. Run `nix develop` from anywhere in the tree; Nix
+searches upward for `flake.nix`.
 
-It looks redundant, and the Bun migration deleted it on that belief.
-`src/main/main.ts` wires `createToolchainPathResolver`;
-`src/main/environment/toolchain-path.ts` captures a **login shell's** `PATH` for
-the workspace directory by running `$SHELL -lic`, which does activate mise; and
-`src/main/environment/workspace-environment.ts` injects the result into setup
-scripts, run scripts, and terminals. So mise's Node 24 *is* on the captured
-`PATH` — but on is not first. A startup file that prepends Homebrew **after**
-activating mise — `eval (brew shellenv fish)` below `mise activate fish`, which
-is the common order — leaves `/opt/homebrew/bin` ahead of it, and mise's hook
-re-applies only when it detects a change, so nothing moves it back. Measured on
-such a setup, the captured `PATH` opened with `/opt/homebrew/bin:/opt/homebrew/sbin`,
-`node` resolved to Homebrew's 26.9.0, and the setup script's `bun ci` died on the
-preinstall guard. Bun is not the variable: it hands lifecycle scripts whatever
-`node` leads `PATH`, identically for `bun install` and `bun ci`.
+What it provides, with every version read from a manifest rather than restated:
 
-The wrapper is a no-op when the right Node already leads `PATH`, so it costs
-nothing on a machine whose startup order is the other way round. It can go once
-the capture itself puts the workspace-pinned toolchain first.
+- **Node**, `nodejs_<major>`, with the major parsed from the root
+  `engines.node` (`>=24 <25`). That is 24.21.0 at the current `flake.lock`.
+- **Bun** from nixpkgs (1.4.2, matching `packageManager`), plus `gnumake` and
+  `python3`.
+- **On Linux:** gcc through `mkShell`'s stdenv; `squashfs-tools` for
+  `make:linux`; `ELECTRON_OVERRIDE_DIST_PATH` pointing at nixpkgs'
+  `electron_<major>`, the major parsed from the desktop `devDependencies.electron`
+  (44.3.0 at the current lock, against the 44.4.5 that packaging and releases
+  ship; native modules are ABI-bound to the major alone); and a `shellHook` that
+  unsets `LD_LIBRARY_PATH`.
+- **On macOS:** `mkShellNoCC`, so the compiler and SDK come from the Xcode
+  Command Line Tools. Nix's darwin stdenv exports `SDKROOT` and `DEVELOPER_DIR`,
+  which would point `xcrun` at a toolchain without `codesign` or `notarytool`.
 
-**Never set `PATH` in `[environment_variables]`.** The resolver runs only when
-`!('PATH' in env)` — the presence of the *key*, not its truthiness — so any `PATH`
-entry silently switches it off, and Bun may not be on `PATH` at all.
+**Why a shell and not guards.** The toolchain used to be assembled from three
+layers of workarounds — a version gate, a toolchain preflight with a container
+fallback, and a wrapper that forced Node 24 to the front of `PATH` — each
+repairing what the one before it could not guarantee. On a NixOS host `bun run
+dev` still failed under all three, and the shell replaced them. The reasoning is
+in [ADR 0083](./adr/0083-develop-inside-a-nix-dev-shell.md).
+
+**Nothing replaces the guards.** There is no Node-version gate and no portability
+check on `pty.node` any more. A command run outside the shell is unsupported, and
+a `make:linux` built locally is the developer's to vet: its terminals only work
+where Nix's glibc exists, so release AppImages come from CI.
+
+**CI splits on purpose.** The `lint`, `typecheck`, and `test` jobs in
+`.github/workflows/checks.yml` use the composite `.github/actions/nix-dev-shell`,
+which installs Nix and runs `nix develop -c bun ci`, and each step then runs as
+`nix develop -c …`. The release and nightly build legs keep
+`.github/actions/install-dependencies` and stay outside Nix: `setup-node` reads
+`engines.node` through `node-version-file: package.json` and `setup-bun` reads
+`packageManager`. They stay outside so the shipped AppImage's `node-pty` links the
+runner's glibc and is portable, and so macOS signing finds the runner's Xcode.
+
+**Never set `PATH` in `[environment_variables]`.** Ensemblr resolves a login-shell
+`PATH` for a workspace directory only when `!('PATH' in env)` — the presence of
+the *key*, not its truthiness — so any `PATH` entry silently switches it off. The
+resolver is an app feature for users' repositories; this repository's own scripts
+no longer depend on it, because the shell puts the pinned tools first itself.
 
 ## Signing & notarization
 
@@ -1084,11 +993,13 @@ nix run github:ensemblr-hq/ensemblr#master    # compiled from master
   lifecycle scripts) and packages from `apps/desktop/`. The version is
   stamped `<version>-master.<date>.g<rev>`, the same shape as the nightly's.
   The build runs `electron-forge package --platform=linux` exactly as CI does,
-  then goes through the same `electron-app.nix`. It cannot run `bun run
-  package:linux`, because `require-linux-toolchain.mjs` refuses a binding linked
-  into the Nix store and reaches for podman.
+  then goes through the same `electron-app.nix`.
 - **`overlays.default`** adds `pkgs.ensemblr` (release) and
   `pkgs.ensemblr-master`.
+- **`devShells.default`** (`nix/dev-shell.nix`) is the development environment
+  for `x86_64-linux`, `aarch64-linux`, and `aarch64-darwin`, entered with
+  `nix develop`. It is not part of the packages: see
+  [The dev shell](#the-dev-shell).
 
 **The sandbox has no network, so the master build takes everything it would
 download from one fixed-output derivation**, `master.deps`. It holds three
@@ -1260,32 +1171,39 @@ reach this directory through the links `scripts/link-hoisted-packages.mjs` write
   (`scripts/diagnose-dock-flash.mjs`): it lists every `dev.ensemblr.app*` Launch
   Services registration and flags id collisions and dangling entries; add
   `--fix` to unregister dangling ones (live sibling builds are left alone).
-- **Node version error at build.** `require-node-version.mjs` refuses to build on
-  a Node outside `>=24 <25`; switch with `nvm`/`mise` (`.nvmrc` / `mise.toml`).
-- **`node-gyp failed to rebuild '.../node-pty'` on Linux.** The host has no C++
-  compiler, and node-pty ships no linux-x64 prebuild. Reaching Forge's error at
-  all means the preflight did not repair it, and there are two reasons it would
-  not: no `podman` or `docker` to build in — install one and re-run — or
-  `ENSEMBLR_SKIP_NATIVE_AUTOBUILD` is set, in which case `bun run rebuild:native`
-  does that same container build by hand. `bun run diagnose:linux` reports what
-  is missing and which of the two you are looking at. See *Developing on Linux*.
-- **Terminals dead in a Linux build that worked locally.** `pty.node` was
-  compiled against a private prefix — a Homebrew or Nix compiler — and carries
-  an rpath no other machine has. `bun run diagnose:linux` names the offending
-  libraries; `rm -rf node_modules/node-pty/build && bun run rebuild:native`
-  replaces it. The `dev`/`package:linux`/`make:linux` guards refuse it now.
+- **Wrong Node or Bun version, or `node-gyp failed to rebuild '.../node-pty'`.**
+  You are outside the dev shell, so you are running whatever Node, Bun, and
+  compiler the host has, and nothing checks them. Enter it with `nix develop`,
+  or prefix the command with `nix develop -c`, and re-run. In a shell that is
+  already entered, `command -v node` should resolve into `/nix/store`. Also
+  check that `[environment_variables]` in `.ensemblr/settings.toml` does not set
+  `PATH`.
+- **`nix develop` reports no `devShells.<system>.default` attribute.** Intel Macs
+  (`x86_64-darwin`) get no shell, because nixpkgs 26.11 dropped the platform.
+- **Terminals dead in a Linux build that worked locally.** A locally built
+  AppImage carries a `node-pty` linked against Nix's glibc, which only exists on
+  machines with that store path. Nothing detects it any more. Use the release or
+  nightly AppImage, which CI builds outside Nix, or build in a container as
+  described in *The Linux build has to run on Linux*.
+- **Electron dies with `GLIBC_2.43 not found`.** `LD_LIBRARY_PATH` is set and
+  points at libraries built against a newer glibc than Nix's. The dev shell
+  unsets it, so you launched Electron from outside the shell, or something after
+  `nix develop` exported it again.
+- **`MESA-LOADER: failed to open dri: … 'GLIBC_2.43' not found` in `dev`.** The
+  flake's nixpkgs is older than your NixOS system, so Electron cannot load the
+  system's GPU drivers and renders in software. Run `nix flake update nixpkgs`.
+  See *Developing on Linux*.
+- **Terminals dead in `dev` after `nix-collect-garbage` or a `flake.lock` bump.**
+  `node-pty` was compiled with the shell's gcc and finds `libstdc++` through a
+  `/nix/store` path the shell no longer holds. Its `.forge-meta` stamp still
+  matches, so Forge does not rebuild it on its own:
+  `rm -r node_modules/node-pty/build` at the repository root, then `dev` again.
+- **`libglib-2.0.so.0: cannot open shared object file` on NixOS.** Electron is the
+  generic-Linux binary Bun installed, not nixpkgs' build. Launch it from inside
+  the dev shell, which sets `ELECTRON_OVERRIDE_DIST_PATH`.
 - **`libnspr4.so: cannot open shared object file`.** Electron is being launched
   inside a container that has no Chromium runtime libraries. Compile in the
   container; run the app on the host.
-- **Node version error at install.** Bun hands lifecycle scripts whatever `node`
-  leads `PATH`, for `bun install` and `bun ci` alike, so the guard is reporting
-  the shell's `PATH` order, not a Bun difference. Inside Ensemblr, run it the way
-  the setup script does — `./scripts/with-pinned-node.sh bun ci` — which puts
-  Node 24 first (see [Why the Node wrapper stays](#why-the-node-wrapper-stays)).
-  In your own shell, check `command -v node`: if it is Homebrew's while mise is
-  active, a startup file is prepending Homebrew after `mise activate` — move
-  `brew shellenv` above it so mise's paths end up in front. Also check that
-  `[environment_variables]` in `.ensemblr/settings.toml` does not set `PATH`.
 - **`hdiutil detach /Volumes/Ensemblr` fails in a release build.** The macOS
   runner occasionally loses the disk image mid-`make` (`hdiutil: detach failed -
   No such file or directory`) and the arm64 or x64 job dies in *Build the signed,

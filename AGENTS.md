@@ -12,7 +12,7 @@ This is a Bun workspaces monorepo.
 | `apps/website/` | The marketing and documentation site. Not started yet. |
 | `packages/shared/` | Code the apps share, such as UI pieces lifted out of the desktop app. Not started yet. |
 
-The root holds only what the whole repository shares: the workspace manifest (`package.json`) and lockfile, the toolchain pins (`mise.toml`, `.nvmrc`) and install settings (`bunfig.toml`), the house Biome config, the monorepo-level scripts in `scripts/`, CI (`.github/`), agent tooling (`.claude/`, `.codex/`, `.agents/`, `.mcp.json`), Ensemblr's repository settings (`.ensemblr/`), the Nix flake entrypoint, and the community files. **Keep it that way: anything that belongs to one app or package lives under that workspace's directory.**
+The root holds only what the whole repository shares: the workspace manifest (`package.json`) and lockfile, the install settings (`bunfig.toml`; the toolchain itself is the Nix dev shell in `flake.nix`), the house Biome config, the monorepo-level scripts in `scripts/`, CI (`.github/`), agent tooling (`.claude/`, `.codex/`, `.agents/`, `.mcp.json`), Ensemblr's repository settings (`.ensemblr/`), the Nix flake entrypoint, and the community files. **Keep it that way: anything that belongs to one app or package lives under that workspace's directory.**
 
 - Before working under `apps/desktop/`, read `apps/desktop/AGENTS.md`. Its paths, and those in the scoped `AGENTS.md` files beneath it, are relative to `apps/desktop/`.
 - When you write a path in prose, write it from the repository root, workspace prefix included — `apps/desktop/src/main/main.ts`, not `src/main/main.ts`.
@@ -55,9 +55,11 @@ Scaffold provenance guardrail:
 
 ## Package Manager Policy
 
-This repository enforces Bun for JavaScript and TypeScript package management. Bun installs packages and runs `package.json` scripts; **Node 24 remains the runtime** (see `.claude/rules/stack.md`; the pin itself is the root `.nvmrc` and `mise.toml`), and Bun does not shim itself as `node`.
+This repository enforces Bun for JavaScript and TypeScript package management. Bun installs packages and runs `package.json` scripts; **Node 24 remains the runtime** (see `.claude/rules/stack.md`; the pin is `engines.node` in the root `package.json`), and Bun does not shim itself as `node`.
 
-- Use `bun install` instead of `npm install`, `pnpm install`, or `yarn install`. Use `bun ci` for a frozen install that must match `bun.lock` exactly — it is what the workspace setup script runs.
+**Run everything inside `nix develop`.** The flake's dev shell (`apps/desktop/nix/dev-shell.nix`) is the only supported development environment: it puts Node 24, Bun, and the native-module toolchain first on `PATH`. Enter it with `nix develop`, or prefix a single command with `nix develop -c <cmd>`; it works from `apps/desktop/` too, because Nix searches upward for `flake.nix`. No script checks the Node version or the host toolchain any more, so a command run outside the shell is unsupported rather than refused. Intel Macs (`x86_64-darwin`) get no shell, because nixpkgs dropped the platform.
+
+- Use `bun install` instead of `npm install`, `pnpm install`, or `yarn install`. Use `bun ci` for a frozen install that must match `bun.lock` exactly — it is what the workspace setup script runs, as `nix develop -c bun ci`.
 - Use `bun run <script>` instead of `npm run <script>`, `pnpm run <script>`, or `yarn run <script>`.
 - Use `bunx <package>` instead of `npx`, `pnpx`, or `yarn dlx`.
 - Use `bun add <package>` (`bun add -d` for a dev dependency) and `bun remove <package>` for dependency changes.
@@ -65,10 +67,10 @@ This repository enforces Bun for JavaScript and TypeScript package management. B
 - `bun.lock` stays at `lockfileVersion: 1`. Dependabot-core's Bun parser raises on a higher version, so dependency PRs would stop arriving. Bun 1.4 stamps 2 on a lockfile regenerated from scratch, so never delete `bun.lock` and reinstall to "refresh" it. `bun run check:lockfile` (part of the root `bun run check`) enforces this; `apps/desktop/docs/build-and-release.md#bun-and-node` records how the current file was produced and why a plain `bun install` without a lockfile silently re-resolves the whole graph.
 - The root `package.json` sets `packageManager` to the Bun version (`bun@1.4.2`); workspace manifests do not repeat it.
 - `bunfig.toml` pins `linker = "hoisted"` because Forge's `PACKAGE_KEEP_*` filters in `apps/desktop/forge.config.ts` match flat `node_modules/<pkg>/` paths. Do not switch to the isolated linker.
-- The root `package.json#trustedDependencies` is the complete list of packages whose install scripts run (an explicit list replaces Bun's built-in allowlist). `node-pty` is deliberately absent — on Linux its binding must be built by Forge against Electron's ABI, not by Bun against Node's. **Never run `bun pm trust --all`.** Bun reads `trustedDependencies` and `overrides` from the root manifest only, so both stay there even though every entry today serves the desktop app.
+- The root `package.json#trustedDependencies` is the complete list of packages whose install scripts run (an explicit list replaces Bun's built-in allowlist). `node-pty` is deliberately absent — its binding must be built by Forge against Electron's ABI, not by Bun against Node's. **Never run `bun pm trust --all`.** Bun reads `trustedDependencies` and `overrides` from the root manifest only, so both stay there even though every entry today serves the desktop app.
 - The local Codex hook `.codex/hooks/enforce-bun-package-manager.sh` (plus the Claude hook `.claude/hooks/enforce-bun.sh`) block direct `npm`, `npx`, `pnpm`, `pnpx`, `yarn`, `yarnpkg`, and matching `corepack` package-manager calls.
-- Never set `PATH` in `.ensemblr/settings.toml`'s `[environment_variables]`. Ensemblr injects the workspace directory's login-shell `PATH` (which activates mise, putting Node 24 and Bun on it) only when no `PATH` key is present, so defining one — even empty — silently disables the resolver.
-- Keep every setup and run script behind the root `scripts/with-pinned-node.sh`. The injected `PATH` has mise's Node 24 *on* it but not necessarily *first* — a shell startup that prepends Homebrew after `mise activate` leaves Node 26 in front, and `bun ci` then dies on the preinstall guard. Bun hands lifecycle scripts whichever `node` leads `PATH`, for `bun install` and `bun ci` alike.
+- Never set `PATH` in `.ensemblr/settings.toml`'s `[environment_variables]`. Ensemblr resolves a login-shell `PATH` for the workspace directory only when no `PATH` key is present, so defining one — even empty — silently disables the resolver. That resolver is an app feature for users' repositories; this repository does not depend on it for its toolchain.
+- Keep every setup and run script behind `nix develop -c`, as `.ensemblr/settings.toml` does. The shell supplies the pinned Node, Bun, and compiler regardless of what the host's shell startup puts on `PATH`.
 
 ## Biome Policy
 

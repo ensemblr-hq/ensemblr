@@ -260,23 +260,28 @@ Building from source is the other path, and the rest of this page covers it.
 
 | Requirement | Version | Check |
 | --- | --- | --- |
-| macOS (Apple silicon or Intel), or Linux on x86-64 | arm64 / x86-64 | `uname -sm` |
-| Node | **exactly 24.x** | `node -v` |
-| Bun | 1.4 (`packageManager` is `bun@1.4.2`) | `bun --version` |
+| macOS on Apple silicon, or Linux on x86-64 or arm64 | arm64 / x86-64 | `uname -sm` |
+| Nix, with flakes enabled | any recent | `nix --version` |
 | git | any recent | `git --version` |
-| `mksquashfs` (Linux only) | any recent | `which mksquashfs` |
-| A C++ toolchain (Linux only) | any recent | `which g++ make python3` |
 
-The Node pin is enforced, not advisory. `package.json` declares
-`engines: ">=24 <25"`, and `.nvmrc` and `mise.toml` both pin 24. A version gate
-runs at three points: on `bun install` (as `preinstall`), before `dev`, and again
-before `package`, `build`, and `make`. Bun manages packages and runs scripts, but
-Node remains the runtime — Bun does not stand in for it. If you use `mise`,
-`mise install` gives you Node 24 and Bun 1.4 together; otherwise `nvm use` reads
-`.nvmrc` and Bun installs from <https://bun.sh>.
+Nix is the whole toolchain. `nix develop` enters the repository's dev shell, which
+supplies Node **24.x**, Bun 1.4 (`packageManager` is `bun@1.4.2`), and on Linux a
+C++ toolchain, `python3`, `make`, `mksquashfs`, and the Electron that
+`bun run dev` launches. Install Nix from <https://nixos.org/download/> and enable
+flakes by adding `experimental-features = nix-command flakes` to your
+`nix.conf`. Intel Macs are not supported, because nixpkgs dropped
+`x86_64-darwin`.
 
-Ignoring the pin fails in ways that do not look like a Node problem — see
-[Troubleshooting](./14-troubleshooting.md) for the two symptoms.
+`package.json` declares `engines: ">=24 <25"`, and the shell takes its Node major
+from that field. Bun manages packages and runs scripts, but Node remains the
+runtime — Bun does not stand in for it. Nothing checks your Node version any
+more: a command run outside the shell uses whatever your host has, and that is
+unsupported rather than refused. Enter the shell with `nix develop`, or run a
+single command as `nix develop -c <command>`; it works from any directory in the
+checkout, because Nix searches upward for `flake.nix`.
+
+Ignoring that fails in ways that do not look like a toolchain problem — see
+[Troubleshooting](./14-troubleshooting.md) for the symptoms.
 
 ### Build
 
@@ -285,15 +290,17 @@ On macOS:
 ```bash
 git clone https://github.com/ensemblr-hq/ensemblr.git
 cd ensemblr
+nix develop
 bun install
+cd apps/desktop
 bun run make
 open out/make/
 ```
 
-`bun install` does two things worth knowing about beyond fetching packages: it
-runs the Node-version gate first, and afterwards it marks `node-pty`'s prebuilt
-`spawn-helper` binaries executable. They ship without the exec bit, and skipping
-that step surfaces much later as a terminal that will not open.
+`bun install` does one thing worth knowing about beyond fetching packages:
+afterwards it marks `node-pty`'s prebuilt `spawn-helper` binaries executable.
+They ship without the exec bit, and skipping that step surfaces much later as a
+terminal that will not open.
 
 `bun ci` is the stricter form — it installs exactly what `bun.lock` records and
 fails rather than change it. It is what the repository's own workspace setup uses.
@@ -314,6 +321,9 @@ an unpacked `.app` straight to `out/` and skips the disk-image step.
 On Linux:
 
 ```bash
+nix develop
+bun ci
+cd apps/desktop
 bun run make:linux
 chmod +x out/make/AppImage/x64/*.AppImage
 ./out/make/AppImage/x64/*.AppImage
@@ -330,28 +340,29 @@ prebuilds for darwin and win32 only, so a cross-build silently packages the
 host's Mach-O `pty.node`: the AppImage builds, launches, and has a dead terminal
 in every tab.
 
-`node-pty` is also the only thing that compiles, which is why a Linux build wants
-a toolchain. (`bun install` deliberately does not run its install script — Forge
-compiles it against Electron's ABI instead.) **If the host has none — every immutable distribution ships without
-one — nothing needs doing: `bun run dev`, `bun run make:linux`, and
-`bun run package:linux` build that one module themselves**, in a throwaway
-`node:24-bookworm` container, and leave the binding where Forge finds it already
-built. The first such run pulls the image and takes a few minutes; later ones
-find the binding stamped for Electron's ABI and skip straight through. It needs
-`podman` or `docker` and installs nothing on the host, which is what makes it
-safe on an immutable root — no sudo, and it survives the next OS update.
+`node-pty` is also the only thing that compiles. (`bun install` deliberately does
+not run its install script — Forge compiles it against Electron's ABI instead.)
+**Inside the dev shell there is nothing to set up for it:** `bun run dev`,
+`bun run make:linux`, and `bun run package:linux` have Forge build that one
+module with the shell's `gcc`, `make`, and `python3`. That is why the shell
+works on an immutable root such as SteamOS or Silverblue, where the host has no
+compiler: nothing is installed on the host at all.
 
-`bun run rebuild:native` runs that same container build by hand, for a binding
-you want to replace without waiting for a preflight to notice. Set
-`ENSEMBLR_SKIP_NATIVE_AUTOBUILD=1` to be refused with instructions instead of
-having an image pulled on your behalf.
+**The Electron that `bun run dev` launches on Linux comes from nixpkgs, not from
+Bun.** The shell sets `ELECTRON_OVERRIDE_DIST_PATH` to nixpkgs' build of the same
+major, which runs on any Linux, NixOS included, and loads the `node-pty` binding
+the shell compiled. No `nix-ld` configuration is needed. It is a patch release
+behind the one the lockfile pins, which is harmless: native modules are ABI-bound
+to the major. The shell also unsets `LD_LIBRARY_PATH`, because a library on it
+that was built against a newer glibc kills Electron at load. On macOS the
+lazily downloaded Electron is used as is.
 
-`bun run diagnose:linux` reports the toolchain plus what `pty.node` actually
-linked against, and never builds anything. A binding whose libraries resolve
-outside `/usr` or `/lib` runs on the machine that built it and nowhere else, so
-the guard refuses it — that one is not repaired automatically, because a
-compiler pointed at a Homebrew or Nix prefix is a host misconfiguration rather
-than a missing tool.
+**An AppImage you build locally is for testing the wrapper, not for sharing.**
+Its `node-pty` links against Nix's glibc, so its terminals work only on a machine
+where that glibc exists. The releases and nightlies on the
+[releases page](https://github.com/ensemblr-hq/ensemblr/releases) are built in CI
+outside Nix and are portable; use one of those when you need terminals to work
+elsewhere.
 
 ### Signing, notarization, and Gatekeeper (macOS)
 

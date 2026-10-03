@@ -440,12 +440,6 @@ export const CREDITS_PACKAGES = [
 		kind: 'development',
 	},
 	{
-		name: 'node-abi',
-		license: 'MIT',
-		url: 'https://github.com/electron/node-abi#readme',
-		kind: 'development',
-	},
-	{
 		name: 'shadcn',
 		license: 'MIT',
 		url: 'https://ui.shadcn.com',

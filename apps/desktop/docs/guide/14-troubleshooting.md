@@ -73,18 +73,17 @@ turn the in-app updater off themselves
 **Cause.** You are on the wrong Node major. Under Node 26, `electron-forge
 package` exits successfully and produces no artifacts.
 
-**Fix.** Switch to Node 24 and rebuild:
+**Fix.** Build inside the repository's dev shell, which supplies Node 24:
 
 ```bash
-node -v          # must report v24.x
-nvm use          # reads .nvmrc — or `mise install`, if you use mise
-bun run make
+nix develop -c node -v   # must report v24.x
+nix develop -c bun run make
 ```
 
-Ensemblr pins Node 24 in `.nvmrc`, `mise.toml`, and `package.json` (`engines:
-">=24 <25"`), and gates both `bun install` and the build commands on it. If the
-gate did not fire, something is invoking Forge directly rather than through the
-`package.json` script.
+Ensemblr pins Node 24 in `package.json` (`engines: ">=24 <25"`) and the dev shell
+takes its Node from that field. Nothing refuses a build on the wrong major any
+more, so a build run outside the shell uses whatever Node your host has, and this
+symptom is what that looks like.
 
 **If `node -v` already reports v24.x, this is not your problem** — read the next
 entry, which produces the same empty `out/` for a different reason.
@@ -145,34 +144,29 @@ majors will not help.
 are building with. `macos-alias` and `fs-xattr` compiled against that major, and
 the mismatch only surfaces later, at packaging time — long after the mistake.
 
-**Fix.** Reinstall under Node 24:
+**Fix.** Reinstall inside the dev shell, which supplies Node 24:
 
 ```bash
-nvm use
 rm -rf node_modules
-bun install
-bun run make
+nix develop -c bun install
+nix develop -c bun run make
 ```
 
-Non-interactive shells — CI, a git hook, a plain `sh -c` — never source the mise
-or nvm hooks, so they run under whatever Node is on `PATH`. A workspace `setup`
-script, run script, or terminal started by Ensemblr gets the workspace
-directory's login-shell `PATH` instead, and that capture does activate mise —
-but it only puts Node 24 *on* the `PATH`, not necessarily *first*. If a startup
-file prepends Homebrew after `mise activate` (`brew shellenv` below it is the
-common order), Homebrew's Node stays in front and the install fails with
-`Node 24 required to install, but running Node 26`. It is the same for
-`bun install` and `bun ci`: Bun hands lifecycle scripts whichever `node` leads
-`PATH`.
+Non-interactive shells — CI, a git hook, a plain `sh -c` — never source your
+version manager's hooks, so they run under whatever Node is on `PATH`. A
+workspace `setup` script, run script, or terminal started by Ensemblr gets the
+workspace directory's login-shell `PATH` instead, but that only puts a version
+manager's Node *on* the `PATH`, not necessarily *first*. If a startup file
+prepends Homebrew after the version manager's activation, Homebrew's Node stays
+in front.
 
-This repository's setup and run scripts go through
-`scripts/with-pinned-node.sh`, which puts the pinned Node first, so they are not
-affected. In your own terminal, `command -v node` shows which one wins; move
-`brew shellenv` above `mise activate` in your startup file to fix it for good.
-The capture is also switched off entirely when `[environment_variables]` in
-`.ensemblr/settings.toml` sets `PATH` at all, so look there too. Either way a
-wrong major fails loudly at `scripts/require-node-version.mjs` rather than
-building quietly.
+This repository's setup and run scripts all go through `nix develop -c`, and the
+dev shell puts its pinned Node first itself, so they are not affected. In your
+own terminal, enter the shell with `nix develop` and `command -v node` should
+resolve into `/nix/store`. The capture is also switched off entirely when
+`[environment_variables]` in `.ensemblr/settings.toml` sets `PATH` at all, so
+look there too. Nothing refuses a wrong Node major any more, so outside the shell
+a wrong one fails later and further from the cause, as the two symptoms above.
 
 ## Terminals and agents
 
