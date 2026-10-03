@@ -114,11 +114,34 @@ function page<T>(nodes: T[], endCursor: string | null = null): LinearPage<T> {
 	return { endCursor, hasNextPage: endCursor !== null, nodes };
 }
 
+/**
+ * Serves a state-filtered list's pages in order, repeating the last one, and
+ * records each request under `label` with its cursor.
+ */
+function createPageQueue(
+	calls: string[],
+	label: string,
+	pages: LinearPage<LinearIssueData>[],
+) {
+	let index = 0;
+
+	return (after: string | null | undefined): LinearPage<LinearIssueData> => {
+		calls.push(`${label}:${after ?? ''}`);
+		const result = pages[Math.min(index, pages.length - 1)];
+		index += 1;
+		if (!result) {
+			throw new Error(`No fake ${label} page configured.`);
+		}
+		return result;
+	};
+}
+
 interface FakeClientOptions {
 	issuePages?: LinearPage<LinearIssueData>[];
 	listIssuesError?: LinearServiceError;
 	notStartedPages?: LinearPage<LinearIssueData>[];
 	searchResults?: LinearIssueData[];
+	startedPages?: LinearPage<LinearIssueData>[];
 	metadata?: Partial<
 		Record<
 			'cycle' | 'label' | 'project' | 'state' | 'team' | 'user',
@@ -131,9 +154,17 @@ function createFakeClient(options: FakeClientOptions = {}) {
 	const calls: string[] = [];
 	const issueRequests: LinearIssueListOptions[] = [];
 	const issuePages = options.issuePages ?? [page([createIssueData()])];
-	const notStartedPages = options.notStartedPages ?? [page([])];
+	const nextNotStartedPage = createPageQueue(
+		calls,
+		'listNotStarted',
+		options.notStartedPages ?? [page([])],
+	);
+	const nextStartedPage = createPageQueue(
+		calls,
+		'listStarted',
+		options.startedPages ?? [page([])],
+	);
 	let issuePageIndex = 0;
-	let notStartedPageIndex = 0;
 
 	const client: LinearClient = {
 		createComment: async ({ body }) => {
@@ -170,17 +201,11 @@ function createFakeClient(options: FakeClientOptions = {}) {
 		listIssues: async (request = {}) => {
 			const { after, stateTypes } = request;
 			issueRequests.push(request);
+			if (stateTypes?.includes('started')) {
+				return nextStartedPage(after);
+			}
 			if (stateTypes) {
-				calls.push(`listNotStarted:${after ?? ''}`);
-				const notStarted =
-					notStartedPages[
-						Math.min(notStartedPageIndex, notStartedPages.length - 1)
-					];
-				notStartedPageIndex += 1;
-				if (!notStarted) {
-					throw new Error('No fake not-started page configured.');
-				}
-				return notStarted;
+				return nextNotStartedPage(after);
 			}
 			calls.push(`listIssues:${after ?? ''}`);
 			if (options.listIssuesError) {
@@ -556,7 +581,7 @@ function issueInState(id: string, type: string): LinearIssueData {
 function createLaterService(
 	databaseService: EnsemblrDatabaseService,
 	options: FakeClientOptions,
-	maxNotStartedSyncPages?: number,
+	maxStateScopeSyncPages?: number,
 ) {
 	const fake = createFakeClient(options);
 
@@ -566,9 +591,9 @@ function createLaterService(
 			clientFactory: () => fake.client,
 			databaseService,
 			listAccounts: async () => [accountSnapshot(ACCOUNT, 'Example Org')],
-			...(maxNotStartedSyncPages === undefined
+			...(maxStateScopeSyncPages === undefined
 				? {}
-				: { maxNotStartedSyncPages }),
+				: { maxStateScopeSyncPages }),
 			now: () => new Date(NOW.getTime() + 10 * 60 * 1000),
 		}),
 	};
@@ -585,7 +610,7 @@ test('listIssues: a not-started read syncs Backlog and Todo with their own query
 		});
 
 	await service.listIssues();
-	const result = await service.listIssues({ notStarted: true });
+	const result = await service.listIssues({ stateScope: 'not-started' });
 
 	assert.ok(result.status === 'ok');
 	assert.strictEqual(result.source, 'remote');
@@ -620,7 +645,7 @@ test('listIssues: a not-started read narrowed to a team syncs and records that t
 		notStartedPages: [page([issueInState('todo-1', 'unstarted')])],
 	});
 
-	await service.listIssues({ notStarted: true, teamId: 'team-1' });
+	await service.listIssues({ stateScope: 'not-started', teamId: 'team-1' });
 
 	assert.strictEqual(issueRequests[0]?.teamId, 'team-1');
 	const database = databaseService.getConnection()?.database;
@@ -643,13 +668,13 @@ test('listIssues: a complete not-started sync drops cached rows that left Backlo
 			]),
 		],
 	});
-	await service.listIssues({ notStarted: true });
+	await service.listIssues({ stateScope: 'not-started' });
 
 	const later = createLaterService(databaseService, {
 		notStartedPages: [page([issueInState('todo-1', 'unstarted')])],
 	});
 	const result = await later.service.listIssues({
-		notStarted: true,
+		stateScope: 'not-started',
 		refresh: true,
 	});
 
@@ -669,7 +694,7 @@ test('listIssues: a capped not-started sync drops nothing it did not reach', asy
 	const { databaseService, service } = createServiceFixture(t, {
 		notStartedPages: [page([issueInState('older-backlog', 'backlog')])],
 	});
-	await service.listIssues({ notStarted: true });
+	await service.listIssues({ stateScope: 'not-started' });
 
 	const later = createLaterService(
 		databaseService,
@@ -681,7 +706,7 @@ test('listIssues: a capped not-started sync drops nothing it did not reach', asy
 		1,
 	);
 	const result = await later.service.listIssues({
-		notStarted: true,
+		stateScope: 'not-started',
 		refresh: true,
 	});
 
@@ -691,6 +716,106 @@ test('listIssues: a capped not-started sync drops nothing it did not reach', asy
 		'todo-1',
 	]);
 	assert.deepStrictEqual(later.calls, ['listNotStarted:']);
+});
+
+test('listIssues: a started read reaches started issues the browse window missed', async (t) => {
+	const { calls, databaseService, issueRequests, service } =
+		createServiceFixture(t, {
+			issuePages: [page([issueInState('done-1', 'completed')])],
+			startedPages: [
+				page([issueInState('progress-1', 'started')], 'cursor-1'),
+				page([issueInState('review-1', 'started')]),
+			],
+		});
+
+	const browse = await service.listIssues();
+	const result = await service.listIssues({ stateScope: 'started' });
+
+	assert.ok(browse.status === 'ok');
+	assert.deepStrictEqual(
+		browse.issues.map((issue) => issue.id),
+		['done-1'],
+	);
+	assert.ok(result.status === 'ok');
+	assert.strictEqual(result.source, 'remote');
+	assert.deepStrictEqual(result.issues.map((issue) => issue.id).sort(), [
+		'progress-1',
+		'review-1',
+	]);
+	assert.deepStrictEqual(calls, [
+		'listIssues:',
+		'listStarted:',
+		'listStarted:cursor-1',
+	]);
+	assert.deepStrictEqual(issueRequests[1], {
+		after: null,
+		orderBy: 'updatedAt',
+		stateTypes: ['started'],
+	});
+
+	const database = databaseService.getConnection()?.database;
+	assert.ok(database);
+	const scopes = database
+		.prepare('SELECT scope FROM linear_sync_state ORDER BY scope')
+		.all() as unknown as Array<{ scope: string }>;
+	assert.deepStrictEqual(
+		scopes.map((row) => row.scope),
+		['issues', 'started'],
+	);
+});
+
+test('listIssues: a started read narrowed to a team syncs and records that team', async (t) => {
+	const { databaseService, issueRequests, service } = createServiceFixture(t, {
+		startedPages: [page([issueInState('progress-1', 'started')])],
+	});
+
+	await service.listIssues({ stateScope: 'started', teamId: 'team-1' });
+
+	assert.strictEqual(issueRequests[0]?.teamId, 'team-1');
+	const database = databaseService.getConnection()?.database;
+	assert.ok(database);
+	const scopes = database
+		.prepare('SELECT scope FROM linear_sync_state')
+		.all() as unknown as Array<{ scope: string }>;
+	assert.deepStrictEqual(
+		scopes.map((row) => row.scope),
+		['started:team-1'],
+	);
+});
+
+test('listIssues: a complete started sync drops cached started rows it no longer returns and keeps not-started ones', async (t) => {
+	const { databaseService, service } = createServiceFixture(t, {
+		notStartedPages: [page([issueInState('todo-1', 'unstarted')])],
+		startedPages: [
+			page([
+				issueInState('finished-elsewhere', 'started'),
+				issueInState('progress-1', 'started'),
+			]),
+		],
+	});
+	await service.listIssues({ stateScope: 'not-started' });
+	await service.listIssues({ stateScope: 'started' });
+
+	const later = createLaterService(databaseService, {
+		notStartedPages: [page([issueInState('todo-1', 'unstarted')])],
+		startedPages: [page([issueInState('progress-1', 'started')])],
+	});
+	const result = await later.service.listIssues({
+		refresh: true,
+		stateScope: 'started',
+	});
+
+	assert.ok(result.status === 'ok');
+	assert.deepStrictEqual(
+		result.issues.map((issue) => issue.id),
+		['progress-1'],
+	);
+	const everything = await later.service.listIssues();
+	assert.ok(everything.status === 'ok');
+	assert.ok(
+		!everything.issues.some((issue) => issue.id === 'finished-elsewhere'),
+	);
+	assert.ok(everything.issues.some((issue) => issue.id === 'todo-1'));
 });
 
 test('getIssue: serves the remote payload and caches comments', async (t) => {

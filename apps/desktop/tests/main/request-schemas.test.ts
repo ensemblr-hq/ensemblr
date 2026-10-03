@@ -9,6 +9,7 @@ import {
 	getWorkspaceGitStatusRequestSchema,
 	infisicalLinkScopeRequestSchema,
 	launchAgentHarnessRequestSchema,
+	listLinearIssuesRequestSchema,
 	openChatTabRequestSchema,
 	parseCreateWorkspaceRequest,
 	parseDeleteRepositoryRequest,
@@ -487,4 +488,19 @@ test('cancelComputeJobRequestSchema requires a non-empty job id', () => {
 	});
 	expect(() => cancelComputeJobRequestSchema.parse({ jobId: '' })).toThrow();
 	expect(() => cancelComputeJobRequestSchema.parse({})).toThrow();
+});
+
+test.each(['not-started', 'started'] as const)(
+	'listLinearIssuesRequestSchema accepts the %s state scope',
+	(stateScope) => {
+		expect(listLinearIssuesRequestSchema.parse({ stateScope })).toEqual({
+			stateScope,
+		});
+	},
+);
+
+test('listLinearIssuesRequestSchema refuses an unknown state scope', () => {
+	expect(() =>
+		listLinearIssuesRequestSchema.parse({ stateScope: 'completed' }),
+	).toThrow();
 });

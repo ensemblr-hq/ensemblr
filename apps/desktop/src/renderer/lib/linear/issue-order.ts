@@ -1,6 +1,9 @@
 import { i18n } from '@/renderer/lib/i18n';
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
-import { LINEAR_NOT_STARTED_STATE_TYPES } from '@/shared/linear-issue-state';
+import {
+	LINEAR_NOT_STARTED_STATE_TYPES,
+	LINEAR_STARTED_STATE_TYPES,
+} from '@/shared/linear-issue-state';
 
 import { getLinearPriorityLabel } from './issue-view';
 
@@ -139,7 +142,11 @@ export function isLinearIssueNotStarted(
 export function isLinearIssueStarted(
 	issue: Pick<LinearIssueWire, 'archivedAt' | 'stateType'>,
 ): boolean {
-	return issue.archivedAt === null && issue.stateType === 'started';
+	return (
+		issue.archivedAt === null &&
+		issue.stateType !== null &&
+		LINEAR_STARTED_STATE_TYPES.includes(issue.stateType)
+	);
 }
 
 /**

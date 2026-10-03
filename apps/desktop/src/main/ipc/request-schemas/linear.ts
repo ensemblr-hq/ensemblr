@@ -37,9 +37,9 @@ const linearIssueFieldsShape = {
 export const listLinearIssuesRequestSchema = z
 	.object({
 		accountId: linearAccountId,
-		notStarted: z.boolean().optional(),
 		query: z.string().optional(),
 		refresh: z.boolean().optional(),
+		stateScope: z.enum(['not-started', 'started']).optional(),
 		teamId: z.string().min(1).optional(),
 	})
 	.optional()

@@ -10,6 +10,7 @@ import type {
 	GetLinearMetadataResult,
 	LinearAccountFailure,
 	LinearAccountSnapshot,
+	LinearIssueStateScope,
 	LinearMetadataWire,
 	LinearResourceWire,
 	ListLinearIssuesRequest,
@@ -17,7 +18,10 @@ import type {
 	MutateLinearIssueResult,
 	UpdateLinearIssueRequest,
 } from '../../shared/ipc/contracts/linear';
-import { LINEAR_NOT_STARTED_STATE_TYPES } from '../../shared/linear-issue-state.ts';
+import {
+	LINEAR_NOT_STARTED_STATE_TYPES,
+	LINEAR_STARTED_STATE_TYPES,
+} from '../../shared/linear-issue-state.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import { createLinearAccountResolver } from './linear-account-resolution.ts';
 import {
@@ -51,19 +55,27 @@ const DEFAULT_STALE_AFTER_MS = 5 * 60 * 1000;
 const DEFAULT_MAX_SYNC_PAGES = 4;
 
 /**
- * Page cap for the not-started sync. Higher than the browse cap because the
+ * Page cap for a state-scoped sync. Higher than the browse cap because the
  * board and the create-from picker need these rows in full, and still bounded
  * so one organization's backlog cannot turn every freshness window into an
  * open-ended crawl of Linear.
  */
-const DEFAULT_MAX_NOT_STARTED_SYNC_PAGES = 10;
+const DEFAULT_MAX_STATE_SCOPE_SYNC_PAGES = 10;
 
 /**
- * Most not-started rows a read returns per account it spans: what the default
+ * Most state-scoped rows a read returns per account it spans: what the default
  * ten pages of fifty hold, so a merged read never cuts off rows the sync paid
  * to fetch.
  */
-const NOT_STARTED_ROWS_PER_ACCOUNT = 500;
+const STATE_SCOPE_ROWS_PER_ACCOUNT = 500;
+
+/** The workflow-state types each state scope asks Linear for and reads back. */
+const STATE_SCOPE_TYPES: Readonly<
+	Record<LinearIssueStateScope, readonly string[]>
+> = {
+	'not-started': LINEAR_NOT_STARTED_STATE_TYPES,
+	started: LINEAR_STARTED_STATE_TYPES,
+};
 
 const METADATA_KINDS: readonly LinearResourceKind[] = [
 	'team',
@@ -114,7 +126,7 @@ export interface CreateLinearServiceOptions {
 	databaseService: EnsemblrDatabaseService;
 	failureCooldownMs?: number;
 	listAccounts: () => Promise<LinearAccountSnapshot[]>;
-	maxNotStartedSyncPages?: number;
+	maxStateScopeSyncPages?: number;
 	maxSyncPages?: number;
 	now?: () => Date;
 	staleAfterMs?: number;
@@ -143,7 +155,7 @@ export function createLinearService({
 	databaseService,
 	failureCooldownMs,
 	listAccounts,
-	maxNotStartedSyncPages = DEFAULT_MAX_NOT_STARTED_SYNC_PAGES,
+	maxStateScopeSyncPages = DEFAULT_MAX_STATE_SCOPE_SYNC_PAGES,
 	maxSyncPages = DEFAULT_MAX_SYNC_PAGES,
 	now = () => new Date(),
 	staleAfterMs = DEFAULT_STALE_AFTER_MS,
@@ -175,26 +187,26 @@ export function createLinearService({
 	}
 
 	/**
-	 * The sync scope a browse read belongs to. A search and a not-started read are
-	 * each their own scope because each is answered by a different Linear query
+	 * The sync scope a browse read belongs to. A search and each state-scoped read
+	 * are their own scope because each is answered by a different Linear query
 	 * than the paged list, and caching them under one key would let a narrow
 	 * query mark the whole list fresh. A search's key is the search text, which
 	 * is why it is not durable.
 	 * @param term - Trimmed search text, empty when browsing.
 	 * @param teamId - Team the read is narrowed to, if any.
-	 * @param notStarted - Whether the read wants only Backlog and Todo issues.
+	 * @param stateScope - The slice of workflow states the read wants, if any.
 	 * @returns The scope this read syncs under.
 	 */
 	function issueScope(
 		term: string,
 		teamId: string | undefined,
-		notStarted: boolean,
+		stateScope: LinearIssueStateScope | undefined,
 	): SyncScope {
 		if (term) {
 			return { durable: false, key: `search:${term}` };
 		}
 
-		const base = notStarted ? 'not-started' : 'issues';
+		const base = stateScope ?? 'issues';
 
 		return { durable: true, key: teamId ? `${base}:${teamId}` : base };
 	}
@@ -283,24 +295,27 @@ export function createLinearService({
 	}
 
 	/**
-	 * Sync one account's Backlog and Todo issues into the store with a
-	 * state-filtered query, most recently updated first, so the board and the
-	 * create-from picker see them however much closed history the team carries.
+	 * Sync one account's issues in a slice of workflow-state types — Backlog and
+	 * Todo, or the started ones — into the store with a state-filtered query, most
+	 * recently updated first, so the board and the create-from picker see them
+	 * however much closed history the team carries.
 	 *
-	 * A run that reached Linear's last page has seen every not-started issue, so
-	 * any cached not-started row it did not return still claims a state it has
+	 * A run that reached Linear's last page has seen every issue in those states,
+	 * so any cached row in them it did not return still claims a state it has
 	 * left — closed, archived, deleted, or moved out of reach — and is dropped,
 	 * unless some other write refreshed it while the run was paging. A capped run
 	 * proves nothing about the rows past the cap and drops none.
 	 * @param store - Store to upsert issues and sync state into.
 	 * @param target - Account and client to sync.
 	 * @param scope - Sync scope to record the attempt under.
+	 * @param stateTypes - Workflow-state types the slice covers.
 	 * @param teamId - Optional team to scope the sync to.
 	 */
-	function syncNotStartedIssues(
+	function syncStateScopedIssues(
 		store: LinearStore,
 		target: AccountTarget,
 		scope: SyncScope,
+		stateTypes: readonly string[],
 		teamId?: string,
 	): Promise<void> {
 		return coordinator.runScopeSync({
@@ -312,17 +327,17 @@ export function createLinearService({
 					target,
 					{
 						orderBy: 'updatedAt',
-						stateTypes: LINEAR_NOT_STARTED_STATE_TYPES,
+						stateTypes,
 						...(teamId ? { teamId } : {}),
 					},
-					maxNotStartedSyncPages,
+					maxStateScopeSyncPages,
 				);
 
 				if (complete) {
 					store.deleteUnconfirmedIssues({
 						accountId: target.account.id,
 						keepIds: ids,
-						stateTypes: LINEAR_NOT_STARTED_STATE_TYPES,
+						stateTypes,
 						syncedBefore: startedAt,
 						...(teamId ? { teamId } : {}),
 					});
@@ -336,25 +351,35 @@ export function createLinearService({
 	}
 
 	/**
-	 * Run the remote sync that answers one browse read's scope: a search, the
-	 * not-started list, or the general paged list.
+	 * Run the remote sync that answers one browse read's scope: a search, a
+	 * state-scoped list, or the general paged list.
 	 * @param store - Store to upsert issues and sync state into.
 	 * @param target - Account and client to sync.
 	 * @param scope - Sync scope to record the attempt under.
-	 * @param read - The read's search text, team, and not-started narrowing.
+	 * @param read - The read's search text, team, and state-scope narrowing.
 	 */
 	function syncIssueScope(
 		store: LinearStore,
 		target: AccountTarget,
 		scope: SyncScope,
-		read: { notStarted: boolean; teamId: string | undefined; term: string },
+		read: {
+			stateScope: LinearIssueStateScope | undefined;
+			teamId: string | undefined;
+			term: string;
+		},
 	): Promise<void> {
 		if (read.term) {
 			return syncSearch(store, target, read.term, scope);
 		}
 
-		if (read.notStarted) {
-			return syncNotStartedIssues(store, target, scope, read.teamId);
+		if (read.stateScope) {
+			return syncStateScopedIssues(
+				store,
+				target,
+				scope,
+				STATE_SCOPE_TYPES[read.stateScope],
+				read.teamId,
+			);
 		}
 
 		return syncIssues(store, target, scope, read.teamId);
@@ -818,25 +843,25 @@ export function createLinearService({
 
 		listIssues: async ({
 			accountId,
-			notStarted = false,
 			query,
 			refresh = false,
+			stateScope,
 			teamId,
 		} = {}) => {
 			try {
 				const store = getStore();
 				const targets = await resolveTargets(accountId);
 				const term = query?.trim() ?? '';
-				const scope = issueScope(term, teamId, notStarted);
+				const scope = issueScope(term, teamId, stateScope);
 				const names = organizationNames(targets);
 				const readCached = () =>
 					store
 						.listIssues({
 							...(accountId ? { accountId } : {}),
-							...(notStarted
+							...(stateScope
 								? {
-										limit: NOT_STARTED_ROWS_PER_ACCOUNT * targets.length,
-										stateTypes: LINEAR_NOT_STARTED_STATE_TYPES,
+										limit: STATE_SCOPE_ROWS_PER_ACCOUNT * targets.length,
+										stateTypes: STATE_SCOPE_TYPES[stateScope],
 									}
 								: {}),
 							...(term ? { query: term } : {}),
@@ -855,7 +880,7 @@ export function createLinearService({
 				}
 
 				const sync = (target: AccountTarget) =>
-					syncIssueScope(store, target, scope, { notStarted, teamId, term });
+					syncIssueScope(store, target, scope, { stateScope, teamId, term });
 				const cachedIssues = readCached();
 
 				if (!refresh && cachedIssues.length > 0) {

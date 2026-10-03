@@ -77,13 +77,15 @@ describe('refreshBoardIssues', () => {
 		prefetchBoardIssues(queryClient, [REPOSITORY_ID]);
 		await settleFetches(queryClient);
 		expect(linearListIssues).toHaveBeenCalledTimes(1);
-		expect(linearListIssues).toHaveBeenLastCalledWith({ notStarted: true });
+		expect(linearListIssues).toHaveBeenLastCalledWith({
+			stateScope: 'not-started',
+		});
 
 		await refreshBoardIssues(queryClient, [REPOSITORY_ID]);
 
 		expect(linearListIssues).toHaveBeenCalledTimes(2);
 		expect(linearListIssues).toHaveBeenLastCalledWith({
-			notStarted: true,
+			stateScope: 'not-started',
 			refresh: true,
 		});
 	});

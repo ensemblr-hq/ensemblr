@@ -179,17 +179,24 @@ export interface LinearMetadataWire {
 }
 
 /**
+ * A slice of Linear issues by workflow-state type that a list read can ask for
+ * on its own: `not-started` is Backlog and Todo, `started` is In Progress, In
+ * Review, and any other state of type `started`.
+ */
+export type LinearIssueStateScope = 'not-started' | 'started';
+
+/**
  * Request for {@link LinearApi.linearListIssues}. Omitting `accountId` merges
- * every connected account; naming one narrows the read to it. `notStarted`
- * narrows the answer to Backlog and Todo issues and syncs them with their own
- * state-filtered query, so a team's closed history cannot crowd them out of
- * the bounded browse window.
+ * every connected account; naming one narrows the read to it. `stateScope`
+ * narrows the answer to that slice of issues and syncs it with its own
+ * state-filtered query, so a team's closed history cannot crowd it out of the
+ * bounded browse window.
  */
 export interface ListLinearIssuesRequest {
 	accountId?: string;
-	notStarted?: boolean;
 	query?: string;
 	refresh?: boolean;
+	stateScope?: LinearIssueStateScope;
 	teamId?: string;
 }
 

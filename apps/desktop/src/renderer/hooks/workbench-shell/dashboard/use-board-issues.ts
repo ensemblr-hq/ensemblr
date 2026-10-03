@@ -104,7 +104,9 @@ export function useBoardIssues(
 			}),
 		),
 	});
-	const linearResult = useQuery(linearIssuesQuery({ notStarted: true }));
+	const linearResult = useQuery(
+		linearIssuesQuery({ stateScope: 'not-started' }),
+	);
 
 	const githubIssuesByProject = useMemo<ProjectGithubIssues[]>(
 		() =>
