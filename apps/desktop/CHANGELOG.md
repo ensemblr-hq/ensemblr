@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Spinners turn in step.** Every spinner on screen now shows the same frame at the same moment,
   however far apart they appeared. Before, each one started its own clock when it mounted. The same
   holds for pulsing placeholders and carets, and for the Concierge mark's orbit. A newly appearing
-  spinner snaps into step on its second frame.
+  spinner snaps into step on its second frame. (#718)
 
 ## [0.2.2] - 2026-10-02
 
