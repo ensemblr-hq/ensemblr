@@ -1114,14 +1114,15 @@
 			"open-workspace": "Open workspace",
 			"open-workspace-aria": "Open workspace {{workspace}}",
 			"queue-position": "#{{position}} in queue",
+			"queue-position-short": "#{{position}}",
 			"script": {
 				"archive": "Archive script",
 				"run": "Run script",
 				"run-named": "Run script: {{name}}",
 				"setup": "Setup script"
 			},
-			"slot-usage_one": "{{inUse}}/{{count}} slot",
-			"slot-usage_other": "{{inUse}}/{{count}} slots",
+			"slot-usage-aria_one": "{{inUse}} of {{count}} slot in use",
+			"slot-usage-aria_other": "{{inUse}} of {{count}} slots in use",
 			"slots-explainer": "Slots in use out of the total. Heavy commands wait for a free slot; a script you start yourself takes one at once, even when all are busy.",
 			"stop": "Stop {{label}}",
 			"summary": "{{running}} running · {{queued}} queued",

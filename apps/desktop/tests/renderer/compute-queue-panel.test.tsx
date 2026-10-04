@@ -17,6 +17,7 @@ import { renderWithProviders } from './support/dom';
 
 const cancelComputeJob = vi.fn();
 const toastError = vi.fn();
+const openFilePreview = vi.fn();
 
 vi.mock('sonner', () => ({ toast: { error: (m: string) => toastError(m) } }));
 vi.mock('@/renderer/api/ensemblr', async (importOriginal) => {
@@ -28,11 +29,16 @@ vi.mock('@/renderer/api/ensemblr', async (importOriginal) => {
 	};
 });
 vi.mock('@/renderer/hooks/concierge/use-concierge-file-preview', () => ({
-	useConciergeFilePreview: () => ({ openFilePreview: undefined }),
+	useConciergeFilePreview: () => ({
+		openFilePreview: (path: string) => openFilePreview(path),
+	}),
 }));
 
 const { ComputeQueuePanel, SidebarComputeQueuePanel } = await import(
 	'../../src/renderer/components/workbench-shell/navigation-sidebar/compute-queue-panel'
+);
+const { WorkbenchLayoutModelProvider } = await import(
+	'../../src/renderer/components/workbench-shell/shell-contexts'
 );
 
 /** Builds a job with sensible defaults; tests override only what they assert on. */
@@ -117,8 +123,53 @@ describe('ComputeQueuePanel', () => {
 			expect.stringContaining('first'),
 			expect.stringContaining('second'),
 		]);
-		expect(screen.getByText('1/2 slots')).toBeTruthy();
-		expect(screen.getByText('#1 in queue')).toBeTruthy();
+		expect(screen.getByText('#1')).toBeTruthy();
+		expect(screen.getByText('#1 in queue').className).toContain('sr-only');
+	});
+
+	test('shows slot usage as a bare ratio once there is more than one slot', () => {
+		const { container } = renderPanel(queue([job({ position: 1 })]));
+
+		const slots = container.querySelector('[data-compute-queue-slots]');
+		expect(slots?.querySelector('[aria-hidden="true"]')?.textContent).toBe(
+			'1/2',
+		);
+		expect(slots?.querySelector('.sr-only')?.textContent).toBe(
+			'1 of 2 slots in use',
+		);
+	});
+
+	test('leaves slot usage out with a single slot', () => {
+		const { container } = renderPanel({
+			enabled: true,
+			inUse: 1,
+			jobs: [job({ startedAt: Date.now(), state: 'running' })],
+			slots: 1,
+		});
+
+		expect(container.querySelector('[data-compute-queue-slots]')).toBeNull();
+	});
+
+	test('shows a single slot once a user script pushes usage past it', () => {
+		const { container } = renderPanel({
+			enabled: true,
+			inUse: 2,
+			jobs: [
+				job({ id: 'a', startedAt: Date.now(), state: 'running' }),
+				job({
+					id: 'b',
+					initiator: 'user',
+					startedAt: Date.now(),
+					state: 'running',
+				}),
+			],
+			slots: 1,
+		});
+
+		expect(
+			container.querySelector('[data-compute-queue-slots] [aria-hidden="true"]')
+				?.textContent,
+		).toBe('2/1');
 	});
 
 	test('a queued job offers cancel and reports its id', () => {
@@ -268,6 +319,7 @@ describe('ComputeQueuePanel', () => {
 
 		const toggle = screen.getByRole('button', { name: /Compute queue/ });
 		expect(toggle.getAttribute('aria-expanded')).toBe('true');
+		expect(screen.queryByText('0 running · 1 queued')).toBeNull();
 		fireEvent.click(toggle);
 		expect(onCollapsedChange).toHaveBeenCalledWith(true);
 
@@ -282,7 +334,16 @@ describe('ComputeQueuePanel', () => {
 		);
 
 		expect(container.querySelector('[data-compute-job-state]')).toBeNull();
-		expect(screen.getByText('0 running · 1 queued')).toBeTruthy();
+		expect(screen.getByText('0 running · 1 queued').className).toContain(
+			'sr-only',
+		);
+		expect(
+			container.querySelector('[data-compute-queue-count="queued"]')
+				?.textContent,
+		).toBe('1');
+		expect(
+			container.querySelector('[data-compute-queue-count="running"]'),
+		).toBeNull();
 		expect(
 			screen
 				.getByRole('button', { name: /Compute queue/ })
@@ -295,6 +356,47 @@ describe('SidebarComputeQueuePanel', () => {
 	beforeEach(() => {
 		cancelComputeJob.mockReset();
 		toastError.mockReset();
+		openFilePreview.mockReset();
+	});
+
+	test('opening a log hands its path to the shared file opener', () => {
+		renderSidebar(queue([job({ id: 'q1', position: 1 })]));
+
+		fireEvent.click(screen.getByRole('button', { name: 'Open log' }));
+
+		expect(openFilePreview).toHaveBeenCalledWith(
+			'/work/ws/.context/compute-queue/job-1.log',
+		);
+	});
+
+	test('the workspace name navigates through the layout model', () => {
+		const navigateToWorkspace = vi.fn();
+		const layoutModel = {
+			displayProjects: [
+				{
+					id: 'project-1',
+					workspaces: [{ id: 'ws-1', name: 'Workspace One' }],
+				},
+			],
+			navigateToWorkspace,
+		} as unknown as ComponentProps<
+			typeof WorkbenchLayoutModelProvider
+		>['value'];
+		const store = createStore();
+		store.set(computeQueueSnapshotAtom, queue([job({ position: 1 })]));
+		renderWithProviders(
+			<Provider store={store}>
+				<WorkbenchLayoutModelProvider value={layoutModel}>
+					<SidebarComputeQueuePanel />
+				</WorkbenchLayoutModelProvider>
+			</Provider>,
+		);
+
+		fireEvent.click(
+			screen.getByRole('button', { name: 'Open workspace Workspace One' }),
+		);
+
+		expect(navigateToWorkspace).toHaveBeenCalledWith('project-1', 'ws-1');
 	});
 
 	/** Renders the wired panel against a store holding the given snapshot. */

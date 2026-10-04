@@ -1114,14 +1114,15 @@
 			"open-workspace": "Άνοιγμα χώρου εργασίας",
 			"open-workspace-aria": "Άνοιγμα χώρου εργασίας {{workspace}}",
 			"queue-position": "#{{position}} στην ουρά",
+			"queue-position-short": "#{{position}}",
 			"script": {
 				"archive": "Σενάριο αρχειοθέτησης",
 				"run": "Σενάριο εκτέλεσης",
 				"run-named": "Σενάριο εκτέλεσης: {{name}}",
 				"setup": "Σενάριο εγκατάστασης"
 			},
-			"slot-usage_one": "{{inUse}}/{{count}} θέση",
-			"slot-usage_other": "{{inUse}}/{{count}} θέσεις",
+			"slot-usage-aria_one": "{{inUse}} από {{count}} θέση σε χρήση",
+			"slot-usage-aria_other": "{{inUse}} από {{count}} θέσεις σε χρήση",
 			"slots-explainer": "Θέσεις σε χρήση επί του συνόλου. Οι βαριές εντολές περιμένουν ελεύθερη θέση· ένα σενάριο που ξεκινάτε εσείς παίρνει θέση αμέσως, ακόμη κι αν όλες είναι κατειλημμένες.",
 			"stop": "Διακοπή {{label}}",
 			"summary": "{{running}} σε εκτέλεση · {{queued}} στην ουρά",

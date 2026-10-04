@@ -69,19 +69,21 @@ export function WorkbenchShellLayout() {
 	return (
 		<NavigationProvider value={navigation}>
 			<SetupDiagnosticsProvider value={setupDiagnostics}>
-				<WorkbenchFrame
-					activeProject={model.activeProject}
-					activeView={routeState.view}
-					activeWorkspace={model.activeWorkspace}
-					addProjectMenu={model.addProjectMenu}
-					health={model.health}
-					onAddProject={model.onAddProject}
-					onStaticNavigationSelect={model.navigateToStaticRoute}
-					onWorkspaceSelect={model.navigateToWorkspace}
-					projects={model.displayProjects}
-					resolveWorkspaceRouteSearch={model.resolveWorkspaceRouteSearch}
-				>
-					<WorkbenchLayoutModelProvider value={model}>
+				{/* Around the frame, not inside it: the sidebar's compute queue panel
+				    opens job logs and workspaces through this model. */}
+				<WorkbenchLayoutModelProvider value={model}>
+					<WorkbenchFrame
+						activeProject={model.activeProject}
+						activeView={routeState.view}
+						activeWorkspace={model.activeWorkspace}
+						addProjectMenu={model.addProjectMenu}
+						health={model.health}
+						onAddProject={model.onAddProject}
+						onStaticNavigationSelect={model.navigateToStaticRoute}
+						onWorkspaceSelect={model.navigateToWorkspace}
+						projects={model.displayProjects}
+						resolveWorkspaceRouteSearch={model.resolveWorkspaceRouteSearch}
+					>
 						<AgentControlWorkspaceFocusBridge />
 						<NotificationFocusBridge />
 						<Outlet />
@@ -90,8 +92,8 @@ export function WorkbenchShellLayout() {
 						    inside the layout model so a file the Concierge names can be
 						    opened in the workspace that holds it. */}
 						<ConciergeLauncher />
-					</WorkbenchLayoutModelProvider>
-				</WorkbenchFrame>
+					</WorkbenchFrame>
+				</WorkbenchLayoutModelProvider>
 				<CloneGithubDialog onOpenChange={setCloneOpen} open={cloneOpen} />
 				<LocalProjectOpenDialog open={localProjectOpen} />
 				<QuickStartDialog

@@ -107,7 +107,7 @@ export function SidebarComputeQueuePanel() {
 					: ''}
 			</div>
 			{snapshot && hasLiveJobs ? (
-				<SidebarFooter className='border-sidebar-border border-t p-2'>
+				<SidebarFooter className='border-sidebar-border border-t px-2 py-1.5'>
 					<ComputeQueuePanel
 						collapsed={collapsed}
 						onCancel={onCancel}

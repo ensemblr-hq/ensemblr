@@ -2,7 +2,6 @@ import type { TFunction } from 'i18next';
 import { FileTextIcon, HourglassIcon, SquareIcon, XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
 import { Spinner } from '@/renderer/components/ui/spinner';
 import {
@@ -71,11 +70,15 @@ function jobTitle(job: ComputeJobSnapshot, t: TFunction): string {
 }
 
 /**
- * One live job: its state, what it is, where it runs, who asked, and the
- * actions still open to the user. The full command is in the title's tooltip
- * because the row truncates the title and a script's title hides it entirely.
- * A running job offers Stop and a queued one Cancel, so the control says
- * whether it ends work in progress or only gives up a place in line.
+ * One live job as a flat two-line sidebar row: what it is and how far along on
+ * the first line, where it runs and who asked on the second.
+ *
+ * The row's actions stay out of the way until it is hovered or focused, the
+ * way a workspace row's archive button does, so the title gets the width they
+ * would otherwise hold. The full command is in the title's tooltip because the
+ * row truncates the title and a script's title hides it entirely. A running
+ * job offers Stop and a queued one Cancel, so the control says whether it ends
+ * work in progress or only gives up a place in line.
  */
 export function ComputeJobRow({
 	actions,
@@ -90,77 +93,88 @@ export function ComputeJobRow({
 
 	return (
 		<li
-			className='flex items-center gap-1.5 rounded-md bg-sidebar px-1.5 py-1'
+			className='group/compute-job relative flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent has-focus-visible:bg-sidebar-accent'
 			data-compute-job-state={job.state}
 		>
-			{running ? (
-				<Spinner
-					aria-hidden='true'
-					className='size-3.5 shrink-0 text-muted-foreground'
-				/>
-			) : (
-				<HourglassIcon
-					aria-hidden='true'
-					className='size-3.5 shrink-0 text-muted-foreground'
-				/>
-			)}
-			<div className='flex min-w-0 flex-1 flex-col'>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<span
-							className={cn(
-								'truncate text-xxs leading-4',
-								job.script ? 'font-medium' : 'font-mono',
-								running ? 'text-sidebar-foreground' : 'text-muted-foreground',
-							)}
-						>
-							{title}
-						</span>
-					</TooltipTrigger>
-					<TooltipContent className='max-w-96 break-all font-mono'>
-						{job.command}
-					</TooltipContent>
-				</Tooltip>
-				<span className='flex min-w-0 items-center gap-1 text-muted-foreground text-xxs leading-4'>
-					<WorkspaceName job={job} workspaceOpener={actions.workspaceOpener} />
-					<InitiatorBadge initiator={job.initiator} />
+			<span className='grid h-4 w-4 shrink-0 place-items-center text-muted-foreground'>
+				{running ? (
+					<Spinner aria-hidden='true' className='size-3.5' />
+				) : (
+					<HourglassIcon aria-hidden='true' className='size-3.5' />
+				)}
+			</span>
+			<div className='flex min-w-0 flex-1 flex-col gap-0.5'>
+				<div className='flex min-w-0 items-center gap-2'>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<span
+								className={cn(
+									'min-w-0 flex-1 truncate text-xs leading-4',
+									job.script ? 'font-medium' : 'font-mono',
+									running ? 'text-sidebar-foreground' : 'text-muted-foreground',
+								)}
+							>
+								{title}
+							</span>
+						</TooltipTrigger>
+						<TooltipContent className='max-w-96 break-all font-mono'>
+							{job.command}
+						</TooltipContent>
+					</Tooltip>
 					<JobTiming job={job} />
-				</span>
+				</div>
+				<div className='flex min-w-0 items-center gap-1 text-muted-foreground text-xxs leading-4'>
+					{job.workspaceName ? (
+						<>
+							<WorkspaceName
+								job={job}
+								name={job.workspaceName}
+								workspaceOpener={actions.workspaceOpener}
+							/>
+							<span aria-hidden='true' className='shrink-0'>
+								·
+							</span>
+						</>
+					) : null}
+					<InitiatorLabel initiator={job.initiator} />
+				</div>
 			</div>
-			{job.kind === 'command' && job.logPath ? (
-				<RowAction
-					label={t(
-						'workbench:navigation-sidebar.compute-queue.open-log',
-						'Open log',
-					)}
-					onClick={() => actions.onOpenLog(job)}
-				>
-					<FileTextIcon />
-				</RowAction>
-			) : null}
-			{running ? (
-				<RowAction
-					label={t(
-						'workbench:navigation-sidebar.compute-queue.stop',
-						'Stop {{label}}',
-						{ label: title },
-					)}
-					onClick={() => actions.onCancel(job.id)}
-				>
-					<SquareIcon />
-				</RowAction>
-			) : (
-				<RowAction
-					label={t(
-						'workbench:navigation-sidebar.compute-queue.cancel',
-						'Cancel {{label}}',
-						{ label: title },
-					)}
-					onClick={() => actions.onCancel(job.id)}
-				>
-					<XIcon />
-				</RowAction>
-			)}
+			<div className='absolute inset-y-0 right-0 flex items-center gap-0.5 rounded-r-md bg-sidebar-accent pr-1 opacity-0 transition-opacity before:pointer-events-none before:absolute before:inset-y-0 before:right-full before:w-4 before:bg-linear-to-r before:from-transparent before:to-sidebar-accent has-focus-visible:opacity-100 group-hover/compute-job:opacity-100'>
+				{job.kind === 'command' && job.logPath ? (
+					<RowAction
+						label={t(
+							'workbench:navigation-sidebar.compute-queue.open-log',
+							'Open log',
+						)}
+						onClick={() => actions.onOpenLog(job)}
+					>
+						<FileTextIcon />
+					</RowAction>
+				) : null}
+				{running ? (
+					<RowAction
+						label={t(
+							'workbench:navigation-sidebar.compute-queue.stop',
+							'Stop {{label}}',
+							{ label: title },
+						)}
+						onClick={() => actions.onCancel(job.id)}
+					>
+						<SquareIcon />
+					</RowAction>
+				) : (
+					<RowAction
+						label={t(
+							'workbench:navigation-sidebar.compute-queue.cancel',
+							'Cancel {{label}}',
+							{ label: title },
+						)}
+						onClick={() => actions.onCancel(job.id)}
+					>
+						<XIcon />
+					</RowAction>
+				)}
+			</div>
 		</li>
 	);
 }
@@ -171,16 +185,17 @@ export function ComputeJobRow({
  */
 function WorkspaceName({
 	job,
+	name,
 	workspaceOpener,
 }: {
 	job: ComputeJobSnapshot;
+	name: string;
 	workspaceOpener?: ComputeJobRowActions['workspaceOpener'];
 }) {
 	const { t } = useTranslation();
-	const name = job.workspaceName ?? '';
 	const openWorkspace = workspaceOpener?.(job) ?? null;
 
-	if (!openWorkspace || !name) {
+	if (!openWorkspace) {
 		return <span className='min-w-0 truncate'>{name}</span>;
 	}
 
@@ -193,7 +208,7 @@ function WorkspaceName({
 						'Open workspace {{workspace}}',
 						{ workspace: name },
 					)}
-					className='min-w-0 truncate rounded-sm text-left underline-offset-2 outline-none hover:text-sidebar-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring'
+					className='min-w-0 truncate rounded-sm text-left underline-offset-2 outline-none hover:text-sidebar-foreground hover:underline focus-visible:ring-2 focus-visible:ring-sidebar-ring'
 					onClick={openWorkspace}
 					type='button'
 				>
@@ -225,7 +240,7 @@ function RowAction({
 			<TooltipTrigger asChild>
 				<Button
 					aria-label={label}
-					className='size-6 shrink-0'
+					className='size-6 shrink-0 text-muted-foreground hover:bg-sidebar hover:text-sidebar-foreground dark:hover:bg-sidebar'
 					onClick={onClick}
 					size='icon-xs'
 					variant='ghost'
@@ -239,10 +254,11 @@ function RowAction({
 }
 
 /**
- * Names who asked for a job — an agent, the app on its own, or the user — with
- * a tooltip spelling out what the short badge means.
+ * Names who asked for a job — an agent, the app on its own, or the user — as
+ * plain text in the row's second line, with a tooltip spelling out what the
+ * short word means.
  */
-function InitiatorBadge({ initiator }: { initiator: ComputeJobInitiator }) {
+function InitiatorLabel({ initiator }: { initiator: ComputeJobInitiator }) {
 	const { t } = useTranslation();
 	const { hint, label } = {
 		agent: {
@@ -280,29 +296,41 @@ function InitiatorBadge({ initiator }: { initiator: ComputeJobInitiator }) {
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
-				<Badge className='h-4 shrink-0 px-1.5 text-xxs' variant='secondary'>
-					{label}
-				</Badge>
+				<span className='shrink-0'>{label}</span>
 			</TooltipTrigger>
 			<TooltipContent>{hint}</TooltipContent>
 		</Tooltip>
 	);
 }
 
-/** Queue position for a waiting job, live elapsed time for a running one. */
+/**
+ * Queue position for a waiting job, live elapsed time for a running one, set
+ * right-aligned on the title line. The position shows in its short form, with
+ * the full phrase for assistive tech.
+ */
 function JobTiming({ job }: { job: ComputeJobSnapshot }) {
 	const { t } = useTranslation();
 
 	if (job.state === 'running') {
 		return <RunningElapsed startedAt={job.startedAt ?? job.enqueuedAt} />;
 	}
+	const position = job.position ?? 0;
 	return (
-		<span className='shrink-0 tabular-nums'>
-			{t(
-				'workbench:navigation-sidebar.compute-queue.queue-position',
-				'#{{position}} in queue',
-				{ position: job.position ?? 0 },
-			)}
+		<span className='shrink-0 text-muted-foreground text-xxs tabular-nums leading-4'>
+			<span aria-hidden='true'>
+				{t(
+					'workbench:navigation-sidebar.compute-queue.queue-position-short',
+					'#{{position}}',
+					{ position },
+				)}
+			</span>
+			<span className='sr-only'>
+				{t(
+					'workbench:navigation-sidebar.compute-queue.queue-position',
+					'#{{position}} in queue',
+					{ position },
+				)}
+			</span>
 		</span>
 	);
 }
@@ -315,7 +343,10 @@ function RunningElapsed({ startedAt }: { startedAt: number }) {
 	const elapsedMs = useElapsedMs(startedAt, ELAPSED_TICK_MS);
 
 	return (
-		<span aria-hidden='true' className='shrink-0 tabular-nums'>
+		<span
+			aria-hidden='true'
+			className='shrink-0 text-muted-foreground text-xxs tabular-nums leading-4'
+		>
 			{formatElapsedSeconds(elapsedMs)}
 		</span>
 	);
