@@ -7,6 +7,7 @@ import { queryClient } from './api/query-client';
 import { Toaster } from './components/ui/sonner';
 import { WindowChromeSync } from './components/workbench-shell/window-controls/window-chrome-sync';
 import { WindowTitleBar } from './components/workbench-shell/window-controls/window-title-bar';
+import { syncLoopingAnimationPhases } from './lib/animation-phase-sync';
 import { startLocalStorageMirror } from './lib/storage-mirror';
 import { applyWindowChrome, readWindowChrome } from './lib/window-chrome';
 import { registerIconCollections } from './lib/workbench/icon-collections';
@@ -38,6 +39,10 @@ startLocalStorageMirror();
 // so every polling query kept firing against it until this taught TanStack
 // Query what focus means here.
 syncQueryFocusWithWindow();
+
+// Every CSS animation starts its own clock on mount, so without this each
+// spinner on screen turns at its own phase rather than in step with the rest.
+syncLoopingAnimationPhases();
 
 // Applied before the first render so no toolbar paints at the wrong offset and
 // then jumps once the chrome is known.
