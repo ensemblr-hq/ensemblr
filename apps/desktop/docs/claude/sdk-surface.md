@@ -29,7 +29,7 @@ of `buildPiSessionArgs` for Pi.
 | `hooks` | `withAfkHooks(withPlanModeHooks(concierge?.hooks, isPlanning), isUnattended)` | Composes the AFK auto-approval guard, the plan-mode write-refusal guard, and (when applicable) the Concierge containment gate; each only denies, never pre-approves, so they compose |
 | `plugins` | `pluginDirectories.map((path) => ({ path, type: 'local' }))`, when non-empty | The shipped skill/plugin bundle; the sibling `skills` option is a context *filter* and is deliberately left unset so the CLI's own defaults hold |
 | `cwd` | `metadata.cwd` | The workspace worktree |
-| `env` | `stripLaunchContextEnv({ ...baseEnv, ...metadata.env })` | `baseEnv` is the login-shell env (ADR 0003 / ADR 0031) so a Finder-launched app still finds `claude`; the strip drops the macOS/Electron launch-context keys that would make LaunchServices re-attribute the child to Ensemblr |
+| `env` | `stripLaunchContextEnv({ ...baseEnv, ...metadata.env })`, plus `CLAUDE_CODE_MCP_STARTUP_WAIT_MS=0` whenever `mcpServers` is passed and the user has not set it | `baseEnv` is the login-shell env (ADR 0003 / ADR 0031) so a Finder-launched app still finds `claude`; the strip drops the macOS/Electron launch-context keys that would make LaunchServices re-attribute the child to Ensemblr. The startup-wait key is explained under [Control MCP entry](#control-mcp-entry) |
 | `forwardSubagentText` | `true` | Without it a subagent forwards only its `tool_use`/`tool_result` blocks, so a `Task` card nests tool rows with none of the prose that explains them |
 | `includePartialMessages` | `true` | Required for `stream_event` deltas — without it the timeline has no streaming text |
 | `effort` | `low` \| `medium` \| `high` \| `xhigh` \| `max` | From `toClaudeEffortLevel(request.thinkingLevel)` |
@@ -67,6 +67,27 @@ The map is empty (and the option omitted) when the control server has no url or
 no token. The reference rather than the literal matters: the SDK serialises this
 map verbatim into a `--mcp-config` argument, so a literal token would be readable
 via `ps`.
+
+That `--mcp-config` argument also changes when the first turn starts. A
+streaming-input CLI launched with it holds the first prompt until **every** MCP
+server it knows has connected — the user's plugin servers and claude.ai
+connectors too, failing ones included — for up to `MCP_TIMEOUT` (30 s by
+default). The interactive CLI and the IDE extensions pass no such flag and hold
+for none, which is why the same machine answered in two seconds there and in up
+to thirty here. `src/main/claude-agent/claude-mcp-startup.ts` closes the gap in
+two halves:
+
+- `withoutMcpStartupWait` sets `CLAUDE_CODE_MCP_STARTUP_WAIT_MS=0` in the child's
+  env whenever `mcpServers` is passed, the CLI's host setting for "do not hold the
+  first turn for MCP". A value the user already exported is kept. A resumed
+  session still waits (up to 2 s) for the servers its transcript used.
+- `waitForControlServer` puts back the one wait Ensemblr depends on: the session's
+  held prompt queue opens only once `mcpServerStatus()` reports the `ensemblr`
+  server as anything but `pending`, or after 5 s, so the first turn reaches the
+  model with the `ensemblr_*` tools its prompt asks for.
+
+Measured with Claude Code 2.1.289 on a machine with 26 MCP servers of the user's
+own: 19.9 s from `query()` to the first `result` before, 2.8 s after.
 
 ## `query({ options })` — capability sessions
 

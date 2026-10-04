@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+	type McpServerConfig,
 	type Options,
 	type Query,
 	query,
@@ -35,6 +36,10 @@ import { withComputeQueueHooks } from './claude-compute-queue-guard.ts';
 import { createConciergeSessionGate } from './claude-concierge-guard.ts';
 import { resolveSystemPromptAppend } from './claude-edit-tool-directive.ts';
 import { buildClaudeMcpServers } from './claude-mcp-config.ts';
+import {
+	waitForControlServer,
+	withoutMcpStartupWait,
+} from './claude-mcp-startup.ts';
 import {
 	buildCanUseTool,
 	type ClaudeApprovalGate,
@@ -316,6 +321,7 @@ function createClaudeSession({
 	};
 
 	const env = stripLaunchContextEnv({ ...baseEnv, ...input.metadata.env });
+	const mcpServers = buildClaudeMcpServers(input.request.controlMcp);
 
 	const normalizer = createSdkMessageNormalizer({
 		credentialEnvVars: readCredentialEnvVars(env),
@@ -558,6 +564,27 @@ function createClaudeSession({
 		}
 	};
 
+	/**
+	 * Waits for the control server this session was handed to connect. Claude
+	 * Code no longer holds the first turn for its MCP servers once
+	 * {@link withoutMcpStartupWait} lifts that wait, so without this a first
+	 * prompt could reach the model before the `ensemblr_*` tools it names exist.
+	 */
+	const awaitControlServer = async (): Promise<void> => {
+		if (!activeQuery || !(CONTROL_SERVER_NAME in mcpServers)) {
+			return;
+		}
+		const status = await waitForControlServer(activeQuery, {
+			isClosed: () => closed,
+		});
+		if (status === 'pending') {
+			console.warn(
+				'[claude-agent] released the first prompt before the control server connected.',
+				{ sessionId: agentSessionId },
+			);
+		}
+	};
+
 	try {
 		activeQuery = queryFn({
 			options: buildQueryOptions({
@@ -567,6 +594,7 @@ function createClaudeSession({
 				input,
 				isPlanning: () => planning,
 				isUnattended: () => unattended,
+				mcpServers,
 				onStderr: (chunk) => {
 					stderr = `${stderr}${chunk}`.slice(-STDERR_RING_BYTES);
 				},
@@ -585,11 +613,14 @@ function createClaudeSession({
 		});
 	}
 
-	// The queue is held so the steer lands before the runtime reads a first turn.
-	// `submit` deliberately does not wait on it: a yield between recording a
-	// prompt and queueing it would let two overlapping submits reach the runtime
-	// in the opposite order to the transcript.
-	void applyOpeningThinking().finally(promptQueue.open);
+	// The queue is held so the steer lands, and the control server connects,
+	// before the runtime reads a first turn. `submit` deliberately does not wait
+	// on it: a yield between recording a prompt and queueing it would let two
+	// overlapping submits reach the runtime in the opposite order to the
+	// transcript.
+	void Promise.all([applyOpeningThinking(), awaitControlServer()]).finally(
+		promptQueue.open,
+	);
 
 	void pump();
 	void probeContextUsage();
@@ -808,7 +839,7 @@ async function applyTurnSelection({
  * Maps the provider-neutral session request onto the SDK's `Options`. This is
  * the Claude counterpart of `buildPiSessionArgs`: every runtime-specific name
  * lives here and nowhere above the adapter seam.
- * @param input - Session inputs plus the assembled env, the stderr sink, and the shipped plugin root.
+ * @param input - Session inputs plus the assembled env, the MCP servers, the stderr sink, and the shipped plugin root.
  * @returns The options for the opening `query()` call.
  */
 function buildQueryOptions({
@@ -818,6 +849,7 @@ function buildQueryOptions({
 	input,
 	isPlanning,
 	isUnattended,
+	mcpServers,
 	onStderr,
 	pluginDirectories,
 	readComputeQueueSettings,
@@ -832,6 +864,8 @@ function buildQueryOptions({
 	isPlanning: () => boolean;
 	/** Reads the session's live AFK flag, for the hook that withholds `AskUserQuestion`. */
 	isUnattended: () => boolean;
+	/** The servers Ensemblr adds to the user's own, which the SDK passes as `--mcp-config`. */
+	mcpServers: Record<string, McpServerConfig>;
 	onStderr: (chunk: string) => void;
 	pluginDirectories: readonly string[];
 	/** Reads the live compute-queue settings, for the hook that refuses heavy commands. */
@@ -852,7 +886,7 @@ function buildQueryOptions({
 		});
 	const effort = toClaudeEffortLevel(request.thinkingLevel);
 	const executablePath = request.executable?.command?.trim();
-	const mcpServers = buildClaudeMcpServers(request.controlMcp);
+	const passesMcpConfig = Object.keys(mcpServers).length > 0;
 	const disallowedTools = resolveDisallowedTools({
 		delegation: request.delegation ?? 'ensemblr',
 		depth: request.lineageDepth ?? 0,
@@ -898,7 +932,7 @@ function buildQueryOptions({
 		// pre-approves, and only over the control tools the others already wave
 		// past, so its allow cannot overturn one of their refusals.
 		hooks: withAfkHooks(guardedHooks, isUnattended),
-		env,
+		env: passesMcpConfig ? withoutMcpStartupWait(env) : env,
 		// Without this the SDK forwards only a subagent's tool_use/tool_result
 		// blocks, so a `Task` card would nest tool rows with none of the prose that
 		// explains them.
@@ -906,7 +940,7 @@ function buildQueryOptions({
 		includePartialMessages: true,
 		...(effort ? { effort } : {}),
 		thinking: CLAUDE_THINKING_CONFIG,
-		...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
+		...(passesMcpConfig ? { mcpServers } : {}),
 		...(request.modelOverride?.trim()
 			? { model: request.modelOverride.trim() }
 			: {}),

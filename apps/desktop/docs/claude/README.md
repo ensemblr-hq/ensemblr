@@ -106,6 +106,7 @@ name:**
 | `src/main/claude-agent/claude-plan-mode.ts`, `src/main/claude-agent/claude-plan-bridge.ts` | native `ExitPlanMode` → the plan review path |
 | `src/main/claude-agent/claude-thinking.ts` | thinking level → `EffortLevel` |
 | `src/main/claude-agent/claude-mcp-config.ts` | the `mcpServers` map pointing at Ensemblr Control |
+| `src/main/claude-agent/claude-mcp-startup.ts` | lifting the CLI's first-turn wait on every MCP server, and waiting for the control server alone |
 | `src/main/claude-agent/claude-slash-commands.ts`, `src/main/claude-agent/claude-mcp-roster.ts`, `src/main/claude-agent/claude-model-lister.ts`, `src/main/claude-agent/claude-model-catalog.ts` | live capability discovery |
 | `src/main/claude-agent/tool-result-details.ts` | `structuredPatch` → a unified patch for edit cards |
 
@@ -692,6 +693,13 @@ The `Authorization` header carries an **env-var reference, not the token**. The
 Agent SDK serialises this map verbatim into a `--mcp-config` argument, so a
 literal token would be readable via `ps` by any process on the machine; Claude
 expands the reference itself.
+
+Passing `--mcp-config` at all makes the CLI hold the first turn until every MCP
+server the user has configured connects, for up to 30 s, where the interactive
+CLI holds for none. `src/main/claude-agent/claude-mcp-startup.ts` lifts that hold
+(`CLAUDE_CODE_MCP_STARTUP_WAIT_MS=0`) and has the adapter wait for the `ensemblr`
+server alone before releasing the first prompt; see
+[the SDK surface](./sdk-surface.md#control-mcp-entry).
 
 `src/main/agent-runtime/session/agent-control-wiring.ts` decides who gets this.
 It asks `usesNativeControlMcp`, which reads `MCP_CLIENT_RUNTIMES` — `new Set(['claude'])`
