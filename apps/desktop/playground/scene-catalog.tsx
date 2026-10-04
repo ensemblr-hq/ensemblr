@@ -7,6 +7,7 @@ import { ArchiveToastScene } from './archive-toast-preview.tsx';
 import { CommentPreviewScene } from './comment-preview.tsx';
 import { ComposerScene } from './composer-preview.tsx';
 import { ComposerQueueScene } from './composer-queue-preview.tsx';
+import { ComputeQueueScene } from './compute-queue-preview.tsx';
 import { ConciergeScene } from './concierge-preview.tsx';
 import { ConflictsScene } from './conflicts-preview.tsx';
 import { ConversationScrollScene } from './conversation-scroll-preview.tsx';
@@ -206,6 +207,12 @@ export const SCENE_GROUPS = [
 				label: 'update panel',
 				render: () => <UpdatePanelScene />,
 				source: 'playground/update-panel-preview.tsx',
+			},
+			{
+				id: 'compute-queue',
+				label: 'compute queue',
+				render: () => <ComputeQueueScene />,
+				source: 'playground/compute-queue-preview.tsx',
 			},
 			{
 				id: 'dock-empty',
