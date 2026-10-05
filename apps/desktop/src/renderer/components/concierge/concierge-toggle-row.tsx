@@ -24,11 +24,11 @@ import { ConciergeUnreadBadge } from './concierge-unread-badge';
  * The toggle keeps to its own width against the row's trailing edge in both,
  * which is what puts it in that corner whatever the row is as wide as.
  *
- * It also reports a shut Concierge: the mark orbits and a status word shows
- * while a turn is streaming, and a count sits at the trailing end for what it
- * produced unseen. Both come from `useConciergeActivityWatch`, which runs at the
- * app root, so the count survives a visit to a screen that drops this row. A
- * polite live region beside the button announces the same two states.
+ * It also reports a shut Concierge: the mark orbits while a turn is streaming,
+ * and a count sits at the trailing end for what it produced unseen. Both come
+ * from `useConciergeActivityWatch`, which runs at the app root, so the count
+ * survives a visit to a screen that drops this row. A polite live region beside
+ * the button announces the same two states.
  */
 export function ConciergeToggleRow() {
 	const { t } = useTranslation();
@@ -67,13 +67,8 @@ export function ConciergeToggleRow() {
 					)}
 				/>
 				<span>{t('workbench:concierge.toggle.label', 'Concierge')}</span>
-				{isWorking || unreadCount > 0 ? (
-					<span className='flex items-center gap-1.5 pl-1'>
-						{isWorking ? (
-							<span className='font-normal text-muted-foreground text-xxs'>
-								{t('workbench:concierge.toggle.working-status', 'Working')}
-							</span>
-						) : null}
+				{unreadCount > 0 ? (
+					<span className='flex items-center pl-1'>
 						<ConciergeUnreadBadge count={unreadCount} />
 					</span>
 				) : null}

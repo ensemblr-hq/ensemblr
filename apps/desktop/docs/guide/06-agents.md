@@ -312,7 +312,7 @@ that runtime, because a model belongs to exactly one. See
 The toggle carries a count of what the Concierge said while its panel was shut — a question it is
 still waiting on you to answer counts as one more — so a turn that finishes behind a closed panel
 is not silent just because nobody was looking at it. While a turn is still running, the toggle's
-mark orbits and it reads **Working**. Opening the panel is what clears the count — the transcript
+mark orbits. Opening the panel is what clears the count — the transcript
 on screen is the report.
 
 A finished turn also raises a desktop notification under the Concierge's own name rather than a
