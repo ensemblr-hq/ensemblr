@@ -24,8 +24,8 @@ export interface RepositorySettingsPatch {
 	previewUrls?: RepositoryPreviewUrl[] | null;
 	remoteOrigin?: string | null;
 	/**
-	 * List issues from the repository `gh` resolves for the checkout — a fork's
-	 * upstream — instead of the one `origin` points at.
+	 * List issues from a fork's upstream — the repository `gh repo set-default`
+	 * picked, else the `upstream` remote's — instead of the one `origin` points at.
 	 */
 	showUpstreamIssues?: boolean | null;
 }

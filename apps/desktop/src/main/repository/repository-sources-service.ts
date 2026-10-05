@@ -17,11 +17,16 @@ import type {
 } from '../../shared/ipc/contracts/workspace-sources';
 import type { LocalCommandService } from '../commands/local-command';
 import { classifyCommandFailure } from '../github/gh-failures.ts';
+import {
+	ghResolvedRepository,
+	parseRemoteConfig,
+	REMOTE_CONFIG_PATTERN,
+	remoteRepository,
+} from '../github/remote-config.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import { selectRepositoryPathById } from '../storage/repositories/repository-row-repository.ts';
 import { listActiveWorkspaceBranchRowsByRepository } from '../storage/repositories/workspace-repository.ts';
 import { fetchRemoteBranches, toBranchWires } from './github-branches.ts';
-import { parseGithubRemoteUrl } from './github-url.ts';
 import {
 	type CachedRepositoryIssues,
 	readCachedRepositoryIssues,
@@ -30,7 +35,8 @@ import {
 
 const GH_TIMEOUT_MS = 45_000;
 const GIT_TIMEOUT_MS = 10_000;
-const ISSUE_REMOTE = 'origin';
+const ORIGIN_REMOTE = 'origin';
+const UPSTREAM_REMOTE = 'upstream';
 const GH_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const LIST_LIMIT = 50;
 const PR_JSON_FIELDS =
@@ -139,7 +145,7 @@ function readShowUpstreamIssues(
  * 0013): branches via `gh api graphql` (remote refs), PRs and issues via
  * `gh pr/issue list`. Pull requests are filtered to same-repo heads, and issues
  * come from the repository `origin` points at, so a fork lists its own unless
- * the repository turns `showUpstreamIssues` on. Every method
+ * the repository turns `showUpstreamIssues` on to list its upstream's. Every method
  * degrades to an empty list plus a typed {@link GithubFailure} rather than
  * throwing, so the picker stays usable.
  */
@@ -210,12 +216,13 @@ export function createRepositorySourcesService({
 	 * Picks the GitHub repository a checkout's issues are listed from: the one its
 	 * `origin` remote points at. Left to itself, `gh` resolves a fork cloned with
 	 * `gh repo clone` to the parent it marked as base, and lists the upstream
-	 * project's issues instead of the fork's — which `showUpstreamIssues` opts
-	 * back into by leaving the choice to `gh`.
+	 * project's issues instead of the fork's. `showUpstreamIssues` opts back into
+	 * that parent — named here rather than left to `gh`, so the issue cache always
+	 * knows which repository a list came from.
 	 * @param repositoryId - ID of the repository whose settings to read
-	 * @param cwd - Repository directory to read the settings and remote in
+	 * @param cwd - Repository directory to read the settings and remotes in
 	 * @returns The `owner/name` to hand `gh --repo`, or null to leave the choice to
-	 * `gh` when upstream issues are on, or `origin` is missing or not on github.com
+	 * `gh` when no remote on github.com answers the question
 	 */
 	async function readIssueRepository(
 		repositoryId: string,
@@ -224,17 +231,20 @@ export function createRepositorySourcesService({
 		const resolved = readRepositorySettings?.({
 			repository: { repositoryId, repositoryPath: cwd },
 		});
-		if (readShowUpstreamIssues(resolved)) {
-			return null;
-		}
 		const result = await localCommandService.run({
-			args: ['remote', 'get-url', ISSUE_REMOTE],
+			args: ['config', '--get-regexp', REMOTE_CONFIG_PATTERN],
 			command: 'git',
 			cwd,
 			timeoutMs: GIT_TIMEOUT_MS,
 		});
-		const coordinates =
-			result.status === 'success' ? parseGithubRemoteUrl(result.stdout) : null;
+		if (result.status !== 'success') {
+			return null;
+		}
+		const { remotes } = parseRemoteConfig(result.stdout);
+		const coordinates = readShowUpstreamIssues(resolved)
+			? (ghResolvedRepository(remotes) ??
+				remoteRepository(remotes, UPSTREAM_REMOTE))
+			: remoteRepository(remotes, ORIGIN_REMOTE);
 		return coordinates ? `${coordinates.owner}/${coordinates.name}` : null;
 	}
 

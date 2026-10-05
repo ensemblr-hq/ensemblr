@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
+import { useId } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import { ensemblrQueryKeys } from '@/renderer/api/ensemblr';
@@ -138,7 +139,16 @@ function UpstreamIssuesSetting({
 }) {
 	const { t } = useTranslation();
 	const queryClient = useQueryClient();
-	const saveAndRelist = async (showUpstreamIssues: boolean | null) => {
+	const switchId = useId();
+	/**
+	 * Stores the switch's new value, then re-lists the repository's issues from
+	 * the repository it now names.
+	 * @param showUpstreamIssues - The new value, or null to clear the override.
+	 * @returns Resolves once the setting is saved and the lists are invalidated.
+	 */
+	const saveAndRelist = async (
+		showUpstreamIssues: boolean | null,
+	): Promise<void> => {
 		await save({ showUpstreamIssues });
 		await queryClient.invalidateQueries({
 			queryKey: ensemblrQueryKeys.repositoryIssuesAll(repoId),
@@ -150,9 +160,11 @@ function UpstreamIssuesSetting({
 			control={
 				<Switch
 					checked={resolved?.value === true}
+					id={switchId}
 					onCheckedChange={(checked) => saveAndRelist(checked)}
 				/>
 			}
+			htmlFor={switchId}
 			description={t(
 				'settings:repo.upstream-issues.description',
 				"For a fork, list the upstream repository's GitHub issues on the board and in issue pickers instead of the fork's own.",

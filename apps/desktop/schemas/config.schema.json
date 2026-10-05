@@ -583,7 +583,7 @@
 				"showUpstreamIssues": {
 					"type": "boolean",
 					"default": false,
-					"description": "List GitHub issues from the repository `gh` resolves for the checkout (a fork's upstream) instead of the one `origin` points at."
+					"description": "List GitHub issues from a fork's upstream (the repository `gh repo set-default` picked, else the `upstream` remote's) instead of the one `origin` points at."
 				},
 				"runScriptMode": {
 					"type": "string",

@@ -119,7 +119,11 @@ function fakeDatabaseServiceWithCache(cached: {
 	} as unknown as EnsemblrDatabaseService;
 }
 
-/** A resolved-settings snapshot carrying only `showUpstreamIssues`. */
+/**
+ * A resolved-settings snapshot carrying only `showUpstreamIssues`.
+ * @param value - The value the setting resolved to.
+ * @returns The snapshot `readRepositorySettings` answers with.
+ */
 function settingsWithUpstreamIssues(
 	value: boolean,
 ): SettingsResolutionSnapshot {
@@ -140,22 +144,48 @@ function settingsWithUpstreamIssues(
 	};
 }
 
-/** The `gh` invocations among a stub's recorded calls. */
+/**
+ * The `gh` invocations among a stub's recorded calls.
+ * @param calls - Every command the stub recorded.
+ * @returns Only the `gh` calls, in order.
+ */
 function ghCalls(calls: LocalCommandRequest[]): LocalCommandRequest[] {
 	return calls.filter((call) => call.command === 'gh');
 }
 
 /**
- * A command stub for a checkout whose `origin` is `originUrl`: `git remote
- * get-url` answers with it, and every `gh` call lists no issues.
+ * A command stub for a checkout with the given remote configuration: `git
+ * config --get-regexp` answers with it, and every `gh` call lists no issues.
+ * @param remoteConfig - `git config --get-regexp` output, one `key value` per line.
+ * @returns The stub and the calls it records.
  */
-function stubCheckoutWithOrigin(originUrl: string) {
+function stubCheckout(remoteConfig: string) {
 	return stubCommandService((request) =>
 		request.command === 'git'
-			? buildResult('git', { status: 'success', stdout: `${originUrl}\n` })
+			? buildResult('git', { status: 'success', stdout: `${remoteConfig}\n` })
 			: buildResult('gh', { status: 'success', stdout: '[]' }),
 	);
 }
+
+/**
+ * A command stub for a checkout whose only remote is `origin`.
+ * @param originUrl - The URL `origin` points at.
+ * @returns The stub and the calls it records.
+ */
+function stubCheckoutWithOrigin(originUrl: string) {
+	return stubCheckout(`remote.origin.url ${originUrl}`);
+}
+
+/**
+ * The remote configuration `gh repo clone` leaves for a fork: the fork as
+ * `origin`, and the parent as `upstream`, marked as gh's resolved base.
+ */
+const GH_CLONED_FORK_CONFIG = [
+	'remote.origin.url git@github.com:octocat/Solaar.git',
+	'remote.upstream.url https://github.com/pwr-Solaar/Solaar.git',
+	'remote.upstream.gh-resolved base',
+	'branch.master.remote origin',
+].join('\n');
 
 test('parseBranches reads the default branch and sorts names newest-commit-first', () => {
 	const stdout = JSON.stringify({
@@ -563,7 +593,8 @@ test('listIssues lists the issues of the repository origin points at', async () 
 
 	await service.listIssues({ repositoryId: 'repo-1', unassignedOnly: true });
 
-	assert.deepEqual(calls[0]?.args, ['remote', 'get-url', 'origin']);
+	assert.equal(calls[0]?.command, 'git');
+	assert.deepEqual(calls[0]?.args?.slice(0, 2), ['config', '--get-regexp']);
 	assert.equal(calls[0]?.cwd, '/repo');
 	const [list] = ghCalls(calls);
 	assert.deepEqual(list?.args?.slice(0, 4), [
@@ -618,7 +649,7 @@ test('listIssues does not fall back to a cache listed from another repository', 
 		request.command === 'git'
 			? buildResult('git', {
 					status: 'success',
-					stdout: 'https://github.com/octocat/Solaar.git\n',
+					stdout: 'remote.origin.url https://github.com/octocat/Solaar.git\n',
 				})
 			: buildResult('gh', {
 					failure: {
@@ -647,9 +678,9 @@ test('listIssues does not fall back to a cache listed from another repository', 
 	assert.equal(result.issues.length, 0);
 });
 
-test('listIssues leaves the repository to gh when the repository shows upstream issues', async () => {
-	const { calls, service: commandService } = stubCheckoutWithOrigin(
-		'git@github.com:octocat/Solaar.git',
+test('listIssues names the repository gh resolved when the repository shows upstream issues', async () => {
+	const { calls, service: commandService } = stubCheckout(
+		GH_CLONED_FORK_CONFIG,
 	);
 	const settingsRequests: SettingsResolutionRequest[] = [];
 	const service = createRepositorySourcesService({
@@ -667,17 +698,71 @@ test('listIssues leaves the repository to gh when the repository shows upstream 
 	assert.deepEqual(settingsRequests, [
 		{ repository: { repositoryId: 'repo-1', repositoryPath: '/repo' } },
 	]);
-	assert.equal(
-		calls.some((call) => call.command === 'git'),
-		false,
+	const [list] = ghCalls(calls);
+	assert.deepEqual(list?.args?.slice(2, 4), ['--repo', 'pwr-Solaar/Solaar']);
+});
+
+test('listIssues follows a gh-resolved owner/name over the upstream remote', async () => {
+	const { calls, service: commandService } = stubCheckout(
+		[
+			'remote.origin.url git@github.com:octocat/Solaar.git',
+			'remote.origin.gh-resolved Solaar-mirror/Solaar',
+			'remote.upstream.url https://github.com/pwr-Solaar/Solaar.git',
+		].join('\n'),
 	);
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseService([]),
+		localCommandService: commandService,
+		readRepositorySettings: () => settingsWithUpstreamIssues(true),
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	await service.listIssues({ repositoryId: 'repo-1' });
+
+	const [list] = ghCalls(calls);
+	assert.deepEqual(list?.args?.slice(2, 4), ['--repo', 'Solaar-mirror/Solaar']);
+});
+
+test('listIssues falls back to the upstream remote when gh resolved nothing', async () => {
+	const { calls, service: commandService } = stubCheckout(
+		[
+			'remote.origin.url git@github.com:octocat/Solaar.git',
+			'remote.upstream.url https://github.com/pwr-Solaar/Solaar.git',
+		].join('\n'),
+	);
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseService([]),
+		localCommandService: commandService,
+		readRepositorySettings: () => settingsWithUpstreamIssues(true),
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	await service.listIssues({ repositoryId: 'repo-1' });
+
+	const [list] = ghCalls(calls);
+	assert.deepEqual(list?.args?.slice(2, 4), ['--repo', 'pwr-Solaar/Solaar']);
+});
+
+test('listIssues leaves the repository to gh when no upstream is configured', async () => {
+	const { calls, service: commandService } = stubCheckoutWithOrigin(
+		'git@github.com:octocat/Solaar.git',
+	);
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseService([]),
+		localCommandService: commandService,
+		readRepositorySettings: () => settingsWithUpstreamIssues(true),
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	await service.listIssues({ repositoryId: 'repo-1' });
+
 	const [list] = ghCalls(calls);
 	assert.equal(list?.args?.includes('--repo'), false);
 });
 
 test('listIssues keeps to origin while upstream issues are off', async () => {
-	const { calls, service: commandService } = stubCheckoutWithOrigin(
-		'git@github.com:octocat/Solaar.git',
+	const { calls, service: commandService } = stubCheckout(
+		GH_CLONED_FORK_CONFIG,
 	);
 	const service = createRepositorySourcesService({
 		databaseService: fakeDatabaseService([]),
@@ -690,6 +775,29 @@ test('listIssues keeps to origin while upstream issues are off', async () => {
 
 	const [list] = ghCalls(calls);
 	assert.deepEqual(list?.args?.slice(2, 4), ['--repo', 'octocat/Solaar']);
+});
+
+// With the parent named explicitly, a cache row listed before `gh repo
+// set-default` moved to another repository no longer matches and is re-listed.
+test('listIssues refreshes an upstream cache once gh resolves elsewhere', async () => {
+	const { calls, service: commandService } = stubCheckout(
+		GH_CLONED_FORK_CONFIG,
+	);
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseServiceWithCache({
+			issues: [CACHED_ISSUE],
+			repository: 'Solaar-mirror/Solaar',
+			syncedAt: new Date().toISOString(),
+		}),
+		localCommandService: commandService,
+		readRepositorySettings: () => settingsWithUpstreamIssues(true),
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	const result = await service.listIssues({ repositoryId: 'repo-1' });
+
+	assert.equal(ghCalls(calls).length, 1);
+	assert.equal(result.status === 'ok' && result.source, 'remote');
 });
 
 test('listIssues serves a fresh cache listed from the same repository', async () => {

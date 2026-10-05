@@ -140,7 +140,11 @@ export const ensemblrQueryKeys = {
 			repositoryId,
 			unassignedOnly ? 'unassigned' : 'all',
 		] as const,
-	/** Prefix matching both of a repository's cached issue lists. */
+	/**
+	 * Prefix matching both of a repository's cached issue lists.
+	 * @param repositoryId - The repository whose issue lists to match.
+	 * @returns The key prefix shared by its all-issues and unassigned lists.
+	 */
 	repositoryIssuesAll: (repositoryId: string) =>
 		[...ensemblrQueryKeys.all, 'repository-issues', repositoryId] as const,
 	/** Query key for a repository's pull requests. */

@@ -248,9 +248,10 @@ repository your checkout's `origin` remote points at — for a fork, the fork's
 own. `gh` on its own would read the upstream instead, because `gh repo clone`
 of a fork adds the parent as `upstream` and marks it as the default repository.
 Turn on **Show upstream issues** on the repository's Git settings screen (or
-`show_upstream_issues = true` here) to list the repository `gh` resolves for
-the checkout, which is that upstream; `gh repo set-default` changes which one it
-is. A repository whose `origin` is not on github.com always leaves the choice to
+`show_upstream_issues = true` here) to list that upstream's issues instead: the
+repository `gh repo set-default` picked for the checkout, or else the one the
+`upstream` remote points at. When neither names a repository on github.com — or,
+with the switch off, when `origin` is not on github.com — the choice is left to
 `gh`. GitHub turns issues off on a new fork, so a fork's own list stays empty
 until you turn them on in the fork's settings on GitHub.
 
