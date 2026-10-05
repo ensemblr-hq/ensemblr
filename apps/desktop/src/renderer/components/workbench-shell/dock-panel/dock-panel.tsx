@@ -1,6 +1,7 @@
 import {
 	ChevronDownIcon,
 	ChevronUpIcon,
+	HourglassIcon,
 	Loader2Icon,
 	PlayIcon,
 	PlusIcon,
@@ -203,6 +204,7 @@ export function DockPanel({
 					isVisible={isPaneVisible('run')}
 					onOpenSetupScripts={actions.onOpenSetupScripts}
 					onRunScript={actions.onRunScript}
+					onStopRunScript={actions.onStopRunScript}
 					script={workspace.scripts.run}
 					tabLabel={runTabLabel}
 					workspaceCwd={workspace.pathLabel}
@@ -268,10 +270,18 @@ function DockTabCloseButton({
 	);
 }
 
-/** Renders the dock tab icon, swapping to a spinner while work is running. */
+/**
+ * Renders the dock tab icon, swapping to a spinner while work is running and to
+ * an hourglass while a script waits for a compute slot — the same glyph the
+ * sidebar's compute queue gives a waiting job.
+ */
 function DockTabGlyph({ tab }: { tab: DockTabModel }) {
 	if (tab.status === 'running') {
 		return <Loader2Icon aria-hidden='true' className='size-3.5 animate-spin' />;
+	}
+
+	if (tab.status === 'queued') {
+		return <HourglassIcon aria-hidden='true' />;
 	}
 
 	const DockTabIcon = getDockTabIcon(tab);

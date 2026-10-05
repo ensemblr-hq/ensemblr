@@ -4,31 +4,53 @@ import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
 
 import { RunStoppedEmptyState } from './run-stopped-empty-state';
 import { ScriptEmptyState } from './script-empty-state';
+import { ScriptQueuedEmptyState } from './script-queued-empty-state';
 import { SecretPromptBar } from './secret-prompt-bar';
 import { XtermTerminal } from './xterm-terminal';
 
-/** Renders the Run script output or the appropriate empty state. */
-export function RunScriptOutputPanel({
-	activeRunScriptName,
-	isVisible = true,
-	onOpenSetupScripts,
-	onRunScript,
-	script,
-	tabLabel,
-	workspaceCwd,
-}: {
+/** Props for {@link RunScriptOutputPanel}. */
+interface RunScriptOutputPanelProps {
 	/** Script the stopped empty state starts, or null when none is configured. */
 	activeRunScriptName: string | null;
 	/** Whether this pane is the dock's active tab and the dock is expanded. */
 	isVisible?: boolean;
 	onOpenSetupScripts: () => void;
 	onRunScript: (scriptName?: string) => void;
+	/** Stops the run script, cancelling a launch still waiting in the compute queue. */
+	onStopRunScript: () => void;
 	script: WorkspaceScriptSummary;
 	/** The dock tab's own name, which names a selection attached from this pane. */
 	tabLabel: string;
 	workspaceCwd: string;
-}) {
+}
+
+/**
+ * Renders the Run script output or the appropriate empty state. A run launch
+ * waiting for a compute slot outranks an earlier run's output, which describes
+ * a session the queued launch is about to replace.
+ */
+export function RunScriptOutputPanel({
+	activeRunScriptName,
+	isVisible = true,
+	onOpenSetupScripts,
+	onRunScript,
+	onStopRunScript,
+	script,
+	tabLabel,
+	workspaceCwd,
+}: RunScriptOutputPanelProps) {
 	const { t } = useTranslation();
+	const { queuedJob } = script;
+
+	if (queuedJob) {
+		return (
+			<ScriptQueuedEmptyState
+				job={queuedJob}
+				onCancel={onStopRunScript}
+				onStartNow={() => onRunScript(queuedJob.scriptName ?? undefined)}
+			/>
+		);
+	}
 
 	if (script.status === 'missing') {
 		return (

@@ -1,4 +1,5 @@
 import type { AgentProviderId } from '@/shared/agent-provider';
+import type { ComputeJobInitiator } from '@/shared/compute-queue';
 import type { ConciergeReference } from '@/shared/concierge-references';
 import type { ModelVendorId } from '@/shared/ipc/contracts/agent-models';
 import type {
@@ -20,6 +21,7 @@ import type {
 	WorkspaceGitDiffScope,
 	WorkspaceGitFailure,
 } from '@/shared/ipc/contracts/workspace-git';
+import type { WorkspaceScriptKind } from '@/shared/ipc/contracts/workspace-scripts';
 import type { RunScriptDefinition } from '@/shared/scripts';
 import type { GithubRepoRef } from './github';
 
@@ -30,7 +32,7 @@ import type { ProjectShellModel } from './project';
 export type FixedDockTabId = 'run' | 'setup';
 export type TerminalDockTabId = `terminal:${string}`;
 export type DockTabId = FixedDockTabId | TerminalDockTabId;
-export type DockTabStatus = 'idle' | 'ready' | 'running' | 'warning';
+export type DockTabStatus = 'idle' | 'queued' | 'ready' | 'running' | 'warning';
 
 export interface SetupScriptDockTabModel {
 	id: 'setup';
@@ -474,6 +476,12 @@ export interface WorkspaceScriptSummary {
 	port?: number;
 	/** Auto-detected local dev-server URL for a running run script, when seen. */
 	previewUrl?: string | null;
+	/**
+	 * A launch of this script still waiting for a compute-queue slot. It sits
+	 * beside `status` rather than in it, because `status` describes the latest
+	 * terminal session and a queued launch has not opened one yet.
+	 */
+	queuedJob?: WorkspaceScriptQueuedJob | null;
 	/** Name of the run script the latest session ran, when it carried one. */
 	scriptName?: string | null;
 	/** Password prompt the running script is blocked on, when it is waiting for one. */
@@ -483,6 +491,23 @@ export interface WorkspaceScriptSummary {
 	status: 'missing' | 'not-run' | 'running' | 'stopped' | 'succeeded';
 	/** Terminal session id of the most recent script run, when one exists. */
 	terminalId?: string | null;
+}
+
+/**
+ * A setup or run script launch the compute queue is holding back until a slot
+ * frees up — what the dock needs to say where it stands in line, how long it
+ * has waited, and who asked for it.
+ */
+export interface WorkspaceScriptQueuedJob {
+	/** Epoch milliseconds the launch entered the queue. */
+	enqueuedAt: number;
+	id: string;
+	initiator: ComputeJobInitiator;
+	kind: WorkspaceScriptKind;
+	/** One-based place among queued jobs; null when the queue reports none. */
+	position: number | null;
+	/** Configured run script the launch starts; null for setup. */
+	scriptName: string | null;
 }
 
 /** Classifies the provenance used to explain why a workspace was created. */

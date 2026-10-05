@@ -24,6 +24,7 @@ function renderPanel(
 	const handlers = {
 		onOpenSetupScripts: vi.fn(),
 		onRunScript: vi.fn(),
+		onStopRunScript: vi.fn(),
 	};
 	const script: WorkspaceScriptSummary = { status: 'stopped' };
 	renderWithProviders(
@@ -79,6 +80,34 @@ test('renders the terminal once the run script owns a session', () => {
 	expect(screen.queryByRole('button', { name: /Start Run/ })).toBeNull();
 });
 
+test('shows the queued panel over an earlier run while a launch waits for a slot', async () => {
+	const user = userEvent.setup();
+	const { onRunScript, onStopRunScript } = renderPanel({
+		script: {
+			queuedJob: {
+				enqueuedAt: Date.now(),
+				id: 'job-1',
+				initiator: 'agent',
+				kind: 'run',
+				position: 2,
+				scriptName: 'test',
+			},
+			status: 'stopped',
+			terminalId: 't1',
+		},
+	});
+
+	expect(screen.queryByTestId('xterm')).toBeNull();
+	expect(screen.getByText('Test is queued')).toBeInTheDocument();
+	expect(screen.getByText('#2 in queue')).toBeInTheDocument();
+
+	await user.click(screen.getByRole('button', { name: 'Start now' }));
+	expect(onRunScript).toHaveBeenCalledWith('test');
+
+	await user.click(screen.getByRole('button', { name: 'Cancel' }));
+	expect(onStopRunScript).toHaveBeenCalledTimes(1);
+});
+
 test('floats the password field over the pane only while the script is asking', () => {
 	renderPanel({
 		script: {
@@ -106,6 +135,7 @@ test('drops a half-typed password when the prompt changes', async () => {
 			activeRunScriptName='dev'
 			onOpenSetupScripts={vi.fn()}
 			onRunScript={vi.fn()}
+			onStopRunScript={vi.fn()}
 			script={{ secretPrompt, status: 'running', terminalId: 't1' }}
 			tabLabel='Run'
 			workspaceCwd='/repo'

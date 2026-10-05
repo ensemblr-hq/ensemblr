@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useAtomValue } from 'jotai';
 import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -13,6 +14,7 @@ import {
 	scriptSummaryToDockStatus,
 } from '@/renderer/lib/terminal';
 import { mapGitStatusToReviewFiles } from '@/renderer/lib/workbench/review-files';
+import { queuedScriptJobsAtomFamily } from '@/renderer/state/compute-queue';
 import type { useWorkspaceTerminalSessions } from '@/renderer/state/workspace/terminal-sessions';
 import type {
 	WorkspaceFileSummary,
@@ -69,8 +71,9 @@ function selectScriptSettings(snapshot: SettingsResolutionSnapshot) {
 
 /**
  * Assembles the live workspace shell model: merges git status, workspace
- * files, PR snapshot, and local review state into the placeholder workspace
- * so the route component stays pure composition.
+ * files, PR snapshot, local review state, and the script launches waiting in
+ * the compute queue into the placeholder workspace so the route component
+ * stays pure composition.
  */
 export function useLiveWorkspaceModel({
 	activeProject,
@@ -112,6 +115,9 @@ export function useLiveWorkspaceModel({
 		}),
 		select: selectScriptSettings,
 	});
+	const queuedScriptJobs = useAtomValue(
+		queuedScriptJobsAtomFamily(activeWorkspace.id),
+	);
 	const { data: gitStatusData } = useQuery(
 		workspaceGitStatusQuery(activeWorkspace.pathLabel ?? null),
 	);
@@ -192,6 +198,7 @@ export function useLiveWorkspaceModel({
 
 	const workspaceWithLiveDockTabs = useMemo<ActiveWorkspace>(() => {
 		const scripts = buildWorkspaceScriptSummaries({
+			queuedJobs: queuedScriptJobs,
 			sessions: terminalSessions.sessions,
 			settings: scriptSettingsData ?? null,
 		});
@@ -235,6 +242,7 @@ export function useLiveWorkspaceModel({
 		liveReview,
 		liveWorkspaceFiles,
 		pullRequest,
+		queuedScriptJobs,
 		scriptSettingsData,
 		terminalSessions.activeTerminalIds,
 		terminalSessions.isLoaded,

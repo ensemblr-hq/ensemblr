@@ -1,5 +1,6 @@
 import type {
 	DockTabStatus,
+	WorkspaceScriptQueuedJob,
 	WorkspaceScriptSummary,
 } from '@/renderer/types/workbench';
 import type { TerminalSessionSnapshot } from '@/shared/ipc/contracts/terminal';
@@ -36,17 +37,28 @@ function resolveConfiguredCommand(
 	return selectDefaultRunScript(settings?.runScripts ?? [])?.command;
 }
 
-/** Builds the setup and run script summaries for the dock panels. */
+/**
+ * Builds the setup and run script summaries for the dock panels.
+ * @param options - Live terminal sessions, resolved script settings, and the workspace's script launches waiting in the compute queue, first in line first.
+ * @returns The setup and run summaries.
+ */
 export function buildWorkspaceScriptSummaries({
+	queuedJobs = [],
 	sessions,
 	settings,
 }: {
+	queuedJobs?: readonly WorkspaceScriptQueuedJob[];
 	sessions: readonly TerminalSessionSnapshot[];
 	settings: WorkspaceScriptSettings | null;
 }): { run: WorkspaceScriptSummary; setup: WorkspaceScriptSummary } {
 	return {
-		run: buildScriptSummary({ kind: 'run', sessions, settings }),
-		setup: buildScriptSummary({ kind: 'setup', sessions, settings }),
+		run: buildScriptSummary({ kind: 'run', queuedJobs, sessions, settings }),
+		setup: buildScriptSummary({
+			kind: 'setup',
+			queuedJobs,
+			sessions,
+			settings,
+		}),
 	};
 }
 
@@ -80,7 +92,10 @@ export function selectActiveRunScript({
 /**
  * Maps a script summary to the dock tab activity state. A script blocked on a
  * password prompt reads as a warning, so the tab asks for attention while the
- * dock is showing something else.
+ * dock is showing something else; a launch waiting for a compute slot reads as
+ * queued, so the tab says the script is coming rather than idle.
+ * @param summary - The script's dock summary.
+ * @returns The tab's activity state.
  */
 export function scriptSummaryToDockStatus(
 	summary: WorkspaceScriptSummary,
@@ -91,6 +106,10 @@ export function scriptSummaryToDockStatus(
 
 	if (summary.status === 'running') {
 		return 'running';
+	}
+
+	if (summary.queuedJob) {
+		return 'queued';
 	}
 
 	if (summary.sessionStatus === 'failed') {
@@ -105,17 +124,20 @@ export function scriptSummaryToDockStatus(
 }
 
 /**
- * Folds a script's resolved command and its latest terminal session into a
- * single dock summary, carrying any auto-detected preview URL and port.
- * @param options - The script kind, live terminal sessions, and resolved script settings
- * @returns The summary describing the script's command, status, and preview
+ * Folds a script's resolved command, its latest terminal session, and any
+ * launch of it waiting in the compute queue into a single dock summary,
+ * carrying any auto-detected preview URL and port.
+ * @param options - The script kind, its queued launches, live terminal sessions, and resolved script settings
+ * @returns The summary describing the script's command, status, queued launch, and preview
  */
 function buildScriptSummary({
 	kind,
+	queuedJobs,
 	sessions,
 	settings,
 }: {
 	kind: WorkspaceScriptKind;
+	queuedJobs: readonly WorkspaceScriptQueuedJob[];
 	sessions: readonly TerminalSessionSnapshot[];
 	settings: WorkspaceScriptSettings | null;
 }): WorkspaceScriptSummary {
@@ -131,6 +153,7 @@ function buildScriptSummary({
 	return {
 		...(command ? { command } : {}),
 		...previewFields(latestSession),
+		...queuedJobFields(kind, queuedJobs, sessions),
 		...secretPromptFields(latestSession),
 		scriptName: latestSession?.scriptName ?? null,
 		sessionStatus: latestSession?.status ?? null,
@@ -158,6 +181,35 @@ function previewFields(
 	const port = extractPreviewPort(previewUrl);
 
 	return { previewUrl, ...(port !== null ? { port } : {}) };
+}
+
+/**
+ * Carries the first launch of this script still waiting for a compute slot onto
+ * the summary. A running session of the same kind is what the dock is showing,
+ * and the queued panel's Cancel stops whatever of that kind is running, so a
+ * launch queued behind a live session never displaces it.
+ * @param kind - The script kind.
+ * @param queuedJobs - The workspace's queued script launches, first in line first.
+ * @param sessions - Every live terminal session in the workspace.
+ * @returns The queued-job field to spread onto the summary, absent when nothing waits.
+ */
+function queuedJobFields(
+	kind: WorkspaceScriptKind,
+	queuedJobs: readonly WorkspaceScriptQueuedJob[],
+	sessions: readonly TerminalSessionSnapshot[],
+): Pick<WorkspaceScriptSummary, 'queuedJob'> {
+	const hasRunningSession = sessions.some(
+		(session) =>
+			session.kind === `${kind}-script` && session.status === 'running',
+	);
+
+	if (hasRunningSession) {
+		return {};
+	}
+
+	const queuedJob = queuedJobs.find((job) => job.kind === kind);
+
+	return queuedJob ? { queuedJob } : {};
 }
 
 /**

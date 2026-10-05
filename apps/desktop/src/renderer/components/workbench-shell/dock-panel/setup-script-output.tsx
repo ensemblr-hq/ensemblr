@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/renderer/components/ui/button';
 import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
 
+import { ScriptQueuedEmptyState } from './script-queued-empty-state';
 import { SecretPromptBar } from './secret-prompt-bar';
 import { SetupMissingEmptyState } from './setup-missing-empty-state';
 import { SetupNotRunEmptyState } from './setup-not-run-empty-state';
@@ -23,7 +24,11 @@ interface SetupScriptOutputPanelProps {
 	workspaceCwd: string;
 }
 
-/** Renders the Setup script output or the appropriate empty state. */
+/**
+ * Renders the Setup script output or the appropriate empty state. A setup
+ * launch waiting for a compute slot outranks an earlier run's output, which
+ * describes a session the queued launch is about to replace.
+ */
 export function SetupScriptOutputPanel({
 	isVisible = true,
 	onAskAgentSetupScript,
@@ -39,6 +44,16 @@ export function SetupScriptOutputPanel({
 			<SetupMissingEmptyState
 				onAddManually={onOpenSetupScripts}
 				onAskAgent={onAskAgentSetupScript}
+			/>
+		);
+	}
+
+	if (script.queuedJob) {
+		return (
+			<ScriptQueuedEmptyState
+				job={script.queuedJob}
+				onCancel={onStopSetupScript}
+				onStartNow={onRunSetupScript}
 			/>
 		);
 	}
