@@ -13,7 +13,7 @@
 		"vite.main.config.mts",
 		"vite.preload.config.mts",
 		"vite.renderer.config.mts",
-		// Dev-only preview harness, served by `npm run dev:playground`. The config
+		// Dev-only preview harness, served by `bun run dev:playground`. The config
 		// reaches playground/index.html through a `/playground/` redirect string,
 		// which is not a resolvable import edge, so the module the page loads is
 		// named directly the same way src/renderer/main.tsx is above.
@@ -72,7 +72,7 @@
 		".demo/**",
 		// Demo mode is a screenshot harness, not part of the product: a separate
 		// Electron entrypoint that renders the shipped renderer against scripted
-		// fixtures, launched by `npm run dev:demo` rather than by Forge. Nothing
+		// fixtures, launched by `bun run dev:demo` rather than by Forge. Nothing
 		// under src/ imports it and the packaged app carries none of it, which
 		// `tests/renderer/demo-isolation.test.ts` enforces in both directions.
 		// Analysing it as first-party is therefore all noise: a scenario is a
@@ -168,7 +168,7 @@
 		// coverage fallow estimates the coverage term from export references and
 		// the cubed factor dominates — an 11-line function with cyclomatic 5 lands
 		// on the complexity list purely for looking untested. Point at the Istanbul
-		// report `npx vitest run --coverage` writes so the scores are measured
+		// report `bunx vitest run --coverage` writes so the scores are measured
 		// instead. Absent (a fresh clone that has not run coverage yet) fallow
 		// falls back to the estimate and still exits 0, so this is safe to commit.
 		"coverage": "coverage/coverage-final.json",

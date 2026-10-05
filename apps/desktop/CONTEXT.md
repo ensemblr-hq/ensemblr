@@ -49,7 +49,7 @@ A per-chat mode that holds an agent to planning until the user approves what it 
 _Avoid_: Read-only mode, dry run
 
 **Ensemblr Control**:
-The permission-gated control surface that lets an agent running inside a workspace drive Ensemblr itself — spawn conversations, launch harnesses, run terminals, focus panels, read the diff and leave or resolve review comments, ask the user a question, and move the workspace across the board — through the `ensemblr_*` tools.
+The permission-gated control surface that lets an agent running inside a workspace drive Ensemblr itself — spawn conversations, launch harnesses, run terminals, focus panels, read the diff and leave or resolve review comments, ask the user a question, queue heavy commands, and move the workspace across the board — through the `ensemblr_*` tools.
 _Avoid_: Agent API, automation, remote control
 
 **Concierge**:
@@ -81,6 +81,14 @@ _Avoid_: Task, npm script, dev server
 **Review Flow**:
 The process of inspecting workspace changes, running checks, resolving merge conflicts, creating a pull request, merging accepted work, or archiving rejected work.
 _Avoid_: Diff screen, done state
+
+**Compute Queue**:
+The one app-wide queue heavy commands wait in — test suites, builds, typechecks, nix rebuilds — shared by every agent in every workspace, so parallel agents cannot saturate the machine. Agents reach it through `ensemblr_run_queued`; a heavy command typed into a shell, a terminal, or a script is refused and pointed at it. The user sets its slot count and which commands count as heavy under Settings → General.
+_Avoid_: Job runner, task scheduler, build server
+
+**Merge Close-Out**:
+What a merged pull request sets in motion, however the merge happened: the workspace's board card moves to Done and the issue the workspace was created from is closed. An agent's own work stops at In Review; Done belongs to the merge.
+_Avoid_: Auto-archive, completion hook
 
 **Attachment**:
 Anything the user pins into a composer draft as a chip — a workspace file or folder, a pasted image or long text block, a Linear or GitHub issue, a review-comment thread, a changed file's diff. Attachments form one ordered list, and the outgoing prompt carries each one at the position its chip sat in the sentence. A thing that exists on disk is attached by reference; a thing that does not — a diff, an issue — is written out as a document the chip points at.

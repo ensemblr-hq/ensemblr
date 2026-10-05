@@ -136,8 +136,8 @@ Every workspace sits in one of five columns:
 | Column | Meaning |
 | --- | --- |
 | Backlog | queued, not started |
-| In Progress | being worked |
-| In Review | changes ready for you to look at |
+| In progress | being worked |
+| In review | changes ready for you to look at |
 | Done | finished |
 | Canceled | abandoned |
 
@@ -230,8 +230,9 @@ run terminals, focus panels, read the diff, leave and resolve review comments,
 ask you a question, move the workspace across the board.
 
 When one agent delegates to others, the **orchestrator** is the root agent that
-does the delegating, and a **sub-agent** is a spawned child. A sub-agent does its
-one unit of work itself and never delegates onward.
+does the delegating, and a **sub-agent** is a spawned child. A sub-agent owns one
+unit of work. A manager one level down may open leaves of its own, but a leaf
+never delegates onward.
 
 _You'll see this in_ [`09-agent-control.md`](./09-agent-control.md).
 

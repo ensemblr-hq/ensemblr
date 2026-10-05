@@ -646,7 +646,9 @@ holds the icon set to both constraints.
 `bun run package` writes the unpacked `.app` to `out/`.
 
 A third artifact exists only on the release, not in `out/`: both workflows write
-**`update-darwin-arm64.json`** and attach it beside the `.zip`. See
+one **`update-<platform>-<arch>.json`** per target — `update-darwin-arm64.json`
+and `update-darwin-x64.json` beside each `.zip`, `update-linux-x64.json` beside
+the AppImage — and attach it. See
 [The update feed document](#the-update-feed-document) below.
 
 **An empty `out/` has two unrelated causes and they look alike.** The Node-major
@@ -676,8 +678,10 @@ is load-bearing: the workflow refuses a tag whose version does not match
 workspace's unmerged commit.
 
 1. On a branch cut from current `origin/master`, run
-   `bun pm version <version> --no-git-tag-version` in `apps/desktop/`,
-   replacing `<version>` with the exact version being cut, then `bun install`.
+   `nix develop -c bun pm version <version> --no-git-tag-version` in `apps/desktop/`,
+   replacing `<version>` with the exact version being cut, then
+   `nix develop -c bun install` from the repository root (the shell is the only
+   supported toolchain, and an agent's own shell does not start inside it).
    Commit `apps/desktop/package.json` and `bun.lock`: the lockfile records every
    workspace's version, so the bump moves that one line and nothing else
    (`bun ci` tolerates the stale line, but the next plain `bun install` would
@@ -743,23 +747,26 @@ does not bump Homebrew because that side effect belongs to the original
 The workflow refuses to build when `apps/desktop/package.json`'s `version` does not match the
 tag with `v` stripped, or when the release is still a draft.
 
-**Seven version-pinned files stay hand-edited, and the version-bump commit
+**Six version-pinned files stay hand-edited, and the version-bump commit
 touches none of them.** The app's README carries three current-release mentions;
-four more files live under `docs/` and quietly point at the previous release
+three more files live under `docs/` and quietly point at the previous release
 until someone edits them. `nix/pins.json` is written by a script rather than by
 hand, and `NOTES.md` and `CHANGELOG.md` take the release's own entry:
 
 | File | What is pinned |
 | --- | --- |
-| `README.md` | version line, status sentence, both `.dmg` URLs (arm64 and x64) |
+| `README.md` | version line, status sentence with its release date, both `.dmg` URLs (arm64 and x64) |
 | `docs/README.md` | version link, both `.dmg` URLs, `.AppImage` URL |
 | `docs/guide/README.md` | the version this guide describes |
-| `docs/guide/01-install.md` | current-version examples and every asset URL, both architectures |
-| `docs/build-and-release.md` | the command and `update-darwin-arm64.json` examples |
+| `docs/guide/01-install.md` | current-version examples (`--version <tag>`, the Settings → General version) and every asset URL, both architectures |
 | `NOTES.md`, `CHANGELOG.md` | the release body (already published) and its changelog entry, with the real asset names in the links |
 | `nix/pins.json` | the flake's `release` variant: version, AppImage name, and hash — run `nix/update-pins.sh release` once the AppImage is attached; `nix` lives at `/nix/var/nix/profiles/default/bin` and may be off a non-login `PATH` |
 
-**Never string-replace the old version into the new one.** Asset filenames
+The examples in this file (`v0.1.20` in the commands and the feed document) are
+illustrative, so a release does not touch them.
+
+**Never string-replace the old version into the new one** without first
+confirming the new names against the release. Asset filenames
 change shape between releases — `0.1.0` dropped the `-beta.N` segment, so
 `Ensemblr-0.1.0-beta.24-arm64.dmg` became `Ensemblr-0.1.0-arm64.dmg` — and a
 substitution produces URLs that 404 while looking right.
@@ -935,9 +942,9 @@ gets wired into `release.yml` — this section is the place to update, alongside
 [`ensemblr-hq/homebrew-tap`](https://github.com/ensemblr-hq/homebrew-tap), which
 holds one cask and nothing else.
 
-The release job bumps it. It reads the `.dmg` asset's `digest` field — GitHub's
-own hash of what it stored, rather than a re-hash of a local copy — rewrites the
-`version` and `sha256` stanzas, and commits through the Contents API, so the
+The release job bumps it. It reads each `.dmg` asset's `digest` field (arm64 and
+x64) — GitHub's own hash of what it stored, rather than a re-hash of a local
+copy — rewrites the `version` stanza and both `sha256` lines, and commits through the Contents API, so the
 token never reaches a git remote. The step runs on `release: published` only: a
 `workflow_dispatch` rebuild of an older tag must not walk the cask backwards.
 
@@ -1234,6 +1241,6 @@ reach this directory through the links `scripts/link-hoisted-packages.mjs` write
 - [ADR 0077](./adr/0077-ship-a-nix-flake-and-stand-the-updater-down-in-the-nix-store.md) — why the flake patches the AppImage instead of sandboxing it, why `master` is a real Forge package, and why a Nix-store copy never updates in-app.
 - [ADR 0031](./adr/0031-strip-launch-context-env-and-single-instance-lock.md), [ADR 0032](./adr/0032-channel-scoped-bundle-identity.md) — the Dock-flash fixes.
 - [ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) — why the Claude binary is not packaged.
-- [`.claude/rules/stack.md`](../../../.claude/rules/stack.md) — the pinned versions, the two `external` packages, and the `legacy-peer-deps` constraint.
+- [`.claude/rules/stack.md`](../../../.claude/rules/stack.md) — the pinned versions, the two `external` packages, and why there is no `.npmrc`.
 - [`README.md`](../README.md) — tech stack and getting started.
 - [`onboarding.md`](./onboarding.md) — the contributor runbook the build sits at the end of.

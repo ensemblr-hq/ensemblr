@@ -134,8 +134,8 @@ and [`12-repository-settings.md`](./12-repository-settings.md).
 
 ## The board
 
-Every workspace is a card in one of five columns: **Backlog**, **In Progress**,
-**In Review**, **Done**, **Canceled**. Drag a card to move it between columns or
+Every workspace is a card in one of five columns: **Backlog**, **In progress**,
+**In review**, **Done**, **Canceled**. Drag a card to move it between columns or
 to reorder within one — the order you set is kept. Each card has an action menu
 for the things you do to a whole workspace without opening it.
 
@@ -147,6 +147,15 @@ agent may *not* do is close out the **Linear** issue behind the work: an update
 targeting a completed or canceled state is refused, so agent work goes as far as
 In Review and you decide whether it is done. See
 [`09-agent-control.md`](./09-agent-control.md).
+
+**Merging the pull request is that decision.** When a workspace's pull request
+merges — from the Merge button, an agent's own `gh pr merge`, the GitHub web UI,
+or a merge queue — Ensemblr moves the card to **Done**, moves the Linear issue
+the workspace was created from to its team's completed state (preferring one
+named Done), and closes a linked GitHub issue as completed. An issue already
+completed or canceled is left alone, and a step that fails does not stop the
+others. See
+[ADR 0082](../adr/0082-close-out-a-workspace-when-its-pull-request-merges.md).
 
 ### Work that has no workspace yet
 
@@ -165,7 +174,7 @@ the repository facet keeps only the Linear issues of the repositories it picks,
 and dragging a Linear issue out of Backlog offers only the repositories that
 take it.
 
-Nothing on the board is ever written back to Linear or GitHub. Dropping an issue
+Nothing you do on the board is written back to Linear or GitHub. Dropping an issue
 on **Canceled** dismisses it here and nowhere else — the issue's own status in
 the tracker stays yours to change.
 

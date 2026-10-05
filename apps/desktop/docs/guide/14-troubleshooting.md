@@ -183,7 +183,7 @@ step. To confirm it took, `ls -l node_modules/node-pty/prebuilds/*/spawn-helper`
 ### An Infisical secret is missing from a terminal or agent
 
 **Cause.** One of four, in the order worth checking. The repository has no link
-(**Settings → Repo → Secrets** shows no project). The link resolves to no local
+(**Settings → Repository → Secrets** shows no project). The link resolves to no local
 account — the project half is committed and the Machine Identity is not, so a
 freshly cloned repository needs an account added under **Settings →
 Integrations**. The secret lives under a path the link does not cover, and

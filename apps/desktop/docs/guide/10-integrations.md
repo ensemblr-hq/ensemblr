@@ -42,6 +42,7 @@ What the integration powers:
 | Repository browsing | lists the repositories your account can see, when you add a project from GitHub |
 | Publishing a project | `gh repo create` publishes a new local project to GitHub |
 | The board backlog | reads each project's **unassigned** open issues, so work with no workspace yet has a place to sit |
+| Issue pickers | the create dialog's Issues tab and the composer's issue picker list the same repository's open issues |
 
 GitHub is treated as the source of truth for remote state: Ensemblr caches what
 it fetched so the panel paints instantly, then refreshes from GitHub, and tells
@@ -54,6 +55,15 @@ rather than presenting them as current. The backlog query asks GitHub for
 unassigned issues directly rather than filtering them afterwards — a page limit
 counts the rows GitHub returns, so filtering after the fact would empty the
 backlog of any repository whose newest open issues happen to all be assigned.
+
+**A fork lists its own issues.** The board, the create dialog's Issues tab, and
+the composer's picker read the repository your checkout's `origin` points at,
+not the upstream that `gh` would pick by default for a fork. Turn on **Show
+upstream issues** (Settings → Git, or `show_upstream_issues = true` under
+`[git]`) to list the upstream's issues instead; the key is in
+[`./12-repository-settings.md`](./12-repository-settings.md). GitHub turns
+issues off on a new fork, so a fork's own list stays empty until you enable
+them there.
 
 A repository with **Issues disabled** on GitHub is not an error. `gh` refuses the
 listing, Ensemblr recognises the refusal, and that repository simply contributes
@@ -113,7 +123,7 @@ What the integration powers:
 
 | Surface | What it does |
 | --- | --- |
-| Issue browsing | search and read issues visible to any connected account, with their comments, team, project, status, labels, and assignee — plus an inline editor for the properties rail |
+| Issue browsing | search and read issues visible to any connected account, with their comments, team, project, status, labels, and assignee — plus an inline editor for the properties rail. The list shows a project column and can group by project |
 | The board backlog | unstarted issues appear in Backlog; dragging one rightward is what creates the workspace from it |
 | Workspace from an issue | create a workspace directly from an issue, seeding its name, branch, and initial prompt from the issue title and identifier |
 | Attaching to a chat | pick an issue in the composer and attach it as a chip; the whole issue is serialized as a markdown document for the agent to read |
@@ -142,6 +152,18 @@ rather than in the renderer, and the expiring signature is stripped before
 anything crosses to the renderer or into an agent's context. A ticket left open
 for an hour still shows its screenshots; an image that genuinely fails falls back
 to a placeholder carrying its alt text.
+
+**Narrow by assignee, and by team per repository.** The browse list, the
+board's toolbar, and the create-from picker's Issues tab each carry an
+**Assignee** filter: pick **Me** (your own user on any connected account),
+**Unassigned**, and any person assigned in the loaded rows. Each surface
+remembers its own selection. To keep one repository's work apart from another's,
+list the Linear teams it belongs to under `[linear] teams` in
+`.ensemblr/settings.toml` (see [`./12-repository-settings.md`](./12-repository-settings.md)):
+the Issues tab then lists only those teams' issues, and the board leaves off an
+issue whose team no repository claims. The picker lists issues nobody has
+started, sorted by priority and then last update, and each Linear issue carries
+a badge naming its Linear project.
 
 **The browse list remembers how you left it.** Search text, account, and team
 narrowing persist across a restart alongside the scope, sort, and grouping

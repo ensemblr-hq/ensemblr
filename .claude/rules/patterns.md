@@ -80,7 +80,8 @@ existing semantics must be preserved exactly.
 validates, resolves its origin from an injected per-workspace bearer token,
 checks scope and the workspace permission mode, applies fork-bomb guardrails,
 then delegates through a **port** (`ports.ts`, `port-adapters.ts`,
-`review-ports.ts`, `linear-ports.ts`) to a service that already exists.
+`review-ports.ts`, `linear-ports.ts`, `architecture-ports.ts`,
+`job-queue-ports.ts`) to a service that already exists.
 
 **Control adds no capability code of its own.** If an operation is not already a
 service, build the service first. Both bridges — Pi via `POST /invoke`, MCP

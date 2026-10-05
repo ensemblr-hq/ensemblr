@@ -206,9 +206,10 @@ Per-repository git defaults, each overriding the matching user-scope setting.
 | `delete_local_branch_on_archive` | boolean | Delete the local branch on archive. The remote branch is untouched. |
 | `archive_after_merge` | boolean | Archive a workspace once its pull request merges. |
 | `set_upstream_on_push` | boolean | New workspaces set upstream on a plain `git push`. |
+| `show_upstream_issues` | boolean | List GitHub issues from a fork's upstream (the repository `gh repo set-default` picked, else the `upstream` remote's) instead of the one `origin` points at. Defaults to `false`. |
 
 `branchPrefix` in camelCase is still accepted as an alias for `branch_prefix`.
-It is the only camelCase `[git]` key accepted; the other five must be snake_case.
+It is the only camelCase `[git]` key accepted; the other six must be snake_case.
 
 ## `[prompts]`
 

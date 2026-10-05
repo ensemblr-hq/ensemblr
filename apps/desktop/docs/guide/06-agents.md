@@ -88,6 +88,12 @@ entitled to:
 All four are deferred until something asks for them, so opening the app spawns
 nothing. [`../claude/README.md`](../claude/README.md) has the details.
 
+A chat's first prompt does not wait for those MCP servers to connect. Ensemblr
+sets `CLAUDE_CODE_MCP_STARTUP_WAIT_MS=0` for the session (unless you already set
+it yourself) and holds the first turn only for its own control server, for at
+most five seconds, so plugins and connectors that are slow or failing no longer
+cost the chat up to thirty.
+
 ### Plan usage and session cost
 
 Claude Code reports what your account has spent against its claude.ai plan, and
@@ -759,7 +765,7 @@ under its own name and clicking it opens its panel rather than a chat — see
 
 A **notification sound** rides alongside, on by default and switchable
 separately — the chat can chime without the notification banner, or the other
-way round. There is also an option to keep the Mac awake while an agent is
+way round. There is also an option to keep the machine awake while an agent is
 running, so a long turn is not cut short by sleep.
 
 ## Quitting with agents still running

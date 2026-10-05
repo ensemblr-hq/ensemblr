@@ -107,6 +107,7 @@ name:**
 | `src/main/claude-agent/claude-thinking.ts` | thinking level → `EffortLevel` |
 | `src/main/claude-agent/claude-mcp-config.ts` | the `mcpServers` map pointing at Ensemblr Control |
 | `src/main/claude-agent/claude-mcp-startup.ts` | lifting the CLI's first-turn wait on every MCP server, and waiting for the control server alone |
+| `src/main/claude-agent/claude-compute-queue-guard.ts` | the `PreToolUse` hook that refuses a heavy `Bash`/`Monitor` command and points at `ensemblr_run_queued` |
 | `src/main/claude-agent/claude-slash-commands.ts`, `src/main/claude-agent/claude-mcp-roster.ts`, `src/main/claude-agent/claude-model-lister.ts`, `src/main/claude-agent/claude-model-catalog.ts` | live capability discovery |
 | `src/main/claude-agent/tool-result-details.ts` | `structuredPatch` → a unified patch for edit cards |
 

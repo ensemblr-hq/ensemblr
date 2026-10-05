@@ -1642,7 +1642,8 @@ review bullet every role shares says only that a comment op needs no focus call
 of its own, so children and plans carry no end-of-turn rule; the filed and
 resolved acknowledgements ask for Checks back if the agent focuses anything
 else before its turn ends. The AFK delivery loop's step 5 repeats the root rule
-once the pull request is opened or updated.
+once the pull request is opened or updated; step 6 then watches that pull request
+through its checks and review bots (ADR 0084).
 This is prose rather than enforcement because the port has no signal for "the
 turn is ending"; the one-yank-per-pass rule above is unchanged.
 

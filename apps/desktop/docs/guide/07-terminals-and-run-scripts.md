@@ -170,6 +170,20 @@ setup exits 0.
 [`./08-reviewing-changes.md`](./08-reviewing-changes.md) for when archiving is
 the right end to a piece of work.
 
+### Queued scripts
+
+With the compute queue on (**Settings → General**, on by default), a setup or
+run script that Ensemblr or an agent starts may have to wait for a free slot
+first. Every setup script counts as heavy; a run script does when its command is
+a build, test run, or similar. While it waits, its dock tab reads **Setup is queued**
+or **Run script is queued**, shows its place — **#2 in queue**, or **Next in
+line** — and offers **Cancel** and **Start now**, which skips the queue. Output
+appears once it starts. A heavy script you start yourself never waits: it starts at
+once and takes a slot, so agents queue behind you. The sidebar's compute queue
+panel lists the same jobs across every workspace. See
+[ADR 0082](../adr/0082-queue-heavy-agent-commands-through-one-app-wide-queue.md)
+and [11. App settings](./11-app-settings.md#general).
+
 ## Editing scripts from inside the app
 
 The repository's **Scripts** settings pane reads and writes

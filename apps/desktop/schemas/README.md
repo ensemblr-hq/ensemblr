@@ -70,7 +70,7 @@ comment, but this one directive is read back and restored, so wiring a
 repository up once survives.
 
 This repository points its own `.ensemblr/settings.toml` at the checked-in file
-with a relative path (`#:schema ../schemas/settings.schema.json`) so it
+with a relative path (`#:schema ../apps/desktop/schemas/settings.schema.json`) so it
 validates offline and always against the tree it ships with.
 
 The presentation schema leaves `glyph` as a string because its runtime validator

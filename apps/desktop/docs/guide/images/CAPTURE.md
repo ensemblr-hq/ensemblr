@@ -112,7 +112,7 @@ image belongs. Replace it with the image rather than adding one beside it:
 Every shot in the list has a scenario, so nothing here is taken by hand any
 more. Additional available scenarios not yet published on guide pages are:
 
-- `dock-terminal`, `board`
+- `dock-terminal`
 - `agents-history`, `architecture`
 - `workspace-files`, `workspace-history`
 - `linear-issue-detail`, `harness-launcher`

@@ -40,8 +40,10 @@ Run these before you push. CI runs the same gates, but only once the branch is u
 `.github/workflows/checks.yml` runs `lint`, `typecheck` and `test` as separate jobs on pushes to `master` and
 PRs targeting it, so the wall clock is the slowest one rather than their sum. `test` is a matrix — both
 `macos-latest` and `ubuntu-latest`, each split into three shards — and `lint` and `typecheck` run on Linux only,
-because neither Biome nor tsc can disagree across platforms. All three collapse into one `verify` status
-check. `scan` runs a `react-doctor` scan diffed against `master`, failing on `error`. Catching a break locally
+because neither Biome nor tsc can disagree across platforms. `nix-deps` builds the Nix deps derivation against
+`apps/desktop/nix/pins.json`, and only when the change touches `bun.lock`, `bunfig.toml`, the flake, or
+`apps/desktop/nix/`; a stale pin fails it (`apps/desktop/nix/update-pins.sh deps` re-pins). All four collapse
+into one `verify` status check. `scan` runs a `react-doctor` scan diffed against `master`, failing on `error`. Catching a break locally
 costs a minute; catching it in CI costs a round trip.
 
 Pushing again to a PR cancels the run it superseded, so a fixup does not queue behind the run nobody will
@@ -103,6 +105,7 @@ src/
 │                 infisical · terminal · scripts · storage · config · environment · secrets
 │                 setup · ipc · app · menu · open-target · root · updates · safe-fs
 │                 concurrency · pi-ipc · pi-runtime · linked-directories
+│                 compute-queue · merge-close-out
 ├── preload/    Context-isolated IPC bridge (bridge/ensemblr-api.ts). Entry: preload.ts.
 ├── renderer/   React UI, organized type-first: api · components · config · fixtures ·
 │               hooks · lib · routing · state · styles · types. Entry: main.tsx.
