@@ -320,7 +320,6 @@ Terminal), and GitKraken. Both add **Copy path**.
 | Shortcut | Action |
 | --- | --- |
 | `⌘O` | open in the current primary target |
-| `⌘⇧C` | copy the workspace path |
 | `1`–`9` | open the Nth entry, while the dropdown is open |
 
 Detection is cached, so the menu paints with real icons on the first frame of

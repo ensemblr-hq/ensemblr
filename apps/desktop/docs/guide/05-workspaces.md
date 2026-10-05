@@ -338,8 +338,8 @@ Only apps you actually have installed appear, and each entry knows how to be
 launched on the platform you are on: macOS detects them through Launch Services,
 Linux resolves either a launcher command on `PATH` or a `.desktop` entry and
 spawns it detached. Either way the menu shows their real icons and never offers
-you something that would fail to open. ⌘O opens your primary editor, ⌘⇧C copies the
-path, and `1`–`9` pick entries while the menu is open. See
+you something that would fail to open. ⌘O opens your primary editor, **Copy path** is
+in the menu (⌘⇧C belongs to the Concierge), and `1`–`9` pick entries while the menu is open. See
 [ADR 0028](../adr/0028-use-launch-services-for-open-workspace-in-app.md).
 
 ## See also
