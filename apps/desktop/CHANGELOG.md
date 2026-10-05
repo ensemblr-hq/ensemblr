@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for you to resolve. Red it did not cause is not worked around: a flake or an outage gets one re-run, and
   an already-failing base, a merge conflict, or a check that never starts goes in the report. The report
   now says what the checks and reviewers said and what was pushed in answer.
-  [ADR 0084](./docs/adr/0084-see-an-unattended-pull-request-through-its-checks.md).
+  [ADR 0084](./docs/adr/0084-see-an-unattended-pull-request-through-its-checks.md). (#725)
 - **Development runs inside a Nix dev shell.** `nix develop` (from `flake.nix`, defined in
   `apps/desktop/nix/dev-shell.nix`) supplies Node, Bun, `make`, `python3`, and on Linux gcc and
   nixpkgs' Electron. It reads every version from the manifests. Setup and run scripts, and CI's
