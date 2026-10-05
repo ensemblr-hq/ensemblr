@@ -11,6 +11,7 @@ import {
 	refreshLinearIssues,
 } from '@/renderer/api/ensemblr';
 import { Skeleton } from '@/renderer/components/ui/skeleton';
+import { useLinearAssigneeFilter } from '@/renderer/hooks/linear/use-linear-assignee-filter';
 import { useLinearRefresh } from '@/renderer/hooks/linear/use-linear-refresh';
 import { useDebouncedValue } from '@/renderer/hooks/use-debounced-value';
 import {
@@ -40,8 +41,10 @@ import { LinearIssueRow } from './issue-row';
 const SEARCH_DEBOUNCE_MS = 250;
 
 /**
- * Linear issue browse list across every connected account: search, account and
- * team filters, a completion scope, and sortable, groupable rows. Every one of
+ * Linear issue browse list across every connected account: search, account,
+ * team, and assignee filters, a completion scope, and sortable, groupable rows.
+ * The assignee facet narrows the rows the read returned rather than the read
+ * itself, so its options stay complete while it is applied. Every one of
  * those is remembered, so opening an issue and coming back returns to the same
  * view. Rows are merged rather than grouped by account, so each carries its
  * organization when the visible set actually spans more than one.
@@ -54,7 +57,7 @@ export function LinearIssueList() {
 	const [scope, setScope] = useAtom(linearIssueScopeAtom);
 	const [sort, setSort] = useAtom(linearIssueSortAtom);
 	const [grouping, setGrouping] = useAtom(linearIssueGroupingAtom);
-	const { clear, filters, setAccountId, setQuery, setTeamId } =
+	const { clear, filters, setAccountId, setQuery, setTeamId, toggleAssignee } =
 		useLinearIssueFilters();
 	const settledQuery = useDebouncedValue(filters.query, SEARCH_DEBOUNCE_MS);
 
@@ -90,13 +93,24 @@ export function LinearIssueList() {
 
 	const showAccountFilter = accounts.length > 1;
 	const rows = useMemo(() => result?.issues ?? [], [result]);
+	const assignee = useLinearAssigneeFilter({
+		issues: rows,
+		selection: filters.assignees,
+	});
+	const assignedRows = useMemo(
+		() => rows.filter(assignee.matches),
+		[assignee.matches, rows],
+	);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: group headings are named through the i18n singleton, so the language is a real input Biome cannot see.
 	const board = useMemo(
-		() => orderLinearIssues({ grouping, issues: rows, scope, sort }),
-		[grouping, i18n.language, rows, scope, sort],
+		() => orderLinearIssues({ grouping, issues: assignedRows, scope, sort }),
+		[assignedRows, grouping, i18n.language, scope, sort],
 	);
-	const showOrganization = useMemo(() => spansOrganizations(rows), [rows]);
+	const showOrganization = useMemo(
+		() => spansOrganizations(assignedRows),
+		[assignedRows],
+	);
 	const showProject = useMemo(
 		() => grouping !== 'project' && hasProjects(board),
 		[board, grouping],
@@ -107,6 +121,11 @@ export function LinearIssueList() {
 			<LinearIssueFilterBar
 				accountId={accountId}
 				accounts={accounts}
+				assignee={{
+					onToggle: toggleAssignee,
+					options: assignee.options,
+					selection: filters.assignees,
+				}}
 				onAccountChange={setAccountId}
 				onClearFilters={clear}
 				onNewIssue={() => setEditorOpen(true)}
@@ -152,6 +171,7 @@ export function LinearIssueList() {
 			) : board.total === 0 ? (
 				<p className='rounded-lg border border-border border-dashed px-3 py-12 text-center text-muted-foreground text-xs'>
 					{emptyText({
+						hasAssignedRows: assignedRows.length > 0,
 						hasRows: rows.length > 0,
 						query: filters.query,
 						scope,
@@ -252,22 +272,32 @@ function spansOrganizations(issues: readonly LinearIssueWire[]): boolean {
 }
 
 /**
- * Copy for an empty list, which has three quite different causes: nothing
- * cached, nothing matching the search, or everything filtered out by the scope.
- * @param options - Whether any rows loaded, the search text, the active scope, and `t`
+ * Copy for an empty list, which has four quite different causes: nothing
+ * cached, nothing matching the search, nobody the assignee facet keeps, or
+ * everything filtered out by the scope.
+ * @param options - Whether any rows loaded and survived the assignee facet, the search text, the active scope, and `t`
  * @returns The sentence to show in place of the list
  */
 function emptyText({
+	hasAssignedRows,
 	hasRows,
 	query,
 	scope,
 	t,
 }: {
+	hasAssignedRows: boolean;
 	hasRows: boolean;
 	query: string;
 	scope: LinearIssueScope;
 	t: (key: string, fallback: string) => string;
 }): string {
+	if (hasRows && !hasAssignedRows) {
+		return t(
+			'linear:issue-list.empty-assignee',
+			'No issues here match the assignee filter.',
+		);
+	}
+
 	if (hasRows) {
 		return scope === 'closed'
 			? t('linear:issue-list.empty-closed', 'No closed issues here yet.')

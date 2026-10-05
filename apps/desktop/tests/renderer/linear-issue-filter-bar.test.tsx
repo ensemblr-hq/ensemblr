@@ -29,6 +29,7 @@ function renderBar(
 	const props = {
 		accountId: ALL_ACCOUNTS,
 		accounts: ACCOUNTS,
+		assignee: { onToggle: vi.fn(), options: [], selection: [] as string[] },
 		onAccountChange: vi.fn(),
 		onClearFilters,
 		onNewIssue: vi.fn(),
@@ -73,6 +74,10 @@ describe('LinearIssueFilterBar', () => {
 		['search', { query: 'oauth' }],
 		['account', { accountId: 'account-1' }],
 		['team', { teamId: 'team-1' }],
+		[
+			'assignee',
+			{ assignee: { onToggle: vi.fn(), options: [], selection: ['me'] } },
+		],
 	])('offers the reset control when the %s is set', (_facet, overrides) => {
 		renderBar(overrides);
 
@@ -113,5 +118,32 @@ describe('LinearIssueFilterBar', () => {
 		);
 
 		expect(props.onQueryChange).toHaveBeenCalledTimes(2);
+	});
+
+	test('names the one selected assignee on the facet trigger', () => {
+		renderBar({
+			assignee: { onToggle: vi.fn(), options: [], selection: ['me'] },
+		});
+
+		expect(screen.getByRole('button', { name: 'Me' })).toBeInTheDocument();
+	});
+
+	test('toggles an assignee through the facet', async () => {
+		const onToggle = vi.fn();
+		renderBar({
+			assignee: {
+				onToggle,
+				options: [{ id: 'bob', name: 'Bob', organizationName: null }],
+				selection: [],
+			},
+		});
+
+		await userEvent.click(screen.getByRole('button', { name: 'Assignee' }));
+		expect(
+			await screen.findByRole('option', { name: 'Unassigned' }),
+		).toBeInTheDocument();
+		await userEvent.click(screen.getByRole('option', { name: 'Bob' }));
+
+		expect(onToggle).toHaveBeenCalledWith('bob');
 	});
 });

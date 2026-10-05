@@ -10,12 +10,16 @@ export const ALL_ACCOUNTS = 'all';
 export const ALL_TEAMS = 'all';
 
 /**
- * Which rows the Linear browse list loads: the search text plus the account and
- * team narrowing. Separate from the scope, sort, and grouping preferences, which
- * change how the same rows are read rather than which rows are fetched.
+ * Which rows the Linear browse list shows: the search text, the account and
+ * team narrowing the read is made with, and the assignee selection applied to
+ * the rows it returns. Separate from the scope, sort, and grouping preferences,
+ * which change how the same rows are read rather than which rows are kept.
+ * `assignees` holds Linear user ids and the `me`/`unassigned` tokens; empty
+ * narrows nothing.
  */
 export interface LinearIssueFilters {
 	accountId: string;
+	assignees: string[];
 	query: string;
 	teamId: string;
 }
@@ -23,6 +27,7 @@ export interface LinearIssueFilters {
 /** Every issue the user can reach, unsearched and unnarrowed. */
 export const DEFAULT_LINEAR_ISSUE_FILTERS: LinearIssueFilters = {
 	accountId: ALL_ACCOUNTS,
+	assignees: [],
 	query: '',
 	teamId: ALL_TEAMS,
 };
@@ -93,12 +98,13 @@ function selectableTeams(
  * Whether anything is currently narrowing the list, which is what decides
  * whether the reset control is worth showing.
  * @param filters - The narrowing in effect, resolved or as stored
- * @returns Whether any one of search, account, or team is set
+ * @returns Whether any one of search, account, team, or assignee is set
  */
 export function hasLinearIssueFilters(filters: LinearIssueFilters): boolean {
 	return (
 		filters.query !== '' ||
 		filters.accountId !== ALL_ACCOUNTS ||
-		filters.teamId !== ALL_TEAMS
+		filters.teamId !== ALL_TEAMS ||
+		filters.assignees.length > 0
 	);
 }

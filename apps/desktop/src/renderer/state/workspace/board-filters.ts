@@ -1,5 +1,5 @@
 import { useAtom } from 'jotai';
-import { atomWithStorage } from 'jotai/utils';
+import { atomWithStorage, createJSONStorage } from 'jotai/utils';
 import { useCallback, useMemo } from 'react';
 
 /** Where a board card came from, as the toolbar's source facet names it. */
@@ -23,10 +23,13 @@ export const BOARD_SORT_MODES: readonly BoardSortMode[] = [
 ];
 
 /**
- * The board's toolbar state. Empty `repoIds` and `sources` mean "no narrowing"
- * rather than "nothing matches", so a fresh install shows every card.
+ * The board's toolbar state. Empty `assignees`, `repoIds`, and `sources` mean
+ * "no narrowing" rather than "nothing matches", so a fresh install shows every
+ * card. `assignees` narrows Linear issue cards only, by Linear user id or the
+ * `me`/`unassigned` tokens.
  */
 export interface BoardFilters {
+	assignees: string[];
 	query: string;
 	repoIds: string[];
 	sort: BoardSortMode;
@@ -35,17 +38,77 @@ export interface BoardFilters {
 
 /** Unfiltered board, ordered by the user's own drag order. */
 export const DEFAULT_BOARD_FILTERS: BoardFilters = {
+	assignees: [],
 	query: '',
 	repoIds: [],
 	sort: 'manual',
 	sources: [],
 };
 
-/** Persisted dashboard toolbar state (search, facets, sort). */
+const boardFiltersStorage = createJSONStorage<BoardFilters>();
+
+/**
+ * Whether a stored field is absent or an array of strings.
+ * @param field - One field of the decoded value
+ * @returns True when the field may be spread over the defaults
+ */
+function isOptionalStringArray(field: unknown): boolean {
+	return (
+		field === undefined ||
+		(Array.isArray(field) && field.every((entry) => typeof entry === 'string'))
+	);
+}
+
+/**
+ * Whether a value decoded from local storage can be read as stored board
+ * filters. Every field is optional, because a value written before a field
+ * existed lacks it and spreading over the defaults fills the gap.
+ * @param value - Whatever JSON decoded to
+ * @returns Whether each field it does carry has its expected type
+ */
+function isStoredBoardFilters(value: unknown): value is Partial<BoardFilters> {
+	if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+		return false;
+	}
+
+	const candidate = value as Record<string, unknown>;
+
+	return (
+		(candidate.query === undefined || typeof candidate.query === 'string') &&
+		(candidate.sort === undefined ||
+			BOARD_SORT_MODES.includes(candidate.sort as BoardSortMode)) &&
+		isOptionalStringArray(candidate.assignees) &&
+		isOptionalStringArray(candidate.repoIds) &&
+		isOptionalStringArray(candidate.sources)
+	);
+}
+
+/**
+ * Persisted dashboard toolbar state (search, facets, sort). The stored value is
+ * validated and laid over the defaults on the way in, because `getOnInit` puts
+ * it into the first render: a value written before the assignee facet existed
+ * would otherwise reach the toolbar without an `assignees` array.
+ */
 export const boardFiltersAtom = atomWithStorage<BoardFilters>(
 	'ensemblr_dashboard_board_filters',
 	DEFAULT_BOARD_FILTERS,
-	undefined,
+	{
+		...boardFiltersStorage,
+		/**
+		 * Reads the stored filters, falling back to the defaults for anything that
+		 * does not decode to the expected shape.
+		 * @param key - The storage key being read
+		 * @param initialValue - The value to assume when nothing is stored
+		 * @returns Filters safe to render
+		 */
+		getItem: (key, initialValue) => {
+			const stored = boardFiltersStorage.getItem(key, initialValue);
+
+			return isStoredBoardFilters(stored)
+				? { ...DEFAULT_BOARD_FILTERS, ...stored }
+				: DEFAULT_BOARD_FILTERS;
+		},
+	},
 	{ getOnInit: true },
 );
 
@@ -55,6 +118,7 @@ export interface BoardFiltersState {
 	filters: BoardFilters;
 	setQuery: (query: string) => void;
 	setSort: (sort: BoardSortMode) => void;
+	toggleAssignee: (entry: string) => void;
 	toggleRepo: (repoId: string) => void;
 	toggleSource: (source: BoardCardSource) => void;
 }
@@ -86,6 +150,14 @@ export function useBoardFilters(): BoardFiltersState {
 		(sort: BoardSortMode) => setFilters((current) => ({ ...current, sort })),
 		[setFilters],
 	);
+	const toggleAssignee = useCallback(
+		(entry: string) =>
+			setFilters((current) => ({
+				...current,
+				assignees: toggleValue(current.assignees, entry),
+			})),
+		[setFilters],
+	);
 	const toggleRepo = useCallback(
 		(repoId: string) =>
 			setFilters((current) => ({
@@ -108,7 +180,23 @@ export function useBoardFilters(): BoardFiltersState {
 	);
 
 	return useMemo(
-		() => ({ clear, filters, setQuery, setSort, toggleRepo, toggleSource }),
-		[clear, filters, setQuery, setSort, toggleRepo, toggleSource],
+		() => ({
+			clear,
+			filters,
+			setQuery,
+			setSort,
+			toggleAssignee,
+			toggleRepo,
+			toggleSource,
+		}),
+		[
+			clear,
+			filters,
+			setQuery,
+			setSort,
+			toggleAssignee,
+			toggleRepo,
+			toggleSource,
+		],
 	);
 }

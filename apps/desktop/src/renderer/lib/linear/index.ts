@@ -1,3 +1,13 @@
+export type { LinearAssigneeOption } from './assignee-filter';
+export {
+	createLinearAssigneeMatcher,
+	isLinearAssigneePerson,
+	isLinearAssigneeSelection,
+	LINEAR_ASSIGNEE_ME,
+	LINEAR_ASSIGNEE_UNASSIGNED,
+	listLinearAssigneeOptions,
+	toggleLinearAssignee,
+} from './assignee-filter';
 export {
 	buildCreateIssueRequest,
 	buildTeamChangeFields,

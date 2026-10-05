@@ -11,6 +11,8 @@ import {
 	useBoardIssueDismissals,
 } from '@/renderer/state/workspace';
 
+const BOARD_FILTERS_KEY = 'ensemblr_dashboard_board_filters';
+
 let store: ReturnType<typeof createStore>;
 
 beforeEach(() => {
@@ -54,14 +56,65 @@ describe('useBoardFilters', () => {
 		expect(result.current.filters.repoIds).toEqual(['repo-1']);
 	});
 
+	test('toggles an assignee on and back off', () => {
+		const { result } = render(useBoardFilters);
+
+		act(() => result.current.toggleAssignee('me'));
+		expect(result.current.filters.assignees).toEqual(['me']);
+
+		act(() => result.current.toggleAssignee('me'));
+		expect(result.current.filters.assignees).toEqual([]);
+	});
+
 	test('clear returns every facet to its default', () => {
 		const { result } = render(useBoardFilters);
 
 		act(() => result.current.setQuery('auth'));
 		act(() => result.current.toggleRepo('repo-1'));
 		act(() => result.current.toggleSource('github'));
+		act(() => result.current.toggleAssignee('unassigned'));
 		act(() => result.current.setSort('priority'));
 		act(() => result.current.clear());
+
+		expect(result.current.filters).toEqual(DEFAULT_BOARD_FILTERS);
+	});
+
+	test('survives an app restart', () => {
+		const first = render(useBoardFilters);
+
+		act(() => first.result.current.toggleAssignee('me'));
+		first.unmount();
+		store = createStore();
+
+		const restarted = render(useBoardFilters);
+
+		expect(restarted.result.current.filters.assignees).toEqual(['me']);
+	});
+
+	// Every install that used the board before the assignee facet has a stored
+	// value without `assignees`, and `getOnInit` hands it to the first render.
+	test('fills a field an older build never wrote from the defaults', () => {
+		globalThis.localStorage.setItem(
+			BOARD_FILTERS_KEY,
+			JSON.stringify({ query: 'auth', repoIds: ['repo-1'], sources: [] }),
+		);
+
+		const { result } = render(useBoardFilters);
+
+		expect(result.current.filters).toEqual({
+			...DEFAULT_BOARD_FILTERS,
+			query: 'auth',
+			repoIds: ['repo-1'],
+		});
+	});
+
+	test('falls back to the defaults for a stored value of the wrong shape', () => {
+		globalThis.localStorage.setItem(
+			BOARD_FILTERS_KEY,
+			JSON.stringify({ assignees: 'me', sort: 'sideways' }),
+		);
+
+		const { result } = render(useBoardFilters);
 
 		expect(result.current.filters).toEqual(DEFAULT_BOARD_FILTERS);
 	});

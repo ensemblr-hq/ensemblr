@@ -34,6 +34,7 @@ import {
 	ALL_ACCOUNTS,
 	ALL_TEAMS,
 	hasLinearIssueFilters,
+	type LinearAssigneeOption,
 	type LinearIssueGrouping,
 	type LinearIssueScope,
 	type LinearIssueSort,
@@ -42,6 +43,7 @@ import type {
 	LinearAccountSnapshot,
 	LinearResourceWire,
 } from '@/shared/ipc/contracts/linear';
+import { LinearAssigneeFacet } from './assignee-facet';
 
 const SCOPES: readonly LinearIssueScope[] = ['active', 'closed', 'all'];
 const SORTS: readonly LinearIssueSort[] = [
@@ -58,10 +60,14 @@ const GROUPINGS: readonly LinearIssueGrouping[] = [
 	'none',
 ];
 
-/** The search, account, and team filters plus the refresh and create actions. */
+/**
+ * The search, account, team, and assignee filters plus the refresh and create
+ * actions.
+ */
 export function LinearIssueFilterBar({
 	accountId,
 	accounts,
+	assignee,
 	onAccountChange,
 	onClearFilters,
 	onNewIssue,
@@ -76,6 +82,12 @@ export function LinearIssueFilterBar({
 }: {
 	accountId: string;
 	accounts: readonly LinearAccountSnapshot[];
+	/** The assignee facet's selection, its person options (null hides it), and its toggle. */
+	assignee: {
+		onToggle: (entry: string) => void;
+		options: readonly LinearAssigneeOption[] | null;
+		selection: string[];
+	};
 	onAccountChange: (accountId: string) => void;
 	onClearFilters: () => void;
 	onNewIssue: () => void;
@@ -95,7 +107,12 @@ export function LinearIssueFilterBar({
 		'All organizations',
 	);
 	const selectedTeam = teams.find((team) => team.id === teamId);
-	const narrowed = hasLinearIssueFilters({ accountId, query, teamId });
+	const narrowed = hasLinearIssueFilters({
+		accountId,
+		assignees: assignee.selection,
+		query,
+		teamId,
+	});
 
 	return (
 		<div className='flex items-center gap-2'>
@@ -159,6 +176,13 @@ export function LinearIssueFilterBar({
 						))}
 					</SelectContent>
 				</Select>
+			) : null}
+			{assignee.options ? (
+				<LinearAssigneeFacet
+					onToggle={assignee.onToggle}
+					options={assignee.options}
+					selection={assignee.selection}
+				/>
 			) : null}
 			{narrowed ? (
 				<Button

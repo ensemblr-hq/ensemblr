@@ -2,6 +2,7 @@ export {
 	linearIssueGroupingAtom,
 	linearIssueScopeAtom,
 	linearIssueSortAtom,
+	linearSourcePickerAssigneesAtom,
 } from './atoms';
 export type { LinearIssueFiltersState } from './issue-filters';
 export {
