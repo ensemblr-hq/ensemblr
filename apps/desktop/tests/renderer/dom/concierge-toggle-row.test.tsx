@@ -314,6 +314,25 @@ describe('the Concierge toggle row', () => {
 		sendStatus('idle', 'evt-status-2');
 		expect(screen.queryByText('Working')).toBeNull();
 	});
+
+	// A changed button label is read only to someone focused on the button, so
+	// the row speaks the two states a shut Concierge reports through its own
+	// live region instead.
+	test('announces a turn starting and what it left behind', () => {
+		renderHarness();
+		const region = document.querySelector(
+			'[data-concierge-status-announcement]',
+		);
+		expect(region).toHaveAttribute('aria-live', 'polite');
+		expect(region).toHaveTextContent('');
+
+		sendStatus('streaming', 'evt-status-1');
+		expect(region).toHaveTextContent('The Concierge is working');
+
+		sendAgentMessage('Two workspaces are stale.', 'evt-1');
+		sendStatus('idle', 'evt-status-2');
+		expect(region).toHaveTextContent('The Concierge has 1 new message');
+	});
 });
 
 /** The mark's orbiting group, which is the element the working state animates. */

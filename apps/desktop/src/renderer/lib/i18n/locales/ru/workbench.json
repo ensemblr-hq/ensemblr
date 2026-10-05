@@ -387,6 +387,11 @@
 			"starting": "Пробуждение Консьержа"
 		},
 		"toggle": {
+			"announce-unread_one": "У Консьержа {{count}} новое сообщение",
+			"announce-unread_few": "У Консьержа {{count}} новых сообщения",
+			"announce-unread_many": "У Консьержа {{count}} новых сообщений",
+			"announce-unread_other": "У Консьержа {{count}} нового сообщения",
+			"announce-working": "Консьерж работает",
 			"close": "Закрыть Консьержа",
 			"label": "Консьерж",
 			"open": "Открыть Консьержа",

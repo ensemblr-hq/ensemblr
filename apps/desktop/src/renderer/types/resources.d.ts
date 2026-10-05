@@ -3090,6 +3090,9 @@ export default interface Resources {
 				starting: 'Waking the Concierge';
 			};
 			toggle: {
+				'announce-unread_one': 'The Concierge has {{count}} new message';
+				'announce-unread_other': 'The Concierge has {{count}} new messages';
+				'announce-working': 'The Concierge is working';
 				close: 'Close the Concierge';
 				label: 'Concierge';
 				open: 'Open the Concierge';

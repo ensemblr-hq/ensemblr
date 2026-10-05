@@ -363,6 +363,9 @@
 			"starting": "Αφύπνιση του Concierge"
 		},
 		"toggle": {
+			"announce-unread_one": "Ο Concierge έχει {{count}} νέο μήνυμα",
+			"announce-unread_other": "Ο Concierge έχει {{count}} νέα μηνύματα",
+			"announce-working": "Ο Concierge εργάζεται",
 			"close": "Κλείσιμο του Concierge",
 			"label": "Concierge",
 			"open": "Άνοιγμα του Concierge",

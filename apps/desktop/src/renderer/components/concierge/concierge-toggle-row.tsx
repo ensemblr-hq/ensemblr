@@ -27,7 +27,8 @@ import { ConciergeUnreadBadge } from './concierge-unread-badge';
  * It also reports a shut Concierge: the mark orbits and a status word shows
  * while a turn is streaming, and a count sits at the trailing end for what it
  * produced unseen. Both come from `useConciergeActivityWatch`, which runs at the
- * app root, so the count survives a visit to a screen that drops this row.
+ * app root, so the count survives a visit to a screen that drops this row. A
+ * polite live region beside the button announces the same two states.
  */
 export function ConciergeToggleRow() {
 	const { t } = useTranslation();
@@ -77,8 +78,53 @@ export function ConciergeToggleRow() {
 					</span>
 				) : null}
 			</Button>
+			<span
+				aria-live='polite'
+				className='sr-only'
+				data-concierge-status-announcement=''
+			>
+				{statusAnnouncement({ isWorking, t, unreadCount })}
+			</span>
 		</div>
 	);
+}
+
+/**
+ * What the row's live region says, so a screen reader hears the Concierge start
+ * a turn and hears what it left once the turn lands, without having to land on
+ * the toggle to read its label.
+ *
+ * Kept outside the button because a changed `aria-label` is announced only to
+ * someone already focused on it. Empty while there is nothing to report, so an
+ * idle Concierge with nothing unseen stays quiet.
+ * @param isWorking - Whether a Concierge turn is streaming right now.
+ * @param t - The translator to render with.
+ * @param unreadCount - How many unseen things the badge is reporting.
+ * @returns The sentence to announce, or an empty string.
+ */
+function statusAnnouncement({
+	isWorking,
+	t,
+	unreadCount,
+}: {
+	isWorking: boolean;
+	t: TFunction;
+	unreadCount: number;
+}): string {
+	if (isWorking) {
+		return t(
+			'workbench:concierge.toggle.announce-working',
+			'The Concierge is working',
+		);
+	}
+	if (unreadCount > 0) {
+		return t('workbench:concierge.toggle.announce-unread', {
+			count: unreadCount,
+			defaultValue_one: 'The Concierge has {{count}} new message',
+			defaultValue_other: 'The Concierge has {{count}} new messages',
+		});
+	}
+	return '';
 }
 
 /**
