@@ -167,7 +167,8 @@ extension `resources/pi-extensions/ensemblr-control.mts`) and MCP-capable
 harnesses via `POST /mcp`. One service resolves a per-workspace bearer token,
 enforces scope and the workspace permission mode, applies fork-bomb guardrails,
 then delegates through a **port** (`ports.ts`, `port-adapters.ts`,
-`review-ports.ts`, `linear-ports.ts`) to an existing service. Control adds no
+`review-ports.ts`, `linear-ports.ts`, `architecture-ports.ts`,
+`job-queue-ports.ts`) to an existing service. Control adds no
 capability code of its own — if an operation does not exist as a service, it does
 not exist as a control op. See [`agent-control.md`](./agent-control.md) and
 ADR&nbsp;0040.

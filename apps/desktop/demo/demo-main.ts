@@ -134,7 +134,7 @@ async function waitForRendererReady(window: BrowserWindow): Promise<boolean> {
 
 /**
  * Waits for the renderer to mark itself ready, then captures the window and
- * quits. Backs `npm run dev:demo -- --shoot`, so a shot can be taken without a
+ * quits. Backs `bun run dev:demo -- --shoot`, so a shot can be taken without a
  * hand on the keyboard.
  *
  * A renderer that never reported ready is refused rather than photographed. A

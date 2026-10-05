@@ -148,6 +148,7 @@ Ensemblr equivalent:
 - Setup is a read-only output tab for the workspace/project setup command, for example dependency install logs.
 - Run is a read-only output tab for the workspace run command, for example a dev server process.
 - The one input either tab takes is a password. When its script stops on a password prompt (`sudo`, `ssh`, `git` over HTTPS), the tab shows its warning state and a masked field floats over the top of the pane. The field sends the answer to the script with Enter and clears itself. It never takes focus on its own, because a chat draft typed into it by accident would reach the script as a password. See [ADR 0078](adr/0078-answer-a-script-password-prompt-through-a-masked-field.md).
+- A setup or run script that is waiting for a slot in the app-wide compute queue is not "not run": its tab wears an hourglass and the pane names the script, its place in line, and who queued it, with **Start now** (skip the queue) and **Cancel** (give up its place) acting on that one job. A running session of the same kind always wins over a queued launch.
 - Each workspace starts with one default Terminal tab. Users can spawn additional named terminal tabs when they need more manual shells.
 - User-spawned terminal tabs are regular IDE-style interactive terminals backed by terminal session IDs.
 - Setup/run output remains visible while the user reviews chat, files, or checks.

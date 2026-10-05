@@ -32,7 +32,7 @@ the app ships no agent binary of its own — it drives the one you installed.
 
 *Ensemblr Control driving the app from inside a workspace: the agent moved the workspace to In progress, started a run script, delegated to two sub-agents in their own chat tabs, and launched a Claude Code harness in a terminal — all of it visible on one screen.*
 
-- **Version:** [`0.2.2`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.2.2) (stable)
+- **Version:** [`0.2.3`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.2.3) (stable)
 - **License:** Apache-2.0
 
 | Platform | Artifact | Install |
@@ -50,7 +50,7 @@ yet. Windows is not supported.
 
 ## Status
 
-Ensemblr is **stable at 0.2.2**, released 2026-10-02. The core workflows —
+Ensemblr is **stable at 0.2.3**, released 2026-10-05. The core workflows —
 isolated workspaces, Pi and Claude Code agent sessions, the review and PR flow, and the GitHub / Linear /
 git integrations — are implemented and wired to real services, on both macOS and Linux. Stable means
 ordinary semver rather than a frozen surface: breaking changes remain possible before 1.0 and are recorded
@@ -62,7 +62,7 @@ in [`CHANGELOG.md`](./CHANGELOG.md) when they land.
 brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
-Or download Ensemblr 0.2.2 (.dmg): **[Apple silicon](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.2/Ensemblr-0.2.2-arm64.dmg)** · **[Intel](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.2/Ensemblr-0.2.2-x64.dmg)** — open it and drag Ensemblr to Applications.
+Or download Ensemblr 0.2.3 (.dmg): **[Apple silicon](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.3/Ensemblr-0.2.3-arm64.dmg)** · **[Intel](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.3/Ensemblr-0.2.3-x64.dmg)** — open it and drag Ensemblr to Applications.
 
 The macOS build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
 stapled, so it opens without a Gatekeeper prompt and validates offline. Every build is on the
@@ -100,7 +100,8 @@ to run natively, and `nix run github:ensemblr-hq/ensemblr#master` compiles the n
 as `ensemblr`, so a system carries one of them. Nix updates them, never the app itself — see
 [the install guide](./docs/guide/01-install.md#nix-nixos).
 
-To build it yourself instead, with Node 24.x and [Bun](https://bun.sh) 1.4:
+To build it yourself instead, with Node 24.x and [Bun](https://bun.sh) 1.4 (the flake's `nix develop` shell
+supplies both):
 
 ```bash
 bun install           # from the repository root; installs every workspace
@@ -182,7 +183,7 @@ documented in [`docs/guide/02-requirements.md`](./docs/guide/02-requirements.md)
 **Working on Ensemblr** — [`CONTRIBUTING.md`](../../CONTRIBUTING.md) ·
 [`docs/onboarding.md`](./docs/onboarding.md) (clone → run → first change) ·
 [`docs/architecture-map.md`](./docs/architecture-map.md) (which directory owns which concern) ·
-[`docs/adr/`](./docs/adr) (78 Architecture Decision Records) ·
+[`docs/adr/`](./docs/adr) (84 Architecture Decision Records) ·
 [`docs/agent-control.md`](./docs/agent-control.md) ·
 [`docs/harnesses.md`](./docs/harnesses.md) ·
 [`docs/build-and-release.md`](./docs/build-and-release.md) ·
@@ -195,8 +196,9 @@ documented in [`docs/guide/02-requirements.md`](./docs/guide/02-requirements.md)
 
 **Agents drive the app — that is the point.** Ensemblr Control is a permission-gated surface that lets an
 agent spawn conversations, launch harnesses, run terminals, open file and diff tabs, read the workspace
-diff and leave review comments on it, read and write Linear issues, ask you a multiple-choice question, and
-move its workspace across the board. Pi reaches it through a shipped extension; Claude Code and any
+diff and leave review comments on it, read and write Linear issues, ask you a multiple-choice question,
+move its workspace across the board, and queue its heavy commands (test suites, builds, typechecks) behind
+one app-wide compute queue so parallel agents cannot saturate the machine. Pi reaches it through a shipped extension; Claude Code and any
 MCP-capable harness reach the same operations through an embedded MCP server, so the two surfaces cannot
 drift.
 
@@ -234,7 +236,9 @@ account has spent against its claude.ai plan, per rate-limit window, next to the
 **Local-first review that ends in GitHub.** One panel with Files, Changes, and Checks. Source-scoped diffs,
 per-file discard, a live file tree, and review comments anchored to specific lines that agents can read,
 answer, and resolve. Then an inline PR editor, commit and push, per-check status through `gh`, and a
-two-step merge — or archive the workspace instead.
+two-step merge — or archive the workspace instead. When the pull request merges, however it merges, the
+workspace closes itself out: its board card moves to Done and the Linear or GitHub issue it was created from
+is closed.
 
 ![The diff viewer open on a changed file, with a review comment thread anchored to the line it is about.](./docs/guide/images/08-changes.png)
 

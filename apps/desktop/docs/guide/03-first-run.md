@@ -176,7 +176,7 @@ offers three sources:
 | --- | --- |
 | **Branches** | A workspace on an existing branch — either taking it over, or duplicating it into a new one. |
 | **Pull requests** | A workspace on an open PR's head branch, for reviewing or continuing it. |
-| **Issues** | A workspace for an issue nobody has started — an open GitHub issue, or a Linear issue in Backlog or Todo — with the issue linked to it. An issue that already has a workspace is not offered again — unless that workspace is archived and the issue is still open or not yet started. Linear issues come from every connected team unless the repository's [`[linear]` block](./12-repository-settings.md#linear) names its own. The most urgent Linear issues come first and those with no priority last; GitHub issues have no priority, so they sit with those. Within each priority, the most recently updated issue leads. |
+| **Issues** | A workspace for an issue nobody has started — an open GitHub issue, or a Linear issue in Backlog or Todo — with the issue linked to it. An issue that already has a workspace is not offered again — unless that workspace is archived and the issue is still open or not yet started. Linear issues come from every connected team unless the repository's [`[linear]` block](./12-repository-settings.md#linear) names its own. The most urgent Linear issues come first and those with no priority last; GitHub issues have no priority, so they sit with those. In a fork, the GitHub issues are the fork's own unless **Show upstream issues** is on. Within each priority, the most recently updated issue leads. |
 
 Each is searchable: branches by name, pull requests by title, number, or author,
 issues by number, title, or description. A search on the Issues tab also reaches

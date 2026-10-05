@@ -23,6 +23,7 @@ These instructions apply to everything under `src/main/`.
   - `chat-tabs/` for the chat-tab service, preview slot, and terminal-session persistence.
   - `checkpoints/` for git-backed per-turn checkpoints.
   - `commands/` for local process and shell execution.
+  - `compute-queue/` for the app-wide queue heavy agent commands wait in: the slot-granting service, the headless command runner behind `ensemblr_run_queued`, the wait loop, and the job records the sidebar panel reads.
   - `concierge/` for the Concierge home directory, memory service and pass, and session service.
   - `concurrency/` for bounded fan-out helpers such as `mapWithConcurrency`.
   - `config/` for declarative config loading, settings resolution, and repository config.
@@ -32,13 +33,14 @@ These instructions apply to everything under `src/main/`.
   - `infisical/` for the Infisical REST client, account and link stores, and the environment layer it feeds.
   - `ipc/` for main-process IPC handler registration and request validation.
   - `linked-directories/` for read grants over directories outside a workspace, and the app-global recents list behind them.
+  - `merge-close-out/` for what a merged pull request sets in motion: the workspace's board card to Done, and the Linear or GitHub issue it was created from closed.
   - `menu/` for the native Electron menu bar: one builder per menu behind `createMenuItemFactory`, composed by `application-menu.ts`, labelled from `menu-strings.ts`, and enabled from the renderer's command report.
   - `open-target/` for external editor and app detection and launch.
   - `repository/` for repository registration, git probing, and lifecycle.
   - `review/` for Ensemblr-local review comments and todos.
   - `root/` for managed root directory resolution and reconciliation.
   - `safe-fs/` for symlink-safe containment and atomic-write primitives used by writers inside a repository checkout.
-  - `scripts/` for the named run-script lifecycle, setup/archive hooks, and setup fingerprint and state file.
+  - `scripts/` for the named run-script lifecycle, setup/archive hooks, setup fingerprint and state file, and the queue gate that holds a heavy script's launch until `compute-queue/` grants a slot.
   - `secrets/` for secret storage backends and metadata.
   - `setup/` for setup diagnostics orchestration.
   - `storage/` for SQLite connections, migrations, and the per-aggregate repository modules.

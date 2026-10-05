@@ -51,8 +51,8 @@ body:
   - type: input
     id: macos
     attributes:
-      label: macOS version and chip
-      placeholder: "15.3, M2 Pro"
+      label: Operating system, version and chip
+      placeholder: "macOS 15.3, M2 Pro, or Ubuntu 24.04, x86-64"
     validations:
       required: true
 

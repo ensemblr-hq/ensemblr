@@ -9,31 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-05
+
+Ensemblr 0.2.3 adds an app-wide compute queue for heavy commands, closes out a workspace when its pull request merges, scopes and filters Linear issues, and makes a Claude session's first answer arrive in seconds instead of half a minute.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.2.3) ·
+[`.dmg` (Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.3/Ensemblr-0.2.3-arm64.dmg) ·
+[`.dmg` (Intel)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.3/Ensemblr-0.2.3-x64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.3/Ensemblr-0.2.3-x64.AppImage)
+
+### Added
+
+- **An app-wide compute queue for heavy commands.** Test suites, builds, typechecks and similar run through one queue shared by every agent in every workspace, so the machine stays usable however many agents are working. Agents reach it with `ensemblr_run_queued`, `ensemblr_wait_for_job` and `ensemblr_cancel_job`; a heavy shell command run any other way is refused with a pointer to the queue. Heavy setup and run scripts wait for a slot too. Settings gain enable, slot count, CPU priority and pattern controls. The sidebar lists running and queued jobs with cancel, Open log and Start now, and a Setup or Run dock tab shows a queued panel while its script waits for a slot. [ADR 0082](./docs/adr/0082-queue-heavy-agent-commands-through-one-app-wide-queue.md). (#714, #719, #721, #722)
+- **A workspace closes out when its pull request merges.** However the merge happens, the board card moves to Done and the issue the workspace was created from is closed: a linked Linear issue moves to its team's completed state, a linked GitHub issue is closed as completed. [ADR 0082](./docs/adr/0082-close-out-a-workspace-when-its-pull-request-merges.md). (#706)
+- **Filter Linear issues by assignee** on the Linear browse list, the dashboard board and the create-from picker's Issues tab. Each surface remembers its own choice across "Me", "Unassigned" and each assigned person. (#723)
+- **Scope Linear issues to a repository's teams.** `[linear] teams = ["THE"]` in `.ensemblr/settings.toml` limits the picker and the board Backlog to those teams, matched by team key or id. (#705)
+- **See which Linear project an issue belongs to** in the browse list (new column and "Group by: Project"), the create-from picker, the board Backlog cards and the composer's issue picker. (#697)
+- **A search in the create-from Issues tab reaches started issues**, so a workspace can be cut for an issue already In Progress or In Review. Started issues sync on their own scope. (#704, #716)
+- **A fork's GitHub issues are its own.** Issues are listed from the `origin` remote instead of the upstream parent `gh` resolves. A new per-repository **Show upstream issues** setting (`[git] show_upstream_issues`) brings the upstream's issues back. (#724)
+
 ### Changed
 
-- **AFK agents see their pull request through its checks.** Opening the pull request no longer ends an
-  unattended run. The agent watches CI, the test suites, and review tools such as CodeRabbit until every
-  check settles. It fixes what failed and pushes each fix as a new commit, never amending or force-pushing
-  the open branch. It judges every review comment, from a bot or a person, the way it judges its own
-  review, and answers disagreements in its report rather than on the pull request. Review threads stay
-  for you to resolve. Red it did not cause is not worked around: a flake or an outage gets one re-run, and
-  an already-failing base, a merge conflict, or a check that never starts goes in the report. The report
-  now says what the checks and reviewers said and what was pushed in answer.
-  [ADR 0084](./docs/adr/0084-see-an-unattended-pull-request-through-its-checks.md). (#725)
-- **Development runs inside a Nix dev shell.** `nix develop` (from `flake.nix`, defined in
-  `apps/desktop/nix/dev-shell.nix`) supplies Node, Bun, `make`, `python3`, and on Linux gcc and
-  nixpkgs' Electron. It reads every version from the manifests. Setup and run scripts, and CI's
-  lint, typecheck, and test jobs, all run through `nix develop -c`. This retires the layers that
-  existed to compensate for an uncontrolled toolchain: `scripts/with-pinned-node.sh`, `mise.toml`,
-  `.nvmrc`, the Node-version gate, and the Linux toolchain preflight with its container autobuild
-  (`rebuild:native`, `diagnose:linux`). `bun run dev` now works on NixOS, where that preflight
-  refused every binding and the container path could not succeed. Release and nightly build legs
-  stay outside Nix so the shipped AppImage's `node-pty` is portable. Intel Macs have no dev shell,
-  because nixpkgs dropped `x86_64-darwin`. [ADR 0083](./docs/adr/0083-develop-inside-a-nix-dev-shell.md). (#714)
-- **Spinners turn in step.** Every spinner on screen now shows the same frame at the same moment,
-  however far apart they appeared. Before, each one started its own clock when it mounted. The same
-  holds for pulsing placeholders and carets, and for the Concierge mark's orbit. A newly appearing
-  spinner snaps into step on its second frame. (#718)
+- **AFK agents see their pull request through its checks.** Opening the pull request no longer ends an unattended run. The agent watches CI, the test suites, and review tools such as CodeRabbit until every check settles. It fixes what failed and pushes each fix as a new commit, never amending or force-pushing the open branch. It judges every review comment, from a bot or a person, the way it judges its own review, and answers disagreements in its report rather than on the pull request. Review threads stay for you to resolve. Red it did not cause is not worked around: a flake or an outage gets one re-run, and an already-failing base, a merge conflict, or a check that never starts goes in the report. The report now says what the checks and reviewers said and what was pushed in answer. [ADR 0084](./docs/adr/0084-see-an-unattended-pull-request-through-its-checks.md). (#725)
+- **Development runs inside a Nix dev shell.** `nix develop` (from `flake.nix`, defined in `apps/desktop/nix/dev-shell.nix`) supplies Node, Bun, `make`, `python3`, and on Linux gcc and nixpkgs' Electron. It reads every version from the manifests. Setup and run scripts, and CI's lint, typecheck, and test jobs, all run through `nix develop -c`. This retires `scripts/with-pinned-node.sh`, `mise.toml`, `.nvmrc`, the Node-version gate, and the Linux toolchain preflight with its container autobuild (`rebuild:native`, `diagnose:linux`). `bun run dev` now works on NixOS. Release and nightly build legs stay outside Nix so the shipped AppImage's `node-pty` is portable. Intel Macs have no dev shell, because nixpkgs dropped `x86_64-darwin`. [ADR 0083](./docs/adr/0083-develop-inside-a-nix-dev-shell.md). (#714, #717)
+- **The create-from picker's Issues tab lists work ready to start**, sorted by priority and then last update, with Backlog and Todo issues synced on their own scope so older ones are no longer lost behind a long closed history. A Linear gap now shows as a note above a populated tab. (#696, #699, #700, #702)
+- **Spinners turn in step.** Every spinner on screen now shows the same frame at the same moment, however far apart they appeared. The same holds for pulsing placeholders and carets, and for the Concierge mark's orbit. (#718)
+- **The sidebar compute queue panel is a native sidebar section**, with flat two-line rows and hover actions. (#719)
+- **The sidebar re-renders less.** Workspace rows no longer re-render on every navigation poll, and the pull-request observation stamp lives beside the navigation tree. [ADR 0081](./docs/adr/0081-keep-the-pull-request-observation-stamp-beside-the-navigation-tree.md). (#695, #703)
+- **Dependencies moved to current patches**, including Electron 44.4.5, Lexical 0.52.0, lucide-react 1.48.0 and the TanStack Router family on one router-core. (#707, #708)
+
+### Fixed
+
+- **A Claude session's first answer no longer waits on every MCP server.** The CLI held the first prompt until every MCP server it knew, the user's plugin servers and claude.ai connectors included, had connected, up to 30 seconds. Ensemblr now defaults `CLAUDE_CODE_MCP_STARTUP_WAIT_MS=0` and holds the prompt only until its own control server is ready. (#720)
+- **Setup no longer runs twice on workspace create.** (#715)
+- **"Linear is unreachable" clears on its own.** A transient sync failure at launch left the notice until a manual refresh. Reads retry once after a dropped connection, and a failed answer is re-read every 30 seconds. Failed syncs now log their cause. (#726)
+- **A stray `text-xxs` prop on the create-from picker's row action is gone.** (#698)
 
 ## [0.2.2] - 2026-10-02
 

@@ -15,16 +15,19 @@ Switch between them with the scope toggle at the top of the settings window.
 ## Ask the Concierge
 
 The Concierge can read and change app preferences directly: General, Models,
-Providers' delegation preference, app-wide Git defaults, Appearance, non-secret
-Dictation configuration, its own model and context-clear preferences, and
-Experimental switches. For example: “Use the dark theme” or “What is my default
-review model?” It reads the current preferences before answering or changing
-anything, and follows the app's existing permission policy for writes.
+Providers' delegation preference, app-wide Git defaults, Appearance, its own
+model and context-clear preferences, and Experimental switches. It can read the
+Dictation settings but not change them. For example: “Use the dark theme” or
+“What is my default review model?” It reads the current preferences before
+answering or changing anything, and follows the app's existing permission policy
+for writes.
 
 It also knows what the settings it **cannot access** do and where to find them:
-Environment, all Repo panes, root-directory changes in General, executable paths
-in Providers, credentials and account connections in Integrations, and diagnostics
-or onboarding actions in Diagnostics. For these, it explains the purpose and
+Environment, all Repo panes, root-directory changes in General, the automatic
+update switch and the compute queue (both refused outright, since they decide
+what installs and how heavy commands run), executable paths and read-only tool
+trust in Providers, credentials and account connections in Integrations, and
+diagnostics or onboarding actions in Diagnostics. For these, it explains the purpose and
 location—not their current values—and does not make the change. Shortcuts is a
 read-only reference, not a rebinding interface.
 
@@ -44,7 +47,7 @@ Values sit under an `app` key, one object per pane:
 
 | Pane | Key in `config.json` |
 | --- | --- |
-| General | `app.general` |
+| General | `app.general`, plus `app.computeQueue` for the compute queue |
 | Models | `app.models`, plus `app.concierge` for the Concierge's own runtime |
 | Providers | `app.providers` |
 | Git | `app.git` |

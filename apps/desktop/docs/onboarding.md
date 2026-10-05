@@ -139,8 +139,8 @@ Read these in order:
    `tailwind.config.js`), and
    [`.claude/rules/patterns.md`](../../../.claude/rules/patterns.md) for the
    structural rules a change has to respect.
-5. [`adr/`](./adr) — 78 Architecture Decision Records, numbered `0001`–`0079`
-(`0007` was withdrawn before acceptance). When something looks odd,
+5. [`adr/`](./adr) — 84 Architecture Decision Records, numbered `0001`–`0084`
+(`0007` was withdrawn before acceptance, and `0082` was assigned twice). When something looks odd,
    the ADR usually explains it. Start with
    [0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) if
    you are touching the agent layer.
@@ -230,8 +230,8 @@ the slowest of the three rather than their sum. `test` is a matrix over **both**
 platforms is what makes a darwin-only assumption fail in CI rather than in a
 user's AppImage. `lint` and `typecheck` run on Linux alone, because neither
 Biome nor tsc can reach a different verdict on macOS. `nix-deps` builds the Nix
-flake's pinned dependencies, but only on a PR that touches `bun.lock`, the flake,
-or `nix/` (see [the Nix flake](./build-and-release.md#the-nix-flake)). A tiny
+flake's pinned dependencies, but only on a PR that touches `bun.lock`, `bunfig.toml`,
+the flake, or `apps/desktop/nix/` (see [the Nix flake](./build-and-release.md#the-nix-flake)). A tiny
 `verify` job collapses all of them into a single status check. Its name stays
 stable because the repository's GitHub ruleset requires it; confirm the current
 GitHub enforcement on the pull request before merging.

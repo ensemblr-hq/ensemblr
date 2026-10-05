@@ -233,7 +233,7 @@ packaged app ships without them.
 | Async data | TanStack Query, TanStack Virtual |
 | State | Jotai (+ `jotai-family` for parameterized atoms) |
 | Terminal | `@xterm/xterm` 6, rendered through `@xterm/addon-webgl` |
-| Composer editor | `lexical` + `@lexical/react` 0.51, plain-text mode only |
+| Composer editor | `lexical` + `@lexical/react` 0.52, plain-text mode only |
 | Markdown | `streamdown` + Shiki, with the `@streamdown/{cjk,math,mermaid}` plugins wired in `apps/desktop/src/renderer/components/message.tsx` |
 | Diff rendering | `react-diff-view`, tokenized through Shiki |
 | Layout / motion | `react-resizable-panels`, `motion` (imported as `motion/react`) |
