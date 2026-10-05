@@ -399,8 +399,7 @@
 			"open-with-unread_few": "Открыть Консьержа, {{count}} новых сообщения",
 			"open-with-unread_many": "Открыть Консьержа, {{count}} новых сообщений",
 			"open-with-unread_other": "Открыть Консьержа, {{count}} нового сообщения",
-			"working": "Открыть Консьержа, ещё работает",
-			"working-status": "Работает"
+			"working": "Открыть Консьержа, ещё работает"
 		}
 	},
 	"context-usage": {

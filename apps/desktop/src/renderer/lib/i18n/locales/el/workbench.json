@@ -371,8 +371,7 @@
 			"open": "Άνοιγμα του Concierge",
 			"open-with-unread_one": "Άνοιγμα του Concierge, {{count}} νέο μήνυμα",
 			"open-with-unread_other": "Άνοιγμα του Concierge, {{count}} νέα μηνύματα",
-			"working": "Άνοιγμα του Concierge, εργάζεται ακόμη",
-			"working-status": "Εργάζεται"
+			"working": "Άνοιγμα του Concierge, εργάζεται ακόμη"
 		}
 	},
 	"context-usage": {

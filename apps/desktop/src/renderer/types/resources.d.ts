@@ -3099,7 +3099,6 @@ export default interface Resources {
 				'open-with-unread_one': 'Open the Concierge, {{count}} new message';
 				'open-with-unread_other': 'Open the Concierge, {{count}} new messages';
 				working: 'Open the Concierge, still working';
-				'working-status': 'Working';
 			};
 		};
 		'context-usage': {

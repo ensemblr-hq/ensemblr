@@ -299,20 +299,20 @@ describe('the Concierge toggle row', () => {
 		).toHaveTextContent('Concierge');
 	});
 
-	test('says it is working while a turn streams, and stops when it ends', () => {
+	test('names a streaming turn in its label without a visible status word', () => {
 		renderHarness();
-		expect(screen.queryByText('Working')).toBeNull();
 
 		sendStatus('streaming', 'evt-status-1');
-		expect(screen.getByText('Working')).toBeInTheDocument();
-		expect(
-			screen.getByRole('button', {
-				name: 'Open the Concierge, still working',
-			}),
-		).toBeInTheDocument();
+		const toggle = screen.getByRole('button', {
+			name: 'Open the Concierge, still working',
+		});
+		expect(toggle).toHaveTextContent(/^Concierge$/);
+		expect(screen.queryByText('Working')).toBeNull();
 
 		sendStatus('idle', 'evt-status-2');
-		expect(screen.queryByText('Working')).toBeNull();
+		expect(
+			screen.getByRole('button', { name: 'Open the Concierge' }),
+		).toBeInTheDocument();
 	});
 
 	// A changed button label is read only to someone focused on the button, so
