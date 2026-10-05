@@ -9,10 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-10-05
+
+Ensemblr 0.2.4 moves the Concierge from a floating button to a slim toggle row.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.2.4) ·
+[`.dmg` (Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.4/Ensemblr-0.2.4-arm64.dmg) ·
+[`.dmg` (Intel)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.4/Ensemblr-0.2.4-x64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.4/Ensemblr-0.2.4-x64.AppImage)
+
 ### Changed
 
-- **The Concierge opens from a slim toggle row instead of a floating button.** In a workspace it sits under the terminal dock in the review rail; on every other screen, and while the rail is collapsed, it runs along the foot of the content area. It names the Concierge beside its mark, orbits that mark while a turn is running, and carries the unread count. The panel still floats, drags and resizes as before.
-- **The guide's screenshots show the Concierge toggle row.** The eighteen shots of shell screens under `docs/guide/images` were re-captured, so none shows the old floating button. Demo mode now lets its window open larger than the desktop, so a display smaller than 1496×933 points shoots the full 2992×1866 instead of a clamped frame.
+- **The Concierge opens from a slim toggle row instead of a floating button.** In a workspace it sits under the terminal dock in the review rail; on every other screen, and while the rail is collapsed, it runs along the foot of the content area. It names the Concierge beside its mark, orbits that mark while a turn is running, and carries the unread count. The panel still floats, drags and resizes as before. (#729, #731)
+- **The guide's screenshots show the Concierge toggle row.** The eighteen shots of shell screens under `docs/guide/images` were re-captured, so none shows the old floating button. Demo mode now lets its window open larger than the desktop, so a display smaller than 1496×933 points shoots the full 2992×1866 instead of a clamped frame. (#730)
 
 ## [0.2.3] - 2026-10-05
 
