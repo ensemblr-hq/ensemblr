@@ -690,10 +690,14 @@ workspace's unmerged commit.
    part of what it installs, so the pin stays valid. Open
    the version-bump PR, and merge it once the **Checks** workflow is green
    — `master` is unprotected, so GitHub will not stop a merge that is red. Advisory review services are not a release gate.
-2. Write the final release body in `NOTES.md` and the matching `CHANGELOG.md`
-   entry (both tracked, both written from `git log <previous-tag>..origin/master`).
-   Leave them uncommitted for now: they ship in the post-release docs PR below,
-   after the asset names are known.
+2. In that same branch, write the final release body in `NOTES.md` and the
+   matching `CHANGELOG.md` entry (both tracked, both written from
+   `git log <previous-tag>..origin/master`). They ride the version-bump PR so the
+   tag carries them: the release body links the changelog at its own tag
+   (`blob/v<version>/apps/desktop/CHANGELOG.md`), and that link only resolves if
+   the tagged commit already holds the entry. Write the asset links from the
+   known naming shape (`Ensemblr-<version>-arm64.dmg`, `-x64.dmg`, `-x64.AppImage`)
+   and confirm them against `gh release view` once the build lands.
 3. Fetch the merged `master`, resolve it to a commit SHA, confirm that tree
    carries the intended package version, and publish the release against that
    immutable target. Run this one from the repository root:
@@ -748,7 +752,7 @@ The workflow refuses to build when `apps/desktop/package.json`'s `version` does 
 tag with `v` stripped, or when the release is still a draft.
 
 **Six version-pinned files stay hand-edited, and the version-bump commit
-touches none of them.** The app's README carries three current-release mentions;
+touches none of them except `NOTES.md` and `CHANGELOG.md`.** The app's README carries three current-release mentions;
 three more files live under `docs/` and quietly point at the previous release
 until someone edits them. `nix/pins.json` is written by a script rather than by
 hand, and `NOTES.md` and `CHANGELOG.md` take the release's own entry:
@@ -759,7 +763,7 @@ hand, and `NOTES.md` and `CHANGELOG.md` take the release's own entry:
 | `docs/README.md` | version link, both `.dmg` URLs, `.AppImage` URL |
 | `docs/guide/README.md` | the version this guide describes |
 | `docs/guide/01-install.md` | current-version examples (`--version <tag>`, the Settings → General version) and every asset URL, both architectures |
-| `NOTES.md`, `CHANGELOG.md` | the release body (already published) and its changelog entry, with the real asset names in the links |
+| `NOTES.md`, `CHANGELOG.md` | written in the version-bump PR, not here; after the build, check their asset links against the real names |
 | `nix/pins.json` | the flake's `release` variant: version, AppImage name, and hash — run `nix/update-pins.sh release` once the AppImage is attached; `nix` lives at `/nix/var/nix/profiles/default/bin` and may be off a non-login `PATH` |
 
 The examples in this file (`v0.1.20` in the commands and the feed document) are
