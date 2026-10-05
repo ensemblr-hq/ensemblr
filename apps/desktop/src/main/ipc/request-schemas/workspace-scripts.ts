@@ -75,6 +75,7 @@ const repositorySettingsPatchSchema = z.object({
 	permissionMode: z.enum(PERMISSION_MODES).nullable().optional(),
 	previewUrls: z.array(repositoryPreviewUrlSchema).nullable().optional(),
 	remoteOrigin: z.string().nullable().optional(),
+	showUpstreamIssues: z.boolean().nullable().optional(),
 });
 
 /** {@link import('../../../shared/ipc').UpdateRepositorySettingsRequest}. */

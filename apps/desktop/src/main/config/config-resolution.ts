@@ -114,6 +114,7 @@ const REPOSITORY_BUILT_IN_DEFAULTS: Readonly<Record<string, unknown>> =
 		runScriptMode: 'concurrent',
 		'security.permissionMode': DEFAULT_PERMISSION_MODE,
 		setUpstreamOnPush: true,
+		showUpstreamIssues: false,
 		'scripts.archive': null,
 		'scripts.run': null,
 		'scripts.runScripts': Object.freeze([]),

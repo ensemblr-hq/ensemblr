@@ -888,6 +888,10 @@
 			"label": "Σενάριο εγκατάστασης",
 			"placeholder": "π.χ. npm ci"
 		},
+		"upstream-issues": {
+			"description": "Για ένα fork, εμφάνιση των ζητημάτων GitHub του upstream αποθετηρίου στον πίνακα εργασιών και στις επιλογές ζητημάτων, αντί για τα ζητήματα του ίδιου του fork.",
+			"label": "Εμφάνιση ζητημάτων του upstream"
+		},
 		"workspace-target": {
 			"placeholder": "Επιλέξτε χώρο εργασίας"
 		},

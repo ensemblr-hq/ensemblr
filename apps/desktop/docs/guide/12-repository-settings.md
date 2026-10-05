@@ -235,11 +235,25 @@ setting for this repository.
 | `delete_local_branch_on_archive` | boolean | Delete the local branch when a workspace is archived. The remote branch is untouched. |
 | `archive_after_merge` | boolean | Archive a workspace automatically once its pull request merges. |
 | `set_upstream_on_push` | boolean | Configure new workspaces so a plain `git push` sets the branch upstream. |
+| `show_upstream_issues` | boolean | List GitHub issues from the fork's upstream instead of the repository `origin` points at. Off by default. |
 
 **Historical spelling.** `branchPrefix` in camelCase is still accepted as an
 alias for `branch_prefix`, so configs written before the snake_case convention
-keep resolving. It is the only camelCase `[git]` key accepted — the other five
+keep resolving. It is the only camelCase `[git]` key accepted — the others
 must be snake_case.
+
+**Which repository's issues you see.** The board's Backlog, the create dialog's
+Issues tab, and the composer's issue picker list the open issues of the GitHub
+repository your checkout's `origin` remote points at — for a fork, the fork's
+own. `gh` on its own would read the upstream instead, because `gh repo clone`
+of a fork adds the parent as `upstream` and marks it as the default repository.
+Turn on **Show upstream issues** on the repository's Git settings screen (or
+`show_upstream_issues = true` here) to list that upstream's issues instead: the
+repository `gh repo set-default` picked for the checkout, or else the one the
+`upstream` remote points at. When neither names a repository on github.com — or,
+with the switch off, when `origin` is not on github.com — the choice is left to
+`gh`. GitHub turns issues off on a new fork, so a fork's own list stays empty
+until you turn them on in the fork's settings on GitHub.
 
 ```toml
 [git]

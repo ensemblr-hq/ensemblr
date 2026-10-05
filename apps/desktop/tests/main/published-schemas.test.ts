@@ -301,6 +301,7 @@ const settingsFixture = {
 		delete_local_branch_on_archive: true,
 		remote_origin: 'origin',
 		set_upstream_on_push: true,
+		show_upstream_issues: true,
 	},
 	infisical: {
 		environment: 'dev',

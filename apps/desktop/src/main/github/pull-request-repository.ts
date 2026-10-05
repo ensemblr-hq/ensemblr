@@ -4,6 +4,13 @@ import {
 	parseGithubRemoteUrl,
 } from '../repository/github-url.ts';
 import { classifyCommandFailure } from './gh-failures.ts';
+import {
+	parseRemoteConfig,
+	REMOTE_CONFIG_PATTERN,
+	RESOLVED_TO_THIS_REMOTE,
+	type RemoteConfig,
+	type RemoteEntry,
+} from './remote-config.ts';
 
 /**
  * Which GitHub repository a `gh` call addresses. `default` leaves the choice to
@@ -16,37 +23,8 @@ export type PullRequestRepository =
 /** The repository `gh` resolves for a checkout on its own. */
 const DEFAULT_REPOSITORY: PullRequestRepository = { kind: 'default' };
 
-/**
- * The git config keys {@link readHeadRepository} reads in one call: every
- * remote's URL and `gh` resolution, and every branch's tracked remote.
- */
-const REMOTE_CONFIG_PATTERN =
-	'^(remote\\..+\\.(url|gh-resolved)|branch\\..+\\.remote)$';
-const REMOTE_URL_KEY = /^remote\.(.+)\.url$/;
-const REMOTE_RESOLUTION_KEY = /^remote\.(.+)\.gh-resolved$/;
-const BRANCH_REMOTE_KEY = /^branch\.(.+)\.remote$/;
-/** The value `gh repo set-default` writes on the remote it resolved to. */
-const RESOLVED_TO_THIS_REMOTE = 'base';
 /** What GitHub's GraphQL API answers for a repository it cannot find. */
 const UNRESOLVABLE_REPOSITORY_MARKER = 'could not resolve to a repository';
-
-/** One configured remote, as far as the head-repository lookup needs it. */
-interface RemoteEntry {
-	ghResolved?: string;
-	url?: string;
-}
-
-/** One `key value` pair from `git config --get-regexp`. */
-interface ConfigEntry {
-	key: string;
-	value: string;
-}
-
-/** The remote configuration of a checkout, keyed by remote and branch name. */
-interface RemoteConfig {
-	branchRemotes: ReadonlyMap<string, string>;
-	remotes: ReadonlyMap<string, RemoteEntry>;
-}
 
 /**
  * The `--repo` flag that points a `gh pr` command at a named repository.
@@ -221,65 +199,6 @@ function selectHeadRepository(
 	)
 		? null
 		: repository;
-}
-
-/**
- * Parses `git config --get-regexp` output for remote URLs, `gh` resolutions,
- * and branch remotes. The first value wins where a key repeats, as it does for
- * a remote with several URLs.
- * @param stdout - The command's output, one `key value` pair per line.
- * @returns The remote configuration.
- */
-function parseRemoteConfig(stdout: string): RemoteConfig {
-	const entries = stdout.split('\n').flatMap(parseConfigLine);
-	const urls = valuesByName(entries, REMOTE_URL_KEY);
-	const resolutions = valuesByName(entries, REMOTE_RESOLUTION_KEY);
-	const remoteNames = new Set([...urls.keys(), ...resolutions.keys()]);
-	return {
-		branchRemotes: valuesByName(entries, BRANCH_REMOTE_KEY),
-		remotes: new Map(
-			[...remoteNames].map((name) => [
-				name,
-				{ ghResolved: resolutions.get(name), url: urls.get(name) },
-			]),
-		),
-	};
-}
-
-/**
- * Collects the values of every key a pattern matches, keyed by the remote or
- * branch name the pattern captures. Built from the reversed list so the first
- * value of a repeated key is the one that survives.
- * @param entries - Parsed config pairs.
- * @param pattern - A key pattern whose first group is the name.
- * @returns The value per name.
- */
-function valuesByName(
-	entries: readonly ConfigEntry[],
-	pattern: RegExp,
-): Map<string, string> {
-	return new Map(
-		entries
-			.flatMap(({ key, value }) => {
-				const name = key.match(pattern)?.[1];
-				return name ? [[name, value] as const] : [];
-			})
-			.reverse(),
-	);
-}
-
-/**
- * Splits one `git config --get-regexp` line at its first space.
- * @param line - A `key value` line.
- * @returns The pair, or nothing for a line without a value.
- */
-function parseConfigLine(line: string): ConfigEntry[] {
-	const separator = line.indexOf(' ');
-	if (separator <= 0) {
-		return [];
-	}
-	const value = line.slice(separator + 1).trim();
-	return value ? [{ key: line.slice(0, separator), value }] : [];
 }
 
 /**

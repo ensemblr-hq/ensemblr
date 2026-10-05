@@ -23,6 +23,11 @@ export interface RepositorySettingsPatch {
 	permissionMode?: PermissionMode | null;
 	previewUrls?: RepositoryPreviewUrl[] | null;
 	remoteOrigin?: string | null;
+	/**
+	 * List issues from a fork's upstream — the repository `gh repo set-default`
+	 * picked, else the `upstream` remote's — instead of the one `origin` points at.
+	 */
+	showUpstreamIssues?: boolean | null;
 }
 
 /** Request to persist a repository's personal settings patch to SQLite. */

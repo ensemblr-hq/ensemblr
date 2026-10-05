@@ -452,6 +452,8 @@ export function registerIpcHandlers({
 				repositorySourcesService: createRepositorySourcesService({
 					databaseService,
 					localCommandService,
+					readRepositorySettings: (request) =>
+						settingsResolutionService.resolve(request),
 				}),
 			});
 			return service;

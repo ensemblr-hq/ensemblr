@@ -25,6 +25,11 @@ const ISSUE_ARRAY_FIELDS = [
  */
 export interface CachedRepositoryIssues {
 	issues: RepositoryIssueWire[];
+	/**
+	 * The `owner/name` the rows were listed from, or null when `gh` resolved the
+	 * repository from the checkout's remotes itself.
+	 */
+	repository: string | null;
 	/** When the rows were read from GitHub, as an ISO timestamp. */
 	syncedAt: string;
 }
@@ -62,7 +67,9 @@ function isIssueWire(value: unknown): value is RepositoryIssueWire {
 
 /**
  * Narrows a parsed cache row to the shape the caller expects, so a row written
- * by an older build cannot reach the renderer as a half-typed list.
+ * by an older build cannot reach the renderer as a half-typed list. A row with
+ * no `repository` predates the field and was listed through `gh`'s own
+ * resolution, so it reads as null.
  * @param value - The parsed `metadata_json` payload.
  * @returns The cached issues, or null when the row is unusable.
  */
@@ -78,21 +85,31 @@ function toCachedIssues(value: unknown): CachedRepositoryIssues | null {
 	) {
 		return null;
 	}
-	return { issues: candidate.issues, syncedAt: candidate.syncedAt };
+	return {
+		issues: candidate.issues,
+		repository:
+			typeof candidate.repository === 'string' ? candidate.repository : null,
+		syncedAt: candidate.syncedAt,
+	};
 }
 
 /**
  * Reads a repository's cached issue list from `integration_metadata`, the same
- * generic table `pr-cache.ts` writes its PR snapshots to.
- * @param input - The database connection, repository, and list variant to read.
+ * generic table `pr-cache.ts` writes its PR snapshots to. A row listed from a
+ * different GitHub repository than the one asked for is another project's
+ * issues, so it reads as absent rather than being served even as a fallback.
+ * @param input - The database connection, repository, list variant, and the
+ * GitHub repository the list must have been read from.
  * @returns The cached issues, or null when nothing usable is stored.
  */
 export function readCachedRepositoryIssues({
 	database,
+	repository,
 	repositoryId,
 	unassignedOnly = false,
 }: {
 	database: DatabaseSync;
+	repository: string | null;
 	repositoryId: string;
 	unassignedOnly?: boolean;
 }): CachedRepositoryIssues | null {
@@ -107,23 +124,27 @@ export function readCachedRepositoryIssues({
 	if (!row) {
 		return null;
 	}
+	let cached: CachedRepositoryIssues | null;
 	try {
-		return toCachedIssues(JSON.parse(row.metadata_json) as unknown);
+		cached = toCachedIssues(JSON.parse(row.metadata_json) as unknown);
 	} catch {
 		return null;
 	}
+	return cached?.repository === repository ? cached : null;
 }
 
 /** Upserts a repository's issue-list cache row (idempotent refresh). */
 export function writeCachedRepositoryIssues({
 	database,
 	issues,
+	repository,
 	repositoryId,
 	syncedAt,
 	unassignedOnly = false,
 }: {
 	database: DatabaseSync;
 	issues: RepositoryIssueWire[];
+	repository: string | null;
 	repositoryId: string;
 	syncedAt: string;
 	unassignedOnly?: boolean;
@@ -144,7 +165,11 @@ export function writeCachedRepositoryIssues({
 			repositoryId,
 			'',
 			syncedAt,
-			JSON.stringify({ issues, syncedAt } satisfies CachedRepositoryIssues),
+			JSON.stringify({
+				issues,
+				repository,
+				syncedAt,
+			} satisfies CachedRepositoryIssues),
 		);
 }
 

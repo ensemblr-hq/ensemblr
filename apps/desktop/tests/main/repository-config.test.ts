@@ -378,6 +378,7 @@ remote_origin = "upstream"
 delete_local_branch_on_archive = true
 archive_after_merge = true
 set_upstream_on_push = false
+show_upstream_issues = true
 `,
 	);
 
@@ -393,6 +394,7 @@ set_upstream_on_push = false
 		deleteLocalBranchOnArchive: true,
 		remoteOrigin: 'upstream',
 		setUpstreamOnPush: false,
+		showUpstreamIssues: true,
 	});
 	assert.deepEqual(loaded.snapshot.diagnostics, []);
 });

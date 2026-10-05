@@ -2588,6 +2588,10 @@ export default interface Resources {
 				label: 'Setup script';
 				placeholder: 'e.g. npm ci';
 			};
+			'upstream-issues': {
+				description: "For a fork, list the upstream repository's GitHub issues on the board and in issue pickers instead of the fork's own.";
+				label: 'Show upstream issues';
+			};
 			'workspace-target': {
 				placeholder: 'Choose a workspace';
 			};
