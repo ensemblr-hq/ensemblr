@@ -167,12 +167,106 @@ describe('afk delivery loop', () => {
 		);
 	});
 
-	it('runs plan, build, review, fix, and ship in that order', () => {
-		const positions = ['**1.', '**2.', '**3.', '**4.', '**5.'].map((step) =>
-			directive.indexOf(step),
-		);
-		expect(positions.every((position) => position > -1)).toBe(true);
-		expect(positions).toEqual([...positions].sort((a, b) => a - b));
+	it('runs plan, build, review, fix, ship, and watch in that order', () => {
+		for (const guidance of [directive, nativeDirective]) {
+			const positions = ['**1.', '**2.', '**3.', '**4.', '**5.', '**6.'].map(
+				(step) => guidance.indexOf(step),
+			);
+			expect(positions.every((position) => position > -1)).toBe(true);
+			expect(positions).toEqual([...positions].sort((a, b) => a - b));
+			expect(guidance.indexOf('**6.')).toBeLessThan(
+				guidance.indexOf('Stop on a hard block'),
+			);
+		}
+	});
+
+	describe('once the pull request is open', () => {
+		for (const delegation of ['ensemblr', 'native'] as const) {
+			const guidance = render({ delegation });
+
+			it(`${delegation}: watches every check until it settles, treating a cut-off watch as a lap`, () => {
+				expect(guidance).toContain('See the pull request through its checks');
+				expect(guidance).toContain('review tools such as CodeRabbit');
+				expect(guidance).toContain('`gh pr checks --watch`');
+				expect(guidance).toContain('until every check has settled');
+				expect(guidance).toContain('is a failed check, not a crashed command');
+				expect(guidance).toContain('a watch it cut off is a lap');
+				expect(guidance).toContain(
+					'"no checks reported" straight after one means ask again shortly',
+				);
+				expect(guidance).toContain('this repository runs none');
+			});
+
+			it(`${delegation}: fixes a failed check as a new commit, never rewriting the open branch`, () => {
+				expect(guidance).toContain(
+					'A failed check is a finding like any in step 4',
+				);
+				expect(guidance).toContain('`gh run view <run-id> --log-failed`');
+				expect(guidance).toContain('push it as a new commit');
+				expect(guidance).toContain(
+					'Never amend, rebase, or force-push a branch whose pull request is open',
+				);
+			});
+
+			it(`${delegation}: reads bot and human review comments and judges them without answering on the pull request`, () => {
+				expect(guidance).toContain('`gh pr view --json reviews,comments`');
+				expect(guidance).toContain(
+					'`gh api --paginate repos/{owner}/{repo}/pulls/<number>/comments`',
+				);
+				expect(guidance).toContain('read them again after every push settles');
+				expect(guidance).toContain(
+					"Judge every comment, a bot's or a person's",
+				);
+				expect(guidance).toContain(
+					'Do not reply to, resolve, or dismiss review threads',
+				);
+			});
+
+			it(`${delegation}: leaves red it did not cause, and base conflicts, to the report`, () => {
+				expect(guidance).toContain(
+					'Some red is not yours to fix on this branch',
+				);
+				expect(guidance).toContain(
+					're-run the failed jobs once (`gh run rerun <run-id> --failed`)',
+				);
+				expect(guidance).toContain('a flake that fails again');
+				expect(guidance).toContain('is not base-sync consent; report it');
+				expect(guidance).toContain('is reported as pending');
+				expect(guidance).toContain(
+					'nothing in the rollup has moved for half an hour',
+				);
+			});
+
+			it(`${delegation}: bounds the watch like the loop and never closes the pull request`, () => {
+				expect(guidance).toContain(
+					'Rounds after the pull request opened follow the rules of steps 1 to 4',
+				);
+				expect(guidance).toContain('A round ends the watch');
+				expect(guidance).toContain(
+					'red only where the paragraph above says the red is not yours',
+				);
+				expect(guidance).toContain(
+					'push the rebuilt change to the same pull request',
+				);
+				expect(guidance).toContain('leave the pull request open');
+			});
+
+			it(`${delegation}: reports what the checks and reviewers said after the pull request opened`, () => {
+				expect(guidance).toContain(
+					'what its checks and reviewers said after it opened, what you pushed in answer, and what is still red or unanswered',
+				);
+			});
+		}
+
+		it('runs on the short path too', () => {
+			expect(directive).toContain('step 6 still sees it through its checks');
+		});
+
+		it('is never handed to a sub-agent', () => {
+			expect(subagentDirective).not.toContain('**6.');
+			expect(subagentDirective).not.toContain('gh pr checks');
+			expect(subagentDirective).not.toContain('review threads');
+		});
 	});
 
 	it('keeps model-role selection live for unattended Ensemblr hand-offs', () => {

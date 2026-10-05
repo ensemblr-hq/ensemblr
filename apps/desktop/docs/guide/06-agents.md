@@ -461,8 +461,22 @@ or to read the diff before it lands:
 5. **Open the pull request.** Turning AFK on for a change is the request for one.
    It never merges, never force-pushes over other work, and updates an existing
    pull request rather than opening a second.
+6. **See the pull request through its checks.** The agent watches CI, test
+   suites, and review tools such as CodeRabbit until every check settles. It
+   reads a failed check's log, fixes the cause, runs your checks, and pushes the
+   fix as a new commit, never amending or force-pushing the open branch. It
+   then reads the reviews and line comments the pull request received, from
+   bots and people alike, and judges each one as it judged its own review's
+   findings. It fixes the ones that are right and answers the rest in its
+   report, not on the pull request: it never replies to, resolves, or dismisses
+   a review thread, so an open thread still means the finding stands. Red it
+   did not cause is not "fixed" on the branch. A flake or an outage gets one
+   re-run. A missing secret, a base branch that is already failing, a merge
+   conflict, or a check that never starts goes in the report. The watch ends
+   the way the loop does: on a round with nothing new to fix, or on a round
+   that repeats itself.
 
-**Not every change earns all five.** A documentation edit, a version bump, a
+**Not every change earns all six.** A documentation edit, a version bump, a
 translation of copy that already exists, or a rename the compiler follows end to
 end is a change the agent can settle by reading its own diff, so running a plan
 and separate review and fix rounds over it buys nothing you would not
@@ -471,8 +485,8 @@ reading, where that reading plus your repository's checks establish it is right,
 and where the shape was decided before it started, it takes a **short path** —
 steps 1, 3 and 4 do not run. It makes the change, runs your checks, reads the
 diff back from the top looking for what it got wrong, and goes to step 5. The
-pull request and the report are the same either way, and the report says which
-path it took.
+pull request, the watch over its checks, and the report are the same either
+way, and the report says which path it took.
 
 The judgement breaks towards the full loop. A change it cannot place is on the
 full loop, and one that outgrows a single reading part-way through — a check
@@ -518,8 +532,9 @@ does gets an answer, not a pull request.
 Read the session summary first when you come back: it is written for exactly this
 case, and it carries what the agent did, what it assumed, and what it left. The
 report names whether it self-reviewed or delegated review and why, every decision
-it took on your behalf, every review finding it disagreed with, and anything it
-could not finish.
+it took on your behalf, every review finding it disagreed with, what the pull
+request's checks and reviewers said and what it pushed in answer, and anything
+it could not finish.
 
 ![A finished unattended run: the report naming the path it took, the calls it made on the user's behalf, the review finding it argued with, and what it is least sure of — with the Review chat beside it in the tab strip and the pull request it opened in the header.](./images/06-afk-report.png)
 
@@ -529,7 +544,8 @@ while you were gone. See
 [ADR 0060](../adr/0060-let-a-chat-run-unattended.md),
 [ADR 0061](../adr/0061-run-an-unattended-change-through-plan-review-and-a-pull-request.md),
 [ADR 0064](../adr/0064-size-the-unattended-delivery-loop-to-the-change.md),
-and [ADR 0068](../adr/0068-let-afk-agents-choose-review-delegation.md).
+[ADR 0068](../adr/0068-let-afk-agents-choose-review-delegation.md),
+and [ADR 0084](../adr/0084-see-an-unattended-pull-request-through-its-checks.md).
 
 ## Checkpoints and session branching
 

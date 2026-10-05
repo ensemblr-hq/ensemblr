@@ -1,7 +1,8 @@
 /**
  * The unattended delivery loop: scope and size the change, plan, build, review,
- * repair, and ship. Review is required; delegating it is the agent's choice under
- * the normal delegation rules.
+ * repair, ship, and see the pull request through its checks and review bots.
+ * Review is required; delegating it is the agent's choice under the normal
+ * delegation rules.
  */
 
 import type { AgentControlRole } from './awareness.ts';
@@ -20,7 +21,7 @@ const RIGHT_SIZE = `**Size the loop to the change before you start it.** Everyth
 
 A change takes the **short path** when all three of these hold: the whole diff fits in one reading of your own; its correctness is settled by that reading plus whatever this repository uses to check a change, rather than by behaviour you would have to reason about to see; and the shape was decided before you started, because the user named it or because the repository leaves one way to do it. Documentation, comments, a translation of copy that already exists, a version or dependency bump, formatting, a rename the compiler follows end to end — those are the short path. A feature, a refactor, a migration, a bug whose cause you still have to find, and anything handed to you in one sentence that you had to design yourself are not, however few lines they end up being.
 
-**On the short path, steps 1, 3, and 4 do not run** — no written plan, no separate review and fix rounds. Make the change; run whatever this repository uses to check it; then read the diff you produced from the top, as though somebody else had written it and you were looking for what they got wrong. That reading is not a formality: it has to catch a claim the code no longer supports, a path that does not exist, a value left unfilled. Then go to step 5. The change is still committed, pushed, and opened as a pull request, and the report still carries everything asked for below.
+**On the short path, steps 1, 3, and 4 do not run** — no written plan, no separate review and fix rounds. Make the change; run whatever this repository uses to check it; then read the diff you produced from the top, as though somebody else had written it and you were looking for what they got wrong. That reading is not a formality: it has to catch a claim the code no longer supports, a path that does not exist, a value left unfilled. Then go to step 5. The change is still committed, pushed, and opened as a pull request, step 6 still sees it through its checks, and the report still carries everything asked for below.
 
 **When you cannot tell which path a change is on, it is on the full loop**, and that judgement only ever moves the same way. Take it again while you build: a diff that outgrows one reading, a check that fails for a reason you did not predict, or a repair that turns out to need a design call all mean the short path was the wrong call — say so in the conversation and pick the loop up at step 1. A run already inside the full loop does not drop out of it to save time. The full loop requires planning, review, and repairs; it does not require another agent.`;
 
@@ -76,12 +77,23 @@ const SHIP = `**5. Open the pull request — and never merge it.** Once the chan
 
 If real problems are still standing — the loop ended with them, or your own reading found one you could not settle — do not open the pull request. Leave the work committed on the branch, and report what is unresolved.`;
 
+/** Keeps the run on the pull request until its checks and reviewers have answered, bounded like the loop. */
+const WATCH = `**6. See the pull request through its checks.** Opening it is not the end of the run: CI, the test suites, and review tools such as CodeRabbit start reading it the moment it lands, and nobody is there to read what they say. Watch it with \`gh pr checks --watch\` until every check has settled. A non-zero exit from it is a failed check, not a crashed command. If your shell tool caps how long a command may run, a watch it cut off is a lap: run it again. Checks take a moment to register after a push, so "no checks reported" straight after one means ask again shortly. If it still says so a few minutes later, this repository runs none, and only the reviews are left to read.
+
+A failed check is a finding like any in step 4. Read its log (\`gh run view <run-id> --log-failed\`), find the cause, and fix it here. Run the repository's checks on the fix, commit it under the repository's conventions, and push it as a new commit. Never amend, rebase, or force-push a branch whose pull request is open. Then watch again.
+
+Once the checks have settled, read what the pull request received: \`gh pr view --json reviews,comments\` for reviews and conversation, and \`gh api --paginate repos/{owner}/{repo}/pulls/<number>/comments\` for comments left on lines. A review bot may post after its own check turns green, or with no check at all, so read them again after every push settles and once more before you write the report. Judge every comment, a bot's or a person's, as you judged the findings in step 4. Fix the ones that are right, the same way as a failed check. Answer the rest in your report rather than on the pull request. Do not reply to, resolve, or dismiss review threads: an open thread is the user's record that a finding still stands, and a disagreement belongs to them to settle.
+
+Some red is not yours to fix on this branch. Where the log points at a flaky test or a runner or network outage, re-run the failed jobs once (\`gh run rerun <run-id> --failed\`). A missing secret, a base branch that is already failing, or a flake that fails again gets a line in your report instead. A merge conflict with the base or a required update from it is not base-sync consent; report it. A check that never starts, because it waits on an approval, a label, or a runner, is reported as pending: stop watching it once nothing in the rollup has moved for half an hour.
+
+Rounds after the pull request opened follow the rules of steps 1 to 4. A round ends the watch when its checks have settled and nothing new needs a fix you agree with. Its checks may be green, or red only where the paragraph above says the red is not yours. A round that repeats findings you already answered ends it too. Rounds circling one class of failure mean the approach is wrong: go back to step 1, and push the rebuilt change to the same pull request. Checks still red when the watch ends leave the pull request open, as it is, with the reason in your report.`;
+
 /** Requires an honest delivery account, including the review choice and unresolved blockers. */
 const REPORT = `**Stop on a hard block, and say so.** A hard block is something no amount of your own effort resolves: a credential or account you do not have, a service that is refusing you, a dependency that cannot be installed here, a step that would need the user's authority — publishing, deleting, paying, touching something outside this workspace. Stop at that point. Do not route around it, do not fake it, do not carry on with the parts that depend on it. Write the report and end the turn.
 
 Being unsure is not a hard block. An ambiguous requirement, a missing convention, a choice between two reasonable designs: decide it yourself, on the most defensible reading, and record it. That is what the rest of this mode is for.
 
-**Your final message is the whole account of the run.** It carries what you built, which path you sized the change onto and why, whether you self-reviewed or delegated review and why, the approach you chose and what you rejected, how many rounds the loop ran and what each one moved, every decision you made on the user's behalf, every review finding you disagreed with and why, what you could not finish and what stopped you, and the pull request if you opened one. Be honest about the parts you are least sure of — a run reported as clean that was not is worse than one that names its own weak spots. Put the same thing in \`ensemblr_set_summary\`, which is what the user reads first.`;
+**Your final message is the whole account of the run.** It carries what you built, which path you sized the change onto and why, whether you self-reviewed or delegated review and why, the approach you chose and what you rejected, how many rounds the loop ran and what each one moved, every decision you made on the user's behalf, every review finding you disagreed with and why, what you could not finish and what stopped you, and the pull request if you opened one — with what its checks and reviewers said after it opened, what you pushed in answer, and what is still red or unanswered. Be honest about the parts you are least sure of — a run reported as clean that was not is worse than one that names its own weak spots. Put the same thing in \`ensemblr_set_summary\`, which is what the user reads first.`;
 
 /** Gives children the verification discipline without delivery or nested-delegation authority. */
 const SUBAGENT_BODY = `The delivery loop Ensemblr runs an unattended change through is not yours. You were spawned to carry out one unit of work, and nothing that happens to the change afterwards is yours: the commit, the review, and the pull request all sit above you, however many levels up that is. Do not commit, push, rebase, or open one from here — make the change, leave it in the working tree, and say in your report exactly what you touched.
@@ -134,6 +146,8 @@ ${native ? REVIEW_FOLLOW_UP_NATIVE : REVIEW_FOLLOW_UP_ENSEMBLR}
 ${ITERATE}
 
 ${SHIP}
+
+${WATCH}
 
 ${REPORT}`;
 }

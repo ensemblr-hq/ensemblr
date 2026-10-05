@@ -384,16 +384,24 @@ button keeps your configured review model and thinking level, which do not pin A
 merges, never force-pushes over work that is not its own, and updates an existing PR rather than opening a
 second. It judges each finding rather than accepting the list, and decides how many rounds the loop runs.
 
-Not every change earns all five steps. A documentation edit, a version bump, or a rename the compiler
+**Opening the PR is not the end of the run.** The agent watches CI, the test suites, and review tools such as
+CodeRabbit until every check settles. It fixes what failed and pushes the fix as a new commit, never amending
+or force-pushing the open branch. It judges each review comment, from a bot or a person, the same way it judged
+its own review. It answers in its report rather than on the PR, and leaves review threads for you to resolve.
+Red it did not cause is not worked around: a flake or an outage gets one re-run, and an already-failing base
+or a merge conflict goes in the report.
+
+Not every change earns all six steps. A documentation edit, a version bump, or a rename the compiler
 follows end to end takes a **short path** — make it, run your checks, read the diff back adversarially, open
-the PR. The agent sizes the change first, breaks towards the full loop when it cannot tell, and never drops
-out of the full loop to save time.
+the PR and see it through its checks. The agent sizes the change first, breaks towards the full loop when it
+cannot tell, and never drops out of the full loop to save time.
 
 ![A finished unattended run: the report naming the path it took, the calls it made on the user's behalf, the review finding it argued with, and what it is least sure of — with the Review chat beside it in the tab strip and the pull request it opened in the header.](./docs/guide/images/06-afk-report.png)
 
 **The report is the point.** You come back to one account of the run: which path it took, whether it
 self-reviewed or delegated review and why, what each review round moved, every decision it made on your
-behalf, every finding it disagreed with and why, what it could not finish, and the pull request. The same account lands in the session summary, so the tab still tells you
+behalf, every finding it disagreed with and why, what it could not finish, and the pull request with what its
+checks and reviewers said after it opened. The same account lands in the session summary, so the tab still tells you
 months later. Full detail in [`docs/guide/06-agents.md`](./docs/guide/06-agents.md#afk-mode) and
 [ADR 0060](./docs/adr/0060-let-a-chat-run-unattended.md).
 
