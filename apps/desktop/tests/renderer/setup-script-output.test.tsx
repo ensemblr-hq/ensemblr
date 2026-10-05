@@ -32,8 +32,10 @@ function renderPanel(
 ) {
 	const handlers = {
 		onAskAgentSetupScript: vi.fn(),
+		onCancelQueuedScript: vi.fn(),
 		onOpenSetupScripts: vi.fn(),
 		onRunSetupScript: vi.fn(),
+		onStartQueuedScript: vi.fn(),
 		onStopSetupScript: vi.fn(),
 	};
 	renderWithProviders(
@@ -90,6 +92,43 @@ test('renders the not-run empty state without a setup control', () => {
 	expect(screen.queryByTestId('xterm')).toBeNull();
 	expect(screen.queryByRole('button', { name: 'Rerun setup' })).toBeNull();
 	expect(screen.queryByRole('button', { name: 'Stop setup' })).toBeNull();
+});
+
+test('acknowledges a setup launch waiting in the compute queue and acts on that job alone', async () => {
+	const user = userEvent.setup();
+	const {
+		onCancelQueuedScript,
+		onRunSetupScript,
+		onStartQueuedScript,
+		onStopSetupScript,
+	} = renderPanel({
+		script: scriptSummary({
+			queuedJob: {
+				enqueuedAt: Date.now(),
+				id: 'job-1',
+				initiator: 'auto',
+				kind: 'setup',
+				position: 1,
+				scriptName: null,
+			},
+			status: 'not-run',
+			terminalId: null,
+		}),
+	});
+
+	expect(screen.getByText('Setup is queued')).toBeInTheDocument();
+	expect(screen.getByText('Next in line')).toBeInTheDocument();
+	expect(screen.getByText('Queued automatically')).toBeInTheDocument();
+	expect(screen.queryByText('No setup script output')).toBeNull();
+
+	await user.click(screen.getByRole('button', { name: 'Start now' }));
+	expect(onStartQueuedScript).toHaveBeenCalledWith('job-1');
+
+	await user.click(screen.getByRole('button', { name: 'Cancel' }));
+	expect(onCancelQueuedScript).toHaveBeenCalledWith('job-1');
+
+	expect(onRunSetupScript).not.toHaveBeenCalled();
+	expect(onStopSetupScript).not.toHaveBeenCalled();
 });
 
 test('keeps Stop setup reachable while the password field is showing', () => {

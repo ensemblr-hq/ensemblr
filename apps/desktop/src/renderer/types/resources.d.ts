@@ -3553,6 +3553,27 @@ export default interface Resources {
 			collapse: 'Collapse terminal area';
 			expand: 'Expand terminal area';
 			'new-terminal': 'New terminal';
+			'script-queued': {
+				cancel: 'Cancel';
+				'cancel-failed': 'Could not cancel it. It may have already finished.';
+				detail: 'Waiting for a free compute slot. Output will appear here once it starts.';
+				initiator: {
+					agent: 'Queued by an agent';
+					auto: 'Queued automatically';
+					user: 'Queued by you';
+				};
+				next: 'Next in line';
+				position: '#{{position}} in queue';
+				'start-now': 'Start now';
+				'start-now-failed': 'Could not start it now. It may have already started or been cancelled.';
+				'start-now-hint': 'Skip the queue and start it now';
+				title: {
+					run: 'Run script is queued';
+					'run-named': '{{name}} is queued';
+					setup: 'Setup is queued';
+				};
+				waiting: 'Waiting {{elapsed}}';
+			};
 		};
 		'dock-tab': {
 			run: {

@@ -112,6 +112,7 @@ export type {
 	WorkspaceOpenTarget,
 	WorkspacePathMatch,
 	WorkspacePathResolver,
+	WorkspaceScriptQueuedJob,
 	WorkspaceScriptSummary,
 	WorkspaceShellData,
 	WorkspaceShellModel,

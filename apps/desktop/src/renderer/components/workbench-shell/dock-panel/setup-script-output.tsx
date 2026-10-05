@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/renderer/components/ui/button';
 import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
 
+import { ScriptQueuedEmptyState } from './script-queued-empty-state';
 import { SecretPromptBar } from './secret-prompt-bar';
 import { SetupMissingEmptyState } from './setup-missing-empty-state';
 import { SetupNotRunEmptyState } from './setup-not-run-empty-state';
@@ -14,8 +15,12 @@ interface SetupScriptOutputPanelProps {
 	/** Whether this pane is the dock's active tab and the dock is expanded. */
 	isVisible?: boolean;
 	onAskAgentSetupScript: () => void;
+	/** Withdraws the queued setup launch with this job id. */
+	onCancelQueuedScript: (jobId: string) => void;
 	onOpenSetupScripts: () => void;
 	onRunSetupScript: () => void;
+	/** Grants the queued setup launch with this job id its slot at once. */
+	onStartQueuedScript: (jobId: string) => void;
 	onStopSetupScript: () => void;
 	script: WorkspaceScriptSummary;
 	/** The dock tab's own name, which names a selection attached from this pane. */
@@ -23,22 +28,40 @@ interface SetupScriptOutputPanelProps {
 	workspaceCwd: string;
 }
 
-/** Renders the Setup script output or the appropriate empty state. */
+/**
+ * Renders the Setup script output or the appropriate empty state. A setup
+ * launch waiting for a compute slot outranks an earlier run's output, which
+ * describes a session the queued launch is about to replace.
+ */
 export function SetupScriptOutputPanel({
 	isVisible = true,
 	onAskAgentSetupScript,
+	onCancelQueuedScript,
 	onOpenSetupScripts,
 	onRunSetupScript,
+	onStartQueuedScript,
 	onStopSetupScript,
 	script,
 	tabLabel,
 	workspaceCwd,
 }: SetupScriptOutputPanelProps) {
+	const { queuedJob } = script;
+
 	if (script.status === 'missing') {
 		return (
 			<SetupMissingEmptyState
 				onAddManually={onOpenSetupScripts}
 				onAskAgent={onAskAgentSetupScript}
+			/>
+		);
+	}
+
+	if (queuedJob) {
+		return (
+			<ScriptQueuedEmptyState
+				job={queuedJob}
+				onCancel={() => onCancelQueuedScript(queuedJob.id)}
+				onStartNow={() => onStartQueuedScript(queuedJob.id)}
 			/>
 		);
 	}

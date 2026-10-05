@@ -6,9 +6,14 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import {
+	cancelComputeJob,
+	startComputeJob,
+} from '@/renderer/api/ensemblr/compute-queue';
+import {
 	runWorkspaceScript,
 	stopWorkspaceScript,
 } from '@/renderer/api/ensemblr/workspace-scripts';
+import { toastUnlessApplied } from '@/renderer/lib/compute-queue-actions';
 import { failureDetail, failureText } from '@/renderer/lib/failure-text';
 import { lastRunScriptAtomFamily } from '@/renderer/state/preferences';
 import {
@@ -46,7 +51,8 @@ interface UseWorkspaceDockActionsOptions {
 
 /**
  * Wires the dock action callbacks: terminal create/close (with focus-follow
- * and last-tab protection) and script run/stop (with conflict toasts).
+ * and last-tab protection), script run/stop (with conflict toasts), and Start
+ * now / Cancel on a queued script launch, bound to its compute-queue job id.
  *
  * The returned object is stable per workspace. Per-render inputs
  * (`updateSearch`, `sessions`, `activeDockTab`) are routed through refs so the
@@ -125,6 +131,14 @@ export function useWorkspaceDockActions({
 	return useMemo<WorkbenchDockActions>(
 		() => ({
 			onAskAgentSetupScript: () => askAgentSetupScriptRef.current(),
+			onCancelQueuedScript: (jobId) =>
+				toastUnlessApplied(
+					cancelComputeJob(jobId).then((result) => result.cancelled),
+					t(
+						'workbench:dock-panel.script-queued.cancel-failed',
+						'Could not cancel it. It may have already finished.',
+					),
+				),
 			onCloseTerminal: (terminalId) => {
 				const remaining = sessionsRef.current.filter(
 					(session) => session.kind === 'terminal' && session.id !== terminalId,
@@ -185,6 +199,14 @@ export function useWorkspaceDockActions({
 					);
 				updateSearchRef.current({ dock: 'setup' });
 			},
+			onStartQueuedScript: (jobId) =>
+				toastUnlessApplied(
+					startComputeJob(jobId).then((result) => result.started),
+					t(
+						'workbench:dock-panel.script-queued.start-now-failed',
+						'Could not start it now. It may have already started or been cancelled.',
+					),
+				),
 			onStopRunScript: () => {
 				void stopWorkspaceScript({ kind: 'run', workspaceId })
 					.then((result) => notifyScriptResult(t, result.diagnostics))

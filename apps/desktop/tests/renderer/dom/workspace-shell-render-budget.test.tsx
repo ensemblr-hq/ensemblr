@@ -96,12 +96,14 @@ const NOOP = () => undefined;
 
 const DOCK_ACTIONS: WorkbenchDockActions = {
 	onAskAgentSetupScript: () => undefined,
+	onCancelQueuedScript: () => undefined,
 	onCloseTerminal: () => undefined,
 	onNewTerminal: () => undefined,
 	onOpenRunPort: () => undefined,
 	onOpenSetupScripts: () => undefined,
 	onRunScript: () => undefined,
 	onRunSetupScript: () => undefined,
+	onStartQueuedScript: () => undefined,
 	onStopRunScript: () => undefined,
 	onStopSetupScript: () => undefined,
 };

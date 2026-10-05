@@ -1,6 +1,7 @@
 import {
 	ChevronDownIcon,
 	ChevronUpIcon,
+	HourglassIcon,
 	Loader2Icon,
 	PlayIcon,
 	PlusIcon,
@@ -185,8 +186,10 @@ export function DockPanel({
 				<SetupScriptOutputPanel
 					isVisible={isPaneVisible('setup')}
 					onAskAgentSetupScript={actions.onAskAgentSetupScript}
+					onCancelQueuedScript={actions.onCancelQueuedScript}
 					onOpenSetupScripts={actions.onOpenSetupScripts}
 					onRunSetupScript={actions.onRunSetupScript}
+					onStartQueuedScript={actions.onStartQueuedScript}
 					onStopSetupScript={actions.onStopSetupScript}
 					script={workspace.scripts.setup}
 					tabLabel={setupTabLabel}
@@ -201,8 +204,10 @@ export function DockPanel({
 				<RunScriptOutputPanel
 					activeRunScriptName={activeRunScript?.name ?? null}
 					isVisible={isPaneVisible('run')}
+					onCancelQueuedScript={actions.onCancelQueuedScript}
 					onOpenSetupScripts={actions.onOpenSetupScripts}
 					onRunScript={actions.onRunScript}
+					onStartQueuedScript={actions.onStartQueuedScript}
 					script={workspace.scripts.run}
 					tabLabel={runTabLabel}
 					workspaceCwd={workspace.pathLabel}
@@ -268,10 +273,18 @@ function DockTabCloseButton({
 	);
 }
 
-/** Renders the dock tab icon, swapping to a spinner while work is running. */
+/**
+ * Renders the dock tab icon, swapping to a spinner while work is running and to
+ * an hourglass while a script waits for a compute slot — the same glyph the
+ * sidebar's compute queue gives a waiting job.
+ */
 function DockTabGlyph({ tab }: { tab: DockTabModel }) {
 	if (tab.status === 'running') {
 		return <Loader2Icon aria-hidden='true' className='size-3.5 animate-spin' />;
+	}
+
+	if (tab.status === 'queued') {
+		return <HourglassIcon aria-hidden='true' />;
 	}
 
 	const DockTabIcon = getDockTabIcon(tab);
