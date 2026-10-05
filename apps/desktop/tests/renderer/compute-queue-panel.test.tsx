@@ -16,6 +16,7 @@ import type {
 import { renderWithProviders } from './support/dom';
 
 const cancelComputeJob = vi.fn();
+const startComputeJob = vi.fn();
 const toastError = vi.fn();
 const openFilePreview = vi.fn();
 
@@ -26,6 +27,7 @@ vi.mock('@/renderer/api/ensemblr', async (importOriginal) => {
 	return {
 		...actual,
 		cancelComputeJob: (id: string) => cancelComputeJob(id),
+		startComputeJob: (id: string) => startComputeJob(id),
 	};
 });
 vi.mock('@/renderer/hooks/concierge/use-concierge-file-preview', () => ({
@@ -82,6 +84,7 @@ function renderPanel(
 			onCancel={() => undefined}
 			onCollapsedChange={() => undefined}
 			onOpenLog={() => undefined}
+			onStartNow={() => undefined}
 			snapshot={snapshot}
 			{...overrides}
 		/>,
@@ -202,6 +205,34 @@ describe('ComputeQueuePanel', () => {
 
 		expect(onCancel).toHaveBeenCalledWith('r1');
 		expect(screen.queryByRole('button', { name: /^Cancel/ })).toBeNull();
+	});
+
+	test('a queued job offers start now and reports its id', () => {
+		const onStartNow = vi.fn();
+		renderPanel(queue([job({ id: 'q1', label: 'bun build', position: 1 })]), {
+			onStartNow,
+		});
+
+		fireEvent.click(
+			screen.getByRole('button', { name: 'Start bun build now' }),
+		);
+
+		expect(onStartNow).toHaveBeenCalledWith('q1');
+	});
+
+	test('a running job offers no start now', () => {
+		renderPanel(
+			queue([
+				job({
+					id: 'r1',
+					label: 'bun build',
+					startedAt: Date.now(),
+					state: 'running',
+				}),
+			]),
+		);
+
+		expect(screen.queryByRole('button', { name: /^Start/ })).toBeNull();
 	});
 
 	test('offers the log for command jobs only', () => {
@@ -329,6 +360,7 @@ describe('ComputeQueuePanel', () => {
 				onCancel={() => undefined}
 				onCollapsedChange={onCollapsedChange}
 				onOpenLog={() => undefined}
+				onStartNow={() => undefined}
 				snapshot={snapshot}
 			/>,
 		);
@@ -355,6 +387,7 @@ describe('ComputeQueuePanel', () => {
 describe('SidebarComputeQueuePanel', () => {
 	beforeEach(() => {
 		cancelComputeJob.mockReset();
+		startComputeJob.mockReset();
 		toastError.mockReset();
 		openFilePreview.mockReset();
 	});
@@ -472,6 +505,48 @@ describe('SidebarComputeQueuePanel', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'Cancel bun build' }));
 
 		await waitFor(() => expect(cancelComputeJob).toHaveBeenCalledWith('q1'));
+		expect(toastError).not.toHaveBeenCalled();
+	});
+
+	test('a start the queue refuses surfaces a toast', async () => {
+		startComputeJob.mockResolvedValue({ started: false });
+		renderSidebar(queue([job({ id: 'q1', label: 'bun build', position: 1 })]));
+
+		fireEvent.click(
+			screen.getByRole('button', { name: 'Start bun build now' }),
+		);
+
+		await waitFor(() =>
+			expect(toastError).toHaveBeenCalledWith(
+				'Could not start the job. It may have already started or finished.',
+			),
+		);
+	});
+
+	test('a start that throws surfaces a toast', async () => {
+		const error = vi
+			.spyOn(console, 'error')
+			.mockImplementation(() => undefined);
+		startComputeJob.mockRejectedValue(new Error('ipc down'));
+		renderSidebar(queue([job({ id: 'q1', label: 'bun build', position: 1 })]));
+
+		fireEvent.click(
+			screen.getByRole('button', { name: 'Start bun build now' }),
+		);
+
+		await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
+		error.mockRestore();
+	});
+
+	test('a successful start stays quiet', async () => {
+		startComputeJob.mockResolvedValue({ started: true });
+		renderSidebar(queue([job({ id: 'q1', label: 'bun build', position: 1 })]));
+
+		fireEvent.click(
+			screen.getByRole('button', { name: 'Start bun build now' }),
+		);
+
+		await waitFor(() => expect(startComputeJob).toHaveBeenCalledWith('q1'));
 		expect(toastError).not.toHaveBeenCalled();
 	});
 

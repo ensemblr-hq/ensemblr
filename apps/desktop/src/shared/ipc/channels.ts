@@ -118,6 +118,7 @@ export const IPC_CHANNELS = {
 	updateStatusChanged: 'ensemblr:update-status-changed',
 	getComputeQueueSnapshot: 'ensemblr:get-compute-queue-snapshot',
 	cancelComputeJob: 'ensemblr:cancel-compute-job',
+	startComputeJob: 'ensemblr:start-compute-job',
 	computeQueueChanged: 'ensemblr:compute-queue-changed',
 	infisicalAccounts: 'ensemblr:infisical-accounts',
 	infisicalAddAccount: 'ensemblr:infisical-add-account',

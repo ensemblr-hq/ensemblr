@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
-import { cancelComputeJob } from '@/renderer/api/ensemblr';
+import { cancelComputeJob, startComputeJob } from '@/renderer/api/ensemblr';
 import { SidebarFooter } from '@/renderer/components/ui/sidebar';
 import { useWorkbenchLayoutRouteModelOptional } from '@/renderer/components/workbench-shell/shell-contexts';
 import { useConciergeFilePreview } from '@/renderer/hooks/concierge/use-concierge-file-preview';
@@ -17,17 +17,39 @@ import type { ComputeJobSnapshot } from '@/shared/compute-queue';
 import { ComputeQueuePanel } from './compute-queue-panel';
 
 /**
+ * Settles a row action against the queue, toasting when the call throws or
+ * the queue declines it because the job had already moved on.
+ * @param applied - Resolves whether the queue carried the action out.
+ * @param failureMessage - The toast shown when it did not.
+ */
+function toastUnlessApplied(
+	applied: Promise<boolean>,
+	failureMessage: string,
+): void {
+	applied
+		.then((done) => {
+			if (!done) {
+				toast.error(failureMessage);
+			}
+		})
+		.catch((error: unknown) => {
+			console.error('Compute queue action failed:', error);
+			toast.error(failureMessage);
+		});
+}
+
+/**
  * The compute queue panel wired to the running app: main's snapshot, the
- * cancel IPC, the shared cross-workspace file opener for a job's log, the
- * workspace route a row's workspace name opens, and the remembered collapsed
- * state.
+ * cancel and start-now IPC, the shared cross-workspace file opener for a job's
+ * log, the workspace route a row's workspace name opens, and the remembered
+ * collapsed state.
  *
  * The footer chrome lives here rather than in the panel so an idle queue shows
  * no bordered strip where the panel would have been. A visually hidden live
  * node stays mounted and announces only the running/queued summary, so a job
  * arriving is a change to something assistive tech was already watching while
- * the per-second timers stay silent. A cancel that fails or finds the job
- * already finished is reported as a toast.
+ * the per-second timers stay silent. A cancel or start that fails, or finds
+ * the job already past the state it acts on, is reported as a toast.
  */
 export function SidebarComputeQueuePanel() {
 	const { t } = useTranslation();
@@ -37,25 +59,25 @@ export function SidebarComputeQueuePanel() {
 	const layoutModel = useWorkbenchLayoutRouteModelOptional();
 
 	const onCancel = useCallback(
-		(jobId: string) => {
-			const notifyNotCancelled = () =>
-				toast.error(
-					t(
-						'workbench:navigation-sidebar.compute-queue.cancel-failed',
-						'Could not cancel the job. It may have already finished.',
-					),
-				);
-			cancelComputeJob(jobId)
-				.then((result) => {
-					if (!result.cancelled) {
-						notifyNotCancelled();
-					}
-				})
-				.catch((error: unknown) => {
-					console.error('Failed to cancel the compute job:', error);
-					notifyNotCancelled();
-				});
-		},
+		(jobId: string) =>
+			toastUnlessApplied(
+				cancelComputeJob(jobId).then((result) => result.cancelled),
+				t(
+					'workbench:navigation-sidebar.compute-queue.cancel-failed',
+					'Could not cancel the job. It may have already finished.',
+				),
+			),
+		[t],
+	);
+	const onStartNow = useCallback(
+		(jobId: string) =>
+			toastUnlessApplied(
+				startComputeJob(jobId).then((result) => result.started),
+				t(
+					'workbench:navigation-sidebar.compute-queue.start-now-failed',
+					'Could not start the job. It may have already started or finished.',
+				),
+			),
 		[t],
 	);
 	const onOpenLog = useCallback(
@@ -113,6 +135,7 @@ export function SidebarComputeQueuePanel() {
 						onCancel={onCancel}
 						onCollapsedChange={setCollapsed}
 						onOpenLog={onOpenLog}
+						onStartNow={onStartNow}
 						snapshot={snapshot}
 						workspaceOpener={workspaceOpener}
 					/>

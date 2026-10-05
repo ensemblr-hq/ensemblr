@@ -16,10 +16,13 @@ export type IpcChannelKey = keyof typeof IPC_CHANNELS;
  *
  * Stop, cancel, and close channels are deliberately `null`: they only ever
  * reduce what is running, and blocking them under `read-only` would strand a
- * process the user is trying to end. `updateRepositorySettings` is `null` for a
- * different reason — it carries the permission mode itself, so its handler runs
- * a bespoke confirmation rather than a mode-derived gate that a read-only
- * repository would use to lock the user out of its own Security screen.
+ * process the user is trying to end. `startComputeJob` is `null` because it
+ * runs nothing new: it only moves forward a job the queue already admitted,
+ * whose command passed its own gate when it was queued.
+ * `updateRepositorySettings` is `null` for a different reason — it carries the
+ * permission mode itself, so its handler runs a bespoke confirmation rather
+ * than a mode-derived gate that a read-only repository would use to lock the
+ * user out of its own Security screen.
  */
 export const IPC_PERMISSION_ACTIONS = {
 	architectureSnapshotChanged: null,
@@ -133,6 +136,7 @@ export const IPC_PERMISSION_ACTIONS = {
 	updateStatusChanged: null,
 	getComputeQueueSnapshot: null,
 	cancelComputeJob: null,
+	startComputeJob: null,
 	computeQueueChanged: null,
 	infisicalAccounts: null,
 	infisicalAddAccount: 'app-settings-change',

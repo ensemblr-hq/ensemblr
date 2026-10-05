@@ -146,8 +146,11 @@ every workspace's jobs — a setup or run script by name, a command by its label
 with who started them (`Agent`, `You`, or `Auto` for the app's own setup), how
 long a running job has run or where a waiting one stands in line, and its
 workspace, which opens on click. A running job offers **Stop**, a waiting one
-**Cancel**, and a command job an open-log action. The badge counts slots in use;
-a script you start yourself takes one at once, so it can read past the limit.
+**Start now** and **Cancel**, and a command job an open-log action. **Start now**
+runs the job at once instead of waiting for a free slot; the row still names
+whoever queued it, and the rest of the line keeps waiting. The badge counts
+slots in use; a script you start yourself, or a job you start now, takes one at
+once, so it can read past the limit.
 Click the panel's header to collapse it to that summary; it stays collapsed
 across restarts.
 The numeric fields commit when you leave the field or press `↵`, and the four rows

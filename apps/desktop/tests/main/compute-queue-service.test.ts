@@ -258,6 +258,91 @@ describe('scheduling', () => {
 	});
 });
 
+describe('start now', () => {
+	it('starts a queued job at once above the limit and keeps the rest in line', async () => {
+		await enqueue('a', 'busy');
+		const a2 = await enqueue('a', 'a2');
+		const b1 = await enqueue('b', 'b1');
+		await flush();
+		expect(queue.getJob(a2)?.position).toBe(2);
+
+		const listener = vi.fn();
+		queue.onChange(listener);
+		expect(queue.startNow(a2)).toBe(true);
+		await flush();
+
+		expect(queue.getJob(a2)).toMatchObject({
+			initiator: 'agent',
+			position: null,
+			state: 'running',
+		});
+		expect(path.basename(runFor('a2').launch.cwd)).toBe('a');
+		expect(queue.snapshot().inUse).toBe(2);
+		expect(queue.getJob(b1)?.position).toBe(1);
+		expect(listener.mock.calls.at(-1)?.[0].inUse).toBe(2);
+
+		runFor('busy').finish(0);
+		await flush();
+		expect(stateOf(b1)).toBe('queued');
+
+		runFor('a2').finish(0);
+		await flush();
+		expect(stateOf(b1)).toBe('running');
+	});
+
+	it('counts as its workspace’s latest grant, so other workspaces go next', async () => {
+		await enqueue('a', 'a0');
+		await enqueue('b', 'b0');
+		await flush();
+		runFor('a0').finish(0);
+		await flush();
+		expect(runs.at(-1)?.launch.command).toBe('b0');
+
+		const a2 = await enqueue('a', 'a2');
+		const b1 = await enqueue('b', 'b1');
+		const a3 = await enqueue('a', 'a3');
+		const b2 = await enqueue('b', 'b2');
+		expect([a2, b1, a3, b2].map((id) => queue.getJob(id)?.position)).toEqual([
+			1, 2, 3, 4,
+		]);
+
+		queue.startNow(a2);
+
+		expect([b1, a3, b2].map((id) => queue.getJob(id)?.position)).toEqual([
+			1, 2, 3,
+		]);
+	});
+
+	it('grants a queued script lease', async () => {
+		await enqueue('a', 'busy');
+		const lease = queue.acquireScriptLease({
+			command: 'setup',
+			script: { kind: 'setup', name: null },
+			initiator: 'auto',
+			label: 'Setup',
+			workspaceId: 'b',
+		});
+		expect(stateOf(lease.jobId)).toBe('queued');
+
+		expect(queue.startNow(lease.jobId)).toBe(true);
+
+		await expect(lease.granted).resolves.toBe('granted');
+		expect(queue.snapshot().inUse).toBe(2);
+	});
+
+	it('refuses a job that is running, finished, or unknown', async () => {
+		const running = await enqueue('a', 'running');
+		const cancelled = await enqueue('a', 'cancelled');
+		await flush();
+		queue.cancel(cancelled);
+
+		expect(queue.startNow(running)).toBe(false);
+		expect(queue.startNow(cancelled)).toBe(false);
+		expect(queue.startNow('missing')).toBe(false);
+		expect(runs.map((run) => run.launch.command)).toEqual(['running']);
+	});
+});
+
 describe('command jobs', () => {
 	it('passes the assembled overlay, base env, cwd, and niceness to the runner', async () => {
 		mkdirSync(path.join(workspaces.a, 'pkg'));

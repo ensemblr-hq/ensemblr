@@ -3,6 +3,7 @@ import type { ComputeQueueSnapshot } from '@/shared/compute-queue';
 import type {
 	CancelComputeJobResult,
 	ComputeQueueChangedBroadcast,
+	StartComputeJobResult,
 } from '@/shared/ipc/contracts/compute-queue';
 
 import { getEnsemblrApi, getEnsemblrApiOrNull } from './query-keys';
@@ -30,5 +31,17 @@ export function cancelComputeJob(
 	return profileElectronIpcCall(
 		{ channel: 'ensemblr:cancel-compute-job', usesDatabase: false },
 		() => getEnsemblrApi().cancelComputeJob({ jobId }),
+	);
+}
+
+/**
+ * Starts one queued job now, over the slot limit if need be.
+ * @param jobId - The queued job to start.
+ * @returns Whether it started; false when it had already left the queue.
+ */
+export function startComputeJob(jobId: string): Promise<StartComputeJobResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemblr:start-compute-job', usesDatabase: false },
+		() => getEnsemblrApi().startComputeJob({ jobId }),
 	);
 }
