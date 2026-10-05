@@ -62,7 +62,10 @@ after `SHIP` and before `REPORT`.
   and resolving is the GitHub counterpart of the in-app rule that only a fixed
   comment is resolved. An open thread is the user's record that a finding still
   stands. A disagreement is theirs to settle, so the agent argues it in its
-  report.
+  report. For the same reason it does not summon a review tool that reports a
+  rate limit or a skipped review with a comment. It says so in the report.
+  This case came up on the first run of the step, when CodeRabbit's free review
+  allowance ran out on the pull request that introduced it.
 - **It does not fix red it did not cause.** Where the log points at a flaky
   test or a runner or network outage, the failed jobs get one
   `gh run rerun --failed`. A missing secret, an already-failing base, or a flake

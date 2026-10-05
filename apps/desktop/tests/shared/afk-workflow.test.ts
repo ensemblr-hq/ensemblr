@@ -214,6 +214,7 @@ describe('afk delivery loop', () => {
 					'`gh api --paginate repos/{owner}/{repo}/pulls/<number>/comments`',
 				);
 				expect(guidance).toContain('read them again after every push settles');
+				expect(guidance).toContain('rather than summoning it with a comment');
 				expect(guidance).toContain(
 					"Judge every comment, a bot's or a person's",
 				);
