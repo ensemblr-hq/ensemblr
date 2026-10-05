@@ -216,6 +216,7 @@ export function createEnsemblrApi(): EnsemblrApi {
 		updateStatus: () => invoke('updateStatus'),
 		getComputeQueueSnapshot: () => invoke('getComputeQueueSnapshot'),
 		cancelComputeJob: (request) => invoke('cancelComputeJob', request),
+		startComputeJob: (request) => invoke('startComputeJob', request),
 		checkForUpdates: () => invoke('checkForUpdates'),
 		installUpdate: () => invoke('installUpdate'),
 		infisicalAccounts: () => invoke('infisicalAccounts'),

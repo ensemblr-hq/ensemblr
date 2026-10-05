@@ -1142,7 +1142,9 @@
 			},
 			"slot-usage-aria_one": "{{inUse}} of {{count}} slot in use",
 			"slot-usage-aria_other": "{{inUse}} of {{count}} slots in use",
-			"slots-explainer": "Slots in use out of the total. Heavy commands wait for a free slot; a script you start yourself takes one at once, even when all are busy.",
+			"slots-explainer": "Slots in use out of the total. Heavy commands wait for a free slot; a script you start yourself, or a queued job you start now, takes one at once, even when all are busy.",
+			"start-now": "Start {{label}} now",
+			"start-now-failed": "Could not start the job. It may have already started or finished.",
 			"stop": "Stop {{label}}",
 			"summary": "{{running}} running · {{queued}} queued",
 			"title": "Compute queue"

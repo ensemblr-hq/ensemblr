@@ -203,7 +203,10 @@ interface RegisterIpcHandlersOptions {
 	toolTrustService: ToolTrustService;
 	unarchiveWorkspaceService: UnarchiveWorkspaceService;
 	updateService: UpdateService;
-	computeQueueService: Pick<ComputeQueueService, 'cancel' | 'snapshot'>;
+	computeQueueService: Pick<
+		ComputeQueueService,
+		'cancel' | 'snapshot' | 'startNow'
+	>;
 	workspaceFilesWatcher: WorkspaceFilesWatcher;
 }
 

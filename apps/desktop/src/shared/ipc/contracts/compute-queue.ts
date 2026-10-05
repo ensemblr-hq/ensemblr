@@ -15,6 +15,16 @@ export interface CancelComputeJobResult {
 	cancelled: boolean;
 }
 
+/** Starts one queued compute job now, ahead of its place in line. */
+export interface StartComputeJobRequest {
+	jobId: string;
+}
+
+/** Whether the job was still queued and has now been granted a slot. */
+export interface StartComputeJobResult {
+	started: boolean;
+}
+
 /** Renderer-facing surface of the app-wide compute queue. */
 export interface ComputeQueueApi {
 	cancelComputeJob: (
@@ -24,4 +34,7 @@ export interface ComputeQueueApi {
 	onComputeQueueChanged: (
 		listener: (event: ComputeQueueChangedBroadcast) => void,
 	) => () => void;
+	startComputeJob: (
+		request: StartComputeJobRequest,
+	) => Promise<StartComputeJobResult>;
 }
