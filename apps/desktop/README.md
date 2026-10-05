@@ -32,7 +32,7 @@ the app ships no agent binary of its own — it drives the one you installed.
 
 *Ensemblr Control driving the app from inside a workspace: the agent moved the workspace to In progress, started a run script, delegated to two sub-agents in their own chat tabs, and launched a Claude Code harness in a terminal — all of it visible on one screen.*
 
-- **Version:** [`0.2.3`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.2.3) (stable)
+- **Version:** [`0.2.4`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.2.4) (stable)
 - **License:** Apache-2.0
 
 | Platform | Artifact | Install |
@@ -50,7 +50,7 @@ yet. Windows is not supported.
 
 ## Status
 
-Ensemblr is **stable at 0.2.3**, released 2026-10-05. The core workflows —
+Ensemblr is **stable at 0.2.4**, released 2026-10-05. The core workflows —
 isolated workspaces, Pi and Claude Code agent sessions, the review and PR flow, and the GitHub / Linear /
 git integrations — are implemented and wired to real services, on both macOS and Linux. Stable means
 ordinary semver rather than a frozen surface: breaking changes remain possible before 1.0 and are recorded
@@ -62,7 +62,7 @@ in [`CHANGELOG.md`](./CHANGELOG.md) when they land.
 brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
-Or download Ensemblr 0.2.3 (.dmg): **[Apple silicon](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.3/Ensemblr-0.2.3-arm64.dmg)** · **[Intel](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.3/Ensemblr-0.2.3-x64.dmg)** — open it and drag Ensemblr to Applications.
+Or download Ensemblr 0.2.4 (.dmg): **[Apple silicon](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.4/Ensemblr-0.2.4-arm64.dmg)** · **[Intel](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.4/Ensemblr-0.2.4-x64.dmg)** — open it and drag Ensemblr to Applications.
 
 The macOS build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
 stapled, so it opens without a Gatekeeper prompt and validates offline. Every build is on the
@@ -328,7 +328,7 @@ does not. It runs above every project, in a folder of its own under the Ensemblr
 agent that can answer a question about all of your work at once — which workspaces have something waiting,
 what a running agent actually did, where a body of work stands.
 
-Open it with `⌘⇧C`, from View ▸ Concierge, or from the round launcher floating over the window. It is a
+Open it with `⌘⇧C`, from View ▸ Concierge, or with the **Concierge** toggle, the slim row under the terminal dock in a workspace and along the foot of the content area elsewhere. It is a
 **panel** rather than a chat tab: drag it where you want it, maximize it with `⌘⇧M`, dismiss it with `⎋`.
 It belongs to the app rather than to a workspace, so it is the same conversation whichever project you
 happen to be looking at. It runs on the same two runtimes as everything else — Pi or Claude Code — under a
