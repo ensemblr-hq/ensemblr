@@ -160,9 +160,11 @@ and it is the only agent that can see all your work at once — which workspaces
 have something waiting, what a running agent actually did, where a body of work
 stands.
 
-Open it with `⌘⇧C`, from View ▸ Concierge, or by clicking the round button
-floating over the window. It is a **panel** rather than a chat tab: drag it where
-you want it, maximize it with `⌘⇧M`, close it with `⎋`. It belongs to the app, so
+Open it with `⌘⇧C`, from View ▸ Concierge, or with the **Concierge** toggle in the
+window's bottom-right corner — the slim row under the terminal dock in a
+workspace, and along the foot of the content area on every other screen. It is a
+**panel** rather than a chat tab: drag it where you want it, maximize it with
+`⌘⇧M`, close it with `⎋` or the same toggle. It belongs to the app, so
 it is the same conversation whichever workspace you happen to be looking at.
 
 It runs on the same two runtimes as everything else — **Pi or Claude Code** — and
@@ -307,10 +309,11 @@ that runtime, because a model belongs to exactly one. See
 
 ### Telling you what happened while it was closed
 
-The launcher bubble carries a count of what the Concierge said while its panel was shut, plus a
-separate mark for a question it is still waiting on you to answer, so a turn that finishes behind a
-closed panel is not silent just because nobody was looking at it. Opening the panel is what clears
-the count — the transcript on screen is the report.
+The toggle carries a count of what the Concierge said while its panel was shut — a question it is
+still waiting on you to answer counts as one more — so a turn that finishes behind a closed panel
+is not silent just because nobody was looking at it. While a turn is still running, the toggle's
+mark orbits and it reads **Working**. Opening the panel is what clears the count — the transcript
+on screen is the report.
 
 A finished turn also raises a desktop notification under the Concierge's own name rather than a
 workspace's, and clicking it opens the panel rather than navigating anywhere, since a Concierge

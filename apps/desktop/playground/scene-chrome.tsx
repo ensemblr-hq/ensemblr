@@ -3,6 +3,7 @@ import { createContext, use } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
+import { changeAppLanguage } from '@/renderer/lib/i18n';
 import { cn } from '@/renderer/lib/utils';
 
 const SceneControlHostContext = createContext<HTMLElement | null>(null);
@@ -81,7 +82,11 @@ export function ControlGroup({
 	);
 }
 
-/** Shared locale toggles for scenes that exercise translated product UI. */
+/**
+ * Shared locale toggles for scenes that exercise translated product UI. Goes
+ * through `changeAppLanguage` because only English is bundled up front: a bare
+ * `changeLanguage` switches to a catalogue nobody loaded and renders English.
+ */
 export function SceneLanguageControl() {
 	const { i18n } = useTranslation();
 
@@ -92,7 +97,7 @@ export function SceneLanguageControl() {
 					isActive={i18n.language === language}
 					key={language}
 					label={language}
-					onClick={() => void i18n.changeLanguage(language)}
+					onClick={() => void changeAppLanguage(language)}
 				/>
 			))}
 		</ControlGroup>

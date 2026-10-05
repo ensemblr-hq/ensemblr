@@ -5,7 +5,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { createStore, Provider } from 'jotai';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { ConciergeLauncher } from '@/renderer/components/concierge';
+import { ConciergeHost } from '@/renderer/components/concierge';
 import { SidebarProvider } from '@/renderer/components/ui/sidebar';
 import {
 	CONCIERGE_MIN_PANEL_SIZE,
@@ -35,7 +35,7 @@ function renderOpenPanel(store: ReturnType<typeof createStore>) {
 		<QueryClientProvider client={createTestQueryClient()}>
 			<Provider store={store}>
 				<SidebarProvider defaultOpen>
-					<ConciergeLauncher />
+					<ConciergeHost />
 				</SidebarProvider>
 			</Provider>
 		</QueryClientProvider>,

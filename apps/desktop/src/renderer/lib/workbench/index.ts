@@ -14,6 +14,7 @@ export {
 	showsComposer,
 	toComposerModelOptions,
 } from './composer';
+export { conciergeToggleHost } from './concierge-toggle-host';
 export { DEFAULT_DOCK_TAB, DEFAULT_REVIEW_TAB } from './constants';
 export {
 	getWorkspaceFileIconName,

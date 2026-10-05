@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The Concierge opens from a slim toggle row instead of a floating button.** In a workspace it sits under the terminal dock in the review rail; on every other screen, and while the rail is collapsed, it runs along the foot of the content area. It names the Concierge beside its mark, says **Working** while a turn is running, and carries the unread count. The panel still floats, drags and resizes as before.
+
 ## [0.2.3] - 2026-10-05
 
 Ensemblr 0.2.3 adds an app-wide compute queue for heavy commands, closes out a workspace when its pull request merges, scopes and filters Linear issues, and makes a Claude session's first answer arrive in seconds instead of half a minute.

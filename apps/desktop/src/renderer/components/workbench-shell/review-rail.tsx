@@ -1,6 +1,7 @@
 import { memo, type ReactNode, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ConciergeToggleRow } from '@/renderer/components/concierge';
 import {
 	ResizableHandle,
 	ResizablePanel,
@@ -13,6 +14,7 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from '@/renderer/components/ui/sheet';
+import { conciergeToggleHost } from '@/renderer/lib/workbench';
 import type { AgentsPanelNavigation } from '@/renderer/types/agents';
 import type {
 	DockTabId,
@@ -52,6 +54,11 @@ export function ReviewRailFrame({ children }: { children: ReactNode }) {
  * panel beside the content on a wide window, {@link ReviewRailSheet} over it on
  * a narrow one — so the terminals and queries inside it exist once.
  *
+ * Inline and open, the rail carries the Concierge toggle under the dock. The
+ * sheet leaves it out — it is modal, so a panel opened from inside it would open
+ * behind the overlay — and so does a collapsed rail, which stays mounted at zero
+ * width; the content column carries the toggle in both cases.
+ *
  * `onDismiss` adds the close affordance the sheet needs, since the toolbar toggle
  * that would otherwise close the rail sits behind the overlay.
  *
@@ -70,7 +77,7 @@ export const ReviewRail = memo(function ReviewRail({
 	onFileSearchOpen,
 	onReviewTabChange,
 }: ReviewRailProps & { onDismiss?: () => void }) {
-	const { actions, meta } = useWorkbenchLayout();
+	const { actions, meta, state } = useWorkbenchLayout();
 
 	return (
 		<ReviewRailFrame>
@@ -110,6 +117,7 @@ export const ReviewRail = memo(function ReviewRail({
 					/>
 				</ResizablePanel>
 			</ResizablePanelGroup>
+			{conciergeToggleHost(state) === 'rail' ? <ConciergeToggleRow /> : null}
 		</ReviewRailFrame>
 	);
 });

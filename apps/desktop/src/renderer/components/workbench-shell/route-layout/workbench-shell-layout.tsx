@@ -6,7 +6,7 @@ import {
 	githubOwnerListQuery,
 	isEnsemblrApiAvailable,
 } from '@/renderer/api/ensemblr-queries';
-import { ConciergeLauncher } from '@/renderer/components/concierge';
+import { ConciergeHost } from '@/renderer/components/concierge';
 import { CloneGithubDialog } from '@/renderer/components/welcome/clone-github-dialog';
 import { LocalProjectOpenDialog } from '@/renderer/components/welcome/local-project-open-dialog';
 import { QuickStartDialog } from '@/renderer/components/welcome/quick-start-dialog';
@@ -91,7 +91,7 @@ export function WorkbenchShellLayout() {
 						    sidebar's own expand trigger — can offer one of its own, and
 						    inside the layout model so a file the Concierge names can be
 						    opened in the workspace that holds it. */}
-						<ConciergeLauncher />
+						<ConciergeHost />
 					</WorkbenchFrame>
 				</WorkbenchLayoutModelProvider>
 				<CloneGithubDialog onOpenChange={setCloneOpen} open={cloneOpen} />
