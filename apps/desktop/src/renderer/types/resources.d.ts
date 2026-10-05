@@ -3555,6 +3555,7 @@ export default interface Resources {
 			'new-terminal': 'New terminal';
 			'script-queued': {
 				cancel: 'Cancel';
+				'cancel-failed': 'Could not cancel it. It may have already finished.';
 				detail: 'Waiting for a free compute slot. Output will appear here once it starts.';
 				initiator: {
 					agent: 'Queued by an agent';
@@ -3564,6 +3565,7 @@ export default interface Resources {
 				next: 'Next in line';
 				position: '#{{position}} in queue';
 				'start-now': 'Start now';
+				'start-now-failed': 'Could not start it now. It may have already started or been cancelled.';
 				'start-now-hint': 'Skip the queue and start it now';
 				title: {
 					run: 'Run script is queued';

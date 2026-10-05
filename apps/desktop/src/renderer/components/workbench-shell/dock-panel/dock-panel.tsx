@@ -186,8 +186,10 @@ export function DockPanel({
 				<SetupScriptOutputPanel
 					isVisible={isPaneVisible('setup')}
 					onAskAgentSetupScript={actions.onAskAgentSetupScript}
+					onCancelQueuedScript={actions.onCancelQueuedScript}
 					onOpenSetupScripts={actions.onOpenSetupScripts}
 					onRunSetupScript={actions.onRunSetupScript}
+					onStartQueuedScript={actions.onStartQueuedScript}
 					onStopSetupScript={actions.onStopSetupScript}
 					script={workspace.scripts.setup}
 					tabLabel={setupTabLabel}
@@ -202,9 +204,10 @@ export function DockPanel({
 				<RunScriptOutputPanel
 					activeRunScriptName={activeRunScript?.name ?? null}
 					isVisible={isPaneVisible('run')}
+					onCancelQueuedScript={actions.onCancelQueuedScript}
 					onOpenSetupScripts={actions.onOpenSetupScripts}
 					onRunScript={actions.onRunScript}
-					onStopRunScript={actions.onStopRunScript}
+					onStartQueuedScript={actions.onStartQueuedScript}
 					script={workspace.scripts.run}
 					tabLabel={runTabLabel}
 					workspaceCwd={workspace.pathLabel}

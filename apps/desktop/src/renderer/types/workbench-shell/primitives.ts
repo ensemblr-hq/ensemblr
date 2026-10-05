@@ -13,6 +13,12 @@ export interface WorkbenchDockActions {
 	 * the repository's `.ensemblr/settings.toml` setup script. Never auto-submits.
 	 */
 	onAskAgentSetupScript: () => void;
+	/**
+	 * Withdraws one setup or run launch from the compute queue by its job id,
+	 * touching no other launch or session; a launch granted its slot an instant
+	 * before the click is stopped, since that job is the one the user cancelled.
+	 */
+	onCancelQueuedScript: (jobId: string) => void;
 	onCloseTerminal: (terminalId: string) => void;
 	onNewTerminal: () => void;
 	/** Opens the detected dev-server preview URL in the system browser. */
@@ -24,6 +30,11 @@ export interface WorkbenchDockActions {
 	 */
 	onRunScript: (scriptName?: string) => void;
 	onRunSetupScript: () => void;
+	/**
+	 * Grants one queued setup or run launch its compute slot at once by its job
+	 * id, keeping who queued it; a launch that already left the queue is left alone.
+	 */
+	onStartQueuedScript: (jobId: string) => void;
 	onStopRunScript: () => void;
 	onStopSetupScript: () => void;
 }

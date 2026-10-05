@@ -1,12 +1,12 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 
 import { cancelComputeJob, startComputeJob } from '@/renderer/api/ensemblr';
 import { SidebarFooter } from '@/renderer/components/ui/sidebar';
 import { useWorkbenchLayoutRouteModelOptional } from '@/renderer/components/workbench-shell/shell-contexts';
 import { useConciergeFilePreview } from '@/renderer/hooks/concierge/use-concierge-file-preview';
+import { toastUnlessApplied } from '@/renderer/lib/compute-queue-actions';
 import { findWorkspaceSelectionById } from '@/renderer/lib/workbench';
 import {
 	computeQueuePanelCollapsedAtom,
@@ -15,28 +15,6 @@ import {
 import type { ComputeJobSnapshot } from '@/shared/compute-queue';
 
 import { ComputeQueuePanel } from './compute-queue-panel';
-
-/**
- * Settles a row action against the queue, toasting when the call throws or
- * the queue declines it because the job had already moved on.
- * @param applied - Resolves whether the queue carried the action out.
- * @param failureMessage - The toast shown when it did not.
- */
-function toastUnlessApplied(
-	applied: Promise<boolean>,
-	failureMessage: string,
-): void {
-	applied
-		.then((done) => {
-			if (!done) {
-				toast.error(failureMessage);
-			}
-		})
-		.catch((error: unknown) => {
-			console.error('Compute queue action failed:', error);
-			toast.error(failureMessage);
-		});
-}
 
 /**
  * The compute queue panel wired to the running app: main's snapshot, the

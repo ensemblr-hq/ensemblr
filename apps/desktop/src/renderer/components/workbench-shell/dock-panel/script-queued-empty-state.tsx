@@ -45,9 +45,11 @@ function queuedTitle(job: WorkspaceScriptQueuedJob, t: TFunction): string {
  * cannot tell a script that is coming from one that never will.
  *
  * It says why the script is waiting, where it stands in line, how long it has
- * waited, and who queued it, and offers the two ways out: Start now, which
- * launches it as the user's own and so skips the queue, and Cancel, which gives
- * up its place. The live terminal replaces it the moment the slot comes.
+ * waited, and who queued it, and offers the two ways out — the same pair the
+ * sidebar's queue row offers for this job: Start now, which grants it a slot at
+ * once, and Cancel, which gives up its place. The host binds both to this job's
+ * id, so neither can reach another launch or another script's session. The
+ * live terminal replaces the panel the moment the slot comes.
  */
 export function ScriptQueuedEmptyState({
 	job,

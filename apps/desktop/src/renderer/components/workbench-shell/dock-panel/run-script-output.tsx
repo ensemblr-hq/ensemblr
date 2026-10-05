@@ -14,10 +14,12 @@ interface RunScriptOutputPanelProps {
 	activeRunScriptName: string | null;
 	/** Whether this pane is the dock's active tab and the dock is expanded. */
 	isVisible?: boolean;
+	/** Withdraws the queued run launch with this job id. */
+	onCancelQueuedScript: (jobId: string) => void;
 	onOpenSetupScripts: () => void;
 	onRunScript: (scriptName?: string) => void;
-	/** Stops the run script, cancelling a launch still waiting in the compute queue. */
-	onStopRunScript: () => void;
+	/** Grants the queued run launch with this job id its slot at once. */
+	onStartQueuedScript: (jobId: string) => void;
 	script: WorkspaceScriptSummary;
 	/** The dock tab's own name, which names a selection attached from this pane. */
 	tabLabel: string;
@@ -32,9 +34,10 @@ interface RunScriptOutputPanelProps {
 export function RunScriptOutputPanel({
 	activeRunScriptName,
 	isVisible = true,
+	onCancelQueuedScript,
 	onOpenSetupScripts,
 	onRunScript,
-	onStopRunScript,
+	onStartQueuedScript,
 	script,
 	tabLabel,
 	workspaceCwd,
@@ -46,8 +49,8 @@ export function RunScriptOutputPanel({
 		return (
 			<ScriptQueuedEmptyState
 				job={queuedJob}
-				onCancel={onStopRunScript}
-				onStartNow={() => onRunScript(queuedJob.scriptName ?? undefined)}
+				onCancel={() => onCancelQueuedScript(queuedJob.id)}
+				onStartNow={() => onStartQueuedScript(queuedJob.id)}
 			/>
 		);
 	}

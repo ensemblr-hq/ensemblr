@@ -22,9 +22,10 @@ function renderPanel(
 	props: Partial<Parameters<typeof RunScriptOutputPanel>[0]> = {},
 ) {
 	const handlers = {
+		onCancelQueuedScript: vi.fn(),
 		onOpenSetupScripts: vi.fn(),
 		onRunScript: vi.fn(),
-		onStopRunScript: vi.fn(),
+		onStartQueuedScript: vi.fn(),
 	};
 	const script: WorkspaceScriptSummary = { status: 'stopped' };
 	renderWithProviders(
@@ -82,30 +83,33 @@ test('renders the terminal once the run script owns a session', () => {
 
 test('shows the queued panel over an earlier run while a launch waits for a slot', async () => {
 	const user = userEvent.setup();
-	const { onRunScript, onStopRunScript } = renderPanel({
-		script: {
-			queuedJob: {
-				enqueuedAt: Date.now(),
-				id: 'job-1',
-				initiator: 'agent',
-				kind: 'run',
-				position: 2,
-				scriptName: 'test',
+	const { onCancelQueuedScript, onRunScript, onStartQueuedScript } =
+		renderPanel({
+			script: {
+				queuedJob: {
+					enqueuedAt: Date.now(),
+					id: 'job-1',
+					initiator: 'agent',
+					kind: 'run',
+					position: 2,
+					scriptName: 'test',
+				},
+				status: 'stopped',
+				terminalId: 't1',
 			},
-			status: 'stopped',
-			terminalId: 't1',
-		},
-	});
+		});
 
 	expect(screen.queryByTestId('xterm')).toBeNull();
 	expect(screen.getByText('Test is queued')).toBeInTheDocument();
 	expect(screen.getByText('#2 in queue')).toBeInTheDocument();
 
 	await user.click(screen.getByRole('button', { name: 'Start now' }));
-	expect(onRunScript).toHaveBeenCalledWith('test');
+	expect(onStartQueuedScript).toHaveBeenCalledWith('job-1');
 
 	await user.click(screen.getByRole('button', { name: 'Cancel' }));
-	expect(onStopRunScript).toHaveBeenCalledTimes(1);
+	expect(onCancelQueuedScript).toHaveBeenCalledWith('job-1');
+
+	expect(onRunScript).not.toHaveBeenCalled();
 });
 
 test('floats the password field over the pane only while the script is asking', () => {
@@ -134,8 +138,9 @@ test('drops a half-typed password when the prompt changes', async () => {
 		<RunScriptOutputPanel
 			activeRunScriptName='dev'
 			onOpenSetupScripts={vi.fn()}
+			onCancelQueuedScript={vi.fn()}
 			onRunScript={vi.fn()}
-			onStopRunScript={vi.fn()}
+			onStartQueuedScript={vi.fn()}
 			script={{ secretPrompt, status: 'running', terminalId: 't1' }}
 			tabLabel='Run'
 			workspaceCwd='/repo'

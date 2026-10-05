@@ -15,8 +15,12 @@ interface SetupScriptOutputPanelProps {
 	/** Whether this pane is the dock's active tab and the dock is expanded. */
 	isVisible?: boolean;
 	onAskAgentSetupScript: () => void;
+	/** Withdraws the queued setup launch with this job id. */
+	onCancelQueuedScript: (jobId: string) => void;
 	onOpenSetupScripts: () => void;
 	onRunSetupScript: () => void;
+	/** Grants the queued setup launch with this job id its slot at once. */
+	onStartQueuedScript: (jobId: string) => void;
 	onStopSetupScript: () => void;
 	script: WorkspaceScriptSummary;
 	/** The dock tab's own name, which names a selection attached from this pane. */
@@ -32,13 +36,17 @@ interface SetupScriptOutputPanelProps {
 export function SetupScriptOutputPanel({
 	isVisible = true,
 	onAskAgentSetupScript,
+	onCancelQueuedScript,
 	onOpenSetupScripts,
 	onRunSetupScript,
+	onStartQueuedScript,
 	onStopSetupScript,
 	script,
 	tabLabel,
 	workspaceCwd,
 }: SetupScriptOutputPanelProps) {
+	const { queuedJob } = script;
+
 	if (script.status === 'missing') {
 		return (
 			<SetupMissingEmptyState
@@ -48,12 +56,12 @@ export function SetupScriptOutputPanel({
 		);
 	}
 
-	if (script.queuedJob) {
+	if (queuedJob) {
 		return (
 			<ScriptQueuedEmptyState
-				job={script.queuedJob}
-				onCancel={onStopSetupScript}
-				onStartNow={onRunSetupScript}
+				job={queuedJob}
+				onCancel={() => onCancelQueuedScript(queuedJob.id)}
+				onStartNow={() => onStartQueuedScript(queuedJob.id)}
 			/>
 		);
 	}
