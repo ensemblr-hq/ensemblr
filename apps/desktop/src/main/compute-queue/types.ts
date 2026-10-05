@@ -106,8 +106,9 @@ export interface ComputeJobFilter {
  * The app-wide queue every heavy agent command waits in. One instance serves
  * every workspace: it grants at most `concurrency` slots at a time (read live
  * from settings), round-robins across workspaces so one burst cannot starve the
- * rest, and lets a user-started script take a slot at once even over the limit.
- * Disabled in settings, it grants everything immediately.
+ * rest, and lets a user-started script — or a queued job the user starts by
+ * hand — take a slot at once even over the limit. Disabled in settings, it
+ * grants everything immediately.
  */
 export interface ComputeQueueService {
 	/** Claims a slot for a repository script; see {@link ScriptLease}. */
@@ -148,6 +149,15 @@ export interface ComputeQueueService {
 	shutdown: () => Promise<void>;
 	/** The queue as it stands now. */
 	snapshot: () => ComputeQueueSnapshot;
+	/**
+	 * Grants a queued job its slot at once, above the limit if every slot is
+	 * busy, the way a user-started script takes one. It counts as its
+	 * workspace's latest grant, so the round-robin serves the other workspaces
+	 * before that workspace's next job. The job keeps its initiator, so an
+	 * agent's command still reads as the agent's. False when unknown, no longer
+	 * queued, or the queue is shutting down.
+	 */
+	startNow: (jobId: string) => boolean;
 	/** Waits until every named job finishes, the timeout passes, or the signal aborts. */
 	waitFor: (
 		jobIds: readonly string[],

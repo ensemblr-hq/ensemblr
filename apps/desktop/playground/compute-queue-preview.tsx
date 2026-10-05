@@ -63,6 +63,7 @@ function FixtureRow({
 				onCancel={() => undefined}
 				onCollapsedChange={setCollapsed}
 				onOpenLog={() => undefined}
+				onStartNow={() => undefined}
 				snapshot={snapshot}
 				workspaceOpener={INERT_WORKSPACE_OPENER}
 			/>
@@ -100,7 +101,7 @@ function InteractiveRow() {
 				</div>
 			}
 			label='interactive'
-			note='collapse, cancel, stop, open a log, or open a workspace — the actions are live here'
+			note='collapse, start now, cancel, stop, open a log, or open a workspace — the actions are live here'
 		>
 			<ComputeQueuePanel
 				collapsed={collapsed}
@@ -110,6 +111,10 @@ function InteractiveRow() {
 				}}
 				onCollapsedChange={setCollapsed}
 				onOpenLog={(job) => setLastAction(`open log ${job.logPath ?? ''}`)}
+				onStartNow={(jobId) => {
+					setSnapshot((current) => withJobStarted(current, jobId));
+					setLastAction(`start now ${jobId}`);
+				}}
 				snapshot={snapshot}
 				workspaceOpener={(job) => () =>
 					setLastAction(`open workspace ${job.workspaceName ?? ''}`)
@@ -145,6 +150,32 @@ function withoutJob(
 		...snapshot,
 		inUse: jobs.filter((entry) => entry.state === 'running').length,
 		jobs,
+	};
+}
+
+/**
+ * Starts a queued job the way main would report it: running at once, over the
+ * slot limit if every slot is busy, with the line behind it moving up a place.
+ * @param snapshot - The queue before the start
+ * @param jobId - The queued job being started now
+ * @returns The queue after it
+ */
+function withJobStarted(
+	snapshot: ComputeQueueSnapshot,
+	jobId: string,
+): ComputeQueueSnapshot {
+	const started = snapshot.jobs.find((entry) => entry.id === jobId);
+	if (started?.state !== 'queued') {
+		return snapshot;
+	}
+	const rest = withoutJob(snapshot, jobId);
+	return {
+		...rest,
+		inUse: rest.inUse + 1,
+		jobs: [
+			...rest.jobs,
+			{ ...started, position: null, startedAt: Date.now(), state: 'running' },
+		],
 	};
 }
 

@@ -18,6 +18,7 @@ import {
 	refreshAgentPlanUsageRequestSchema,
 	resumeAgentHarnessRequestSchema,
 	setInfisicalLinkRequestSchema,
+	startComputeJobRequestSchema,
 } from '../../src/main/ipc/request-schemas.ts';
 
 test('openChatTabRequestSchema accepts the terminal tab kind', () => {
@@ -488,6 +489,14 @@ test('cancelComputeJobRequestSchema requires a non-empty job id', () => {
 	});
 	expect(() => cancelComputeJobRequestSchema.parse({ jobId: '' })).toThrow();
 	expect(() => cancelComputeJobRequestSchema.parse({})).toThrow();
+});
+
+test('startComputeJobRequestSchema requires a non-empty job id', () => {
+	expect(startComputeJobRequestSchema.parse({ jobId: 'job-1' })).toEqual({
+		jobId: 'job-1',
+	});
+	expect(() => startComputeJobRequestSchema.parse({ jobId: '' })).toThrow();
+	expect(() => startComputeJobRequestSchema.parse({})).toThrow();
 });
 
 test.each(['not-started', 'started'] as const)(

@@ -513,6 +513,20 @@ export function createComputeQueueService(
 	}
 
 	/**
+	 * Starts one queued job now; see {@link ComputeQueueService.startNow}.
+	 * @param id - Job id.
+	 * @returns False when the job is unknown, no longer queued, or the queue is shutting down.
+	 */
+	function startNow(id: string): boolean {
+		if (shutdownPromise !== null || records.get(id)?.state !== 'queued') {
+			return false;
+		}
+		grant(id);
+		emit();
+		return true;
+	}
+
+	/**
 	 * Cancels every unfinished job matching a predicate. One job whose cancel
 	 * throws is logged and skipped, so it cannot spare the rest.
 	 * @param matches - Selects the jobs to cancel.
@@ -709,6 +723,7 @@ export function createComputeQueueService(
 			cancelWhere((record) => record.workspaceId === workspaceId),
 		shutdown,
 		snapshot: () => snapshot(),
+		startNow,
 		waitFor: (jobIds, waitOptions) =>
 			waiters.add(
 				jobIds.filter((id) => records.has(id)),

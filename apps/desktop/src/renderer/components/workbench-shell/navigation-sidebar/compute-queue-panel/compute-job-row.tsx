@@ -1,5 +1,11 @@
 import type { TFunction } from 'i18next';
-import { FileTextIcon, HourglassIcon, SquareIcon, XIcon } from 'lucide-react';
+import {
+	FileTextIcon,
+	HourglassIcon,
+	PlayIcon,
+	SquareIcon,
+	XIcon,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/renderer/components/ui/button';
@@ -25,6 +31,8 @@ const ELAPSED_TICK_MS = 1000;
 export interface ComputeJobRowActions {
 	onCancel: (jobId: string) => void;
 	onOpenLog: (job: ComputeJobSnapshot) => void;
+	/** Starts a queued job now instead of waiting for a free slot. */
+	onStartNow: (jobId: string) => void;
 	/**
 	 * Resolves how to open a job's workspace, or null when it cannot be opened
 	 * from here — no workspace route to move to, or a workspace the route does
@@ -78,7 +86,8 @@ function jobTitle(job: ComputeJobSnapshot, t: TFunction): string {
  * would otherwise hold. The full command is in the title's tooltip because the
  * row truncates the title and a script's title hides it entirely. A running
  * job offers Stop and a queued one Cancel, so the control says whether it ends
- * work in progress or only gives up a place in line.
+ * work in progress or only gives up a place in line. A queued job also offers
+ * Start now, for when the user would rather not wait for a slot.
  */
 export function ComputeJobRow({
 	actions,
@@ -139,30 +148,62 @@ export function ComputeJobRow({
 					<InitiatorLabel initiator={job.initiator} />
 				</div>
 			</div>
-			<div className='absolute inset-y-0 right-0 flex items-center gap-0.5 rounded-r-md bg-sidebar-accent pr-1 opacity-0 transition-opacity before:pointer-events-none before:absolute before:inset-y-0 before:right-full before:w-4 before:bg-linear-to-r before:from-transparent before:to-sidebar-accent has-focus-visible:opacity-100 group-hover/compute-job:opacity-100'>
-				{job.kind === 'command' && job.logPath ? (
+			<JobActions actions={actions} job={job} title={title} />
+		</li>
+	);
+}
+
+/**
+ * The row's hover-revealed controls: an open-log for a command job that has a
+ * log, Stop for a running job, and Start now beside Cancel for a queued one.
+ */
+function JobActions({
+	actions,
+	job,
+	title,
+}: {
+	actions: ComputeJobRowActions;
+	job: ComputeJobSnapshot;
+	title: string;
+}) {
+	const { t } = useTranslation();
+
+	return (
+		<div className='absolute inset-y-0 right-0 flex items-center gap-0.5 rounded-r-md bg-sidebar-accent pr-1 opacity-0 transition-opacity before:pointer-events-none before:absolute before:inset-y-0 before:right-full before:w-4 before:bg-linear-to-r before:from-transparent before:to-sidebar-accent group-hover/compute-job:opacity-100 has-focus-visible:opacity-100'>
+			{job.kind === 'command' && job.logPath ? (
+				<RowAction
+					label={t(
+						'workbench:navigation-sidebar.compute-queue.open-log',
+						'Open log',
+					)}
+					onClick={() => actions.onOpenLog(job)}
+				>
+					<FileTextIcon />
+				</RowAction>
+			) : null}
+			{job.state === 'running' ? (
+				<RowAction
+					label={t(
+						'workbench:navigation-sidebar.compute-queue.stop',
+						'Stop {{label}}',
+						{ label: title },
+					)}
+					onClick={() => actions.onCancel(job.id)}
+				>
+					<SquareIcon />
+				</RowAction>
+			) : (
+				<>
 					<RowAction
 						label={t(
-							'workbench:navigation-sidebar.compute-queue.open-log',
-							'Open log',
-						)}
-						onClick={() => actions.onOpenLog(job)}
-					>
-						<FileTextIcon />
-					</RowAction>
-				) : null}
-				{running ? (
-					<RowAction
-						label={t(
-							'workbench:navigation-sidebar.compute-queue.stop',
-							'Stop {{label}}',
+							'workbench:navigation-sidebar.compute-queue.start-now',
+							'Start {{label}} now',
 							{ label: title },
 						)}
-						onClick={() => actions.onCancel(job.id)}
+						onClick={() => actions.onStartNow(job.id)}
 					>
-						<SquareIcon />
+						<PlayIcon />
 					</RowAction>
-				) : (
 					<RowAction
 						label={t(
 							'workbench:navigation-sidebar.compute-queue.cancel',
@@ -173,9 +214,9 @@ export function ComputeJobRow({
 					>
 						<XIcon />
 					</RowAction>
-				)}
-			</div>
-		</li>
+				</>
+			)}
+		</div>
 	);
 }
 

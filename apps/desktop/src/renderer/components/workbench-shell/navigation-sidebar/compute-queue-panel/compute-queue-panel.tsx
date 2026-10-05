@@ -60,8 +60,9 @@ interface ComputeQueuePanelProps extends ComputeJobRowActions {
 /**
  * The sidebar's view of the app-wide compute queue: the commands and scripts
  * every workspace has waiting for or holding a slot, with a stop or cancel on
- * each. It is a sidebar section rather than a card, so the rows run the full
- * width of the column and line up with the workspace list above them.
+ * each and a start-now on every waiting one. It is a sidebar section rather
+ * than a card, so the rows run the full width of the column and line up with
+ * the workspace list above them.
  *
  * The whole header is the disclosure control. Collapsed, it carries the
  * running/queued counts the hidden rows would have shown, the way a collapsed
@@ -174,7 +175,8 @@ function QueueCounts({ queued, running }: { queued: number; running: number }) {
  * Slots in use against the configured count, as a bare ratio: the header is
  * the queue's, so the unit goes without saying, and the tooltip and the
  * screen-reader text spell it out. The count can run past the limit because a
- * script the user starts takes a slot at once rather than waiting behind agents.
+ * script the user starts, or a queued job the user starts now, takes a slot at
+ * once rather than waiting behind agents.
  */
 function SlotUsage({ inUse, slots }: { inUse: number; slots: number }) {
 	const { t } = useTranslation();
@@ -202,7 +204,7 @@ function SlotUsage({ inUse, slots }: { inUse: number; slots: number }) {
 			<TooltipContent className='max-w-64'>
 				{t(
 					'workbench:navigation-sidebar.compute-queue.slots-explainer',
-					'Slots in use out of the total. Heavy commands wait for a free slot; a script you start yourself takes one at once, even when all are busy.',
+					'Slots in use out of the total. Heavy commands wait for a free slot; a script you start yourself, or a queued job you start now, takes one at once, even when all are busy.',
 				)}
 			</TooltipContent>
 		</Tooltip>
