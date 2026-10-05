@@ -37,19 +37,20 @@ inside the app.
   downscaled to 1600px wide, which is where its softness came from.
 - **2992×1866 is the ceiling, and it is a hardware one.** The capture is the
   window server's own pixels, so the resolution is the window's point size times
-  the display's backing scale — 1496×933 at 2× on a 3024×1964 panel. A window
-  cannot be sized past the desktop it lives on, and forcing a higher device scale
-  factor only makes Chromium rasterize into a surface the compositor still shows
-  at 2×. To go higher, capture on a display with a larger backing store; there is
-  no software lever.
+  the display's backing scale — 1496×933 at 2×. The demo window is allowed to
+  open larger than the desktop it lives on (`enableLargerThanScreen` in
+  `demo/demo-main.ts`), so a 1440×900 display still shoots 2992×1866 rather than
+  a clamped 2880×1740; what no setting moves is the 2× scale. Forcing a higher
+  device scale factor only makes Chromium rasterize into a surface the
+  compositor still shows at 2×. To go higher, capture on a display with a larger
+  backing store; there is no software lever.
 - **Budget: 600 KB per image, 9 MB for this directory.** The set in place is
-  9.3 MB across twenty-five shots, averaging 373 KB — roughly ten times what
+  8.8 MB across twenty-five shots, averaging 352 KB — roughly ten times what
   the downscaled set cost, for four times the pixels and no lossy step. The
-  Agents panel shot is the heaviest at 593 KB, with the two create-workspace
-  dialogs close behind at 578 KB and 560 KB, because a long list of distinct
-  rows is the worst case for PNG. The set is already past the directory
-  budget, so the next shot added has to come with an existing one dropped to
-  pay for it.
+  two create-workspace dialogs are the heaviest at 548 KB and 531 KB, because
+  a long list of distinct rows is the worst case for PNG. That leaves about
+  190 KB of headroom, less than one average shot, so the next shot added has
+  to come with an existing one dropped to pay for it.
 
 ### Processing a raw capture
 
@@ -58,11 +59,14 @@ quantization step, because a 256-colour palette is exactly the kind of softening
 these shots are meant not to have.
 
 ```sh
-oxipng -o 4 --strip safe -q <target>.png
+oxipng -o 4 -Z --strip safe -q <target>.png
 ```
 
 Copy the raw capture to its target name first — `oxipng` rewrites in place. That
-takes a ~680 KB capture to roughly 370 KB with every pixel intact. If the
+takes a ~800 KB capture to roughly 420 KB with every pixel intact. `-Z` swaps in
+the Zopfli deflater: still lossless, about 3% smaller than `-o 4` alone, at
+about a minute and a half per shot, so run a batch through `xargs -P 4`. The
+settings and onboarding shots predate it and were processed without it. If the
 directory ever runs past its budget, drop a shot rather than quantizing the set:
 `pngquant --quality 90-100` halves the size at an RMSE of 0.5%, which is
 invisible in isolation and visible when a reader flips between two images

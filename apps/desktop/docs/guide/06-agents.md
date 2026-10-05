@@ -171,7 +171,7 @@ It runs on the same two runtimes as everything else â€” **Pi or Claude Code** â€
 carries the Ensemblr Control tools, on a playbook written for supervising rather
 than for doing the work.
 
-![The Concierge panel floating over the dashboard board, answering a question about where every workspace stands with project and workspace names rendered as chips.](./images/06-concierge.png)
+![The Concierge panel floating over the dashboard board, answering a question about where every workspace stands with project and workspace names rendered as chips, with the Concierge toggle lit in the bottom-right corner beneath it.](./images/06-concierge.png)
 
 ### It reads everywhere and writes in one place
 

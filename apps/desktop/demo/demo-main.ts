@@ -54,13 +54,16 @@ function readRendererUrl(): string {
 /**
  * Creates the demo window with the same chrome options the real app constructs
  * its window with, so the traffic lights, the corner radius, and the content
- * insets are the shipped ones rather than an approximation.
+ * insets are the shipped ones rather than an approximation. It may open larger
+ * than the desktop, because macOS otherwise clamps it to the screen and a
+ * display smaller than the scenario's window would shoot every scenario short.
  * @returns The demo window.
  */
 function createDemoWindow(): BrowserWindow {
 	const window = new BrowserWindow({
 		...resolveWindowChromeOptions(process.platform, 'system'),
 		backgroundColor: '#0b0808',
+		enableLargerThanScreen: true,
 		height: 933,
 		show: false,
 		title: DEMO_APP_NAME,
