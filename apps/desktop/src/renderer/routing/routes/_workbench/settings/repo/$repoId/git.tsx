@@ -1,6 +1,8 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { Trans, useTranslation } from 'react-i18next';
 
+import { ensemblrQueryKeys } from '@/renderer/api/ensemblr';
 import { BranchPicker } from '@/renderer/components/git/branch-picker';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
@@ -36,7 +38,7 @@ export const Route = createFileRoute('/_workbench/settings/repo/$repoId/git')({
 	component: RepoGitSettings,
 });
 
-/** Repository-scoped Git settings panel for branch-from, remote origin, and archive defaults that override user-scope git settings. */
+/** Repository-scoped Git settings panel for branch-from, archive defaults that override user-scope git settings, and which repository's issues to list. */
 function RepoGitSettings() {
 	const { t } = useTranslation();
 	const { repoId } = Route.useParams();
@@ -103,6 +105,12 @@ function RepoGitSettings() {
 				onReset={() => save({ archiveAfterMerge: null })}
 			/>
 
+			<UpstreamIssuesSetting
+				repoId={repoId}
+				resolved={resolved('showUpstreamIssues')}
+				save={save}
+			/>
+
 			<p className='py-3 text-muted-foreground text-xs'>
 				<Trans
 					components={{ file: <code className='font-mono' /> }}
@@ -111,6 +119,53 @@ function RepoGitSettings() {
 				/>
 			</p>
 		</SettingsSection>
+	);
+}
+
+/**
+ * Repo-scoped switch between a fork's own GitHub issues and its upstream's.
+ * Flipping it re-lists the repository's issues: the lists already loaded belong
+ * to the repository they were read from, and main re-reads GitHub for the other.
+ */
+function UpstreamIssuesSetting({
+	repoId,
+	resolved,
+	save,
+}: {
+	repoId: string;
+	resolved: ResolvedSettingSnapshot | undefined;
+	save: (patch: RepositorySettingsPatch) => Promise<void>;
+}) {
+	const { t } = useTranslation();
+	const queryClient = useQueryClient();
+	const saveAndRelist = async (showUpstreamIssues: boolean | null) => {
+		await save({ showUpstreamIssues });
+		await queryClient.invalidateQueries({
+			queryKey: ensemblrQueryKeys.repositoryIssuesAll(repoId),
+		});
+	};
+
+	return (
+		<SettingRow
+			control={
+				<Switch
+					checked={resolved?.value === true}
+					onCheckedChange={(checked) => saveAndRelist(checked)}
+				/>
+			}
+			description={t(
+				'settings:repo.upstream-issues.description',
+				"For a fork, list the upstream repository's GitHub issues on the board and in issue pickers instead of the fork's own.",
+			)}
+			label={
+				<span className='flex items-center gap-2'>
+					{t('settings:repo.upstream-issues.label', 'Show upstream issues')}
+					<SourceBadge source={resolved?.source} />
+				</span>
+			}
+			modified={isPersonalOverride(resolved)}
+			onReset={() => saveAndRelist(null)}
+		/>
 	);
 }
 

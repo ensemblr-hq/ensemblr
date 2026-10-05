@@ -152,7 +152,9 @@ In Review and you decide whether it is done. See
 
 Backlog holds more than workspaces. It also carries **tracker issues nothing has
 been started from** — unstarted Linear issues from every connected account, and
-open GitHub issues nobody is assigned to. An issue card is not a workspace;
+open GitHub issues nobody is assigned to — a fork's own, not its upstream's,
+unless the repository turns on **Show upstream issues** (see
+[12. Repository settings](./12-repository-settings.md#git)). An issue card is not a workspace;
 **dragging one rightward is what creates the workspace from it**, with the same
 naming, branch, and seeded prompt the Issues tab of the create dialog produces.
 

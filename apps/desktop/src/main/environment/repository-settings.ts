@@ -15,8 +15,8 @@ interface UpsertRepositorySettingsInput {
 /**
  * Persists a repository's personal settings patch as repository-scoped SQLite
  * rows the settings resolver reads verbatim (`branchFrom`, `remoteOrigin`,
- * `deleteLocalBranchOnArchive`, `archiveAfterMerge`, `filesToCopy`,
- * `previewUrls`, `security.permissionMode`). An omitted field is left
+ * `deleteLocalBranchOnArchive`, `archiveAfterMerge`, `showUpstreamIssues`,
+ * `filesToCopy`, `previewUrls`, `security.permissionMode`). An omitted field is left
  * untouched; an explicit `null` (or a
  * blank string / empty list) deletes its row so the value falls back to
  * `.ensemblr/settings.toml`, user defaults, then the built-in default. All rows
@@ -55,6 +55,12 @@ export function upsertRepositorySettings({
 			key: 'archiveAfterMerge',
 			scope,
 			value: settings.archiveAfterMerge,
+		});
+		setBooleanSetting({
+			database,
+			key: 'showUpstreamIssues',
+			scope,
+			value: settings.showUpstreamIssues,
 		});
 		setListSetting({
 			database,

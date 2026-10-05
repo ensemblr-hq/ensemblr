@@ -98,6 +98,10 @@
 				"set_upstream_on_push": {
 					"type": "boolean",
 					"description": "Configure new workspaces so a plain `git push` sets the branch upstream."
+				},
+				"show_upstream_issues": {
+					"type": "boolean",
+					"description": "List GitHub issues from the repository `gh` resolves for the checkout (a fork's upstream) instead of the one `origin` points at."
 				}
 			}
 		},

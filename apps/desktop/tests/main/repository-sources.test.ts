@@ -13,6 +13,10 @@ import {
 	parsePullRequests,
 } from '../../src/main/repository/repository-sources-service.ts';
 import type { EnsemblrDatabaseService } from '../../src/main/storage';
+import type {
+	SettingsResolutionRequest,
+	SettingsResolutionSnapshot,
+} from '../../src/shared/ipc/contracts/settings-resolution.ts';
 
 const fixedNow = () => new Date('2026-06-07T12:00:00.000Z');
 
@@ -97,6 +101,7 @@ const CACHED_ISSUE = {
  */
 function fakeDatabaseServiceWithCache(cached: {
 	issues: unknown[];
+	repository?: string | null;
 	syncedAt: string;
 }): EnsemblrDatabaseService {
 	const database = {
@@ -112,6 +117,44 @@ function fakeDatabaseServiceWithCache(cached: {
 	return {
 		getConnection: () => ({ database }),
 	} as unknown as EnsemblrDatabaseService;
+}
+
+/** A resolved-settings snapshot carrying only `showUpstreamIssues`. */
+function settingsWithUpstreamIssues(
+	value: boolean,
+): SettingsResolutionSnapshot {
+	return {
+		app: { diagnostics: [], settings: [] },
+		repository: {
+			diagnostics: [],
+			settings: [
+				{
+					candidates: [],
+					key: 'showUpstreamIssues',
+					locked: false,
+					source: 'sqlite',
+					value,
+				},
+			],
+		},
+	};
+}
+
+/** The `gh` invocations among a stub's recorded calls. */
+function ghCalls(calls: LocalCommandRequest[]): LocalCommandRequest[] {
+	return calls.filter((call) => call.command === 'gh');
+}
+
+/**
+ * A command stub for a checkout whose `origin` is `originUrl`: `git remote
+ * get-url` answers with it, and every `gh` call lists no issues.
+ */
+function stubCheckoutWithOrigin(originUrl: string) {
+	return stubCommandService((request) =>
+		request.command === 'git'
+			? buildResult('git', { status: 'success', stdout: `${originUrl}\n` })
+			: buildResult('gh', { status: 'success', stdout: '[]' }),
+	);
 }
 
 test('parseBranches reads the default branch and sorts names newest-commit-first', () => {
@@ -483,8 +526,8 @@ test('listIssues serves a fresh cache without a staleError', async () => {
 
 	assert.equal(result.status, 'ok');
 	assert.equal(result.status === 'ok' && result.staleError, undefined);
-	// A fresh cache answers without shelling out at all.
-	assert.equal(calls.length, 0);
+	// A fresh cache answers without asking GitHub at all.
+	assert.equal(ghCalls(calls).length, 0);
 });
 
 test('listIssues asks gh for unassigned issues only when the board asks', async () => {
@@ -500,8 +543,174 @@ test('listIssues asks gh for unassigned issues only when the board asks', async 
 	await service.listIssues({ repositoryId: 'repo-1', unassignedOnly: true });
 	await service.listIssues({ repositoryId: 'repo-1' });
 
-	assert.deepEqual(calls[0]?.args?.slice(-2), ['--search', 'no:assignee']);
-	assert.equal(calls[1]?.args?.includes('--search'), false);
+	const [unassigned, all] = ghCalls(calls);
+	assert.deepEqual(unassigned?.args?.slice(-2), ['--search', 'no:assignee']);
+	assert.equal(all?.args?.includes('--search'), false);
+});
+
+// `gh repo clone` of a fork adds the parent as `upstream` and marks it as gh's
+// resolved base, so an implicit `gh issue list` in the fork's checkout read the
+// upstream project's issues onto the fork's dashboard board.
+test('listIssues lists the issues of the repository origin points at', async () => {
+	const { calls, service: commandService } = stubCheckoutWithOrigin(
+		'git@github.com:octocat/Solaar.git',
+	);
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseService([]),
+		localCommandService: commandService,
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	await service.listIssues({ repositoryId: 'repo-1', unassignedOnly: true });
+
+	assert.deepEqual(calls[0]?.args, ['remote', 'get-url', 'origin']);
+	assert.equal(calls[0]?.cwd, '/repo');
+	const [list] = ghCalls(calls);
+	assert.deepEqual(list?.args?.slice(0, 4), [
+		'issue',
+		'list',
+		'--repo',
+		'octocat/Solaar',
+	]);
+});
+
+test('listIssues leaves the repository to gh when origin is not on github.com', async () => {
+	const { calls, service: commandService } = stubCheckoutWithOrigin(
+		'https://gitlab.com/octocat/Solaar.git',
+	);
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseService([]),
+		localCommandService: commandService,
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	await service.listIssues({ repositoryId: 'repo-1' });
+
+	const [list] = ghCalls(calls);
+	assert.equal(list?.args?.includes('--repo'), false);
+});
+
+// Rows cached before issues were pinned to `origin` came from gh's own
+// resolution — for a fork, the parent's issues — and must not be served as the
+// fork's list even while they are fresh.
+test('listIssues refreshes a cache listed from another repository', async () => {
+	const { calls, service: commandService } = stubCheckoutWithOrigin(
+		'https://github.com/octocat/Solaar.git',
+	);
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseServiceWithCache({
+			issues: [CACHED_ISSUE],
+			syncedAt: new Date().toISOString(),
+		}),
+		localCommandService: commandService,
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	const result = await service.listIssues({ repositoryId: 'repo-1' });
+
+	assert.equal(ghCalls(calls).length, 1);
+	assert.equal(result.status === 'ok' && result.source, 'remote');
+	assert.equal(result.issues.length, 0);
+});
+
+test('listIssues does not fall back to a cache listed from another repository', async () => {
+	const { service: commandService } = stubCommandService((request) =>
+		request.command === 'git'
+			? buildResult('git', {
+					status: 'success',
+					stdout: 'https://github.com/octocat/Solaar.git\n',
+				})
+			: buildResult('gh', {
+					failure: {
+						code: 'nonzero-exit',
+						exitCode: 1,
+						message: 'network',
+						signal: null,
+					},
+					status: 'failure',
+					stderr: 'error connecting to api.github.com',
+				}),
+	);
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseServiceWithCache({
+			issues: [CACHED_ISSUE],
+			repository: 'pwr-Solaar/Solaar',
+			syncedAt: '2020-01-01T00:00:00.000Z',
+		}),
+		localCommandService: commandService,
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	const result = await service.listIssues({ repositoryId: 'repo-1' });
+
+	assert.equal(result.status, 'error');
+	assert.equal(result.issues.length, 0);
+});
+
+test('listIssues leaves the repository to gh when the repository shows upstream issues', async () => {
+	const { calls, service: commandService } = stubCheckoutWithOrigin(
+		'git@github.com:octocat/Solaar.git',
+	);
+	const settingsRequests: SettingsResolutionRequest[] = [];
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseService([]),
+		localCommandService: commandService,
+		readRepositorySettings: (request) => {
+			settingsRequests.push(request);
+			return settingsWithUpstreamIssues(true);
+		},
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	await service.listIssues({ repositoryId: 'repo-1', unassignedOnly: true });
+
+	assert.deepEqual(settingsRequests, [
+		{ repository: { repositoryId: 'repo-1', repositoryPath: '/repo' } },
+	]);
+	assert.equal(
+		calls.some((call) => call.command === 'git'),
+		false,
+	);
+	const [list] = ghCalls(calls);
+	assert.equal(list?.args?.includes('--repo'), false);
+});
+
+test('listIssues keeps to origin while upstream issues are off', async () => {
+	const { calls, service: commandService } = stubCheckoutWithOrigin(
+		'git@github.com:octocat/Solaar.git',
+	);
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseService([]),
+		localCommandService: commandService,
+		readRepositorySettings: () => settingsWithUpstreamIssues(false),
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	await service.listIssues({ repositoryId: 'repo-1' });
+
+	const [list] = ghCalls(calls);
+	assert.deepEqual(list?.args?.slice(2, 4), ['--repo', 'octocat/Solaar']);
+});
+
+test('listIssues serves a fresh cache listed from the same repository', async () => {
+	const { calls, service: commandService } = stubCheckoutWithOrigin(
+		'https://github.com/octocat/Solaar.git',
+	);
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseServiceWithCache({
+			issues: [CACHED_ISSUE],
+			repository: 'octocat/Solaar',
+			syncedAt: new Date().toISOString(),
+		}),
+		localCommandService: commandService,
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	const result = await service.listIssues({ repositoryId: 'repo-1' });
+
+	assert.equal(ghCalls(calls).length, 0);
+	assert.equal(result.status === 'ok' && result.source, 'cache');
+	assert.equal(result.issues.length, 1);
 });
 
 // `gh issue list` exits 1 on a repository whose issues are turned off, but the

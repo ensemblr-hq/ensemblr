@@ -902,6 +902,10 @@
 			"label": "Скрипт настройки",
 			"placeholder": "например, npm ci"
 		},
+		"upstream-issues": {
+			"description": "Для fork показывать на доске и в выборе задач задачи GitHub из upstream-репозитория, а не задачи самого fork.",
+			"label": "Показывать задачи из upstream"
+		},
 		"workspace-target": {
 			"placeholder": "Выберите рабочее пространство"
 		},

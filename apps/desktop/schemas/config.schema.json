@@ -580,6 +580,11 @@
 					"default": null,
 					"description": "Remote Ensemblr treats as origin."
 				},
+				"showUpstreamIssues": {
+					"type": "boolean",
+					"default": false,
+					"description": "List GitHub issues from the repository `gh` resolves for the checkout (a fork's upstream) instead of the one `origin` points at."
+				},
 				"runScriptMode": {
 					"type": "string",
 					"enum": ["concurrent", "nonconcurrent"],

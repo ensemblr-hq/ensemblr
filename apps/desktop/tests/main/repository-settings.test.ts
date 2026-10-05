@@ -72,6 +72,7 @@ test('upsertRepositorySettings persists rows the resolver reads as sqlite', (t) 
 			filesToCopy: ['.env', 'config/*.json'],
 			previewUrls: [{ name: 'Dev', url: 'http://localhost:3000' }],
 			remoteOrigin: 'upstream',
+			showUpstreamIssues: true,
 		},
 	});
 
@@ -85,6 +86,7 @@ test('upsertRepositorySettings persists rows the resolver reads as sqlite', (t) 
 			filesToCopy: resolved('filesToCopy')?.value,
 			previewUrls: resolved('previewUrls')?.value,
 			remoteOrigin: resolved('remoteOrigin')?.value,
+			showUpstreamIssues: resolved('showUpstreamIssues')?.value,
 			source: resolved('branchFrom')?.source,
 		},
 		{
@@ -94,8 +96,30 @@ test('upsertRepositorySettings persists rows the resolver reads as sqlite', (t) 
 			filesToCopy: ['.env', 'config/*.json'],
 			previewUrls: [{ name: 'Dev', url: 'http://localhost:3000' }],
 			remoteOrigin: 'upstream',
+			showUpstreamIssues: true,
 			source: 'sqlite',
 		},
+	);
+});
+
+test('showUpstreamIssues resolves off until a repository turns it on', (t) => {
+	const database = createDatabaseFixture(t);
+
+	const before = resolvedRepository(database)('showUpstreamIssues');
+	upsertRepositorySettings({
+		database,
+		repositoryId: REPO_ID,
+		settings: { showUpstreamIssues: true },
+	});
+	const after = resolvedRepository(database)('showUpstreamIssues');
+
+	assert.deepEqual(
+		{ source: before?.source, value: before?.value },
+		{ source: 'built-in-default', value: false },
+	);
+	assert.deepEqual(
+		{ source: after?.source, value: after?.value },
+		{ source: 'sqlite', value: true },
 	);
 });
 

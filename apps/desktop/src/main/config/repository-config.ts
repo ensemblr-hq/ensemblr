@@ -88,6 +88,7 @@ const GIT_FIELD_MAP: ReadonlyMap<
 	],
 	['archive_after_merge', { key: 'archiveAfterMerge', type: 'boolean' }],
 	['set_upstream_on_push', { key: 'setUpstreamOnPush', type: 'boolean' }],
+	['show_upstream_issues', { key: 'showUpstreamIssues', type: 'boolean' }],
 ]);
 
 /**

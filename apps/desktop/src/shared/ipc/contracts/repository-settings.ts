@@ -23,6 +23,11 @@ export interface RepositorySettingsPatch {
 	permissionMode?: PermissionMode | null;
 	previewUrls?: RepositoryPreviewUrl[] | null;
 	remoteOrigin?: string | null;
+	/**
+	 * List issues from the repository `gh` resolves for the checkout — a fork's
+	 * upstream — instead of the one `origin` points at.
+	 */
+	showUpstreamIssues?: boolean | null;
 }
 
 /** Request to persist a repository's personal settings patch to SQLite. */

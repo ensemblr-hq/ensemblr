@@ -2,6 +2,10 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import type { GithubFailure } from '../../shared/ipc/contracts/github';
 import type {
+	SettingsResolutionRequest,
+	SettingsResolutionSnapshot,
+} from '../../shared/ipc/contracts/settings-resolution';
+import type {
 	ListRepositoryBranchesRequest,
 	ListRepositoryBranchesResult,
 	ListRepositoryIssuesRequest,
@@ -17,6 +21,7 @@ import type { EnsemblrDatabaseService } from '../storage';
 import { selectRepositoryPathById } from '../storage/repositories/repository-row-repository.ts';
 import { listActiveWorkspaceBranchRowsByRepository } from '../storage/repositories/workspace-repository.ts';
 import { fetchRemoteBranches, toBranchWires } from './github-branches.ts';
+import { parseGithubRemoteUrl } from './github-url.ts';
 import {
 	type CachedRepositoryIssues,
 	readCachedRepositoryIssues,
@@ -24,6 +29,8 @@ import {
 } from './issue-cache.ts';
 
 const GH_TIMEOUT_MS = 45_000;
+const GIT_TIMEOUT_MS = 10_000;
+const ISSUE_REMOTE = 'origin';
 const GH_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const LIST_LIMIT = 50;
 const PR_JSON_FIELDS =
@@ -88,25 +95,58 @@ export interface RepositorySourcesService {
 	) => Promise<ListRepositoryPullRequestsResult>;
 }
 
+/** Which issue list a request reads, lists, and caches. */
+interface IssueListTarget {
+	/** The `owner/name` handed to `gh --repo`, or null when `gh` resolves it. */
+	repository: string | null;
+	repositoryId: string;
+	unassignedOnly: boolean;
+}
+
 /** Options for {@link createRepositorySourcesService}. */
 interface CreateRepositorySourcesServiceOptions {
 	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
+	/**
+	 * Resolves the effective repository settings, read for `showUpstreamIssues`.
+	 * When omitted (e.g. in tests), issues always come from `origin`.
+	 */
+	readRepositorySettings?: (
+		request: SettingsResolutionRequest,
+	) => SettingsResolutionSnapshot;
 	/** Test seam: resolves a repository id to its on-disk path. */
 	resolveRepositoryPath?: (repositoryId: string) => string | null;
+}
+
+/**
+ * Reads whether a repository lists its upstream's issues rather than its own.
+ * @param resolved - Resolved settings snapshot, when available.
+ * @returns True only when `showUpstreamIssues` resolved to `true`.
+ */
+function readShowUpstreamIssues(
+	resolved: SettingsResolutionSnapshot | undefined,
+): boolean {
+	return (
+		resolved?.repository?.settings.find(
+			(setting) => setting.key === 'showUpstreamIssues',
+		)?.value === true
+	);
 }
 
 /**
  * Builds the service backing the "Create workspace from source" picker. All three
  * lists come from the authenticated `gh` CLI run inside the repository path (ADR
  * 0013): branches via `gh api graphql` (remote refs), PRs and issues via
- * `gh pr/issue list`. Pull requests are filtered to same-repo heads. Every method
+ * `gh pr/issue list`. Pull requests are filtered to same-repo heads, and issues
+ * come from the repository `origin` points at, so a fork lists its own unless
+ * the repository turns `showUpstreamIssues` on. Every method
  * degrades to an empty list plus a typed {@link GithubFailure} rather than
  * throwing, so the picker stays usable.
  */
 export function createRepositorySourcesService({
 	databaseService,
 	localCommandService,
+	readRepositorySettings,
 	resolveRepositoryPath,
 }: CreateRepositorySourcesServiceOptions): RepositorySourcesService {
 	const resolvePath =
@@ -121,59 +161,81 @@ export function createRepositorySourcesService({
 
 	/**
 	 * Reads a repository's persisted issue list, if the database is open.
-	 * @param repositoryId - ID of the repository whose cached issues to read
+	 * @param target - The repository, GitHub repository, and list variant to read
 	 * @returns The cached issues, or null when there are none to serve
 	 */
 	function readIssueCache(
-		repositoryId: string,
-		unassignedOnly: boolean,
+		target: IssueListTarget,
 	): CachedRepositoryIssues | null {
 		const database = databaseService.getConnection()?.database ?? null;
 		return database
-			? readCachedRepositoryIssues({ database, repositoryId, unassignedOnly })
+			? readCachedRepositoryIssues({ database, ...target })
 			: null;
 	}
 
 	/**
 	 * Persists a repository's freshly listed issues for the next app start.
-	 * @param repositoryId - ID of the repository the issues belong to
+	 * @param target - The list the issues belong to
 	 * @param issues - The issues `gh` just returned
 	 * @param syncedAt - ISO timestamp the issues were read at
 	 */
 	function writeIssueCache(
-		repositoryId: string,
+		target: IssueListTarget,
 		issues: RepositoryIssueWire[],
 		syncedAt: string,
-		unassignedOnly: boolean,
 	): void {
 		const database = databaseService.getConnection()?.database ?? null;
 		if (database) {
-			writeCachedRepositoryIssues({
-				database,
-				issues,
-				repositoryId,
-				syncedAt,
-				unassignedOnly,
-			});
+			writeCachedRepositoryIssues({ database, issues, syncedAt, ...target });
 		}
 	}
 
 	/**
 	 * Caches an issue list `gh` just produced and shapes it as the remote-sourced
 	 * result both the listed and the issues-disabled paths return.
-	 * @param repositoryId - ID of the repository the issues belong to
+	 * @param target - The list the issues belong to
 	 * @param issues - The issues to cache and return
-	 * @param unassignedOnly - Which of the two cached lists this one is
 	 * @returns The successful issue-list result to hand the caller
 	 */
 	function recordListedIssues(
-		repositoryId: string,
+		target: IssueListTarget,
 		issues: RepositoryIssueWire[],
-		unassignedOnly: boolean,
 	): ListRepositoryIssuesResult {
 		const syncedAt = new Date().toISOString();
-		writeIssueCache(repositoryId, issues, syncedAt, unassignedOnly);
+		writeIssueCache(target, issues, syncedAt);
 		return { issues, source: 'remote', status: 'ok', syncedAt };
+	}
+
+	/**
+	 * Picks the GitHub repository a checkout's issues are listed from: the one its
+	 * `origin` remote points at. Left to itself, `gh` resolves a fork cloned with
+	 * `gh repo clone` to the parent it marked as base, and lists the upstream
+	 * project's issues instead of the fork's — which `showUpstreamIssues` opts
+	 * back into by leaving the choice to `gh`.
+	 * @param repositoryId - ID of the repository whose settings to read
+	 * @param cwd - Repository directory to read the settings and remote in
+	 * @returns The `owner/name` to hand `gh --repo`, or null to leave the choice to
+	 * `gh` when upstream issues are on, or `origin` is missing or not on github.com
+	 */
+	async function readIssueRepository(
+		repositoryId: string,
+		cwd: string,
+	): Promise<string | null> {
+		const resolved = readRepositorySettings?.({
+			repository: { repositoryId, repositoryPath: cwd },
+		});
+		if (readShowUpstreamIssues(resolved)) {
+			return null;
+		}
+		const result = await localCommandService.run({
+			args: ['remote', 'get-url', ISSUE_REMOTE],
+			command: 'git',
+			cwd,
+			timeoutMs: GIT_TIMEOUT_MS,
+		});
+		const coordinates =
+			result.status === 'success' ? parseGithubRemoteUrl(result.stdout) : null;
+		return coordinates ? `${coordinates.owner}/${coordinates.name}` : null;
 	}
 
 	/**
@@ -324,8 +386,15 @@ export function createRepositorySourcesService({
 				return { error: repositoryMissing(), issues: [], status: 'error' };
 			}
 
-			const unassignedOnly = request.unassignedOnly === true;
-			const cached = readIssueCache(request.repositoryId, unassignedOnly);
+			const target: IssueListTarget = {
+				repository: await readIssueRepository(
+					request.repositoryId,
+					repositoryPath,
+				),
+				repositoryId: request.repositoryId,
+				unassignedOnly: request.unassignedOnly === true,
+			};
+			const cached = readIssueCache(target);
 			if (!request.refresh && cached && !isCacheExpired(cached)) {
 				return servedFromCache(cached);
 			}
@@ -333,18 +402,19 @@ export function createRepositorySourcesService({
 			const result = await runGh(repositoryPath, [
 				'issue',
 				'list',
+				...(target.repository ? ['--repo', target.repository] : []),
 				'--json',
 				ISSUE_JSON_FIELDS,
 				'--limit',
 				String(LIST_LIMIT),
-				...(unassignedOnly ? ['--search', UNASSIGNED_SEARCH] : []),
+				...(target.unassignedOnly ? ['--search', UNASSIGNED_SEARCH] : []),
 			]);
 			if (!result.ok) {
 				// A repository with issues turned off on GitHub has no issues rather
 				// than a broken list, so it answers empty; an error would redden every
 				// surface that fans this call out across all repositories at once.
 				if (result.error.code === 'issues-disabled') {
-					return recordListedIssues(request.repositoryId, [], unassignedOnly);
+					return recordListedIssues(target, []);
 				}
 				return cached
 					? servedFromCache(cached, result.error)
@@ -358,7 +428,7 @@ export function createRepositorySourcesService({
 					? servedFromCache(cached, failure)
 					: { error: failure, issues: [], status: 'error' };
 			}
-			return recordListedIssues(request.repositoryId, issues, unassignedOnly);
+			return recordListedIssues(target, issues);
 		},
 	};
 }
