@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { ConciergeToggleRow } from '@/renderer/components/concierge';
 import {
 	ResizableHandle,
 	ResizablePanel,
@@ -7,6 +8,7 @@ import {
 } from '@/renderer/components/ui/resizable';
 import { SidebarInset } from '@/renderer/components/ui/sidebar';
 import { RIGHT_SIDEBAR_COLLAPSED_SIZE } from '@/renderer/hooks/workbench-shell/use-right-sidebar-controller';
+import { conciergeToggleHost } from '@/renderer/lib/workbench';
 import { SHELL_INSET_CLASS } from '@/renderer/lib/workbench/shell-inset';
 import type { AgentsPanelNavigation } from '@/renderer/types/agents';
 import type {
@@ -88,7 +90,13 @@ function NarrowReviewRailHost(props: ReviewRailProps) {
 	return state.isNarrowViewport ? <ReviewRailSheet {...props} /> : null;
 }
 
-/** Left resizable panel containing the workbench header and main content. */
+/**
+ * Left resizable panel containing the workbench header and main content.
+ *
+ * It takes the Concierge toggle whenever the rail is not inline to carry it —
+ * collapsed, or presented as a sheet on a narrow window — so the toggle stays in
+ * the bottom-right corner rather than leaving with the rail.
+ */
 function MainWorkspacePanel({
 	activeProject,
 	activeWorkspace,
@@ -98,6 +106,8 @@ function MainWorkspacePanel({
 	activeWorkspace: WorkspaceShellModel;
 	children: ReactNode;
 }) {
+	const { state } = useWorkbenchLayout();
+
 	return (
 		<ResizablePanel defaultSize='66%' minSize='32rem'>
 			<div className='flex h-full min-w-0 flex-col overflow-hidden'>
@@ -106,6 +116,9 @@ function MainWorkspacePanel({
 					activeWorkspace={activeWorkspace}
 				/>
 				{children}
+				{conciergeToggleHost(state) === 'footer' ? (
+					<ConciergeToggleRow />
+				) : null}
 			</div>
 		</ResizablePanel>
 	);

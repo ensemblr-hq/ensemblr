@@ -6,7 +6,10 @@ import userEvent from '@testing-library/user-event';
 import { createStore, Provider } from 'jotai';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { ConciergeLauncher } from '@/renderer/components/concierge';
+import {
+	ConciergeHost,
+	ConciergeToggleRow,
+} from '@/renderer/components/concierge';
 import { SidebarProvider } from '@/renderer/components/ui/sidebar';
 import { useConciergeActivityWatch } from '@/renderer/hooks/concierge/use-concierge-activity-watch';
 import { pendingAskUserQuestionsAtom } from '@/renderer/state/ask-user-question';
@@ -26,12 +29,17 @@ let listeners: ((broadcast: ConciergeEventBroadcastWire) => void)[] = [];
 const SESSION_ID = 'concierge-1';
 
 /**
- * Mounts the launcher under the app-root watcher, which is where the badge's
- * count actually comes from — the launcher itself only renders it.
+ * Mounts the toggle row under the app-root watcher, which is where the badge's
+ * count actually comes from — the row itself only renders it.
  */
 function Harness() {
 	useConciergeActivityWatch();
-	return <ConciergeLauncher />;
+	return (
+		<>
+			<ConciergeHost />
+			<ConciergeToggleRow />
+		</>
+	);
 }
 
 function renderHarness(store = createStore()) {
@@ -145,7 +153,7 @@ afterEach(() => {
 	clearEnsemblrApi();
 });
 
-describe('the Concierge launcher badge', () => {
+describe('the Concierge toggle row', () => {
 	test('counts agent messages that land while the panel is shut', () => {
 		renderHarness();
 
@@ -179,7 +187,7 @@ describe('the Concierge launcher badge', () => {
 		expect(badge()).toBeNull();
 	});
 
-	test('collapses a runaway count rather than growing past the bubble', () => {
+	test('collapses a runaway count rather than growing past its pill', () => {
 		renderHarness();
 		for (let index = 0; index < 11; index += 1) {
 			sendAgentMessage(`Message ${index}`, `evt-${index}`);
@@ -250,7 +258,7 @@ describe('the Concierge launcher badge', () => {
 	});
 
 	// A child that dies mid-turn emits `shutdown` and no trailing `idle`, so
-	// without handling it the bubble orbited for a turn nothing was running.
+	// without handling it the toggle orbited for a turn nothing was running.
 	test('stops orbiting when the runtime shuts down mid-turn', () => {
 		renderHarness();
 		sendStatus('streaming', 'evt-status-1');
@@ -281,6 +289,49 @@ describe('the Concierge launcher badge', () => {
 		expect(orbitRing()?.getAttribute('class')).not.toContain(
 			'motion-safe:animate-concierge-orbit',
 		);
+	});
+
+	test('spells out its name beside the mark', () => {
+		renderHarness();
+
+		expect(
+			screen.getByRole('button', { name: 'Open the Concierge' }),
+		).toHaveTextContent('Concierge');
+	});
+
+	test('says it is working while a turn streams, and stops when it ends', () => {
+		renderHarness();
+		expect(screen.queryByText('Working')).toBeNull();
+
+		sendStatus('streaming', 'evt-status-1');
+		expect(screen.getByText('Working')).toBeInTheDocument();
+		expect(
+			screen.getByRole('button', {
+				name: 'Open the Concierge, still working',
+			}),
+		).toBeInTheDocument();
+
+		sendStatus('idle', 'evt-status-2');
+		expect(screen.queryByText('Working')).toBeNull();
+	});
+
+	// A changed button label is read only to someone focused on the button, so
+	// the row speaks the two states a shut Concierge reports through its own
+	// live region instead.
+	test('announces a turn starting and what it left behind', () => {
+		renderHarness();
+		const region = document.querySelector(
+			'[data-concierge-status-announcement]',
+		);
+		expect(region).toHaveAttribute('aria-live', 'polite');
+		expect(region).toHaveTextContent('');
+
+		sendStatus('streaming', 'evt-status-1');
+		expect(region).toHaveTextContent('The Concierge is working');
+
+		sendAgentMessage('Two workspaces are stale.', 'evt-1');
+		sendStatus('idle', 'evt-status-2');
+		expect(region).toHaveTextContent('The Concierge has 1 new message');
 	});
 });
 

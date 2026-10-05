@@ -5,7 +5,7 @@
  * The app's per-chat unread system cannot carry this: an entry there is keyed by
  * a workspace and a chat tab, and the Concierge has neither — which is why
  * `useAutoMarkUnread` skips it outright. This is the Concierge's own, much
- * smaller version of the same idea, read by the launcher bubble.
+ * smaller version of the same idea, read by the toggle row.
  */
 import { atom } from 'jotai';
 import type {
@@ -28,7 +28,7 @@ export interface ConciergeActivityState {
 	sessionId: string | null;
 }
 
-/** Nothing seen and nothing pending: what the launcher shows no badge for. */
+/** Nothing seen and nothing pending: what the toggle shows no badge for. */
 export const CONCIERGE_ACTIVITY_NONE: ConciergeActivityState = {
 	count: 0,
 	hasQuestion: false,
@@ -47,8 +47,8 @@ export const conciergeActivityAtom = atom<ConciergeActivityState>(
 /**
  * Whether the Concierge is mid-turn. The one answer to that question: the panel
  * reads it too, rather than deriving a second one from its own transcript, so
- * the bubble and the composer can never disagree about whether a turn is
- * running. Held here rather than in the panel because the launcher needs it with
+ * the toggle and the composer can never disagree about whether a turn is
+ * running. Held here rather than in the panel because the toggle needs it with
  * the panel shut — and from a settings route, where the panel is not mounted.
  */
 export const conciergeStreamingAtom = atom(false);
@@ -57,7 +57,7 @@ export const conciergeStreamingAtom = atom(false);
  * Whether a status the runtime reported means a turn is in flight.
  *
  * `starting` counts: the child is spinning up for a prompt that has already been
- * submitted, and a launcher that stayed still until the first token would read
+ * submitted, and a toggle that stayed still until the first token would read
  * as nothing having happened.
  * @param status - The status a `status` event carried.
  * @returns True while a turn is running.
@@ -150,7 +150,7 @@ export function setConciergeQuestion(
 /**
  * Drops everything held, which is what opening the panel does — the transcript
  * on screen is the report. Returns the same object when there was nothing held,
- * so an open panel does not re-render the launcher on every keystroke elsewhere.
+ * so an open panel does not re-render the toggle on every keystroke elsewhere.
  * @param state - The activity so far.
  * @returns The emptied activity state.
  */

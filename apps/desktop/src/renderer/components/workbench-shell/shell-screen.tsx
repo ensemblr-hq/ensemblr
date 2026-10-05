@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { ConciergeToggleRow } from '@/renderer/components/concierge';
 import { SidebarInset } from '@/renderer/components/ui/sidebar';
 import { cn } from '@/renderer/lib/utils';
 import { SHELL_INSET_CLASS } from '@/renderer/lib/workbench/shell-inset';
@@ -20,6 +21,10 @@ const SHELL_CONTENT_CLASS = 'flex min-w-0 flex-1 flex-col overflow-hidden';
  *
  * `className` replaces the content column's layout for screens that centre their
  * body instead of stacking it.
+ *
+ * The Concierge toggle runs along the inset's foot, outside the content column,
+ * so a screen that centres its body still keeps the toggle in the bottom-right
+ * corner where the workspace's review rail puts it.
  */
 export function ShellScreen({
 	children,
@@ -31,6 +36,7 @@ export function ShellScreen({
 	return (
 		<SidebarInset className={SHELL_INSET_CLASS}>
 			<div className={cn(SHELL_CONTENT_CLASS, className)}>{children}</div>
+			<ConciergeToggleRow />
 		</SidebarInset>
 	);
 }

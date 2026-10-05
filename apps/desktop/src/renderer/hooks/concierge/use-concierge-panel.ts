@@ -208,7 +208,7 @@ export function useConciergePanel(): ConciergePanelModel {
 
 	const panelRef = anchor.ref;
 	useEffect(() => {
-		// The composer takes focus from the handoff the launcher drives; the panel
+		// The composer takes focus from the handoff the host drives; the panel
 		// itself is the fallback for a composer that cannot take it — disabled while
 		// the session opens — so the two chords above still have a target.
 		const node = isOpen ? panelRef.current : null;

@@ -337,12 +337,6 @@
 			"send-tooltip": "Αποστολή μηνύματος",
 			"upload-input": "Μεταφόρτωση συνημμένου"
 		},
-		"launcher": {
-			"open": "Άνοιγμα του Concierge",
-			"open-with-unread_one": "Άνοιγμα του Concierge, {{count}} νέο μήνυμα",
-			"open-with-unread_other": "Άνοιγμα του Concierge, {{count}} νέα μηνύματα",
-			"working": "Άνοιγμα του Concierge, εργάζεται ακόμη"
-		},
 		"panel": {
 			"clear": "Εκκαθάριση περιβάλλοντος και νέα αρχή",
 			"collapse-sidebar": "Απόκρυψη πλαϊνής στήλης",
@@ -367,6 +361,18 @@
 		"timeline": {
 			"empty": "Ρωτήστε για τα τρέχοντα έργα σας, αναθέστε δουλειά, μάθετε οτιδήποτε για το Ensemblr — ή απλώς συζητήστε.",
 			"starting": "Αφύπνιση του Concierge"
+		},
+		"toggle": {
+			"announce-unread_one": "Ο Concierge έχει {{count}} νέο μήνυμα",
+			"announce-unread_other": "Ο Concierge έχει {{count}} νέα μηνύματα",
+			"announce-working": "Ο Concierge εργάζεται",
+			"close": "Κλείσιμο του Concierge",
+			"label": "Concierge",
+			"open": "Άνοιγμα του Concierge",
+			"open-with-unread_one": "Άνοιγμα του Concierge, {{count}} νέο μήνυμα",
+			"open-with-unread_other": "Άνοιγμα του Concierge, {{count}} νέα μηνύματα",
+			"working": "Άνοιγμα του Concierge, εργάζεται ακόμη",
+			"working-status": "Εργάζεται"
 		}
 	},
 	"context-usage": {

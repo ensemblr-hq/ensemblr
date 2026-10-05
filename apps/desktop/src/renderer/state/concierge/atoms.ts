@@ -16,8 +16,8 @@ export interface ConciergePoint {
 export const CONCIERGE_UNPLACED: ConciergePoint = { x: -1, y: -1 };
 
 /**
- * How much of the screen the Concierge is taking. `closed` shows only the
- * launcher bubble, `panel` the docked card, `fullscreen` the whole shell.
+ * How much of the screen the Concierge is taking. `closed` leaves only the
+ * toggle row, `panel` the floating card, `fullscreen` the whole shell.
  */
 export type ConciergePresentation = 'closed' | 'fullscreen' | 'panel';
 
@@ -34,12 +34,12 @@ export interface ConciergeSessionIdentity {
 
 /**
  * The Concierge session the panel is showing, or null before it opens. Held here
- * rather than in the panel so the launcher can read live state without mounting
- * the panel.
+ * rather than in the panel so the toggle row can read live state without
+ * mounting the panel.
  *
  * All three fields travel together because the panel does not survive a visit to
  * Settings: `/_workbench/settings/*` is a sibling of the shell layout the
- * launcher mounts in, so that subtree unmounts and anything held in component
+ * Concierge host mounts in, so that subtree unmounts and anything held in component
  * state comes back empty while an id kept here survives. A session whose cwd went
  * missing that way disables the composer with nothing on screen to explain it.
  */
@@ -109,15 +109,12 @@ export const focusConciergeComposerAtom = atom(null, (get, set) => {
 });
 
 /**
- * Persisted bottom-right corner the whole Concierge hangs from; unplaced until
+ * Persisted bottom-right corner the floating panel hangs from; unplaced until
  * the user drags it.
  *
- * One point rather than one per surface, because the launcher bubble and the
- * panel are the same thing in two sizes: the bubble opens into a panel whose
- * corner it was sitting on, and closing puts the bubble back on the corner the
- * panel was left at. A corner rather than a top-left is what makes that hold —
- * the two surfaces differ by hundreds of pixels in both axes, so a shared
- * top-left would have them agree only on the one edge nobody drags from.
+ * A corner rather than a top-left because the panel docks against the window's
+ * bottom-right, above the toggle row: a stored bottom-right keeps it there
+ * whatever size the user resizes it to.
  */
 export const conciergeAnchorAtom = atomWithStorage<ConciergePoint>(
 	'concierge_anchor',

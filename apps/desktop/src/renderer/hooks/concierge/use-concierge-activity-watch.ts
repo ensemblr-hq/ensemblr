@@ -39,12 +39,12 @@ function findConciergeQuestion(
 }
 
 /**
- * Watches the Concierge from above every route, so the launcher bubble can say
- * what happened while its panel was shut.
+ * Watches the Concierge from above every route, so the toggle row can say what
+ * happened while its panel was shut.
  *
- * Mounted at the app root rather than beside the launcher, because
- * `/_workbench/settings/*` is a sibling of the shell layout the launcher lives
- * in: a subscription owned by the launcher would go deaf exactly while the user
+ * Mounted at the app root rather than beside the toggle, because
+ * `/_workbench/settings/*` is a sibling of the shell layout the toggle lives
+ * in: a subscription owned by the toggle would go deaf exactly while the user
  * is somewhere the badge is the only way to find out that a turn landed.
  *
  * The presentation is read out of the store at event time rather than taken as
@@ -87,7 +87,7 @@ export function useConciergeActivityWatch(): void {
 						return;
 					}
 					// A child that dies mid-turn emits this and no trailing `idle`, so
-					// without it the bubble would orbit for a turn nothing is running.
+					// without it the toggle would orbit for a turn nothing is running.
 					if (payload?.kind === 'shutdown') {
 						setStreaming(false);
 						return;

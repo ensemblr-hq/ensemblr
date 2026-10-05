@@ -23,7 +23,7 @@ export const pendingNotificationFocusAtom = atom<UnreadChatRef | null>(null);
 /**
  * Whether a clicked Concierge notification is still waiting for the shell to
  * come back. The panel itself needs no request parked — opening it is one atom —
- * but the launcher that renders it only exists under the shell route, so the trip
+ * but the host that renders it only exists under the shell route, so the trip
  * back is derived from this exactly as the chat's is from its own request.
  */
 const pendingConciergeFocusAtom = atom(false);

@@ -14,7 +14,10 @@ import {
 	vi,
 } from 'vitest';
 
-import { ConciergeLauncher } from '@/renderer/components/concierge';
+import {
+	ConciergeHost,
+	ConciergeToggleRow,
+} from '@/renderer/components/concierge';
 import { SidebarProvider } from '@/renderer/components/ui/sidebar';
 import { TOOLBAR_HEIGHT_CLASS } from '@/renderer/lib/workbench/shell-inset';
 import { formatShortcut, matchesShortcut } from '@/shared/keymap';
@@ -27,8 +30,8 @@ import {
 } from '../support/dom';
 
 /**
- * Renders the launcher with a `QueryClientProvider`, a fresh Jotai store, and
- * the sidebar context its maximized header reads — and nothing else.
+ * Renders the host and a toggle row with a `QueryClientProvider`, a fresh Jotai
+ * store, and the sidebar context its maximized header reads — and nothing else.
  *
  * Deliberately not `renderWithProviders`, which installs a `TooltipProvider` of
  * its own: the Concierge brings its own, and an ambient one would hide the
@@ -50,7 +53,8 @@ function renderBare({
 		<QueryClientProvider client={createTestQueryClient()}>
 			<Provider store={store}>
 				<SidebarProvider defaultOpen={sidebarOpen}>
-					<ConciergeLauncher />
+					<ConciergeHost />
+					<ConciergeToggleRow />
 				</SidebarProvider>
 			</Provider>
 		</QueryClientProvider>,
@@ -142,7 +146,7 @@ afterEach(() => {
 	clearEnsemblrApi();
 });
 
-describe('the Concierge launcher', () => {
+describe('the Concierge host', () => {
 	test('opens its panel without an ambient TooltipProvider', async () => {
 		renderBare();
 
@@ -151,7 +155,7 @@ describe('the Concierge launcher', () => {
 		);
 
 		// The composer reuses the workspace composer's model and thinking pickers,
-		// and both render tooltips — so before the launcher carried its own
+		// and both render tooltips — so before the Concierge carried its own
 		// provider, this click threw "`Tooltip` must be used within
 		// `TooltipProvider`" and the panel never appeared.
 		expect(
@@ -291,7 +295,7 @@ describe('the Concierge launcher', () => {
 		).toBeInTheDocument();
 	});
 
-	test('hides the launcher while the panel is open', async () => {
+	test('closes the panel from the same toggle that opened it', async () => {
 		renderBare();
 
 		await userEvent.click(
@@ -299,8 +303,17 @@ describe('the Concierge launcher', () => {
 		);
 		await screen.findByRole('region', { name: 'Concierge' });
 
+		// The toggle stays on screen while the panel is up, so it has to say what
+		// pressing it now does.
 		expect(
 			screen.queryByRole('button', { name: 'Open the Concierge' }),
+		).not.toBeInTheDocument();
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Close the Concierge' }),
+		);
+
+		expect(
+			screen.queryByRole('region', { name: 'Concierge' }),
 		).not.toBeInTheDocument();
 	});
 
@@ -312,7 +325,7 @@ describe('the Concierge launcher', () => {
 		);
 		await screen.findByRole('region', { name: 'Concierge' });
 
-		// Settings is a sibling of the shell layout the launcher mounts in, so a
+		// Settings is a sibling of the shell layout the host mounts in, so a
 		// trip there unmounts the whole Concierge while the store outlives it. The
 		// session's cwd used to live in the hook's own state and came back null,
 		// which disables every control on the composer with no error to explain it.
@@ -325,7 +338,7 @@ describe('the Concierge launcher', () => {
 		).toBeEnabled();
 	});
 
-	test('closes the panel and brings the launcher back', async () => {
+	test('closes the panel from its header and resets the toggle', async () => {
 		renderBare();
 
 		await userEvent.click(
@@ -493,42 +506,37 @@ describe('the Concierge composer', () => {
 });
 
 describe('the Concierge anchor', () => {
-	test('opens the panel on the corner the bubble was dragged to', async () => {
+	test('opens the panel docked to the bottom-right corner', async () => {
 		renderBare();
-		const bubble = screen.getByRole('button', { name: 'Open the Concierge' });
-		expect(bubble).toHaveStyle({ left: '964px', top: '628px' });
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Open the Concierge' }),
+		);
 
-		dragBy(bubble, { x: -300, y: -100 });
-
-		expect(bubble).toHaveStyle({ left: '664px', top: '528px' });
-		await userEvent.click(bubble);
-
-		// Both surfaces hang their bottom-right corner from one stored point, so
-		// the panel opens where the bubble was rather than back at its own dock:
-		// the bubble's corner is (708, 572), and the panel is 416×512.
+		// Undragged, the panel hangs 16px in from the right and 96px up from the
+		// bottom, clear of the toasts and of the toggle row along the bottom edge.
 		const panel = await screen.findByRole('region', { name: 'Concierge' });
-		expect(panel).toHaveStyle({ left: '292px', top: '60px' });
+		expect(panel).toHaveStyle({ left: '592px', top: '160px' });
 	});
 
-	test('brings the bubble back on the corner the panel was dragged to', async () => {
+	test('reopens the panel on the corner it was dragged to', async () => {
 		renderBare();
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Open the Concierge' }),
 		);
 		const panel = await screen.findByRole('region', { name: 'Concierge' });
-		const header = panel.querySelector('header');
-		if (!header) {
-			throw new Error('the panel renders no header to drag by');
-		}
-
-		dragBy(header, { x: -200, y: -100 });
+		dragBy(panelHeader(panel), { x: -200, y: -100 });
 		expect(panel).toHaveStyle({ left: '392px', top: '60px' });
-		await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 
-		// The panel's corner is (808, 572), and the bubble is 44×44.
-		expect(
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Close the Concierge' }),
+		);
+		await userEvent.click(
 			screen.getByRole('button', { name: 'Open the Concierge' }),
-		).toHaveStyle({ left: '764px', top: '528px' });
+		);
+
+		expect(
+			await screen.findByRole('region', { name: 'Concierge' }),
+		).toHaveStyle({ left: '392px', top: '60px' });
 	});
 
 	test('returns to its anchored corner after a trip through fullscreen', async () => {
@@ -549,62 +557,45 @@ describe('the Concierge anchor', () => {
 		expect(panel).toHaveStyle({ left: '592px', top: '160px' });
 	});
 
-	test('does not transition the offsets it is dragged by', () => {
+	test('persists the anchor once per drag, not once per pointer move', async () => {
 		renderBare();
-		const bubble = screen.getByRole('button', { name: 'Open the Concierge' });
-
-		// The button's base style transitions every property, `left` and `top`
-		// among them — which had the bubble easing toward the cursor a transition
-		// duration behind it while the panel, a plain section, tracked it exactly.
-		// `transform` is on the named list because the hover lift is a scale, which
-		// the drag never writes.
-		expect(bubble).not.toHaveClass('transition-all');
-		expect(bubble).toHaveClass(
-			'transition-[background-color,border-color,box-shadow,transform]',
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Open the Concierge' }),
 		);
-	});
-
-	test('moves the bubble without opening the panel', () => {
-		renderBare();
-		const bubble = screen.getByRole('button', { name: 'Open the Concierge' });
-
-		dragBy(bubble, { x: -120, y: -80 });
-
-		// The bubble is both a drag handle and a button, so the click its own
-		// pointer-up produces has to be swallowed — otherwise every reposition
-		// opens the panel.
-		expect(
-			screen.queryByRole('region', { name: 'Concierge' }),
-		).not.toBeInTheDocument();
-	});
-
-	test('persists the anchor once per drag, not once per pointer move', () => {
-		renderBare();
-		const bubble = screen.getByRole('button', { name: 'Open the Concierge' });
+		const panel = await screen.findByRole('region', { name: 'Concierge' });
 		const setItem = vi.spyOn(window.localStorage, 'setItem');
 
-		fireEvent.pointerDown(bubble, { clientX: 600, clientY: 600 });
-		for (const step of [40, 80, 120, 160, 200]) {
+		fireEvent.pointerDown(panelHeader(panel), { clientX: 600, clientY: 600 });
+		for (const step of [20, 40, 60, 80, 100]) {
 			fireEvent.pointerMove(window, {
 				clientX: 600 - step,
 				clientY: 600 - step,
 			});
 			// The node follows the pointer inside the move itself: the gesture writes
 			// `left`/`top` straight onto it, so nothing waits on a React render.
-			expect(bubble).toHaveStyle({
-				left: `${964 - step}px`,
-				top: `${628 - step}px`,
+			expect(panel).toHaveStyle({
+				left: `${592 - step}px`,
+				top: `${160 - step}px`,
 			});
 		}
 		expect(anchorWrites(setItem)).toHaveLength(0);
 
-		fireEvent.pointerUp(window, { clientX: 400, clientY: 400 });
+		fireEvent.pointerUp(window, { clientX: 500, clientY: 500 });
 
 		// A write per move meant a synchronous `localStorage` round trip on every
-		// pointer event, which is what left the bubble trailing the cursor.
-		expect(anchorWrites(setItem)).toEqual(['{"x":808,"y":472}']);
+		// pointer event, which is what left the surface trailing the cursor.
+		expect(anchorWrites(setItem)).toEqual(['{"x":908,"y":572}']);
 	});
 });
+
+/** The panel's title bar, which is what the user drags it by. */
+function panelHeader(panel: HTMLElement): HTMLElement {
+	const header = panel.querySelector('header');
+	if (!header) {
+		throw new Error('the panel renders no header to drag by');
+	}
+	return header;
+}
 
 /**
  * Drags an element by a delta far enough to pass the gesture's threshold,

@@ -20,9 +20,9 @@ const SIDEBAR_CHROME_SELECTOR =
  *
  * Maximized, the panel covers the shell inset but not the navigation sidebar,
  * so picking a workspace there leaves the app on a different screen with the
- * panel still claiming to be maximized — and since the launcher bubble hides
- * whenever the Concierge is open, there is nothing left to press to get back to
- * it. Restoring on the press that navigates away is what keeps that from being
+ * panel still claiming to be maximized — and since the toggle row sits inside
+ * the inset the maximized panel covers, there is nothing left to press to get
+ * back to it. Restoring on the press that navigates away is what keeps that from being
  * a dead end.
  *
  * Navigating away is the whole trigger, which is why the sidebar is named

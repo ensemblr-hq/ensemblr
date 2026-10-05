@@ -361,14 +361,6 @@
 			"send-tooltip": "Отправить сообщение",
 			"upload-input": "Загрузить вложение"
 		},
-		"launcher": {
-			"open": "Открыть Консьержа",
-			"open-with-unread_one": "Открыть Консьержа, {{count}} новое сообщение",
-			"open-with-unread_few": "Открыть Консьержа, {{count}} новых сообщения",
-			"open-with-unread_many": "Открыть Консьержа, {{count}} новых сообщений",
-			"open-with-unread_other": "Открыть Консьержа, {{count}} нового сообщения",
-			"working": "Открыть Консьержа, ещё работает"
-		},
 		"panel": {
 			"clear": "Очистить контекст и начать заново",
 			"collapse-sidebar": "Скрыть боковую панель",
@@ -393,6 +385,22 @@
 		"timeline": {
 			"empty": "Спросите о текущих проектах, поручите работу, узнайте что угодно про Ensemblr — или просто поболтайте.",
 			"starting": "Пробуждение Консьержа"
+		},
+		"toggle": {
+			"announce-unread_one": "У Консьержа {{count}} новое сообщение",
+			"announce-unread_few": "У Консьержа {{count}} новых сообщения",
+			"announce-unread_many": "У Консьержа {{count}} новых сообщений",
+			"announce-unread_other": "У Консьержа {{count}} нового сообщения",
+			"announce-working": "Консьерж работает",
+			"close": "Закрыть Консьержа",
+			"label": "Консьерж",
+			"open": "Открыть Консьержа",
+			"open-with-unread_one": "Открыть Консьержа, {{count}} новое сообщение",
+			"open-with-unread_few": "Открыть Консьержа, {{count}} новых сообщения",
+			"open-with-unread_many": "Открыть Консьержа, {{count}} новых сообщений",
+			"open-with-unread_other": "Открыть Консьержа, {{count}} нового сообщения",
+			"working": "Открыть Консьержа, ещё работает",
+			"working-status": "Работает"
 		}
 	},
 	"context-usage": {

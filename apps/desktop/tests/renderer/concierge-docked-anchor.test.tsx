@@ -20,8 +20,6 @@ import {
 import { resolveWindowChrome } from '../../src/shared/window-chrome';
 import { installLocalStorage } from './support/dom';
 
-const LAUNCHER_SIZE = { height: 44, width: 44 };
-
 /** Bottom edge of the zone toasts and the rerun control occupy, in pixels. */
 const OCCUPIED_CORNER_HEIGHT = 76;
 
@@ -34,15 +32,16 @@ const APP_TITLE_BAR_HEIGHT = 36;
  * @param size - The surface's own width and height.
  * @returns The node's top edge, and its offsets from the bottom and right edges.
  */
-function placeSurface(anchor = CONCIERGE_UNPLACED, size = LAUNCHER_SIZE) {
+function placeSurface(
+	anchor = CONCIERGE_UNPLACED,
+	size = CONCIERGE_MIN_PANEL_SIZE,
+) {
 	getDefaultStore().set(conciergeAnchorAtom, anchor);
-	const node = document.createElement('button');
+	const node = document.createElement('section');
 	document.body.append(node);
 	const ref = { current: node };
 
-	renderHook(() =>
-		useConciergeAnchor<HTMLButtonElement>({ externalRef: ref, size }),
-	);
+	renderHook(() => useConciergeAnchor<HTMLElement>({ externalRef: ref, size }));
 
 	return {
 		fromBottom:
@@ -83,16 +82,6 @@ describe('the undragged Concierge surface', () => {
 		expect(fromRight).toBe(16);
 	});
 
-	// The panel opens where the bubble was, so the two have to dock on the same
-	// corner: a launcher-only margin would make opening the panel jump.
-	test('hands the panel the same corner it docked the bubble on', () => {
-		const bubble = placeSurface();
-		const panel = placeSurface(CONCIERGE_UNPLACED, CONCIERGE_MIN_PANEL_SIZE);
-
-		expect(panel.fromBottom).toBe(bubble.fromBottom);
-		expect(panel.fromRight).toBe(bubble.fromRight);
-	});
-
 	test('gives the corner back once the user has dragged it there', () => {
 		const { fromBottom } = placeSurface({
 			x: window.innerWidth - 16,
@@ -120,7 +109,7 @@ describe('a surface dragged to the top of the window', () => {
 	test('stops below the title bar Ensemblr draws for itself', () => {
 		installWindowChrome('linux');
 
-		const { top } = placeSurface({ x: 200, y: 0 }, CONCIERGE_MIN_PANEL_SIZE);
+		const { top } = placeSurface({ x: 200, y: 0 });
 
 		expect(top).toBe(APP_TITLE_BAR_HEIGHT + 8);
 	});
@@ -128,7 +117,7 @@ describe('a surface dragged to the top of the window', () => {
 	test('reaches the window edge where the desktop draws the title bar', () => {
 		installWindowChrome('darwin');
 
-		const { top } = placeSurface({ x: 200, y: 0 }, CONCIERGE_MIN_PANEL_SIZE);
+		const { top } = placeSurface({ x: 200, y: 0 });
 
 		expect(top).toBe(8);
 	});

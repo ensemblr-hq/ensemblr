@@ -11,7 +11,7 @@ import {
 import { createStore, Provider } from 'jotai';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { ConciergeLauncher } from '@/renderer/components/concierge';
+import { ConciergeHost } from '@/renderer/components/concierge';
 import { SidebarProvider } from '@/renderer/components/ui/sidebar';
 import { useAskUserQuestionSync } from '@/renderer/state/ask-user-question';
 import { conciergePresentationAtom } from '@/renderer/state/concierge';
@@ -79,10 +79,10 @@ const answerUserQuestion = vi.fn();
 const openConciergeSession = vi.fn();
 let deliverAsk: ((payload: AskUserQuestionBroadcast) => void) | null = null;
 
-/** Mirrors the app root: the sync effect above, the Concierge launcher below. */
+/** Mirrors the app root: the sync effect above, the Concierge host below. */
 function Harness() {
 	useAskUserQuestionSync();
-	return <ConciergeLauncher />;
+	return <ConciergeHost />;
 }
 
 /** Opens the panel and waits for its transcript, as the user sees it. */

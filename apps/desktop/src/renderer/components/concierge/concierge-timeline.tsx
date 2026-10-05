@@ -159,7 +159,7 @@ export function ConciergeTimeline({
 	if (messages.length === 0) {
 		return (
 			<div className='flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-muted-foreground text-sm'>
-				{/* The launcher's own mark, so the surface the bubble opened onto is
+				{/* The toggle's own mark, so the surface the toggle opened onto is
 				    recognisably the thing that was clicked. Waking spins its orbit
 				    rather than swapping in a spinner, for the same reason. */}
 				<span

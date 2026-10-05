@@ -3064,12 +3064,6 @@ export default interface Resources {
 				'send-tooltip': 'Send message';
 				'upload-input': 'Upload attachment';
 			};
-			launcher: {
-				open: 'Open the Concierge';
-				'open-with-unread_one': 'Open the Concierge, {{count}} new message';
-				'open-with-unread_other': 'Open the Concierge, {{count}} new messages';
-				working: 'Open the Concierge, still working';
-			};
 			panel: {
 				clear: 'Clear context and start over';
 				'collapse-sidebar': 'Hide the sidebar';
@@ -3094,6 +3088,18 @@ export default interface Resources {
 			timeline: {
 				empty: 'Ask about your current projects, assign some work, learn anything about Ensemblr — or just chat.';
 				starting: 'Waking the Concierge';
+			};
+			toggle: {
+				'announce-unread_one': 'The Concierge has {{count}} new message';
+				'announce-unread_other': 'The Concierge has {{count}} new messages';
+				'announce-working': 'The Concierge is working';
+				close: 'Close the Concierge';
+				label: 'Concierge';
+				open: 'Open the Concierge';
+				'open-with-unread_one': 'Open the Concierge, {{count}} new message';
+				'open-with-unread_other': 'Open the Concierge, {{count}} new messages';
+				working: 'Open the Concierge, still working';
+				'working-status': 'Working';
 			};
 		};
 		'context-usage': {

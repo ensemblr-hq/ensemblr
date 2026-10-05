@@ -55,8 +55,8 @@ function isStreamingFrom(
  * runs to write its memories, which belongs in that session's own transcript.
  *
  * The mid-turn answer is published into `conciergeStreamingAtom` rather than
- * returned alone, because the launcher bubble reads the same atom with the panel
- * shut, and a second local answer is how the bubble and the composer came to
+ * returned alone, because the toggle row reads the same atom with the panel
+ * shut, and a second local answer is how the toggle and the composer came to
  * disagree about whether a turn was running.
  * @param sessionId - Session to follow, or null before one is open.
  * @returns The transcript so far and whether a turn is in flight.

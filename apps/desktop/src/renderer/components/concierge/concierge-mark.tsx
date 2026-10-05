@@ -27,7 +27,7 @@ const ORBIT_CELLS = [
  * cells orbiting it — the one agent that sits above every workspace.
  *
  * Cut from the same rounded-square cell the app icon builds its `E` out of, and
- * drawn in `currentColor`, so the launcher bubble, the panel header, and the
+ * drawn in `currentColor`, so the toggle row, the panel header, and the
  * empty transcript all wear one glyph at whatever weight their surface asks for.
  *
  * The orbit is its own group so a surface can spin it — pass

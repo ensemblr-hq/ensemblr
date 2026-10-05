@@ -21,12 +21,6 @@ export interface ConciergeSurfaceSize {
 
 /** What a Concierge surface needs to place and drag itself. */
 export interface ConciergeAnchoredSurface<T extends HTMLElement> {
-	/**
-	 * Whether the press in flight has travelled far enough to count as a drag.
-	 * A getter rather than a value because the gesture never re-renders: a click
-	 * handler has to read it at the moment the click arrives.
-	 */
-	isDragging: () => boolean;
 	onPointerDown: (event: { clientX: number; clientY: number }) => void;
 	ref: RefObject<T | null>;
 }
@@ -44,13 +38,10 @@ const DOCK_MARGIN_X = 16;
  * Distance the anchor keeps from the viewport's bottom edge initially. Taller
  * than the side margin because the bottom-right corner is already occupied:
  * `src/renderer/components/ui/sonner.tsx` leaves sonner on its default
- * bottom-right stack, which starts 24px up, and the Setup pane floats its rerun
- * control in the same corner — both of which an undragged bubble would sit on
- * top of.
- *
- * It lifts the panel by the same amount, because the two surfaces share one
- * corner by design: the panel opens where the bubble was, so a launcher-only
- * margin would make opening it jump.
+ * bottom-right stack, which starts 24px up, the Setup pane floats its rerun
+ * control in the same corner, and the Concierge toggle row runs along the
+ * bottom edge beneath both — all of which an undragged panel would sit on top
+ * of.
  */
 const DOCK_MARGIN_Y = 96;
 
@@ -63,7 +54,7 @@ interface DragSession {
 }
 
 /**
- * The bottom-right corner the Concierge hangs from before the user has moved it.
+ * The bottom-right corner the panel hangs from before the user has moved it.
  * @returns The default anchor.
  */
 function dockedAnchor(): ConciergePoint {
@@ -128,17 +119,16 @@ function topLeftFor(
 }
 
 /**
- * Places a Concierge surface against the shared anchor and makes it draggable.
+ * Places a Concierge surface against the persisted anchor and makes it
+ * draggable.
  *
- * Both surfaces hang their bottom-right corner from one persisted point, so the
- * launcher bubble and the panel that replaces it stay in the same place: drag
- * either and the other has already moved. Two positions could not do that — a
- * bubble dragged to the top-left opened a panel still docked bottom-right.
+ * The surface hangs its bottom-right corner from that point, so a panel the
+ * user moved reopens where they left it.
  *
  * The gesture writes `left`/`top` straight onto the node and commits to the atom
  * only on pointer-up. Persisting each move meant a `localStorage` write and a
- * React render per pointer event, which is what left the bubble trailing the
- * cursor; the surface now moves in the same frame as the pointer.
+ * React render per pointer event, which is what left the surface trailing the
+ * cursor; it now moves in the same frame as the pointer.
  *
  * That direct write is why the placement is applied in a layout effect rather
  * than through `style`: the panel re-renders while the agent streams, and a
@@ -151,7 +141,7 @@ function topLeftFor(
  * @param enabled - False while the surface is positioned by something else, as the maximized panel is.
  * @param externalRef - Node ref to place, when the caller already holds one; a ref of its own otherwise.
  * @param suspended - Reports a gesture that owns the node's offsets right now.
- * @returns The node ref to attach, the drag handler, and the click-suppression getter.
+ * @returns The node ref to attach, and the drag handler.
  */
 export function useConciergeAnchor<T extends HTMLElement>({
 	enabled = true,
@@ -168,7 +158,6 @@ export function useConciergeAnchor<T extends HTMLElement>({
 	const ownRef = useRef<T | null>(null);
 	const ref = externalRef ?? ownRef;
 	const session = useRef<DragSession | null>(null);
-	const dragged = useRef(false);
 	const endDrag = useRef<(() => void) | null>(null);
 
 	const applyAnchoredPosition = useCallback(() => {
@@ -222,7 +211,6 @@ export function useConciergeAnchor<T extends HTMLElement>({
 					return;
 				}
 				drag.moved = true;
-				dragged.current = true;
 				drag.point = clampToViewport(
 					{ x: drag.start.x + dx, y: drag.start.y + dy },
 					size,
@@ -238,11 +226,6 @@ export function useConciergeAnchor<T extends HTMLElement>({
 				endDrag.current = null;
 				const drag = session.current;
 				session.current = null;
-				// Cleared on the next frame so the click this pointer-up produces
-				// still sees the drag and can suppress itself.
-				requestAnimationFrame(() => {
-					dragged.current = false;
-				});
 				if (!drag?.moved) {
 					return;
 				}
@@ -260,9 +243,5 @@ export function useConciergeAnchor<T extends HTMLElement>({
 		[anchor, enabled, ref, setAnchor, size],
 	);
 
-	return {
-		isDragging: useCallback(() => dragged.current, []),
-		onPointerDown,
-		ref,
-	};
+	return { onPointerDown, ref };
 }

@@ -11,7 +11,7 @@ import {
 import { createStore, Provider } from 'jotai';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { ConciergeLauncher } from '@/renderer/components/concierge';
+import { ConciergeHost } from '@/renderer/components/concierge';
 import { SidebarProvider } from '@/renderer/components/ui/sidebar';
 import { conciergePresentationAtom } from '@/renderer/state/concierge';
 import type { ConciergeSessionEventWire } from '@/shared/ipc/contracts/concierge';
@@ -107,7 +107,7 @@ async function renderPanel() {
 		<QueryClientProvider client={createTestQueryClient()}>
 			<Provider store={store}>
 				<SidebarProvider defaultOpen>
-					<ConciergeLauncher />
+					<ConciergeHost />
 				</SidebarProvider>
 			</Provider>
 		</QueryClientProvider>,
