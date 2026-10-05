@@ -37,8 +37,15 @@
 		"trigger": "Create workspace"
 	},
 	"failure": {
-		"account-partial_one": "One organization could not be read, so its issues are missing: {{details}}",
-		"account-partial_other": "{{count}} organizations could not be read, so their issues are missing: {{details}}",
+		"accounts": {
+			"not-connected": "Sign in to Linear again for {{organizations, list}} from integration settings.",
+			"permission-denied": "Your Linear account for {{organizations, list}} does not have permission to read this.",
+			"rate-limited": "Linear is rate-limiting {{organizations, list}}. Try again shortly.",
+			"rate-limited-retry": "Linear is rate-limiting {{organizations, list}}. Try again in {{seconds}}s.",
+			"reconnect-required": "The Linear connection for {{organizations, list}} expired. Reconnect from integration settings.",
+			"unreachable": "Could not reach Linear for {{organizations, list}}. Showing cached data where available.",
+			"unreadable": "Could not read {{organizations, list}} from Linear. Showing cached data where available."
+		},
 		"not-connected": "Linear is not connected. Sign in from integration settings.",
 		"not-found": "This Linear issue no longer exists or is not visible to you.",
 		"permission-denied": "Your Linear account does not have permission for this action.",

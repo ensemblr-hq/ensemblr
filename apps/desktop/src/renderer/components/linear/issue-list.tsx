@@ -19,6 +19,7 @@ import {
 	ALL_TEAMS,
 	describeLinearAccountFailures,
 	describeLinearFailure,
+	isTransientLinearFailure,
 	type LinearIssueBoard,
 	type LinearIssueGroup,
 	type LinearIssueScope,
@@ -34,6 +35,7 @@ import {
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 import { LinearIssueEditorDialog } from './issue-editor-dialog';
 import { LinearPriorityIcon, LinearStateIcon } from './issue-glyphs';
+import { LinearIssueListNotice } from './issue-list-notice';
 import { LinearIssueFilterBar, LinearIssueViewBar } from './issue-list-toolbar';
 import { LinearIssueRow } from './issue-row';
 
@@ -141,15 +143,29 @@ export function LinearIssueList() {
 			<LinearIssueEditorDialog onOpenChange={setEditorOpen} open={editorOpen} />
 
 			{result?.status === 'error' ? (
-				<p className='rounded-md border border-status-danger/40 bg-status-danger/5 px-3 py-2 text-status-danger text-xs'>
-					{describeLinearFailure(result.failure)}
-				</p>
+				<LinearIssueListNotice
+					message={describeLinearFailure(result.failure)}
+					onRetry={
+						isTransientLinearFailure(result.failure) ? refresh.start : null
+					}
+					refreshing={refresh.active}
+					tone='danger'
+				/>
 			) : null}
 
 			{result && result.accountFailures.length > 0 ? (
-				<p className='rounded-md border border-status-warning/40 bg-status-warning/5 px-3 py-2 text-status-warning text-xs'>
-					{describeLinearAccountFailures(result.accountFailures)}
-				</p>
+				<LinearIssueListNotice
+					message={describeLinearAccountFailures(result.accountFailures)}
+					onRetry={
+						result.accountFailures.some((entry) =>
+							isTransientLinearFailure(entry.failure),
+						)
+							? refresh.start
+							: null
+					}
+					refreshing={refresh.active}
+					tone='warning'
+				/>
 			) : null}
 
 			<LinearIssueViewBar

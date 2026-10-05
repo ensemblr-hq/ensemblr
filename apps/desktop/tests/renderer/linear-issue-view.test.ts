@@ -1,12 +1,15 @@
 import { expect, test } from 'vitest';
 import {
 	deriveLinearGateState,
+	describeLinearAccountFailures,
 	describeLinearFailure,
 	formatLinearIssueContext,
 	getLinearPriorityLabel,
 	isLinearDataStale,
+	isTransientLinearFailure,
 	mapLinearIssuesToWorkspaceSources,
 } from '../../src/renderer/lib/linear';
+import type { LinearAccountFailure } from '../../src/shared/ipc/contracts/linear';
 import {
 	createLinearConnectionFixture,
 	createLinearFailureFixture,
@@ -92,6 +95,94 @@ test('describeLinearFailure: produces actionable copy per failure code', () => {
 	expect(
 		describeLinearFailure(createLinearFailureFixture({ code: 'network' })),
 	).toContain('cached');
+});
+
+/**
+ * One organization's failure inside a merged read.
+ * @param organizationName - Organization the account signs into
+ * @param failure - Overrides for the failure it reported
+ * @returns The per-account failure
+ */
+function accountFailure(
+	organizationName: string,
+	failure: Parameters<typeof createLinearFailureFixture>[0] = {},
+): LinearAccountFailure {
+	return {
+		accountId: `account-${organizationName}`,
+		failure: createLinearFailureFixture(failure),
+		organizationName,
+	};
+}
+
+test('describeLinearAccountFailures: names every organization that failed the same way once', () => {
+	expect(
+		describeLinearAccountFailures([
+			accountFailure('The Swiss Cheese'),
+			accountFailure('Almost Always'),
+		]),
+	).toBe(
+		'Could not reach Linear for The Swiss Cheese and Almost Always. Showing cached data where available.',
+	);
+});
+
+test('describeLinearAccountFailures: gives each distinct reason its own sentence', () => {
+	expect(
+		describeLinearAccountFailures([
+			accountFailure('The Swiss Cheese'),
+			accountFailure('Almost Always', { code: 'reconnect-required' }),
+			accountFailure('Acme'),
+		]),
+	).toBe(
+		'Could not reach Linear for The Swiss Cheese and Acme. Showing cached data where available. The Linear connection for Almost Always expired. Reconnect from integration settings.',
+	);
+});
+
+test('describeLinearAccountFailures: waits out the longest rate-limit window', () => {
+	expect(
+		describeLinearAccountFailures([
+			accountFailure('The Swiss Cheese', {
+				code: 'rate-limited',
+				retryAfterSeconds: 12,
+			}),
+			accountFailure('Almost Always', {
+				code: 'rate-limited',
+				retryAfterSeconds: 40,
+			}),
+		]),
+	).toBe(
+		'Linear is rate-limiting The Swiss Cheese and Almost Always. Try again in 40s.',
+	);
+});
+
+test('describeLinearAccountFailures: falls back to the account id for an unnamed organization', () => {
+	expect(
+		describeLinearAccountFailures([
+			{
+				accountId: 'account-1',
+				failure: createLinearFailureFixture(),
+				organizationName: null,
+			},
+		]),
+	).toContain('for account-1.');
+});
+
+test('isTransientLinearFailure: only the network and rate limits clear on their own', () => {
+	expect(isTransientLinearFailure(createLinearFailureFixture())).toBe(true);
+	expect(
+		isTransientLinearFailure(
+			createLinearFailureFixture({ code: 'rate-limited' }),
+		),
+	).toBe(true);
+	expect(
+		isTransientLinearFailure(
+			createLinearFailureFixture({ code: 'reconnect-required' }),
+		),
+	).toBe(false);
+	expect(
+		isTransientLinearFailure(
+			createLinearFailureFixture({ code: 'permission-denied' }),
+		),
+	).toBe(false);
 });
 
 test('isLinearDataStale: respects the freshness window', () => {

@@ -59,6 +59,7 @@ export {
 	formatLinearIssueDocument,
 	getLinearPriorityLabel,
 	isLinearDataStale,
+	isTransientLinearFailure,
 	linearInitials,
 	mapLinearIssuesToWorkspaceSources,
 } from './issue-view';

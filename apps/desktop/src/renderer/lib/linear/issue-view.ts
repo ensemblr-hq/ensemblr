@@ -119,29 +119,141 @@ export function describeLinearFailure(failure: LinearServiceFailure): string {
 }
 
 /**
- * User-facing copy naming the accounts a merged read could not reach, so a
- * short list is not mistaken for a complete one.
+ * Whether a Linear failure may clear up on its own — the network or a rate
+ * limit — rather than waiting on the user to reconnect or fix something.
+ * @param failure - The failure to classify
+ * @returns True when retrying later can succeed without the user acting
+ */
+export function isTransientLinearFailure(
+	failure: LinearServiceFailure,
+): boolean {
+	return failure.code === 'network' || failure.code === 'rate-limited';
+}
+
+/** Accounts a merged read could not reach for one shared reason. */
+interface LinearAccountFailureGroup {
+	code: LinearServiceFailure['code'];
+	organizations: string[];
+	retryAfterSeconds: number | null;
+}
+
+/**
+ * Collects per-account failures under their reason, so several organizations
+ * that failed the same way are named in one sentence rather than one each.
  * @param failures - Per-account failures reported alongside a partial result
- * @returns The warning sentence naming each organization and its reason
+ * @returns One group per failure code, in the order each code first appears
+ */
+function groupLinearAccountFailures(
+	failures: readonly LinearAccountFailure[],
+): LinearAccountFailureGroup[] {
+	const codes = [...new Set(failures.map((entry) => entry.failure.code))];
+
+	return codes.map((code) => {
+		const members = failures.filter((entry) => entry.failure.code === code);
+
+		return {
+			code,
+			organizations: [
+				...new Set(
+					members.map((entry) => entry.organizationName ?? entry.accountId),
+				),
+			],
+			retryAfterSeconds: members.reduce<number | null>(
+				(longest, entry) =>
+					laterRetry(longest, entry.failure.retryAfterSeconds),
+				null,
+			),
+		};
+	});
+}
+
+/**
+ * The longer of two rate-limit windows, since retrying before the later one
+ * ends still fails for that organization.
+ * @param current - The window recorded so far, if any
+ * @param next - Another account's window, if any
+ * @returns The longer window, or null when neither names one
+ */
+function laterRetry(
+	current: number | null,
+	next: number | null,
+): number | null {
+	if (current === null || next === null) {
+		return current ?? next;
+	}
+
+	return Math.max(current, next);
+}
+
+/**
+ * One sentence naming every organization that failed for the same reason.
+ * @param group - The organizations and the reason they share
+ * @returns The localized sentence
+ */
+function describeLinearAccountFailureGroup({
+	code,
+	organizations,
+	retryAfterSeconds,
+}: LinearAccountFailureGroup): string {
+	switch (code) {
+		case 'rate-limited':
+			return retryAfterSeconds
+				? i18n.t(
+						'linear:failure.accounts.rate-limited-retry',
+						'Linear is rate-limiting {{organizations, list}}. Try again in {{seconds}}s.',
+						{ organizations, seconds: retryAfterSeconds },
+					)
+				: i18n.t(
+						'linear:failure.accounts.rate-limited',
+						'Linear is rate-limiting {{organizations, list}}. Try again shortly.',
+						{ organizations },
+					);
+		case 'reconnect-required':
+			return i18n.t(
+				'linear:failure.accounts.reconnect-required',
+				'The Linear connection for {{organizations, list}} expired. Reconnect from integration settings.',
+				{ organizations },
+			);
+		case 'not-connected':
+			return i18n.t(
+				'linear:failure.accounts.not-connected',
+				'Sign in to Linear again for {{organizations, list}} from integration settings.',
+				{ organizations },
+			);
+		case 'permission-denied':
+			return i18n.t(
+				'linear:failure.accounts.permission-denied',
+				'Your Linear account for {{organizations, list}} does not have permission to read this.',
+				{ organizations },
+			);
+		case 'network':
+			return i18n.t(
+				'linear:failure.accounts.unreachable',
+				'Could not reach Linear for {{organizations, list}}. Showing cached data where available.',
+				{ organizations },
+			);
+		default:
+			return i18n.t(
+				'linear:failure.accounts.unreadable',
+				'Could not read {{organizations, list}} from Linear. Showing cached data where available.',
+				{ organizations },
+			);
+	}
+}
+
+/**
+ * User-facing copy naming the organizations a merged read could not reach, so
+ * a short list is not mistaken for a complete one. Organizations that failed
+ * the same way share one sentence.
+ * @param failures - Per-account failures reported alongside a partial result
+ * @returns One sentence per distinct reason, naming its organizations
  */
 export function describeLinearAccountFailures(
 	failures: readonly LinearAccountFailure[],
 ): string {
-	return i18n.t(
-		'linear:failure.account-partial',
-		'{{count}} organizations could not be read, so their issues are missing: {{details}}',
-		{
-			count: failures.length,
-			defaultValue_one:
-				'One organization could not be read, so its issues are missing: {{details}}',
-			details: failures
-				.map(
-					(entry) =>
-						`${entry.organizationName ?? entry.accountId} — ${describeLinearFailure(entry.failure)}`,
-				)
-				.join('; '),
-		},
-	);
+	return groupLinearAccountFailures(failures)
+		.map(describeLinearAccountFailureGroup)
+		.join(' ');
 }
 
 /**

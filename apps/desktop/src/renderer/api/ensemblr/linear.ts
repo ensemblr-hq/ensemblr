@@ -5,6 +5,7 @@ import {
 } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
+import { isTransientLinearFailure } from '@/renderer/lib/linear';
 import type {
 	CreateLinearCommentRequest,
 	CreateLinearCommentResult,
@@ -74,6 +75,44 @@ export function disconnectLinear(
 const SYNCING_POLL_MS = 1200;
 
 /**
+ * How often to re-read a Linear answer that reported a failure which can clear
+ * on its own. It matches the main process's failure cooldown, so each re-read
+ * lands just as the next sync attempt is allowed to start.
+ */
+const FAILURE_RETRY_POLL_MS = 30_000;
+
+/**
+ * When to re-read a Linear list or metadata answer: quickly while a refresh
+ * runs behind it, slowly while it reports a network or rate-limit failure, and
+ * never otherwise. The slow re-read is what retires a failure: the main process
+ * keeps reporting the last one until a sync succeeds, and without a read
+ * nothing would start that sync, so one failed launch-time attempt held its
+ * notice on screen until the user refreshed by hand.
+ * @param data - The answer the query holds, if any
+ * @returns The interval in milliseconds, or false to stop polling
+ */
+export function linearReadPollInterval(
+	data: ListLinearIssuesResult | GetLinearMetadataResult | undefined,
+): number | false {
+	if (!data) {
+		return false;
+	}
+
+	if (data.status === 'ok' && data.syncing) {
+		return SYNCING_POLL_MS;
+	}
+
+	const failures = [
+		...data.accountFailures.map((entry) => entry.failure),
+		...(data.status === 'error' ? [data.failure] : []),
+	];
+
+	return failures.some(isTransientLinearFailure)
+		? FAILURE_RETRY_POLL_MS
+		: false;
+}
+
+/**
  * Query options for the cached Linear issue list. `keepPreviousData` holds the
  * current rows on screen while a changed filter or search term loads, because
  * every distinct filter is its own cache entry and the list would otherwise fall
@@ -88,10 +127,7 @@ export function linearIssuesQuery(request: ListLinearIssuesRequest = {}) {
 				() => getEnsemblrApi().linearListIssues(request),
 			),
 		queryKey: ensemblrQueryKeys.linearIssues(request),
-		refetchInterval: (query) =>
-			query.state.data?.status === 'ok' && query.state.data.syncing
-				? SYNCING_POLL_MS
-				: false,
+		refetchInterval: (query) => linearReadPollInterval(query.state.data),
 		staleTime: 5000,
 	});
 }
@@ -220,10 +256,7 @@ export const linearMetadataQuery = queryOptions({
 			() => getEnsemblrApi().linearMetadata({}),
 		),
 	queryKey: ensemblrQueryKeys.linearMetadata(),
-	refetchInterval: (query) =>
-		query.state.data?.status === 'ok' && query.state.data.syncing
-			? SYNCING_POLL_MS
-			: false,
+	refetchInterval: (query) => linearReadPollInterval(query.state.data),
 	staleTime: 30_000,
 });
 
