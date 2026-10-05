@@ -5,7 +5,9 @@ import { useCallback, useMemo } from 'react';
 import {
 	ALL_TEAMS,
 	DEFAULT_LINEAR_ISSUE_FILTERS,
+	isLinearAssigneeSelection,
 	type LinearIssueFilters,
+	toggleLinearAssignee,
 } from '@/renderer/lib/linear';
 import { KEY } from './atoms';
 
@@ -19,25 +21,28 @@ const filtersStorage = createJSONStorage<LinearIssueFilters>();
  * Every field is optional here: a value written by an older build predates any
  * field added since, and spreading it over the defaults is what fills the gap.
  * @param value - Whatever JSON decoded to
- * @returns Whether each field it does carry is a string
+ * @returns Whether each field it does carry has its expected type
  */
-function isStoredFilters(
-	value: unknown,
-): value is Partial<Record<keyof LinearIssueFilters, string>> {
+function isStoredFilters(value: unknown): value is Partial<LinearIssueFilters> {
 	if (typeof value !== 'object' || value === null || Array.isArray(value)) {
 		return false;
 	}
 
 	const candidate = value as Record<string, unknown>;
 
-	return (['accountId', 'query', 'teamId'] as const).every(
-		(field) =>
-			candidate[field] === undefined || typeof candidate[field] === 'string',
+	return (
+		(['accountId', 'query', 'teamId'] as const).every(
+			(field) =>
+				candidate[field] === undefined || typeof candidate[field] === 'string',
+		) &&
+		(candidate.assignees === undefined ||
+			isLinearAssigneeSelection(candidate.assignees))
 	);
 }
 
 /**
- * Filter bar state of the Linear browse list — search text, account, and team.
+ * Filter bar state of the Linear browse list — search text, account, team, and
+ * assignee.
  * Persisted so leaving the list for an issue and coming back lands on the same
  * narrowed set rather than resetting to every issue in every organization.
  * `getOnInit` keeps a cold start from rendering the unfiltered list for a frame
@@ -78,6 +83,7 @@ export interface LinearIssueFiltersState {
 	setAccountId: (accountId: string) => void;
 	setQuery: (query: string) => void;
 	setTeamId: (teamId: string) => void;
+	toggleAssignee: (entry: string) => void;
 }
 
 /**
@@ -102,13 +108,28 @@ export function useLinearIssueFilters(): LinearIssueFiltersState {
 		(teamId: string) => setFilters((current) => ({ ...current, teamId })),
 		[setFilters],
 	);
+	const toggleAssignee = useCallback(
+		(entry: string) =>
+			setFilters((current) => ({
+				...current,
+				assignees: toggleLinearAssignee(current.assignees, entry),
+			})),
+		[setFilters],
+	);
 	const clear = useCallback(
 		() => setFilters(DEFAULT_LINEAR_ISSUE_FILTERS),
 		[setFilters],
 	);
 
 	return useMemo(
-		() => ({ clear, filters, setAccountId, setQuery, setTeamId }),
-		[clear, filters, setAccountId, setQuery, setTeamId],
+		() => ({
+			clear,
+			filters,
+			setAccountId,
+			setQuery,
+			setTeamId,
+			toggleAssignee,
+		}),
+		[clear, filters, setAccountId, setQuery, setTeamId, toggleAssignee],
 	);
 }

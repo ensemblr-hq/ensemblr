@@ -2,7 +2,12 @@ import { useState } from 'react';
 
 import { LinearIssueEditorDialog } from '@/renderer/components/linear/issue-editor-dialog';
 import { LinearIssueFilterBar } from '@/renderer/components/linear/issue-list-toolbar';
-import { ALL_ACCOUNTS, ALL_TEAMS } from '@/renderer/lib/linear';
+import {
+	ALL_ACCOUNTS,
+	ALL_TEAMS,
+	listLinearAssigneeOptions,
+	toggleLinearAssignee,
+} from '@/renderer/lib/linear';
 
 import {
 	createFixtureLinearIssue,
@@ -27,6 +32,13 @@ export function LinearIssueEditorScene() {
 	const [accountId, setAccountId] = useState(ALL_ACCOUNTS);
 	const [teamId, setTeamId] = useState(ALL_TEAMS);
 	const [query, setQuery] = useState('');
+	const [assignees, setAssignees] = useState<string[]>([]);
+	const assigneeOptions = listLinearAssigneeOptions({
+		issues: [createFixtureLinearIssue()],
+		selection: assignees,
+		users: resolveFixtureLinearMetadata().metadata.users,
+		viewerIds: FIXTURE_LINEAR_ACCOUNTS.map((account) => account.userId),
+	});
 
 	return (
 		<SceneSection
@@ -64,11 +76,18 @@ export function LinearIssueEditorScene() {
 				<LinearIssueFilterBar
 					accountId={accountId}
 					accounts={FIXTURE_LINEAR_ACCOUNTS}
+					assignee={{
+						onToggle: (entry) =>
+							setAssignees((current) => toggleLinearAssignee(current, entry)),
+						options: assigneeOptions,
+						selection: assignees,
+					}}
 					onAccountChange={setAccountId}
 					onClearFilters={() => {
 						setAccountId(ALL_ACCOUNTS);
 						setTeamId(ALL_TEAMS);
 						setQuery('');
+						setAssignees([]);
 					}}
 					onNewIssue={() => {
 						setMode('create');

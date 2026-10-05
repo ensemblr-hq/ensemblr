@@ -49,9 +49,21 @@ describe('useLinearIssueFilters', () => {
 
 		expect(result.current.filters).toEqual({
 			accountId: 'account-1',
+			assignees: [],
 			query: 'oauth',
 			teamId: 'team-1',
 		});
+	});
+
+	test('toggles an assignee on and back off', () => {
+		const { result } = render();
+
+		act(() => result.current.toggleAssignee('me'));
+		act(() => result.current.toggleAssignee('unassigned'));
+		expect(result.current.filters.assignees).toEqual(['me', 'unassigned']);
+
+		act(() => result.current.toggleAssignee('me'));
+		expect(result.current.filters.assignees).toEqual(['unassigned']);
 	});
 
 	// A team belongs to exactly one account, so keeping it across an account
@@ -90,6 +102,7 @@ describe('useLinearIssueFilters', () => {
 
 		expect(second.result.current.filters).toEqual({
 			accountId: 'account-1',
+			assignees: [],
 			query: 'oauth',
 			teamId: ALL_TEAMS,
 		});
@@ -104,6 +117,7 @@ describe('useLinearIssueFilters', () => {
 		act(() => first.result.current.setAccountId('account-1'));
 		act(() => first.result.current.setTeamId('team-1'));
 		act(() => first.result.current.setQuery('oauth'));
+		act(() => first.result.current.toggleAssignee('me'));
 		first.unmount();
 
 		expect(stored()).not.toBeNull();
@@ -112,6 +126,7 @@ describe('useLinearIssueFilters', () => {
 
 		expect(restarted.result.current.filters).toEqual({
 			accountId: 'account-1',
+			assignees: ['me'],
 			query: 'oauth',
 			teamId: 'team-1',
 		});
@@ -141,6 +156,8 @@ describe('useLinearIssueFilters', () => {
 			'a string': '"oauth"',
 			'an array': '["account-1"]',
 			'a field of the wrong type': '{"accountId":7,"query":"","teamId":"all"}',
+			'assignees that are not strings': '{"assignees":[7]}',
+			'assignees that are not an array': '{"assignees":"me"}',
 			'malformed json': '{not json',
 		};
 
@@ -167,6 +184,7 @@ describe('useLinearIssueFilters', () => {
 
 		expect(result.current.filters).toEqual({
 			accountId: DEFAULT_LINEAR_ISSUE_FILTERS.accountId,
+			assignees: [],
 			query: 'oauth',
 			teamId: DEFAULT_LINEAR_ISSUE_FILTERS.teamId,
 		});

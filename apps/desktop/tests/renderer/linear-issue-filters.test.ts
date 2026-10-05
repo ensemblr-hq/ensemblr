@@ -162,6 +162,7 @@ describe('hasLinearIssueFilters', () => {
 		['search', { query: 'oauth' }],
 		['account', { accountId: 'account-1' }],
 		['team', { teamId: 'team-1' }],
+		['assignee', { assignees: ['me'] }],
 	])('is true when only the %s is set', (_facet, overrides) => {
 		expect(hasLinearIssueFilters(filters(overrides))).toBe(true);
 	});

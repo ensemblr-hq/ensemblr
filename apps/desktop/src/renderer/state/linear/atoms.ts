@@ -1,9 +1,10 @@
-import { atomWithStorage } from 'jotai/utils';
+import { atomWithStorage, createJSONStorage } from 'jotai/utils';
 
-import type {
-	LinearIssueGrouping,
-	LinearIssueScope,
-	LinearIssueSort,
+import {
+	isLinearAssigneeSelection,
+	type LinearIssueGrouping,
+	type LinearIssueScope,
+	type LinearIssueSort,
 } from '@/renderer/lib/linear';
 
 /**
@@ -38,4 +39,33 @@ export const linearIssueSortAtom = atomWithStorage<LinearIssueSort>(
 export const linearIssueGroupingAtom = atomWithStorage<LinearIssueGrouping>(
 	KEY('grouping'),
 	'status',
+);
+
+const assigneeSelectionStorage = createJSONStorage<string[]>();
+
+/**
+ * Assignee selection of the create-from picker's Issues tab, apart from the
+ * browse list's and the board's so narrowing one surface never quietly narrows
+ * another. Persisted, and validated on the way in for the same reason the
+ * browse filters are: `getOnInit` puts the stored value into the first render.
+ */
+export const linearSourcePickerAssigneesAtom = atomWithStorage<string[]>(
+	KEY('source_picker_assignees'),
+	[],
+	{
+		...assigneeSelectionStorage,
+		/**
+		 * Reads the stored selection, falling back to none when it does not decode
+		 * to an array of strings.
+		 * @param key - The storage key being read
+		 * @param initialValue - The value to assume when nothing is stored
+		 * @returns A selection safe to render
+		 */
+		getItem: (key, initialValue) => {
+			const stored = assigneeSelectionStorage.getItem(key, initialValue);
+
+			return isLinearAssigneeSelection(stored) ? stored : [];
+		},
+	},
+	{ getOnInit: true },
 );

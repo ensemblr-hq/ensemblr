@@ -1,31 +1,19 @@
 import type { TFunction } from 'i18next';
 import {
 	ArrowUpDownIcon,
-	CheckIcon,
 	FolderGit2Icon,
 	LayersIcon,
 	RefreshCwIcon,
 	SearchIcon,
 	XIcon,
 } from 'lucide-react';
-import { type ReactNode, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { FacetItem, FacetPopover } from '@/renderer/components/facet-popover';
+import { LinearAssigneeFacet } from '@/renderer/components/linear/assignee-facet';
 import { Button } from '@/renderer/components/ui/button';
-import {
-	Command,
-	CommandEmpty,
-	CommandGroup,
-	CommandInput,
-	CommandItem,
-	CommandList,
-} from '@/renderer/components/ui/command';
 import { Input } from '@/renderer/components/ui/input';
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from '@/renderer/components/ui/popover';
 import {
 	Select,
 	SelectContent,
@@ -34,7 +22,7 @@ import {
 	SelectValue,
 } from '@/renderer/components/ui/select';
 import { ProjectAvatar } from '@/renderer/components/workbench-shell/project-avatar';
-import { cn } from '@/renderer/lib/utils';
+import type { LinearAssigneeOption } from '@/renderer/lib/linear';
 import {
 	BOARD_CARD_SOURCES,
 	BOARD_SORT_MODES,
@@ -42,6 +30,7 @@ import {
 	type BoardFiltersState,
 	type BoardSortMode,
 } from '@/renderer/state/workspace';
+import type { FacetCollapse } from '@/renderer/types/components';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 
 /**
@@ -60,6 +49,12 @@ const COLLAPSE_LABEL_TO_ICON = '@max-2xl/dashboard-header:hidden';
  * than being concatenated onto this number.
  */
 const REVEAL_WHEN_LABEL_COLLAPSED = 'hidden @max-2xl/dashboard-header:inline';
+
+/** How every facet on the board collapses as the dashboard header narrows. */
+const BOARD_FACET_COLLAPSE: FacetCollapse = {
+	hideLabel: COLLAPSE_LABEL_TO_ICON,
+	showCount: REVEAL_WHEN_LABEL_COLLAPSED,
+};
 
 /**
  * Collapses the sort control to its icon at the same width. The value is
@@ -109,16 +104,27 @@ function boardSortLabel(t: TFunction, sort: BoardSortMode): string {
 
 /**
  * Filter and sort controls for the dashboard board: free-text search, a
- * repository facet, a source facet, and the column sort. Every control writes
- * straight to the persisted toolbar state, so the board comes back the way the
- * user left it.
+ * repository facet, a source facet, a Linear assignee facet, and the column
+ * sort. Every control writes straight to the persisted toolbar state, so the
+ * board comes back the way the user left it. The assignee facet shows only
+ * while Linear is connected, which `assigneeOptions` being null says it is not.
  */
 export function BoardToolbar({
-	filters: { clear, filters, setQuery, setSort, toggleRepo, toggleSource },
+	assigneeOptions,
+	filters: {
+		clear,
+		filters,
+		setQuery,
+		setSort,
+		toggleAssignee,
+		toggleRepo,
+		toggleSource,
+	},
 	isRefreshing,
 	onRefresh,
 	projects,
 }: {
+	assigneeOptions: readonly LinearAssigneeOption[] | null;
 	filters: BoardFiltersState;
 	isRefreshing: boolean;
 	onRefresh: () => void;
@@ -137,6 +143,7 @@ export function BoardToolbar({
 		filters.query.length > 0 ||
 		filters.repoIds.length > 0 ||
 		filters.sources.length > 0 ||
+		filters.assignees.length > 0 ||
 		filters.sort !== 'manual';
 
 	return (
@@ -157,7 +164,8 @@ export function BoardToolbar({
 					value={filters.query}
 				/>
 			</div>
-			<BoardFacetPopover
+			<FacetPopover
+				collapse={BOARD_FACET_COLLAPSE}
 				count={filters.repoIds.length}
 				icon={
 					<FolderGit2Icon
@@ -180,7 +188,7 @@ export function BoardToolbar({
 				)}
 			>
 				{projects.map((project) => (
-					<BoardFacetItem
+					<FacetItem
 						isSelected={selectedRepoIds.has(project.id)}
 						key={project.id}
 						label={project.name}
@@ -188,10 +196,11 @@ export function BoardToolbar({
 						value={project.id}
 					>
 						<ProjectAvatar project={project} size='sm' />
-					</BoardFacetItem>
+					</FacetItem>
 				))}
-			</BoardFacetPopover>
-			<BoardFacetPopover
+			</FacetPopover>
+			<FacetPopover
+				collapse={BOARD_FACET_COLLAPSE}
 				count={filters.sources.length}
 				icon={
 					<LayersIcon
@@ -214,7 +223,7 @@ export function BoardToolbar({
 				)}
 			>
 				{BOARD_CARD_SOURCES.map((source) => (
-					<BoardFacetItem
+					<FacetItem
 						isSelected={selectedSources.has(source)}
 						key={source}
 						label={boardSourceLabel(t, source)}
@@ -222,7 +231,15 @@ export function BoardToolbar({
 						value={source}
 					/>
 				))}
-			</BoardFacetPopover>
+			</FacetPopover>
+			{assigneeOptions ? (
+				<LinearAssigneeFacet
+					collapse={BOARD_FACET_COLLAPSE}
+					onToggle={toggleAssignee}
+					options={assigneeOptions}
+					selection={filters.assignees}
+				/>
+			) : null}
 			<Select
 				onValueChange={(next) => setSort(next as BoardSortMode)}
 				value={filters.sort}
@@ -278,93 +295,5 @@ export function BoardToolbar({
 				/>
 			</Button>
 		</div>
-	);
-}
-
-/** Shape of a {@link BoardFacetPopover} facet. */
-interface BoardFacetPopoverProps {
-	children: ReactNode;
-	/** How many options the facet holds selected, which its label already states. */
-	count: number;
-	icon: ReactNode;
-	label: string;
-	searchPlaceholder: string;
-}
-
-/** Popover wrapping one multi-select facet's searchable option list. */
-function BoardFacetPopover({
-	children,
-	count,
-	icon,
-	label,
-	searchPlaceholder,
-}: BoardFacetPopoverProps) {
-	const { t } = useTranslation();
-	const [open, setOpen] = useState(false);
-
-	return (
-		<Popover onOpenChange={setOpen} open={open}>
-			<PopoverTrigger asChild>
-				<Button
-					aria-label={label}
-					className='h-7 shrink-0 gap-1.5 px-2 font-medium text-xs'
-					size='sm'
-					title={label}
-					variant='ghost'
-				>
-					{icon}
-					<span className={cn('max-w-32 truncate', COLLAPSE_LABEL_TO_ICON)}>
-						{label}
-					</span>
-					{count > 0 ? (
-						<span className={REVEAL_WHEN_LABEL_COLLAPSED}>{count}</span>
-					) : null}
-				</Button>
-			</PopoverTrigger>
-			<PopoverContent align='end' className='w-56 overflow-hidden p-0'>
-				<Command>
-					<CommandInput placeholder={searchPlaceholder} />
-					<CommandList>
-						<CommandEmpty className='py-6 text-muted-foreground text-xs'>
-							{t('workbench:dashboard.toolbar.facet-empty', 'Nothing to show.')}
-						</CommandEmpty>
-						<CommandGroup>{children}</CommandGroup>
-					</CommandList>
-				</Command>
-			</PopoverContent>
-		</Popover>
-	);
-}
-
-/** One toggleable row inside a facet popover, check-marked while selected. */
-function BoardFacetItem({
-	children,
-	isSelected,
-	label,
-	onSelect,
-	value,
-}: {
-	children?: ReactNode;
-	isSelected: boolean;
-	label: string;
-	onSelect: () => void;
-	value: string;
-}) {
-	return (
-		<CommandItem
-			className='gap-2'
-			keywords={[label]}
-			onSelect={onSelect}
-			value={value}
-		>
-			<span className='flex w-4 shrink-0 items-center justify-center'>
-				<CheckIcon
-					aria-hidden='true'
-					className={cn('size-4', !isSelected && 'invisible')}
-				/>
-			</span>
-			{children}
-			<span className='min-w-0 flex-1 truncate text-[0.8125rem]'>{label}</span>
-		</CommandItem>
 	);
 }

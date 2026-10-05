@@ -22,6 +22,10 @@ import {
 	LINEAR_STARTED_STATE_TYPES,
 } from '@/shared/linear-issue-state';
 import {
+	createLinearAccountFixture,
+	createLinearConnectionFixture,
+} from '../../fixtures/linear';
+import {
 	clearEnsemblrApi,
 	createTestQueryClient,
 	installEnsemblrApi,
@@ -152,6 +156,10 @@ function installBridge({
 	};
 	const linearRequests: ListLinearIssuesRequest[] = [];
 	installEnsemblrApi({
+		linearConnectionStatus: async () =>
+			createLinearConnectionFixture({
+				accounts: [createLinearAccountFixture({ userId: 'viewer' })],
+			}),
 		linearListIssues: async (request: ListLinearIssuesRequest) => {
 			linearRequests.push(request);
 			if (request.stateScope === 'not-started') {
@@ -176,8 +184,15 @@ function installBridge({
 	return linearRequests;
 }
 
-/** Renders the picker hook on the Issues tab of `repo-1`, searched for `query`. */
-function renderIssuesTab(projects: ProjectShellModel[], query = '') {
+/**
+ * Renders the picker hook on the Issues tab of `repo-1`, searched for `query`
+ * and narrowed to `linearAssignees`.
+ */
+function renderIssuesTab(
+	projects: ProjectShellModel[],
+	query = '',
+	linearAssignees: string[] = [],
+) {
 	const client = createTestQueryClient();
 	const wrapper = ({ children }: { children: ReactNode }) => (
 		<QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -186,6 +201,7 @@ function renderIssuesTab(projects: ProjectShellModel[], query = '') {
 		({ search }: { search: string }) =>
 			useWorkspaceSourcePicker({
 				kind: 'issue',
+				linearAssignees,
 				open: true,
 				projects,
 				query: search,
@@ -410,6 +426,34 @@ test('the Issues tab keeps only the Linear teams the repository names', async ()
 		'Ensemblr issue',
 	]);
 	expect(result.current.itemsById.has('mkt')).toBe(false);
+});
+
+test('the assignee facet narrows Linear rows and leaves GitHub rows alone', async () => {
+	installBridge({
+		githubIssues: [githubIssue({ number: 7, title: 'GitHub issue' })],
+		linear: {
+			accountFailures: [],
+			issues: [
+				linearIssue({ assigneeId: 'viewer', id: 'mine', title: 'My issue' }),
+				linearIssue({ assigneeId: 'bob', id: 'bobs', title: 'Bob issue' }),
+				linearIssue({ id: 'nobodys', title: 'Unassigned issue' }),
+			],
+			source: 'remote',
+			status: 'ok',
+		},
+	});
+
+	const { result } = renderIssuesTab([projectAtRoot()], '', ['me']);
+
+	await waitFor(() => expect(result.current.assigneeOptions).not.toBeNull());
+	await waitFor(() => expect(result.current.isLoading).toBe(false));
+	expect(result.current.sources.map((source) => source.title).sort()).toEqual([
+		'GitHub issue',
+		'My issue',
+	]);
+	expect(result.current.assigneeOptions?.map((option) => option.id)).toEqual([
+		'bob',
+	]);
 });
 
 test('the Issues tab keeps every Linear team when the repository names none', async () => {

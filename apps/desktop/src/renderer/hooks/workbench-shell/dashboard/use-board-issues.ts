@@ -23,6 +23,7 @@ import type {
 	BoardIssuesFailure,
 } from '@/renderer/types/workbench-shell';
 import type { GithubFailure } from '@/shared/ipc/contracts/github';
+import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 import type { ListRepositoryIssuesResult } from '@/shared/ipc/contracts/workspace-sources';
 
 /** The board's issue cards plus the degradable state its column header shows. */
@@ -35,6 +36,8 @@ export interface BoardIssuesState {
 	 */
 	errors: BoardIssuesFailure[];
 	isLoading: boolean;
+	/** The Linear issues behind the backlog and dismissed cards, which the assignee facet draws its people from. */
+	linearIssues: LinearIssueWire[];
 }
 
 /**
@@ -85,7 +88,7 @@ function combineLinearTeams(results: readonly UseQueryResult<string[]>[]): {
  * of rather than reading as "nothing to do"; one whose settings could not be
  * read is treated as naming no teams.
  * @param projects - The projects whose repositories to list issues for.
- * @returns The backlog and dismissed issue cards, with loading and failure state.
+ * @returns The backlog and dismissed issue cards, the Linear issues behind them, and loading and failure state.
  */
 export function useBoardIssues(
 	projects: readonly ProjectShellModel[],
@@ -153,6 +156,10 @@ export function useBoardIssues(
 			projects,
 		],
 	);
+	const linearIssues = useMemo(
+		() => linearIssuesOf([...issues.backlog, ...issues.dismissed]),
+		[issues],
+	);
 
 	// A dismissed key outlives the issue it names — closed on GitHub, or turned
 	// into a workspace — and nothing else ever removes it, so an issue dismissed
@@ -175,7 +182,19 @@ export function useBoardIssues(
 		dismissedIssues: issues.dismissed,
 		errors: githubErrors,
 		isLoading,
+		linearIssues,
 	};
+}
+
+/**
+ * The Linear issues a set of board cards was built from, GitHub cards skipped.
+ * @param cards - The board's issue cards.
+ * @returns The Linear issue behind each Linear card, in card order.
+ */
+function linearIssuesOf(cards: readonly BoardIssueCard[]): LinearIssueWire[] {
+	return cards.flatMap((card) =>
+		card.item.kind === 'linear-issue' ? [card.item.issue] : [],
+	);
 }
 
 /**

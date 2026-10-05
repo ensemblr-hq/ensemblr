@@ -1248,6 +1248,14 @@ export default interface Resources {
 		};
 	};
 	linear: {
+		'assignee-filter': {
+			count_one: '{{count}} assignee';
+			count_other: '{{count}} assignees';
+			label: 'Assignee';
+			me: 'Me';
+			search: 'Search people…';
+			unknown: 'Unknown member';
+		};
 		browse: {
 			title: 'Linear issues';
 		};
@@ -1364,6 +1372,7 @@ export default interface Resources {
 			count_one: '{{count}} issue';
 			count_other: '{{count}} issues';
 			empty: 'No Linear issues are cached yet. Refresh to sync from Linear.';
+			'empty-assignee': 'No issues here match the assignee filter.';
 			'empty-closed': 'No closed issues here yet.';
 			'empty-scope': 'Every issue here is closed. Switch to All to see them.';
 			'empty-search': 'No issues match your search.';
@@ -3439,6 +3448,7 @@ export default interface Resources {
 			description: 'Choose a branch, pull request, or issue to start a workspace.';
 			empty: {
 				issue: 'No issues waiting to be started. Open GitHub issues and Linear issues in Backlog or Todo appear here until a workspace is created from them. Search to find Linear issues already in progress.';
+				'issue-assignee': 'No issues waiting to be started match the assignee filter.';
 			};
 			loading: 'Loading {{sources}}…';
 			'no-match': 'No {{sources}} match your search.';

@@ -39,6 +39,7 @@ vi.mock(
 	'@/renderer/hooks/workbench-shell/navigation-sidebar/use-workspace-source-picker',
 	() => ({
 		useWorkspaceSourcePicker: () => ({
+			assigneeOptions: null,
 			error: null,
 			isLoading: false,
 			itemsById: new Map<string, WorkspaceSourceItem>(),

@@ -1,10 +1,12 @@
 import type { TFunction } from 'i18next';
+import { useAtom } from 'jotai';
 import {
 	GitBranchIcon,
 	GitPullRequestIcon,
 	TriangleAlertIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { LinearAssigneeFacet } from '@/renderer/components/linear/assignee-facet';
 import { LinearProjectBadge } from '@/renderer/components/linear/issue-project';
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -25,6 +27,7 @@ import { RepositoryPicker } from '@/renderer/components/workbench-shell/reposito
 import { useWorkspaceSourcePicker } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-workspace-source-picker';
 import { useWorkspaceSourceSelection } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-workspace-source-selection';
 import { failureText } from '@/renderer/lib/failure-text';
+import { toggleLinearAssignee } from '@/renderer/lib/linear';
 import {
 	getWorkspaceSourceActions,
 	getWorkspaceSourceKindLabel,
@@ -32,6 +35,7 @@ import {
 	WORKSPACE_SOURCE_KINDS,
 	workspaceSeedFromSourceItem,
 } from '@/renderer/lib/workbench';
+import { linearSourcePickerAssigneesAtom } from '@/renderer/state/linear';
 import type {
 	ProjectShellModel,
 	WorkspaceCreationSeed,
@@ -88,15 +92,27 @@ export function CreateWorkspaceSourceDialog({
 	const { t } = useTranslation();
 	const { kind, repoId, search, selectedRepo, setKind, setRepoId, setSearch } =
 		useWorkspaceSourceSelection({ open, project, projects });
+	const [linearAssignees, setLinearAssignees] = useAtom(
+		linearSourcePickerAssigneesAtom,
+	);
 
-	const { error, isLoading, itemsById, linearGap, sources, startedSources } =
-		useWorkspaceSourcePicker({
-			kind,
-			open,
-			projects,
-			query: search,
-			repoId,
-		});
+	const {
+		assigneeOptions,
+		error,
+		isLoading,
+		itemsById,
+		linearGap,
+		sources,
+		startedSources,
+	} = useWorkspaceSourcePicker({
+		kind,
+		linearAssignees,
+		open,
+		projects,
+		query: search,
+		repoId,
+	});
+	const showAssigneeFacet = kind === 'issue' && assigneeOptions !== null;
 	const isEmpty = sources.length === 0 && startedSources.length === 0;
 	// cmdk reorders groups by best match while searching, so an unheaded group
 	// could land under the started heading and read as part of it.
@@ -165,17 +181,31 @@ export function CreateWorkspaceSourceDialog({
 							</ToggleGroupItem>
 						))}
 					</ToggleGroup>
-					<RepositoryPicker
-						onSelect={setRepoId}
-						projects={projects}
-						selectedRepo={selectedRepo}
-					/>
+					<div className='flex min-w-0 items-center gap-1'>
+						{showAssigneeFacet ? (
+							<LinearAssigneeFacet
+								onToggle={(entry) =>
+									setLinearAssignees((current) =>
+										toggleLinearAssignee(current, entry),
+									)
+								}
+								options={assigneeOptions}
+								selection={linearAssignees}
+							/>
+						) : null}
+						<RepositoryPicker
+							onSelect={setRepoId}
+							projects={projects}
+							selectedRepo={selectedRepo}
+						/>
+					</div>
 				</div>
 				<CommandSeparator alwaysRender />
 				{linearGap && !isEmpty ? <LinearGapNote message={linearGap} /> : null}
 				<CommandList className='max-h-80'>
 					<SourceListPlaceholder
 						error={error}
+						isAssigneeFiltered={showAssigneeFacet && linearAssignees.length > 0}
 						isEmpty={isEmpty}
 						isLoading={isLoading}
 						isSearching={search.trim().length > 0}
@@ -232,6 +262,8 @@ function SourceGroup({
 interface SourceListPlaceholderProps {
 	/** The GitHub failure behind the active tab's list, if its read failed. */
 	error: GithubFailure | null;
+	/** Whether the assignee facet is narrowing the Issues tab's Linear rows. */
+	isAssigneeFiltered: boolean;
 	isEmpty: boolean;
 	isLoading: boolean;
 	/** Whether the search input holds a query, which widens the Issues tab. */
@@ -248,12 +280,14 @@ interface SourceListPlaceholderProps {
  * state over real data. An empty, unsearched Issues tab is an ordinary state,
  * because it lists only work nobody has started, so it says so rather than
  * blaming a search nobody typed — unless Linear could not be read, when
- * "nothing to start" would be a false claim. A search also reaches started
+ * "nothing to start" would be a false claim, or the assignee facet is set, when
+ * the claim is only true of the people it keeps. A search also reaches started
  * issues, so a searched list with no rows falls to the search-miss message,
  * as every other empty list does.
  */
 function SourceListPlaceholder({
 	error,
+	isAssigneeFiltered,
 	isEmpty,
 	isLoading,
 	isSearching,
@@ -292,6 +326,17 @@ function SourceListPlaceholder({
 		return (
 			<div className='px-3 py-8 text-destructive text-xs'>
 				<p>{linearGap}</p>
+			</div>
+		);
+	}
+
+	if (isEmpty && kind === 'issue' && !isSearching && isAssigneeFiltered) {
+		return (
+			<div className='px-6 py-8 text-center text-muted-foreground text-xs'>
+				{t(
+					'workbench:create-workspace-source.empty.issue-assignee',
+					'No issues waiting to be started match the assignee filter.',
+				)}
 			</div>
 		);
 	}

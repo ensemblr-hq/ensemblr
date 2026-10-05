@@ -2,8 +2,10 @@
 
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { createStore, Provider } from 'jotai';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { CreateWorkspaceSourceDialog } from '@/renderer/components/workbench-shell/create-workspace-source-dialog';
+import type { LinearAssigneeOption } from '@/renderer/lib/linear';
 import type {
 	ProjectShellModel,
 	WorkspaceCreationSeed,
@@ -16,6 +18,7 @@ import { renderWithProviders } from '../support/dom';
 
 // Hoisted so the vi.mock factory, lifted above the imports, can close over it.
 const pickerHolder = vi.hoisted(() => ({
+	assigneeOptions: null as LinearAssigneeOption[] | null,
 	error: null as GithubFailure | null,
 	isLoading: false,
 	itemsById: new Map<string, WorkspaceSourceItem>(),
@@ -28,6 +31,7 @@ vi.mock(
 	'@/renderer/hooks/workbench-shell/navigation-sidebar/use-workspace-source-picker',
 	() => ({
 		useWorkspaceSourcePicker: ({ query }: { query: string }) => ({
+			assigneeOptions: pickerHolder.assigneeOptions,
 			error: pickerHolder.error,
 			isLoading: pickerHolder.isLoading,
 			itemsById: pickerHolder.itemsById,
@@ -72,6 +76,7 @@ const startedSource: WorkspaceSource = {
 };
 
 beforeEach(() => {
+	pickerHolder.assigneeOptions = null;
 	pickerHolder.error = null;
 	pickerHolder.isLoading = false;
 	pickerHolder.itemsById = new Map();
@@ -319,4 +324,40 @@ test('an empty Pull requests tab keeps the search-miss message', async () => {
 
 	expect(screen.getByText(NO_MATCH)).toBeInTheDocument();
 	expect(screen.queryByText(NOTHING_TO_START)).not.toBeInTheDocument();
+});
+
+// The facet keeps its selection in a persisted atom, so this test runs against
+// its own store rather than the default one every other test here shares.
+test('an empty Issues tab narrowed by assignee says the facet is why', async () => {
+	pickerHolder.assigneeOptions = [];
+	renderWithProviders(
+		<Provider store={createStore()}>
+			<CreateWorkspaceSourceDialog
+				onOpenChange={() => {}}
+				open
+				project={project}
+				projects={[project]}
+			/>
+		</Provider>,
+	);
+	await userEvent.click(screen.getByRole('radio', { name: 'Issues' }));
+	expect(screen.getByText(NOTHING_TO_START)).toBeInTheDocument();
+
+	await userEvent.click(screen.getByRole('button', { name: 'Assignee' }));
+	await userEvent.click(await screen.findByRole('option', { name: 'Me' }));
+
+	expect(
+		screen.getByText(
+			'No issues waiting to be started match the assignee filter.',
+		),
+	).toBeInTheDocument();
+});
+
+test('the assignee facet stays off the tabs that list no issues', async () => {
+	pickerHolder.assigneeOptions = [];
+	await openTab('Pull requests');
+
+	expect(
+		screen.queryByRole('button', { name: 'Assignee' }),
+	).not.toBeInTheDocument();
 });

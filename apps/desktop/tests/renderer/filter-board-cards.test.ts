@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest';
 
+import {
+	createLinearAssigneeMatcher,
+	LINEAR_ASSIGNEE_ME,
+} from '../../src/renderer/lib/linear';
 import { filterBoardCards } from '../../src/renderer/lib/workbench/filter-board-cards';
 import { DEFAULT_BOARD_FILTERS } from '../../src/renderer/state/workspace';
 import type {
@@ -10,6 +14,7 @@ import type {
 	BoardCard,
 	BoardIssueCard,
 } from '../../src/renderer/types/workbench-shell';
+import { createLinearIssueFixture } from '../fixtures/linear';
 
 function workspaceCard({
 	branchName = 'psoldunov/board',
@@ -94,6 +99,54 @@ describe('filterBoardCards source facet', () => {
 			sources: ['workspace'],
 		});
 		expect(keysOf(filtered)).toEqual(['w1']);
+	});
+});
+
+describe('filterBoardCards assignee facet', () => {
+	const linearAssignedTo = (key: string, assigneeId: string | null) =>
+		issueCard({
+			item: {
+				issue: createLinearIssueFixture({ assigneeId, id: key }),
+				kind: 'linear-issue',
+			},
+			key,
+		});
+	const cards = [
+		workspaceCard({ id: 'w1', name: 'Fern' }),
+		linearAssignedTo('mine', 'viewer'),
+		linearAssignedTo('bobs', 'bob'),
+		linearAssignedTo('nobodys', null),
+		issueCard({
+			item: { issue: {} as never, kind: 'github-issue' },
+			key: 'gh',
+			provider: 'github',
+		}),
+	];
+	const filters = {
+		...DEFAULT_BOARD_FILTERS,
+		assignees: [LINEAR_ASSIGNEE_ME],
+	};
+
+	test('keeps every card when no predicate is given', () => {
+		expect(keysOf(filterBoardCards(cards, filters))).toEqual([
+			'w1',
+			'mine',
+			'bobs',
+			'nobodys',
+			'gh',
+		]);
+	});
+
+	// Workspaces have no assignee and the board's GitHub cards are unassigned by
+	// construction, so the facet narrows Linear issue cards and nothing else.
+	test('narrows Linear issue cards only', () => {
+		const matches = createLinearAssigneeMatcher(filters.assignees, ['viewer']);
+
+		expect(keysOf(filterBoardCards(cards, filters, matches))).toEqual([
+			'w1',
+			'mine',
+			'gh',
+		]);
 	});
 });
 

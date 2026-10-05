@@ -9,9 +9,15 @@
 import { linearPriorityRank } from '@/renderer/lib/linear';
 import type { BoardCardSource, BoardFilters } from '@/renderer/state/workspace';
 import type { BoardCard } from '@/renderer/types/workbench-shell';
+import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 
 /** Rank given to a card with no priority of its own, matching Linear's "none". */
 const UNPRIORITIZED_RANK = linearPriorityRank(null);
+
+/** The assignee facet's test over one Linear issue. */
+type LinearAssigneePredicate = (
+	issue: Pick<LinearIssueWire, 'assigneeId'>,
+) => boolean;
 
 /**
  * Which facet value a card answers to.
@@ -104,16 +110,35 @@ function matchesPickedRepos(
 }
 
 /**
+ * Whether a card survives the assignee facet, which only a Linear issue card
+ * answers to: a workspace has no assignee, and the GitHub cards on the board are
+ * unassigned by construction, so neither is the clutter the facet removes.
+ * @param card - The card to test.
+ * @param matchesLinearAssignee - The facet's predicate over Linear issues.
+ * @returns True when the card stays under the facet.
+ */
+function matchesAssignee(
+	card: BoardCard,
+	matchesLinearAssignee: LinearAssigneePredicate,
+): boolean {
+	return card.kind === 'issue' && card.issue.item.kind === 'linear-issue'
+		? matchesLinearAssignee(card.issue.item.issue)
+		: true;
+}
+
+/**
  * Whether a card survives the toolbar's facets and search.
  * @param card - The card to test.
  * @param filters - The active toolbar state.
  * @param pickedRepoIds - `filters.repoIds` as a set, built once per column.
+ * @param matchesLinearAssignee - The assignee facet's predicate over Linear issues.
  * @returns True when the card should stay on the board.
  */
 function matchesFilters(
 	card: BoardCard,
 	filters: BoardFilters,
 	pickedRepoIds: ReadonlySet<string>,
+	matchesLinearAssignee: LinearAssigneePredicate,
 ): boolean {
 	if (
 		filters.sources.length > 0 &&
@@ -122,6 +147,9 @@ function matchesFilters(
 		return false;
 	}
 	if (!matchesPickedRepos(card, pickedRepoIds)) {
+		return false;
+	}
+	if (!matchesAssignee(card, matchesLinearAssignee)) {
 		return false;
 	}
 	const query = filters.query.trim().toLowerCase();
@@ -161,17 +189,23 @@ function compareCards(
 
 /**
  * Applies the dashboard toolbar to one column's cards: drops what the facets and
- * the search exclude, then reorders what remains.
+ * the search exclude, then reorders what remains. The assignee facet arrives as
+ * a predicate built from `filters.assignees`, because resolving its "me" token
+ * needs the connected Linear accounts, which the toolbar state does not hold.
  * @param cards - The column's cards, already in manual order.
  * @param filters - The active toolbar state.
+ * @param matchesLinearAssignee - The assignee facet's predicate over Linear issues; keeps every issue when omitted.
  * @returns A new, filtered and sorted card list.
  */
 export function filterBoardCards(
 	cards: readonly BoardCard[],
 	filters: BoardFilters,
+	matchesLinearAssignee: LinearAssigneePredicate = () => true,
 ): BoardCard[] {
 	const pickedRepoIds = new Set(filters.repoIds);
 	return cards
-		.filter((card) => matchesFilters(card, filters, pickedRepoIds))
+		.filter((card) =>
+			matchesFilters(card, filters, pickedRepoIds, matchesLinearAssignee),
+		)
 		.sort((left, right) => compareCards(left, right, filters.sort));
 }

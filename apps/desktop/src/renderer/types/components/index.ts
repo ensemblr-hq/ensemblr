@@ -4,6 +4,7 @@ export type {
 	ChecksPanelState,
 	ProviderMarkKind,
 } from './checks-panel';
+export type { FacetCollapse } from './facet';
 export type {
 	WorkbenchChildMatch,
 	WorkbenchShellRouteState,

@@ -10,6 +10,7 @@ import {
 	useWorkbenchLayoutRouteModel,
 } from '@/renderer/components/workbench-shell/shell-contexts';
 import { ShellScreen } from '@/renderer/components/workbench-shell/shell-screen';
+import { useLinearAssigneeFilter } from '@/renderer/hooks/linear/use-linear-assignee-filter';
 import { useBoardDragMonitor } from '@/renderer/hooks/workbench-shell/dashboard/use-board-drag';
 import { useBoardIssues } from '@/renderer/hooks/workbench-shell/dashboard/use-board-issues';
 import { cn } from '@/renderer/lib/utils';
@@ -44,8 +45,9 @@ import {
 /**
  * Drops the "Dashboard" heading one step before any toolbar control collapses.
  * It is the row's most expendable element — the nav sidebar already marks
- * Dashboard as the active route — and the toolbar needs around 38rem with every
- * label showing, so the heading and its gap stop fitting beside it below 48rem.
+ * Dashboard as the active route — and the toolbar needs around 44rem with every
+ * label showing, or 39rem once its search box gives way to its minimum width,
+ * so the heading and its gap stop fitting beside it below 48rem.
  * Container width rather than viewport width because neither the sidebar nor the
  * window controls leave this row what the window is wide: a 48rem window gives
  * it around 37rem with the sidebar offcanvas, and 30rem once that opens.
@@ -68,9 +70,8 @@ export function DashboardBoard() {
 	const { reorderBoard, setWorkspaceBoardStatus } = useWorkspaceBoardActions();
 	const { dismiss, restore } = useBoardIssueDismissals();
 	const boardFilters = useBoardFilters();
-	const { backlogIssues, dismissedIssues, errors, isLoading } = useBoardIssues(
-		model.displayProjects,
-	);
+	const { backlogIssues, dismissedIssues, errors, isLoading, linearIssues } =
+		useBoardIssues(model.displayProjects);
 	const [assignRequest, setAssignRequest] = useState<AssignIssueRequest | null>(
 		null,
 	);
@@ -146,6 +147,10 @@ export function DashboardBoard() {
 		],
 	);
 	useBoardDragMonitor(handleDrop);
+	const assignee = useLinearAssigneeFilter({
+		issues: linearIssues,
+		selection: boardFilters.filters.assignees,
+	});
 
 	const grouped = useMemo(
 		() =>
@@ -167,11 +172,15 @@ export function DashboardBoard() {
 	const columns = useMemo(
 		() =>
 			BOARD_STATUS_ORDER.map((status) => ({
-				cards: filterBoardCards(grouped[status], boardFilters.filters),
+				cards: filterBoardCards(
+					grouped[status],
+					boardFilters.filters,
+					assignee.matches,
+				),
 				status,
 				totalCount: grouped[status].length,
 			})),
-		[boardFilters.filters, grouped],
+		[assignee.matches, boardFilters.filters, grouped],
 	);
 	const columnActions = useMemo<BoardColumnActions>(
 		() => ({
@@ -198,6 +207,7 @@ export function DashboardBoard() {
 						{t('workbench:dashboard.title', 'Dashboard')}
 					</span>
 					<BoardToolbar
+						assigneeOptions={assignee.options}
 						filters={boardFilters}
 						isRefreshing={isRefreshing}
 						onRefresh={handleRefresh}
