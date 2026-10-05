@@ -34,6 +34,7 @@ function createClientFixture(
 	const client = createLinearClient({
 		fetchImpl,
 		getAccessToken: async () => 'token-1',
+		retryDelayMs: 0,
 	});
 
 	return { client, requests };
@@ -156,7 +157,7 @@ test('execute: maps HTTP 429 with Retry-After to rate-limited', async () => {
 });
 
 test('execute: maps non-JSON HTTP failures to network errors', async () => {
-	const { client } = createClientFixture(
+	const { client, requests } = createClientFixture(
 		() => new Response('<html>bad gateway</html>', { status: 502 }),
 	);
 
@@ -164,6 +165,86 @@ test('execute: maps non-JSON HTTP failures to network errors', async () => {
 		assert.strictEqual(error.code, 'network');
 		assert.match(error.message, /502/);
 	});
+	assert.strictEqual(requests.length, 2);
+});
+
+const EMPTY_ISSUES_PAGE = {
+	data: {
+		issues: { nodes: [], pageInfo: { endCursor: null, hasNextPage: false } },
+	},
+};
+
+test('execute: retries a read once after the connection fails', async () => {
+	let attempts = 0;
+	const { client, requests } = createClientFixture(() => {
+		attempts += 1;
+
+		if (attempts === 1) {
+			throw new TypeError('fetch failed');
+		}
+
+		return Response.json(EMPTY_ISSUES_PAGE);
+	});
+
+	const page = await client.listIssues();
+
+	assert.deepStrictEqual(page.nodes, []);
+	assert.strictEqual(requests.length, 2);
+});
+
+test('execute: retries a read once after a gateway error', async () => {
+	let attempts = 0;
+	const { client, requests } = createClientFixture(() => {
+		attempts += 1;
+
+		return attempts === 1
+			? new Response('upstream', { status: 503 })
+			: Response.json(EMPTY_ISSUES_PAGE);
+	});
+
+	const page = await client.listIssues();
+
+	assert.deepStrictEqual(page.nodes, []);
+	assert.strictEqual(requests.length, 2);
+});
+
+test('execute: reports a read that fails twice as unreachable', async () => {
+	const { client, requests } = createClientFixture(() => {
+		throw new TypeError('fetch failed');
+	});
+
+	await expectServiceError(client.listIssues(), (error) => {
+		assert.strictEqual(error.code, 'network');
+		assert.match(error.message, /Could not reach/);
+	});
+	assert.strictEqual(requests.length, 2);
+});
+
+test('execute: never repeats a mutation whose connection failed', async () => {
+	const { client, requests } = createClientFixture(() => {
+		throw new TypeError('fetch failed');
+	});
+
+	await expectServiceError(
+		client.createComment({ body: 'Hello', issueId: 'issue-1' }),
+		(error) => assert.strictEqual(error.code, 'network'),
+	);
+	assert.strictEqual(requests.length, 1);
+});
+
+test('execute: does not retry a rate-limited read', async () => {
+	const { client, requests } = createClientFixture(
+		() =>
+			new Response('', {
+				headers: { 'retry-after': '5' },
+				status: 429,
+			}),
+	);
+
+	await expectServiceError(client.listIssues(), (error) => {
+		assert.strictEqual(error.code, 'rate-limited');
+	});
+	assert.strictEqual(requests.length, 1);
 });
 
 test('listIssues: sends bearer auth and the team filter, maps nodes', async () => {

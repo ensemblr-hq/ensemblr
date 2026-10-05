@@ -64,7 +64,8 @@ export interface CreateLinearSyncCoordinatorOptions {
  * The live failure a cached read reports comes from memory, so it lasts as long
  * as the process. The `status` and `errorCode` on the persisted row are the
  * durable record of the last attempt, for the support bundle rather than for a
- * reader inside the app.
+ * reader inside the app. Each failure is also logged with its cause chain,
+ * because `errorCode` alone cannot tell a timeout from a refused connection.
  * @param options - Freshness window, failure cooldown, and optional clock.
  * @returns A fresh {@link LinearSyncCoordinator}.
  */
@@ -271,6 +272,11 @@ export function createLinearSyncCoordinator({
 					cooldownUntil.delete(key);
 					failures.delete(key);
 				} catch (error) {
+					// A transient scope's key is the user's search text, which stays out of the log.
+					console.warn(
+						`[linear] sync of "${store ? scope : 'search'}" failed for account ${accountId}`,
+						error,
+					);
 					recordAttempt(
 						{
 							accountId,

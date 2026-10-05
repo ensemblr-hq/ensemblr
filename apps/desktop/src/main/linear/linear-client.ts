@@ -149,10 +149,21 @@ export interface CreateLinearClientOptions {
 	fetchImpl?: typeof fetch;
 	getAccessToken: () => Promise<string>;
 	requestTimeoutMs?: number;
+	retryDelayMs?: number;
 }
 
 /** How long one Linear GraphQL request may run before it is abandoned. */
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
+
+/**
+ * How long a read waits before its one retry after a transient transport
+ * failure. Long enough for a dropped connection or a busy launch to clear, short
+ * enough that a read Linear genuinely cannot answer still fails promptly.
+ */
+const DEFAULT_RETRY_DELAY_MS = 1000;
+
+/** Gateway statuses Linear's edge returns for a blip rather than a refusal. */
+const TRANSIENT_HTTP_STATUSES: ReadonlySet<number> = new Set([502, 503, 504]);
 
 const ISSUE_FIELDS = `
 	id
@@ -235,27 +246,26 @@ export function createLinearClient({
 	fetchImpl = fetch,
 	getAccessToken,
 	requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+	retryDelayMs = DEFAULT_RETRY_DELAY_MS,
 }: CreateLinearClientOptions): LinearClient {
 	/**
-	 * Send a GraphQL operation to Linear, mapping auth, rate-limit, and transport
-	 * failures onto typed {@link LinearServiceError}s.
-	 * @param query - GraphQL query or mutation document.
-	 * @param variables - Variables for the operation.
-	 * @returns The `data` payload from the response.
+	 * POST one GraphQL body to Linear. A connection that fails, times out, or
+	 * meets a gateway error is tried again `retries` more times, which only a
+	 * read may ask for: a mutation that timed out may still have landed, and
+	 * repeating it could create a second issue or comment.
+	 * @param body - Serialized GraphQL request.
+	 * @param accessToken - Bearer token for the account.
+	 * @param retries - Further attempts allowed after a transient failure.
+	 * @returns Linear's response, whatever its status.
 	 */
-	async function execute<T>(
-		query: string,
-		variables: Record<string, unknown>,
-	): Promise<T> {
-		const accessToken = await getAccessToken().catch((error) => {
-			throw mapAuthError(error);
-		});
-
-		let response: Response;
-
+	async function send(
+		body: string,
+		accessToken: string,
+		retries: number,
+	): Promise<Response> {
 		try {
-			response = await fetchImpl(apiUrl, {
-				body: JSON.stringify({ query, variables }),
+			const response = await fetchImpl(apiUrl, {
+				body,
 				headers: {
 					authorization: `Bearer ${accessToken}`,
 					'content-type': 'application/json',
@@ -263,15 +273,50 @@ export function createLinearClient({
 				method: 'POST',
 				signal: AbortSignal.timeout(requestTimeoutMs),
 			});
+
+			if (retries === 0 || !TRANSIENT_HTTP_STATUSES.has(response.status)) {
+				return response;
+			}
+
+			await response.body?.cancel();
 		} catch (error) {
-			throw new LinearServiceError(
-				'network',
-				isTimeout(error)
-					? 'The Linear API did not respond in time.'
-					: 'Could not reach the Linear API.',
-				{ cause: error },
-			);
+			if (retries === 0) {
+				throw new LinearServiceError(
+					'network',
+					isTimeout(error)
+						? 'The Linear API did not respond in time.'
+						: 'Could not reach the Linear API.',
+					{ cause: error },
+				);
+			}
 		}
+
+		await delay(retryDelayMs);
+
+		return send(body, accessToken, retries - 1);
+	}
+
+	/**
+	 * Send a GraphQL operation to Linear, mapping auth, rate-limit, and transport
+	 * failures onto typed {@link LinearServiceError}s.
+	 * @param query - GraphQL query or mutation document.
+	 * @param variables - Variables for the operation.
+	 * @param options - Whether the operation only reads, and so may be retried.
+	 * @returns The `data` payload from the response.
+	 */
+	async function execute<T>(
+		query: string,
+		variables: Record<string, unknown>,
+		{ read }: { read: boolean },
+	): Promise<T> {
+		const accessToken = await getAccessToken().catch((error) => {
+			throw mapAuthError(error);
+		});
+		const response = await send(
+			JSON.stringify({ query, variables }),
+			accessToken,
+			read ? 1 : 0,
+		);
 
 		if (response.status === 401) {
 			throw new LinearServiceError(
@@ -334,6 +379,7 @@ export function createLinearClient({
 		const data = await execute<Record<string, ConnectionPayload<IssueNode>>>(
 			query,
 			variables,
+			{ read: true },
 		);
 		const connection = data[connectionKey];
 
@@ -366,6 +412,7 @@ export function createLinearClient({
 					}
 				}`,
 				{ input: { body, issueId } },
+				{ read: false },
 			);
 
 			if (!data.commentCreate.success || !data.commentCreate.comment) {
@@ -389,6 +436,7 @@ export function createLinearClient({
 					}
 				}`,
 				{ input },
+				{ read: false },
 			);
 
 			if (!data.issueCreate.success || !data.issueCreate.issue) {
@@ -417,6 +465,7 @@ export function createLinearClient({
 					}
 				}`,
 				{ first: PAGE_SIZE, id },
+				{ read: true },
 			);
 
 			if (!data.issue) {
@@ -457,7 +506,7 @@ export function createLinearClient({
 		listMetadata: async (kind, after = null) => {
 			const data = await execute<
 				Record<string, ConnectionPayload<MetadataNode>>
-			>(METADATA_QUERIES[kind], { after, first: PAGE_SIZE });
+			>(METADATA_QUERIES[kind], { after, first: PAGE_SIZE }, { read: true });
 			const connection = data[METADATA_CONNECTION_KEYS[kind]];
 
 			if (!connection) {
@@ -498,6 +547,7 @@ export function createLinearClient({
 					}
 				}`,
 				{ id, input },
+				{ read: false },
 			);
 
 			if (!data.issueUpdate.success || !data.issueUpdate.issue) {
@@ -664,6 +714,15 @@ function resolveMetadataName(node: MetadataNode): string {
  */
 function isTimeout(error: unknown): boolean {
 	return error instanceof Error && error.name === 'TimeoutError';
+}
+
+/**
+ * Wait before a retry.
+ * @param ms - How long to wait.
+ * @returns A promise that settles once the time has passed.
+ */
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
