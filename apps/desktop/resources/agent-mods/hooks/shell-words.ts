@@ -3,9 +3,11 @@
  *
  * Not a shell: it knows quotes, backslash escapes, the list and pipe operators,
  * subshell parentheses, command substitution (`$(...)` and backticks, inside
- * double quotes too), and here-documents, which is enough to find every `git` a
+ * double quotes too), arithmetic expansion, here-documents and here-strings,
+ * comments, and line continuations, which is enough to find every `git` a
  * command would start without mistaking the words of a quoted commit message or
- * a here-document body for one.
+ * a here-document body for one. An unquoted here-document's body is skipped
+ * whole, so a substitution inside it is not read.
  *
  * A substitution's own commands are read as commands of their own; in the word
  * that holds it, the substitution leaves a `$` behind, so whoever reads that
@@ -254,14 +256,15 @@ function readBare(reader: Reader, frame: Frame, character: string): void {
 		} else {
 			openSubstitution(reader, '`');
 		}
-	} else if (
-		character === '<' &&
-		line[reader.index] === '<' &&
-		line[reader.index + 1] !== '<'
-	) {
+	} else if (character === '<' && line.startsWith('<<', reader.index)) {
+		reader.index += 2;
+		append(frame, '<<<');
+	} else if (character === '<' && line[reader.index] === '<') {
 		reader.index += 1;
 		endWord(frame);
 		readHeredocOperator(reader);
+	} else if (character === '#' && !frame.hasWord) {
+		skipComment(reader);
 	} else if (character === '\n') {
 		endCommand(reader, frame);
 		skipHeredocBodies(reader);
@@ -274,6 +277,50 @@ function readBare(reader: Reader, frame: Frame, character: string): void {
 	} else {
 		append(frame, character);
 	}
+}
+
+/**
+ * Reads a backslash: the next character taken literally, or, before a line
+ * break, a line continuation that joins the two lines.
+ * @param reader - The reader, positioned after the backslash.
+ * @param frame - The reading level.
+ */
+function readEscape(reader: Reader, frame: Frame): void {
+	const next = reader.line[reader.index] ?? '';
+	reader.index += 1;
+	if (next !== '\n') {
+		append(frame, next);
+	}
+}
+
+/**
+ * Reads `$(`: a command substitution, or `$((`, an arithmetic expansion that
+ * runs no command and is skipped whole.
+ * @param reader - The reader, positioned at the `(` after `$`.
+ * @param frame - The reading level.
+ */
+function readDollarParen(reader: Reader, frame: Frame): void {
+	if (reader.line[reader.index + 1] !== '(') {
+		reader.index += 1;
+		openSubstitution(reader, ')');
+		return;
+	}
+	let depth = 0;
+	do {
+		const character = reader.line[reader.index];
+		depth += character === '(' ? 1 : character === ')' ? -1 : 0;
+		reader.index += 1;
+	} while (depth > 0 && reader.index < reader.line.length);
+	append(frame, '$');
+}
+
+/**
+ * Skips a comment, up to but not including the line break that ends it.
+ * @param reader - The reader, positioned after the `#`.
+ */
+function skipComment(reader: Reader): void {
+	const newline = reader.line.indexOf('\n', reader.index);
+	reader.index = newline === -1 ? reader.line.length : newline;
 }
 
 /**
@@ -297,11 +344,9 @@ export function splitCommands(line: string): string[][] {
 		if (quote === 'single') {
 			readSingleQuoted(frame, character);
 		} else if (character === '\\') {
-			append(frame, line[reader.index] ?? '');
-			reader.index += 1;
+			readEscape(reader, frame);
 		} else if (character === '$' && line[reader.index] === '(') {
-			reader.index += 1;
-			openSubstitution(reader, ')');
+			readDollarParen(reader, frame);
 		} else if (quote === 'double') {
 			readDoubleQuoted(reader, frame, character);
 		} else {

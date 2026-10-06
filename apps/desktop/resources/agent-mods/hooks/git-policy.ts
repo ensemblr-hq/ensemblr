@@ -41,6 +41,9 @@ const READ_ONLY_SUBCOMMANDS = new Set([
 	'version',
 ]);
 
+/** Subcommands that create a repository rather than write into one. */
+const CREATES_A_REPOSITORY = new Set(['clone', 'init']);
+
 /** `git branch` flags that only list. */
 const BRANCH_LIST_FLAGS = new Set([
 	'-a',
@@ -200,7 +203,11 @@ function judgeTargets(
 				(scope.gitDir !== null && isWithin(path, scope.gitDir))
 			),
 	);
-	if (stray === undefined || isReadOnly(invocation)) {
+	if (
+		stray === undefined ||
+		isReadOnly(invocation) ||
+		CREATES_A_REPOSITORY.has(invocation.subcommand ?? '')
+	) {
 		return null;
 	}
 	const where =

@@ -9,6 +9,7 @@ import {
 	isCredentialUrl,
 	isDigitsAndPunctuation,
 	looksLikePlainConfig,
+	MAXIMUM_KEYED_PLAIN_NUMBER_LENGTH,
 	MINIMUM_TRANSCRIPT_SECRET_LENGTH,
 } from './redaction/value-shapes.ts';
 import { SENSITIVE_KEY_PARTS } from './sensitive-key.ts';
@@ -227,11 +228,12 @@ export function isRedactableKeyName(key: string): boolean {
  *
  * - under 6 characters: never;
  * - carried by a secret-like key ({@link isRedactableKeyName}): always, unless
- *   it is only digits and punctuation;
+ *   it is only digits and punctuation and at most 10 characters long;
  * - a URL with credentials (`scheme://user:pass@`, `scheme://token@`): always;
  * - otherwise not when it is under 8 characters, only digits and punctuation,
  *   one alphabetic word under 16, a dotted or dashed identifier under 24, a URL
- *   with no `@` under 40, or a path with no whitespace; and always else.
+ *   with no `@` under 40, or a path with no whitespace, `+` or `=` (base64
+ *   that happens to start with `/` is no path); and always else.
  *
  * A short or word-shaped secret under a plain key name therefore survives. That
  * is the price of not rewriting configuration, and control tokens never pass
@@ -248,7 +250,10 @@ export function isDistinctiveSecretValue(
 		return false;
 	}
 	if (keyNames.some(isRedactableKeyName)) {
-		return !isDigitsAndPunctuation(value);
+		return !(
+			isDigitsAndPunctuation(value) &&
+			value.length <= MAXIMUM_KEYED_PLAIN_NUMBER_LENGTH
+		);
 	}
 	return isCredentialUrl(value) || !looksLikePlainConfig(value);
 }

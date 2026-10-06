@@ -19,15 +19,6 @@ import type { HttpInit } from 'claude-code';
  */
 export const CONTROL_DEADLINE_MS = 4_000;
 
-/**
- * What a deadline becomes when its own wait fails rather than elapses — aborted
- * once the call it guards has answered, or refused by the host: a deadline
- * that cannot be timed must never win the race as if it had run out.
- */
-export const NEVER_SETTLES: Promise<never> = new Promise<never>(
-	() => undefined,
-);
-
 /** Where the control server lives and how this session authenticates to it. */
 export interface ControlEndpoint {
 	token: string;

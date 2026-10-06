@@ -54,21 +54,42 @@ const COMMAND_PREFIXES = new Set([
 	'while',
 ]);
 
-/** A program that runs another one: its options that take a value, and the positionals before the program. */
+/** A program that runs another one: its option table and the positionals before the program. */
 interface Wrapper {
+	/** Options that run the program in another directory. */
+	chdirOptions?: ReadonlySet<string>;
 	positionals: number;
+	/** Options that name a placeholder the program's words are filled from. */
+	replaceOptions?: ReadonlySet<string>;
 	valueOptions: ReadonlySet<string>;
 }
 
 /** Wrappers a command in good faith is plausibly started through. */
 const WRAPPERS: ReadonlyMap<string, Wrapper> = new Map([
-	['env', { positionals: 0, valueOptions: new Set(['-u', '--unset', '-S']) }],
+	[
+		'env',
+		{
+			chdirOptions: new Set(['-C', '--chdir']),
+			positionals: 0,
+			valueOptions: new Set(['-u', '--unset', '-S', '-C', '--chdir']),
+		},
+	],
 	['nice', { positionals: 0, valueOptions: new Set(['-n', '--adjustment']) }],
 	[
 		'sudo',
 		{
+			chdirOptions: new Set(['-D', '--chdir']),
 			positionals: 0,
-			valueOptions: new Set(['-u', '-g', '-C', '-D', '-h', '-p', '-U']),
+			valueOptions: new Set([
+				'-u',
+				'-g',
+				'-C',
+				'-D',
+				'--chdir',
+				'-h',
+				'-p',
+				'-U',
+			]),
 		},
 	],
 	[
@@ -82,6 +103,7 @@ const WRAPPERS: ReadonlyMap<string, Wrapper> = new Map([
 		'xargs',
 		{
 			positionals: 0,
+			replaceOptions: new Set(['-I', '--replace']),
 			valueOptions: new Set([
 				'-a',
 				'-d',
@@ -96,6 +118,9 @@ const WRAPPERS: ReadonlyMap<string, Wrapper> = new Map([
 		},
 	],
 ]);
+
+/** The placeholder `xargs -i` and a bare `--replace` fill. */
+const XARGS_DEFAULT_PLACEHOLDER = '{}';
 
 /** `cd` and `pushd` flags that change how a path resolves, not which. */
 const CD_FLAGS = /^-[LPe@]+$/;
@@ -174,7 +199,8 @@ function readGitWords(
 		const [flag, attached] = word.split(/=(.*)/s, 2);
 		const value = attached ?? words[index + 1] ?? '';
 		if (word === '-C') {
-			directory = resolvePath(directory, value, context.home);
+			directory =
+				value === '' ? null : resolvePath(directory, value, context.home);
 			targets.push({ path: directory, source: '-C' });
 			index += 2;
 		} else if (flag === '--git-dir' || flag === '--work-tree') {
@@ -217,21 +243,82 @@ function targetsFromAssignments(
 	});
 }
 
+/** What a run of leading words told about the program they start. */
+interface Prefixes {
+	assignments: string[];
+	/** The directory a wrapper runs the program in, as written; absent when none. */
+	directory?: string;
+	/** Placeholders a wrapper fills the program's words from. */
+	placeholders: string[];
+}
+
+/**
+ * Splits an option from a value written onto it: `--chdir=/x`, or a short
+ * option that takes a value written without a space (`-I{}`, `-n5`).
+ * @param word - The option word.
+ * @param valueOptions - The options that take a value.
+ * @returns The option, and its attached value when it has one.
+ */
+function splitOption(
+	word: string,
+	valueOptions: ReadonlySet<string>,
+): [string, string | undefined] {
+	if (word.startsWith('--')) {
+		const [flag = word, attached] = word.split(/=(.*)/s, 2);
+		return [flag, attached];
+	}
+	const short = word.slice(0, 2);
+	return word.length > 2 && valueOptions.has(short)
+		? [short, word.slice(2)]
+		: [word, undefined];
+}
+
+/**
+ * Reads one wrapper option, noting a directory or placeholder it sets.
+ * @param wrapper - The wrapper's option table.
+ * @param words - One simple command's words.
+ * @param index - Index of the option.
+ * @param found - What the leading words told so far; updated in place.
+ * @returns How many words the option took.
+ */
+function readWrapperOption(
+	wrapper: Wrapper,
+	words: readonly string[],
+	index: number,
+	found: Prefixes,
+): number {
+	const word = words[index] ?? '';
+	const [flag, attached] = splitOption(word, wrapper.valueOptions);
+	const value = attached ?? words[index + 1] ?? '';
+	if (wrapper.chdirOptions?.has(flag)) {
+		found.directory = value;
+	}
+	if (wrapper.replaceOptions?.has(flag)) {
+		found.placeholders.push(value || XARGS_DEFAULT_PLACEHOLDER);
+	}
+	if (word === '-i' && wrapper.replaceOptions) {
+		found.placeholders.push(XARGS_DEFAULT_PLACEHOLDER);
+	}
+	return attached === undefined && wrapper.valueOptions.has(flag) ? 2 : 1;
+}
+
 /**
  * Skips a wrapper's options and leading positionals.
  * @param words - One simple command's words.
  * @param start - Index of the first word after the wrapper's name.
  * @param wrapper - The wrapper's option table.
+ * @param found - What the leading words told so far; updated in place.
  * @returns Index of the first word of the program it runs.
  */
 function skipWrapper(
 	words: readonly string[],
 	start: number,
 	wrapper: Wrapper,
+	found: Prefixes,
 ): number {
 	let index = start;
 	while ((words[index] ?? '').startsWith('-')) {
-		index += wrapper.valueOptions.has(words[index] ?? '') ? 2 : 1;
+		index += readWrapperOption(wrapper, words, index, found);
 	}
 	return index + wrapper.positionals;
 }
@@ -239,30 +326,38 @@ function skipWrapper(
 /**
  * Drops the words that lead a command without naming its program: shell
  * keywords, wrappers such as `sudo`, `env` or `timeout` and their options,
- * and assignments.
+ * and assignments. A word a wrapper fills from a placeholder (`xargs -I {}`)
+ * cannot be known without running the command, so it keeps a `$` in its place.
  * @param words - One simple command's words.
- * @returns The assignments it carried and the words from its program on.
+ * @returns What the leading words told, and the words from the program on.
  */
-function stripPrefixes(words: readonly string[]): {
-	assignments: string[];
-	program: readonly string[];
-} {
-	const assignments: string[] = [];
+function stripPrefixes(
+	words: readonly string[],
+): Prefixes & { program: readonly string[] } {
+	const found: Prefixes = { assignments: [], placeholders: [] };
 	let index = 0;
 	while (index < words.length) {
 		const word = words[index] ?? '';
 		const wrapper = WRAPPERS.get(word);
 		if (ASSIGNMENT.test(word)) {
-			assignments.push(word);
+			found.assignments.push(word);
 		} else if (wrapper) {
-			index = skipWrapper(words, index + 1, wrapper);
+			index = skipWrapper(words, index + 1, wrapper, found);
 			continue;
 		} else if (!COMMAND_PREFIXES.has(word)) {
 			break;
 		}
 		index += 1;
 	}
-	return { assignments, program: words.slice(index) };
+	const program = words
+		.slice(index)
+		.map((word) =>
+			found.placeholders.reduce(
+				(filled, placeholder) => filled.replaceAll(placeholder, '$'),
+				word,
+			),
+		);
+	return { ...found, program };
 }
 
 /**
@@ -344,9 +439,11 @@ function applyShellCommand(
 
 /**
  * Finds every `git` a Bash command would start, following `cd`, `pushd`,
- * `export`, and subshells through the command, so a git run after changing
- * directory, a relative `-C`, or a `GIT_DIR` exported earlier in the line is
- * read where it lands.
+ * `export`, `env -C`, and subshells through the command, so a git run after
+ * changing directory, a relative `-C`, or a `GIT_DIR` exported earlier in the
+ * line is read where it lands. A `cd` to a directory that cannot be read
+ * without running the shell (`cd "$(git rev-parse --show-toplevel)"`, `cd -`)
+ * is not counted as leaving the worktree: it is how agents return to it.
  * @param command - The Bash command line.
  * @param context - The directory the command starts in and the home directory.
  * @returns Each git invocation, in order.
@@ -360,16 +457,22 @@ export function findGitInvocations(
 	const subshells: ShellState[] = [];
 	const found: GitInvocation[] = [];
 	for (const words of splitCommands(command)) {
-		const { assignments, program } = stripPrefixes(words);
+		const { assignments, directory, program } = stripPrefixes(words);
 		const [name, ...rest] = program;
 		if (words.length === 1 && name === SUBSHELL_OPEN) {
 			subshells.push(state);
 		} else if (words.length === 1 && name === SUBSHELL_CLOSE) {
 			state = subshells.pop() ?? state;
 		} else if (isGit(name)) {
-			const here: ShellContext = { cwd: state.cwd, home };
+			const cwd =
+				directory === undefined
+					? state.cwd
+					: resolvePath(state.cwd, directory, home);
+			const here: ShellContext = { cwd, home };
 			const moved: GitTarget[] =
-				state.cwd === context.cwd ? [] : [{ path: state.cwd, source: 'cd' }];
+				cwd === null || cwd === context.cwd
+					? []
+					: [{ path: cwd, source: 'cd' }];
 			found.push(
 				readGitWords(rest, here, [
 					...moved,
@@ -377,7 +480,7 @@ export function findGitInvocations(
 					...targetsFromAssignments(assignments, here),
 				]),
 			);
-		} else {
+		} else if (directory === undefined) {
 			state = applyShellCommand(state, program, home);
 		}
 	}

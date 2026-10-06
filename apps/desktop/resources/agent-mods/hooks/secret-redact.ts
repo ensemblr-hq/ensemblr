@@ -26,7 +26,6 @@ import {
 	buildInvokeRequest,
 	CONTROL_DEADLINE_MS,
 	type ControlEndpoint,
-	NEVER_SETTLES,
 	readInvokeData,
 	toControlEndpoint,
 } from './control.ts';
@@ -71,7 +70,7 @@ async function fetchWithinDeadline(
 		.sleep(CONTROL_DEADLINE_MS, { signal: timer.signal })
 		.then(
 			() => null,
-			() => NEVER_SETTLES,
+			() => new Promise<never>(() => undefined),
 		);
 	try {
 		return await Promise.race([

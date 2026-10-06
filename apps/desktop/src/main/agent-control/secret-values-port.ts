@@ -27,8 +27,9 @@ const SECRET_VALUES_TTL_MS = 60_000;
 const FAILED_ASSEMBLY_RETRY_MS = 5_000;
 
 /**
- * How long a workspace's table survives without a read, so the values of an
- * archived or closed workspace do not stay in memory for the app's lifetime.
+ * How long a workspace's table survives without a read. Eviction runs on the
+ * next read of any workspace, so an archived workspace's values are dropped
+ * the next time any session redacts anything, not on a timer.
  */
 const IDLE_EVICTION_MS = 10 * 60_000;
 
@@ -157,28 +158,26 @@ export function createSecretValuesPort({
 	): Promise<readonly NamedSecretValue[]> => {
 		const refreshing = Promise.resolve()
 			.then(() => assemble(workspaceId))
-			.then(
-				(assembly) => {
-					const values = nameDistinctiveSecretValues(assembly);
-					update(workspaceId, {
-						freshUntil: now() + ttlMs,
-						lastGood: values,
-						refreshing: null,
-					});
-					return values;
-				},
-				(error: unknown) => {
-					console.warn(
-						'[agent-control] could not assemble workspace secrets for redaction.',
-						{ workspaceId, ...describeFailure(error) },
-					);
-					update(workspaceId, {
-						freshUntil: now() + failureRetryMs,
-						refreshing: null,
-					});
-					return cache.get(workspaceId)?.lastGood ?? [];
-				},
-			);
+			.then((assembly) => {
+				const values = nameDistinctiveSecretValues(assembly);
+				update(workspaceId, {
+					freshUntil: now() + ttlMs,
+					lastGood: values,
+					refreshing: null,
+				});
+				return values;
+			})
+			.catch((error: unknown) => {
+				console.warn(
+					'[agent-control] could not assemble workspace secrets for redaction.',
+					{ workspaceId, ...describeFailure(error) },
+				);
+				update(workspaceId, {
+					freshUntil: now() + failureRetryMs,
+					refreshing: null,
+				});
+				return cache.get(workspaceId)?.lastGood ?? [];
+			});
 		update(workspaceId, { refreshing });
 		return refreshing;
 	};

@@ -94,11 +94,11 @@ describe('reading a command line', () => {
 		expect(found?.targets[0]?.path).toBeNull();
 	});
 
-	test('undoes a cd made inside a subshell, and loses track after cd -', () => {
+	test('undoes a cd made inside a subshell, and does not count an unreadable cd', () => {
 		const [sub] = findGitInvocations('(cd /tmp && ls); git status', CONTEXT);
 		expect(sub?.targets).toEqual([]);
 		const [back] = findGitInvocations('cd - && git status', CONTEXT);
-		expect(back?.targets).toEqual([{ path: null, source: 'cd' }]);
+		expect(back?.targets).toEqual([]);
 	});
 
 	test('sees through timeout, nice, xargs and --namespace', () => {
@@ -192,7 +192,16 @@ describe('git pointed outside the worktree', () => {
 			'cd /work/ensemblr/sibling && git commit -am x',
 			'cd ../sibling && git stash push -u -m t',
 			'pushd /work/ensemblr/sibling && git -C . commit',
-			'cd - && git commit -am x',
+			'cat <<< "$(git -C /work/ensemblr/other push --force)"',
+			'cat <<< foo\ngit -C ../sibling push',
+			'echo $((1<<2))\ngit -C ../sibling push',
+			"# don't do this\ngit -C ../sibling push",
+			'git \\\n  -C ../sibling push',
+			'env -C /work/ensemblr/sibling git push',
+			'env --chdir=/work/ensemblr/sibling git push',
+			'sudo -D /work/ensemblr/sibling git push',
+			"git worktree list | awk '{print $2}' | xargs -I{} git -C {} pull",
+			'ls | xargs -i git -C {} pull',
 		]) {
 			expect(firstDenial(command)).toContain('outside this session');
 		}
@@ -214,6 +223,11 @@ describe('git pointed outside the worktree', () => {
 			'git -C ../sibling stash list',
 			'git -C ../sibling remote get-url origin',
 			'git -C ../sibling reflog',
+			'cd "$(git rev-parse --show-toplevel)" && git commit -m x',
+			'cd - && git commit -am x',
+			'cd /tmp && git clone https://example.com/y.git',
+			'git -C /tmp/scratch init',
+			'echo $((1 << 2)) && git add .',
 		]) {
 			expect(firstDenial(command)).toBeNull();
 		}

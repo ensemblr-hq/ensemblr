@@ -44,6 +44,19 @@ const CREDENTIAL_URL = /^[a-z][a-z0-9+.-]*:\/\/[^/\s]+@/i;
 const FILESYSTEM_PATH = /^(?:\/|~\/|\.\.?\/)\S*$/;
 
 /**
+ * Characters base64 uses and paths almost never do: a base64 key that happens
+ * to start with `/` is not a path.
+ */
+const BASE64_PADDING_OR_PLUS = /[+=]/;
+
+/**
+ * Longest digits-and-punctuation value a secret-named key may carry and still
+ * read as a setting (a port, a timeout, a PIN-length toggle) rather than as a
+ * numeric credential.
+ */
+export const MAXIMUM_KEYED_PLAIN_NUMBER_LENGTH = 10;
+
+/**
  * Whether a value is only digits and punctuation, which no secret-named key
  * makes distinctive: a port or a version recurs all over unrelated text.
  * @param value - Candidate value.
@@ -78,6 +91,6 @@ export function looksLikePlainConfig(value: string): boolean {
 		(URL_SCHEME.test(value) &&
 			!value.includes('@') &&
 			value.length < MAXIMUM_PLAIN_URL_LENGTH) ||
-		FILESYSTEM_PATH.test(value)
+		(FILESYSTEM_PATH.test(value) && !BASE64_PADDING_OR_PLUS.test(value))
 	);
 }

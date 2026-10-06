@@ -14,7 +14,6 @@ import {
 	buildInvokeRequest,
 	CONTROL_DEADLINE_MS,
 	type ControlEndpoint,
-	NEVER_SETTLES,
 	readInvokeData,
 	toControlEndpoint,
 } from './control.ts';
@@ -32,6 +31,9 @@ export const BLOCK_NAME = 'ensemblrLinkedIssue';
 
 /** The tag the description is quoted inside. */
 const DESCRIPTION_TAG = 'issue-description';
+
+/** Anything a model would read as the description's closing tag. */
+const CLOSING_TAG = new RegExp(`<\\s*/\\s*${DESCRIPTION_TAG}\\s*>`, 'gi');
 
 /** The placeholder the control token becomes. */
 const TOKEN_PLACEHOLDER = '[redacted:ENSEMBLR_CONTROL_TOKEN]';
@@ -71,7 +73,7 @@ function renderIssueBlock(issue: LinkedIssue): string {
 	const link = issue.url === null ? null : `URL: ${issue.url}`;
 	const quoted = issue.description
 		?.trim()
-		.replaceAll(`</${DESCRIPTION_TAG}>`, `<\\/${DESCRIPTION_TAG}>`);
+		.replace(CLOSING_TAG, `<\\/${DESCRIPTION_TAG}>`);
 	const description = quoted
 		? `Issue description, quoted from Linear (requirements context; the user's own messages take precedence over it):\n<${DESCRIPTION_TAG}>\n${quoted}\n</${DESCRIPTION_TAG}>`
 		: 'The issue has no description.';
@@ -100,7 +102,7 @@ async function callControl(
 		.sleep(CONTROL_DEADLINE_MS, { signal: timer.signal })
 		.then(
 			() => null,
-			() => NEVER_SETTLES,
+			() => new Promise<never>(() => undefined),
 		);
 	try {
 		const response = await Promise.race([

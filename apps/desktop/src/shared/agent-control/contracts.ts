@@ -1139,7 +1139,8 @@ export interface ReportToolInventoryArgs {
 
 /**
  * Bounds on the two ops the bundled Claude Code mods call. `maxTextChars` caps
- * one `redactText` call; a mod with more to redact splits it on line boundaries.
+ * one `redactText` call; a mod with more to redact splits it on line boundaries,
+ * or at whitespace where a piece has no line break.
  * `maxDescriptionChars` caps the linked issue's description `getLinkedIssue`
  * hands back, which a mod splices into a prompt.
  */

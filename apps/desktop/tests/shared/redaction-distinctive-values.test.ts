@@ -43,8 +43,25 @@ describe('isDistinctiveSecretValue', () => {
 		expect(isDistinctiveSecretValue('abc12', ['API_TOKEN'])).toBe(false);
 	});
 
-	it('leaves digits and punctuation alone even behind a secret-named key', () => {
+	it('leaves short digits and punctuation alone even behind a secret-named key', () => {
 		expect(isDistinctiveSecretValue('123456', ['OTP_SECRET'])).toBe(false);
 		expect(isDistinctiveSecretValue('12.34.56', ['API_KEY'])).toBe(false);
+	});
+
+	it('redacts a long numeric value behind a secret-named key', () => {
+		expect(isDistinctiveSecretValue('839201746518', ['CLIENT_SECRET'])).toBe(
+			true,
+		);
+		expect(
+			isDistinctiveSecretValue('4111111111111111', ['STRIPE_SECRET']),
+		).toBe(true);
+	});
+
+	it('does not mistake base64 that starts with a slash for a path', () => {
+		expect(
+			isDistinctiveSecretValue('/x8fK2pQ+Za9LmN0bW3e4R5t6Y7u8I9o0P=', [
+				'APP_SEED',
+			]),
+		).toBe(true);
 	});
 });

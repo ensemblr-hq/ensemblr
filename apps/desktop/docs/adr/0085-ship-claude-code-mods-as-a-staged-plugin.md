@@ -136,19 +136,28 @@ never reads that record, but the transcript file and a host that renders from it
 do.
 
 git-guard reads a command line, it does not run a shell. It follows:
-- quotes, operators, here-documents and command substitutions, each read as a
-  subshell;
+- quotes, operators, comments and line continuations;
+- here-documents, here-strings and arithmetic;
+- command substitutions, each read as a subshell;
 - `cd`, `pushd`, `popd`, `export` and subshells;
-- the wrappers `env`, `sudo`, `nice`, `timeout` and `xargs`.
+- the wrappers `env` (including `-C`), `sudo` (including `-D`), `nice`,
+  `timeout` and `xargs` (including `-I` placeholders).
 
 A `cd` or `pushd` out of the worktree counts as pointing git elsewhere, as `-C`
 does, and paths are resolved through symbolic links. A path built from a
-variable or a substitution cannot be read without running the shell, so a write
-through one is refused, with a request to write the path literally. Read-only
-subcommands may look at any repository, since reads may span every open
-workspace. `bash -c`, `eval` and git aliases are not followed. Those are
-deliberate evasions, and the guard is a check on good-faith mistakes, not a
-sandbox.
+variable, a substitution or an `xargs` placeholder cannot be read without
+running the shell, so a write through one is refused, with a request to write
+the path literally. A `cd` to an unreadable directory is not counted:
+`cd "$(git rev-parse --show-toplevel)"` is how agents return to the worktree.
+`clone` and `init` create a repository rather than write into one, so they may
+run anywhere. Read-only subcommands may look at any repository, since reads may
+span every open workspace.
+
+The guard is a check on good-faith mistakes, not a sandbox, so some gaps are
+left on purpose:
+- `bash -c`, `eval` and git aliases are not followed, because they are
+  deliberate evasions;
+- a substitution inside an unquoted here-document body is not read.
 
 The mods are checked by `claude plugin validate` and `claude plugin test`
 against the engine itself, outside the repository's own type-check: their types
