@@ -202,6 +202,7 @@ describe('git pointed outside the worktree', () => {
 			'sudo -D /work/ensemblr/sibling git push',
 			"git worktree list | awk '{print $2}' | xargs -I{} git -C {} pull",
 			'ls | xargs -i git -C {} pull',
+			'ls | xargs --replace git -C {} pull',
 		]) {
 			expect(firstDenial(command)).toContain('outside this session');
 		}

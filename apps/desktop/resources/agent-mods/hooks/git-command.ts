@@ -294,7 +294,12 @@ function readWrapperOption(
 		found.directory = value;
 	}
 	if (wrapper.replaceOptions?.has(flag)) {
-		found.placeholders.push(value || XARGS_DEFAULT_PLACEHOLDER);
+		const isBareLongForm = flag.startsWith('--') && attached === undefined;
+		found.placeholders.push(
+			isBareLongForm
+				? XARGS_DEFAULT_PLACEHOLDER
+				: value || XARGS_DEFAULT_PLACEHOLDER,
+		);
 	}
 	if (word === '-i' && wrapper.replaceOptions) {
 		found.placeholders.push(XARGS_DEFAULT_PLACEHOLDER);
