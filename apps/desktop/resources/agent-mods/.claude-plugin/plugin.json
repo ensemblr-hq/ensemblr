@@ -1,0 +1,9 @@
+{
+	"name": "ensemblr-mods",
+	"description": "Ensemblr's Claude Code function hooks: refuse git moves that break the workspace model, redact known secret values, keep control-tool ids through compaction, and add the linked Linear issue to a conversation.",
+	"version": "0.1.0",
+	"author": {
+		"name": "Ensemblr",
+		"url": "https://ensemblr.dev"
+	}
+}

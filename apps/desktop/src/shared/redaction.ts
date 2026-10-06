@@ -1,3 +1,4 @@
+import { MINIMUM_VALUE_LENGTH } from './redaction/named-literals.ts';
 import {
 	replaceAssignmentValues,
 	replaceJwts,
@@ -5,6 +6,13 @@ import {
 	replaceUrlPasswords,
 } from './redaction/secret-scanners.ts';
 import { SENSITIVE_KEY_PARTS } from './sensitive-key.ts';
+
+export {
+	lineLiteral,
+	MINIMUM_VALUE_LENGTH,
+	type NamedSecretValue,
+	redactNamedSecrets,
+} from './redaction/named-literals.ts';
 
 /** Placeholder every redactor substitutes for a secret. */
 export const REDACTED = '[REDACTED]';
@@ -163,12 +171,6 @@ const ASSIGNMENT_KEY_PROBE = new RegExp(
 
 /** A character every assignment match contains: its separator. */
 const ASSIGNMENT_SEPARATOR_PATTERN = /[=:]/;
-
-/**
- * Shortest value worth redacting. Below it a match is as likely to be a flag or
- * a placeholder as a credential, and blanking it only costs readability.
- */
-const MINIMUM_VALUE_LENGTH = 4;
 
 /**
  * Normalises a key name for substring comparison, dropping every separator so

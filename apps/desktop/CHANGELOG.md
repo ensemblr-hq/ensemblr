@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Claude sessions load four Ensemblr mods.** On Claude Code 2.1.288 or later, every Claude session Ensemblr starts loads a second bundled plugin of function hooks. It refuses `git branch -m`, stash moves outside the shared-stack recipe, and git writes aimed at another checkout, and says what to do instead. It replaces the exact values of the workspace's secrets and control tokens with `[redacted:NAME]` before the model reads a row. It tells every compaction to keep child session and tab ids, queued job ids, the branch, open review comments and decisions. It adds the linked Linear issue's description to a conversation's first message. Secret values never leave the app: the mods send text to two internal control ops, `redactText` and `getLinkedIssue`, which have no MCP tools. Older Claude Code versions load the plugin as an empty one. (ADR 0085)
+
 ## [0.2.4] - 2026-10-05
 
 Ensemblr 0.2.4 moves the Concierge from a floating button to a slim toggle row.

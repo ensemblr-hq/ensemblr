@@ -301,11 +301,16 @@ export function conciergeControlOpDenial(op: AgentControlOp): string | null {
  * Pi extension blocks a guarded call outright when that check does not answer —
  * `getSessionBrief` carries the playbook the pass is told to apply, and
  * `recallMemory` is how it avoids filing a memory it already holds.
+ * `redactText` and `getLinkedIssue` are what the bundled Claude Code mods call
+ * on every turn; they read and change nothing, and refusing `redactText` would
+ * leave the mod showing the model text it could not clean.
  */
 const RETIRED_ALLOWED_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'checkPlanModeTool',
+	'getLinkedIssue',
 	'getSessionBrief',
 	'recallMemory',
+	'redactText',
 ]);
 
 /**

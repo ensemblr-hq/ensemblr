@@ -22,6 +22,7 @@ import {
 	EXIT_PLAN_MODE_LIMITS,
 	FOCUS_PANEL_NAMES,
 	LINEAR_AGENT_LIMITS,
+	MOD_CONTROL_LIMITS,
 	REPORT_TOOL_INVENTORY_LIMITS,
 	SET_BRANCH_NAME_LIMITS,
 	WORKSPACE_BOARD_STATUSES,
@@ -588,6 +589,10 @@ const reportToolInventorySchema = z.strictObject({
 		.max(REPORT_TOOL_INVENTORY_LIMITS.maxTools),
 });
 
+const redactTextSchema = z.strictObject({
+	text: z.string().max(MOD_CONTROL_LIMITS.maxTextChars),
+});
+
 const exitPlanModeSchema = z.strictObject({
 	title: nonEmpty.max(EXIT_PLAN_MODE_LIMITS.maxTitleLength),
 	plan: nonEmpty.max(EXIT_PLAN_MODE_LIMITS.maxPlanLength),
@@ -661,6 +666,8 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	getSessionBrief: emptySchema,
 	checkPlanModeTool: checkPlanModeToolSchema,
 	reportToolInventory: reportToolInventorySchema,
+	redactText: redactTextSchema,
+	getLinkedIssue: emptySchema,
 	exitPlanMode: exitPlanModeSchema,
 } satisfies Record<AgentControlOp, z.ZodType>;
 

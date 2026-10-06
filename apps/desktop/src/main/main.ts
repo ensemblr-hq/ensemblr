@@ -1689,6 +1689,17 @@ agentControlService = createAgentControlService({
 	readTuiHarnessesEnabled,
 	ports: createAgentControlPorts({
 		architectureService,
+		/**
+		 * Assembles a workspace's variables and secrets for `redactText`, the same
+		 * values a queued command's output is redacted against.
+		 * @param workspaceId - Workspace whose environment to assemble.
+		 * @returns The overlay and its literal secret values.
+		 */
+		assembleSecretEnvironment: (workspaceId) =>
+			workspaceEnvironmentService.assemble({
+				includeSecrets: true,
+				workspaceId,
+			}),
 		augmentHarnessCommand,
 		computeQueueService,
 		conciergePorts,

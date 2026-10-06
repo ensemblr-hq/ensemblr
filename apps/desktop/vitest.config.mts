@@ -221,6 +221,8 @@ export default defineConfig({
 						'tests/main/map-with-concurrency.test.ts',
 						'tests/main/terminal-tab-naming.test.ts',
 						'tests/main/agent-control-service.test.ts',
+						'tests/main/agent-control-mod-ops.test.ts',
+						'tests/main/agent-control-secret-values-port.test.ts',
 						'tests/main/agent-control-guardrails.test.ts',
 						'tests/main/agent-control-origin-registry.test.ts',
 						'tests/main/agent-control-control-server.test.ts',

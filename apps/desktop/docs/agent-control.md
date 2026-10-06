@@ -90,6 +90,19 @@ resolved by `resolveAgentSkillBundle` in
 `pluginDirectories` and `skillDirectories` arrays when no bundle is found.
 The runtime still launches, without the bundled skills.
 
+A third root, `resources/agent-mods/`, is the Claude Code mods plugin — function
+hooks rather than skills — and reaches Claude alone, through
+`pluginDirectories`; Pi never sees it. Claude Code writes into a plugin folder
+that holds a hooks module (it lays `.claude-plugin/types/` and a root
+`tsconfig.json` there on every load), so the shipped tree is never handed over
+in place: that would dirty a development checkout and write into the signed app
+bundle. `src/main/agent-skills/mods-staging.ts` copies it once per process into
+`<userData>/claude-mods/<hash>/`, the hash being the first 16 hex digits of a
+SHA-256 over every file's relative path and bytes, `tests/` and `*.test.ts`
+excluded. A directory already at that hash is reused, copies untouched for a day
+are removed, and any failure contributes no root — the session launches exactly
+as it would without the mods.
+
 The SDK's sibling `skills` option is deliberately **not** set: it is a context
 filter, so naming ours there would hide every skill the user already has.
 
@@ -1251,8 +1264,9 @@ read-only and returns an actionable plan.
 
 ### Not served over MCP
 
-`getSessionBrief`, `checkPlanModeTool` and `reportToolInventory` are control ops
-with no entry in `TOOL_DEFS`. They are the Pi extension's own per-turn hooks —
+`getSessionBrief`, `checkPlanModeTool`, `reportToolInventory`, `redactText` and
+`getLinkedIssue` are control ops with no entry in `TOOL_DEFS`. The first three
+are the Pi extension's own per-turn hooks —
 the extension pulls the upkeep block over `getSessionBrief` on
 `before_agent_start`, asks `checkPlanModeTool` whether a tool call is allowed
 while planning or for the Concierge, and hands over the tools its session holds
@@ -1261,6 +1275,23 @@ them over MCP. A first-class runtime driven over MCP has its system prompt fixed
 at session open and receives the same upkeep block through
 `resolveTurnPreamble` instead; Claude Code's tool list reaches the same
 inventory from the SDK's `init` message.
+
+`redactText` and `getLinkedIssue` belong to the Claude Code mods Ensemblr ships
+in `resources/agent-mods/`, which call `/invoke` with the session's own token.
+`redactText({ text })` answers `{ text, redacted }`: the text with every exact
+secret value of the caller's workspace — its Infisical secrets, stored secret
+variables, and secret-like env-file values, as `runQueued` output is redacted
+against — and every live control token minted in that workspace replaced by
+`[redacted:NAME]`, `NAME` being the variable that carries it (`SECRET` when none
+does). It matches exact literals only, never secret *shapes*, merges overlapping
+matches into one span, and also matches the distinctive lines of a multi-line
+value. The values never leave the app: the op is an oracle, because a mod runs
+inside the agent process and anything it could read the model could read too.
+It takes at most 500,000 characters per call, is a read every role, mode and
+depth may call, and no guardrail counts it — the mod calls it once per
+conversation row. `getLinkedIssue({})` answers `{ issue }`, null unless the
+workspace was created from a Linear issue, with the issue's description read
+from Linear and capped at 8,000 characters, or null when Linear cannot be read.
 
 `checkPlanModeTool` also consults the user's read-only tool list for the
 caller's runtime — `providers.piReadOnlyTools` or

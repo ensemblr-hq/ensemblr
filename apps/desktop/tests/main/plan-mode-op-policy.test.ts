@@ -33,6 +33,8 @@ const EXPECTED_DENIALS: Record<
 	askUserQuestion: ['subagent'],
 	checkPlanModeTool: [],
 	reportToolInventory: [],
+	redactText: [],
+	getLinkedIssue: [],
 	closeTab: [],
 	getDiffComments: [],
 	recallMemory: [],

@@ -14,7 +14,7 @@ These instructions apply to everything under `src/main/`.
   - `pi-ipc/` for transport plumbing shared by `pi-runtime/` and `pi-agent/`; pure utilities, no protocol knowledge.
   - `agent-providers/` for the provider-parameterized settings surface: model catalogue, executable overrides, readiness probes.
   - `agents/` for detecting which spawnable harnesses are installed and their trusted launch commands.
-  - `agent-skills/` for where the Agent Skill bundle Ensemblr ships lives on disk, addressed per runtime; path resolution only.
+  - `agent-skills/` for where the Agent Skill bundle Ensemblr ships lives on disk, addressed per runtime, and for staging the Claude Code mods plugin into user data before Claude loads it.
   - `agent-control/` for the loopback control server, its MCP endpoint, ports/adapters, guardrails, and origin registry.
   - `plan-mode/` for the per-session plan registry, plan-file writing, and plan submission.
   - `afk-mode/` for the in-memory registry of sessions the user has stepped away from.

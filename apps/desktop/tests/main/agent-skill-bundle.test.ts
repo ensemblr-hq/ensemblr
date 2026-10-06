@@ -1,10 +1,24 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	statSync,
+	utimesSync,
+	writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { App } from 'electron';
 import { describe, expect, it, vi } from 'vitest';
 
+import {
+	readStagedAgentMods,
+	stageAgentMods,
+} from '../../src/main/agent-skills/mods-staging.ts';
 import { resolveAgentSkillBundle } from '../../src/main/agent-skills/skill-bundle-paths.ts';
 import { AGENT_CONTROL_OPS } from '../../src/shared/agent-control.ts';
 
@@ -16,6 +30,7 @@ const ARCHITECTURE_PLUGIN_ROOT = path.join(
 	'agent-skills-architecture',
 );
 const PLUGIN_ROOTS = [PLUGIN_ROOT, ARCHITECTURE_PLUGIN_ROOT];
+const MODS_PLUGIN_ROOT = path.join(REPO_ROOT, 'resources', 'agent-mods');
 const SKILL_ROOT = path.join(PLUGIN_ROOT, 'skills', 'ensemblr');
 const ARCHITECTURE_SKILL_ROOT = path.join(
 	ARCHITECTURE_PLUGIN_ROOT,
@@ -75,9 +90,56 @@ const frontmatter = (source: string): Record<string, string> => {
 	);
 };
 
+const USER_DATA = mkdtempSync(path.join(tmpdir(), 'ensemblr-user-data-'));
+
 /** An Electron `app` stub covering only what the resolver reads. */
 const fakeApp = (appPath: string): App =>
-	({ getAppPath: () => appPath, isPackaged: false }) as unknown as App;
+	({
+		getAppPath: () => appPath,
+		getPath: () => USER_DATA,
+		isPackaged: false,
+	}) as unknown as App;
+
+/** A staged mods root under the stub's user data, whatever its hash. */
+const STAGED_MODS_ROOT = expect.stringMatching(
+	/[\\/]claude-mods[\\/][0-9a-f]{16}$/,
+);
+
+/**
+ * Writes a minimal mods plugin, plus test-only files that must never ship.
+ * @param root - Directory to write it into.
+ * @param hook - Body of the one hook module, so a test can change what ships.
+ */
+const writeModsPlugin = (root: string, hook = 'export default {};\n'): void => {
+	mkdirSync(path.join(root, '.claude-plugin'), { recursive: true });
+	mkdirSync(path.join(root, 'hooks'), { recursive: true });
+	mkdirSync(path.join(root, 'tests'), { recursive: true });
+	writeFileSync(path.join(root, '.claude-plugin', 'plugin.json'), '{}\n');
+	writeFileSync(path.join(root, 'hooks', 'hooks.json'), '{}\n');
+	writeFileSync(path.join(root, 'hooks', 'mod.ts'), hook);
+	writeFileSync(path.join(root, 'hooks', 'mod.test.ts'), 'test one\n');
+	writeFileSync(path.join(root, 'tests', 'suite.ts'), 'test two\n');
+};
+
+/** A fresh scratch directory for one staging test. */
+const scratch = (): string =>
+	mkdtempSync(path.join(tmpdir(), 'ensemblr-mods-staging-'));
+
+/**
+ * Lists every file under a directory, relative to it.
+ * @param root - Directory to list.
+ * @returns POSIX-style relative paths, sorted.
+ */
+const listFiles = (root: string): string[] =>
+	readdirSync(root, { recursive: true, withFileTypes: true })
+		.filter((entry) => entry.isFile())
+		.map((entry) =>
+			path
+				.relative(root, path.join(entry.parentPath, entry.name))
+				.split(path.sep)
+				.join('/'),
+		)
+		.sort();
 
 describe.each(PLUGIN_ROOTS)('the shipped Claude plugin manifest', (root) => {
 	it('names every skill directory it bundles, and each one exists', () => {
@@ -197,21 +259,35 @@ describe('the skill against the surfaces it documents', () => {
 	});
 });
 
+describe('the shipped Claude Code mods plugin', () => {
+	it('keeps components out of .claude-plugin/, which holds the manifest alone', () => {
+		expect(readdirSync(path.join(MODS_PLUGIN_ROOT, '.claude-plugin'))).toEqual([
+			'plugin.json',
+		]);
+	});
+
+	it('carries the hook registry the staging step requires', () => {
+		expect(existsSync(path.join(MODS_PLUGIN_ROOT, 'hooks', 'hooks.json'))).toBe(
+			true,
+		);
+	});
+});
+
 describe('resolveAgentSkillBundle', () => {
-	it('finds the bundle shipped in the repository', () => {
+	it('finds the bundle shipped in the repository, the staged mods last', () => {
 		expect(
 			resolveAgentSkillBundle(fakeApp(REPO_ROOT), {
 				architectureDiagram: true,
 			}),
 		).toEqual({
-			pluginDirectories: PLUGIN_ROOTS,
+			pluginDirectories: [...PLUGIN_ROOTS, STAGED_MODS_ROOT],
 			skillDirectories: [SKILL_ROOT, ARCHITECTURE_SKILL_ROOT],
 		});
 	});
 
-	it('withholds the architecture bundle by default', () => {
+	it('withholds the architecture bundle by default, and gives Pi nothing from the mods', () => {
 		expect(resolveAgentSkillBundle(fakeApp(REPO_ROOT))).toEqual({
-			pluginDirectories: [PLUGIN_ROOT],
+			pluginDirectories: [PLUGIN_ROOT, STAGED_MODS_ROOT],
 			skillDirectories: [SKILL_ROOT],
 		});
 	});
@@ -226,6 +302,120 @@ describe('resolveAgentSkillBundle', () => {
 			).toEqual({ pluginDirectories: [], skillDirectories: [] });
 		} finally {
 			cwd.mockRestore();
+		}
+	});
+});
+
+describe('stageAgentMods', () => {
+	it('copies what ships into a content-hashed directory, leaving tests behind', () => {
+		const source = path.join(scratch(), 'agent-mods');
+		writeModsPlugin(source);
+		const parent = path.join(scratch(), 'claude-mods');
+
+		const staged = stageAgentMods(source, parent);
+
+		expect(path.dirname(staged)).toBe(parent);
+		expect(path.basename(staged)).toMatch(/^[0-9a-f]{16}$/);
+		expect(listFiles(staged)).toEqual([
+			'.claude-plugin/plugin.json',
+			'hooks/hooks.json',
+			'hooks/mod.ts',
+		]);
+	});
+
+	it('hashes only what ships, so a test-only change keeps the same copy', () => {
+		const source = path.join(scratch(), 'agent-mods');
+		writeModsPlugin(source);
+		const parent = path.join(scratch(), 'claude-mods');
+		const before = stageAgentMods(source, parent);
+
+		writeFileSync(path.join(source, 'tests', 'suite.ts'), 'changed\n');
+		writeFileSync(path.join(source, 'hooks', 'mod.test.ts'), 'changed\n');
+
+		expect(stageAgentMods(source, parent)).toBe(before);
+	});
+
+	it('moves to a new copy when a shipped file changes', () => {
+		const source = path.join(scratch(), 'agent-mods');
+		writeModsPlugin(source);
+		const parent = path.join(scratch(), 'claude-mods');
+		const before = stageAgentMods(source, parent);
+
+		writeModsPlugin(source, 'export default { changed: true };\n');
+
+		expect(stageAgentMods(source, parent)).not.toBe(before);
+	});
+
+	it('reuses a copy already staged, keeping what Claude wrote into it', () => {
+		const source = path.join(scratch(), 'agent-mods');
+		writeModsPlugin(source);
+		const parent = path.join(scratch(), 'claude-mods');
+		const staged = stageAgentMods(source, parent);
+		writeFileSync(path.join(staged, 'tsconfig.json'), '{}\n');
+
+		expect(stageAgentMods(source, parent)).toBe(staged);
+		expect(existsSync(path.join(staged, 'tsconfig.json'))).toBe(true);
+	});
+
+	it('removes sibling copies untouched for a day and keeps recent ones', () => {
+		const source = path.join(scratch(), 'agent-mods');
+		writeModsPlugin(source);
+		const parent = path.join(scratch(), 'claude-mods');
+		const stale = path.join(parent, '0000000000000000');
+		const recent = path.join(parent, '1111111111111111');
+		mkdirSync(stale, { recursive: true });
+		mkdirSync(recent, { recursive: true });
+		const now = Date.now();
+		const twoDaysAgo = new Date(now - 2 * 24 * 60 * 60 * 1000);
+		utimesSync(stale, twoDaysAgo, twoDaysAgo);
+
+		const staged = stageAgentMods(source, parent, now);
+
+		expect(existsSync(stale)).toBe(false);
+		expect(existsSync(recent)).toBe(true);
+		expect(statSync(staged).mtimeMs).toBe(now);
+	});
+});
+
+describe('readStagedAgentMods', () => {
+	it('stages the first complete candidate once per process', () => {
+		const incomplete = path.join(scratch(), 'agent-mods');
+		mkdirSync(path.join(incomplete, '.claude-plugin'), { recursive: true });
+		writeFileSync(path.join(incomplete, '.claude-plugin', 'plugin.json'), '{}');
+		const source = path.join(scratch(), 'agent-mods');
+		writeModsPlugin(source);
+		const parent = path.join(scratch(), 'claude-mods');
+
+		const staged = readStagedAgentMods([incomplete, source], parent);
+		writeModsPlugin(source, 'export default { later: true };\n');
+
+		expect(staged).not.toBeNull();
+		expect(readStagedAgentMods([incomplete, source], parent)).toBe(staged);
+		expect(readdirSync(parent)).toHaveLength(1);
+	});
+
+	it('contributes nothing when no candidate holds the hook registry', () => {
+		const source = path.join(scratch(), 'agent-mods');
+		mkdirSync(path.join(source, '.claude-plugin'), { recursive: true });
+		writeFileSync(path.join(source, '.claude-plugin', 'plugin.json'), '{}');
+
+		expect(
+			readStagedAgentMods([source], path.join(scratch(), 'claude-mods')),
+		).toBeNull();
+	});
+
+	it('contributes nothing, and logs, when the copy cannot be written', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const source = path.join(scratch(), 'agent-mods');
+		writeModsPlugin(source);
+		const blocked = path.join(scratch(), 'not-a-directory');
+		writeFileSync(blocked, 'a file where the staging parent should be');
+
+		try {
+			expect(readStagedAgentMods([source], blocked)).toBeNull();
+			expect(warn).toHaveBeenCalled();
+		} finally {
+			warn.mockRestore();
 		}
 	});
 });

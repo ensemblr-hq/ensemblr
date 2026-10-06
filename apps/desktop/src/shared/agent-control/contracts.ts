@@ -80,6 +80,8 @@ export const AGENT_CONTROL_OPS = [
 	'getSessionBrief',
 	'checkPlanModeTool',
 	'reportToolInventory',
+	'redactText',
+	'getLinkedIssue',
 	'exitPlanMode',
 ] as const;
 
@@ -1133,6 +1135,47 @@ export interface ReportToolInventoryArgs {
 		/** What registered the tool, such as the Pi package it came from. */
 		source: string | null;
 	}[];
+}
+
+/**
+ * Bounds on the two ops the bundled Claude Code mods call. `maxTextChars` caps
+ * one `redactText` call; a mod with more to redact splits it on line boundaries.
+ * `maxDescriptionChars` caps the linked issue's description `getLinkedIssue`
+ * hands back, which a mod splices into a prompt.
+ */
+export const MOD_CONTROL_LIMITS = {
+	maxDescriptionChars: 8000,
+	maxTextChars: 500_000,
+} as const;
+
+/** Args for `redactText`: text a mod is about to show the model. */
+export interface RedactTextArgs {
+	text: string;
+}
+
+/**
+ * Result of `redactText`: the text with every exact secret value of the
+ * caller's workspace, and every live control token minted there, replaced by
+ * `[redacted:NAME]`. The values themselves never leave the app.
+ */
+export interface RedactTextResult {
+	/** Number of spans replaced; 0 means `text` is the input unchanged. */
+	redacted: number;
+	text: string;
+}
+
+/** The workspace's linked Linear issue, as `getLinkedIssue` reports it. */
+export interface ModLinkedIssue {
+	/** Truncated to {@link MOD_CONTROL_LIMITS.maxDescriptionChars}; null when Linear could not be read. */
+	description: string | null;
+	identifier: string;
+	title: string;
+	url: string | null;
+}
+
+/** Result of `getLinkedIssue`: null unless the workspace was created from a Linear issue. */
+export interface GetLinkedIssueResult {
+	issue: ModLinkedIssue | null;
 }
 
 /**

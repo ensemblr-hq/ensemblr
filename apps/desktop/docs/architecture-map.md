@@ -48,7 +48,7 @@ each exposing its public surface through `index.ts`.
 | Provider catalogue | `agent-providers/` | Model catalogue, executable overrides, readiness probes across runtimes |
 | Harness detection | `agents/` | Which spawnable harnesses are installed on PATH, and their trusted launch commands |
 | Agent → app control | `agent-control/` | Loopback control server, MCP endpoint, ports/adapters, guardrails, origin registry |
-| Shipped Agent Skills | `agent-skills/` | Where the bundled skills live on disk, each addressed as a Pi skill directory and as a Claude plugin root. Two roots ship: `resources/agent-skills/` always, and `resources/agent-skills-architecture/` only while the Experimental architecture-diagram switch is on |
+| Shipped Agent Skills | `agent-skills/` | Where the bundled skills live on disk, each addressed as a Pi skill directory and as a Claude plugin root. Two roots ship: `resources/agent-skills/` always, and `resources/agent-skills-architecture/` only while the Experimental architecture-diagram switch is on. A third, `resources/agent-mods/` (Claude Code mods), is staged into `<userData>/claude-mods/<hash>/` and handed to Claude alone |
 | Plan mode | `plan-mode/` | Per-session plan registry, plan-file writing, plan submission — the enforcement classifiers live in `src/shared/plan-mode/` |
 | AFK Mode | `afk-mode/` | The per-session registry of which chats the user has stepped away from, which the IPC layer writes and the control layer reads (ADR&nbsp;0060) |
 | App lifecycle | `app/` | `BrowserWindow` creation, window state, the quit guard + coordinator that confirm a quit while agents are still running, and the `app://bundle` protocol the packaged renderer is served from (ADR&nbsp;0072) |

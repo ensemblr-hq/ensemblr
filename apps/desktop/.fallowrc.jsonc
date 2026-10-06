@@ -34,6 +34,10 @@
 		// Pi extensions are loaded at runtime by the Pi child via
 		// `pi --mode rpc -e <file>`; nothing imports them statically.
 		"resources/pi-extensions/*.mts",
+		// Claude Code loads the mods' hooks module from `hooks/hooks.json`, and
+		// `claude plugin test` runs their tests; nothing imports either statically.
+		"resources/agent-mods/hooks/register.ts",
+		"resources/agent-mods/tests/*.test.ts",
 		// Concern barrels are the mandated public entrypoints (src/shared
 		// AGENTS.md: "keep the root file as the public entrypoint"; renderer
 		// AGENTS.md: state via `state/<concern>/index.ts`, and `lib/<concern>/index.ts`
@@ -120,8 +124,11 @@
 	// src/renderer/lib/workbench/icon-subset.gen.ts, which is what ships. The
 	// generator resolves them with `import.meta.resolve` on a computed package
 	// name, so there is no static import edge for fallow to follow.
+	// `claude-code` is the type module Claude Code writes beside a mod it loads
+	// (resources/agent-mods): type-only imports, empty at run time, never a package.
 	"ignoreDependencies": [
 		"@electron-forge/shared-types",
+		"claude-code",
 		"@iconify-json/logos",
 		"@iconify-json/vscode-icons",
 		"@tailwindcss/typography",
