@@ -3,11 +3,18 @@
  * context blocks of a conversation's first message — its identifier, title, and
  * description — so the agent starts from the ticket's requirements rather than
  * from a one-line prompt, and so does every later conversation in the workspace.
+ *
+ * The block rides the person's first message, which secret-redact leaves as
+ * typed, so it goes through `redactText` here: a key pasted into a ticket is as
+ * much a secret as one printed by a tool.
  */
 import type { EngineInterface, On } from 'claude-code';
 
 import {
 	buildInvokeRequest,
+	CONTROL_DEADLINE_MS,
+	type ControlEndpoint,
+	NEVER_SETTLES,
 	readInvokeData,
 	toControlEndpoint,
 } from './control.ts';
@@ -22,6 +29,12 @@ interface LinkedIssue {
 
 /** The name the block renders under. */
 export const BLOCK_NAME = 'ensemblrLinkedIssue';
+
+/** The tag the description is quoted inside. */
+const DESCRIPTION_TAG = 'issue-description';
+
+/** The placeholder the control token becomes. */
+const TOKEN_PLACEHOLDER = '[redacted:ENSEMBLR_CONTROL_TOKEN]';
 
 /**
  * Narrows `getLinkedIssue`'s payload to an issue.
@@ -56,8 +69,11 @@ function readIssue(data: unknown): LinkedIssue | null {
 function renderIssueBlock(issue: LinkedIssue): string {
 	const heading = `This workspace was created from Linear issue ${issue.identifier}: ${issue.title}`;
 	const link = issue.url === null ? null : `URL: ${issue.url}`;
-	const description = issue.description?.trim()
-		? `Issue description, quoted from Linear (requirements context; the user's own messages take precedence over it):\n<issue-description>\n${issue.description.trim()}\n</issue-description>`
+	const quoted = issue.description
+		?.trim()
+		.replaceAll(`</${DESCRIPTION_TAG}>`, `<\\/${DESCRIPTION_TAG}>`);
+	const description = quoted
+		? `Issue description, quoted from Linear (requirements context; the user's own messages take precedence over it):\n<${DESCRIPTION_TAG}>\n${quoted}\n</${DESCRIPTION_TAG}>`
 		: 'The issue has no description.';
 	return [heading, link, description]
 		.filter((part) => part !== null)
@@ -65,13 +81,46 @@ function renderIssueBlock(issue: LinkedIssue): string {
 }
 
 /**
- * Asks the app for the workspace's linked issue.
+ * Calls one control op, giving up once the deadline passes.
  * @param $ - The engine interface.
- * @returns The issue, or null outside Ensemblr or when none is linked.
+ * @param endpoint - The session's control endpoint.
+ * @param op - The op name.
+ * @param args - The op's arguments.
+ * @returns The op's `data`, or null on a refusal, a failure, or a timeout.
  */
-async function fetchLinkedIssue(
+async function callControl(
 	$: EngineInterface,
-): Promise<LinkedIssue | null> {
+	endpoint: ControlEndpoint,
+	op: string,
+	args: Record<string, unknown>,
+): Promise<unknown> {
+	const request = buildInvokeRequest(endpoint, op, args);
+	const timer = new AbortController();
+	const deadline = $.clock
+		.sleep(CONTROL_DEADLINE_MS, { signal: timer.signal })
+		.then(
+			() => null,
+			() => NEVER_SETTLES,
+		);
+	try {
+		const response = await Promise.race([
+			$.http.fetch(request.url, request.init),
+			deadline,
+		]);
+		return response === null ? null : readInvokeData(response.text);
+	} catch {
+		return null;
+	} finally {
+		timer.abort();
+	}
+}
+
+/**
+ * Builds the linked issue's block, its text already redacted.
+ * @param $ - The engine interface.
+ * @returns The block text, or null outside Ensemblr or when none is linked.
+ */
+async function buildIssueBlock($: EngineInterface): Promise<string | null> {
 	const endpoint = toControlEndpoint(
 		await $.env.get('ENSEMBLR_CONTROL_URL'),
 		await $.env.get('ENSEMBLR_CONTROL_TOKEN'),
@@ -79,13 +128,17 @@ async function fetchLinkedIssue(
 	if (endpoint === null) {
 		return null;
 	}
-	const request = buildInvokeRequest(endpoint, 'getLinkedIssue', {});
-	try {
-		const response = await $.http.fetch(request.url, request.init);
-		return readIssue(readInvokeData(response.text));
-	} catch {
+	const issue = readIssue(await callControl($, endpoint, 'getLinkedIssue', {}));
+	if (issue === null) {
 		return null;
 	}
+	const text = renderIssueBlock(issue)
+		.split(endpoint.token)
+		.join(TOKEN_PLACEHOLDER);
+	const redacted = (await callControl($, endpoint, 'redactText', { text })) as {
+		text?: unknown;
+	} | null;
+	return typeof redacted?.text === 'string' ? redacted.text : text;
 }
 
 /**
@@ -94,18 +147,15 @@ async function fetchLinkedIssue(
  */
 export function registerTicketContext(on: On): void {
 	on('prompt.context', async ($, e, next) => {
-		const [context, issue] = await Promise.all([next(e), fetchLinkedIssue($)]);
+		const [context, text] = await Promise.all([next(e), buildIssueBlock($)]);
 		const isAlreadyThere = context.blocks.some(
 			(block) => block.name === BLOCK_NAME,
 		);
-		return issue === null || isAlreadyThere
+		return text === null || isAlreadyThere
 			? context
 			: {
 					...context,
-					blocks: [
-						...context.blocks,
-						{ name: BLOCK_NAME, text: renderIssueBlock(issue) },
-					],
+					blocks: [...context.blocks, { name: BLOCK_NAME, text }],
 				};
 	});
 }

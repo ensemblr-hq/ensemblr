@@ -4,21 +4,33 @@
  *
  * `redactText` runs once per conversation row, and assembling an environment
  * resolves Infisical over the network and a login-shell `PATH`, so the named
- * value table is cached per workspace for a short window and concurrent callers
- * share one in-flight assembly.
+ * value table is cached per workspace. Only a workspace's first read waits for
+ * an assembly: after that an expired table is served as it stands while one
+ * background refresh replaces it, so a row is never held up by the network and
+ * a secret that changed is redacted from the next refresh on, up to a window
+ * later.
  */
-import type { NamedSecretValue } from '../../shared/redaction.ts';
+import {
+	isDistinctiveSecretValue,
+	type NamedSecretValue,
+} from '../../shared/redaction.ts';
 import type { SecretValuesPort } from './ports.ts';
 
-/** How long one workspace's assembled value table is served from the cache. */
+/** How long one workspace's assembled value table is served before a refresh. */
 const SECRET_VALUES_TTL_MS = 60_000;
 
 /**
- * How long a failed assembly is remembered as "no values". Short, so a
+ * How long a failed assembly waits before the next attempt. Short, so a
  * transient Infisical outage clears quickly, but long enough that a burst of
  * rows does not retry and log once each.
  */
 const FAILED_ASSEMBLY_RETRY_MS = 5_000;
+
+/**
+ * How long a workspace's table survives without a read, so the values of an
+ * archived or closed workspace do not stay in memory for the app's lifetime.
+ */
+const IDLE_EVICTION_MS = 10 * 60_000;
 
 /** Placeholder name for a secret value no environment key carries. */
 const UNNAMED_SECRET = 'SECRET';
@@ -35,34 +47,51 @@ interface CreateSecretValuesPortOptions {
 	now?: () => number;
 	ttlMs?: number;
 	failureRetryMs?: number;
+	idleEvictionMs?: number;
 }
 
-/** One cached value table and when it stops being served. */
+/** One workspace's cached table, its freshness, and any refresh in flight. */
 interface CacheEntry {
-	expiresAt: number;
-	values: Promise<readonly NamedSecretValue[]>;
+	freshUntil: number;
+	/** The last successfully assembled table; null until one succeeds. */
+	lastGood: readonly NamedSecretValue[] | null;
+	lastReadAt: number;
+	refreshing: Promise<readonly NamedSecretValue[]> | null;
 }
 
 /**
- * Names every redact value after the first environment key, in sorted order,
- * that carries it, so the placeholder says which variable leaked.
- * @param assembly - The assembled environment and its redact values.
- * @returns Each redact value with its name, `SECRET` when no key carries it.
+ * Groups the environment's keys by the value they carry, in sorted key order.
+ * @param env - The assembled environment.
+ * @returns Every key carrying each value, first key first.
  */
-export function nameSecretValues(
+function keysByValue(
+	env: Readonly<Record<string, string>>,
+): ReadonlyMap<string, readonly string[]> {
+	const grouped = new Map<string, readonly string[]>();
+	for (const key of Object.keys(env).sort()) {
+		const value = env[key] as string;
+		grouped.set(value, [...(grouped.get(value) ?? []), key]);
+	}
+	return grouped;
+}
+
+/**
+ * Keeps the redact values distinctive enough to replace in a transcript and
+ * names each after the first environment key, in sorted order, that carries it,
+ * so the placeholder says which variable leaked.
+ * @param assembly - The assembled environment and its redact values.
+ * @returns Each kept value with its name, `SECRET` when no key carries it.
+ */
+export function nameDistinctiveSecretValues(
 	assembly: SecretEnvironmentAssembly,
 ): readonly NamedSecretValue[] {
-	const nameByValue = new Map<string, string>();
-	for (const key of Object.keys(assembly.env).sort()) {
-		const value = assembly.env[key] as string;
-		if (!nameByValue.has(value)) {
-			nameByValue.set(value, key);
-		}
-	}
-	return assembly.redactValues.map((value) => ({
-		name: nameByValue.get(value) ?? UNNAMED_SECRET,
-		value,
-	}));
+	const keysFor = keysByValue(assembly.env);
+	return assembly.redactValues.flatMap((value) => {
+		const keys = keysFor.get(value) ?? [];
+		return isDistinctiveSecretValue(value, keys)
+			? [{ name: keys[0] ?? UNNAMED_SECRET, value }]
+			: [];
+	});
 }
 
 /**
@@ -89,49 +118,94 @@ export function createSecretValuesPort({
 	now = Date.now,
 	ttlMs = SECRET_VALUES_TTL_MS,
 	failureRetryMs = FAILED_ASSEMBLY_RETRY_MS,
+	idleEvictionMs = IDLE_EVICTION_MS,
 }: CreateSecretValuesPortOptions): SecretValuesPort {
 	const cache = new Map<string, CacheEntry>();
 
 	/**
-	 * Starts one assembly and caches it, shortening the entry's life if it fails.
-	 * @param workspaceId - Workspace to assemble.
-	 * @returns The entry now in the cache.
+	 * Replaces fields of a workspace's entry, unless it was evicted meanwhile.
+	 * @param workspaceId - Workspace whose entry to update.
+	 * @param patch - Fields to replace.
 	 */
-	const load = (workspaceId: string): CacheEntry => {
-		const entry: CacheEntry = {
-			expiresAt: now() + ttlMs,
-			values: assemble(workspaceId)
-				.then(nameSecretValues)
-				.catch((error: unknown) => {
+	const update = (workspaceId: string, patch: Partial<CacheEntry>): void => {
+		const current = cache.get(workspaceId);
+		if (current) {
+			cache.set(workspaceId, { ...current, ...patch });
+		}
+	};
+
+	/**
+	 * Drops every entry no read has touched within the idle window.
+	 * @param at - Current time, in epoch milliseconds.
+	 */
+	const evictIdle = (at: number): void => {
+		for (const [workspaceId, entry] of cache) {
+			if (at - entry.lastReadAt > idleEvictionMs) {
+				cache.delete(workspaceId);
+			}
+		}
+	};
+
+	/**
+	 * Starts one assembly for a workspace and records it as in flight. A
+	 * failure keeps the last good table and waits briefly before the next try.
+	 * @param workspaceId - Workspace to assemble.
+	 * @returns The refreshed table; the last good one, or none, on failure.
+	 */
+	const refresh = (
+		workspaceId: string,
+	): Promise<readonly NamedSecretValue[]> => {
+		const refreshing = Promise.resolve()
+			.then(() => assemble(workspaceId))
+			.then(
+				(assembly) => {
+					const values = nameDistinctiveSecretValues(assembly);
+					update(workspaceId, {
+						freshUntil: now() + ttlMs,
+						lastGood: values,
+						refreshing: null,
+					});
+					return values;
+				},
+				(error: unknown) => {
 					console.warn(
 						'[agent-control] could not assemble workspace secrets for redaction.',
 						{ workspaceId, ...describeFailure(error) },
 					);
-					if (cache.get(workspaceId) === entry) {
-						cache.set(workspaceId, {
-							expiresAt: now() + failureRetryMs,
-							values: entry.values,
-						});
-					}
-					return [];
-				}),
-		};
-		cache.set(workspaceId, entry);
-		return entry;
+					update(workspaceId, {
+						freshUntil: now() + failureRetryMs,
+						refreshing: null,
+					});
+					return cache.get(workspaceId)?.lastGood ?? [];
+				},
+			);
+		update(workspaceId, { refreshing });
+		return refreshing;
 	};
 
 	return {
 		/**
-		 * Serves the workspace's named secret values from the cache, assembling
-		 * them when the entry is missing or has expired.
+		 * Serves the workspace's named secret values. A fresh table is served
+		 * as it stands; an expired one is served too while a single refresh runs
+		 * behind it; only a workspace with no table yet waits for an assembly.
 		 * @param workspaceId - Workspace whose values to read.
-		 * @returns The named values; empty when assembly failed.
+		 * @returns The named values; empty when no assembly has succeeded.
 		 */
 		readSecretValues: (workspaceId) => {
-			const cached = cache.get(workspaceId);
-			return cached && cached.expiresAt > now()
-				? cached.values
-				: load(workspaceId).values;
+			const at = now();
+			evictIdle(at);
+			const entry: CacheEntry = cache.get(workspaceId) ?? {
+				freshUntil: 0,
+				lastGood: null,
+				lastReadAt: at,
+				refreshing: null,
+			};
+			cache.set(workspaceId, { ...entry, lastReadAt: at });
+			if (entry.freshUntil > at) {
+				return Promise.resolve(entry.lastGood ?? []);
+			}
+			const refreshing = entry.refreshing ?? refresh(workspaceId);
+			return entry.lastGood ? Promise.resolve(entry.lastGood) : refreshing;
 		},
 	};
 }

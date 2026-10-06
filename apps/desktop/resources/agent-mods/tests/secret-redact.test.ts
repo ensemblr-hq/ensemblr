@@ -112,3 +112,17 @@ test('cuts long text on line boundaries and joins back whole', () => {
 	}
 	expect(chunkText('short')).toEqual(['short']);
 });
+
+test('cuts one long line at whitespace, and an unbroken run at the limit', () => {
+	const words = 'token-like-word '.repeat(12_500);
+	const pieces = chunkText(words);
+	expect(pieces.join('')).toBe(words);
+	for (const piece of pieces) {
+		expect(piece.length).toBeLessThanOrEqual(150_000);
+		expect(piece.endsWith(' ')).toBe(true);
+	}
+	const run = 'x'.repeat(200_000);
+	expect(chunkText(run).map((piece) => piece.length)).toEqual([
+		150_000, 50_000,
+	]);
+});

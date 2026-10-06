@@ -1,13 +1,15 @@
 /**
  * Finds the `git` invocations in a Bash command and what each one points at:
  * the subcommand and its arguments, and every path that moves git off the
- * session's own checkout (`-C`, `--git-dir`, `--work-tree`, `GIT_DIR`,
- * `GIT_WORK_TREE`), resolved against the directory the command runs in.
+ * session's own checkout (`cd`/`pushd`, `-C`, `--git-dir`, `--work-tree`,
+ * `GIT_DIR`, `GIT_WORK_TREE`), resolved against the directory the command
+ * runs in.
  */
-import { splitCommands } from './shell-words.ts';
+import { SUBSHELL_CLOSE, SUBSHELL_OPEN, splitCommands } from './shell-words.ts';
 
-/** How a path redirected git: a global option, or an environment variable. */
+/** How a path redirected git: a directory change, a global option, or an environment variable. */
 export type GitTargetSource =
+	| 'cd'
 	| '-C'
 	| '--git-dir'
 	| '--work-tree'
@@ -45,14 +47,58 @@ const COMMAND_PREFIXES = new Set([
 	'else',
 	'exec',
 	'if',
-	'nice',
 	'nohup',
-	'sudo',
 	'then',
 	'time',
 	'until',
 	'while',
 ]);
+
+/** A program that runs another one: its options that take a value, and the positionals before the program. */
+interface Wrapper {
+	positionals: number;
+	valueOptions: ReadonlySet<string>;
+}
+
+/** Wrappers a command in good faith is plausibly started through. */
+const WRAPPERS: ReadonlyMap<string, Wrapper> = new Map([
+	['env', { positionals: 0, valueOptions: new Set(['-u', '--unset', '-S']) }],
+	['nice', { positionals: 0, valueOptions: new Set(['-n', '--adjustment']) }],
+	[
+		'sudo',
+		{
+			positionals: 0,
+			valueOptions: new Set(['-u', '-g', '-C', '-D', '-h', '-p', '-U']),
+		},
+	],
+	[
+		'timeout',
+		{
+			positionals: 1,
+			valueOptions: new Set(['-s', '--signal', '-k', '--kill-after']),
+		},
+	],
+	[
+		'xargs',
+		{
+			positionals: 0,
+			valueOptions: new Set([
+				'-a',
+				'-d',
+				'-E',
+				'-e',
+				'-I',
+				'-L',
+				'-n',
+				'-P',
+				'-s',
+			]),
+		},
+	],
+]);
+
+/** `cd` and `pushd` flags that change how a path resolves, not which. */
+const CD_FLAGS = /^-[LPe@]+$/;
 
 /** Environment variables that point git at another repository or checkout. */
 const TARGET_VARIABLES = new Set<GitTargetSource>(['GIT_DIR', 'GIT_WORK_TREE']);
@@ -61,7 +107,7 @@ const TARGET_VARIABLES = new Set<GitTargetSource>(['GIT_DIR', 'GIT_WORK_TREE']);
 const ASSIGNMENT = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/s;
 
 /** Git global options that take the next word as their value. */
-const VALUE_OPTIONS = new Set(['-c', '--config-env']);
+const VALUE_OPTIONS = new Set(['-c', '--config-env', '--namespace']);
 
 /**
  * Expands a leading `~` the way the shell would.
@@ -172,8 +218,28 @@ function targetsFromAssignments(
 }
 
 /**
+ * Skips a wrapper's options and leading positionals.
+ * @param words - One simple command's words.
+ * @param start - Index of the first word after the wrapper's name.
+ * @param wrapper - The wrapper's option table.
+ * @returns Index of the first word of the program it runs.
+ */
+function skipWrapper(
+	words: readonly string[],
+	start: number,
+	wrapper: Wrapper,
+): number {
+	let index = start;
+	while ((words[index] ?? '').startsWith('-')) {
+		index += wrapper.valueOptions.has(words[index] ?? '') ? 2 : 1;
+	}
+	return index + wrapper.positionals;
+}
+
+/**
  * Drops the words that lead a command without naming its program: shell
- * keywords, wrappers such as `sudo`, `env` and its flags, and assignments.
+ * keywords, wrappers such as `sudo`, `env` or `timeout` and their options,
+ * and assignments.
  * @param words - One simple command's words.
  * @returns The assignments it carried and the words from its program on.
  */
@@ -185,13 +251,11 @@ function stripPrefixes(words: readonly string[]): {
 	let index = 0;
 	while (index < words.length) {
 		const word = words[index] ?? '';
+		const wrapper = WRAPPERS.get(word);
 		if (ASSIGNMENT.test(word)) {
 			assignments.push(word);
-		} else if (word === 'env') {
-			index += 1;
-			while ((words[index] ?? '').startsWith('-')) {
-				index += words[index] === '-u' ? 2 : 1;
-			}
+		} else if (wrapper) {
+			index = skipWrapper(words, index + 1, wrapper);
 			continue;
 		} else if (!COMMAND_PREFIXES.has(word)) {
 			break;
@@ -210,10 +274,79 @@ function isGit(word: string | undefined): boolean {
 	return word === 'git' || (word?.endsWith('/git') ?? false);
 }
 
+/** Where the shell stands while a command line is read. */
+interface ShellState {
+	cwd: string | null;
+	exported: readonly GitTarget[];
+	pushed: readonly (string | null)[];
+}
+
 /**
- * Finds every `git` a Bash command would start, following `cd` and `export`
- * through the command so a relative `-C` or a `GIT_DIR` exported earlier in the
- * line is read where it lands.
+ * Resolves where `cd` or `pushd` lands.
+ * @param state - Where the shell stands.
+ * @param args - The command's arguments.
+ * @param home - The home directory.
+ * @returns The new directory, or null when it cannot be read (`cd -`, an unknown flag).
+ */
+function changeDirectory(
+	state: ShellState,
+	args: readonly string[],
+	home: string | null,
+): string | null {
+	const operands = args.filter((arg) => !CD_FLAGS.test(arg));
+	const [target] = operands;
+	if (target === '-' || target?.startsWith('-')) {
+		return null;
+	}
+	return resolvePath(state.cwd, target ?? '~', home);
+}
+
+/**
+ * Applies one simple command to where the shell stands.
+ * @param state - Where the shell stands before it.
+ * @param program - The command, prefixes stripped.
+ * @param home - The home directory.
+ * @returns Where the shell stands after it.
+ */
+function applyShellCommand(
+	state: ShellState,
+	program: readonly string[],
+	home: string | null,
+): ShellState {
+	const [name, ...rest] = program;
+	switch (name) {
+		case 'cd':
+			return { ...state, cwd: changeDirectory(state, rest, home) };
+		case 'pushd':
+			return {
+				...state,
+				cwd: rest.length === 0 ? null : changeDirectory(state, rest, home),
+				pushed: [...state.pushed, state.cwd],
+			};
+		case 'popd':
+			return {
+				...state,
+				cwd: state.pushed.length === 0 ? null : (state.pushed.at(-1) ?? null),
+				pushed: state.pushed.slice(0, -1),
+			};
+		case 'export':
+			return {
+				...state,
+				exported: [
+					...state.exported,
+					...targetsFromAssignments(rest, { cwd: state.cwd, home }),
+				],
+			};
+		default:
+			return state;
+	}
+}
+
+/**
+ * Finds every `git` a Bash command would start, following `cd`, `pushd`,
+ * `export`, and subshells through the command, so a git run after changing
+ * directory, a relative `-C`, or a `GIT_DIR` exported earlier in the line is
+ * read where it lands.
  * @param command - The Bash command line.
  * @param context - The directory the command starts in and the home directory.
  * @returns Each git invocation, in order.
@@ -222,23 +355,30 @@ export function findGitInvocations(
 	command: string,
 	context: ShellContext,
 ): GitInvocation[] {
-	let cwd = context.cwd;
-	let exported: GitTarget[] = [];
+	const { home } = context;
+	let state: ShellState = { cwd: context.cwd, exported: [], pushed: [] };
+	const subshells: ShellState[] = [];
 	const found: GitInvocation[] = [];
 	for (const words of splitCommands(command)) {
 		const { assignments, program } = stripPrefixes(words);
-		const here: ShellContext = { cwd, home: context.home };
 		const [name, ...rest] = program;
-		if (name === 'cd') {
-			cwd = resolvePath(cwd, rest[0] ?? '~', context.home);
-		} else if (name === 'export') {
-			exported = [...exported, ...targetsFromAssignments(rest, here)];
+		if (words.length === 1 && name === SUBSHELL_OPEN) {
+			subshells.push(state);
+		} else if (words.length === 1 && name === SUBSHELL_CLOSE) {
+			state = subshells.pop() ?? state;
 		} else if (isGit(name)) {
-			const inherited = [
-				...exported,
-				...targetsFromAssignments(assignments, here),
-			];
-			found.push(readGitWords(rest, here, inherited));
+			const here: ShellContext = { cwd: state.cwd, home };
+			const moved: GitTarget[] =
+				state.cwd === context.cwd ? [] : [{ path: state.cwd, source: 'cd' }];
+			found.push(
+				readGitWords(rest, here, [
+					...moved,
+					...state.exported,
+					...targetsFromAssignments(assignments, here),
+				]),
+			);
+		} else {
+			state = applyShellCommand(state, program, home);
 		}
 	}
 	return found;

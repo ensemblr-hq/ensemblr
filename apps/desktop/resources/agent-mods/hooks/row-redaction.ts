@@ -22,8 +22,27 @@ const CHUNK_CHARS = 150_000;
 const MINIMUM_CHARS = 4;
 
 /**
- * Cuts text into pieces the op accepts, on line boundaries where it can, so a
- * secret is never split across two calls.
+ * Finds where to cut a piece: after the last line break inside the limit, else
+ * after the last whitespace, so a secret, which holds neither, is never split
+ * across two calls. Only a single unbroken run longer than the limit is cut
+ * mid-run.
+ * @param text - Text longer than the limit.
+ * @returns The length of the first piece.
+ */
+function cutPoint(text: string): number {
+	const lineBreak = text.lastIndexOf('\n', CHUNK_CHARS - 1);
+	if (lineBreak > 0) {
+		return lineBreak + 1;
+	}
+	let space = CHUNK_CHARS - 1;
+	while (space > 0 && !/\s/.test(text[space] ?? '')) {
+		space -= 1;
+	}
+	return space > 0 ? space + 1 : CHUNK_CHARS;
+}
+
+/**
+ * Cuts text into pieces the op accepts.
  * @param text - The text to cut.
  * @returns The pieces, in order, joining back to the text.
  */
@@ -31,8 +50,7 @@ export function chunkText(text: string): string[] {
 	if (text.length <= CHUNK_CHARS) {
 		return [text];
 	}
-	const cut = text.lastIndexOf('\n', CHUNK_CHARS);
-	const end = cut > 0 ? cut + 1 : CHUNK_CHARS;
+	const end = cutPoint(text);
 	return [text.slice(0, end), ...chunkText(text.slice(end))];
 }
 

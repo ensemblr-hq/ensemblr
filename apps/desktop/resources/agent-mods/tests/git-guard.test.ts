@@ -30,7 +30,10 @@ describe('reading a command line', () => {
 			'stash',
 			'log',
 		]);
-		expect(found[0]?.targets).toEqual([{ path: '/x', source: 'GIT_DIR' }]);
+		expect(found[0]?.targets).toEqual([
+			{ path: `${ROOT}/sub`, source: 'cd' },
+			{ path: '/x', source: 'GIT_DIR' },
+		]);
 	});
 
 	test('does not mistake a quoted commit message for a command', () => {
@@ -48,7 +51,9 @@ describe('reading a command line', () => {
 		);
 		expect(chained?.targets.at(-1)?.path).toBe('/work/ensemblr/other');
 		const [afterCd] = findGitInvocations('cd /tmp && git -C repo log', CONTEXT);
-		expect(afterCd?.targets[0]?.path).toBe('/tmp/repo');
+		expect(afterCd?.targets.find((t) => t.source === '-C')?.path).toBe(
+			'/tmp/repo',
+		);
 		const [home] = findGitInvocations('git -C ~/code log', CONTEXT);
 		expect(home?.targets[0]?.path).toBe('/home/me/code');
 		const [exported] = findGitInvocations(
@@ -59,6 +64,55 @@ describe('reading a command line', () => {
 			path: '/work/ensemblr/sibling',
 			source: 'GIT_WORK_TREE',
 		});
+	});
+
+	test('skips here-document bodies in both directions', () => {
+		const commitWithBody = [
+			"git commit -m \"$(cat <<'EOF'",
+			'feat: x',
+			'',
+			"git stash pop is now refused; don't worry",
+			'EOF',
+			')" && git stash pop',
+		].join('\n');
+		expect(
+			findGitInvocations(commitWithBody, CONTEXT).map((i) => i.subcommand),
+		).toEqual(['commit', 'stash']);
+		const fromStdin =
+			'git commit -F - <<-EOF\n\tgit branch -m old new\n\tEOF\n';
+		expect(
+			findGitInvocations(fromStdin, CONTEXT).map((i) => i.subcommand),
+		).toEqual(['commit']);
+	});
+
+	test('keeps reading the outer command after a substitution', () => {
+		const [found] = findGitInvocations(
+			'git -C "$(git rev-parse --show-toplevel)" stash pop',
+			CONTEXT,
+		).filter((i) => i.subcommand === 'stash');
+		expect(found?.args).toEqual(['pop']);
+		expect(found?.targets[0]?.path).toBeNull();
+	});
+
+	test('undoes a cd made inside a subshell, and loses track after cd -', () => {
+		const [sub] = findGitInvocations('(cd /tmp && ls); git status', CONTEXT);
+		expect(sub?.targets).toEqual([]);
+		const [back] = findGitInvocations('cd - && git status', CONTEXT);
+		expect(back?.targets).toEqual([{ path: null, source: 'cd' }]);
+	});
+
+	test('sees through timeout, nice, xargs and --namespace', () => {
+		for (const command of [
+			'timeout 30 git stash pop',
+			'timeout -k 5 30s git stash pop',
+			'nice -n 5 git stash pop',
+			'echo x | xargs -n 1 git stash pop',
+			'git --namespace foo stash pop',
+		]) {
+			expect(
+				findGitInvocations(command, CONTEXT).map((i) => i.subcommand),
+			).toEqual(['stash']);
+		}
 	});
 
 	test('cannot read a path built from a variable', () => {
@@ -80,6 +134,7 @@ describe('branch renames', () => {
 			);
 		}
 		expect(firstDenial('git branch -m x')).toContain('userRequested');
+		expect(firstDenial('git stash apply "$SHA"')).toContain('literally');
 	});
 
 	test('lets other branch calls through', () => {
@@ -132,6 +187,12 @@ describe('git pointed outside the worktree', () => {
 			'GIT_DIR=/repos/ensemblr/.git git reset --hard',
 			'export GIT_WORK_TREE=/repos/ensemblr && git add -A',
 			'git -C "$ROOT" commit',
+			'git -C "$(pwd)/../sibling" commit -am x',
+			'GIT_DIR=$(cd ../sibling && pwd)/.git git commit -am x',
+			'cd /work/ensemblr/sibling && git commit -am x',
+			'cd ../sibling && git stash push -u -m t',
+			'pushd /work/ensemblr/sibling && git -C . commit',
+			'cd - && git commit -am x',
 		]) {
 			expect(firstDenial(command)).toContain('outside this session');
 		}
@@ -148,6 +209,11 @@ describe('git pointed outside the worktree', () => {
 			`GIT_DIR=${GIT_DIR} git status`,
 			`git --git-dir=${GIT_DIR} commit -m x`,
 			'git commit -m "touch ../sibling"',
+			'cd apps/desktop && git add .',
+			'(cd /tmp && ls); git commit -am x',
+			'git -C ../sibling stash list',
+			'git -C ../sibling remote get-url origin',
+			'git -C ../sibling reflog',
 		]) {
 			expect(firstDenial(command)).toBeNull();
 		}

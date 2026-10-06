@@ -67,7 +67,11 @@ resources/agent-mods/
 folder in place would have the engine write type files into the signed macOS
 app bundle, and into the repository checkout in development. A content-hashed
 directory is staged once per build and renamed into place whole, so concurrent
-sessions never read a half-written copy.
+sessions never read a half-written copy. The hash leaves out what the engine
+itself writes (`.claude-plugin/types/**`, the root `tsconfig.json`). The copy is
+checked again on every launch: a missing copy is re-staged, and so is one whose
+content no longer matches its name. It sits in a user-writable directory, and a
+copy an agent edited would otherwise change git-guard for every later session.
 
 **`"hooks": {}` beside `modules` is the version gate.** Engines that predate
 modules validate an empty classic hook table and ignore the unknown key, so
@@ -85,9 +89,21 @@ carried the values to the mod would be one the model could read too. The op is
 an oracle — it confirms a guess — and that is no new exposure, because
 `runQueued` output is already redacted against the same values.
 
+The transcript gets a stricter value gate than command output. An Infisical
+project holds plain configuration beside its secrets (`NODE_ENV=production`,
+`AWS_REGION=us-east-1`, `PORT=3000`). Replacing those in every file the model
+reads would have it write `[redacted:NODE_ENV]` back into source. So a value
+under a secret-like key name is always matched; so is a URL carrying
+credentials. Any other value is matched only when it is long and irregular
+enough to be a credential: short values, numbers, single words, dotted or
+dashed identifiers, short credential-free URLs, and paths are left alone.
+Control tokens are always matched.
+
 Redaction runs at `session.append`, not per tool. Every row passes that event,
 so a secret is caught whichever tool, attachment, or delivery carried it. The
-person's own prompt and slash commands are left as typed.
+person's own prompt and slash commands are left as typed. The linked issue's
+block rides that first prompt, so ticket-context runs it through `redactText`
+itself.
 
 **The linked issue reaches the mod the same way**, through a second internal op,
 `getLinkedIssue`, which reads the workspace's linked issue and fetches its
@@ -101,11 +117,17 @@ no pane, band, status line, or toast is drawn.
 
 ## Consequences
 
-Each conversation row costs one loopback request while a workspace has secrets
-to match; the main process caches each workspace's value table for about a
-minute, because Infisical resolves over the network. When the app does not
-answer, the mod still replaces the control token itself and lets the row
-through rather than blocking the session.
+Every row from a door the mod does not skip costs one loopback request per text
+of four characters or more (per 150,000-character piece), whether or not the
+workspace has secrets. The mod cannot know that without asking. The main
+process caches each workspace's value table for about a minute, because
+Infisical resolves over the network. Past that, it serves the last table while
+one refresh runs, so only a workspace's first row waits on Infisical. A secret
+changed in Settings can therefore go unmatched for up to a minute. A `$` call
+does not count against a hook's own budget, so each call to the app races a
+four-second deadline. When the app does not answer in time, the mod still
+replaces the control token itself and lets the row through. Failing open was
+chosen over holding the session on a slow main process.
 
 What the mods rewrite is what the model reads and what the next request sends.
 A tool's structured record beside its result (`tool_use_result` in the SDK
@@ -113,11 +135,20 @@ stream, which the engine stores as made) still carries the raw output. The model
 never reads that record, but the transcript file and a host that renders from it
 do.
 
-git-guard reads a command line, it does not run a shell. It follows quotes,
-operators, substitutions, `cd`, and `export`, and resolves paths through
-symbolic links. A path built from a variable it cannot read is refused for a
-write, with a request to write the path literally. Read-only subcommands may
-look at any repository, since reads may span every open workspace.
+git-guard reads a command line, it does not run a shell. It follows:
+- quotes, operators, here-documents and command substitutions, each read as a
+  subshell;
+- `cd`, `pushd`, `popd`, `export` and subshells;
+- the wrappers `env`, `sudo`, `nice`, `timeout` and `xargs`.
+
+A `cd` or `pushd` out of the worktree counts as pointing git elsewhere, as `-C`
+does, and paths are resolved through symbolic links. A path built from a
+variable or a substitution cannot be read without running the shell, so a write
+through one is refused, with a request to write the path literally. Read-only
+subcommands may look at any repository, since reads may span every open
+workspace. `bash -c`, `eval` and git aliases are not followed. Those are
+deliberate evasions, and the guard is a check on good-faith mistakes, not a
+sandbox.
 
 The mods are checked by `claude plugin validate` and `claude plugin test`
 against the engine itself, outside the repository's own type-check: their types

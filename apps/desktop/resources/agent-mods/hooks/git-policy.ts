@@ -17,6 +17,9 @@ export interface WorktreeScope {
 const READ_ONLY_SUBCOMMANDS = new Set([
 	'blame',
 	'cat-file',
+	'check-ignore',
+	'cherry',
+	'count-objects',
 	'describe',
 	'diff',
 	'for-each-ref',
@@ -34,6 +37,7 @@ const READ_ONLY_SUBCOMMANDS = new Set([
 	'show',
 	'show-ref',
 	'status',
+	'var',
 	'version',
 ]);
 
@@ -120,7 +124,7 @@ function judgeStash(args: readonly string[]): string | null {
 		case 'apply':
 			return positionals.some((arg) => COMMIT_ID.test(arg))
 				? null
-				: `ensemblr git-guard: \`git stash apply\` must name your entry by its commit SHA, not by position, because other sessions move the shared stack. ${STASH_RECIPE}`;
+				: `ensemblr git-guard: \`git stash apply\` must name your entry by its commit SHA, written literally, not by position or through a variable, because other sessions move the shared stack. ${STASH_RECIPE}`;
 		case 'drop':
 			return positionals.length > 0 ? null : STASH_DENIAL;
 		default:
@@ -146,7 +150,20 @@ function isReadOnly({ args, subcommand }: GitInvocation): boolean {
 		case 'worktree':
 			return args[0] === 'list';
 		case 'remote':
-			return args.every((arg) => arg === '-v' || arg === '--verbose');
+			return (
+				args.every((arg) => arg === '-v' || arg === '--verbose') ||
+				args[0] === 'get-url' ||
+				args[0] === 'show'
+			);
+		case 'stash':
+			return args[0] === 'list' || args[0] === 'show';
+		case 'reflog':
+			return (
+				args[0] === undefined ||
+				args[0] === 'show' ||
+				args[0] === 'exists' ||
+				isOption(args[0])
+			);
 		case 'config':
 			return args.some((arg) => /^(--get|--list$|-l$)/.test(arg));
 		default:
@@ -188,9 +205,9 @@ function judgeTargets(
 	}
 	const where =
 		stray.path === null
-			? `a path this guard cannot read without running the shell (write it as a literal path)`
+			? 'a path this guard cannot read without running the shell (write it as a literal path)'
 			: `\`${stray.path}\``;
-	return `ensemblr git-guard: \`${stray.source}\` points git at ${where}, outside this session's worktree \`${scope.root}\`. Write only in your own worktree: a sibling workspace or the root checkout is not yours to change, and git writes there land in another session's index and branch. Read-only commands (status, log, diff, show, ...) may look elsewhere.`;
+	return `ensemblr git-guard: through \`${stray.source}\`, this git command would act on ${where}, outside this session's worktree \`${scope.root}\`. Write only in your own worktree: a sibling workspace or the root checkout is not yours to change, and git writes there land in another session's index and branch. Read-only commands (status, log, diff, show, ...) may look elsewhere.`;
 }
 
 /**

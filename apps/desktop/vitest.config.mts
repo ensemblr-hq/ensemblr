@@ -91,6 +91,7 @@ export default defineConfig({
 					include: [
 						'tests/shared/**/*.test.ts',
 						'tests/scripts/**/*.test.mjs',
+						'tests/main/agent-mods-staging.test.ts',
 						'tests/main/agent-skill-bundle.test.ts',
 						'tests/main/app-bundle.test.ts',
 						'tests/main/architecture-control-port.test.ts',

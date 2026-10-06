@@ -1285,7 +1285,20 @@ against — and every live control token minted in that workspace replaced by
 `[redacted:NAME]`, `NAME` being the variable that carries it (`SECRET` when none
 does). It matches exact literals only, never secret *shapes*, merges overlapping
 matches into one span, and also matches the distinctive lines of a multi-line
-value. The values never leave the app: the op is an oracle, because a mod runs
+value. Its workspace values pass a stricter gate than `runQueued`'s, because an
+Infisical project hands over plain configuration beside its secrets and
+replacing `production` or `us-east-1` in every file the model reads would have
+it write placeholders back into code. `isDistinctiveSecretValue` in
+`src/shared/redaction.ts` holds the rule: nothing under six characters; a value
+behind a secret-like key unless it is only digits and punctuation; a URL with
+credentials; and otherwise only a value that does not look like configuration —
+not a short word, a dotted or dashed identifier, a short URL, a path, or a
+number. A short or word-shaped secret under a plain key name therefore stays
+visible; that is the deliberate trade-off. Control tokens bypass the gate. The
+values are cached per workspace for 60 seconds, and an expired table keeps
+being served while one refresh replaces it in the background, so a changed
+secret is redacted from up to about a minute after the change. The values
+never leave the app: the op is an oracle, because a mod runs
 inside the agent process and anything it could read the model could read too.
 It takes at most 500,000 characters per call, is a read every role, mode and
 depth may call, and no guardrail counts it — the mod calls it once per

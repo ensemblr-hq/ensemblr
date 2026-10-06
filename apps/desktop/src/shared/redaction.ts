@@ -5,6 +5,12 @@ import {
 	replacePrivateKeyBlocks,
 	replaceUrlPasswords,
 } from './redaction/secret-scanners.ts';
+import {
+	isCredentialUrl,
+	isDigitsAndPunctuation,
+	looksLikePlainConfig,
+	MINIMUM_TRANSCRIPT_SECRET_LENGTH,
+} from './redaction/value-shapes.ts';
 import { SENSITIVE_KEY_PARTS } from './sensitive-key.ts';
 
 export {
@@ -209,6 +215,42 @@ export function isRedactableKeyName(key: string): boolean {
 		REDACTION_KEY_PARTS.some((part) => normalized.includes(part)) ||
 		keySegments(key).some((segment) => REDACTION_KEY_SEGMENTS.includes(segment))
 	);
+}
+
+/**
+ * Reports whether a known environment value is distinctive enough to replace
+ * wherever it appears in a transcript. A deliberate trade-off: an environment
+ * layer carries plain configuration beside its secrets, and replacing
+ * `production` or `us-east-1` in every file the model reads breaks the code it
+ * writes back, so a value a secret-named key does not vouch for has to look
+ * like a credential too. The rule, in order:
+ *
+ * - under 6 characters: never;
+ * - carried by a secret-like key ({@link isRedactableKeyName}): always, unless
+ *   it is only digits and punctuation;
+ * - a URL with credentials (`scheme://user:pass@`, `scheme://token@`): always;
+ * - otherwise not when it is under 8 characters, only digits and punctuation,
+ *   one alphabetic word under 16, a dotted or dashed identifier under 24, a URL
+ *   with no `@` under 40, or a path with no whitespace; and always else.
+ *
+ * A short or word-shaped secret under a plain key name therefore survives. That
+ * is the price of not rewriting configuration, and control tokens never pass
+ * through this gate.
+ * @param value - The environment value.
+ * @param keyNames - Every environment key that carries the value; empty when none does.
+ * @returns True when the value should be redacted from transcripts.
+ */
+export function isDistinctiveSecretValue(
+	value: string,
+	keyNames: readonly string[],
+): boolean {
+	if (value.length < MINIMUM_TRANSCRIPT_SECRET_LENGTH) {
+		return false;
+	}
+	if (keyNames.some(isRedactableKeyName)) {
+		return !isDigitsAndPunctuation(value);
+	}
+	return isCredentialUrl(value) || !looksLikePlainConfig(value);
 }
 
 /**

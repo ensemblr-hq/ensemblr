@@ -2,7 +2,9 @@
  * secret-redact: replaces the exact values of this workspace's secrets — its
  * Infisical secrets, its Keychain environment rows, and the control tokens the
  * app minted — with `[redacted:NAME]` in every row the conversation keeps,
- * before the model reads it, the transcript stores it, or Ensemblr draws it.
+ * before the model reads it or the next request sends it. A tool's structured
+ * record beside its result is stored as the tool made it, so the transcript
+ * file and a host drawing from that record can still show the raw output.
  *
  * The values never reach this module. Ensemblr matches them in its own process
  * (`redactText` over the control server) and answers with the redacted text, so
@@ -14,13 +16,17 @@
  * Rows are rewritten at `session.append`, the one place every row passes, so a
  * secret is caught whichever tool, attachment, or delivery carried it. The
  * person's own prompt and slash commands are left as typed: a value they paste
- * on purpose is theirs to hand the model.
+ * on purpose is theirs to hand the model. When the app does not answer within
+ * {@link CONTROL_DEADLINE_MS}, the row goes on with the local pass alone:
+ * holding the session hostage to a slow main process is the worse failure.
  */
-import type { EngineInterface, On } from 'claude-code';
+import type { EngineInterface, HttpResponse, On } from 'claude-code';
 
 import {
 	buildInvokeRequest,
+	CONTROL_DEADLINE_MS,
 	type ControlEndpoint,
+	NEVER_SETTLES,
 	readInvokeData,
 	toControlEndpoint,
 } from './control.ts';
@@ -51,6 +57,35 @@ async function readEndpoint(
 }
 
 /**
+ * Calls the app, giving up once the deadline passes.
+ * @param $ - The engine interface.
+ * @param request - The request to send.
+ * @returns The response, or null on a failure or a timeout.
+ */
+async function fetchWithinDeadline(
+	$: EngineInterface,
+	request: ReturnType<typeof buildInvokeRequest>,
+): Promise<HttpResponse | null> {
+	const timer = new AbortController();
+	const deadline = $.clock
+		.sleep(CONTROL_DEADLINE_MS, { signal: timer.signal })
+		.then(
+			() => null,
+			() => NEVER_SETTLES,
+		);
+	try {
+		return await Promise.race([
+			$.http.fetch(request.url, request.init),
+			deadline,
+		]);
+	} catch {
+		return null;
+	} finally {
+		timer.abort();
+	}
+}
+
+/**
  * Has the app redact one piece of text against the workspace's secrets.
  * @param $ - The engine interface.
  * @param endpoint - The session's control endpoint.
@@ -63,13 +98,11 @@ async function redactRemotely(
 	piece: string,
 ): Promise<string> {
 	const request = buildInvokeRequest(endpoint, 'redactText', { text: piece });
-	try {
-		const response = await $.http.fetch(request.url, request.init);
-		const data = readInvokeData(response.text) as { text?: unknown } | null;
-		return typeof data?.text === 'string' ? data.text : piece;
-	} catch {
-		return piece;
-	}
+	const response = await fetchWithinDeadline($, request);
+	const data = (response === null ? null : readInvokeData(response.text)) as {
+		text?: unknown;
+	} | null;
+	return typeof data?.text === 'string' ? data.text : piece;
 }
 
 /**
