@@ -247,6 +247,26 @@ export function joinFacts(facts: readonly (string | null)[]): string {
 }
 
 /**
+ * The collapsed-line fact for a wait that returned before what it watched had
+ * settled: the user's message cut it short, or its window expired first.
+ * @param payload - The wait's result payload
+ * @returns The fact, or null when the wait ran to its end
+ */
+export function waitEndingFact(
+	payload: Readonly<Record<string, unknown>>,
+): string | null {
+	if (payload.interrupted === 'user-message') {
+		return i18n.t(
+			'workbench:control-tool.preview.interrupted-by-user',
+			'paused for your message',
+		);
+	}
+	return payload.timedOut === true
+		? i18n.t('workbench:control-tool.preview.timed-out', 'wait window expired')
+		: null;
+}
+
+/**
  * Names how many rows a listing body left out, so a capped list never reads as
  * a complete one.
  * @param count - Rows not painted

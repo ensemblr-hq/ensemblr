@@ -573,6 +573,7 @@
 			"context": "{{percent}}% context",
 			"entries_one": "{{count}} entry",
 			"entries_other": "{{count}} entries",
+			"interrupted-by-user": "paused for your message",
 			"issues_one": "{{count}} issue",
 			"issues_other": "{{count}} issues",
 			"jobs-pending_one": "{{count}} job still going",

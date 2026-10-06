@@ -5,6 +5,9 @@ import {
 	beforeDelegationToolCall,
 	createDelegationBarrierState,
 	delegationBarrierActive,
+	delegationBarrierEnforced,
+	endDelegationInterjection,
+	noteDelegationUserMessage,
 	noteStalledDelegationTurn,
 	restoreDelegationBarrierState,
 	sanitizeDelegationMessageContent,
@@ -629,4 +632,159 @@ describe('Pi delegation barrier', () => {
 			expect(delegationBarrierActive(settled)).toBe(active);
 		},
 	);
+});
+
+// A user message mid-wait ends the wait so the runtime can deliver it, but the
+// barrier would then strip the orchestrator's reply and block whatever the user
+// asked for. It stands aside until the next wait or the end of the turn.
+describe('Pi delegation barrier: user interjection', () => {
+	const interrupted = () =>
+		waitFor(startChild(), {
+			completed: [],
+			interrupted: 'user-message',
+			pending: [{ agentSessionId: 'child-1', status: 'streaming' }],
+			timedOut: false,
+		});
+
+	it('stands aside after a wait the user cut short', () => {
+		const state = interrupted();
+
+		expect(delegationBarrierActive(state)).toBe(true);
+		expect(delegationBarrierEnforced(state)).toBe(false);
+		for (const toolName of ['read', 'ensemblr_ask_user_question']) {
+			const call = beforeDelegationToolCall(state, {
+				batchStartsChild: false,
+				input: {},
+				toolCallId: `${toolName}-1`,
+				toolName,
+			});
+			expect(call.blockReason).toBeUndefined();
+		}
+	});
+
+	it('keeps the child outstanding so the wait loop resumes afterwards', () => {
+		const state = interrupted();
+
+		expect(state.children).toEqual([
+			{ agentSessionId: 'child-1', chatTabId: 'tab-1', phase: 'working' },
+		]);
+		expect(shouldResumeDelegationWait(state)).toBe(true);
+	});
+
+	it('enforces again from the next wait', () => {
+		const waiting = beforeDelegationToolCall(interrupted(), {
+			batchStartsChild: false,
+			input: { mode: 'all' },
+			toolCallId: 'wait-2',
+			toolName: 'ensemblr_wait_for_agents',
+		});
+
+		expect(waiting.input).toMatchObject({ mode: 'all', targets: ['child-1'] });
+		expect(delegationBarrierEnforced(waiting.state)).toBe(true);
+	});
+
+	it('enforces again once the turn settles', () => {
+		const settled = endDelegationInterjection(interrupted());
+
+		expect(delegationBarrierEnforced(settled)).toBe(true);
+		const read = beforeDelegationToolCall(settled, {
+			batchStartsChild: false,
+			input: {},
+			toolCallId: 'read-2',
+			toolName: 'read',
+		});
+		expect(read.blockReason).toContain('ensemblr_wait_for_agents');
+	});
+
+	it('leaves a barrier with no interjection untouched at turn end', () => {
+		const state = startChild();
+
+		expect(endDelegationInterjection(state)).toBe(state);
+	});
+
+	it('stays enforced after a wait that merely timed out', () => {
+		const state = waitFor(startChild(), {
+			completed: [],
+			pending: [{ agentSessionId: 'child-1', status: 'streaming' }],
+			timedOut: true,
+		});
+
+		expect(delegationBarrierEnforced(state)).toBe(true);
+	});
+
+	it('does not carry an interjection across a reload', () => {
+		expect(
+			delegationBarrierEnforced(restoreDelegationBarrierState(interrupted())),
+		).toBe(true);
+	});
+
+	it('stands aside after a wait: true follow-up the user cut short', () => {
+		const state = startChild();
+		const sending = beforeDelegationToolCall(state, {
+			batchStartsChild: false,
+			input: { agentSessionId: 'child-1', prompt: 'and?', wait: true },
+			toolCallId: 'follow-1',
+			toolName: 'ensemblr_send_follow_up',
+		});
+		const sent = afterDelegationToolResult(sending.state, {
+			details: successful({
+				interrupted: 'user-message',
+				result: 'interrupted',
+			}),
+			input: { agentSessionId: 'child-1', prompt: 'and?', wait: true },
+			toolCallId: 'follow-1',
+			toolName: 'ensemblr_send_follow_up',
+		});
+
+		expect(delegationBarrierEnforced(sent)).toBe(false);
+	});
+
+	it('stands aside after a wait: true spawn the user cut short', () => {
+		const started = beforeDelegationToolCall(createDelegationBarrierState(), {
+			batchStartsChild: true,
+			input: { wait: true },
+			toolCallId: 'start-2',
+			toolName: 'ensemblr_start_conversation',
+		});
+		const state = afterDelegationToolResult(started.state, {
+			details: successful({
+				agentSessionId: 'child-2',
+				chatTabId: 'tab-2',
+				interrupted: 'user-message',
+				result: 'interrupted',
+			}),
+			input: { wait: true },
+			toolCallId: 'start-2',
+			toolName: 'ensemblr_start_conversation',
+		});
+
+		expect(delegationBarrierActive(state)).toBe(true);
+		expect(delegationBarrierEnforced(state)).toBe(false);
+	});
+
+	// A message can land at a boundary no wait was holding — after a blocked call,
+	// say — and its answer would be stripped all the same.
+	it('stands aside for a user message delivered anywhere mid-run', () => {
+		const lifted = noteDelegationUserMessage(startChild());
+
+		expect(delegationBarrierEnforced(lifted)).toBe(false);
+	});
+
+	it('ignores a user message while no child work is outstanding', () => {
+		const idle = createDelegationBarrierState();
+
+		expect(noteDelegationUserMessage(idle)).toBe(idle);
+	});
+
+	it('wires the interjection into the extension', () => {
+		const source = readExtensionSource();
+
+		expect(source).toContain('!delegationBarrierEnforced(delegationBarrier)');
+		expect(source).toContain(
+			'const restored = endDelegationInterjection(delegationBarrier);',
+		);
+		expect(source).toContain(
+			'const lifted = noteDelegationUserMessage(delegationBarrier);',
+		);
+	});
 });

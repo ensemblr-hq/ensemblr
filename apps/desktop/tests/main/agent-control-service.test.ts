@@ -827,8 +827,11 @@ describe('agent-control service: the deadline on a non-blocking op', () => {
 		expect(ports.conversations.waitForIdle).toHaveBeenCalledWith(
 			'child',
 			expect.any(Number),
-			controller.signal,
+			expect.any(AbortSignal),
 		);
+		const [, , waitSignal] =
+			vi.mocked(ports.conversations.waitForIdle).mock.calls[0] ?? [];
+		expect(waitSignal?.aborted).toBe(true);
 	});
 });
 

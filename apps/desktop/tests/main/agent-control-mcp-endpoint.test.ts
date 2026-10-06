@@ -78,6 +78,8 @@ const makeStubService = (
 	readTurnPreamble: async () => null,
 	releaseSession: () => {},
 	retireSession: () => undefined,
+	noteUserSteer: () => undefined,
+	noteSessionEvent: () => undefined,
 });
 
 const stubService: AgentControlService = makeStubService();
@@ -690,6 +692,8 @@ const makeBlockingService = (audience: ControlAudience = HARNESS_ROOT) => {
 		readTurnPreamble: async () => null,
 		releaseSession: () => {},
 		retireSession: () => undefined,
+		noteUserSteer: () => undefined,
+		noteSessionEvent: () => undefined,
 	};
 	return { release: () => release(), service, started };
 };

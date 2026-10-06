@@ -130,6 +130,8 @@ interface AgentSessionLifecycleOptions {
 	 * one that finished on its own.
 	 */
 	onSessionAborted?: (sessionId: string) => void;
+	/** Announces a steer the runtime accepted into a running turn. */
+	onSteerAccepted?: (sessionId: string) => void;
 	/**
 	 * Announces a summary that has landed on disk. Summary writes are async and
 	 * finish after the close that triggered them has already answered the
@@ -221,6 +223,7 @@ export function createAgentSessionLifecycle({
 	isAfkModeActive,
 	now,
 	onSessionAborted,
+	onSteerAccepted,
 	onSummaryPersisted,
 	persistRuntimeEvent,
 	agentClient,
@@ -251,6 +254,7 @@ export function createAgentSessionLifecycle({
 		isAfkModeActive,
 		isPlanModeActive,
 		now,
+		onSteerAccepted,
 		turnBoundaries,
 	});
 

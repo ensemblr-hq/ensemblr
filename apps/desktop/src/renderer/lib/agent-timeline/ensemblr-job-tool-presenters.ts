@@ -14,6 +14,7 @@ import {
 	markdownRow,
 	numberValue,
 	stringValue,
+	waitEndingFact,
 } from './ensemblr-control-presenter-helpers';
 
 /**
@@ -128,17 +129,6 @@ function jobBlocks(jobs: readonly unknown[]): string | null {
 }
 
 /**
- * The collapsed line a capped wait earns when it ran out before the jobs did.
- * @param timedOut - Whether the wait window expired
- * @returns The fact, or null when it did not
- */
-function timedOutFact(timedOut: boolean): string | null {
-	return timedOut
-		? i18n.t('workbench:control-tool.preview.timed-out', 'wait window expired')
-		: null;
-}
-
-/**
  * Presents a queued command: its outcome once it finished, or where it stands.
  * @param part - The `ensemblr_run_queued` tool part to project
  * @returns The row's body and collapsed summary
@@ -150,10 +140,7 @@ function presentRunQueued(part: DynamicToolUIPart): ControlRow {
 	}
 	return markdownRow(
 		markdownBlocks([jobBlock(payload.job), stringValue(payload, 'note')]),
-		joinFacts([
-			jobVerdict(payload.job),
-			timedOutFact(payload.timedOut === true),
-		]),
+		joinFacts([jobVerdict(payload.job), waitEndingFact(payload)]),
 	);
 }
 
@@ -203,7 +190,7 @@ function presentWaitForJob(part: DynamicToolUIPart): ControlRow {
 						defaultValue_one: '{{count}} job still going',
 						defaultValue_other: '{{count}} jobs still going',
 					}),
-			timedOutFact(payload.timedOut === true),
+			waitEndingFact(payload),
 		]),
 	);
 }

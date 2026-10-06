@@ -20,7 +20,9 @@ import {
 	afterDelegationToolResult,
 	beforeDelegationToolCall,
 	createDelegationBarrierState,
-	delegationBarrierActive,
+	delegationBarrierEnforced,
+	endDelegationInterjection,
+	noteDelegationUserMessage,
 	noteStalledDelegationTurn,
 	restoreDelegationBarrierState,
 	sanitizeDelegationMessageContent,
@@ -152,7 +154,7 @@ interface AwarenessFeatures {
  * The compute-queue bullet every workspace playbook carries. MUST stay
  * byte-identical to its counterpart in `src/shared/agent-control/awareness.ts`.
  */
-const COMPUTE_QUEUE_INVENTORY = `- Heavy commands: run a test suite, a build, a typecheck, a compile, or a nix build with \`ensemblr_run_queued\` — never in your own shell, an Ensemblr terminal, or a script, where Ensemblr refuses them. One queue serves every agent in every workspace, so the user's machine stays usable however many of you are working. It runs the command in this workspace with the full Ensemblr environment, Infisical secrets included, and returns the exit code and the end of the output. A \`timedOut\` answer is a lap, not a failure: the job keeps its place and keeps running, so call \`ensemblr_wait_for_job\` with its \`jobId\`; \`ensemblr_cancel_job\` drops one you no longer need.`;
+const COMPUTE_QUEUE_INVENTORY = `- Heavy commands: run a test suite, a build, a typecheck, a compile, or a nix build with \`ensemblr_run_queued\` — never in your own shell, an Ensemblr terminal, or a script, where Ensemblr refuses them. One queue serves every agent in every workspace, so the user's machine stays usable however many of you are working. It runs the command in this workspace with the full Ensemblr environment, Infisical secrets included, and returns the exit code and the end of the output. A \`timedOut\` answer is a lap, not a failure: the job keeps its place and keeps running, so call \`ensemblr_wait_for_job\` with its \`jobId\`; \`ensemblr_cancel_job\` drops one you no longer need. An \`interrupted: "user-message"\` answer means the user wrote to you mid-wait: answer them first, then wait on the job again.`;
 
 /** Git write scope and human consent apply across every workspace role and mode. */
 const GIT_WORKSPACE_CONSENT = `Git isolation and consent: write only in your own worktree; a shared object store is not a shared checkout or index. Before Git writes, verify cwd, Git top-level, and branch match your assigned workspace. Never route writes to a sibling workspace or managed root checkout through git -C, environment overrides, or shared Git metadata. Do not merge, pull, rebase, cherry-pick, reset, or checkout files from main/master, the base, or another workspace merely to catch up, fix ordinary failures, prepare/open a PR, or because another workspace merged. PR presence or absence and AFK do not imply consent. An explicit human request to integrate a named base or resolve merge conflicts authorizes necessary local merge/rebase and continuation for this workspace/task only — not PR merging, arbitrary imports, sibling writes, or overriding subagent/reviewer no-HEAD rules or plan-mode read-only limits. Without that permission, ask when attended; when AFK leave Git unchanged and report. Unexpected history or worktree movement: inspect and report; never automatically reset/rebase to hide it.`;
@@ -215,7 +217,7 @@ Watch how full a window is before you put more work into it. \`ensemblr_get_conv
 
 When delegation is warranted — delegate → wait → evaluate → integrate:
 
-Pi enforces the boundary rather than trusting this sequence as prose. From the first child spawn until a report-producing wait has observed every child settled, unrelated tools are blocked and premature assistant prose is removed; the extension queues another turn when you stop instead of waiting. It also rewrites waits to \`mode: "all"\` with every outstanding child id, so a restart cannot erase the target list. If reload catches a spawn before its result is persisted, Pi keeps a recovery intent, uses the app's default child set on the next explicit wait, and stays blocked without auto-retrying until a real child settle is observed. Finish all parallel spawn calls in one tool batch, then wait in the next — a wait beside a spawn is blocked because the child id does not exist yet.
+Pi enforces the boundary rather than trusting this sequence as prose. From the first child spawn until a report-producing wait has observed every child settled, unrelated tools are blocked and premature assistant prose is removed; the extension queues another turn when you stop instead of waiting. It also rewrites waits to \`mode: "all"\` with every outstanding child id, so a restart cannot erase the target list. If reload catches a spawn before its result is persisted, Pi keeps a recovery intent, uses the app's default child set on the next explicit wait, and stays blocked without auto-retrying until a real child settle is observed. Finish all parallel spawn calls in one tool batch, then wait in the next — a wait beside a spawn is blocked because the child id does not exist yet. A message from the user — one that cuts a wait short or lands at any other point — lifts the barrier until your next wait or the end of the turn, so you can answer them with prose or any tool.
 
 1. Spawn each helper with \`ensemblr_start_conversation\` in its own fresh tab — pass a short, descriptive \`title\` and do NOT pass \`chatTabId\` (reusing a prior tab keeps its old title); omit \`wait\` and keep BOTH ids it hands back — the \`agentSessionId\` you wait on and follow up with, and the \`chatTabId\` you close its tab with. Brief each one with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask you about, and whether it reports inline — the default — or writes a file at a path you name. A brief phrased as a noun ("produce a reference doc", "write up the mapping") reads as an instruction to create one.
 2. Once you have delegated everything you can in parallel, call \`ensemblr_wait_for_agents\` and let it block — this is how you avoid racing ahead. Do NOT hand-roll a polling loop with \`ensemblr_get_conversation_status\`; the wait tool parks your turn efficiently and returns the moment a child finishes or needs you.
@@ -225,6 +227,7 @@ Pi enforces the boundary rather than trusting this sequence as prose. From the f
    - \`reports: "brief"\` returns each report's opening plus a pointer to \`ensemblr_get_last_message\` for the rest, instead of every child's whole turn at once. Worth it on a wide fan-out, where reading four full reports to use one line of each is what makes delegation cost you more context than doing the work inline.
    - A child that cannot produce its deliverable at all until someone answers calls \`ensemblr_notify_orchestrator\` with reason \`need_decision\` or \`blocked\`, which wakes your wait immediately whatever the mode. Ordinary open decisions do NOT arrive this way — children park those in their reports for you to batch in step 5, so a wait that returns no signal does not mean nothing needs asking.
    - \`timedOut: true\` with children still in \`pending\` is a lap of the loop, not a fault: the wait window is capped and a child doing real work outlives it routinely. Wait again on the pending ids. Do not report a timeout to the user as a problem, work around it, or re-spawn the child — it is still working.
+   - \`interrupted: "user-message"\` means the user sent you a message while you waited, and it follows the result. Answer it first. No child was stopped, so once you have answered, wait again on the pending ids.
 3. Evaluate each result. If a child is wrong, incomplete, or asked you something, reply with \`ensemblr_send_follow_up\` and call \`ensemblr_wait_for_agents\` again. Repeat until done, then close that child's tab with \`ensemblr_close_tab\` — as it settles, not at the end of the run.
 4. Verify before you rely. A report is a claim, not a fact you checked. Before you build on a load-bearing one, open the path the child cited and read it yourself — delegation makes a citation feel checked when nobody checked it. When the claim is about what the child did rather than what a file says — a test suite it ran, a command that passed — \`ensemblr_read_conversation\` replays its actual tool calls; probe it with \`stat: true\` first.
 5. Put the open questions to the user, once, before you answer. Read every child's \`Open questions\` section, drop the ones you can settle yourself by reading, merge the duplicates across children, and ask what survives with \`ensemblr_ask_user_question\` — up to 4 per call, 2-6 options each, your recommendation in the option descriptions. One questionnaire at the end is why children park questions instead of interrupting you mid-run; skipping it is how a decision the user cared about ships as a silent default. Then fold the answers into the work.
@@ -375,7 +378,7 @@ ${DELEGATION_ROLE_GUIDANCE}
 
 When it is warranted, the loop is delegate → wait → evaluate → integrate:
 
-Pi enforces the boundary rather than trusting this sequence as prose. From the first child spawn until a report-producing wait has observed every child settled, unrelated tools are blocked and premature assistant prose is removed; the extension queues another turn when you stop instead of waiting. It also rewrites waits to \`mode: "all"\` with every outstanding child id, so a restart cannot erase the target list. If reload catches a spawn before its result is persisted, Pi keeps a recovery intent, uses the app's default child set on the next explicit wait, and stays blocked without auto-retrying until a real child settle is observed. Finish all parallel spawn calls in one tool batch, then wait in the next — a wait beside a spawn is blocked because the child id does not exist yet.
+Pi enforces the boundary rather than trusting this sequence as prose. From the first child spawn until a report-producing wait has observed every child settled, unrelated tools are blocked and premature assistant prose is removed; the extension queues another turn when you stop instead of waiting. It also rewrites waits to \`mode: "all"\` with every outstanding child id, so a restart cannot erase the target list. If reload catches a spawn before its result is persisted, Pi keeps a recovery intent, uses the app's default child set on the next explicit wait, and stays blocked without auto-retrying until a real child settle is observed. Finish all parallel spawn calls in one tool batch, then wait in the next — a wait beside a spawn is blocked because the child id does not exist yet. A message from the user — one that cuts a wait short or lands at any other point — lifts the barrier until your next wait or the end of the turn, so you can answer them with prose or any tool.
 
 1. Spawn each investigator with \`ensemblr_start_conversation\` in its own fresh tab — pass a short \`title\` naming the QUESTION it is answering and do NOT pass \`chatTabId\`; omit \`wait\` and keep BOTH ids it hands back — the \`agentSessionId\` you wait on, and the \`chatTabId\` you close its tab with. Name Explorer as the chosen advisory role in every brief: planning children are read-only, so another role would misstate their boundary. To run one on a specific model, call \`ensemblr_list_models\` first and choose only an id from a row whose runtime its live policy permits; never invent one. If you meaningfully choose a model without the Explorer tag, say why in the brief. Each row also carries a \`tier\`: naming a \`frontier\` one is put to the user for confirmation whatever the permission mode, because it costs several times what the rest do and inheriting yours does not. Reach for it only when the question genuinely needs it, and expect to be refused while the user is away. ${SPARK_MODEL_GUIDANCE} Delegation has two edges: a depth-1 planning manager may open fresh read-only depth-2 leaves. Lifetime spawn count and rate are capped across the root tree, and closing does not refund budget — never fork-bomb.
 2. A child you spawn inherits Plan Mode: it reads the repository and runs read-only commands, and it cannot write, edit, spawn anything of its own, or talk to the user. So brief it as a question to answer — "find and report how X works, with full paths" — never as work to do. A child briefed to implement will come back saying it could not. Name the defaults it should assume rather than come back and ask you about, so it spends its turn reading instead of waiting on you.
@@ -1239,9 +1242,17 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 		});
 
 		pi.on('message_end', (event) => {
+			if (event.message.role === 'user') {
+				const lifted = noteDelegationUserMessage(delegationBarrier);
+				if (lifted !== delegationBarrier) {
+					delegationBarrier = lifted;
+					pi.appendEntry(DELEGATION_BARRIER_ENTRY, delegationBarrier);
+				}
+				return;
+			}
 			if (
 				event.message.role !== 'assistant' ||
-				!delegationBarrierActive(delegationBarrier)
+				!delegationBarrierEnforced(delegationBarrier)
 			) {
 				return;
 			}
@@ -1257,6 +1268,11 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 		});
 
 		pi.on('agent_settled', () => {
+			const restored = endDelegationInterjection(delegationBarrier);
+			if (restored !== delegationBarrier) {
+				delegationBarrier = restored;
+				pi.appendEntry(DELEGATION_BARRIER_ENTRY, delegationBarrier);
+			}
 			if (
 				delegationResumeQueued ||
 				!shouldResumeDelegationWait(delegationBarrier)
@@ -2113,7 +2129,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_wait_for_agents',
 		'waitForAgents',
-		'Block until the agents you are waiting on finish or need a decision, then return each settled one\'s status and report (its whole final turn), plus `pending` naming the ones still running so you can wait on exactly those next. Prefer this over polling get_conversation_status. targets defaults to every child you spawned, whichever runtime each is on — name an `agentSessionId` in `targets` to wait on a conversation that is not your child, which the default never picks up; mode defaults to "first", which returns on the first to settle — pass "all" to wait for every target. A need_decision/blocked signal wakes the wait whatever the mode. reports: "brief" returns each report\'s opening plus a pointer to ensemblr_get_last_message for the rest, instead of every child\'s whole turn at once — worth it on a wide fan-out, where reading four full reports to use one line of each is what makes delegation cost you more context than doing the work inline. Every child reported, settled or pending, carries `contextUsage`: how full its own window is. A child at or past 50% is one to retire rather than reload — give the next unit of work to a fresh conversation, briefed with the paths and findings it needs, rather than following up there.',
+		'Block until the agents you are waiting on finish or need a decision, then return each settled one\'s status and report (its whole final turn), plus `pending` naming the ones still running so you can wait on exactly those next. Prefer this over polling get_conversation_status. targets defaults to every child you spawned, whichever runtime each is on — name an `agentSessionId` in `targets` to wait on a conversation that is not your child, which the default never picks up; mode defaults to "first", which returns on the first to settle — pass "all" to wait for every target. A need_decision/blocked signal wakes the wait whatever the mode. reports: "brief" returns each report\'s opening plus a pointer to ensemblr_get_last_message for the rest, instead of every child\'s whole turn at once — worth it on a wide fan-out, where reading four full reports to use one line of each is what makes delegation cost you more context than doing the work inline. Every child reported, settled or pending, carries `contextUsage`: how full its own window is. A child at or past 50% is one to retire rather than reload — give the next unit of work to a fresh conversation, briefed with the paths and findings it needs, rather than following up there. If the user sends you a message while you wait, the wait returns at once with `interrupted: "user-message"` and the message follows the result: answer it first, then wait again on `pending`.',
 		Type.Object({
 			targets: Type.Optional(Type.Array(Type.String())),
 			mode: Type.Optional(
@@ -2131,7 +2147,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_run_queued',
 		'runQueued',
-		"Run a compute-heavy shell command — a test suite, a build, a typecheck, a compile, a nix build — through Ensemblr's compute queue, which every agent in every workspace shares so the user's machine stays usable. Ensemblr refuses these commands in your own shell, in an Ensemblr terminal, and as a script, so this is the one place they run. The job waits for a free slot, then runs in this workspace (`cwd` is a directory relative to its root) with the full Ensemblr environment — environment variables and Infisical secrets included. The result carries its exit code, how long it waited and ran, the end of its output with secrets redacted, and `logPath`, the whole output under `.context/compute-queue/`. By default the call blocks until the job finishes. That wait is capped: `timedOut: true` is a lap, not a failure — the job keeps its place and keeps running, so call ensemblr_wait_for_job with its jobId. Pass wait=false to queue it now and collect it later. Queue a command once: a duplicate takes a second slot. A delegation tree may hold only a few unfinished jobs at once.",
+		'Run a compute-heavy shell command — a test suite, a build, a typecheck, a compile, a nix build — through Ensemblr\'s compute queue, which every agent in every workspace shares so the user\'s machine stays usable. Ensemblr refuses these commands in your own shell, in an Ensemblr terminal, and as a script, so this is the one place they run. The job waits for a free slot, then runs in this workspace (`cwd` is a directory relative to its root) with the full Ensemblr environment — environment variables and Infisical secrets included. The result carries its exit code, how long it waited and ran, the end of its output with secrets redacted, and `logPath`, the whole output under `.context/compute-queue/`. By default the call blocks until the job finishes. That wait is capped: `timedOut: true` is a lap, not a failure — the job keeps its place and keeps running, so call ensemblr_wait_for_job with its jobId. A message from the user ends the wait early the same way, with `interrupted: "user-message"`: answer it first, then wait on the job. Pass wait=false to queue it now and collect it later. Queue a command once: a duplicate takes a second slot. A delegation tree may hold only a few unfinished jobs at once.',
 		Type.Object({
 			command: Type.String({ maxLength: 8000 }),
 			cwd: Type.Optional(
@@ -2153,7 +2169,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_wait_for_job',
 		'waitForJob',
-		"Block until compute-queue jobs finish, then return each finished one's exit code and output tail in `settled`, and where the rest stand — running, or queued at a position — in `pending`. jobIds defaults to every job this session queued that has not finished. The wait is capped: `timedOut: true` with jobs in `pending` is a lap of the loop, not a fault — they keep their place and keep running, so wait again on the same ids rather than queueing them again. A job from another workspace is `not-found`.",
+		'Block until compute-queue jobs finish, then return each finished one\'s exit code and output tail in `settled`, and where the rest stand — running, or queued at a position — in `pending`. jobIds defaults to every job this session queued that has not finished. The wait is capped: `timedOut: true` with jobs in `pending` is a lap of the loop, not a fault — they keep their place and keep running, so wait again on the same ids rather than queueing them again. A message from the user ends the wait early with `interrupted: "user-message"`: answer it first, then wait again. A job from another workspace is `not-found`.',
 		Type.Object({
 			jobIds: Type.Optional(Type.Array(Type.String(), { maxItems: 20 })),
 			timeoutMs: Type.Optional(Type.Number()),

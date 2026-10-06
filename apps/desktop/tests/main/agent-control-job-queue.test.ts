@@ -151,6 +151,31 @@ const makeQueue = (
 	return { jobs, port };
 };
 
+/**
+ * Makes the fake queue's wait behave like the real one under an abort: it holds
+ * until the signal fires, then hands back whatever is still unfinished, with no
+ * timeout.
+ */
+const waitUntilAborted = (queue: ReturnType<typeof makeQueue>): void => {
+	vi.mocked(queue.port.waitFor).mockImplementation(
+		(jobIds, { signal }) =>
+			new Promise((resolve) => {
+				const settle = () => {
+					const current = jobIds.flatMap((id) => {
+						const job = queue.jobs.get(id)?.job;
+						return job ? [job] : [];
+					});
+					resolve({ pending: current, settled: [], timedOut: false });
+				};
+				if (signal?.aborted) {
+					settle();
+					return;
+				}
+				signal?.addEventListener('abort', settle, { once: true });
+			}),
+	);
+};
+
 /** Stub ports; only the queue, terminals, plan mode, and permissions are live. */
 const makePorts = (
 	options: {
@@ -348,7 +373,7 @@ describe('agent-control compute queue: runQueued', () => {
 		);
 
 		expect(queue.port.waitFor).toHaveBeenCalledWith(['job-1'], {
-			signal: undefined,
+			signal: expect.any(AbortSignal),
 			timeoutMs: 1_000,
 		});
 		expect(data.timedOut).toBe(true);
@@ -501,7 +526,7 @@ describe('agent-control compute queue: waitForJob and cancelJob', () => {
 		const data = dataOf<WaitForJobResult>(await invoke('waitForJob', {}));
 
 		expect(queue.port.waitFor).toHaveBeenCalledWith(['mine'], {
-			signal: undefined,
+			signal: expect.any(AbortSignal),
 			timeoutMs: 300_000,
 		});
 		expect(data.settled.map((job) => job.jobId)).toEqual(['mine']);
@@ -630,6 +655,67 @@ describe('agent-control compute queue: waitForJob and cancelJob', () => {
 			expect(note).toContain('this turn was interrupted');
 			expect(note).not.toContain('wait window expired');
 		}
+	});
+
+	it('ends a job wait early when the user steers the caller', async () => {
+		const queue = makeQueue({
+			seed: [{ job: jobOf({ id: 'mine' }), rootSessionId: 'caller' }],
+		});
+		waitUntilAborted(queue);
+		const { service } = setup(makePorts({ jobQueue: queue.port }));
+
+		const pending = service.invoke({
+			op: 'waitForJob',
+			rawArgs: { jobIds: ['mine'] },
+			token: 'tok-caller',
+		});
+		await vi.waitFor(() => expect(queue.port.waitFor).toHaveBeenCalled());
+		service.noteUserSteer('caller');
+		const data = dataOf<WaitForJobResult>(await pending);
+
+		expect(data.timedOut).toBe(false);
+		expect(data.interrupted).toBe('user-message');
+		expect(data.pending.map((job) => job.jobId)).toEqual(['mine']);
+		expect(data.note).toContain('the user sent you a message');
+		expect(data.note).toContain('ensemblr_wait_for_job({ jobIds: ["mine"] })');
+		expect(queue.port.cancel).not.toHaveBeenCalled();
+	});
+
+	it('returns a queued command at once when the user steered first', async () => {
+		const queue = makeQueue();
+		waitUntilAborted(queue);
+		const { service } = setup(makePorts({ jobQueue: queue.port }));
+
+		service.noteUserSteer('caller');
+		const ran = dataOf<RunQueuedResult>(
+			await service.invoke({
+				op: 'runQueued',
+				rawArgs: { command: HEAVY },
+				token: 'tok-caller',
+			}),
+		);
+
+		expect(ran.timedOut).toBe(false);
+		expect(ran.interrupted).toBe('user-message');
+		expect(ran.note).toContain('the user sent you a message');
+		expect(ran.note).not.toContain('this turn was interrupted');
+	});
+
+	it('marks a finished job as finished, not interrupted, under a steer', async () => {
+		const queue = makeQueue({ finish: { exitCode: 0, state: 'succeeded' } });
+		const { service } = setup(makePorts({ jobQueue: queue.port }));
+
+		service.noteUserSteer('caller');
+		const ran = dataOf<RunQueuedResult>(
+			await service.invoke({
+				op: 'runQueued',
+				rawArgs: { command: HEAVY },
+				token: 'tok-caller',
+			}),
+		);
+
+		expect(ran.job.state).toBe('succeeded');
+		expect(ran.interrupted).toBeUndefined();
 	});
 
 	it('cancels the jobs a session owns when the session is released', () => {

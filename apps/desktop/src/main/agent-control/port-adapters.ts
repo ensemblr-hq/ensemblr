@@ -1136,17 +1136,21 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			}
 			return applied;
 		},
+		// Status is read before the abort is honoured, so a wait cut short the
+		// moment it opened still reports a conversation that had already finished.
 		waitForIdle: async (agentSessionId, timeoutMs, signal) => {
 			const deadline = Date.now() + timeoutMs;
-			while (Date.now() < deadline && !signal?.aborted) {
+			for (;;) {
 				const status =
 					deps.agentSessionService.readStatus(agentSessionId)?.status;
 				if (!status || IDLE_STATUSES.has(status)) {
 					return 'completed';
 				}
+				if (signal?.aborted || Date.now() >= deadline) {
+					return 'timeout';
+				}
 				await new Promise((resolve) => setTimeout(resolve, WAIT_POLL_MS));
 			}
-			return 'timeout';
 		},
 		// `readStatus` rather than `getSession`, and that is the whole point: this
 		// runs per waited target every 250 ms, and `getSession` builds the

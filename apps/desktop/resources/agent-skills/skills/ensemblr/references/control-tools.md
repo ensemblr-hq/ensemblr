@@ -201,6 +201,9 @@ its front — and `logPath`, the whole output under `.context/compute-queue/`.
 `timedOut: true` is a lap, not a failure: the job keeps its place, so call
 `ensemblr_wait_for_job` with its `jobId` (`jobIds` defaults to every unfinished
 job your session queued). `ensemblr_cancel_job` drops one you no longer need.
+`interrupted: "user-message"` means the user wrote to you while you waited: the
+wait ended early so their message could reach you, and the job kept running.
+Answer them first, then wait on it again.
 An agent-started setup or run script that is heavy answers `queued` with a
 `jobId` instead of a `terminalId`, launches on its own when a slot frees, and
 `ensemblr_wait_for_job` waits for it to exit.
@@ -247,7 +250,9 @@ peer or Review, overrides inherited Plan/AFK state, or steers another branch:
    loop over `ensemblr_get_conversation_status`.
 3. `timedOut: true` with children still in `pending` is a lap of the loop, not a
    fault. Wait again on the pending ids. Do not re-spawn, and do not report it
-   to the user as a problem.
+   to the user as a problem. `interrupted: "user-message"` means the user sent
+   you a message mid-wait, and it follows the result: answer it first, then wait
+   again on the pending ids — no child was stopped.
 4. Read `contextUsage` on every child the wait names, settled or pending. At or
    past **50%** of its window, that child is the wrong home for a *new* unit of
    work: spawn a fresh one and quote it the paths and findings it needs, rather

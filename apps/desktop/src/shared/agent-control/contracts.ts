@@ -774,17 +774,26 @@ export interface PendingAgent {
 }
 
 /**
+ * Why a blocking wait returned before what it watched had settled, other than
+ * its window expiring: the user sent the waiting agent a message mid-turn, which
+ * its runtime delivers only once the wait's tool call returns. Present only on a
+ * wait it cut short.
+ */
+export type WaitInterruption = 'user-message';
+
+/**
  * Result of `waitForAgents`: the children that settled, the ones still running,
  * and whether it timed out. `pending` spares the caller a status poll per child
  * when the wait returns before every target is done — on `mode: "first"`, on a
- * signal, or on a timeout. `note` carries the same instruction as prose, because
- * an orchestrator reads a bare `timedOut: true` as a fault to report rather than
- * a lap of the wait loop.
+ * signal, on a timeout, or on a user message (`interrupted`). `note` carries the
+ * same instruction as prose, because an orchestrator reads a bare
+ * `timedOut: true` as a fault to report rather than a lap of the wait loop.
  */
 export interface WaitForAgentsResult {
 	completed: readonly WaitedAgent[];
 	pending: readonly PendingAgent[];
 	timedOut: boolean;
+	interrupted?: WaitInterruption;
 	note?: string;
 }
 
@@ -847,10 +856,14 @@ export interface QueuedJobReport {
 	logPath: string | null;
 }
 
-/** Result of `runQueued`: the job, and whether the wait ran out before it finished. */
+/**
+ * Result of `runQueued`: the job, and whether the wait ran out or was cut short
+ * by a user message before it finished.
+ */
 export interface RunQueuedResult {
 	job: QueuedJobReport;
 	timedOut: boolean;
+	interrupted?: WaitInterruption;
 	note?: string;
 }
 
@@ -859,6 +872,7 @@ export interface WaitForJobResult {
 	settled: readonly QueuedJobReport[];
 	pending: readonly QueuedJobReport[];
 	timedOut: boolean;
+	interrupted?: WaitInterruption;
 	note?: string;
 }
 
