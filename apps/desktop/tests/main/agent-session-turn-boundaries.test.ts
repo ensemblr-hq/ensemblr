@@ -204,6 +204,7 @@ async function openService(
 		adapter: AgentAdapter,
 		fake: ReturnType<typeof createFakeAgentAdapter>,
 	) => AgentAdapter = (adapter) => adapter,
+	onSteerAccepted?: (sessionId: string) => void,
 ) {
 	const database = openFixture(t);
 	const fake = createFakeAgentAdapter();
@@ -212,6 +213,7 @@ async function openService(
 		agentClient: createAgentClient({
 			adapter: wrapAdapter(fake.adapter, fake),
 		}),
+		onSteerAccepted,
 		databaseService: {
 			close: () => undefined,
 			getConnection: () => ({ database, path: ':memory:', schemaVersion: 5 }),
@@ -412,6 +414,56 @@ test('a rejected steer hands the interrupted turn back', async (t) => {
 			?.status,
 		'streaming',
 	);
+});
+
+// The control layer ends whatever wait the agent is blocked in on this cue, so
+// it must come only once the runtime holds the message, and only for a steer —
+// a follow-up waits for the turn by design.
+test('an accepted steer is announced once the runtime holds it', async (t) => {
+	const steered: string[] = [];
+	const harness = await openService(t, undefined, (sessionId) =>
+		steered.push(sessionId),
+	);
+	await harness.service.submitPrompt({
+		prompt: 'first',
+		sessionId: harness.snapshot.id,
+	});
+	assert.deepEqual(steered, []);
+
+	await harness.service.submitPrompt({
+		prompt: 'and another thing',
+		sessionId: harness.snapshot.id,
+		streamingBehavior: 'followUp',
+	});
+	assert.deepEqual(steered, []);
+
+	await harness.service.submitPrompt({
+		prompt: 'change course',
+		sessionId: harness.snapshot.id,
+		streamingBehavior: 'steer',
+	});
+	assert.deepEqual(steered, [harness.snapshot.id]);
+});
+
+test('a rejected steer is not announced', async (t) => {
+	const steered: string[] = [];
+	const harness = await openService(t, rejectInterjections, (sessionId) =>
+		steered.push(sessionId),
+	);
+	await harness.service.submitPrompt({
+		prompt: 'first',
+		sessionId: harness.snapshot.id,
+	});
+
+	await assert.rejects(
+		harness.service.submitPrompt({
+			prompt: 'change course',
+			sessionId: harness.snapshot.id,
+			streamingBehavior: 'steer',
+		}),
+		/steer rejected/,
+	);
+	assert.deepEqual(steered, []);
 });
 
 test('stopping a running turn aborts it and locks its range once', async (t) => {

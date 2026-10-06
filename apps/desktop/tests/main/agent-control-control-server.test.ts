@@ -39,6 +39,8 @@ const stubService: AgentControlService = {
 	readTurnPreamble: async () => null,
 	releaseSession: () => {},
 	retireSession: () => undefined,
+	noteUserSteer: () => undefined,
+	noteSessionEvent: () => undefined,
 };
 
 const post = (url: string, token: string | null, body: unknown) =>
@@ -218,6 +220,8 @@ describe('control server', () => {
 			readTurnPreamble: async () => null,
 			releaseSession: () => {},
 			retireSession: () => undefined,
+			noteUserSteer: () => undefined,
+			noteSessionEvent: () => undefined,
 		};
 		server = await startControlServer(holdingService, {
 			requestTimeoutMs: 200,
@@ -293,6 +297,8 @@ describe('control server', () => {
 			readTurnPreamble: async () => null,
 			releaseSession: () => {},
 			retireSession: () => undefined,
+			noteUserSteer: () => undefined,
+			noteSessionEvent: () => undefined,
 		};
 		server = await startControlServer(holdingService);
 		const aborter = new AbortController();

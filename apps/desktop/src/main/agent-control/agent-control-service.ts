@@ -84,6 +84,7 @@ import type {
 	WaitForAgentsArgs,
 	WaitForAgentsResult,
 	WaitForJobArgs,
+	WaitInterruption,
 	WaitMode,
 	WaitReportDetail,
 	WriteTerminalArgs,
@@ -123,6 +124,7 @@ import {
 	type AgentProviderId,
 	getAgentProviderLabel,
 } from '../../shared/agent-provider.ts';
+import type { AgentPersistedEnvelope } from '../../shared/ipc/contracts/agent-message-payloads.ts';
 import {
 	classifyPermissionAction,
 	type PermissionActionKind,
@@ -155,6 +157,11 @@ import {
 	createStartedTerminalRegistry,
 	type StartedTerminalRegistry,
 } from './started-terminals.ts';
+import {
+	createUserInterjections,
+	type UserInterjections,
+	type WaitWatch,
+} from './user-interjections.ts';
 
 /** A single inbound control command, as handed over by either bridge. */
 export interface AgentControlCommand {
@@ -272,6 +279,23 @@ export interface AgentControlService {
 	 * unknown sessions.
 	 */
 	retireSession: (sessionId: string) => void;
+	/**
+	 * Records that the user steered a session mid-turn. Its runtime delivers the
+	 * message only once the current tool call returns, so every wait the session
+	 * is blocked in ends now rather than when its window expires — or, when it
+	 * has none open, the next one it starts returns at once.
+	 */
+	noteUserSteer: (sessionId: string) => void;
+	/**
+	 * Reads one runtime event of a session, so a steer it was holding stops being
+	 * owed to its next wait once the runtime has delivered it — at a tool result,
+	 * an answer that ended without a tool call, or the turn settling — and so a
+	 * steer is left alone while its main thread is inside a sub-agent call.
+	 */
+	noteSessionEvent: (
+		sessionId: string,
+		envelope: AgentPersistedEnvelope | null,
+	) => void;
 }
 
 /**
@@ -295,6 +319,11 @@ interface AgentControlServiceOptions {
 	 * one of them.
 	 */
 	startedTerminals?: StartedTerminalRegistry;
+	/**
+	 * Ends a session's blocking waits when the user steers it. Defaults to a fresh
+	 * registry for the same reason {@link startedTerminals} does.
+	 */
+	userInterjections?: UserInterjections;
 	/**
 	 * Whether the architecture diagram feature is on, read live rather than
 	 * captured: it is a user setting the app watches, and the answer gates both
@@ -834,46 +863,107 @@ function emptyWait(defaulted: boolean): WaitForAgentsResult {
  * becomes wrong: the caller then has to be threaded through, the way
  * `getConversationStatus` threads one — that op is held by every role, which is
  * why it is the one that can mislead.
- * @param outcome - The settled children, the ones still running, whether the window expired, and the mode the caller waited in.
+ *
+ * A wait the user's message cut short says so in the same note, because the
+ * caller is about to read that message and must know to answer it rather than
+ * take the early return for its children having finished.
+ * @param outcome - The settled children, the ones still running, why the wait
+ *   returned early if it did, and the mode the caller waited in.
  * @returns The wait result, with the notes it earned.
  */
 function waitOutcome(outcome: {
 	completed: readonly WaitedAgent[];
 	pending: readonly PendingAgent[];
-	timedOut: boolean;
+	ending: WaitEnding;
 	mode: WaitMode;
 }): WaitForAgentsResult {
-	const { mode, ...result } = outcome;
+	const { completed, ending, mode, pending } = outcome;
+	const result: WaitForAgentsResult = {
+		completed,
+		pending,
+		timedOut: ending === 'expired',
+		...(ending === 'interjected' && pending.length > 0
+			? { interrupted: 'user-message' as const }
+			: {}),
+	};
 	const note = joinNotes([
-		resumeNote(result.pending, result.timedOut, mode),
-		delegateContextPressureNote(
-			[...result.completed, ...result.pending],
-			'spawns-tabs',
-		),
+		resumeNote(pending, ending, mode),
+		delegateContextPressureNote([...completed, ...pending], 'spawns-tabs'),
 	]);
 	return note ? { ...result, note } : result;
 }
 
+/** How a `wait: true` spawn or follow-up ended its wait on the conversation. */
+type ConversationWaitResult = 'completed' | 'timeout' | 'interrupted';
+
 /**
- * The reminder that a timed-out wait is a lap of the loop rather than a fault,
- * naming the ids to wait on next.
- * @param pending - Targets still running when the window closed.
- * @param timedOut - Whether the window closing is why the wait returned.
+ * What a `wait: true` spawn or follow-up adds to its result when the user's
+ * message cut its wait short: the same `interrupted` field `waitForAgents`
+ * carries, and a note naming the call that resumes it.
+ * @param result - How the wait ended, or undefined when none was asked for.
+ * @param agentSessionId - The conversation that was being waited on.
+ * @returns The fields, or nothing when the wait was not cut short.
+ */
+function conversationWaitNote(
+	result: ConversationWaitResult | undefined,
+	agentSessionId: string,
+): { interrupted?: WaitInterruption; note?: string } {
+	return result === 'interrupted'
+		? {
+				interrupted: 'user-message',
+				note: `Not a failure: the wait stopped early because the user sent you a message, which follows this result. Answer the user first (if you already have, just resume). The conversation is still working, so once you have answered, wait on it with ensemblr_wait_for_agents({ targets: ["${agentSessionId}"] }).`,
+			}
+		: {};
+}
+
+/**
+ * Why a wait returned before its mode was satisfied, if it did: its window
+ * expired, or the user sent the waiting agent a message.
+ */
+type WaitEnding = 'none' | 'expired' | 'interjected';
+
+/**
+ * Names why a poll tick that is about to return is returning: its mode was
+ * satisfied, the user steered the caller, or — failing both — the window
+ * expired. A user message outranks the window expiring on the same tick: either
+ * way the children are still working, and only the message asks for an answer.
+ * @param tick - Whether the mode was satisfied and whether the user steered.
+ * @returns `none` when the mode was satisfied, else what cut the wait short.
+ */
+function earlyWaitEnding(tick: {
+	satisfied: boolean;
+	steered: boolean;
+}): WaitEnding {
+	if (tick.satisfied) {
+		return 'none';
+	}
+	return tick.steered ? 'interjected' : 'expired';
+}
+
+/**
+ * The reminder that a wait which returned early is a lap of the loop rather than
+ * a fault, naming the ids to wait on next. A user message is told apart from a
+ * window expiring, because it asks for an answer before the wait resumes.
+ * @param pending - Targets still running when the wait returned.
+ * @param ending - Why the wait returned before its mode was satisfied.
  * @param mode - The mode the caller waited in, so the resume call matches it.
  * @returns The note, or null when nothing is still running to resume on.
  */
 function resumeNote(
 	pending: readonly PendingAgent[],
-	timedOut: boolean,
+	ending: WaitEnding,
 	mode: WaitMode,
 ): string | null {
-	if (!timedOut || pending.length === 0) {
+	if (ending === 'none' || pending.length === 0) {
 		return null;
 	}
 	const targets = pending
 		.map((entry) => `"${entry.agentSessionId}"`)
 		.join(', ');
-	return `Not a failure: the wait window expired while ${pending.length} child(ren) were still working. Keep waiting with ensemblr_wait_for_agents({ mode: "${mode}", targets: [${targets}] }).`;
+	const resume = `ensemblr_wait_for_agents({ mode: "${mode}", targets: [${targets}] })`;
+	return ending === 'interjected'
+		? `Not a failure: the wait stopped early because the user sent you a message, which follows this result. Answer the user first (if you already have, just resume). No child was stopped — ${pending.length} child(ren) are still working, so once you have answered, resume with ${resume}.`
+		: `Not a failure: the wait window expired while ${pending.length} child(ren) were still working. Keep waiting with ${resume}.`;
 }
 
 /**
@@ -956,13 +1046,18 @@ export function createAgentControlService({
 	originRegistry,
 	guardrails,
 	startedTerminals = createStartedTerminalRegistry(),
+	userInterjections = createUserInterjections(),
 	readArchitectureDiagramEnabled = () => false,
 	readTuiHarnessesEnabled = () => false,
 	readDelegationInitiative = () => 'automatic',
 	scheduler = REAL_SCHEDULER,
 	dispatchTimeoutMs = DISPATCH_TIMEOUT_MS,
 }: AgentControlServiceOptions): AgentControlService {
-	const jobQueue = createJobQueueOps({ guardrails, port: ports.jobQueue });
+	const jobQueue = createJobQueueOps({
+		guardrails,
+		interjections: userInterjections,
+		port: ports.jobQueue,
+	});
 	const modOps = createModOps({ originRegistry, ports });
 
 	/** Latest pending signal per child session id, scoped to its immediate parent. */
@@ -1352,19 +1447,39 @@ export function createAgentControlService({
 			: fail(reservation.code, reservation.reason);
 	};
 
+	/**
+	 * Waits for a conversation the caller just started or steered to go idle,
+	 * when it asked to. A user steer ends this wait the way it ends
+	 * `waitForAgents`, answering `interrupted` so the caller reads the message
+	 * before it waits again.
+	 * @param callerSessionId - The waiting caller, whose steer ends the wait.
+	 * @param agentSessionId - The conversation to wait on.
+	 * @param wait - Whether the caller asked to wait.
+	 * @param signal - Aborts when the calling turn ends.
+	 * @returns How the wait ended, or undefined when none was asked for.
+	 */
 	const waitIfRequested = async (
+		callerSessionId: string,
 		agentSessionId: string,
 		wait: boolean | undefined,
 		signal: AbortSignal | undefined,
-	): Promise<'completed' | 'timeout' | undefined> => {
+	): Promise<ConversationWaitResult | undefined> => {
 		if (!wait) {
 			return undefined;
 		}
-		return ports.conversations.waitForIdle(
-			agentSessionId,
-			guardrails.waitTimeoutMs,
-			signal,
-		);
+		const watch = userInterjections.watch(callerSessionId, signal);
+		try {
+			const result = await ports.conversations.waitForIdle(
+				agentSessionId,
+				guardrails.waitTimeoutMs,
+				watch.signal,
+			);
+			return result === 'timeout' && watch.interjected()
+				? 'interrupted'
+				: result;
+		} finally {
+			watch.release();
+		}
 	};
 
 	/**
@@ -1956,6 +2071,7 @@ export function createAgentControlService({
 				return fail('invalid-args', started.reason);
 			}
 			const result = await waitIfRequested(
+				origin.sessionId,
 				started.agentSessionId,
 				args.wait,
 				signal,
@@ -1964,6 +2080,7 @@ export function createAgentControlService({
 				agentSessionId: started.agentSessionId,
 				chatTabId: started.chatTabId,
 				result,
+				...conversationWaitNote(result, started.agentSessionId),
 			});
 		} finally {
 			releasePeerSlot?.();
@@ -2615,11 +2732,15 @@ export function createAgentControlService({
 			return fail('denied-scope', delivered.reason);
 		}
 		const result = await waitIfRequested(
+			origin.sessionId,
 			args.agentSessionId,
 			args.wait,
 			signal,
 		);
-		return ok({ result });
+		return ok({
+			result,
+			...conversationWaitNote(result, args.agentSessionId),
+		});
 	};
 
 	const handleCloseTab = async (
@@ -3460,13 +3581,15 @@ export function createAgentControlService({
 	};
 
 	/**
-	 * Polls the targets until the mode is satisfied, the deadline passes, or the
-	 * waiting turn ends. An abandoned wait returns before it reports: the report
-	 * is expensive and it spends the children's escalations, so a turn that is
-	 * already gone must not be the one to take them.
+	 * Polls the targets until the mode is satisfied, the deadline passes, the
+	 * user steers the caller, or the waiting turn ends. An abandoned wait returns
+	 * before it reports: the report is expensive and it spends the children's
+	 * escalations, so a turn that is already gone must not be the one to take
+	 * them. A steered one still reports, because its caller is alive and about to
+	 * read the user's message beside whatever has settled.
 	 * @param input - The targets, caller id, mode, report detail, deadline, and the
-	 *   signal that ends the wait early.
-	 * @returns What settled, what is still running, and whether time ran out.
+	 *   watch whose signal ends the wait early.
+	 * @returns What settled, what is still running, and why it returned.
 	 */
 	const pollUntilSettled = async (input: {
 		parentSessionId: string;
@@ -3474,27 +3597,28 @@ export function createAgentControlService({
 		mode: WaitMode;
 		detail: WaitReportDetail;
 		deadline: number;
-		signal: AbortSignal | undefined;
+		watch: WaitWatch;
 	}): Promise<WaitForAgentsResult> => {
-		const { deadline, detail, mode, parentSessionId, signal, targets } = input;
+		const { deadline, detail, mode, parentSessionId, targets, watch } = input;
 		for (;;) {
 			const settled = await Promise.all(
 				targets.map((target) => settleTarget(target, parentSessionId)),
 			);
 			const pending = stillRunning(settled);
-			if (signal?.aborted) {
-				return waitOutcome({ completed: [], mode, pending, timedOut: false });
+			const steered = watch.interjected();
+			if (watch.signal.aborted && !steered) {
+				return waitOutcome({ completed: [], ending: 'none', mode, pending });
 			}
 			const done = settled.filter((entry) => entry.settled);
 			const satisfied =
 				mode === 'first' ? done.length > 0 : waitAllSatisfied(settled);
 			const expired = scheduler.now() >= deadline;
-			if (satisfied || expired) {
+			if (satisfied || expired || steered) {
 				return waitOutcome({
 					completed: await collectReports(done, detail, parentSessionId),
+					ending: earlyWaitEnding({ satisfied, steered }),
 					mode,
 					pending,
-					timedOut: !satisfied && expired,
 				});
 			}
 			await scheduler.sleep(WAIT_POLL_MS);
@@ -3509,7 +3633,8 @@ export function createAgentControlService({
 	 *   targets.
 	 * @param args - Validated targets, mode, report detail, and timeout.
 	 * @param signal - Aborts when the waiting turn ends, so the poll loop stops
-	 *   rather than running its full window for nobody.
+	 *   rather than running its full window for nobody. A user steer ends the
+	 *   loop too, through the caller's interjection watch.
 	 * @returns The wait outcome, or a guardrail denial for a deadlocking target.
 	 */
 	const handleWaitForAgents = async (
@@ -3542,16 +3667,21 @@ export function createAgentControlService({
 			args.timeoutMs ?? guardrails.waitTimeoutMs,
 			guardrails.waitTimeoutMs,
 		);
-		return ok(
-			await pollUntilSettled({
-				deadline: scheduler.now() + timeoutMs,
-				parentSessionId: origin.sessionId,
-				detail: args.reports ?? 'full',
-				mode: args.mode ?? 'first',
-				signal,
-				targets,
-			}),
-		);
+		const watch = userInterjections.watch(origin.sessionId, signal);
+		try {
+			return ok(
+				await pollUntilSettled({
+					deadline: scheduler.now() + timeoutMs,
+					parentSessionId: origin.sessionId,
+					detail: args.reports ?? 'full',
+					mode: args.mode ?? 'first',
+					targets,
+					watch,
+				}),
+			);
+		} finally {
+			watch.release();
+		}
 	};
 
 	/**
@@ -4216,6 +4346,7 @@ export function createAgentControlService({
 				signalsByChild.delete(childSessionId);
 			}
 		}
+		userInterjections.forget(sessionId);
 		linearSearchesBySession.delete(sessionId);
 		reviewsByCaller.delete(sessionId);
 		openedReviewSessions.delete(sessionId);
@@ -4241,5 +4372,7 @@ export function createAgentControlService({
 		readTurnPreamble,
 		releaseSession,
 		retireSession,
+		noteUserSteer: userInterjections.noteSteer,
+		noteSessionEvent: userInterjections.noteEvent,
 	};
 }

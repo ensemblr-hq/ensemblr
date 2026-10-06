@@ -183,6 +183,7 @@ const setup = (options: {
 	guardrails?: Parameters<typeof createGuardrails>[0];
 	lastMessage?: (agentSessionId: string) => string;
 	contextUsage?: Map<string, AgentControlContextUsage>;
+	scheduler?: WaitScheduler;
 }) => {
 	const registry: OriginRegistry = createOriginRegistry({
 		generateToken: () => `tok-${Math.random()}`,
@@ -202,17 +203,18 @@ const setup = (options: {
 			parentSessionId: 'master',
 		}),
 	);
+	const ports = makePorts(
+		options.statuses,
+		options.lastMessage,
+		options.contextUsage,
+	);
 	const service = createAgentControlService({
-		ports: makePorts(
-			options.statuses,
-			options.lastMessage,
-			options.contextUsage,
-		),
+		ports,
 		originRegistry: registry,
 		guardrails: createGuardrails(options.guardrails),
-		scheduler: makeScheduler(),
+		scheduler: options.scheduler ?? makeScheduler(),
 	});
-	return { service, registry, master, childOrigins };
+	return { service, registry, master, childOrigins, ports };
 };
 
 describe('agent-control waitForAgents', () => {
@@ -843,6 +845,267 @@ describe('agent-control waitForAgents: context usage', () => {
 			expect(data.timedOut).toBe(true);
 			expect(data.note).toContain('Not a failure');
 			expect(data.note).toContain('Context pressure');
+		}
+	});
+});
+
+/**
+ * A deterministic scheduler that runs `onTick` on every poll sleep, so a test can
+ * act at a known point while a wait is blocked.
+ */
+const makeTickingScheduler = (
+	onTick: (tick: number) => void,
+): WaitScheduler => {
+	let clock = 0;
+	let tick = 0;
+	return {
+		now: () => clock,
+		sleep: async (ms) => {
+			clock += ms;
+			tick += 1;
+			onTick(tick);
+		},
+	};
+};
+
+// Both runtimes hand a steer to the agent only once its current tool call
+// returns, so a wait that held its whole window kept the user's message unread
+// for up to five minutes. The steer has to end the wait, and the result has to
+// say so, or the agent reads the early return as its children having finished.
+describe('agent-control waitForAgents: user steer', () => {
+	it('ends a blocked wait the moment the user steers the caller', async () => {
+		const statuses = new Map([
+			['c1', 'idle'],
+			['c2', 'streaming'],
+		]);
+		let steer: () => void = () => undefined;
+		const { service, master } = setup({
+			statuses,
+			children: ['c1', 'c2'],
+			scheduler: makeTickingScheduler((tick) => {
+				if (tick === 2) {
+					steer();
+				}
+			}),
+		});
+		steer = () => service.noteUserSteer('master');
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'all', timeoutMs: 60_000 },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.timedOut).toBe(false);
+			expect(data.interrupted).toBe('user-message');
+			expect(data.completed).toHaveLength(1);
+			expect(data.completed[0]).toMatchObject({
+				agentSessionId: 'c1',
+				lastMessage: 'msg:c1',
+			});
+			expect(data.pending.map((entry) => entry.agentSessionId)).toEqual(['c2']);
+			expect(data.note).toContain('the user sent you a message');
+			expect(data.note).toContain('mode: "all"');
+			expect(data.note).toContain('"c2"');
+			expect(data.note).not.toContain('"c1"');
+		}
+	});
+
+	it('returns at once when the steer landed before the wait began', async () => {
+		const statuses = new Map([['c1', 'streaming']]);
+		const { service, master } = setup({ statuses, children: ['c1'] });
+		service.noteUserSteer('master');
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'first', timeoutMs: 1000 },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.interrupted).toBe('user-message');
+			expect(data.timedOut).toBe(false);
+		}
+	});
+
+	it('spends an early steer on one wait, not every wait after it', async () => {
+		const statuses = new Map([['c1', 'streaming']]);
+		const { service, master } = setup({ statuses, children: ['c1'] });
+		service.noteUserSteer('master');
+		await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'first', timeoutMs: 1000 },
+		});
+		const second = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'first', timeoutMs: 1000 },
+		});
+		expect(second.ok).toBe(true);
+		if (second.ok) {
+			const data = second.data as WaitForAgentsResult;
+			expect(data.timedOut).toBe(true);
+			expect(data.interrupted).toBeUndefined();
+		}
+	});
+
+	// A tool boundary is where the runtime delivered the steer, so the agent has
+	// already read it; a wait it starts afterwards owes nobody an early return.
+	it('blocks as usual once a tool boundary has delivered the steer', async () => {
+		const statuses = new Map([['c1', 'streaming']]);
+		const { service, master } = setup({ statuses, children: ['c1'] });
+		service.noteUserSteer('master');
+		service.noteSessionEvent('master', {
+			kind: 'message',
+			payload: {
+				isError: false,
+				kind: 'tool-result',
+				output: 'ok',
+				toolCallId: 'read-1',
+			},
+			role: 'tool',
+		});
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'first', timeoutMs: 1000 },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.timedOut).toBe(true);
+			expect(data.interrupted).toBeUndefined();
+		}
+	});
+
+	it('leaves a wait alone when the user steers some other session', async () => {
+		const statuses = new Map([['c1', 'streaming']]);
+		let steer: () => void = () => undefined;
+		const { service, master } = setup({
+			statuses,
+			children: ['c1'],
+			scheduler: makeTickingScheduler(() => steer()),
+		});
+		steer = () => service.noteUserSteer('c1');
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'first', timeoutMs: 1000 },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.timedOut).toBe(true);
+			expect(data.interrupted).toBeUndefined();
+		}
+	});
+
+	// A turn that ended has nobody left to answer the user, and reading a report
+	// spends the children's escalations, so the abandoned path still wins.
+	it('reports nothing when the turn ended as well as being steered', async () => {
+		const statuses = new Map([['c1', 'idle']]);
+		const { service, master } = setup({ statuses, children: ['c1'] });
+		service.noteUserSteer('master');
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'first', timeoutMs: 1000 },
+			signal: AbortSignal.abort(),
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.completed).toEqual([]);
+			expect(data.interrupted).toBeUndefined();
+		}
+	});
+
+	it('marks nothing interrupted when the wait was satisfied anyway', async () => {
+		const statuses = new Map([['c1', 'idle']]);
+		const { service, master } = setup({ statuses, children: ['c1'] });
+		service.noteUserSteer('master');
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'first', timeoutMs: 1000 },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.completed).toHaveLength(1);
+			expect(data.interrupted).toBeUndefined();
+			expect(data.note).toBeUndefined();
+		}
+	});
+
+	// A Claude Code `Task` sub-agent reaches the control server on its parent's
+	// token, yet the parent's steer reaches only the main thread, once the call
+	// returns. Cutting the sub-agent's wait would have it answer nothing.
+	it('leaves a sub-agent’s wait alone while the main thread is inside its call', async () => {
+		const statuses = new Map([['c1', 'streaming']]);
+		let steer: () => void = () => undefined;
+		const { service, master } = setup({
+			statuses,
+			children: ['c1'],
+			scheduler: makeTickingScheduler(() => steer()),
+		});
+		service.noteSessionEvent('master', {
+			kind: 'message',
+			parentToolCallId: 'task-1',
+			payload: { kind: 'text', text: 'sub-agent at work' },
+			role: 'agent',
+		});
+		steer = () => service.noteUserSteer('master');
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'first', timeoutMs: 1000 },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.timedOut).toBe(true);
+			expect(data.interrupted).toBeUndefined();
+		}
+	});
+
+	it('cuts a wait: true follow-up short and names the resume call', async () => {
+		const statuses = new Map([['c1', 'streaming']]);
+		const { service, master, ports } = setup({
+			statuses,
+			children: ['c1'],
+		});
+		vi.mocked(ports.conversations.waitForIdle).mockImplementation(
+			(_agentSessionId, _timeoutMs, signal) =>
+				new Promise((resolve) => {
+					signal?.addEventListener('abort', () => resolve('timeout'), {
+						once: true,
+					});
+				}),
+		);
+		const pending = service.invoke({
+			op: 'sendFollowUp',
+			token: master.token,
+			rawArgs: { agentSessionId: 'c1', prompt: 'and then?', wait: true },
+		});
+		await vi.waitFor(() =>
+			expect(ports.conversations.waitForIdle).toHaveBeenCalled(),
+		);
+		service.noteUserSteer('master');
+		const result = await pending;
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as {
+				interrupted?: string;
+				note?: string;
+				result?: string;
+			};
+			expect(data.result).toBe('interrupted');
+			expect(data.interrupted).toBe('user-message');
+			expect(data.note).toContain('the user sent you a message');
+			expect(data.note).toContain('targets: ["c1"]');
 		}
 	});
 });

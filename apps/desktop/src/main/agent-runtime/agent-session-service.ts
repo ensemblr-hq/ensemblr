@@ -134,6 +134,12 @@ interface AgentSessionServiceOptions {
 	 */
 	onSessionAborted?: (sessionId: string) => void;
 	/**
+	 * Announces a steer the runtime accepted into a running turn. The runtime
+	 * hands it to the agent only at its next tool boundary, so the composition
+	 * root ends any wait the agent is blocked in, letting the message land now.
+	 */
+	onSteerAccepted?: (sessionId: string) => void;
+	/**
 	 * Announces a summary that has landed on disk, so the composition root can
 	 * refresh the closed-tab surfaces. The write is async and outlives the close
 	 * that triggered it, so a listener is the only way those surfaces learn the
@@ -340,6 +346,7 @@ export function createAgentSessionService({
 	isPlanModeActive = () => false,
 	isAfkModeActive = () => false,
 	onSessionAborted,
+	onSteerAccepted,
 	onSummaryPersisted,
 	isSpawnedSubAgent,
 	queueNaming,
@@ -371,6 +378,7 @@ export function createAgentSessionService({
 		isAfkModeActive,
 		now,
 		onSessionAborted,
+		onSteerAccepted,
 		onSummaryPersisted,
 		persistRuntimeEvent,
 		agentClient,

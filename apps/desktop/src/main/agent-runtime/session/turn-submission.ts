@@ -61,6 +61,7 @@ interface TurnSubmitter {
  * @param isAfkModeActive - Reads a session's AFK state for a prompt
  * @param isPlanModeActive - Reads a session's Plan Mode state for a prompt
  * @param now - Clock stamping when a turn settled or a session closed
+ * @param onSteerAccepted - Announces a steer once the runtime has accepted it
  * @param turnBoundaries - Turn-row and checkpoint bookkeeping
  * @returns The submitter
  */
@@ -69,12 +70,14 @@ export function createTurnSubmitter({
 	isAfkModeActive,
 	isPlanModeActive,
 	now,
+	onSteerAccepted,
 	turnBoundaries,
 }: {
 	activeSessions: ActiveSessionMap;
 	isAfkModeActive: (agentSessionId: string) => boolean;
 	isPlanModeActive: (agentSessionId: string) => boolean;
 	now: () => Date;
+	onSteerAccepted?: (sessionId: string) => void;
 	turnBoundaries: TurnBoundaries;
 }): TurnSubmitter {
 	const quarantiningSessions = new Set<string>();
@@ -221,7 +224,9 @@ export function createTurnSubmitter({
 	 * and events after the switch are tagged with the new turn. The session
 	 * keeps streaming. A stop or replacement during the snapshot, or a refused
 	 * submit, errors the new turn and discards its checkpoint; an unconfirmed
-	 * submit leaves it active, since the runtime may have taken it.
+	 * submit leaves it active, since the runtime may have taken it. An accepted
+	 * steer is announced only after the runtime has queued it, so whatever it
+	 * cuts short returns to a runtime already holding the message.
 	 * @param active - The session the input is submitted to
 	 * @param database - Database holding the session and turn rows
 	 * @param request - The steer or follow-up
@@ -255,22 +260,26 @@ export function createTurnSubmitter({
 			});
 			throw sessionNotOpen(request.sessionId);
 		}
-		try {
-			return await active.agentRuntimeSession.submit({
+		const accepted = await active.agentRuntimeSession
+			.submit({
 				prompt: request.prompt,
 				streamingBehavior: request.streamingBehavior,
+			})
+			.catch((cause: unknown) => {
+				if (!isUnconfirmedSubmit(cause)) {
+					turnBoundaries.rejectTurn({
+						active,
+						database,
+						superseded: opening.superseded,
+						turnId: turn.id,
+					});
+				}
+				throw cause;
 			});
-		} catch (cause) {
-			if (!isUnconfirmedSubmit(cause)) {
-				turnBoundaries.rejectTurn({
-					active,
-					database,
-					superseded: opening.superseded,
-					turnId: turn.id,
-				});
-			}
-			throw cause;
+		if (request.streamingBehavior === 'steer') {
+			onSteerAccepted?.(request.sessionId);
 		}
+		return accepted;
 	};
 
 	/**

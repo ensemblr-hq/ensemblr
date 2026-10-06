@@ -22,6 +22,7 @@ import {
 	type RunQueuedResult,
 	type WaitForJobArgs,
 	type WaitForJobResult,
+	type WaitInterruption,
 } from '../../shared/agent-control.ts';
 import {
 	classifyHeavyCommandForSettings,
@@ -35,6 +36,7 @@ import type { Guardrails } from './guardrails.ts';
 import type { JobQueuePort } from './job-queue-ports.ts';
 import { fitTail } from './payload-fit.ts';
 import { type AgentControlOrigin, originToolNaming } from './ports.ts';
+import type { UserInterjections, WaitWatch } from './user-interjections.ts';
 
 /** The queue ops and heavy-command gates the agent-control service composes. */
 export interface JobQueueOps {
@@ -75,6 +77,8 @@ interface JobQueueOpsOptions {
 	/** The queue, or undefined when none is wired; every op is then refused. */
 	port: JobQueuePort | undefined;
 	guardrails: Guardrails;
+	/** Ends a wait early when the user steers the agent holding it. */
+	interjections: UserInterjections;
 }
 
 /** The queue tools under the names Pi and the MCP server register them as. */
@@ -227,24 +231,42 @@ function describePending(report: QueuedJobReport): string {
 
 /**
  * How a wait for unfinished jobs ended: none was asked for, its window
- * expired, or the calling turn was interrupted before either.
+ * expired, the user sent a message, or the calling turn was interrupted.
  */
-type WaitEnding = 'none' | 'expired' | 'aborted';
+type WaitEnding = 'none' | 'expired' | 'interjected' | 'aborted';
 
 /** The sentence a resume note opens with, for each way a wait can end. */
 const WAIT_ENDING_OPENINGS: Readonly<Record<WaitEnding, string>> = {
 	aborted: 'The wait stopped because this turn was interrupted. ',
 	expired: 'Not a failure: the wait window expired first. ',
+	interjected:
+		'Not a failure: the wait stopped early because the user sent you a message, which follows this result. Answer the user first (if you already have, just resume), then come back to the jobs. ',
 	none: '',
 };
 
 /**
  * Names how a wait that returned with jobs unfinished ended.
- * @param signal - The calling turn's abort signal, if any.
- * @returns `aborted` when the turn was interrupted, else `expired`.
+ * @param watch - The watch the wait ran under.
+ * @returns `interjected` for a user message, `aborted` when the turn was interrupted, else `expired`.
  */
-function waitEnding(signal: AbortSignal | undefined): WaitEnding {
-	return signal?.aborted ? 'aborted' : 'expired';
+function waitEnding(watch: WaitWatch): WaitEnding {
+	if (watch.interjected()) {
+		return 'interjected';
+	}
+	return watch.signal.aborted ? 'aborted' : 'expired';
+}
+
+/**
+ * The `interrupted` field a wait result carries when a user message cut it short.
+ * @param pending - Whether anything was still unfinished when the wait returned.
+ * @param watch - The watch the wait ran under.
+ * @returns The field, or nothing when the wait was not cut short.
+ */
+function interruption(
+	pending: boolean,
+	watch: WaitWatch,
+): { interrupted?: WaitInterruption } {
+	return pending && watch.interjected() ? { interrupted: 'user-message' } : {};
 }
 
 /**
@@ -356,12 +378,14 @@ function classifySafely(
 
 /**
  * Builds the compute-queue ops and gates.
- * @param options - The queue port and the guardrails that bound enqueues.
+ * @param options - The queue port, the guardrails that bound enqueues, and the
+ *   interjections that end a wait early.
  * @returns The ops the agent-control service dispatches to.
  */
 export function createJobQueueOps({
 	port,
 	guardrails,
+	interjections,
 }: JobQueueOpsOptions): JobQueueOps {
 	const unsubmittedInput = new Map<string, string>();
 
@@ -437,6 +461,36 @@ export function createJobQueueOps({
 			: {};
 
 	/**
+	 * Waits on jobs within the app's ceiling under a watch a user steer ends
+	 * early, releasing the watch however the wait returns.
+	 * @param queue - The queue port.
+	 * @param origin - Resolved caller identity, whose steer ends the wait.
+	 * @param jobIds - The jobs to wait on.
+	 * @param wait - The calling turn's abort signal and the requested timeout.
+	 * @returns The queue's wait result, and the watch to read how it ended.
+	 */
+	const watchedWait = async (
+		queue: JobQueuePort,
+		origin: AgentControlOrigin,
+		jobIds: readonly string[],
+		wait: { signal: AbortSignal | undefined; timeoutMs: number | undefined },
+	): Promise<{
+		waited: Awaited<ReturnType<JobQueuePort['waitFor']>>;
+		watch: WaitWatch;
+	}> => {
+		const watch = interjections.watch(origin.sessionId, wait.signal);
+		try {
+			const waited = await queue.waitFor(jobIds, {
+				signal: watch.signal,
+				timeoutMs: clampWait(wait.timeoutMs),
+			});
+			return { waited, watch };
+		} finally {
+			watch.release();
+		}
+	};
+
+	/**
 	 * Queues a command and, unless told not to, waits for it within the app's
 	 * wait ceiling. The enqueue is bounded per delegation tree before the queue
 	 * sees it, so a runaway loop cannot fill the machine's queue.
@@ -485,31 +539,31 @@ export function createJobQueueOps({
 		}
 		reservation.settle();
 		const jobId = outcome.job.id;
-		const waited =
+		const watched =
 			args.wait === false
 				? null
-				: await port.waitFor([jobId], {
+				: await watchedWait(port, origin, [jobId], {
 						signal,
-						timeoutMs: clampWait(args.timeoutMs),
+						timeoutMs: args.timeoutMs,
 					});
 		const job = port.getJob(jobId);
 		if (!job) {
 			return fail('internal', `Compute-queue job ${jobId} vanished.`);
 		}
-		const timedOut = waited?.timedOut ?? false;
+		const finished = isComputeJobFinished(job.state);
 		const render = (reports: readonly QueuedJobReport[]): RunQueuedResult => ({
 			job: reports[0],
-			timedOut,
+			timedOut: watched?.waited.timedOut ?? false,
+			...(watched ? interruption(!finished, watched.watch) : {}),
 		});
 		const [report] = fitReports([toReport(job, origin.workspaceCwd)], render);
-		const finished = isComputeJobFinished(report.state);
 		return ok({
 			...render([report]),
 			...noteFor(
 				origin,
 				finished
 					? truncatedLogNote([report])
-					: resumeNote([report], waited ? waitEnding(signal) : 'none'),
+					: resumeNote([report], watched ? waitEnding(watched.watch) : 'none'),
 			),
 		} satisfies RunQueuedResult);
 	};
@@ -550,9 +604,9 @@ export function createJobQueueOps({
 				return owned;
 			}
 		}
-		const waited = await port.waitFor(jobIds, {
+		const { waited, watch } = await watchedWait(port, origin, jobIds, {
 			signal,
-			timeoutMs: clampWait(args.timeoutMs),
+			timeoutMs: args.timeoutMs,
 		});
 		const reports = fitReports(
 			[...waited.settled, ...waited.pending].map((job) =>
@@ -566,10 +620,11 @@ export function createJobQueueOps({
 			pending,
 			settled,
 			timedOut: waited.timedOut,
+			...interruption(pending.length > 0, watch),
 			...noteFor(
 				origin,
 				joinNotes([
-					pending.length > 0 ? resumeNote(pending, waitEnding(signal)) : null,
+					pending.length > 0 ? resumeNote(pending, waitEnding(watch)) : null,
 					truncatedLogNote(settled),
 				]),
 			),

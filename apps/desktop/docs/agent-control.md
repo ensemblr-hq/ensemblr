@@ -577,7 +577,8 @@ of its output with secrets redacted, `omittedChars`, and `logPath` — the whole
 output under `.context/compute-queue/`, workspace-relative. The payload is fitted
 to the shared ceiling by cutting each tail from the front, because the verdict
 lands last. A `timedOut` answer is a lap, and the note says so and names each
-job's position.
+job's position. A wait the user's message cut short answers
+`interrupted: "user-message"` instead — see the steer paragraph below.
 
 `ensemblr_wait_for_job` defaults to every unfinished job the calling session
 queued; every id must belong to the caller's workspace or the call is
@@ -1920,7 +1921,36 @@ orchestrator that owns the conversation is blocked waiting on its report.
 Two things a wait returns as prose rather than as a flag. `timedOut: true` with
 children still `pending` carries a `note` naming the exact resume call, in the
 caller's own mode, because an orchestrator reads a bare timeout as a fault to
-report. A *default* wait also resolves children from validated lineage in SQLite, so it
+report.
+
+A user message ends a wait early. Both runtimes hand a mid-turn steer to the
+agent only once its current tool call returns, so a blocking op —
+`ensemblr_wait_for_agents`, `ensemblr_run_queued`, `ensemblr_wait_for_job`, or a
+`wait: true` spawn or follow-up — used to hold the user's message unread for the
+whole window. Every one of them now runs under a per-session watch
+(`src/main/agent-control/user-interjections.ts`): an accepted steer
+(`onSteerAccepted`, announced by the turn submitter once the runtime holds the
+message) aborts the waits its session has open, and they return with
+`interrupted: "user-message"`, whatever had settled, and a note naming the resume
+call; a `wait: true` spawn or follow-up also answers `result: "interrupted"`.
+Nothing the wait watched is cancelled. A steer that lands while no wait is open
+— the model still writing the call that starts one — arms the session, and its
+next wait returns at once. The boundary where the runtime delivers the message
+disarms it: a main-thread tool result, an answer that ended without a tool call
+(`endsResponse`, where Pi flushes its steering queue), or the turn leaving
+`streaming`. The main process reads those off every runtime event
+(`noteSessionEvent`). A steer is left alone while the main thread is inside a
+Claude Code `Task` call: that sub-agent reaches the server on its parent's
+token, so its waits look like the parent's, yet the message reaches only the
+main thread once the call returns. Only the user's steer does this: an agent's
+`ensemblr_send_follow_up` is a `followUp`, which waits for the turn by design. A
+turn that ended outranks a steer, so an abandoned wait still reports nothing. On
+Pi the delegation barrier stands aside until the next wait or the end of the
+turn, both after an interrupted wait and whenever Pi delivers a user-role
+message while child work is outstanding, so the orchestrator's answer is not
+stripped. One race remains: Pi's steer frame and an earlier tool result can
+cross, and a tool result read after the steer disarms it one boundary early, so
+that one wait blocks as it used to. A *default* wait also resolves children from validated lineage in SQLite, so it
 continues to find owned descendants after an app restart even when the live
 origin registry starts empty. `notifyOrchestrator` and the wait target therefore
 agree on the same durable immediate parent rather than relying on transcript-held

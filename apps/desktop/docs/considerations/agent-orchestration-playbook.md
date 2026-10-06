@@ -253,6 +253,10 @@ three orchestrating playbooks say so and a parity test pins it.
      bare boolean as something to report to the user or work around — same reason a shortened
      report carries its own re-fetch pointer. See `waitOutcome`
      (`src/main/agent-control/agent-control-service.ts`).
+   - `interrupted: "user-message"` is the user steering the orchestrator mid-wait. The runtime
+     delivers the steer only once the wait's tool call returns, so the steer ends the wait at once;
+     the note tells the orchestrator to answer first and names the same resume call. No child is
+     stopped. See `src/main/agent-control/user-interjections.ts`.
    - A child that hits a decision point calls `ensemblr_notify_orchestrator` (`need_decision` /
      `blocked`), which wakes the wait immediately **in either mode**. `waitAllSatisfied`
      (`src/main/agent-control/agent-control-service.ts`) is what makes that true under `all`:

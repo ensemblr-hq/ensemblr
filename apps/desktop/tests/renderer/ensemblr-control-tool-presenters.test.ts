@@ -87,6 +87,21 @@ describe('wait_for_agents', () => {
 		});
 	});
 
+	test('says the user cut the wait short rather than calling it an expiry', () => {
+		const presentation = presentToolCall(
+			piCall(
+				'ensemblr_wait_for_agents',
+				{ mode: 'all' },
+				{ ...payload, interrupted: 'user-message', timedOut: false },
+			),
+		);
+
+		expect(presentation.preview).toEqual({
+			font: 'sans',
+			text: '1 settled · 1 still working · paused for your message',
+		});
+	});
+
 	test('reads the same payload off the MCP transport', () => {
 		const body = markdownOf(
 			presentToolCall(mcpCall('ensemblr_wait_for_agents', {}, payload)).body,
@@ -174,6 +189,44 @@ describe('wait_for_agents', () => {
 		);
 
 		expect(body.match(/\*\*idle\*\*/g)).toHaveLength(1);
+	});
+});
+
+describe('wait_for_job', () => {
+	test('says the user cut the wait short in the preview', () => {
+		const presentation = presentToolCall(
+			mcpCall(
+				'ensemblr_wait_for_job',
+				{},
+				{
+					interrupted: 'user-message',
+					pending: [
+						{
+							command: 'bun run test',
+							durationMs: null,
+							exitCode: null,
+							jobId: 'job-1',
+							kind: 'command',
+							label: 'bun run test',
+							logPath: null,
+							omittedChars: 0,
+							outputTail: '',
+							position: null,
+							signal: null,
+							state: 'running',
+							waitedMs: 0,
+						},
+					],
+					settled: [],
+					timedOut: false,
+				},
+			),
+		);
+
+		expect(presentation.preview).toEqual({
+			font: 'sans',
+			text: '1 job still going · paused for your message',
+		});
 	});
 });
 

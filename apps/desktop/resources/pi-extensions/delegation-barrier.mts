@@ -30,6 +30,12 @@ export interface DelegationBarrierState {
 	recoveryRequired: boolean;
 	/** Consecutive auto-resumed turns that settled without running any tool. */
 	staleResumes: number;
+	/**
+	 * A user message cut the last wait short. The barrier stands aside until the
+	 * next wait or the end of the turn, so the orchestrator can answer it — in
+	 * prose or with any tool — rather than have its reply stripped.
+	 */
+	userInterjection: boolean;
 	waitFailed: boolean;
 }
 
@@ -87,6 +93,7 @@ export function createDelegationBarrierState(): DelegationBarrierState {
 		operations: [],
 		recoveryRequired: false,
 		staleResumes: 0,
+		userInterjection: false,
 		waitFailed: false,
 	};
 }
@@ -100,6 +107,47 @@ export function delegationBarrierActive(
 		state.operations.length > 0 ||
 		state.children.some((child) => child.phase !== 'settled')
 	);
+}
+
+/**
+ * Whether the barrier is blocking work and stripping prose right now: child
+ * work is outstanding and no user message has asked it to stand aside.
+ * @param state - The barrier as it stands.
+ * @returns True when the barrier's guards apply.
+ */
+export function delegationBarrierEnforced(
+	state: DelegationBarrierState,
+): boolean {
+	return !state.userInterjection && delegationBarrierActive(state);
+}
+
+/**
+ * Stands the barrier aside for a message addressed to this orchestrator — the
+ * user's, or its own orchestrator's — that Pi delivered while child work was
+ * outstanding, wherever it landed. A wait the message cut short says the same
+ * thing from the app's side; this catches one that arrived at any other
+ * boundary, whose answer would otherwise be stripped.
+ * @param state - The barrier as the message arrived.
+ * @returns The barrier standing aside, or the same state when it was not active.
+ */
+export function noteDelegationUserMessage(
+	state: DelegationBarrierState,
+): DelegationBarrierState {
+	return delegationBarrierEnforced(state)
+		? { ...state, userInterjection: true }
+		: state;
+}
+
+/**
+ * Puts the barrier back once the turn a user message opened it for has ended,
+ * so the resumed wait loop runs under its guards again.
+ * @param state - The barrier as the turn left it.
+ * @returns The barrier with the interjection spent, or the same state when there was none.
+ */
+export function endDelegationInterjection(
+	state: DelegationBarrierState,
+): DelegationBarrierState {
+	return state.userInterjection ? { ...state, userInterjection: false } : state;
 }
 
 /** Whether a premature stop should queue another turn to resume the wait loop. */
@@ -184,11 +232,10 @@ function decideDelegationToolCall(
 	call: DelegationToolCall,
 ): DelegationToolCallDecision {
 	const input = recordOf(call.input);
+	const enforced = delegationBarrierEnforced(state);
 	if (call.toolName === START_CONVERSATION_TOOL) {
 		if (input.peer === true) {
-			return delegationBarrierActive(state)
-				? { blockReason: WORK_BLOCK_REASON, state }
-				: { state };
+			return enforced ? { blockReason: WORK_BLOCK_REASON, state } : { state };
 		}
 		return {
 			state: {
@@ -219,14 +266,14 @@ function decideDelegationToolCall(
 		return {
 			clearWaitTargets: state.recoveryRequired,
 			input: waitInput,
-			state: { ...state, waitFailed: false },
+			state: { ...state, userInterjection: false, waitFailed: false },
 		};
 	}
 
 	if (call.toolName === SEND_FOLLOW_UP_TOOL) {
 		const agentSessionId = stringField(input, 'agentSessionId');
 		if (!agentSessionId || !hasChild(state, agentSessionId)) {
-			return delegationBarrierActive(state)
+			return enforced
 				? {
 						blockReason:
 							'Only a tracked child can receive a follow-up while delegated work is outstanding.',
@@ -246,7 +293,7 @@ function decideDelegationToolCall(
 		};
 	}
 
-	if (call.toolName === CLOSE_TAB_TOOL && delegationBarrierActive(state)) {
+	if (call.toolName === CLOSE_TAB_TOOL && enforced) {
 		const chatTabId = stringField(input, 'chatTabId');
 		return state.children.some((child) => child.chatTabId === chatTabId)
 			? { state }
@@ -260,14 +307,14 @@ function decideDelegationToolCall(
 	if (
 		(call.toolName === ASK_USER_QUESTION_TOOL ||
 			call.toolName === NOTIFY_ORCHESTRATOR_TOOL) &&
-		delegationBarrierActive(state)
+		enforced
 	) {
 		return state.children.some((child) => child.phase === 'attention')
 			? { state }
 			: { blockReason: WORK_BLOCK_REASON, state };
 	}
 
-	if (delegationBarrierActive(state) || call.batchStartsChild) {
+	if (enforced || (call.batchStartsChild && !state.userInterjection)) {
 		return {
 			blockReason: call.batchStartsChild
 				? BATCH_BLOCK_REASON
@@ -300,7 +347,7 @@ export function afterDelegationToolResult(
 		if (!envelope?.ok || !agentSessionId || !chatTabId) {
 			return next;
 		}
-		return upsertChild(next, {
+		return upsertChild(withInterruption(next, data), {
 			agentSessionId,
 			chatTabId,
 			phase: 'working',
@@ -321,7 +368,11 @@ export function afterDelegationToolResult(
 		if (!envelope?.ok) {
 			return next;
 		}
-		return updateChildPhase(next, operation.agentSessionId, 'working');
+		return updateChildPhase(
+			withInterruption(next, recordOf(envelope.data)),
+			operation.agentSessionId,
+			'working',
+		);
 	}
 
 	if (result.toolName !== WAIT_FOR_AGENTS_TOOL) {
@@ -335,7 +386,11 @@ export function afterDelegationToolResult(
 		return { ...state, waitFailed: true };
 	}
 	const data = recordOf(envelope.data);
-	let next = { ...state, waitFailed: false };
+	let next = {
+		...state,
+		userInterjection: data.interrupted === 'user-message',
+		waitFailed: false,
+	};
 	if (state.recoveryRequired) {
 		for (const completed of recordsOf(data.completed)) {
 			next = adoptRecoveryChild(
@@ -392,6 +447,23 @@ function completedChildPhase(
 	return reason === 'done' || reason === 'progress' ? 'settled' : 'attention';
 }
 
+/**
+ * Stands the barrier aside when a `wait: true` spawn or follow-up reports that
+ * the user's message cut its wait short, the way an interrupted
+ * `ensemblr_wait_for_agents` does.
+ * @param state - The barrier after the call's own bookkeeping.
+ * @param data - The call's result payload.
+ * @returns The barrier, standing aside when the result says it was interrupted.
+ */
+function withInterruption(
+	state: DelegationBarrierState,
+	data: Record<string, unknown>,
+): DelegationBarrierState {
+	return data.interrupted === 'user-message'
+		? { ...state, userInterjection: true }
+		: state;
+}
+
 /** Adopts a child returned by a recovery wait without inventing a tab id. */
 function adoptRecoveryChild(
 	state: DelegationBarrierState,
@@ -434,6 +506,7 @@ export function restoreDelegationBarrierState(
 		recoveryRequired:
 			record.recoveryRequired === true || record.operations.length > 0,
 		staleResumes: staleResumeCount(record.staleResumes),
+		userInterjection: false,
 		waitFailed: record.waitFailed === true,
 	};
 }

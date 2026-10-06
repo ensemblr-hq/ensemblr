@@ -24,6 +24,7 @@ import {
 	REPORT_EXCERPT_LIMIT,
 	ROW_EXCERPT_LIMIT,
 	stringValue,
+	waitEndingFact,
 } from './ensemblr-control-presenter-helpers';
 
 /**
@@ -129,16 +130,16 @@ function waitRows(
 
 /**
  * Builds the collapsed line for a wait: how many children settled, how many are
- * still working, and whether the wait window expired before they did.
+ * still working, and what cut the wait short if anything did.
  * @param completed - Settled children
  * @param pending - Children still running
- * @param timedOut - Whether the wait window expired
+ * @param ending - Why the wait returned early, already rendered, or null
  * @returns The collapsed line
  */
 function waitPreview(
 	completed: readonly unknown[],
 	pending: readonly unknown[],
-	timedOut: boolean,
+	ending: string | null,
 ): string {
 	return joinFacts([
 		completed.length === 0
@@ -155,12 +156,7 @@ function waitPreview(
 					defaultValue_one: '{{count}} still working',
 					defaultValue_other: '{{count}} still working',
 				}),
-		timedOut
-			? i18n.t(
-					'workbench:control-tool.preview.timed-out',
-					'wait window expired',
-				)
-			: null,
+		ending,
 	]);
 }
 
@@ -206,7 +202,7 @@ function presentWaitForAgents(part: DynamicToolUIPart): ControlRow {
 	]);
 	return markdownRow(
 		body,
-		waitPreview(completed, pending, payload.timedOut === true),
+		waitPreview(completed, pending, waitEndingFact(payload)),
 	);
 }
 

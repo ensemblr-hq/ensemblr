@@ -573,6 +573,7 @@
 			"context": "{{percent}}% συμφραζομένων",
 			"entries_one": "{{count}} καταχώριση",
 			"entries_other": "{{count}} καταχωρίσεις",
+			"interrupted-by-user": "διακόπηκε από το μήνυμά σας",
 			"issues_one": "{{count}} ζήτημα",
 			"issues_other": "{{count}} ζητήματα",
 			"jobs-pending_one": "{{count}} διεργασία συνεχίζεται",

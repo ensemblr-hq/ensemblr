@@ -615,6 +615,7 @@
 			"entries_few": "{{count}} записи",
 			"entries_many": "{{count}} записей",
 			"entries_other": "{{count}} записей",
+			"interrupted-by-user": "прервано вашим сообщением",
 			"issues_one": "{{count}} задача",
 			"issues_few": "{{count}} задачи",
 			"issues_many": "{{count}} задач",

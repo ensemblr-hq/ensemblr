@@ -1012,6 +1012,7 @@ const agentSessionService = createAgentSessionService({
 			sessionId,
 			workspaceId,
 		});
+		agentControlService?.noteSessionEvent(sessionId, payload.event.payload);
 		if (event.eventType === 'shutdown') {
 			agentControlService?.releaseSession(sessionId);
 		}
@@ -1022,6 +1023,8 @@ const agentSessionService = createAgentSessionService({
 	isAfkModeActive: (sessionId) => afkModeRegistry.isActive(sessionId),
 	/** Keeps the stop the user just asked for from notifying as a finished turn. */
 	onSessionAborted: (sessionId) => agentActivityMonitor.noteUserStop(sessionId),
+	/** Ends any wait the steered agent is blocked in, so the message lands now. */
+	onSteerAccepted: (sessionId) => agentControlService?.noteUserSteer(sessionId),
 	/**
 	 * Refreshes the chat-tab queries once a flushed summary file lands. The write
 	 * settles after the close that triggered it has already answered, so the
