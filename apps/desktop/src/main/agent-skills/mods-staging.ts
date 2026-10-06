@@ -201,13 +201,19 @@ function siblingPath(target: string, prefix: string): string {
 
 /**
  * Renames a fully written copy onto the target, moving a tampered copy aside
- * first because a directory cannot be renamed over a non-empty one.
+ * first because a directory cannot be renamed over a non-empty one. A target
+ * that another process repaired while this copy was being written is kept,
+ * and this copy is dropped, so two repairs never move each other's copy aside.
  * @param temporary - The fully written copy.
  * @param target - Final directory of this copy.
  */
 function swapIntoPlace(temporary: string, target: string): void {
 	if (!existsSync(target)) {
 		renameSync(temporary, target);
+		return;
+	}
+	if (isIntactCopy(target)) {
+		rmSync(temporary, { force: true, recursive: true });
 		return;
 	}
 	const discarded = siblingPath(target, DISCARD_PREFIX);
