@@ -60,6 +60,7 @@ import { controlToolNamingForRuntime } from '../../shared/agent-control.ts';
 import type { AgentProviderId } from '../../shared/agent-provider.ts';
 import type { AppLanguage } from '../../shared/i18n.ts';
 import type { PermissionMode } from '../../shared/permissions.ts';
+import type { NamedSecretValue } from '../../shared/redaction.ts';
 import type { JobQueuePort } from './job-queue-ports.ts';
 
 /**
@@ -967,6 +968,21 @@ export interface ToolTrustPort {
 	recordRefusal: (provider: AgentProviderId, tool: string) => void;
 }
 
+/**
+ * The exact secret values a workspace's processes are handed — Infisical
+ * secrets, stored secret variables, and secret-like env-file values — each
+ * named after the variable that carries it. Read only by `redactText`, which
+ * replaces them inside the app; no op ever returns one.
+ *
+ * Never rejects: a workspace whose environment cannot be assembled answers an
+ * empty list, so redaction still covers the control tokens it adds itself.
+ */
+export interface SecretValuesPort {
+	readSecretValues: (
+		workspaceId: string,
+	) => Promise<readonly NamedSecretValue[]>;
+}
+
 /** All collaborators the agent-control service composes. */
 export interface AgentControlPorts {
 	appSettings: AppSettingsPort;
@@ -999,6 +1015,11 @@ export interface AgentControlPorts {
 	 * then refused and no shell command is gated on it.
 	 */
 	jobQueue?: JobQueuePort;
+	/**
+	 * A workspace's secret values, for `redactText`. Absent when none is wired:
+	 * the op then redacts the live control tokens alone.
+	 */
+	secretValues?: SecretValuesPort;
 	diff: DiffPort;
 	review: ReviewPort;
 	reviewLaunch: ReviewLaunchPort;

@@ -16,6 +16,12 @@
  * control tools nobody holds. Both runtimes take a list: the SDK's `plugins` is
  * an array and `--plugin-dir` repeats.
  *
+ * The Claude Code mods are a third plugin root, `agent-mods`, and reach Claude
+ * alone: they are function hooks rather than skills, so Pi has nothing to load
+ * from them. They are never handed over in place — Claude writes into a plugin
+ * folder that holds a hooks module — but staged into user data first, by
+ * `mods-staging.ts`.
+ *
  * Every path is resolved defensively: a missing bundle contributes nothing and
  * the runtime launches exactly as it did before skills existed, which beats
  * failing a session over a documentation file.
@@ -24,6 +30,8 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 import type { App } from 'electron';
+
+import { MODS_STAGING_DIRECTORY, readStagedAgentMods } from './mods-staging.ts';
 
 /** Manifest that marks a bundle root as a Claude Code plugin. */
 const PLUGIN_MANIFEST = path.join('.claude-plugin', 'plugin.json');
@@ -52,6 +60,9 @@ const ARCHITECTURE_BUNDLE: BundleSpec = {
 	directory: 'agent-skills-architecture',
 	skillSubpaths: [path.join('skills', 'architecture-diagram')],
 };
+
+/** Directory the Claude Code mods plugin ships under. */
+const MODS_DIRECTORY = 'agent-mods';
 
 /** The shipped skills, addressed the way each runtime wants them. */
 export interface AgentSkillBundle {
@@ -118,11 +129,31 @@ function resolveBundle(app: App, spec: BundleSpec): AgentSkillBundle | null {
 }
 
 /**
+ * Resolves the staged copy of the Claude Code mods, or nothing when the plugin
+ * is absent or cannot be staged.
+ * @param app - The Electron app, for packaged vs. dev paths and user data.
+ * @returns The staged plugin root, or null.
+ */
+function resolveModsRoot(app: App): string | null {
+	try {
+		return readStagedAgentMods(
+			bundleCandidates(app, MODS_DIRECTORY),
+			path.join(app.getPath('userData'), MODS_STAGING_DIRECTORY),
+		);
+	} catch (error) {
+		console.warn('[agent-skills] could not locate the Claude Code mods.', {
+			error: error instanceof Error ? error.message : String(error),
+		});
+		return null;
+	}
+}
+
+/**
  * Resolves the shipped skills a session should load, folding every bundle it is
  * entitled to into one answer.
  * @param app - The Electron app, for packaged vs. dev path resolution.
  * @param options - Which optional bundles this session is entitled to.
- * @returns The plugin roots and skill directories, each list empty when nothing was found.
+ * @returns The plugin roots (the staged mods last) and skill directories, each list empty when nothing was found.
  */
 export function resolveAgentSkillBundle(
 	app: App,
@@ -134,8 +165,12 @@ export function resolveAgentSkillBundle(
 	const bundles = specs
 		.map((spec) => resolveBundle(app, spec))
 		.filter((bundle) => bundle !== null);
+	const modsRoot = resolveModsRoot(app);
 	return {
-		pluginDirectories: bundles.flatMap((bundle) => bundle.pluginDirectories),
+		pluginDirectories: [
+			...bundles.flatMap((bundle) => bundle.pluginDirectories),
+			...(modsRoot ? [modsRoot] : []),
+		],
 		skillDirectories: bundles.flatMap((bundle) => bundle.skillDirectories),
 	};
 }

@@ -125,6 +125,10 @@ import {
 	type WorkspacePort,
 } from './ports.ts';
 import { makeDiffPort, makeReviewPort } from './review-ports.ts';
+import {
+	createSecretValuesPort,
+	type SecretEnvironmentAssembly,
+} from './secret-values-port.ts';
 import { listImmediateAgentSessionChildren } from './session-lineage.ts';
 import {
 	isSessionTabMarkedSubAgent,
@@ -202,6 +206,13 @@ export interface PortAdapterDeps {
 	 * the queue wants.
 	 */
 	computeQueueService?: ComputeQueueService;
+	/**
+	 * Assembles a workspace's environment with secrets resolved, for the values
+	 * `redactText` replaces. Omitted, that op redacts control tokens alone.
+	 */
+	assembleSecretEnvironment?: (
+		workspaceId: string,
+	) => Promise<SecretEnvironmentAssembly>;
 	/**
 	 * The three Concierge-only ports, or null when the Concierge is not composed
 	 * in. Nullable rather than optional so the composition root has to state which
@@ -1981,6 +1992,13 @@ export function createAgentControlPorts(
 						deps.computeQueueService,
 						() => deps.appSettingsService.read().computeQueue,
 					),
+				}
+			: {}),
+		...(deps.assembleSecretEnvironment
+			? {
+					secretValues: createSecretValuesPort({
+						assemble: deps.assembleSecretEnvironment,
+					}),
 				}
 			: {}),
 		...(deps.conciergePorts ?? {}),

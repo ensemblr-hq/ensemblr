@@ -7,3 +7,7 @@ assets/avatar.png
 
 # Verified AppImage runtime, fetched by scripts/fetch-appimage-runtime.mjs.
 .appimage-runtime/
+
+# Claude Code writes these into a plugin folder it loads a hooks module from.
+resources/agent-mods/tsconfig.json
+resources/agent-mods/.claude-plugin/types/

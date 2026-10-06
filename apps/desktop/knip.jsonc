@@ -35,6 +35,8 @@
 		"tests/**/*.test.{ts,tsx}",
 		"scripts/**/*.{mjs,ts}",
 		"resources/pi-extensions/*.mts",
+		"resources/agent-mods/hooks/register.ts",
+		"resources/agent-mods/tests/*.test.ts",
 		"src/shared/ipc/index.ts",
 		"src/shared/pi-rpc/index.ts",
 		"src/shared/keymap/index.ts",

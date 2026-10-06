@@ -1,4 +1,5 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,6 +17,7 @@ const ARCHITECTURE_PLUGIN_ROOT = path.join(
 	'agent-skills-architecture',
 );
 const PLUGIN_ROOTS = [PLUGIN_ROOT, ARCHITECTURE_PLUGIN_ROOT];
+const MODS_PLUGIN_ROOT = path.join(REPO_ROOT, 'resources', 'agent-mods');
 const SKILL_ROOT = path.join(PLUGIN_ROOT, 'skills', 'ensemblr');
 const ARCHITECTURE_SKILL_ROOT = path.join(
 	ARCHITECTURE_PLUGIN_ROOT,
@@ -75,9 +77,20 @@ const frontmatter = (source: string): Record<string, string> => {
 	);
 };
 
+const USER_DATA = mkdtempSync(path.join(tmpdir(), 'ensemblr-user-data-'));
+
 /** An Electron `app` stub covering only what the resolver reads. */
 const fakeApp = (appPath: string): App =>
-	({ getAppPath: () => appPath, isPackaged: false }) as unknown as App;
+	({
+		getAppPath: () => appPath,
+		getPath: () => USER_DATA,
+		isPackaged: false,
+	}) as unknown as App;
+
+/** A staged mods root under the stub's user data, whatever its hash. */
+const STAGED_MODS_ROOT = expect.stringMatching(
+	/[\\/]claude-mods[\\/][0-9a-f]{16}$/,
+);
 
 describe.each(PLUGIN_ROOTS)('the shipped Claude plugin manifest', (root) => {
 	it('names every skill directory it bundles, and each one exists', () => {
@@ -197,21 +210,35 @@ describe('the skill against the surfaces it documents', () => {
 	});
 });
 
+describe('the shipped Claude Code mods plugin', () => {
+	it('keeps components out of .claude-plugin/, which holds the manifest alone', () => {
+		expect(readdirSync(path.join(MODS_PLUGIN_ROOT, '.claude-plugin'))).toEqual([
+			'plugin.json',
+		]);
+	});
+
+	it('carries the hook registry the staging step requires', () => {
+		expect(existsSync(path.join(MODS_PLUGIN_ROOT, 'hooks', 'hooks.json'))).toBe(
+			true,
+		);
+	});
+});
+
 describe('resolveAgentSkillBundle', () => {
-	it('finds the bundle shipped in the repository', () => {
+	it('finds the bundle shipped in the repository, the staged mods last', () => {
 		expect(
 			resolveAgentSkillBundle(fakeApp(REPO_ROOT), {
 				architectureDiagram: true,
 			}),
 		).toEqual({
-			pluginDirectories: PLUGIN_ROOTS,
+			pluginDirectories: [...PLUGIN_ROOTS, STAGED_MODS_ROOT],
 			skillDirectories: [SKILL_ROOT, ARCHITECTURE_SKILL_ROOT],
 		});
 	});
 
-	it('withholds the architecture bundle by default', () => {
+	it('withholds the architecture bundle by default, and gives Pi nothing from the mods', () => {
 		expect(resolveAgentSkillBundle(fakeApp(REPO_ROOT))).toEqual({
-			pluginDirectories: [PLUGIN_ROOT],
+			pluginDirectories: [PLUGIN_ROOT, STAGED_MODS_ROOT],
 			skillDirectories: [SKILL_ROOT],
 		});
 	});

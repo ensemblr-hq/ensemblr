@@ -209,6 +209,10 @@ as the whole set. Their argument shapes live in
 - `listRunScripts()` → `{ scripts }` (#223) — the repository's named run scripts and which is default
 - `getSessionBrief()` and `checkPlanModeTool({ tool, command? })` — control ops with **no** MCP tool.
   They are the Pi extension's own per-turn hooks; nothing reaches them over `POST /mcp`
+- `redactText({ text })` → `{ text, redacted }` and `getLinkedIssue()` → `{ issue }` — control ops
+  with **no** MCP tool, called over `POST /invoke` by the bundled Claude Code mods in
+  `resources/agent-mods/`. `redactText` replaces the caller workspace's exact secret values and live
+  control tokens with `[redacted:NAME]` inside the app, so no value ever crosses to the agent process
 
 ## Components to build
 

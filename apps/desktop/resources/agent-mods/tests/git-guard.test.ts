@@ -1,0 +1,286 @@
+import type { On } from 'claude-code';
+import { describe, expect, mock, test } from 'claude-code/testing';
+
+import { findGitInvocations } from '../hooks/git-command.ts';
+import { judgeGitInvocation } from '../hooks/git-policy.ts';
+
+const ROOT = '/work/ensemblr/grieg';
+const GIT_DIR = '/repos/ensemblr/.git/worktrees/grieg';
+const SCOPE = { gitDir: GIT_DIR, root: ROOT };
+const CONTEXT = { cwd: ROOT, home: '/home/me' };
+
+function judge(command: string): (string | null)[] {
+	return findGitInvocations(command, CONTEXT).map((invocation) =>
+		judgeGitInvocation(invocation, SCOPE),
+	);
+}
+
+function firstDenial(command: string): string | null {
+	return judge(command).find((denial) => denial !== null) ?? null;
+}
+
+describe('reading a command line', () => {
+	test('finds git behind operators, wrappers, assignments and substitutions', () => {
+		const found = findGitInvocations(
+			'cd sub && GIT_DIR=/x sudo git status; echo "$(git stash pop)" | env -i git log',
+			CONTEXT,
+		);
+		expect(found.map((invocation) => invocation.subcommand)).toEqual([
+			'status',
+			'stash',
+			'log',
+		]);
+		expect(found[0]?.targets).toEqual([
+			{ path: `${ROOT}/sub`, source: 'cd' },
+			{ path: '/x', source: 'GIT_DIR' },
+		]);
+	});
+
+	test('does not mistake a quoted commit message for a command', () => {
+		expect(
+			findGitInvocations('git commit -m "fix; git stash pop"', CONTEXT).map(
+				(invocation) => invocation.subcommand,
+			),
+		).toEqual(['commit']);
+	});
+
+	test('resolves -C chains, cd, ~ and exported GIT_WORK_TREE', () => {
+		const [chained] = findGitInvocations(
+			'git -C .. -C ./other status',
+			CONTEXT,
+		);
+		expect(chained?.targets.at(-1)?.path).toBe('/work/ensemblr/other');
+		const [afterCd] = findGitInvocations('cd /tmp && git -C repo log', CONTEXT);
+		expect(afterCd?.targets.find((t) => t.source === '-C')?.path).toBe(
+			'/tmp/repo',
+		);
+		const [home] = findGitInvocations('git -C ~/code log', CONTEXT);
+		expect(home?.targets[0]?.path).toBe('/home/me/code');
+		const [exported] = findGitInvocations(
+			'export GIT_WORK_TREE=../sibling; git add .',
+			CONTEXT,
+		);
+		expect(exported?.targets[0]).toEqual({
+			path: '/work/ensemblr/sibling',
+			source: 'GIT_WORK_TREE',
+		});
+	});
+
+	test('skips here-document bodies in both directions', () => {
+		const commitWithBody = [
+			"git commit -m \"$(cat <<'EOF'",
+			'feat: x',
+			'',
+			"git stash pop is now refused; don't worry",
+			'EOF',
+			')" && git stash pop',
+		].join('\n');
+		expect(
+			findGitInvocations(commitWithBody, CONTEXT).map((i) => i.subcommand),
+		).toEqual(['commit', 'stash']);
+		const fromStdin =
+			'git commit -F - <<-EOF\n\tgit branch -m old new\n\tEOF\n';
+		expect(
+			findGitInvocations(fromStdin, CONTEXT).map((i) => i.subcommand),
+		).toEqual(['commit']);
+	});
+
+	test('keeps reading the outer command after a substitution', () => {
+		const [found] = findGitInvocations(
+			'git -C "$(git rev-parse --show-toplevel)" stash pop',
+			CONTEXT,
+		).filter((i) => i.subcommand === 'stash');
+		expect(found?.args).toEqual(['pop']);
+		expect(found?.targets[0]?.path).toBeNull();
+	});
+
+	test('undoes a cd made inside a subshell, and does not count an unreadable cd', () => {
+		const [sub] = findGitInvocations('(cd /tmp && ls); git status', CONTEXT);
+		expect(sub?.targets).toEqual([]);
+		const [back] = findGitInvocations('cd - && git status', CONTEXT);
+		expect(back?.targets).toEqual([]);
+	});
+
+	test('sees through timeout, nice, xargs and --namespace', () => {
+		for (const command of [
+			'timeout 30 git stash pop',
+			'timeout -k 5 30s git stash pop',
+			'nice -n 5 git stash pop',
+			'echo x | xargs -n 1 git stash pop',
+			'git --namespace foo stash pop',
+		]) {
+			expect(
+				findGitInvocations(command, CONTEXT).map((i) => i.subcommand),
+			).toEqual(['stash']);
+		}
+	});
+
+	test('cannot read a path built from a variable', () => {
+		const [found] = findGitInvocations('git -C "$OTHER" commit', CONTEXT);
+		expect(found?.targets[0]?.path).toBeNull();
+	});
+});
+
+describe('branch renames', () => {
+	test('refuses -m, -M, --move and clusters, pointing at set_branch_name', () => {
+		for (const command of [
+			'git branch -m new-name',
+			'git branch -M old new',
+			'git branch --move new',
+			'git branch -fm new',
+		]) {
+			expect(firstDenial(command)).toContain(
+				'mcp__ensemblr__ensemblr_set_branch_name',
+			);
+		}
+		expect(firstDenial('git branch -m x')).toContain('userRequested');
+		expect(firstDenial('git stash apply "$SHA"')).toContain('literally');
+	});
+
+	test('lets other branch calls through', () => {
+		expect(firstDenial('git branch --merged')).toBeNull();
+		expect(firstDenial('git branch feature/x')).toBeNull();
+		expect(firstDenial('git branch -d done')).toBeNull();
+	});
+});
+
+describe('the shared stash stack', () => {
+	test('refuses bare stash, pop, clear, save, branch, and positional apply/drop', () => {
+		for (const command of [
+			'git stash',
+			'git stash pop',
+			'git stash pop stash@{0}',
+			'git stash clear',
+			'git stash save wip',
+			'git stash branch b',
+			'git stash apply',
+			'git stash apply stash@{1}',
+			'git stash drop',
+			'git stash push -u',
+			'git stash -u',
+		]) {
+			expect(firstDenial(command)).toContain('shared');
+		}
+	});
+
+	test('allows the recipe: tagged push, apply by sha, list, show, drop by ref', () => {
+		for (const command of [
+			'git stash push -u -m "ensemblr-wip-1"',
+			'git stash push --include-untracked --message=wip',
+			'git stash -um tag',
+			"git stash list --format='%H %gs'",
+			'git stash show -p',
+			'git stash apply 3f9c2ab1',
+			'git stash drop stash@{2}',
+		]) {
+			expect(firstDenial(command)).toBeNull();
+		}
+	});
+});
+
+describe('git pointed outside the worktree', () => {
+	test('refuses writes through -C, --git-dir, --work-tree, GIT_DIR and GIT_WORK_TREE', () => {
+		for (const command of [
+			'git -C ../sibling commit -m x',
+			'git --git-dir=/repos/ensemblr/.git checkout main',
+			'git --work-tree /repos/ensemblr add .',
+			'GIT_DIR=/repos/ensemblr/.git git reset --hard',
+			'export GIT_WORK_TREE=/repos/ensemblr && git add -A',
+			'git -C "$ROOT" commit',
+			'git -C "$(pwd)/../sibling" commit -am x',
+			'GIT_DIR=$(cd ../sibling && pwd)/.git git commit -am x',
+			'cd /work/ensemblr/sibling && git commit -am x',
+			'cd ../sibling && git stash push -u -m t',
+			'pushd /work/ensemblr/sibling && git -C . commit',
+			'cat <<< "$(git -C /work/ensemblr/other push --force)"',
+			'cat <<< foo\ngit -C ../sibling push',
+			'echo $((1<<2))\ngit -C ../sibling push',
+			"# don't do this\ngit -C ../sibling push",
+			'git \\\n  -C ../sibling push',
+			'env -C /work/ensemblr/sibling git push',
+			'env --chdir=/work/ensemblr/sibling git push',
+			'sudo -D /work/ensemblr/sibling git push',
+			"git worktree list | awk '{print $2}' | xargs -I{} git -C {} pull",
+			'ls | xargs -i git -C {} pull',
+			'ls | xargs --replace git -C {} pull',
+		]) {
+			expect(firstDenial(command)).toContain('outside this session');
+		}
+	});
+
+	test('lets reads look anywhere and lets writes stay home', () => {
+		for (const command of [
+			'git -C ../sibling log --oneline',
+			'git -C /repos/ensemblr status',
+			'git -C ../sibling diff main',
+			'git -C ../sibling branch -a',
+			'git -C ../sibling config --get user.name',
+			`git -C ${ROOT}/apps commit -m x`,
+			`GIT_DIR=${GIT_DIR} git status`,
+			`git --git-dir=${GIT_DIR} commit -m x`,
+			'git commit -m "touch ../sibling"',
+			'cd apps/desktop && git add .',
+			'(cd /tmp && ls); git commit -am x',
+			'git -C ../sibling stash list',
+			'git -C ../sibling remote get-url origin',
+			'git -C ../sibling reflog',
+			'cd "$(git rev-parse --show-toplevel)" && git commit -m x',
+			'cd - && git commit -am x',
+			'cd /tmp && git clone https://example.com/y.git',
+			'git -C /tmp/scratch init',
+			'echo $((1 << 2)) && git add .',
+		]) {
+			expect(firstDenial(command)).toBeNull();
+		}
+	});
+
+	test('treats a diff written to a file as a write', () => {
+		expect(firstDenial('git -C ../sibling diff --output=x.patch')).toContain(
+			'outside this session',
+		);
+	});
+});
+
+function answerEngine(on: On): void {
+	mock.env(on, { HOME: '/home/me' });
+	on('session.cwd', () => ({ value: ROOT }));
+	on('process.run', () => ({
+		value: {
+			exitCode: 0,
+			isStderrTruncated: false,
+			isStdoutTruncated: false,
+			stderr: '',
+			stdout: `${ROOT}\n${GIT_DIR}\n`,
+		},
+	}));
+	on('fs.stat', (_$, e) => ({
+		value: {
+			isLink: false,
+			kind: 'dir' as const,
+			mtimeMs: 0,
+			realPath: e.path,
+			size: 0,
+		},
+	}));
+	on('tool.call', { tool: 'Bash' }, () => ({
+		result: { interrupted: false, stderr: '', stdout: 'ran' },
+	}));
+}
+
+function refusalOf(result: {
+	deny?: string;
+	isError?: true;
+	text?: string;
+}): string | undefined {
+	return result.deny ?? (result.isError ? result.text : undefined);
+}
+
+test('the Bash hook denies a forbidden move and runs the rest', async ($, on) => {
+	answerEngine(on);
+	const denied = await $.tool.call({ command: 'git stash pop', tool: 'Bash' });
+	expect(refusalOf(denied)).toContain('stash stack is shared');
+	for (const command of ['git status', 'ls -la', 'git -C ../x log']) {
+		const ran = await $.tool.call({ command, tool: 'Bash' });
+		expect(refusalOf(ran)).toBeUndefined();
+	}
+});

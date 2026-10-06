@@ -60,6 +60,7 @@ import type {
 	ReadTerminalOutputArgs,
 	ReadTerminalOutputResult,
 	RecallMemoryArgs,
+	RedactTextArgs,
 	ReportToolInventoryArgs,
 	ResolveDiffCommentsArgs,
 	RunQueuedArgs,
@@ -139,6 +140,7 @@ import {
 } from './dispatch-deadline.ts';
 import type { Guardrails } from './guardrails.ts';
 import { createJobQueueOps } from './job-queue-ops.ts';
+import { createModOps } from './mod-ops.ts';
 import type { OriginRegistry } from './origin-registry.ts';
 import {
 	type AgentControlOrigin,
@@ -961,6 +963,7 @@ export function createAgentControlService({
 	dispatchTimeoutMs = DISPATCH_TIMEOUT_MS,
 }: AgentControlServiceOptions): AgentControlService {
 	const jobQueue = createJobQueueOps({ guardrails, port: ports.jobQueue });
+	const modOps = createModOps({ originRegistry, ports });
 
 	/** Latest pending signal per child session id, scoped to its immediate parent. */
 	const signalsByChild = new Map<
@@ -3919,6 +3922,9 @@ export function createAgentControlService({
 			handleCheckPlanModeTool(origin, args as CheckPlanModeToolArgs),
 		reportToolInventory: ({ args, origin }) =>
 			handleReportToolInventory(origin, args as ReportToolInventoryArgs),
+		redactText: ({ args, origin }) =>
+			modOps.redactText(origin, args as RedactTextArgs),
+		getLinkedIssue: ({ origin }) => modOps.getLinkedIssue(origin),
 		closeTab: ({ args, origin }) =>
 			handleCloseTab(origin, args as CloseTabArgs),
 		exitPlanMode: ({ args, origin }) =>

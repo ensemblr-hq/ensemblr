@@ -426,6 +426,7 @@ const config: ForgeConfig = {
 			'resources/pi-extensions',
 			'resources/agent-skills',
 			'resources/agent-skills-architecture',
+			'resources/agent-mods',
 			LINUX_ICONS_DIR,
 		],
 		// Packager resolves the platform extension (`icon.icns` on macOS).

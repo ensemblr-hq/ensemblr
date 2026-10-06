@@ -126,6 +126,7 @@ export const CANONICAL_ARG_KEYS = {
 	targets: 'Conversations an op acts on.',
 	theme: 'App theme: system, light, or dark.',
 	teamId: 'Identifier of a tracker team.',
+	text: 'Free text an op transforms and hands back, such as output to redact.',
 	terminalId: 'Identifier of a terminal.',
 	notificationSound: 'Whether desktop notification sounds are enabled.',
 	renameWorkspaceOnBranch: 'Whether a workspace follows branch renames.',

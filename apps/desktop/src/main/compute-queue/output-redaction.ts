@@ -1,4 +1,9 @@
-import { createTextRedactor, REDACTED } from '../../shared/redaction.ts';
+import {
+	createTextRedactor,
+	lineLiteral,
+	MINIMUM_VALUE_LENGTH,
+	REDACTED,
+} from '../../shared/redaction.ts';
 
 /** Opening armor line of a PEM private key. */
 const PRIVATE_KEY_BEGIN = /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/g;
@@ -6,24 +11,8 @@ const PRIVATE_KEY_BEGIN = /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/g;
 /** Closing armor line of a PEM private key. */
 const PRIVATE_KEY_END = /-----END (?:[A-Z]+ )?PRIVATE KEY-----/;
 
-/** Any PEM armor line, which is public boilerplate rather than secret material. */
-const PEM_ARMOR_LINE = /^-----(?:BEGIN|END) [A-Z ]+-----$/;
-
 /** Cheap substring every opening armor line contains. */
 const PRIVATE_KEY_BEGIN_PREFIX = '-----BEGIN ';
-
-/** Shortest literal the shared redactor replaces; mirrors its own floor. */
-const MINIMUM_LITERAL_LENGTH = 4;
-
-/**
- * Shortest line of a multi-line secret worth redacting on its own. Shorter
- * lines — braces, `"type": "service_account",` — are structure that would
- * blank unrelated output wherever it recurs.
- */
-const MINIMUM_LINE_LITERAL_LENGTH = 16;
-
-/** A `"key": value` member line of a JSON document, capturing the value. */
-const JSON_MEMBER_LINE = /^"[^"]*"\s*:\s*(.*?)\s*,?$/;
 
 /**
  * Characters a partial line may be cut just after: whitespace only. A `,` or
@@ -55,26 +44,6 @@ export interface PartialLineCut {
 }
 
 /**
- * The part of one line of a multi-line secret worth redacting on its own: a
- * JSON member's value rather than the whole member, and nothing for an armor
- * line, a URL, or anything too short to be distinctive.
- * @param line - One line of the secret.
- * @returns The literal to add, or null.
- */
-function lineLiteral(line: string): string | null {
-	const trimmed = line.trim();
-	if (PEM_ARMOR_LINE.test(trimmed)) {
-		return null;
-	}
-	const member = JSON_MEMBER_LINE.exec(trimmed)?.[1];
-	const candidate = member?.replace(/^"(.*)"$/, '$1') ?? trimmed;
-	return candidate.length >= MINIMUM_LINE_LITERAL_LENGTH &&
-		!/^[a-z][a-z0-9+.-]*:\/\//i.test(candidate)
-		? candidate
-		: null;
-}
-
-/**
  * Adds the distinctive lines of every multi-line secret as literals of their
  * own, so a value whose lines arrive in different pipe chunks is still
  * redacted line by line.
@@ -95,7 +64,7 @@ export function expandRedactValues(values: readonly string[]): string[] {
 		}
 	}
 	return Array.from(expanded).filter(
-		(value) => value.length >= MINIMUM_LITERAL_LENGTH,
+		(value) => value.length >= MINIMUM_VALUE_LENGTH,
 	);
 }
 

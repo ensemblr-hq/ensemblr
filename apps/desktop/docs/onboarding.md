@@ -139,7 +139,7 @@ Read these in order:
    `tailwind.config.js`), and
    [`.claude/rules/patterns.md`](../../../.claude/rules/patterns.md) for the
    structural rules a change has to respect.
-5. [`adr/`](./adr) — 84 Architecture Decision Records, numbered `0001`–`0084`
+5. [`adr/`](./adr) — 85 Architecture Decision Records, numbered `0001`–`0085`
 (`0007` was withdrawn before acceptance, and `0082` was assigned twice). When something looks odd,
    the ADR usually explains it. Start with
    [0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md) if
