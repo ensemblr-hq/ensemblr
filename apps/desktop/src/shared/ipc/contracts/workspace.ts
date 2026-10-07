@@ -270,22 +270,30 @@ export interface SetWorkspaceBaseBranchResult {
 
 /**
  * Continues a workspace past its merged pull request by branching onto a
- * `-v<n>` successor and checking it out. The successor forks from the base
- * branch when the workspace's committed tree already matches it, so the review
- * panel opens empty rather than re-listing squash-merged work; when the branch
- * still holds commits the base has not taken, the fork falls back to the current
- * HEAD and the result carries a `base-branch-unsynced` warning. The merged
- * branch stays where it is, so the old PR keeps its history while the workspace
- * stops resolving to it — `gh pr view` matches by head-ref name, and the fresh
- * branch has none until a new PR is opened. Uncommitted work carries over
- * untouched.
+ * `-v<n>` successor and checking it out. The base is fetched first, and the
+ * successor forks from it once the work the branch committed is already on it,
+ * so the review panel opens empty rather than re-listing squash-merged work.
+ * Commits made after the merged pull request's head are replayed on top; a
+ * replay that conflicts is aborted and reported as `follow-up-replay-failed`.
+ * When the branch holds commits the base has not taken and no merged head
+ * explains them, the fork falls back to the current HEAD with a
+ * `base-branch-unsynced` warning, and a fetch that fails adds
+ * `base-refresh-failed`. Uncommitted edits to a file the switch would rewrite
+ * fail the request with `local-changes-block-sync`; other uncommitted work
+ * carries over untouched. The merged branch stays where it is, so the old PR
+ * keeps its history while the workspace stops resolving to it — `gh pr view`
+ * matches by head-ref name, and the fresh branch has none until a new PR is
+ * opened.
  */
 export type ContinueWorkspaceBranchDiagnosticCode =
 	| 'base-branch-unsynced'
+	| 'base-refresh-failed'
 	| 'branch-checkout-failed'
 	| 'branch-rollback-failed'
 	| 'branch-unresolved'
 	| 'database-unavailable'
+	| 'follow-up-replay-failed'
+	| 'local-changes-block-sync'
 	| 'workspace-not-found'
 	| 'workspace-update-failed';
 
@@ -299,6 +307,12 @@ export type ContinueWorkspaceBranchDiagnosticSeverity =
 export interface ContinueWorkspaceBranchDiagnostic {
 	code: ContinueWorkspaceBranchDiagnosticCode;
 	message: string;
+	/**
+	 * Worktree-relative files behind a `local-changes-block-sync` refusal, as
+	 * data so the renderer can name them in the user's language rather than
+	 * show `message`'s English.
+	 */
+	paths?: string[];
 	severity: ContinueWorkspaceBranchDiagnosticSeverity;
 }
 

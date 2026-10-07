@@ -43,7 +43,11 @@ vi.mock('@/renderer/api/ensemblr-queries', () => ({
 }));
 
 vi.mock('sonner', () => ({
-	toast: Object.assign(vi.fn(), { success: vi.fn(), warning: vi.fn() }),
+	toast: Object.assign(vi.fn(), {
+		error: vi.fn(),
+		success: vi.fn(),
+		warning: vi.fn(),
+	}),
 }));
 
 vi.mock('@/renderer/hooks/workbench-shell/use-remove-workspace-action', () => ({
@@ -301,6 +305,38 @@ test('leaves the continue busy flag off a workspace that is not the one continui
 			expect.objectContaining({ workspaceId: 'san-antonio' }),
 		);
 	});
+});
+
+test('names the uncommitted files that blocked a continue', async () => {
+	continueWorkspaceBranch.mockResolvedValue({
+		branchName: null,
+		diagnostics: [
+			{
+				code: 'local-changes-block-sync',
+				message:
+					'Uncommitted changes to "README.md" would be overwritten by newer commits on "main".',
+				paths: ['README.md'],
+				severity: 'error',
+			},
+		],
+		previousBranchName: null,
+		status: 'failure',
+		workspaceId: 'san-antonio',
+	});
+	const { result } = renderReviewMutations(false);
+
+	act(() => {
+		result.current.continueMergedWorkspace();
+	});
+
+	await waitFor(() => {
+		expect(toast.error).toHaveBeenCalledTimes(1);
+	});
+	const [, options] = vi.mocked(toast.error).mock.calls[0] ?? [];
+	expect(options?.description).toMatch(/^Uncommitted changes block the move/);
+	expect(options?.description).toMatch(/Files: README\.md$/);
+	expect(options?.description).not.toContain('would be overwritten');
+	expect(refreshPullRequestSnapshot).not.toHaveBeenCalled();
 });
 
 test('keeps the continue busy flag on across a shell unmount and remount', async () => {

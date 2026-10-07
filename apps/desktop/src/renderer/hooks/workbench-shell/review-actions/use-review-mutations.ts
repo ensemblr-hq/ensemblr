@@ -20,7 +20,7 @@ import {
 	refreshPullRequestSnapshotAfterPush,
 } from '@/renderer/api/ensemblr-queries';
 import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
-import { failureText } from '@/renderer/lib/failure-text';
+import { failureDetail, failureText } from '@/renderer/lib/failure-text';
 import { i18n } from '@/renderer/lib/i18n';
 import {
 	archivedWorkspaceTitle,
@@ -124,9 +124,47 @@ function useWorkspaceRunIsPending(
 	return targetedWorkspaceIds.includes(workspaceId);
 }
 
+/** How many blocking files the failure toast names before counting the rest. */
+const MAX_LISTED_BLOCKING_PATHS = 5;
+
+/**
+ * Describes why a continue failed: the coded headline in the active language,
+ * followed by the files that blocked the switch when main sent them, or else
+ * by main's own words when they carry specifics the headline cannot.
+ * @param diagnostics - Diagnostics the service attached to the failure.
+ * @returns The toast description, or undefined when there is none.
+ */
+function continueFailureDescription(
+	diagnostics: ContinueWorkspaceBranchResult['diagnostics'],
+): string | undefined {
+	const [cause] = diagnostics;
+	if (!cause) {
+		return undefined;
+	}
+	const headline = failureText(i18n.t, cause) ?? cause.message;
+	const detail = cause.paths?.length
+		? blockingPathsLine(cause.paths)
+		: failureDetail(i18n.t, cause);
+	return detail ? `${headline} ${detail}` : headline;
+}
+
+/**
+ * Names the first few blocking files in the active language, with a count of
+ * any left over.
+ * @param paths - Worktree-relative files that blocked the continue.
+ * @returns The translated files line.
+ */
+function blockingPathsLine(paths: readonly string[]): string {
+	const listed = paths.slice(0, MAX_LISTED_BLOCKING_PATHS).join(', ');
+	const hidden = paths.length - MAX_LISTED_BLOCKING_PATHS;
+	return i18n.t('errors:continue-branch.blocked-files', 'Files: {{files}}', {
+		files: hidden > 0 ? `${listed}, +${hidden}` : listed,
+	});
+}
+
 /**
  * Announces a completed continue, downgrading to a warning toast when the
- * successor branch still carries commits the base has not taken.
+ * successor branch did not land on the fresh base or could not refresh it.
  * @param branchName - The branch now checked out.
  * @param diagnostics - Warnings the service attached to the success.
  */
@@ -314,7 +352,7 @@ export function useReviewMutations({
 						'errors:continue-branch.failed.title',
 						'Could not continue past the merged pull request.',
 					),
-					{ description: result.diagnostics[0]?.message },
+					{ description: continueFailureDescription(result.diagnostics) },
 				);
 				return;
 			}
