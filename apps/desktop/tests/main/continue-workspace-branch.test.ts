@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import {
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	realpathSync,
 	rmSync,
 	writeFileSync,
@@ -178,6 +179,59 @@ function commitFile(cwd: string, name: string, contents: string): void {
 function squashMergeIntoMain(repositoryPath: string, branch: string): void {
 	runGit(repositoryPath, ['merge', '--squash', branch]);
 	runGit(repositoryPath, ['commit', '-m', `${branch} (#1)`]);
+}
+
+/**
+ * Gives the harness repository a bare `origin` tracking `main`, plus a second
+ * clone standing in for GitHub and the teammates who push to it.
+ */
+function attachOriginWithCollaborator(harness: Harness): string {
+	const remotePath = path.join(harness.rootPath, 'origin.git');
+	const collaboratorPath = path.join(harness.rootPath, 'collaborator');
+	runGit(harness.rootPath, ['init', '--bare', remotePath]);
+	runGit(remotePath, ['symbolic-ref', 'HEAD', 'refs/heads/main']);
+	runGit(harness.repositoryPath, ['remote', 'add', 'origin', remotePath]);
+	runGit(harness.repositoryPath, ['push', '-u', 'origin', 'main']);
+	runGit(harness.rootPath, ['clone', remotePath, collaboratorPath]);
+	runGit(collaboratorPath, ['config', 'user.email', 'test@ensemblr.dev']);
+	runGit(collaboratorPath, ['config', 'user.name', 'Ensemblr Test']);
+	return collaboratorPath;
+}
+
+/** Caches a merged pull request whose head was `headRefOid`, as the PR sweep would. */
+function recordMergedPullRequest(
+	harness: Harness,
+	workspaceId: string,
+	headRefOid: string,
+): void {
+	const database = harness.databaseService.getConnection()?.database;
+	assert.ok(database);
+	writeCachedPullRequestSnapshot({
+		database,
+		snapshot: {
+			branchSync: null,
+			pullRequest: {
+				additions: null,
+				baseRefName: 'main',
+				body: '',
+				checks: [],
+				comments: [],
+				deletions: null,
+				deployments: [],
+				headRefName: 'bach',
+				headRefOid,
+				isDraft: false,
+				mergeable: 'unknown',
+				number: 1,
+				state: 'merged',
+				title: 'Bach',
+				updatedAt: fixedNow().toISOString(),
+				url: 'https://github.com/ensemblr/demo/pull/1',
+			},
+			syncedAt: fixedNow().toISOString(),
+		},
+		workspaceId,
+	});
 }
 
 async function seedWorkspace(harness: Harness, name: string) {
@@ -405,6 +459,267 @@ test('continue keeps commits the base has not taken and warns about them', async
 	assert.match(
 		runGit(workspace.path, ['diff', '--name-only', 'main...bach-v1']),
 		/followup\.txt/,
+	);
+});
+
+test('continue forks from the base after other work lands on it', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	commitFile(workspace.path, 'feature.txt', 'shipped\n');
+	recordMergedPullRequest(
+		harness,
+		workspace.id,
+		runGit(workspace.path, ['rev-parse', 'HEAD']),
+	);
+	squashMergeIntoMain(harness.repositoryPath, 'bach');
+	commitFile(harness.repositoryPath, 'other.txt', 'another pull request\n');
+
+	const result = await createService(harness).continueBranch({
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.deepEqual(result.diagnostics, []);
+	assert.equal(
+		runGit(workspace.path, ['rev-parse', 'bach-v1']),
+		runGit(harness.repositoryPath, ['rev-parse', 'main']),
+	);
+});
+
+test('continue fetches the base so the merge on the remote is picked up', async (t) => {
+	const harness = createHarness(t);
+	const collaboratorPath = attachOriginWithCollaborator(harness);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	commitFile(workspace.path, 'feature.txt', 'shipped\n');
+	runGit(workspace.path, ['push', 'origin', 'bach']);
+	recordMergedPullRequest(
+		harness,
+		workspace.id,
+		runGit(workspace.path, ['rev-parse', 'HEAD']),
+	);
+	runGit(collaboratorPath, ['fetch', 'origin', 'bach']);
+	runGit(collaboratorPath, ['merge', '--squash', 'FETCH_HEAD']);
+	runGit(collaboratorPath, ['commit', '-m', 'bach (#1)']);
+	commitFile(collaboratorPath, 'other.txt', 'another pull request\n');
+	runGit(collaboratorPath, ['push', 'origin', 'main']);
+	const remoteTip = runGit(collaboratorPath, ['rev-parse', 'HEAD']);
+
+	const result = await createService(harness).continueBranch({
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.deepEqual(result.diagnostics, []);
+	assert.equal(runGit(workspace.path, ['rev-parse', 'bach-v1']), remoteTip);
+	assert.equal(
+		runGit(workspace.path, ['diff', '--name-only', 'origin/main', 'bach-v1']),
+		'',
+	);
+});
+
+test('continue replays commits made after the merge onto the base', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	commitFile(workspace.path, 'feature.txt', 'shipped\n');
+	const mergedHead = runGit(workspace.path, ['rev-parse', 'HEAD']);
+	squashMergeIntoMain(harness.repositoryPath, 'bach');
+	commitFile(harness.repositoryPath, 'other.txt', 'another pull request\n');
+	commitFile(workspace.path, 'followup.txt', 'not merged yet\n');
+	recordMergedPullRequest(harness, workspace.id, mergedHead);
+
+	const result = await createService(harness).continueBranch({
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.deepEqual(result.diagnostics, []);
+	assert.equal(
+		runGit(workspace.path, ['rev-parse', 'bach-v1~1']),
+		runGit(harness.repositoryPath, ['rev-parse', 'main']),
+	);
+	assert.equal(
+		runGit(workspace.path, ['diff', '--name-only', 'main', 'bach-v1']),
+		'followup.txt',
+	);
+});
+
+test('continue without a cached merge keeps the previous base once the base moved on', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	commitFile(workspace.path, 'feature.txt', 'shipped\n');
+	squashMergeIntoMain(harness.repositoryPath, 'bach');
+	commitFile(harness.repositoryPath, 'other.txt', 'another pull request\n');
+
+	const result = await createService(harness).continueBranch({
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.diagnostics[0]?.code, 'base-branch-unsynced');
+	assert.equal(
+		runGit(workspace.path, ['rev-parse', 'bach-v1']),
+		runGit(workspace.path, ['rev-parse', 'bach']),
+	);
+});
+
+test('continue replays a follow-up that undoes part of the merged work', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	commitFile(workspace.path, 'README.md', '# demo shipped\n');
+	const mergedHead = runGit(workspace.path, ['rev-parse', 'HEAD']);
+	squashMergeIntoMain(harness.repositoryPath, 'bach');
+	commitFile(harness.repositoryPath, 'other.txt', 'another pull request\n');
+	commitFile(workspace.path, 'README.md', '# demo\n');
+	recordMergedPullRequest(harness, workspace.id, mergedHead);
+
+	const result = await createService(harness).continueBranch({
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.deepEqual(result.diagnostics, []);
+	assert.equal(
+		runGit(workspace.path, ['rev-parse', 'bach-v1~1']),
+		runGit(harness.repositoryPath, ['rev-parse', 'main']),
+	);
+	assert.equal(
+		runGit(workspace.path, ['show', 'bach-v1:README.md']),
+		'# demo',
+		'the revert made after the merge must survive the move',
+	);
+});
+
+test('continue aborts a conflicting replay and keeps the previous base', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	commitFile(workspace.path, 'feature.txt', 'shipped\n');
+	const mergedHead = runGit(workspace.path, ['rev-parse', 'HEAD']);
+	squashMergeIntoMain(harness.repositoryPath, 'bach');
+	commitFile(harness.repositoryPath, 'README.md', '# demo upstream\n');
+	commitFile(workspace.path, 'README.md', '# demo follow-up\n');
+	writeFileSync(path.join(workspace.path, 'notes.txt'), 'scratch\n');
+	recordMergedPullRequest(harness, workspace.id, mergedHead);
+
+	const result = await createService(harness).continueBranch({
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.diagnostics[0]?.code, 'follow-up-replay-failed');
+	assert.equal(result.diagnostics[0]?.severity, 'warning');
+	assert.equal(currentBranch(workspace.path), 'bach-v1');
+	assert.equal(
+		runGit(workspace.path, ['rev-parse', 'bach-v1']),
+		runGit(workspace.path, ['rev-parse', 'bach']),
+	);
+	assert.equal(
+		runGit(workspace.path, ['status', '--porcelain']),
+		'?? notes.txt',
+		'the aborted replay must leave no conflict behind',
+	);
+});
+
+test('continue refuses when uncommitted edits collide with the newer base', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	commitFile(workspace.path, 'feature.txt', 'shipped\n');
+	recordMergedPullRequest(
+		harness,
+		workspace.id,
+		runGit(workspace.path, ['rev-parse', 'HEAD']),
+	);
+	squashMergeIntoMain(harness.repositoryPath, 'bach');
+	commitFile(harness.repositoryPath, 'README.md', '# demo upstream\n');
+	writeFileSync(path.join(workspace.path, 'README.md'), '# demo local\n');
+
+	const result = await createService(harness).continueBranch({
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'failure');
+	assert.equal(result.diagnostics[0]?.code, 'local-changes-block-sync');
+	assert.match(result.diagnostics[0]?.message ?? '', /"README\.md"/);
+	assert.equal(currentBranch(workspace.path), 'bach');
+	assert.equal(branchExists(harness.repositoryPath, 'bach-v1'), false);
+	assert.equal(runGit(workspace.path, ['diff', '--name-only']), 'README.md');
+	assert.equal(workspaceRow(harness, workspace.id).branchName, 'bach');
+});
+
+test('continue refuses when an ignored local file sits where the base adds one', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	commitFile(harness.repositoryPath, 'local.cfg', 'tracked\n');
+	const commonDir = runGit(workspace.path, [
+		'rev-parse',
+		'--path-format=absolute',
+		'--git-common-dir',
+	]);
+	writeFileSync(path.join(commonDir, 'info', 'exclude'), 'local.cfg\n');
+	writeFileSync(path.join(workspace.path, 'local.cfg'), 'SECRET\n');
+
+	const result = await createService(harness).continueBranch({
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'failure');
+	assert.equal(result.diagnostics[0]?.code, 'local-changes-block-sync');
+	assert.match(result.diagnostics[0]?.message ?? '', /"local\.cfg"/);
+	assert.equal(currentBranch(workspace.path), 'bach');
+	assert.equal(
+		readFileSync(path.join(workspace.path, 'local.cfg'), 'utf8'),
+		'SECRET\n',
+	);
+});
+
+test('continue refuses to replay follow-up commits over staged changes', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	commitFile(workspace.path, 'feature.txt', 'shipped\n');
+	const mergedHead = runGit(workspace.path, ['rev-parse', 'HEAD']);
+	squashMergeIntoMain(harness.repositoryPath, 'bach');
+	commitFile(workspace.path, 'followup.txt', 'not merged yet\n');
+	writeFileSync(path.join(workspace.path, 'staged.txt'), 'half done\n');
+	runGit(workspace.path, ['add', 'staged.txt']);
+	recordMergedPullRequest(harness, workspace.id, mergedHead);
+
+	const result = await createService(harness).continueBranch({
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'failure');
+	assert.equal(result.diagnostics[0]?.code, 'local-changes-block-sync');
+	assert.match(result.diagnostics[0]?.message ?? '', /Staged.*"staged\.txt"/);
+	assert.equal(currentBranch(workspace.path), 'bach');
+	assert.equal(branchExists(harness.repositoryPath, 'bach-v1'), false);
+	assert.equal(
+		runGit(workspace.path, ['status', '--porcelain']),
+		'A  staged.txt',
+	);
+});
+
+test('continue warns and uses the cached base when the fetch fails', async (t) => {
+	const harness = createHarness(t);
+	attachOriginWithCollaborator(harness);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	runGit(harness.repositoryPath, [
+		'remote',
+		'set-url',
+		'origin',
+		path.join(harness.rootPath, 'missing.git'),
+	]);
+
+	const result = await createService(harness).continueBranch({
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.deepEqual(
+		result.diagnostics.map((diagnostic) => diagnostic.code),
+		['base-refresh-failed'],
+	);
+	assert.equal(
+		runGit(workspace.path, ['rev-parse', 'bach-v1']),
+		runGit(harness.repositoryPath, ['rev-parse', 'main']),
 	);
 });
 

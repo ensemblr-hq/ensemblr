@@ -20,7 +20,7 @@ import {
 	refreshPullRequestSnapshotAfterPush,
 } from '@/renderer/api/ensemblr-queries';
 import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
-import { failureText } from '@/renderer/lib/failure-text';
+import { failureDetail, failureText } from '@/renderer/lib/failure-text';
 import { i18n } from '@/renderer/lib/i18n';
 import {
 	archivedWorkspaceTitle,
@@ -125,8 +125,27 @@ function useWorkspaceRunIsPending(
 }
 
 /**
+ * Describes why a continue failed: the coded headline in the active language,
+ * followed by main's own words when they carry specifics the headline cannot,
+ * such as the uncommitted files that blocked the switch.
+ * @param diagnostics - Diagnostics the service attached to the failure.
+ * @returns The toast description, or undefined when there is none.
+ */
+function continueFailureDescription(
+	diagnostics: ContinueWorkspaceBranchResult['diagnostics'],
+): string | undefined {
+	const [cause] = diagnostics;
+	if (!cause) {
+		return undefined;
+	}
+	const headline = failureText(i18n.t, cause) ?? cause.message;
+	const detail = failureDetail(i18n.t, cause);
+	return detail ? `${headline} ${detail}` : headline;
+}
+
+/**
  * Announces a completed continue, downgrading to a warning toast when the
- * successor branch still carries commits the base has not taken.
+ * successor branch did not land on the fresh base or could not refresh it.
  * @param branchName - The branch now checked out.
  * @param diagnostics - Warnings the service attached to the success.
  */
@@ -314,7 +333,7 @@ export function useReviewMutations({
 						'errors:continue-branch.failed.title',
 						'Could not continue past the merged pull request.',
 					),
-					{ description: result.diagnostics[0]?.message },
+					{ description: continueFailureDescription(result.diagnostics) },
 				);
 				return;
 			}

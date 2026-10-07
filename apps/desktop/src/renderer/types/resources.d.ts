@@ -676,7 +676,7 @@ export default interface Resources {
 			'base-branch-invalid': 'That base branch name is not valid.';
 			'base-branch-missing': 'The base branch was not preserved, so the worktree cannot be recreated.';
 			'base-branch-unresolvable': 'That base branch could not be resolved in this repository, even after fetching.';
-			'base-branch-unsynced': 'The base branch is out of sync with its remote.';
+			'base-branch-unsynced': 'The new branch kept commits the base branch has not taken, so its diff includes already-merged work.';
 			'base-refresh-failed': 'The remote base could not be refreshed. This workspace uses cached code and may not be current.';
 			'branch-adopted': 'This workspace took over an existing branch, which may already back a pull request, so the branch cannot be renamed here.';
 			'branch-already-checked-out': 'That branch is already checked out in another worktree.';
@@ -723,6 +723,7 @@ export default interface Resources {
 			'diff-failed': 'The diff could not be produced.';
 			'dirty-state': 'The working tree has uncommitted changes.';
 			'exchange-failed': 'Linear rejected the sign-in. Try again.';
+			'follow-up-replay-failed': 'Commits made after the merge conflict with the latest base, so the new branch kept the previous base.';
 			'gh-not-authenticated': 'GitHub CLI is not signed in. Run gh auth login, then retry.';
 			'gh-not-installed': 'GitHub CLI was not found in PATH. Install it, then retry.';
 			'git-failed': 'The git command failed.';
@@ -757,6 +758,7 @@ export default interface Resources {
 			'job-unknown': 'The clone job has expired or was never prepared. Start a new clone.';
 			'lifecycle-hook-failed': 'A lifecycle hook failed.';
 			'linear-unknown': 'The Linear operation failed.';
+			'local-changes-block-sync': 'Uncommitted changes block the move onto the latest base branch. Commit or discard them, then continue again.';
 			'login-canceled': 'The Linear sign-in was canceled.';
 			'login-in-progress': 'A Linear sign-in is already waiting for the browser.';
 			'managed-directory-create-failed': 'A managed directory could not be created under the root.';

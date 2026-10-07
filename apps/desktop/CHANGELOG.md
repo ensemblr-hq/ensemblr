@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **A message you send an agent mid-turn ends the wait it is blocked in.** Both runtimes hand a steer to the agent only once its current tool call returns, so an agent waiting on its sub-agents or on a queued command used to read your message only when the wait window ran out, up to five minutes later. `ensemblr_wait_for_agents`, `ensemblr_run_queued`, `ensemblr_wait_for_job`, and a `wait: true` spawn or follow-up now return as soon as you send, with `interrupted: "user-message"` and a note telling the agent to answer you before it waits again; nothing it was waiting on is stopped. A queued message, and an agent's own follow-up to a child, still wait for the turn. A message that lands while a Claude Code sub-agent is running reaches the agent when that sub-agent returns, as before. On Pi the delegation barrier steps aside until the next wait, so the reply is not stripped. The timeline row reads "paused for your message".
 
+### Fixed
+
+- **Continue on a merged workspace starts from the latest base.** Continue never fetched, and it forked from the base only when the branch's files matched it exactly, which stopped being true as soon as another pull request landed after yours. The new branch then started from the merged one, the Changes panel listed the merged work again, and the next pull request ran into conflicts. Continue now fetches the base first and forks from it once the merged pull request's work is there, squash merges included. Commits made after the pull request merged are cherry-picked onto the new branch. If one conflicts, Continue aborts the replay and keeps the old base with a warning, so the worktree is never left mid-conflict. Uncommitted changes the newer base would overwrite stop the move, and so do ignored local files sitting where the base adds a file. The toast names the files to commit or discard first. A fetch that fails falls back to the cached base with a warning.
+
 ## [0.2.4] - 2026-10-05
 
 Ensemblr 0.2.4 moves the Concierge from a floating button to a slim toggle row.

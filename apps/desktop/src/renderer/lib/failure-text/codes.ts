@@ -314,7 +314,7 @@ export const APP_FAILURE_TEXT: Record<
 	'base-branch-unsynced': (t) =>
 		t(
 			'errors:failure.base-branch-unsynced',
-			'The base branch is out of sync with its remote.',
+			'The new branch kept commits the base branch has not taken, so its diff includes already-merged work.',
 		),
 	'base-branch-diverged': (t) =>
 		t(
@@ -325,6 +325,16 @@ export const APP_FAILURE_TEXT: Record<
 		t(
 			'errors:failure.base-refresh-failed',
 			'The remote base could not be refreshed. This workspace uses cached code and may not be current.',
+		),
+	'follow-up-replay-failed': (t) =>
+		t(
+			'errors:failure.follow-up-replay-failed',
+			'Commits made after the merge conflict with the latest base, so the new branch kept the previous base.',
+		),
+	'local-changes-block-sync': (t) =>
+		t(
+			'errors:failure.local-changes-block-sync',
+			'Uncommitted changes block the move onto the latest base branch. Commit or discard them, then continue again.',
 		),
 	'branch-adopted': (t) =>
 		t(
