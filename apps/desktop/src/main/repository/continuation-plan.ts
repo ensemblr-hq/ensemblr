@@ -148,14 +148,20 @@ export async function planContinuation(
 		);
 	}
 
-	const blocked = await findBlockingLocalChanges({
+	const localChanges = await checkLocalChanges({
 		baseBranch,
 		baseCommit,
 		git: request.git,
 		replaying: replay.range !== null,
 	});
-	if (blocked) {
-		return { diagnostic: blocked, kind: 'blocked' };
+	if (localChanges.kind === 'unchecked') {
+		return keepHead(
+			`Could not list the files "${baseBranch}" adds, so the new branch forked from the previous one rather than risk overwriting ignored local files.`,
+			warnings,
+		);
+	}
+	if (localChanges.kind === 'blocked') {
+		return { diagnostic: localChanges.diagnostic, kind: 'blocked' };
 	}
 
 	return { baseCommit, kind: 'fresh-base', replay: replay.range, warnings };
@@ -330,16 +336,24 @@ function isAncestor(
 	return git.succeeds(['merge-base', '--is-ancestor', ancestor, descendant]);
 }
 
+/** What the local-change check concluded about moving onto the base. */
+type LocalChangeCheck =
+	| { diagnostic: ContinueWorkspaceBranchDiagnostic; kind: 'blocked' }
+	| { kind: 'clear' }
+	| { kind: 'unchecked' };
+
 /**
- * Finds uncommitted work the move onto the base cannot carry. A local file the
- * switch would rewrite blocks it; so does anything staged when follow-up
- * commits need replaying, because `git cherry-pick` refuses to run while the
- * index differs from HEAD. The messages name files only — the renderer's
+ * Checks for uncommitted work the move onto the base cannot carry. A local
+ * file the switch would rewrite blocks it; so does anything staged when
+ * follow-up commits need replaying, because `git cherry-pick` refuses to run
+ * while the index differs from HEAD. When the base's added files cannot be
+ * listed the check is `unchecked`, since git's own checkout would not protect
+ * an ignored file there. The messages name files only — the renderer's
  * headline carries what to do about them.
  * @param options - Base, whether a replay follows, and git.
- * @returns The refusal diagnostic, or `null` when the move is safe.
+ * @returns Whether the move is clear, blocked, or could not be checked.
  */
-async function findBlockingLocalChanges({
+async function checkLocalChanges({
 	baseBranch,
 	baseCommit,
 	git,
@@ -349,16 +363,21 @@ async function findBlockingLocalChanges({
 	baseCommit: string;
 	git: WorktreeGit;
 	replaying: boolean;
-}): Promise<ContinueWorkspaceBranchDiagnostic | null> {
+}): Promise<LocalChangeCheck> {
+	const shadowed = await listShadowedLocalFiles(git, baseCommit);
+	if (!shadowed) {
+		return { kind: 'unchecked' };
+	}
 	const rewritten = [
 		...new Set([
 			...(await listRewrittenTrackedChanges(git, baseCommit)),
-			...(await listShadowedLocalFiles(git, baseCommit)),
+			...shadowed,
 		]),
 	];
 	if (rewritten.length > 0) {
 		return blockedBy(
 			`Uncommitted changes to ${describeFiles(rewritten)} would be overwritten by newer commits on "${baseBranch}".`,
+			rewritten,
 		);
 	}
 	const staged = replaying
@@ -376,8 +395,9 @@ async function findBlockingLocalChanges({
 	return staged.length > 0
 		? blockedBy(
 				`Staged changes to ${describeFiles(staged)} stop the commits made after the merge from being replayed onto "${baseBranch}".`,
+				staged,
 			)
-		: null;
+		: { kind: 'clear' };
 }
 
 /**
@@ -420,23 +440,26 @@ async function listRewrittenTrackedChanges(
  * files it considers expendable.
  * @param git - Worktree git.
  * @param baseCommit - Commit the successor will fork from.
- * @returns The shadowed paths.
+ * @returns The shadowed paths, or `null` when git could not list the base's
+ * added files in full (a failure, a timeout, or output past the cap).
  */
 async function listShadowedLocalFiles(
 	git: WorktreeGit,
 	baseCommit: string,
-): Promise<string[]> {
-	const added = nulSeparated(
-		await git.run([
-			'diff',
-			'--name-only',
-			'--no-renames',
-			'--diff-filter=A',
-			'-z',
-			'HEAD',
-			baseCommit,
-		]),
-	);
+): Promise<string[] | null> {
+	const listing = await git.run([
+		'diff',
+		'--name-only',
+		'--no-renames',
+		'--diff-filter=A',
+		'-z',
+		'HEAD',
+		baseCommit,
+	]);
+	if (listing.status !== 'success' || listing.stdoutTruncated) {
+		return null;
+	}
+	const added = nulSeparated(listing);
 	const present = await Promise.all(
 		added.map(async (file) =>
 			(await existsOnDisk(path.join(git.cwd, file))) ? file : null,
@@ -460,12 +483,25 @@ async function existsOnDisk(target: string): Promise<boolean> {
 }
 
 /**
- * Wraps a refusal message in the diagnostic that blocks the continue.
- * @param message - Which files blocked the move, and why.
- * @returns The error diagnostic.
+ * Wraps a refusal in the check result that blocks the continue, carrying the
+ * paths as data so the renderer can name them in the user's language.
+ * @param message - Support-bundle English naming the files and why.
+ * @param paths - Every blocking path.
+ * @returns The blocked check result.
  */
-function blockedBy(message: string): ContinueWorkspaceBranchDiagnostic {
-	return { code: 'local-changes-block-sync', message, severity: 'error' };
+function blockedBy(
+	message: string,
+	paths: readonly string[],
+): LocalChangeCheck {
+	return {
+		diagnostic: {
+			code: 'local-changes-block-sync',
+			message,
+			paths: [...paths],
+			severity: 'error',
+		},
+		kind: 'blocked',
+	};
 }
 
 /**

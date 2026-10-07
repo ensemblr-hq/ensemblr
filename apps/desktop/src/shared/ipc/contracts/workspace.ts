@@ -307,6 +307,12 @@ export type ContinueWorkspaceBranchDiagnosticSeverity =
 export interface ContinueWorkspaceBranchDiagnostic {
 	code: ContinueWorkspaceBranchDiagnosticCode;
 	message: string;
+	/**
+	 * Worktree-relative files behind a `local-changes-block-sync` refusal, as
+	 * data so the renderer can name them in the user's language rather than
+	 * show `message`'s English.
+	 */
+	paths?: string[];
 	severity: ContinueWorkspaceBranchDiagnosticSeverity;
 }
 

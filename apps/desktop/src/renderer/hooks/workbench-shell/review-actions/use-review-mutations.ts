@@ -124,10 +124,13 @@ function useWorkspaceRunIsPending(
 	return targetedWorkspaceIds.includes(workspaceId);
 }
 
+/** How many blocking files the failure toast names before counting the rest. */
+const MAX_LISTED_BLOCKING_PATHS = 5;
+
 /**
  * Describes why a continue failed: the coded headline in the active language,
- * followed by main's own words when they carry specifics the headline cannot,
- * such as the uncommitted files that blocked the switch.
+ * followed by the files that blocked the switch when main sent them, or else
+ * by main's own words when they carry specifics the headline cannot.
  * @param diagnostics - Diagnostics the service attached to the failure.
  * @returns The toast description, or undefined when there is none.
  */
@@ -139,8 +142,24 @@ function continueFailureDescription(
 		return undefined;
 	}
 	const headline = failureText(i18n.t, cause) ?? cause.message;
-	const detail = failureDetail(i18n.t, cause);
+	const detail = cause.paths?.length
+		? blockingPathsLine(cause.paths)
+		: failureDetail(i18n.t, cause);
 	return detail ? `${headline} ${detail}` : headline;
+}
+
+/**
+ * Names the first few blocking files in the active language, with a count of
+ * any left over.
+ * @param paths - Worktree-relative files that blocked the continue.
+ * @returns The translated files line.
+ */
+function blockingPathsLine(paths: readonly string[]): string {
+	const listed = paths.slice(0, MAX_LISTED_BLOCKING_PATHS).join(', ');
+	const hidden = paths.length - MAX_LISTED_BLOCKING_PATHS;
+	return i18n.t('errors:continue-branch.blocked-files', 'Files: {{files}}', {
+		files: hidden > 0 ? `${listed}, +${hidden}` : listed,
+	});
 }
 
 /**

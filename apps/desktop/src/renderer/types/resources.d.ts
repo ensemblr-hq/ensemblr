@@ -647,6 +647,7 @@ export default interface Resources {
 			};
 		};
 		'continue-branch': {
+			'blocked-files': 'Files: {{files}}';
 			failed: {
 				title: 'Could not continue past the merged pull request.';
 			};

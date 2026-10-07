@@ -181,6 +181,7 @@
 		}
 	},
 	"continue-branch": {
+		"blocked-files": "Файлы: {{files}}",
 		"failed": {
 			"title": "Не удалось продолжить после merge pull request."
 		},

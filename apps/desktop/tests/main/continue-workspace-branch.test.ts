@@ -639,6 +639,7 @@ test('continue refuses when uncommitted edits collide with the newer base', asyn
 	assert.equal(result.status, 'failure');
 	assert.equal(result.diagnostics[0]?.code, 'local-changes-block-sync');
 	assert.match(result.diagnostics[0]?.message ?? '', /"README\.md"/);
+	assert.deepEqual(result.diagnostics[0]?.paths, ['README.md']);
 	assert.equal(currentBranch(workspace.path), 'bach');
 	assert.equal(branchExists(harness.repositoryPath, 'bach-v1'), false);
 	assert.equal(runGit(workspace.path, ['diff', '--name-only']), 'README.md');
@@ -664,10 +665,30 @@ test('continue refuses when an ignored local file sits where the base adds one',
 	assert.equal(result.status, 'failure');
 	assert.equal(result.diagnostics[0]?.code, 'local-changes-block-sync');
 	assert.match(result.diagnostics[0]?.message ?? '', /"local\.cfg"/);
+	assert.deepEqual(result.diagnostics[0]?.paths, ['local.cfg']);
 	assert.equal(currentBranch(workspace.path), 'bach');
 	assert.equal(
 		readFileSync(path.join(workspace.path, 'local.cfg'), 'utf8'),
 		'SECRET\n',
+	);
+});
+
+test('continue keeps the previous base when it cannot list what the base adds', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	commitFile(harness.repositoryPath, 'local.cfg', 'tracked\n');
+
+	const result = await createService(harness, {
+		localCommandService: gitServiceFailing((args) =>
+			args.includes('--diff-filter=A'),
+		),
+	}).continueBranch({ workspaceId: workspace.id });
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.diagnostics[0]?.code, 'base-branch-unsynced');
+	assert.equal(
+		runGit(workspace.path, ['rev-parse', 'bach-v1']),
+		runGit(workspace.path, ['rev-parse', 'bach']),
 	);
 });
 

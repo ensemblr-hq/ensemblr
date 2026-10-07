@@ -173,6 +173,7 @@
 		}
 	},
 	"continue-branch": {
+		"blocked-files": "Αρχεία: {{files}}",
 		"failed": {
 			"title": "Δεν ήταν δυνατή η συνέχεια μετά το merge του pull request."
 		},

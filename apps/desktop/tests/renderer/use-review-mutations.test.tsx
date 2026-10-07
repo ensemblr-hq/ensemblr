@@ -315,6 +315,7 @@ test('names the uncommitted files that blocked a continue', async () => {
 				code: 'local-changes-block-sync',
 				message:
 					'Uncommitted changes to "README.md" would be overwritten by newer commits on "main".',
+				paths: ['README.md'],
 				severity: 'error',
 			},
 		],
@@ -333,7 +334,8 @@ test('names the uncommitted files that blocked a continue', async () => {
 	});
 	const [, options] = vi.mocked(toast.error).mock.calls[0] ?? [];
 	expect(options?.description).toMatch(/^Uncommitted changes block the move/);
-	expect(options?.description).toContain('"README.md"');
+	expect(options?.description).toMatch(/Files: README\.md$/);
+	expect(options?.description).not.toContain('would be overwritten');
 	expect(refreshPullRequestSnapshot).not.toHaveBeenCalled();
 });
 
