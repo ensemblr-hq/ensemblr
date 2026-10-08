@@ -43,6 +43,7 @@ function makeUserGit(overrides: Partial<GitSettings> = {}): GitSettings {
 		renameWorkspaceOnBranch: true,
 		deleteLocalBranchOnArchive: false,
 		archiveAfterMerge: false,
+		updateBaseAfterMerge: true,
 		coAuthorEnsemblr: true,
 		setUpstreamOnPush: true,
 		...overrides,
@@ -547,6 +548,43 @@ test('repository sources override user-default settings', () => {
 	);
 	assert.equal(autoRunAfterSetup.source, 'ensemblr-config');
 	assert.equal(autoRunAfterSetup.value, false);
+});
+
+test('updateBaseAfterMerge defaults on, follows the user default, and yields to the repository', () => {
+	const builtIn = resolveSettings({
+		config: createConfig(),
+		repository: { repositoryId: 'repo-1' },
+	});
+	const userOff = resolveSettings({
+		config: createConfig(),
+		repository: { repositoryId: 'repo-1' },
+		userGitDefaults: makeUserGit({ updateBaseAfterMerge: false }),
+	});
+	const repositoryOn = resolveSettings({
+		config: createConfig(),
+		repository: {
+			ensemblrConfig: { updateBaseAfterMerge: true },
+			repositoryId: 'repo-1',
+		},
+		userGitDefaults: makeUserGit({ updateBaseAfterMerge: false }),
+	});
+
+	if (!builtIn.repository || !userOff.repository || !repositoryOn.repository) {
+		assert.fail('Expected repository settings resolution');
+	}
+
+	const resolved = [builtIn, userOff, repositoryOn].map((snapshot) => {
+		const { source, value } = getSetting(
+			snapshot.repository as SettingsResolutionGroupSnapshot,
+			'updateBaseAfterMerge',
+		);
+		return { source, value };
+	});
+	assert.deepEqual(resolved, [
+		{ source: 'built-in-default', value: true },
+		{ source: 'user-default', value: false },
+		{ source: 'ensemblr-config', value: true },
+	]);
 });
 
 test('normalizes IPC settings resolution requests', () => {

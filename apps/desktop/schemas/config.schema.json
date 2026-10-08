@@ -261,6 +261,11 @@
 							"default": false,
 							"description": "Archive a workspace automatically once its pull request merges."
 						},
+						"updateBaseAfterMerge": {
+							"type": "boolean",
+							"default": true,
+							"description": "Fetch the base branch and fast-forward the local copy of it once a workspace's pull request merges. A branch with local commits of its own is never touched."
+						},
 						"setUpstreamOnPush": {
 							"type": "boolean",
 							"default": true,
@@ -550,6 +555,11 @@
 					"type": "boolean",
 					"default": false,
 					"description": "Archive a workspace automatically once its pull request merges."
+				},
+				"updateBaseAfterMerge": {
+					"type": "boolean",
+					"default": true,
+					"description": "Fetch the base branch and fast-forward the local copy of it once a workspace's pull request merges. A branch with local commits of its own is never touched."
 				},
 				"autoRunAfterSetup": {
 					"type": "boolean",

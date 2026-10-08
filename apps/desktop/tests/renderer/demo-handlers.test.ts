@@ -218,6 +218,7 @@ describe('demo handlers', () => {
 					{ key: 'scripts.run' },
 					{ key: 'filesToCopy' },
 					{ key: 'archiveAfterMerge' },
+					{ key: 'updateBaseAfterMerge', value: true },
 					{ key: 'setUpstreamOnPush' },
 					{ key: 'scripts.runScripts' },
 				],

@@ -106,6 +106,32 @@ function RepoGitSettings() {
 				onReset={() => save({ archiveAfterMerge: null })}
 			/>
 
+			<SettingRow
+				control={
+					<Switch
+						checked={resolved('updateBaseAfterMerge')?.value !== false}
+						onCheckedChange={(checked) =>
+							save({ updateBaseAfterMerge: checked })
+						}
+					/>
+				}
+				description={t(
+					'settings:repo.update-base-on-merge.description',
+					'After the PR merges, fetch the base branch and fast-forward the local copy of it, like `git pull --ff-only`. A branch with local commits of its own is never touched. Overrides your user-scope default for this repo.',
+				)}
+				label={
+					<span className='flex items-center gap-2'>
+						{t(
+							'settings:repo.update-base-on-merge.label',
+							'Update base branch after merge',
+						)}
+						<SourceBadge source={resolved('updateBaseAfterMerge')?.source} />
+					</span>
+				}
+				modified={isPersonalOverride(resolved('updateBaseAfterMerge'))}
+				onReset={() => save({ updateBaseAfterMerge: null })}
+			/>
+
 			<UpstreamIssuesSetting
 				repoId={repoId}
 				resolved={resolved('showUpstreamIssues')}

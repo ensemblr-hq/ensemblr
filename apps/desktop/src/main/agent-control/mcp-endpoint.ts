@@ -391,6 +391,13 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		},
 	},
 	{
+		name: 'ensemblr_merge_pull_request',
+		op: 'mergePullRequest',
+		description:
+			"Merge this workspace's pull request the way the app's Merge button does (squash unless `method` says merge or rebase), then report what the close-out did: `status: 'merged'` with the board card moved to Done, the linked issue closed (`issue`), and the local base branch fast-forwarded (`baseSync`); `status: 'queued'` when a merge queue took it and the close-out follows later; or `status: 'failed'` with a `failure` code and message, which is a result to relay rather than an error. Call it only when the user asked you to merge. It is refused while the user is AFK and while planning. It never archives the workspace — that is left for the user.",
+		shape: { method: z.enum(['squash', 'merge', 'rebase']).optional() },
+	},
+	{
 		name: 'ensemblr_get_workspace_status',
 		op: 'getWorkspaceStatus',
 		description:

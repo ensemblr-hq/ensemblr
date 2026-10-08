@@ -18,6 +18,7 @@ import {
 	deleteBranchOnArchiveAtom,
 	renameWorkspaceOnBranchAtom,
 	setUpstreamOnPushAtom,
+	updateBaseAfterMergeAtom,
 } from '@/renderer/state/preferences';
 import { ENSEMBLR_CO_AUTHOR_TRAILER } from '@/shared/co-author';
 import { DEFAULT_APP_SETTINGS } from '@/shared/config';
@@ -40,6 +41,7 @@ function GitSettings() {
 	);
 	const [deleteBranch, setDeleteBranch] = useAtom(deleteBranchOnArchiveAtom);
 	const [archiveOnMerge, setArchiveOnMerge] = useAtom(archiveOnMergeAtom);
+	const [updateBase, setUpdateBase] = useAtom(updateBaseAfterMergeAtom);
 	const [setUpstream, setSetUpstream] = useAtom(setUpstreamOnPushAtom);
 	const [coAuthor, setCoAuthor] = useAtom(coAuthorEnsemblrAtom);
 
@@ -157,6 +159,22 @@ function GitSettings() {
 				label={t('settings:git.archive-on-merge.label', 'Archive on merge')}
 				modified={archiveOnMerge !== DEFAULTS.archiveAfterMerge}
 				onReset={() => setArchiveOnMerge(DEFAULTS.archiveAfterMerge)}
+			/>
+
+			<SettingRow
+				control={
+					<Switch checked={updateBase} onCheckedChange={setUpdateBase} />
+				}
+				description={t(
+					'settings:git.update-base-on-merge.description',
+					'After the PR merges, fetch the base branch and fast-forward the local copy of it, like `git pull --ff-only`. A branch with local commits of its own is never touched.',
+				)}
+				label={t(
+					'settings:git.update-base-on-merge.label',
+					'Update base branch after merge',
+				)}
+				modified={updateBase !== DEFAULTS.updateBaseAfterMerge}
+				onReset={() => setUpdateBase(DEFAULTS.updateBaseAfterMerge)}
 			/>
 
 			<SettingRow

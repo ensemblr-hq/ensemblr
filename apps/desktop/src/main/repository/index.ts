@@ -16,6 +16,7 @@ export type {
 	CreateArchiveWorkspaceServiceOptions,
 } from './archive-workspace.ts';
 export { createArchiveWorkspaceService } from './archive-workspace.ts';
+export { fastForwardLocalBase } from './base-fast-forward.ts';
 export type {
 	CloneCommandRunHandlers,
 	CloneCommandRunner,

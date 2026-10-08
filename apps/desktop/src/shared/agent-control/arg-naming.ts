@@ -67,12 +67,16 @@ export const CANONICAL_ARG_KEYS = {
 	hiddenModels: 'Model ids hidden from spawn choices.',
 	alwaysShowContextUsage: 'Whether context usage stays visible in the UI.',
 	archiveAfterMerge: 'Whether merged workspaces are archived automatically.',
+	updateBaseAfterMerge:
+		'Whether the local base branch is fast-forwarded after a pull request merges.',
 	label:
 		'Short human description of a queued job, shown in the compute-queue panel.',
 	language: 'App interface and agent reply language preference.',
 	markdownStyle: 'Markdown rendering style.',
 	models: 'Model preference section.',
 	monoFont: 'Code and markdown monospace font family.',
+	method:
+		'How a pull request is merged: squash (the default), merge, or rebase.',
 	mode: 'How an op behaves across several targets.',
 	model: 'Identifier of the agent model a conversation runs on.',
 	baseBranch: 'Branch a new workspace measures its diff against.',

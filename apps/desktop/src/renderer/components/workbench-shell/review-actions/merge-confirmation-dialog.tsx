@@ -11,7 +11,9 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
+import { cn } from '@/renderer/lib/utils';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import { bareBranchName } from '@/shared/branch-ref';
 
 /**
  * Final merge confirmation (ADR 0023). Summarizes branch, PR,
@@ -25,6 +27,7 @@ export function MergeConfirmationDialog({
 	onConfirm,
 	onOpenChange,
 	open,
+	updateBaseAfterMerge,
 	workspace,
 }: {
 	archiveAfterMerge: boolean;
@@ -33,6 +36,7 @@ export function MergeConfirmationDialog({
 	onConfirm: () => void;
 	onOpenChange: (open: boolean) => void;
 	open: boolean;
+	updateBaseAfterMerge: boolean;
 	workspace: WorkspaceShellModel;
 }) {
 	const { t } = useTranslation();
@@ -40,9 +44,13 @@ export function MergeConfirmationDialog({
 	const isReady = pullRequest.status === 'ready-to-merge';
 	const { hasBlockers, rows } = summarizeMergeReadiness({
 		archiveAfterMerge,
+		baseBranch: bareBranchName(
+			workspace.landingSummary?.branchSource.baseBranch,
+		),
 		deleteLocalBranchOnArchive,
 		pullRequest,
 		t,
+		updateBaseAfterMerge,
 	});
 
 	return (
@@ -73,6 +81,7 @@ export function MergeConfirmationDialog({
 				<ul className='flex flex-col gap-1.5 text-xs'>
 					{rows.map((row) => (
 						<MergeSummaryRow
+							detail={row.detail}
 							key={row.label}
 							label={row.label}
 							tone={row.tone}
@@ -117,6 +126,7 @@ export function MergeConfirmationDialog({
 
 /** One label/value row of the merge-readiness summary, tinted by tone. */
 interface MergeSummaryRowModel {
+	detail?: string;
 	label: string;
 	tone: 'neutral' | 'ok' | 'warning';
 	value: string;
@@ -126,21 +136,27 @@ interface MergeSummaryRowModel {
  * Summarize a pull request's merge readiness as the rows the dialog lists, plus
  * whether any check blocks the merge (which the warning copy keys off).
  * @param archiveAfterMerge - Whether the workspace is archived once the merge lands
+ * @param baseBranch - The bare name of the branch the pull request merges into, when known
  * @param deleteLocalBranchOnArchive - Whether archiving also deletes the local branch
  * @param pullRequest - The workspace's pull-request model
  * @param t - The caller's translation function, so the copy follows the UI language
+ * @param updateBaseAfterMerge - Whether the local base branch is fast-forwarded once the merge lands
  * @returns The summary rows and the blocking-check flag
  */
 function summarizeMergeReadiness({
 	archiveAfterMerge,
+	baseBranch,
 	deleteLocalBranchOnArchive,
 	pullRequest,
 	t,
+	updateBaseAfterMerge,
 }: {
 	archiveAfterMerge: boolean;
+	baseBranch: string | null;
 	deleteLocalBranchOnArchive: boolean;
 	pullRequest: WorkspaceShellModel['pullRequest'];
 	t: TFunction;
+	updateBaseAfterMerge: boolean;
 }): { hasBlockers: boolean; rows: MergeSummaryRowModel[] } {
 	const failing = pullRequest.checks.filter(
 		(check) => check.status === 'blocked',
@@ -200,6 +216,9 @@ function summarizeMergeReadiness({
 					deleteLocalBranchOnArchive,
 					t,
 				}),
+				detail: updateBaseAfterMerge
+					? describeBaseUpdate({ baseBranch, t })
+					: undefined,
 			},
 		],
 	};
@@ -273,6 +292,31 @@ function describeArchiveBehavior({
 }
 
 /**
+ * Phrase the local base-branch fast-forward that follows the merge.
+ * @param baseBranch - The bare name of the branch the pull request merges into, when known
+ * @param t - The caller's translation function, so the copy follows the UI language
+ * @returns The summary sentence
+ */
+function describeBaseUpdate({
+	baseBranch,
+	t,
+}: {
+	baseBranch: string | null;
+	t: TFunction;
+}): string {
+	return baseBranch
+		? t(
+				'git:merge-dialog.after-merge-update-base',
+				'Local {{branch}} will be fast-forwarded',
+				{ branch: baseBranch },
+			)
+		: t(
+				'git:merge-dialog.after-merge-update-base-unnamed',
+				'Local base branch will be fast-forwarded',
+			);
+}
+
+/**
  * Label the confirm button, warning when the merge overrides readiness.
  * @param isReady - Whether the pull request reports as ready to merge
  * @param t - The caller's translation function, so the copy follows the UI language
@@ -298,11 +342,14 @@ const TONE_CLASS: Record<MergeSummaryRowModel['tone'], string> = {
 };
 
 /** Renders one label/value row in the merge confirmation summary, tinted by tone. */
-function MergeSummaryRow({ label, tone, value }: MergeSummaryRowModel) {
+function MergeSummaryRow({ detail, label, tone, value }: MergeSummaryRowModel) {
 	return (
 		<li className='flex items-baseline justify-between gap-3'>
 			<span className='shrink-0 text-muted-foreground'>{label}</span>
-			<span className={TONE_CLASS[tone]}>{value}</span>
+			<span className={cn('flex flex-col items-end', TONE_CLASS[tone])}>
+				<span>{value}</span>
+				{detail ? <span>{detail}</span> : null}
+			</span>
 		</li>
 	);
 }

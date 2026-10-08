@@ -1954,6 +1954,7 @@ test('mergePullRequest announces a merge the refreshed snapshot confirms', async
 	});
 
 	assert.equal(result.merged, true);
+	assert.equal(result.pullRequestNumber, 7);
 	assert.deepEqual(events, [{ pullRequestNumber: 7, workspaceId: 'ws-1' }]);
 });
 
@@ -1967,10 +1968,12 @@ test('mergePullRequest leaves a queued merge for the refresh that sees it land',
 		(event) => events.push(event),
 	);
 
-	await service.mergePullRequest({
+	const queued = await service.mergePullRequest({
 		workspaceCwd: '/tmp/ws',
 		workspaceId: 'ws-1',
 	});
+	assert.equal(queued.merged, true);
+	assert.equal(queued.pullRequestNumber, null);
 	assert.deepEqual(events, []);
 
 	state = 'MERGED';

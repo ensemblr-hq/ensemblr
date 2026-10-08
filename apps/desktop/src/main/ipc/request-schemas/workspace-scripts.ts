@@ -76,6 +76,7 @@ const repositorySettingsPatchSchema = z.object({
 	previewUrls: z.array(repositoryPreviewUrlSchema).nullable().optional(),
 	remoteOrigin: z.string().nullable().optional(),
 	showUpstreamIssues: z.boolean().nullable().optional(),
+	updateBaseAfterMerge: z.boolean().nullable().optional(),
 });
 
 /** {@link import('../../../shared/ipc').UpdateRepositorySettingsRequest}. */

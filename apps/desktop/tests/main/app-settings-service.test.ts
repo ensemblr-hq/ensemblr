@@ -158,18 +158,25 @@ describe('createAppSettingsService', () => {
 		const service = createAppSettingsService({ configPath });
 
 		expect(service.read().git.setUpstreamOnPush).toBe(true);
+		expect(service.read().git.updateBaseAfterMerge).toBe(true);
 		expect(readJson(configPath).app.git.branchPrefixSource).toBe(
 			'github-username',
 		);
 
 		const next = service.update({
-			git: { archiveAfterMerge: true, branchPrefixSource: 'none' },
+			git: {
+				archiveAfterMerge: true,
+				branchPrefixSource: 'none',
+				updateBaseAfterMerge: false,
+			},
 		});
 		expect(next.git.archiveAfterMerge).toBe(true);
+		expect(next.git.updateBaseAfterMerge).toBe(false);
 		expect(next.git.branchPrefixSource).toBe('none');
 		expect(next.git.setUpstreamOnPush).toBe(true); // untouched default
 
 		expect(service.read().git.archiveAfterMerge).toBe(true);
+		expect(service.read().git.updateBaseAfterMerge).toBe(false);
 		expect(readJson(configPath).app.git.branchPrefixSource).toBe('none');
 	});
 

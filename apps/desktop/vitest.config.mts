@@ -252,6 +252,8 @@ export default defineConfig({
 						'tests/main/agent-control-ask-user-question.test.ts',
 						'tests/main/board-status-store.test.ts',
 						'tests/main/merge-close-out.test.ts',
+						'tests/main/workspace-merge.test.ts',
+						'tests/main/base-fast-forward.test.ts',
 						'tests/main/afk-claude-hook.test.ts',
 						'tests/main/afk-claude-approval.test.ts',
 						'tests/main/afk-mode-registry.test.ts',

@@ -87,6 +87,7 @@ const GIT_FIELD_MAP: ReadonlyMap<
 		{ key: 'deleteLocalBranchOnArchive', type: 'boolean' },
 	],
 	['archive_after_merge', { key: 'archiveAfterMerge', type: 'boolean' }],
+	['update_base_after_merge', { key: 'updateBaseAfterMerge', type: 'boolean' }],
 	['set_upstream_on_push', { key: 'setUpstreamOnPush', type: 'boolean' }],
 	['show_upstream_issues', { key: 'showUpstreamIssues', type: 'boolean' }],
 ]);

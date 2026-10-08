@@ -551,6 +551,10 @@
 			"done": "Listed workspaces",
 			"running": "Listing workspaces"
 		},
+		"merge-pull-request": {
+			"done": "Merged the pull request",
+			"running": "Merging the pull request"
+		},
 		"message-concierge": {
 			"done": "Messaged the Concierge",
 			"running": "Messaging the Concierge"

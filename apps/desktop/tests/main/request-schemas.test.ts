@@ -218,6 +218,7 @@ test('accepts a repository-settings patch and preserves explicit nulls', () => {
 			branchFrom: 'develop',
 			filesToCopy: ['.env'],
 			previewUrls: [{ name: 'Dev', url: 'http://localhost:3000' }],
+			updateBaseAfterMerge: null,
 		},
 	});
 
@@ -228,6 +229,7 @@ test('accepts a repository-settings patch and preserves explicit nulls', () => {
 			branchFrom: 'develop',
 			filesToCopy: ['.env'],
 			previewUrls: [{ name: 'Dev', url: 'http://localhost:3000' }],
+			updateBaseAfterMerge: null,
 		},
 	});
 });

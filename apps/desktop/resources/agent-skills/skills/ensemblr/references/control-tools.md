@@ -23,6 +23,14 @@ Control adds no capability of its own — it is a gate, not a feature.
 `ensemblr_focus_dock_tab`, `ensemblr_focus_panel`, `ensemblr_get_workspace_status`,
 `ensemblr_set_workspace_status`.
 
+**Merging** — `ensemblr_merge_pull_request`. Call it, rather than `gh pr merge`,
+when the user asks you to merge this workspace's pull request: it merges the way
+the Merge button does (squash unless you pass `method`) and reports the
+close-out — board card to Done, linked issue closed, local base branch
+fast-forwarded. `failed` is a result to relay, not a fault. Never merge unasked;
+it is refused while AFK, while planning, and to sub-agents and the Concierge.
+It leaves the workspace for the user to archive.
+
 **Naming and the session record** — `ensemblr_set_name`,
 `ensemblr_set_branch_name`, `ensemblr_set_summary`.
 

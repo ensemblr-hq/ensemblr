@@ -40,6 +40,7 @@ describe('depth-aware descendant policy', () => {
 			'startTerminal',
 			'askUserQuestion',
 			'setWorkspaceStatus',
+			'mergePullRequest',
 		] as const) {
 			expect(subAgentControlOpDenial(op, 1), op).not.toBeNull();
 			expect(withheldControlOps(descendantAudience(1)).has(op), op).toBe(true);

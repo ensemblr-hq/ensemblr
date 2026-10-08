@@ -116,6 +116,7 @@ export function reviewMergeSettingsQuery(
 				archiveAfterMerge: readBoolean('archiveAfterMerge'),
 				deleteLocalBranchOnArchive: readBoolean('deleteLocalBranchOnArchive'),
 				setUpstreamOnPush: readBooleanOr('setUpstreamOnPush', true),
+				updateBaseAfterMerge: readBooleanOr('updateBaseAfterMerge', true),
 			};
 		},
 		queryKey: ensemblrQueryKeys.reviewMergeSettings(

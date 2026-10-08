@@ -211,6 +211,10 @@ export const deleteBranchOnArchiveAtom = settingAtom(
 	'deleteLocalBranchOnArchive',
 );
 export const archiveOnMergeAtom = settingAtom('git', 'archiveAfterMerge');
+export const updateBaseAfterMergeAtom = settingAtom(
+	'git',
+	'updateBaseAfterMerge',
+);
 export const setUpstreamOnPushAtom = settingAtom('git', 'setUpstreamOnPush');
 /**
  * Whether commits made in an Ensemblr workspace credit Ensemblr as a co-author.

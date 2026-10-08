@@ -302,6 +302,7 @@ const settingsFixture = {
 		remote_origin: 'origin',
 		set_upstream_on_push: true,
 		show_upstream_issues: true,
+		update_base_after_merge: false,
 	},
 	infisical: {
 		environment: 'dev',

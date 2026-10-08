@@ -143,6 +143,14 @@ const makePorts = (
 		setWorkspaceStatus: vi.fn(),
 		getWorkspaceStatus: vi.fn().mockReturnValue('backlog'),
 	},
+	pullRequests: {
+		merge: vi.fn().mockResolvedValue({
+			baseSync: { branch: 'master', status: 'up-to-date' },
+			issue: 'closed',
+			pullRequestNumber: 42,
+			status: 'merged',
+		}),
+	},
 	diff: {
 		readWorkspaceDiff: vi.fn().mockResolvedValue({
 			baseRef: 'origin/master',
@@ -939,6 +947,153 @@ describe('agent-control service: review comments', () => {
 	});
 });
 
+describe('agent-control service: mergePullRequest', () => {
+	it('merges the caller own workspace pull request, squash left to the port', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'mergePullRequest',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result.ok).toBe(true);
+		expect(ports.pullRequests.merge).toHaveBeenCalledWith({
+			method: undefined,
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+	});
+
+	it('forwards the requested merge method', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		await service.invoke({
+			op: 'mergePullRequest',
+			token: 'tok-caller',
+			rawArgs: { method: 'rebase' },
+		});
+
+		expect(ports.pullRequests.merge).toHaveBeenCalledWith(
+			expect.objectContaining({ method: 'rebase' }),
+		);
+	});
+
+	it('passes the merge outcome through as the result data', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'mergePullRequest',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result).toEqual({
+			ok: true,
+			data: {
+				baseSync: { branch: 'master', status: 'up-to-date' },
+				issue: 'closed',
+				pullRequestNumber: 42,
+				status: 'merged',
+			},
+		});
+	});
+
+	it('reports a failed merge as a successful result carrying the failure', async () => {
+		const ports = makePorts();
+		const failure = { code: 'command-failed', message: 'not mergeable' };
+		vi.mocked(ports.pullRequests.merge).mockResolvedValue({
+			failure,
+			status: 'failed',
+		} as never);
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'mergePullRequest',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result).toEqual({ ok: true, data: { failure, status: 'failed' } });
+	});
+
+	it('rejects an unknown merge method and an unknown key', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		for (const rawArgs of [{ method: 'fast-forward' }, { workspaceId: 'ws' }]) {
+			const result = await service.invoke({
+				op: 'mergePullRequest',
+				token: 'tok-caller',
+				rawArgs,
+			});
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.code).toBe('invalid-args');
+			}
+		}
+		expect(ports.pullRequests.merge).not.toHaveBeenCalled();
+	});
+
+	it('follows the permission mode as a control write', async () => {
+		const readOnly = makePorts({ mode: 'read-only' });
+		const blocked = await setup({ ports: readOnly }).service.invoke({
+			op: 'mergePullRequest',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+		expect(blocked.ok).toBe(false);
+		if (!blocked.ok) {
+			expect(blocked.code).toBe('denied-permission');
+		}
+		expect(readOnly.pullRequests.merge).not.toHaveBeenCalled();
+
+		const approval = makePorts({ confirm: false, mode: 'approval-required' });
+		const declined = await setup({ ports: approval }).service.invoke({
+			op: 'mergePullRequest',
+			token: 'tok-caller',
+			rawArgs: { method: 'merge' },
+		});
+		expect(declined.ok).toBe(false);
+		expect(approval.confirm.confirm).toHaveBeenCalledWith(
+			expect.objectContaining({
+				summary: expect.stringContaining('merge this workspace'),
+			}),
+		);
+		expect(approval.pullRequests.merge).not.toHaveBeenCalled();
+	});
+
+	it('runs once the user approves in approval-required mode', async () => {
+		const ports = makePorts({ confirm: true, mode: 'approval-required' });
+
+		const result = await setup({ ports }).service.invoke({
+			op: 'mergePullRequest',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result.ok).toBe(true);
+		expect(ports.pullRequests.merge).toHaveBeenCalledTimes(1);
+	});
+
+	it('is refused to the Concierge, which has no workspace pull request', async () => {
+		const ports = makePorts();
+		const { service } = setup({ concierge: true, ports });
+
+		const result = await service.invoke({
+			op: 'mergePullRequest',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+
+		expect(result.ok).toBe(false);
+		expect(ports.pullRequests.merge).not.toHaveBeenCalled();
+	});
+});
+
 describe('agent-control service: board status', () => {
 	it('setWorkspaceStatus targets the caller own workspace and returns ok', async () => {
 		const ports = makePorts();
@@ -1249,6 +1404,7 @@ describe('agent-control service: sub-agent role gate outside plan mode', () => {
 		closeTab: { chatTabId: 'abc' },
 		setBranchName: { name: 'add-dark-mode' },
 		setWorkspaceStatus: { status: 'done' },
+		mergePullRequest: {},
 		askUserQuestion: {
 			questions: [
 				{ options: [{ label: 'A' }, { label: 'B' }], question: 'Q?' },
@@ -1290,6 +1446,7 @@ describe('agent-control service: sub-agent role gate outside plan mode', () => {
 		}
 
 		expect(ports.board.setWorkspaceStatus).not.toHaveBeenCalled();
+		expect(ports.pullRequests.merge).not.toHaveBeenCalled();
 		expect(ports.tabs.closeTab).not.toHaveBeenCalled();
 		expect(ports.terminals.stopTerminal).not.toHaveBeenCalled();
 		expect(ports.terminals.writeTerminal).not.toHaveBeenCalled();

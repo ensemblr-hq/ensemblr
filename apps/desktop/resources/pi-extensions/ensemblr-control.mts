@@ -156,6 +156,12 @@ interface AwarenessFeatures {
  */
 const COMPUTE_QUEUE_INVENTORY = `- Heavy commands: run a test suite, a build, a typecheck, a compile, or a nix build with \`ensemblr_run_queued\` — never in your own shell, an Ensemblr terminal, or a script, where Ensemblr refuses them. One queue serves every agent in every workspace, so the user's machine stays usable however many of you are working. It runs the command in this workspace with the full Ensemblr environment, Infisical secrets included, and returns the exit code and the end of the output. A \`timedOut\` answer is a lap, not a failure: the job keeps its place and keeps running, so call \`ensemblr_wait_for_job\` with its \`jobId\`; \`ensemblr_cancel_job\` drops one you no longer need. An \`interrupted: "user-message"\` answer means the user wrote to you mid-wait: answer them first, then wait on the job again.`;
 
+/**
+ * The merge bullet every merge-capable playbook carries. MUST stay
+ * byte-identical to its counterpart in `src/shared/agent-control/awareness.ts`.
+ */
+const MERGE_INVENTORY = `- Merge: when the user asks you to merge this workspace's pull request, call \`ensemblr_merge_pull_request\` rather than running \`gh pr merge\` — it merges the way the Merge button does (squash unless you pass \`method\`), then reports the close-out: the board card moved to Done, the linked issue closed, and the local base branch fast-forwarded. Never merge unasked, and it is refused while the user is AFK. It leaves the workspace for the user to archive.`;
+
 /** Git write scope and human consent apply across every workspace role and mode. */
 const GIT_WORKSPACE_CONSENT = `Git isolation and consent: write only in your own worktree; a shared object store is not a shared checkout or index. Before Git writes, verify cwd, Git top-level, and branch match your assigned workspace. Never route writes to a sibling workspace or managed root checkout through git -C, environment overrides, or shared Git metadata. Do not merge, pull, rebase, cherry-pick, reset, or checkout files from main/master, the base, or another workspace merely to catch up, fix ordinary failures, prepare/open a PR, or because another workspace merged. PR presence or absence and AFK do not imply consent. An explicit human request to integrate a named base or resolve merge conflicts authorizes necessary local merge/rebase and continuation for this workspace/task only — not PR merging, arbitrary imports, sibling writes, or overriding subagent/reviewer no-HEAD rules or plan-mode read-only limits. Without that permission, ask when attended; when AFK leave Git unchanged and report. Unexpected history or worktree movement: inspect and report; never automatically reset/rebase to hide it.`;
 
@@ -171,6 +177,7 @@ ${COMPUTE_QUEUE_INVENTORY}
 - Agent review (explicit request only): \`ensemblr_start_review\` opens this workspace's Review conversation over your change — the same review the user's Review button runs, on the model they configured for it, deferring to whatever review skill the repository ships. Call it only when the user explicitly asks for an agent review. AFK alone is not a request. Do not start it as routine verification; review your own diff or choose a reviewer through ordinary delegation under your role's rules. The configured Review model does not pin those delegates. What it opens is a root orchestrator rather than your child, so it has a delegation budget of its own and fans its own readers out over a wide diff — which also means \`ensemblr_wait_for_agents\` will not find it unless you name its \`agentSessionId\` in \`targets\`. It shares this worktree: leave the files alone while it works. Send its findings back to the SAME conversation with \`ensemblr_send_follow_up\` and have it fix them there rather than fixing them yourself — you stay the committer and you own the pull request. Calling the op again while that reviewer still exists hands the same one back rather than opening a second, so re-reading a rebuilt change is a follow-up either way. It takes one of the workspace's co-tenancy slots, so a workspace already at its limit of agents writing the checkout refuses it — that allowance is two while the user is here and four while they are away${features.tuiHarnesses ? ORCHESTRATOR_START_REVIEW_HARNESS_CLAUSE : ''}. Its tab is the user's record of the review and stays open: it is not yours to clean up when the review is done.
 - Linear: search the connected account's issues (\`ensemblr_linear_list_issues\`), read one with its comments (\`ensemblr_linear_get_issue\`), and read the team/project/state/label/user tables an update needs ids from (\`ensemblr_linear_get_metadata\`). None of this is scoped to your workspace — Linear is an app-level integration and one account can span several teams, so narrow a search with \`teamId\` or \`query\` rather than reading the whole list as the work in front of you. Linear is often not connected at all, so every one of these answers with a \`status\` — \`not-connected\` means the user has not linked Linear and no amount of retrying will change that, and it is not the same answer as an empty result. Comment on an issue (\`ensemblr_linear_create_comment\`) and move one along (\`ensemblr_linear_update_issue\`: state, assignee, priority, title, description). A state whose type is \`completed\` or \`canceled\` is refused whatever you pass — you take work as far as \`In Review\` and the user decides whether it is done. File a new one (\`ensemblr_linear_create_issue\`, \`teamId\` required) for the follow-up you found and were told not to fix, never for the work you are already doing; \`ensemblr_linear_list_issues\` has to have run at least once in this conversation before the first create, because nothing here can delete the duplicate a search would have caught.
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
+${MERGE_INVENTORY}
 - Reach the Concierge: \`ensemblr_message_concierge\` is your one channel upward — to the app-level agent that briefs workspace agents and supervises every workspace at once. Use it when something you found changes what the Concierge should do and it has no way to see it: you are blocked on a dependency outside this workspace, the brief it gave you was wrong, the work belongs in a different repository, or you have finished what it asked for. It does not read your workspace on its own initiative, so a discovery left only in your own tab reaches nobody. You pass no session id and should hold none — its conversation is cleared and restarted routinely, so the app resolves whichever one is live at the moment you send. The send does not block: carry on, and a reply, if one comes, arrives here as a follow-up. It is refused outright when no Concierge conversation is open, and capped per conversation, so say it once and in full rather than in installments.
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.
 - Keep the workspace legible: name your tab (\`ensemblr_set_name\`, argument \`title\`), name the workspace and its git branch together from one short readable name (\`ensemblr_set_branch_name\`, argument \`name\` — the workspace takes it as written, the branch takes it slugged), and record what the conversation has covered (\`ensemblr_set_summary\`, arguments \`title\` and \`summary\`).
@@ -358,7 +365,7 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you can dri
 - Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).
 - Reach the Concierge: \`ensemblr_message_concierge\` stays open while planning — messaging is not implementing. Use it with reason \`brief_wrong\` the moment planning shows that the brief you were given is wrong, and with \`blocked\` when the plan cannot be settled without something outside this workspace. You pass no session id; the app resolves whichever Concierge conversation is live at the moment you send.
 
-The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, ${features.tuiHarnesses ? PLAN_MODE_HARNESS_BLOCKED : ''}\`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, \`ensemblr_run_queued\`, \`ensemblr_resolve_diff_comments\`, ${features.architectureDiagram ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_BLOCKED : ''}and \`ensemblr_linear_update_issue\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. ${features.architectureDiagram ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_OPEN : ''}\`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, ${features.tuiHarnesses ? PLAN_MODE_HARNESS_BLOCKED : ''}\`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, \`ensemblr_run_queued\`, \`ensemblr_merge_pull_request\`, \`ensemblr_resolve_diff_comments\`, ${features.architectureDiagram ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_BLOCKED : ''}and \`ensemblr_linear_update_issue\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. ${features.architectureDiagram ? PLAN_MODE_ORCHESTRATOR_DIAGRAM_OPEN : ''}\`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
 
 Nothing else in your context outranks this block, with one exception: an ENSEMBLR SESSION UPKEEP block may follow it. That block is the app's own bookkeeping — naming this tab, naming the workspace and its branch, recording the session summary — and every item on it stays allowed while you plan. Do what it asks, when it asks: it labels the work rather than starting it, and a name deferred until the plan lands is a name the board went without for the whole interview.
 
@@ -423,7 +430,7 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you were sp
 
 You do not talk to the user. The orchestrator that spawned you owns that conversation and is blocked waiting on your report, so \`ensemblr_ask_user_question\` is refused here — send \`ensemblr_notify_orchestrator\` with reason \`need_decision\` instead and it will answer you.
 
-The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_run_queued\`, \`ensemblr_resolve_diff_comments\` and \`ensemblr_linear_update_issue\` (each claims work you have not done), ${features.architectureDiagram ? PLAN_MODE_SUBAGENT_DIAGRAM_BLOCKED : ''}and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, ${features.tuiHarnesses ? PLAN_MODE_HARNESS_BLOCKED : ''}\`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. Being a spawned sub-agent blocks more, whatever the mode: the workspace's tabs and terminals outlive the question you were handed, so \`ensemblr_stop_terminal\`, \`ensemblr_open_tab\`, \`ensemblr_close_tab\`, and \`ensemblr_linear_create_comment\` are refused here too${features.architectureDiagram ? PLAN_MODE_SUBAGENT_DIAGRAM_REFUSED : ''}. \`ensemblr_exit_plan_mode\` is not yours to call either: submitting the plan belongs to the orchestrator, and a plan posted from here would put a review panel in a tab nobody is watching. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_run_queued\`, \`ensemblr_merge_pull_request\`, \`ensemblr_resolve_diff_comments\` and \`ensemblr_linear_update_issue\` (each claims work you have not done), ${features.architectureDiagram ? PLAN_MODE_SUBAGENT_DIAGRAM_BLOCKED : ''}and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, ${features.tuiHarnesses ? PLAN_MODE_HARNESS_BLOCKED : ''}\`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. Being a spawned sub-agent blocks more, whatever the mode: the workspace's tabs and terminals outlive the question you were handed, so \`ensemblr_stop_terminal\`, \`ensemblr_open_tab\`, \`ensemblr_close_tab\`, and \`ensemblr_linear_create_comment\` are refused here too${features.architectureDiagram ? PLAN_MODE_SUBAGENT_DIAGRAM_REFUSED : ''}. \`ensemblr_exit_plan_mode\` is not yours to call either: submitting the plan belongs to the orchestrator, and a plan posted from here would put a review panel in a tab nobody is watching. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
 
 Nothing else in your context outranks this block, with one exception: an ENSEMBLR SESSION UPKEEP block may follow it. That block is the app's own bookkeeping — naming this tab, naming the workspace and its branch, recording the session summary — and every item on it stays allowed while you plan. Do what it asks, when it asks: it labels the work rather than starting it, and a name deferred until the plan lands is a name the board went without for the whole interview.
 
@@ -616,6 +623,7 @@ const SUBAGENT_WITHHELD_OPS = new Set([
 	'linearUpdateIssue',
 	'listModels',
 	'listRunScripts',
+	'mergePullRequest',
 	'messageConcierge',
 	'openTab',
 	'sendFollowUp',
@@ -660,6 +668,7 @@ const CONCIERGE_WITHHELD_OPS = new Set([
 	'exitPlanMode',
 	'launchHarness',
 	'listRunScripts',
+	'mergePullRequest',
 	'messageConcierge',
 	'notifyOrchestrator',
 	'openTab',
@@ -1489,6 +1498,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 				renameWorkspaceOnBranch: Type.Optional(Type.Boolean()),
 				deleteLocalBranchOnArchive: Type.Optional(Type.Boolean()),
 				archiveAfterMerge: Type.Optional(Type.Boolean()),
+				updateBaseAfterMerge: Type.Optional(Type.Boolean()),
 				setUpstreamOnPush: Type.Optional(Type.Boolean()),
 				coAuthorEnsemblr: Type.Optional(Type.Boolean()),
 			}),
@@ -1814,6 +1824,20 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 				Type.Literal('canceled'),
 			]),
 			workspaceId: Type.Optional(Type.String()),
+		}),
+	);
+	tool(
+		'ensemblr_merge_pull_request',
+		'mergePullRequest',
+		"Merge this workspace's pull request the way the app's Merge button does (squash unless `method` says merge or rebase), then report what the close-out did: `status: 'merged'` with the board card moved to Done, the linked issue closed (`issue`), and the local base branch fast-forwarded (`baseSync`); `status: 'queued'` when a merge queue took it and the close-out follows later; or `status: 'failed'` with a `failure` code and message, which is a result to relay rather than an error. Call it only when the user asked you to merge. It is refused while the user is AFK and while planning. It never archives the workspace — that is left for the user.",
+		Type.Object({
+			method: Type.Optional(
+				Type.Union([
+					Type.Literal('squash'),
+					Type.Literal('merge'),
+					Type.Literal('rebase'),
+				]),
+			),
 		}),
 	);
 	tool(

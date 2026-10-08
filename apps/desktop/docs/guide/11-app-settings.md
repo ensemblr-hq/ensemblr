@@ -475,6 +475,7 @@ See [12. Repository settings](./12-repository-settings.md).
 | Let agents name the workspace and branch | Ask the agent to rename a workspace away from its placeholder composer name, and its git branch to match, once it knows what the work is. Off leaves the placeholder in place. | On / off | On |
 | Delete branch on archive | Delete the local branch when a workspace is archived. The remote branch is untouched — configure that on GitHub. | On / off | Off |
 | Archive on merge | Archive a workspace automatically after its pull request merges. | On / off | Off |
+| Update base branch after merge | After a pull request merges, fetch the base branch and fast-forward the local copy of it, like `git pull --ff-only`. A branch with local commits of its own is never touched. | On / off | On |
 | Credit Ensemblr as a commit co-author | Ask agents to end every commit they make with the `Co-authored-by: Ensemblr <howdy@ensemblr.dev>` trailer, which GitHub credits to the Ensemblr account. | On / off | On |
 | Set upstream on plain `git push` | Configure new workspaces so a bare `git push` sets the branch upstream. Turning it off avoids writing git worktree config, at the cost of less reliable PR information until branches have an upstream. | On / off | On |
 

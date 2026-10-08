@@ -353,6 +353,10 @@ const setWorkspaceStatusSchema = z.strictObject({
 	workspaceId: nonEmpty.optional(),
 });
 
+const mergePullRequestSchema = z.strictObject({
+	method: z.enum(['squash', 'merge', 'rebase']).optional(),
+});
+
 const getWorkspaceStatusSchema = z.strictObject({
 	workspaceId: nonEmpty.optional(),
 });
@@ -633,6 +637,7 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	createWorkspace: createWorkspaceSchema,
 	recallMemory: recallMemorySchema,
 	setWorkspaceStatus: setWorkspaceStatusSchema,
+	mergePullRequest: mergePullRequestSchema,
 	getWorkspaceStatus: getWorkspaceStatusSchema,
 	getWorkspaceDiff: getWorkspaceDiffSchema,
 	getDiffComments: getDiffCommentsSchema,

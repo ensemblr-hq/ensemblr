@@ -127,11 +127,13 @@ describe('parseAppSettings', () => {
 				branchPrefixSource: 'custom',
 				branchPrefixCustom: 'feat/',
 				archiveAfterMerge: 'yes', // invalid → default
+				updateBaseAfterMerge: 'no', // invalid → default
 			},
 		});
 		expect(parsed.git.branchPrefixSource).toBe('custom');
 		expect(parsed.git.branchPrefixCustom).toBe('feat/');
 		expect(parsed.git.archiveAfterMerge).toBe(false); // default
+		expect(parsed.git.updateBaseAfterMerge).toBe(true); // default
 		expect(parsed.git.deleteLocalBranchOnArchive).toBe(false); // default
 		expect(parsed.git.setUpstreamOnPush).toBe(true); // default
 		expect(parsed.git.renameWorkspaceOnBranch).toBe(true); // default

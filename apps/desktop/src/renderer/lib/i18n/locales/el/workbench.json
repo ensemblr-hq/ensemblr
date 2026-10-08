@@ -551,6 +551,10 @@
 			"done": "Παρέθεσε τους χώρους εργασίας",
 			"running": "Παραθέτει τους χώρους εργασίας"
 		},
+		"merge-pull-request": {
+			"done": "Έκανε merge το pull request",
+			"running": "Κάνει merge το pull request"
+		},
 		"message-concierge": {
 			"done": "Έστειλε μήνυμα στον Concierge",
 			"running": "Στέλνει μήνυμα στον Concierge"

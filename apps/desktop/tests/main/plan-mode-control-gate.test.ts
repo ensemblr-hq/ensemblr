@@ -96,6 +96,7 @@ const makePorts = (planningSessions: ReadonlySet<string>): AgentControlPorts =>
 				.mockResolvedValue({ capturedAtOrdinal: 3, message: 'ok' }),
 		},
 		linear: { readLinkedIssue: vi.fn().mockReturnValue(null) },
+		pullRequests: { merge: vi.fn().mockResolvedValue({ status: 'queued' }) },
 	}) as unknown as AgentControlPorts;
 
 /**
@@ -177,6 +178,7 @@ const invoke = (
 // into. Neither can be made safe by inheritance the way a spawned Pi child can.
 const ARGS_BY_OP: Record<string, Record<string, unknown>> = {
 	launchHarness: { harnessId: 'claude-code' },
+	mergePullRequest: {},
 	startTerminal: { kind: 'run' },
 	writeTerminal: { input: 'rm -rf .\n', terminalId: 'term-1' },
 };
@@ -201,6 +203,7 @@ describe('plan mode: control-op gate', () => {
 			expect(ports.terminals.startTerminal).not.toHaveBeenCalled();
 			expect(ports.terminals.writeTerminal).not.toHaveBeenCalled();
 			expect(ports.harnesses.launchHarness).not.toHaveBeenCalled();
+			expect(ports.pullRequests.merge).not.toHaveBeenCalled();
 		});
 
 		it(`allows \`${op}\` when the session is not planning`, async () => {

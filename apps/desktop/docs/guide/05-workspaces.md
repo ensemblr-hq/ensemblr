@@ -310,6 +310,7 @@ Two settings under `[git]` govern it:
 | --- | --- | --- |
 | `delete_local_branch_on_archive` | off | also delete the workspace's local branch when archiving |
 | `archive_after_merge` | off | archive the workspace automatically once its pull request merges |
+| `update_base_after_merge` | on | after the pull request merges, fetch the base branch and fast-forward the local copy of it (like `git pull --ff-only`); a branch with local commits of its own is never touched |
 
 `delete_local_branch_on_archive` is the **only** control over branch cleanup —
 the archive dialog carries no checkbox of its own, and archiving by hand does
