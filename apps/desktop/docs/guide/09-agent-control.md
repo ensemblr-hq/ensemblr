@@ -15,6 +15,7 @@ An agent with Control can:
 - read the workspace diff, leave review comments on specific lines, and resolve
   ones it has addressed
 - read Linear issues, comment on one, and move it along
+- merge its own workspace's pull request, the way the Merge button does
 - move its workspace across the board
 
 A workspace created from a tracker issue tells its agent so. The chat carries a
@@ -130,6 +131,14 @@ Delegation is bounded so a runaway agent cannot fill your machine with children:
 | Terminal starts per minute | 10 |
 | Blocking wait | times out after 5 minutes; the child keeps running |
 | Waiting on an ancestor | refused — it would deadlock |
+
+**Your message cuts a wait short.** A blocking call — waiting on children, on a
+queued job, or on a spawn or follow-up that waits for the answer — would
+otherwise hold a message you send mid-turn unread until it returned. Now your
+message ends the wait at once. The call comes back marked as interrupted (the
+tool row reads *paused for your message*) with whatever had settled, and the
+agent answers you first, then resumes the wait. Nothing it was waiting on is
+stopped.
 
 A depth-2 leaf cannot delegate. Plan mode and AFK mode are inherited by spawned
 children; a planning manager can therefore open read-only leaves, but the depth

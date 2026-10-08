@@ -94,6 +94,25 @@ it yourself) and holds the first turn only for its own control server, for at
 most five seconds, so plugins and connectors that are slow or failing no longer
 cost the chat up to thirty.
 
+### Ensemblr's Claude Code mods
+
+Ensemblr loads a small plugin of function hooks ("mods") into every Claude chat.
+It needs Claude Code 2.1.288 or later; older versions ignore it and run as they
+always did. There is nothing to configure, and Pi never sees it. Four mods:
+
+- **git-guard** refuses `git branch -m`, the shared stash stack outside the
+  workspace recipe, and git aimed at another checkout (`-C`, `--git-dir`,
+  `--work-tree`, `cd` out of the worktree).
+- **secret-redact** replaces the exact values of the workspace's secrets, and
+  Ensemblr's own control tokens, with `[redacted:NAME]` in what the model reads.
+  Text you type yourself is left as typed.
+- **compact-keeper** tells every compaction to keep delegated children's session
+  ids, queued job ids, the branch, open review comments, and decisions made.
+- **ticket-context** adds the description of the Linear issue a workspace was
+  created from to the first message, not just its identifier and title.
+
+See [ADR 0085](../adr/0085-ship-claude-code-mods-as-a-staged-plugin.md).
+
 ### Plan usage and session cost
 
 Claude Code reports what your account has spent against its claude.ai plan, and

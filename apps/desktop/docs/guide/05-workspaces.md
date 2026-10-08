@@ -210,19 +210,29 @@ Resolving them is part of the review flow —
 
 When a workspace's pull request has merged and you want to keep going in the same
 place, **continue** it. Ensemblr branches onto a numbered successor — `bach`
-becomes `bach-v1`, `bach-v1` becomes `bach-v2` — forking from the base branch and
-checking the new branch out. An existing `-v<n>` marker is bumped rather than
-stacked, so you never end up on `bach-v1-v1`. A name already taken is skipped,
-so continuing `bach` a second time while `bach-v1` still exists lands on
-`bach-v2` rather than colliding.
+becomes `bach-v1`, `bach-v1` becomes `bach-v2` — and checks the new branch out.
+An existing `-v<n>` marker is bumped rather than stacked, so you never end up on
+`bach-v1-v1`. A name already taken is skipped, so continuing `bach` a second time
+while `bach-v1` still exists lands on `bach-v2` rather than colliding.
 
-Three things to expect:
+The successor forks from the base branch, freshly fetched, once the merged work
+is on it — however the pull request merged, squash included — so the review
+panel opens empty and the next pull request starts from the latest code. Commits
+you made after the pull request's merged head are replayed on top of it.
 
-- Uncommitted work carries over untouched.
+Four things to expect:
+
+- Uncommitted work carries over untouched, unless it edits a file the move to
+  the latest base would rewrite. Then the continue is refused and tells you which
+  files; commit or discard them and continue again.
 - The merged branch stays exactly where it is, so the old pull request keeps its
   history; the workspace simply stops resolving to it.
-- If the base branch could not be resolved, the successor forks from your current
-  HEAD instead and the result carries a warning saying so.
+- If the base branch could not be resolved, or the branch holds commits the base
+  has not taken, the successor forks from your current HEAD instead and the
+  result carries a warning saying so.
+- If replaying your later commits conflicts, the replay is abandoned: the
+  successor forks from HEAD rather than leave the worktree mid-conflict, and a
+  warning says it kept the previous base.
 
 ## Archiving and history
 

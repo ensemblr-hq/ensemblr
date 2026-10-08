@@ -33,7 +33,7 @@ These instructions apply to everything under `src/main/`.
   - `infisical/` for the Infisical REST client, account and link stores, and the environment layer it feeds.
   - `ipc/` for main-process IPC handler registration and request validation.
   - `linked-directories/` for read grants over directories outside a workspace, and the app-global recents list behind them.
-  - `merge-close-out/` for what a merged pull request sets in motion: the workspace's board card to Done, and the Linear or GitHub issue it was created from closed.
+  - `merge-close-out/` for what a merged pull request sets in motion: the workspace's board card to Done, the Linear or GitHub issue it was created from closed, and the local base branch fast-forwarded; it also performs the merge behind `ensemblr_merge_pull_request`.
   - `menu/` for the native Electron menu bar: one builder per menu behind `createMenuItemFactory`, composed by `application-menu.ts`, labelled from `menu-strings.ts`, and enabled from the renderer's command report.
   - `open-target/` for external editor and app detection and launch.
   - `repository/` for repository registration, git probing, and lifecycle.
@@ -48,7 +48,7 @@ These instructions apply to everything under `src/main/`.
   - `updates/` for the release feed, update preconditions, and the AppImage and Homebrew update paths.
   - `workspace-files/` and `workspace-git/` for workspace file watching and listing, the content-addressed composer attachment store, path-safety and image-signature checks, and git status, commits, and worktrees.
 - Do not add new root-level files under `src/main/` unless Electron Forge or Vite needs them as entrypoints.
-- Main returns locale-neutral codes, never English labels — it cannot reach the renderer's i18n instance, so adding a code here is a user-facing change that owes the renderer mapper a `t()` case with `ru` and `el` filled. `menu/menu-strings.ts` is the one exception: it holds all three languages itself, because the menu bar is built before any renderer exists.
+- Main returns locale-neutral codes, never English labels — it cannot reach the renderer's i18n instance, so adding a code here is a user-facing change that owes the renderer mapper a `t()` case with `ru` and `el` filled. The `*-strings.ts` tables listed in `.claude/rules/i18n.md` (`menu/menu-strings.ts` and seven others) are the exception: each holds all three languages itself, because the surface is drawn by the OS or a browser before any renderer is involved.
 - Adding an agent runtime means a new adapter folder beside `pi-agent/` and `claude-agent/`, a provider id in `src/shared/agent-provider.ts`, and an entry in the client's adapter map. Keep runtime-specific flags, SDK option names, and wire shapes out of `agent-runtime/`.
 
 ## Public Surfaces
