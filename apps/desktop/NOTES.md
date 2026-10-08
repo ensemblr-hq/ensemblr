@@ -1,13 +1,22 @@
-# Ensemblr v0.2.4
+# Ensemblr v0.2.5
 
-Ensemblr 0.2.4 moves the Concierge from a floating button to a slim toggle row.
+Ensemblr 0.2.5 adds four bundled Claude Code mods, lets a message you send cut an agent's wait short, keeps the local base branch current after a merge, and lets agents merge pull requests.
+
+### Added
+
+* **Claude sessions load four Ensemblr mods.** They refuse risky git commands, redact workspace secrets before the model reads them, keep key ids through a compaction, and add the linked Linear issue to a conversation's first message. Needs Claude Code 2.1.288 or later. (#734)
+* **Agents can merge a pull request** with `ensemblr_merge_pull_request`, under the workspace permission mode. (#737)
 
 ### Changed
 
-* **The Concierge opens from a slim toggle row.** In a workspace it sits under the terminal dock in the review rail; everywhere else it runs along the foot of the content area. It carries the unread count and its mark orbits while a turn is running. The panel still floats, drags and resizes as before. (#729, #731)
-* **The guide's screenshots show the new toggle row.** (#730)
+* **The local base branch is fast-forwarded after a merge**, so the repository root no longer drifts behind `origin`. Switch it in Settings → Git. (#737)
+* **A message you send mid-turn ends the wait an agent is blocked in** instead of waiting up to five minutes. (#735)
 
-See the [changelog](https://github.com/ensemblr-hq/ensemblr/blob/v0.2.4/apps/desktop/CHANGELOG.md) for every change.
+### Fixed
+
+* **Continue on a merged workspace starts from the latest base**, so the Changes panel no longer lists merged work again. (#736)
+
+See the [changelog](https://github.com/ensemblr-hq/ensemblr/blob/v0.2.5/apps/desktop/CHANGELOG.md) for every change.
 
 ### Install
 
@@ -17,7 +26,7 @@ macOS (Apple silicon and Intel):
 brew install --cask ensemblr-hq/tap/ensemblr
 ```
 
-Or download the `.dmg` for your Mac: `Ensemblr-0.2.4-arm64.dmg` (Apple silicon) or `Ensemblr-0.2.4-x64.dmg` (Intel).
+Or download the `.dmg` for your Mac: `Ensemblr-0.2.5-arm64.dmg` (Apple silicon) or `Ensemblr-0.2.5-x64.dmg` (Intel).
 
 Linux (x64):
 
@@ -29,4 +38,4 @@ Both `.dmg` files are signed with a Developer ID certificate, hardened-runtime, 
 
 ---
 
-*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.2.3...v0.2.4>
+*Full changelog*: <https://github.com/ensemblr-hq/ensemblr/compare/v0.2.4...v0.2.5>
