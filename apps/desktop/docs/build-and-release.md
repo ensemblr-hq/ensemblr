@@ -672,7 +672,7 @@ bisect a packaging break.
 
 ### Cutting a release
 
-**Merge the version bump, write the notes, then create the release.** The order
+**Merge the version bump (which carries the notes), then create the release.** The order
 is load-bearing: the workflow refuses a tag whose version does not match
 `package.json`, and the tag must point at reviewed `master`, not at the release
 workspace's unmerged commit.
@@ -708,8 +708,14 @@ tag="v${version}"
 git fetch origin master
 target=$(git rev-parse origin/master)
 git show "${target}:apps/desktop/package.json" | grep -F "\"version\": \"${version}\""
-gh release create "$tag" --target "$target" --title "Ensemblr ${tag}" --notes-file apps/desktop/NOTES.md
+git show "${target}:apps/desktop/NOTES.md" > /tmp/ensemblr-notes.md
+gh release create "$tag" --target "$target" --title "Ensemblr ${tag}" --notes-file /tmp/ensemblr-notes.md
 ```
+
+Read the notes from `${target}` rather than from the working tree: a release
+workspace is usually on a branch that predates the merged bump, so its
+`NOTES.md` is still the previous release's. The block is bash: fish has no `${var}` syntax and mangles it into a bad
+path, so run it under `bash -c` from a fish shell.
 
 `--title` matters: without it GitHub titles the release with the bare tag, and
 every earlier release is titled `Ensemblr vX.Y.Z`.

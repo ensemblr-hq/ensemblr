@@ -268,6 +268,21 @@ however the pull request merged. It can be the Merge button, an agent running
 next time it refreshes the pull request. An issue that is already done, or
 canceled, is left as it is.
 
+The close-out also brings your own copy of the base branch up to date. Merging
+lands the work on GitHub's copy only, so the repository root's checkout would
+otherwise stay behind until you pulled. The confirmation lists this under
+**After merge** (*Local master will be fast-forwarded*). Ensemblr fetches the
+base and moves the local branch forward only by fast-forward. A local branch with
+commits of its own is never touched, and one checked out in another workspace is
+left alone. **Settings → Git → Update base branch after merge** turns it off, and
+a repository can override it ([12. Repository settings](./12-repository-settings.md)).
+See [ADR 0086](../adr/0086-fast-forward-the-local-base-when-a-pull-request-merges.md).
+
+An agent can merge too: its `ensemblr_merge_pull_request` tool runs the same
+merge as the button, squash by default, and reports what the close-out did. It
+follows the workspace permission mode, and is refused in Plan Mode, in AFK Mode,
+to sub-agents, and to the Concierge. It never archives the workspace.
+
 **Settings → Git → Archive on merge** decides what happens next: with it on, the
 workspace is archived as soon as the merge lands (and its local branch dropped,
 if you also enabled that); with it off, the workspace stays open and archiving
