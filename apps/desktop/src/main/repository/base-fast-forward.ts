@@ -103,8 +103,10 @@ async function fastForwardTo(
 	upstreamRef: string,
 ): Promise<LocalBaseSyncOutcome> {
 	const { branch } = context;
-	const from = await commitOf(context, `refs/heads/${branch}`);
-	const to = await commitOf(context, `${upstreamRef}^{commit}`);
+	const [from, to] = await Promise.all([
+		commitOf(context, `refs/heads/${branch}`),
+		commitOf(context, `${upstreamRef}^{commit}`),
+	]);
 	if (!from || !to) {
 		return {
 			detail: `Could not resolve ${branch} or ${upstreamRef} to a commit.`,
