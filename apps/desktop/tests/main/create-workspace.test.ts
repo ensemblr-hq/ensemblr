@@ -41,6 +41,7 @@ function gitDefaults(overrides: Partial<GitSettings> = {}): GitSettings {
 		renameWorkspaceOnBranch: true,
 		deleteLocalBranchOnArchive: false,
 		archiveAfterMerge: false,
+		updateBaseAfterMerge: true,
 		coAuthorEnsemblr: true,
 		setUpstreamOnPush: true,
 		...overrides,

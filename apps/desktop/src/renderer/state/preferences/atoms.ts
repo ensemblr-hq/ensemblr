@@ -365,6 +365,7 @@ const REPO_SETTINGS_KEYS = [
 	'remoteOrigin',
 	'deleteLocalBranchOnArchive',
 	'archiveAfterMerge',
+	'updateBaseAfterMerge',
 	'showUpstreamIssues',
 	'filesToCopy',
 	'previewUrls',

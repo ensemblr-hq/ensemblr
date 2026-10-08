@@ -26,11 +26,9 @@ import type {
 import type { DictationService } from '../dictation';
 import type { EnvironmentVariablesService } from '../environment';
 import {
-	createGithubService,
 	createWorkspacePrStatusSweeper,
 	type GithubService,
 	listSweepableWorkspaces,
-	type PullRequestMergedEvent,
 } from '../github/index.ts';
 import type { InfisicalService } from '../infisical';
 import type { LinearAuthService, LinearService } from '../linear';
@@ -155,6 +153,8 @@ interface RegisterIpcHandlersOptions {
 	githubOwnerListService: GithubOwnerListService;
 	githubRemoteBranchListService: GithubRemoteBranchListService;
 	githubRepositoryListService: GithubRepositoryListService;
+	/** The `gh`-backed review flow, built in main so agent control shares it. */
+	githubService: GithubService;
 	harnessDetectionService: HarnessDetectionService;
 	linearAuthService: LinearAuthService;
 	linearService: LinearService;
@@ -173,8 +173,6 @@ interface RegisterIpcHandlersOptions {
 	rebuildMenu: () => void;
 	/** Fired after an in-app App-settings write so renderer and side-effects refresh. */
 	onAppSettingsUpdated?: (settings: AppSettings) => void;
-	/** Told when a workspace's pull request is seen to merge, by any path. */
-	onPullRequestMerged?: (event: PullRequestMergedEvent) => void;
 	openTargetService: OpenTargetService;
 	piExecutableService: PiExecutableService;
 	/** Merged per-runtime model catalog, shared with the agent-control spawn path. */
@@ -244,6 +242,7 @@ export function registerIpcHandlers({
 	githubOwnerListService,
 	githubRemoteBranchListService,
 	githubRepositoryListService,
+	githubService,
 	harnessDetectionService,
 	linearAuthService,
 	linearService,
@@ -255,7 +254,6 @@ export function registerIpcHandlers({
 	menuBarStore,
 	menuContextStore,
 	onAppSettingsUpdated,
-	onPullRequestMerged,
 	activeChatStore,
 	openTargetService,
 	rebuildMenu,
@@ -300,9 +298,8 @@ export function registerIpcHandlers({
 	 * Registers every handler group while the permission gate is intercepting
 	 * `ipcMain.handle`, and restores the original before returning so nothing
 	 * registered later is silently gated by a table it was never checked against.
-	 * @returns The GitHub service the PR sweeper outlives registration with.
 	 */
-	const registerGatedHandlerGroups = (): GithubService => {
+	const registerGatedHandlerGroups = (): void => {
 		try {
 			registerWindowHandlers({ requestRelaunch });
 			registerTextEditingHandlers();
@@ -440,14 +437,7 @@ export function registerIpcHandlers({
 			registerWorkspaceGitHandlers({
 				workspaceGitService: createWorkspaceGitService({ localCommandService }),
 			});
-			const service = createGithubService({
-				databaseService,
-				localCommandService,
-				onPullRequestMerged,
-				readCoAuthorEnabled: () =>
-					appSettingsService.read().git.coAuthorEnsemblr,
-			});
-			registerGithubHandlers({ githubService: service });
+			registerGithubHandlers({ githubService });
 			registerRepositorySourcesHandlers({
 				repositorySourcesService: createRepositorySourcesService({
 					databaseService,
@@ -456,12 +446,11 @@ export function registerIpcHandlers({
 						settingsResolutionService.resolve(request),
 				}),
 			});
-			return service;
 		} finally {
 			restorePermissionGate();
 		}
 	};
-	const githubService = registerGatedHandlerGroups();
+	registerGatedHandlerGroups();
 
 	const prStatusSweeper = createWorkspacePrStatusSweeper({
 		listActiveWorkspaces: () => {

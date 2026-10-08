@@ -377,6 +377,7 @@ branch_from = "develop"
 remote_origin = "upstream"
 delete_local_branch_on_archive = true
 archive_after_merge = true
+update_base_after_merge = false
 set_upstream_on_push = false
 show_upstream_issues = true
 `,
@@ -395,6 +396,7 @@ show_upstream_issues = true
 		remoteOrigin: 'upstream',
 		setUpstreamOnPush: false,
 		showUpstreamIssues: true,
+		updateBaseAfterMerge: false,
 	});
 	assert.deepEqual(loaded.snapshot.diagnostics, []);
 });

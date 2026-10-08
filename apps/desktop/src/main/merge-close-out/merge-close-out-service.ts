@@ -1,8 +1,9 @@
 /**
  * Closes out a workspace once its pull request merges: the board card moves to
- * Done, and the issue the workspace was created from is closed wherever it lives
+ * Done, the issue the workspace was created from is closed wherever it lives
  * — a Linear issue moves to its team's completed state, a GitHub issue is closed
- * as completed.
+ * as completed — and the local copy of the base branch is fast-forwarded to the
+ * merge.
  *
  * This is the app acting on a merge, not an agent acting on a ticket, which is
  * why it talks to the Linear service directly rather than through the
@@ -21,6 +22,7 @@ import type {
 	LinearIssueWire,
 	LinearResourceWire,
 } from '../../shared/ipc/contracts/linear.ts';
+import type { LocalBaseSyncOutcome } from '../../shared/workspace-merge.ts';
 import type { LocalCommandService } from '../commands/local-command';
 import type { PullRequestMergedEvent } from '../github';
 import type { LinearService } from '../linear';
@@ -34,6 +36,7 @@ export type LinkedIssueCloseOut =
 
 /** The outcome of closing out one merged pull request. */
 export interface MergeCloseOutReport extends PullRequestMergedEvent {
+	baseSync: LocalBaseSyncOutcome;
 	issue: LinkedIssueCloseOut;
 }
 
@@ -42,6 +45,11 @@ export interface MergeCloseOutDeps {
 	linearService: LinearService;
 	localCommandService: LocalCommandService;
 	readLinkedIssue: (workspaceId: string) => WorkspaceLinkedIssue | null;
+	/**
+	 * Fast-forwards the local copy of a merged workspace's base branch, honouring
+	 * the `updateBaseAfterMerge` setting. Must resolve rather than reject.
+	 */
+	syncLocalBase: (workspaceId: string) => Promise<LocalBaseSyncOutcome>;
 	/**
 	 * Moves a workspace's board card. Board status is renderer-owned, so this
 	 * updates the main-process mirror and broadcasts to every window, the same
@@ -56,12 +64,12 @@ export interface MergeCloseOutDeps {
 /** Public surface of the merge close-out. */
 export interface MergeCloseOutService {
 	/**
-	 * Closes out one merged pull request. Resolves null when that pull request
-	 * was already closed out this session, and never rejects.
+	 * Closes out one merged pull request, once per session: a repeat call for the
+	 * same pull request resolves to the first call's report, so a caller that
+	 * merged it can await the close-out the merge listener already started.
+	 * Never rejects.
 	 */
-	closeOut: (
-		event: PullRequestMergedEvent,
-	) => Promise<MergeCloseOutReport | null>;
+	closeOut: (event: PullRequestMergedEvent) => Promise<MergeCloseOutReport>;
 }
 
 const GH_TIMEOUT_MS = 45_000;
@@ -125,6 +133,10 @@ function completedStateOf(
 	);
 }
 
+/** Base-sync outcomes that are an ordinary result rather than something to log. */
+const QUIET_BASE_SYNC_STATUSES: ReadonlySet<LocalBaseSyncOutcome['status']> =
+	new Set(['disabled', 'fast-forwarded', 'up-to-date']);
+
 /**
  * Builds the merge close-out.
  * @param deps - The services and app state the close-out acts through.
@@ -135,8 +147,9 @@ export function createMergeCloseOutService({
 	localCommandService,
 	readLinkedIssue,
 	setBoardStatus,
+	syncLocalBase,
 }: MergeCloseOutDeps): MergeCloseOutService {
-	let closedOutKeys: ReadonlySet<string> = new Set();
+	let closeOuts: ReadonlyMap<string, Promise<MergeCloseOutReport>> = new Map();
 
 	/**
 	 * Finds the completed state for an issue's team, reading the cached metadata
@@ -265,23 +278,64 @@ export function createMergeCloseOutService({
 		}
 	};
 
+	/**
+	 * Fast-forwards the merged workspace's local base branch, turning a rejection
+	 * into an outcome so it cannot cost the issue its close.
+	 * @param event - The merge being closed out.
+	 * @returns What became of the local base branch.
+	 */
+	const syncBase = async (
+		event: PullRequestMergedEvent,
+	): Promise<LocalBaseSyncOutcome> => {
+		const outcome = await syncLocalBase(event.workspaceId).catch(
+			(cause: unknown): LocalBaseSyncOutcome => ({
+				detail: cause instanceof Error ? cause.message : String(cause),
+				status: 'unavailable',
+			}),
+		);
+		if (!QUIET_BASE_SYNC_STATUSES.has(outcome.status)) {
+			console.warn('[merge-close-out] left the local base branch as it was.', {
+				outcome,
+				pullRequestNumber: event.pullRequestNumber,
+				workspaceId: event.workspaceId,
+			});
+		}
+		return outcome;
+	};
+
+	/**
+	 * Runs every close-out step for one merge.
+	 * @param event - The merge being closed out.
+	 * @returns What each step did.
+	 */
+	const runCloseOut = async (
+		event: PullRequestMergedEvent,
+	): Promise<MergeCloseOutReport> => {
+		moveBoardCardToDone(event);
+		const [issue, baseSync] = await Promise.all([
+			closeLinkedIssue(event.workspaceId),
+			syncBase(event),
+		]);
+		if (issue.status === 'failed') {
+			console.warn('[merge-close-out] could not close the linked issue.', {
+				message: issue.message,
+				pullRequestNumber: event.pullRequestNumber,
+				workspaceId: event.workspaceId,
+			});
+		}
+		return { ...event, baseSync, issue };
+	};
+
 	return {
-		closeOut: async (event) => {
+		closeOut: (event) => {
 			const key = `${event.workspaceId}#${event.pullRequestNumber}`;
-			if (closedOutKeys.has(key)) {
-				return null;
+			const started = closeOuts.get(key);
+			if (started) {
+				return started;
 			}
-			closedOutKeys = new Set([...closedOutKeys, key]);
-			moveBoardCardToDone(event);
-			const issue = await closeLinkedIssue(event.workspaceId);
-			if (issue.status === 'failed') {
-				console.warn('[merge-close-out] could not close the linked issue.', {
-					message: issue.message,
-					pullRequestNumber: event.pullRequestNumber,
-					workspaceId: event.workspaceId,
-				});
-			}
-			return { ...event, issue };
+			const closeOut = runCloseOut(event);
+			closeOuts = new Map([...closeOuts, [key, closeOut]]);
+			return closeOut;
 		},
 	};
 }

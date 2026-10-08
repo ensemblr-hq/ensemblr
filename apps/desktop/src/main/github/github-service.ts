@@ -933,28 +933,28 @@ export function createGithubService({
 			}
 			// Refresh the cache so the workspace immediately reflects merged state.
 			const database = databaseService.getConnection()?.database ?? null;
-			if (database) {
-				const refreshed = await fetchSnapshot(cwd.cwd, baseBranch);
-				if (refreshed.ok) {
-					const cached = readCachedPullRequestSnapshot({
-						database,
-						workspaceId: request.workspaceId,
-					});
-					writeCachedPullRequestSnapshot({
-						database,
-						snapshot: retainCheckObservation(
-							retainKnownMergeability(refreshed.snapshot, cached),
-							cached,
-						),
-						workspaceId: request.workspaceId,
-					});
-					announceMerge(
-						request.workspaceId,
-						mergedPullRequestNumber(refreshed.snapshot),
-					);
-				}
+			if (!database) {
+				return { merged: true, pullRequestNumber: null };
 			}
-			return { merged: true };
+			const refreshed = await fetchSnapshot(cwd.cwd, baseBranch);
+			if (!refreshed.ok) {
+				return { merged: true, pullRequestNumber: null };
+			}
+			const cached = readCachedPullRequestSnapshot({
+				database,
+				workspaceId: request.workspaceId,
+			});
+			writeCachedPullRequestSnapshot({
+				database,
+				snapshot: retainCheckObservation(
+					retainKnownMergeability(refreshed.snapshot, cached),
+					cached,
+				),
+				workspaceId: request.workspaceId,
+			});
+			const pullRequestNumber = mergedPullRequestNumber(refreshed.snapshot);
+			announceMerge(request.workspaceId, pullRequestNumber);
+			return { merged: true, pullRequestNumber };
 		},
 	};
 

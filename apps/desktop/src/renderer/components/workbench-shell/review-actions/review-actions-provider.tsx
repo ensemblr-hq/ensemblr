@@ -30,6 +30,7 @@ const DEFAULT_MERGE_SETTINGS = {
 	archiveAfterMerge: false,
 	deleteLocalBranchOnArchive: false,
 	setUpstreamOnPush: true,
+	updateBaseAfterMerge: true,
 } as const;
 
 /**
@@ -176,6 +177,7 @@ export function ReviewActionsProvider({
 					}
 				}}
 				open={activeDialog?.kind === 'merge'}
+				updateBaseAfterMerge={mergeSettings.updateBaseAfterMerge}
 				workspace={activeWorkspace}
 			/>
 		</ReviewActionsContextProvider>

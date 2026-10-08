@@ -49,6 +49,7 @@ import type {
 	LinearUpdateIssueArgs,
 	ListTabsArgs,
 	ListTerminalsArgs,
+	MergePullRequestArgs,
 	MessageConciergeArgs,
 	MessageConciergeResult,
 	NotifyOrchestratorArgs,
@@ -585,6 +586,10 @@ function confirmationSummary(
 	const head = `Agent requests ${op} in workspace ${origin.workspaceId}.`;
 	if (op === 'runQueued') {
 		return `${head}\n\n${(args as RunQueuedArgs).command}`;
+	}
+	if (op === 'mergePullRequest') {
+		const method = (args as MergePullRequestArgs).method ?? 'squash';
+		return `${head}\n\nIt would merge this workspace's pull request (${method}) into its base branch.`;
 	}
 	if (op !== 'updateAppSettings') {
 		return head;
@@ -3327,6 +3332,31 @@ export function createAgentControlService({
 		return ok({ ok: true });
 	};
 
+	/**
+	 * Merges the caller's own pull request and hands back the close-out's report.
+	 * A failed merge is the result, not an error, so the agent reads the failure
+	 * code and decides what to tell the user.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The merge method, squash when omitted.
+	 * @returns The merge outcome, or a failure envelope when no workspace resolves.
+	 */
+	const handleMergePullRequest = async (
+		origin: AgentControlOrigin,
+		args: MergePullRequestArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		const target = await resolveTargetWorkspace(origin, undefined);
+		if ('failure' in target) {
+			return target.failure;
+		}
+		return ok(
+			await ports.pullRequests.merge({
+				method: args.method,
+				workspaceCwd: target.cwd,
+				workspaceId: target.workspaceId,
+			}),
+		);
+	};
+
 	const handleGetWorkspaceStatus = async (
 		origin: AgentControlOrigin,
 		args: GetWorkspaceStatusArgs,
@@ -4172,6 +4202,8 @@ export function createAgentControlService({
 			handleSetSummary(origin, args as SetSummaryArgs),
 		setWorkspaceStatus: ({ args, origin }) =>
 			handleSetWorkspaceStatus(origin, args as SetWorkspaceStatusArgs),
+		mergePullRequest: ({ args, origin }) =>
+			handleMergePullRequest(origin, args as MergePullRequestArgs),
 		getArchitectureDiagram: ({ origin }) =>
 			handleGetArchitectureDiagram(origin),
 		updateArchitectureDiagram: ({ args, origin }) =>

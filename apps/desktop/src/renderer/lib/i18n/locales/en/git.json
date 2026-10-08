@@ -83,6 +83,8 @@
 		"after-merge-archive-branch": "Workspace will be archived and the local branch deleted",
 		"after-merge-label": "After merge",
 		"after-merge-stay": "Workspace stays open (archive offered after merge)",
+		"after-merge-update-base": "Local {{branch}} will be fast-forwarded",
+		"after-merge-update-base-unnamed": "Local base branch will be fast-forwarded",
 		"checks-blocked": "{{failing}} failing, {{pending}} pending",
 		"checks-label": "Checks",
 		"checks-none": "No checks reported",

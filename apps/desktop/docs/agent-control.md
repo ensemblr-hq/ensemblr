@@ -211,20 +211,20 @@ from. A tab the Concierge reuses has any marker its last tenant left cleared,
 because the tab now hosts a root; a spawn that fails to submit puts back whatever
 the tab carried before rather than assuming which way the write went.
 
-The policy refuses a leaf twenty-two ops with `denied-scope`:
+The policy refuses a leaf twenty-three ops with `denied-scope`:
 
 `spawnChatTab`, `startConversation`, `startReview`, `sendFollowUp`,
 `launchHarness`, `listModels`, `startTerminal`, `stopTerminal`, `waitForAgents`,
 `writeTerminal`, `openTab`, `closeTab`, `setBranchName`, `setWorkspaceStatus`,
-`getArchitectureDiagram`, `updateArchitectureDiagram`, `askUserQuestion`,
+`mergePullRequest`, `getArchitectureDiagram`, `updateArchitectureDiagram`, `askUserQuestion`,
 `exitPlanMode`, `linearCreateComment`, `linearCreateIssue`, `linearUpdateIssue`,
 `messageConcierge`.
 
-The policy refuses a manager seventeen ops with `denied-scope`:
+The policy refuses a manager eighteen ops with `denied-scope`:
 
 `spawnChatTab`, `startReview`, `launchHarness`, `startTerminal`, `stopTerminal`,
 `writeTerminal`, `openTab`, `setBranchName`, `setWorkspaceStatus`,
-`getArchitectureDiagram`, `updateArchitectureDiagram`, `askUserQuestion`,
+`mergePullRequest`, `getArchitectureDiagram`, `updateArchitectureDiagram`, `askUserQuestion`,
 `exitPlanMode`, `linearCreateComment`, `linearCreateIssue`, `linearUpdateIssue`,
 `messageConcierge`.
 
@@ -238,7 +238,7 @@ always treated as a depth-2 leaf.
 `listRunScripts` is not denied — no descendant can start a workspace-owned run
 script, so the listing is merely unusable. It is the sole member of
 `SUBAGENT_UNUSABLE_OPS` and is withheld from every descendant.
-`SUBAGENT_WITHHELD_OPS` — twenty-three ops in all — is the leaf-safe default. The
+`SUBAGENT_WITHHELD_OPS` — twenty-four ops in all — is the leaf-safe default. The
 Pi extension uses `ENSEMBLR_CONTROL_DEPTH` to select the manager or leaf set and
 defaults an unrecognized descendant value to leaf.
 
@@ -331,7 +331,7 @@ harness.
 
 ## Tool reference
 
-Fifty-three tools, enumerated from `TOOL_DEFS` in
+Fifty-four tools, enumerated from `TOOL_DEFS` in
 `src/main/agent-control/mcp-endpoint.ts`. The argument names and types below are
 the authoritative Zod schemas in `src/shared/agent-control/schemas.ts` — every
 schema is a `strictObject`, so an argument not listed here is rejected as
@@ -605,6 +605,7 @@ session cancels every job it still has queued or running.
 | `ensemblr_focus_workspace` | **`workspaceId: string`** | write | workspace agent |
 | `ensemblr_create_workspace` | **`projectId: string`**, **`name: string`**, `baseBranch?: string` | write, spawn | workspace agent |
 | `ensemblr_set_workspace_status` | **`status: 'backlog' \| 'in-progress' \| 'in-review' \| 'done' \| 'canceled'`**, `workspaceId?: string` | write | sub-agent |
+| `ensemblr_merge_pull_request` | `method?: 'squash' \| 'merge' \| 'rebase'` | write | Concierge, sub-agent |
 | `ensemblr_get_workspace_status` | `workspaceId?: string` | read | — |
 | `ensemblr_list_projects` | *(none)* | read | workspace agent |
 | `ensemblr_list_workspaces` | *(none)* | read | — |
@@ -612,6 +613,19 @@ session cancels every job it still has queued or running.
 | `ensemblr_list_terminals` | `workspaceId?: string` | read | — |
 
 `file`/`diff` tabs need `filePath`; a `comment` tab needs `commentBody`.
+
+**`ensemblr_merge_pull_request` merges the way the Merge button does.** It calls
+`mergeWorkspacePullRequest` (`src/main/merge-close-out/workspace-merge.ts`) through
+the `pullRequests` port, then answers with the `WorkspaceMergeOutcome` from
+`src/shared/workspace-merge.ts`: `merged` carries the pull request number, the
+linked-issue close-out status, and what became of the local base branch;
+`queued` means a merge queue took it and the close-out follows on a later
+refresh; `failed` carries the `GithubFailure`. A failed merge is the result, not
+an error envelope, so the agent reads the failure code. The method defaults to
+squash. The op is a plain control write: it follows the workspace permission
+mode rather than the always-confirm `pull-request-merge` action, it never
+archives the workspace (that would end the calling session), and it is refused
+in Plan Mode, in AFK Mode, to a sub-agent, and to the Concierge.
 
 **A `file` or `diff` tab names itself after the file.** The op stamps the target's basename as the
 tab title, which is what the renderer's own openers do and is locale-neutral, so writing it from the
@@ -1499,7 +1513,7 @@ build routinely outlives two minutes.
 
 **Raising it per server means the app owes a bound per op.** A day is the right
 answer for the six ops that block by design and the wrong one for the other
-forty-nine: before, a wedged port surfaced to the agent as its client's
+fifty: before, a wedged port surfaced to the agent as its client's
 60-second timeout and the turn carried on; after, the same wedge would hold the
 agent for a day while the heartbeat reported it healthy. Port coverage does not
 close that on its own — `linear-client.ts` and `workspace-git-status.ts` bound

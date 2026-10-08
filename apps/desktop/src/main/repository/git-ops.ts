@@ -45,7 +45,7 @@ export type WorktreeRemoveOutcome =
 	| { status: 'failure'; message: string };
 
 /** Parsed reference to a branch hosted by a configured Git remote. */
-interface RemoteBranchRef {
+export interface RemoteBranchRef {
 	branch: string;
 	remote: string;
 }
@@ -446,7 +446,7 @@ function describeWorktreeAddFailure(result: LocalCommandResult): string {
  * @param stderr - Raw stderr from the git process.
  * @returns The real error line, or an empty string.
  */
-function extractGitError(stderr: string): string {
+export function extractGitError(stderr: string): string {
 	const lines = stderr
 		.split(/\r?\n/)
 		.map((line) => line.trim())
@@ -543,7 +543,7 @@ export async function resolveRootBranch({
  * @param options - Candidate ref and Git command dependencies.
  * @returns The parsed remote ref, or `null` for local branch refs.
  */
-async function resolveConfiguredRemoteRef({
+export async function resolveConfiguredRemoteRef({
 	baseBranch,
 	localCommandService,
 	repositoryPath,
@@ -571,7 +571,7 @@ async function resolveConfiguredRemoteRef({
  * @param options - Local branch and Git command dependencies.
  * @returns The upstream ref, or `null` when none is configured.
  */
-async function readUpstreamRef({
+export async function readUpstreamRef({
 	baseBranch,
 	localCommandService,
 	repositoryPath,
@@ -754,7 +754,7 @@ export async function ensureBaseRefAvailable({
  * @param options - Remote ref and Git command dependencies.
  * @returns True when the fetch succeeded.
  */
-async function fetchRemoteRef({
+export async function fetchRemoteRef({
 	localCommandService,
 	remoteRef,
 	repositoryPath,
@@ -773,7 +773,7 @@ async function fetchRemoteRef({
 }
 
 /** Runs a read-only git command, returning trimmed stdout (empty on failure). */
-async function runGitText({
+export async function runGitText({
 	args,
 	localCommandService,
 	maxOutputBytes = 16 * 1024,
@@ -799,7 +799,7 @@ async function runGitText({
 }
 
 /** Runs a git command and reports whether it exited successfully. */
-async function runGitSucceeds({
+export async function runGitSucceeds({
 	args,
 	localCommandService,
 	maxOutputBytes = 4 * 1024,

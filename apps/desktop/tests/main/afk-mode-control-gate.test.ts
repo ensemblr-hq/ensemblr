@@ -93,6 +93,7 @@ const makePorts = (options: {
 			}),
 		},
 		linear: { readLinkedIssue: vi.fn().mockReturnValue(null) },
+		pullRequests: { merge: vi.fn().mockResolvedValue({ status: 'queued' }) },
 	}) as unknown as AgentControlPorts;
 
 const setup = (options: {
@@ -177,6 +178,30 @@ describe('afk mode: the ask tool', () => {
 		const result = await invoke(service, 'listWorkspaces');
 
 		expect(result.ok).toBe(true);
+	});
+});
+
+describe('afk mode: merging the pull request', () => {
+	it('refuses `mergePullRequest` and tells the agent to report instead', async () => {
+		const { ports, service } = setup({ unattended: true });
+
+		const result = await invoke(service, 'mergePullRequest');
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-scope');
+			expect(result.error).toContain('ready to merge');
+		}
+		expect(ports.pullRequests.merge).not.toHaveBeenCalled();
+	});
+
+	it('merges while the user is present', async () => {
+		const { ports, service } = setup({ unattended: false });
+
+		const result = await invoke(service, 'mergePullRequest');
+
+		expect(result.ok).toBe(true);
+		expect(ports.pullRequests.merge).toHaveBeenCalledOnce();
 	});
 });
 

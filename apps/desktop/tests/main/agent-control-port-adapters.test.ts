@@ -339,6 +339,31 @@ describe('agent-control port adapters: non-chat tab titles', () => {
 	});
 });
 
+describe('agent-control port adapters: pull requests', () => {
+	it('merge delegates to the workspace merge and returns its outcome untouched', async () => {
+		const { deps } = makeDeps();
+		const outcome = { status: 'queued' } as const;
+		const mergeWorkspacePullRequest = vi.fn().mockResolvedValue(outcome);
+		const ports = createAgentControlPorts({
+			...deps,
+			mergeWorkspacePullRequest,
+		});
+
+		const result = await ports.pullRequests.merge({
+			method: 'rebase',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+
+		expect(result).toBe(outcome);
+		expect(mergeWorkspacePullRequest).toHaveBeenCalledWith({
+			method: 'rebase',
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+	});
+});
+
 describe('agent-control port adapters: board status', () => {
 	it('setWorkspaceStatus updates the mirror and broadcasts', () => {
 		const { deps, broadcastBoardStatus, boardStatusStore } = makeDeps();

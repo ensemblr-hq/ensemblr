@@ -33,4 +33,5 @@ export interface ReviewMergeSettings {
 	archiveAfterMerge: boolean;
 	deleteLocalBranchOnArchive: boolean;
 	setUpstreamOnPush: boolean;
+	updateBaseAfterMerge: boolean;
 }

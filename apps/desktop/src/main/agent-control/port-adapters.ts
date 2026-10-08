@@ -49,6 +49,7 @@ import { assignedRolesFor } from '../../shared/model-role.ts';
 import type { PermissionMode } from '../../shared/permissions.ts';
 import { planModeFollowUpDenial } from '../../shared/plan-mode.ts';
 import { selectDefaultRunScript } from '../../shared/scripts.ts';
+import type { WorkspaceMergeOutcome } from '../../shared/workspace-merge.ts';
 import type {
 	SpawnCallerIdentity,
 	SpawnModelResolver,
@@ -73,6 +74,7 @@ import type { ChatTabService } from '../chat-tabs/chat-tab-service.ts';
 import type { ComputeQueueService } from '../compute-queue/index.ts';
 import type { AppSettingsService } from '../config';
 import type { LinearService } from '../linear';
+import type { WorkspaceMergeRequest } from '../merge-close-out';
 import type { PiExecutableService } from '../pi-runtime';
 import { isBlockedByPiExecutable } from '../pi-runtime/pi-executable-gate.ts';
 import type { RenameWorkspaceService } from '../repository';
@@ -114,6 +116,7 @@ import {
 	type MemoryPort,
 	originHasChatTab,
 	type PlanModePort,
+	type PullRequestPort,
 	type ReviewLaunchPort,
 	type SessionNamingPort,
 	type StartTerminalOutcome,
@@ -198,6 +201,14 @@ export interface PortAdapterDeps {
 	 * agent the choice it could not make. Empty when Linear is not composed in.
 	 */
 	listLinearAccounts: () => Promise<readonly LinearAccountRef[]>;
+	/**
+	 * Merges a workspace's pull request and awaits the close-out, for
+	 * `mergePullRequest`. Injected so the adapters never load the merge
+	 * close-out's repository and storage tree.
+	 */
+	mergeWorkspacePullRequest: (
+		request: WorkspaceMergeRequest,
+	) => Promise<WorkspaceMergeOutcome>;
 	/** Names a workspace and its git branch together, for `setBranchName`. */
 	renameWorkspace: RenameWorkspaceService['rename'];
 	/**
@@ -1797,6 +1808,18 @@ function makeBoardPort(deps: PortAdapterDeps): BoardPort {
 }
 
 /**
+ * Builds the pull-request port: the merge the Merge button runs, followed by the
+ * close-out it sets off, awaited so the agent reads what happened.
+ * @param deps - Adapter collaborators.
+ * @returns The pull-request port.
+ */
+function makePullRequestPort(deps: PortAdapterDeps): PullRequestPort {
+	return {
+		merge: (request) => deps.mergeWorkspacePullRequest(request),
+	};
+}
+
+/**
  * Builds the session-naming port over the workspace rename service, the naming
  * policy module, and the Pi session service. Naming policy itself lives in
  * `agent-runtime/naming/`; this stays wiring — resolve the database and the user's
@@ -1972,6 +1995,7 @@ export function createAgentControlPorts(
 		harnesses: makeHarnessPort(deps),
 		focus: makeFocusPort(deps),
 		board: makeBoardPort(deps),
+		pullRequests: makePullRequestPort(deps),
 		diff: makeDiffPort(deps),
 		review: makeReviewPort(deps),
 		linear: makeLinearPort(deps),

@@ -250,6 +250,7 @@ const makePorts = (
 		focusWorkspace: vi.fn(),
 	},
 	board: { setWorkspaceStatus: vi.fn(), getWorkspaceStatus: () => 'backlog' },
+	pullRequests: { merge: vi.fn() },
 	diff: { readWorkspaceDiff: vi.fn() },
 	review: {
 		listComments: vi.fn(),

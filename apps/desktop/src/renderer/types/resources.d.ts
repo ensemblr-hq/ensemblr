@@ -1171,6 +1171,8 @@ export default interface Resources {
 			'after-merge-archive-branch': 'Workspace will be archived and the local branch deleted';
 			'after-merge-label': 'After merge';
 			'after-merge-stay': 'Workspace stays open (archive offered after merge)';
+			'after-merge-update-base': 'Local {{branch}} will be fast-forwarded';
+			'after-merge-update-base-unnamed': 'Local base branch will be fast-forwarded';
 			'checks-blocked': '{{failing}} failing, {{pending}} pending';
 			'checks-label': 'Checks';
 			'checks-none': 'No checks reported';
@@ -2018,6 +2020,10 @@ export default interface Resources {
 				label: 'Set upstream on plain `git push`';
 			};
 			title: 'Git';
+			'update-base-on-merge': {
+				description: 'After the PR merges, fetch the base branch and fast-forward the local copy of it, like `git pull --ff-only`. A branch with local commits of its own is never touched.';
+				label: 'Update base branch after merge';
+			};
 		};
 		header: {
 			'edit-config': 'Edit in {{file}}';
@@ -2597,6 +2603,10 @@ export default interface Resources {
 				description: 'Runs when a new workspace is created.';
 				label: 'Setup script';
 				placeholder: 'e.g. npm ci';
+			};
+			'update-base-on-merge': {
+				description: 'After the PR merges, fetch the base branch and fast-forward the local copy of it, like `git pull --ff-only`. A branch with local commits of its own is never touched. Overrides your user-scope default for this repo.';
+				label: 'Update base branch after merge';
 			};
 			'upstream-issues': {
 				description: "For a fork, list the upstream repository's GitHub issues on the board and in issue pickers instead of the fork's own.";
@@ -3280,6 +3290,10 @@ export default interface Resources {
 			'list-workspaces': {
 				done: 'Listed workspaces';
 				running: 'Listing workspaces';
+			};
+			'merge-pull-request': {
+				done: 'Merged the pull request';
+				running: 'Merging the pull request';
 			};
 			'message-concierge': {
 				done: 'Messaged the Concierge';

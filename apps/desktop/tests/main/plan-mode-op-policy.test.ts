@@ -69,6 +69,9 @@ const EXPECTED_DENIALS: Record<
 	openTab: [],
 	readConversation: [],
 	readTerminalOutput: [],
+	// Denied for both roles: a merge ships a change, and none of it is approved
+	// while `write` and `edit` are blocked.
+	mergePullRequest: ['orchestrator', 'subagent'],
 	resolveDiffComments: ['orchestrator', 'subagent'],
 	sendFollowUp: 'conditional',
 	// Allowed for both roles, and deliberately so: the branch it moves is the one

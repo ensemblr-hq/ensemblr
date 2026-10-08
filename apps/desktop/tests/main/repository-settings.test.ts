@@ -73,6 +73,7 @@ test('upsertRepositorySettings persists rows the resolver reads as sqlite', (t) 
 			previewUrls: [{ name: 'Dev', url: 'http://localhost:3000' }],
 			remoteOrigin: 'upstream',
 			showUpstreamIssues: true,
+			updateBaseAfterMerge: false,
 		},
 	});
 
@@ -88,6 +89,7 @@ test('upsertRepositorySettings persists rows the resolver reads as sqlite', (t) 
 			remoteOrigin: resolved('remoteOrigin')?.value,
 			showUpstreamIssues: resolved('showUpstreamIssues')?.value,
 			source: resolved('branchFrom')?.source,
+			updateBaseAfterMerge: resolved('updateBaseAfterMerge')?.value,
 		},
 		{
 			archiveAfterMerge: true,
@@ -98,7 +100,38 @@ test('upsertRepositorySettings persists rows the resolver reads as sqlite', (t) 
 			remoteOrigin: 'upstream',
 			showUpstreamIssues: true,
 			source: 'sqlite',
+			updateBaseAfterMerge: false,
 		},
+	);
+});
+
+test('updateBaseAfterMerge resolves on until a repository turns it off', (t) => {
+	const database = createDatabaseFixture(t);
+
+	const before = resolvedRepository(database)('updateBaseAfterMerge');
+	upsertRepositorySettings({
+		database,
+		repositoryId: REPO_ID,
+		settings: { updateBaseAfterMerge: false },
+	});
+	const off = resolvedRepository(database)('updateBaseAfterMerge');
+	upsertRepositorySettings({
+		database,
+		repositoryId: REPO_ID,
+		settings: { updateBaseAfterMerge: null },
+	});
+	const cleared = resolvedRepository(database)('updateBaseAfterMerge');
+
+	assert.deepEqual(
+		[before, off, cleared].map((setting) => ({
+			source: setting?.source,
+			value: setting?.value,
+		})),
+		[
+			{ source: 'built-in-default', value: true },
+			{ source: 'sqlite', value: false },
+			{ source: 'built-in-default', value: true },
+		],
 	);
 });
 

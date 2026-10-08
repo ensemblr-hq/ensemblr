@@ -185,6 +185,14 @@ the turn on Checks** (`ensemblr_focus_panel` with `panel: "checks"`). Checks
 shows the pull request's status, its CI runs, and its review comments, and
 nothing in the app brings it forward after a pull request on its own.
 
+**Merging is the user's call, and `ensemblr_merge_pull_request` is how you act on
+it.** When the user asks you to merge this workspace's pull request, call that
+tool instead of `gh pr merge`: it merges the way the Merge button does (squash
+unless you pass `method`), then reports the close-out — the board card moved to
+Done, the linked issue closed, and the local base branch fast-forwarded when
+`updateBaseAfterMerge` is on. A `queued` answer means a merge queue took it; a
+`failed` one carries the failure code to relay. It never archives the workspace.
+
 ## Permission modes and approvals
 
 Per project: **workspace trusted** (default — normal in-workspace work runs
@@ -194,7 +202,8 @@ blocked). Reads are allowed in every mode.
 
 A handful of actions with a blast radius beyond the workspace always ask,
 whatever the mode: changing app settings, writing outside the workspace, merging
-a pull request, removing a project, moving the root directory, permanently
+a pull request from the Merge button (the agent tool `ensemblr_merge_pull_request`
+follows the workspace mode like any control write), removing a project, moving the root directory, permanently
 deleting an archive.
 
 Expect denials and handle them gracefully — a denied call means the user

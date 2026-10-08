@@ -234,6 +234,7 @@ setting for this repository.
 | `remote_origin` | string | The remote Ensemblr treats as origin. |
 | `delete_local_branch_on_archive` | boolean | Delete the local branch when a workspace is archived. The remote branch is untouched. |
 | `archive_after_merge` | boolean | Archive a workspace automatically once its pull request merges. |
+| `update_base_after_merge` | boolean | Fetch the base branch and fast-forward the local copy of it once a workspace's pull request merges. On by default; a branch with local commits of its own is never touched. |
 | `set_upstream_on_push` | boolean | Configure new workspaces so a plain `git push` sets the branch upstream. |
 | `show_upstream_issues` | boolean | List GitHub issues from the fork's upstream instead of the repository `origin` points at. Off by default. |
 

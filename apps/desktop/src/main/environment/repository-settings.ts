@@ -15,7 +15,7 @@ interface UpsertRepositorySettingsInput {
 /**
  * Persists a repository's personal settings patch as repository-scoped SQLite
  * rows the settings resolver reads verbatim (`branchFrom`, `remoteOrigin`,
- * `deleteLocalBranchOnArchive`, `archiveAfterMerge`, `showUpstreamIssues`,
+ * `deleteLocalBranchOnArchive`, `archiveAfterMerge`, `updateBaseAfterMerge`, `showUpstreamIssues`,
  * `filesToCopy`, `previewUrls`, `security.permissionMode`). An omitted field is left
  * untouched; an explicit `null` (or a
  * blank string / empty list) deletes its row so the value falls back to
@@ -55,6 +55,12 @@ export function upsertRepositorySettings({
 			key: 'archiveAfterMerge',
 			scope,
 			value: settings.archiveAfterMerge,
+		});
+		setBooleanSetting({
+			database,
+			key: 'updateBaseAfterMerge',
+			scope,
+			value: settings.updateBaseAfterMerge,
 		});
 		setBooleanSetting({
 			database,

@@ -38,10 +38,10 @@ describe('afk directive', () => {
 describe('afk control-op policy', () => {
 	// Held as an explicit list rather than derived: adding an op to
 	// `AGENT_CONTROL_OPS` should fail this until someone decides whether it parks
-	// the turn on a human.
-	const BLOCKED = new Set(['askUserQuestion']);
+	// the turn on a human or lands work nobody is there to answer for.
+	const BLOCKED = new Set(['askUserQuestion', 'mergePullRequest']);
 
-	it('refuses exactly the ops that wait on a human', () => {
+	it('refuses exactly the ops that wait on a human or merge unwatched', () => {
 		const refused = AGENT_CONTROL_OPS.filter(
 			(op) => afkModeControlOpDenial(op) !== null,
 		);
@@ -54,5 +54,12 @@ describe('afk control-op policy', () => {
 
 		expect(denial).toContain('they are away');
 		expect(denial).toContain('Decide it yourself');
+	});
+
+	it('tells an unattended agent to leave the pull request open and report it', () => {
+		const denial = afkModeControlOpDenial('mergePullRequest') ?? '';
+
+		expect(denial).toContain('they are away');
+		expect(denial).toContain('ready to merge');
 	});
 });

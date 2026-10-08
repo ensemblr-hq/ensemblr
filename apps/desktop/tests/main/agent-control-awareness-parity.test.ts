@@ -1938,3 +1938,33 @@ describe('the third-party CLI harness feature switch', () => {
 		);
 	});
 });
+
+describe('merge pull request in the playbooks', () => {
+	it('tells the roles that hold the tool to use it instead of `gh pr merge`', () => {
+		for (const playbook of [
+			ORCHESTRATOR_AWARENESS,
+			NATIVE_ORCHESTRATOR_AWARENESS,
+			HARNESS_AWARENESS,
+		]) {
+			expect(playbook).toContain('`ensemblr_merge_pull_request`');
+			expect(playbook).toContain('rather than running `gh pr merge`');
+			expect(playbook).toContain('Never merge unasked');
+		}
+	});
+
+	it('never offers it to a sub-agent or the Concierge, and names it among the blocked while planning', () => {
+		for (const playbook of [
+			MANAGER_SUBAGENT_AWARENESS,
+			SUBAGENT_AWARENESS,
+			CONCIERGE_AWARENESS,
+		]) {
+			expect(playbook).not.toContain('rather than running `gh pr merge`');
+		}
+		expect(PLAN_MODE_ORCHESTRATOR_AWARENESS).toContain(
+			'`ensemblr_merge_pull_request`',
+		);
+		expect(PLAN_MODE_SUBAGENT_AWARENESS).toContain(
+			'`ensemblr_merge_pull_request`',
+		);
+	});
+});

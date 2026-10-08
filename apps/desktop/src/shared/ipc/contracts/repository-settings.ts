@@ -28,6 +28,7 @@ export interface RepositorySettingsPatch {
 	 * picked, else the `upstream` remote's — instead of the one `origin` points at.
 	 */
 	showUpstreamIssues?: boolean | null;
+	updateBaseAfterMerge?: boolean | null;
 }
 
 /** Request to persist a repository's personal settings patch to SQLite. */

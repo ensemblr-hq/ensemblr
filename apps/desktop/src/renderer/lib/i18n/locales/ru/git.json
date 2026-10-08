@@ -89,6 +89,8 @@
 		"after-merge-archive-branch": "Рабочее пространство будет заархивировано, а локальная ветка удалена",
 		"after-merge-label": "После merge",
 		"after-merge-stay": "Рабочее пространство останется открытым (архивация будет предложена после merge)",
+		"after-merge-update-base": "Локальная ветка {{branch}} будет обновлена через fast-forward",
+		"after-merge-update-base-unnamed": "Локальная базовая ветка будет обновлена через fast-forward",
 		"checks-blocked": "{{failing}} с ошибками, {{pending}} в ожидании",
 		"checks-label": "Проверки",
 		"checks-none": "Проверок нет",

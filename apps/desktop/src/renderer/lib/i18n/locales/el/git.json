@@ -83,6 +83,8 @@
 		"after-merge-archive-branch": "Ο χώρος εργασίας θα αρχειοθετηθεί και ο τοπικός κλάδος θα διαγραφεί",
 		"after-merge-label": "Μετά το merge",
 		"after-merge-stay": "Ο χώρος εργασίας παραμένει ανοιχτός (η αρχειοθέτηση προτείνεται μετά το merge)",
+		"after-merge-update-base": "Ο τοπικός κλάδος {{branch}} θα ενημερωθεί με fast-forward",
+		"after-merge-update-base-unnamed": "Ο τοπικός βασικός κλάδος θα ενημερωθεί με fast-forward",
 		"checks-blocked": "{{failing}} απέτυχαν, {{pending}} σε εκκρεμότητα",
 		"checks-label": "Έλεγχοι",
 		"checks-none": "Δεν αναφέρθηκαν έλεγχοι",

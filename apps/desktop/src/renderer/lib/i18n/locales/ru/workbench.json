@@ -585,6 +585,10 @@
 			"done": "Получил список рабочих пространств",
 			"running": "Получает список рабочих пространств"
 		},
+		"merge-pull-request": {
+			"done": "Выполнил merge pull request",
+			"running": "Выполняет merge pull request"
+		},
 		"message-concierge": {
 			"done": "Отправил сообщение Консьержу",
 			"running": "Отправляет сообщение Консьержу"

@@ -888,6 +888,22 @@ export const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 				),
 		],
 	},
+	ensemblr_merge_pull_request: {
+		detailKeys: ['method'],
+		glyph: 'git-merge',
+		title: [
+			() =>
+				i18n.t(
+					'workbench:control-tool.merge-pull-request.done',
+					'Merged the pull request',
+				),
+			() =>
+				i18n.t(
+					'workbench:control-tool.merge-pull-request.running',
+					'Merging the pull request',
+				),
+		],
+	},
 	ensemblr_set_workspace_status: {
 		detailKeys: ['status'],
 		glyph: 'kanban',

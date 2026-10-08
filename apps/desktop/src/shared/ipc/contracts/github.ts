@@ -265,10 +265,15 @@ export interface MergePullRequestRequest {
 	workspaceId: string;
 }
 
-/** Result of merging a pull request. */
+/**
+ * Result of merging a pull request. `merged` reports that `gh pr merge`
+ * succeeded; `pullRequestNumber` is the pull request the refresh right after it
+ * read as merged, and stays null when a merge queue only enqueued it.
+ */
 export interface MergePullRequestResult {
 	error?: GithubFailure;
 	merged: boolean;
+	pullRequestNumber?: number | null;
 }
 
 /** GitHub review-flow IPC surface (commit/push/PR/checks/merge through `gh`). */

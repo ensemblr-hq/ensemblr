@@ -192,6 +192,7 @@ describe('the Concierge withholding axis', () => {
 			'stopTerminal',
 			'writeTerminal',
 			'setBranchName',
+			'mergePullRequest',
 		] as const) {
 			expect(CONCIERGE_WITHHELD_OPS.has(op)).toBe(true);
 			expect(conciergeControlOpDenial(op)).not.toBeNull();

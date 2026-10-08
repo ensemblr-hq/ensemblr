@@ -46,6 +46,13 @@ export const DEMO_REPOSITORY_SETTINGS: SettingsResolutionGroupSnapshot = {
 		},
 		{
 			candidates: [],
+			key: 'updateBaseAfterMerge',
+			locked: false,
+			source: 'built-in-default',
+			value: true,
+		},
+		{
+			candidates: [],
 			key: 'setUpstreamOnPush',
 			locked: false,
 			source: 'user-default',

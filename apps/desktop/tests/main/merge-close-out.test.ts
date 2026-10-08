@@ -16,6 +16,7 @@ import type {
 	LinearIssueWire,
 	LinearResourceWire,
 } from '../../src/shared/ipc/contracts/linear.ts';
+import type { LocalBaseSyncOutcome } from '../../src/shared/workspace-merge.ts';
 
 const ACCOUNT_ID = 'acct-1';
 const TEAM_ID = 'team-1';
@@ -27,6 +28,13 @@ const LINEAR_LINK: WorkspaceLinkedIssue = {
 	provider: 'linear',
 	title: 'Ship it',
 	url: 'https://linear.app/the/issue/THE-42',
+};
+
+const FAST_FORWARDED: LocalBaseSyncOutcome = {
+	branch: 'master',
+	from: 'aaa',
+	status: 'fast-forwarded',
+	to: 'bbb',
 };
 
 const GITHUB_LINK: WorkspaceLinkedIssue = {
@@ -175,10 +183,12 @@ function closeOutWith({
 	linear = fakeLinear(),
 	commands = fakeCommands(),
 	readLinkedIssue = () => LINEAR_LINK,
+	syncLocalBase = vi.fn(async () => FAST_FORWARDED),
 }: {
 	linear?: ReturnType<typeof fakeLinear>;
 	commands?: ReturnType<typeof fakeCommands>;
 	readLinkedIssue?: MergeCloseOutDeps['readLinkedIssue'];
+	syncLocalBase?: MergeCloseOutDeps['syncLocalBase'];
 } = {}) {
 	const setBoardStatus = vi.fn();
 	const service = createMergeCloseOutService({
@@ -186,8 +196,9 @@ function closeOutWith({
 		localCommandService: commands.service,
 		readLinkedIssue,
 		setBoardStatus,
+		syncLocalBase,
 	});
-	return { commands, linear, service, setBoardStatus };
+	return { commands, linear, service, setBoardStatus, syncLocalBase };
 }
 
 describe('merge close-out', () => {
@@ -215,7 +226,11 @@ describe('merge close-out', () => {
 			id: 'issue-uuid',
 			input: { stateId: 'state-done' },
 		});
-		expect(report).toEqual({ ...MERGE, issue: { status: 'closed' } });
+		expect(report).toEqual({
+			...MERGE,
+			baseSync: FAST_FORWARDED,
+			issue: { status: 'closed' },
+		});
 	});
 
 	it('falls back to the first completed state when none is named Done', async () => {
@@ -240,7 +255,7 @@ describe('merge close-out', () => {
 		const report = await service.closeOut(MERGE);
 
 		expect(linear.updateIssue).not.toHaveBeenCalled();
-		expect(report?.issue).toEqual({ status: 'already-closed' });
+		expect(report.issue).toEqual({ status: 'already-closed' });
 	});
 
 	it('syncs the metadata once when the cache has no completed state for the team', async () => {
@@ -258,7 +273,7 @@ describe('merge close-out', () => {
 			accountId: ACCOUNT_ID,
 			refresh: true,
 		});
-		expect(report?.issue).toEqual({ status: 'closed' });
+		expect(report.issue).toEqual({ status: 'closed' });
 	});
 
 	it('reports a team with no completed state as a failure, without writing', async () => {
@@ -270,7 +285,7 @@ describe('merge close-out', () => {
 		const report = await service.closeOut(MERGE);
 
 		expect(linear.updateIssue).not.toHaveBeenCalled();
-		expect(report?.issue.status).toBe('failed');
+		expect(report.issue.status).toBe('failed');
 		expect(warn).toHaveBeenCalledOnce();
 	});
 
@@ -286,7 +301,7 @@ describe('merge close-out', () => {
 		const report = await service.closeOut(MERGE);
 
 		expect(setBoardStatus).toHaveBeenCalledWith('ws-1', 'done');
-		expect(report?.issue).toEqual({ message: 'offline', status: 'failed' });
+		expect(report.issue).toEqual({ message: 'offline', status: 'failed' });
 	});
 
 	it('closes a linked GitHub issue as completed', async () => {
@@ -308,7 +323,7 @@ describe('merge close-out', () => {
 				command: 'gh',
 			}),
 		);
-		expect(report?.issue).toEqual({ status: 'closed' });
+		expect(report.issue).toEqual({ status: 'closed' });
 	});
 
 	it('reports a GitHub issue gh found closed already', async () => {
@@ -323,7 +338,7 @@ describe('merge close-out', () => {
 
 		const report = await service.closeOut(MERGE);
 
-		expect(report?.issue).toEqual({ status: 'already-closed' });
+		expect(report.issue).toEqual({ status: 'already-closed' });
 	});
 
 	it('refuses to hand gh a GitHub issue URL it cannot vouch for', async () => {
@@ -335,7 +350,7 @@ describe('merge close-out', () => {
 		const report = await service.closeOut(MERGE);
 
 		expect(commands.run).not.toHaveBeenCalled();
-		expect(report?.issue.status).toBe('failed');
+		expect(report.issue.status).toBe('failed');
 	});
 
 	it('moves only the board card when the workspace has no linked issue', async () => {
@@ -348,25 +363,87 @@ describe('merge close-out', () => {
 		expect(setBoardStatus).toHaveBeenCalledWith('ws-1', 'done');
 		expect(linear.getIssue).not.toHaveBeenCalled();
 		expect(commands.run).not.toHaveBeenCalled();
-		expect(report?.issue).toEqual({ status: 'no-linked-issue' });
+		expect(report.issue).toEqual({ status: 'no-linked-issue' });
 	});
 
-	it('closes out each merged pull request once', async () => {
-		const { service, setBoardStatus } = closeOutWith({
+	it('closes out each merged pull request once, sharing the first report', async () => {
+		const { service, setBoardStatus, syncLocalBase } = closeOutWith({
 			readLinkedIssue: () => null,
 		});
 
-		const first = await service.closeOut(MERGE);
-		const repeat = await service.closeOut(MERGE);
+		const first = service.closeOut(MERGE);
+		const repeat = service.closeOut(MERGE);
 		const successor = await service.closeOut({
 			...MERGE,
 			pullRequestNumber: 8,
 		});
 
-		expect(first).not.toBeNull();
-		expect(repeat).toBeNull();
-		expect(successor).not.toBeNull();
+		expect(repeat).toBe(first);
+		expect(await repeat).toEqual(await first);
+		expect(successor.pullRequestNumber).toBe(8);
 		expect(setBoardStatus).toHaveBeenCalledTimes(2);
+		expect(syncLocalBase).toHaveBeenCalledTimes(2);
+	});
+
+	it('fast-forwards the local base branch of the merged workspace', async () => {
+		const { service, syncLocalBase } = closeOutWith({
+			readLinkedIssue: () => null,
+		});
+
+		const report = await service.closeOut(MERGE);
+
+		expect(syncLocalBase).toHaveBeenCalledWith('ws-1');
+		expect(report.baseSync).toEqual(FAST_FORWARDED);
+	});
+
+	it('logs a base branch it had to leave alone, without failing the close-out', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+		const diverged: LocalBaseSyncOutcome = {
+			branch: 'master',
+			status: 'diverged',
+			upstreamRef: 'origin/master',
+		};
+		const { service, setBoardStatus } = closeOutWith({
+			readLinkedIssue: () => null,
+			syncLocalBase: async () => diverged,
+		});
+
+		const report = await service.closeOut(MERGE);
+
+		expect(report.baseSync).toEqual(diverged);
+		expect(report.issue).toEqual({ status: 'no-linked-issue' });
+		expect(setBoardStatus).toHaveBeenCalledWith('ws-1', 'done');
+		expect(warn).toHaveBeenCalledOnce();
+	});
+
+	it('stays quiet when the setting turned the base sync off', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+		const { service } = closeOutWith({
+			readLinkedIssue: () => null,
+			syncLocalBase: async () => ({ status: 'disabled' }),
+		});
+
+		const report = await service.closeOut(MERGE);
+
+		expect(report.baseSync).toEqual({ status: 'disabled' });
+		expect(warn).not.toHaveBeenCalled();
+	});
+
+	it('turns a base sync that throws into an outcome', async () => {
+		vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+		const { service } = closeOutWith({
+			syncLocalBase: async () => {
+				throw new Error('git missing');
+			},
+		});
+
+		const report = await service.closeOut(MERGE);
+
+		expect(report.baseSync).toEqual({
+			detail: 'git missing',
+			status: 'unavailable',
+		});
+		expect(report.issue).toEqual({ status: 'closed' });
 	});
 
 	it('never rejects, even when its collaborators throw', async () => {
@@ -382,7 +459,7 @@ describe('merge close-out', () => {
 
 		const report = await service.closeOut(MERGE);
 
-		expect(report?.issue).toEqual({
+		expect(report.issue).toEqual({
 			message: 'database closed',
 			status: 'failed',
 		});

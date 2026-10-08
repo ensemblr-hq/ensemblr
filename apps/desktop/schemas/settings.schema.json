@@ -95,6 +95,10 @@
 					"type": "boolean",
 					"description": "Archive a workspace automatically once its pull request merges."
 				},
+				"update_base_after_merge": {
+					"type": "boolean",
+					"description": "Fetch the base branch and fast-forward the local copy of it once a workspace's pull request merges. A branch with local commits of its own is never touched. On by default."
+				},
 				"set_upstream_on_push": {
 					"type": "boolean",
 					"description": "Configure new workspaces so a plain `git push` sets the branch upstream."

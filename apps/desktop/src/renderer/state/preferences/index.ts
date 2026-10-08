@@ -66,6 +66,7 @@ export {
 	titleBarAtom,
 	toolCallCollapseAtom,
 	tuiHarnessesAtom,
+	updateBaseAfterMergeAtom,
 	useAppSettingsSync,
 } from './app-settings';
 export type {

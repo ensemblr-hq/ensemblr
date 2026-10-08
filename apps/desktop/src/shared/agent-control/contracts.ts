@@ -14,6 +14,7 @@ import type { AgentProviderId } from '../agent-provider.ts';
 import type { ThinkingAxis } from '../agent-thinking.ts';
 import { ARCHITECTURE_DIAGRAM_LIMITS } from '../architecture-diagram/schema.ts';
 import type { AppSettingsControl, AppSettingsControlPatch } from '../config.ts';
+import type { GithubMergeMethod } from '../ipc/contracts/github.ts';
 import type { ReviewCommentWire } from '../ipc/contracts/review-comments.ts';
 import type {
 	WorkspaceGitChangeSummaryWire,
@@ -47,6 +48,7 @@ export const AGENT_CONTROL_OPS = [
 	'createWorkspace',
 	'recallMemory',
 	'setWorkspaceStatus',
+	'mergePullRequest',
 	'getWorkspaceStatus',
 	'getWorkspaceDiff',
 	'getDiffComments',
@@ -184,6 +186,7 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'focusWorkspace',
 	'createWorkspace',
 	'setWorkspaceStatus',
+	'mergePullRequest',
 	'addDiffComments',
 	'resolveDiffComments',
 	'linearCreateComment',
@@ -1374,6 +1377,12 @@ export interface SetWorkspaceStatusArgs {
 	status: WorkspaceBoardStatusValue;
 	/** Concierge-only; every other caller moves its own workspace. */
 	workspaceId?: string;
+}
+
+/** Args for `mergePullRequest`: merge the caller's own workspace pull request. */
+export interface MergePullRequestArgs {
+	/** Merge method; squash, as the Merge button does, when omitted. */
+	method?: GithubMergeMethod;
 }
 
 /**

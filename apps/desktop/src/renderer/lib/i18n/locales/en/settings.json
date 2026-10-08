@@ -307,7 +307,11 @@
 			"description": "Configure new Ensemblr workspaces so plain `git push` sets a branch upstream. Turning this off avoids writing Git worktree config, but PR info may be less reliable until branches have an upstream.",
 			"label": "Set upstream on plain `git push`"
 		},
-		"title": "Git"
+		"title": "Git",
+		"update-base-on-merge": {
+			"description": "After the PR merges, fetch the base branch and fast-forward the local copy of it, like `git pull --ff-only`. A branch with local commits of its own is never touched.",
+			"label": "Update base branch after merge"
+		}
 	},
 	"header": {
 		"edit-config": "Edit in {{file}}",
@@ -887,6 +891,10 @@
 			"description": "Runs when a new workspace is created.",
 			"label": "Setup script",
 			"placeholder": "e.g. npm ci"
+		},
+		"update-base-on-merge": {
+			"description": "After the PR merges, fetch the base branch and fast-forward the local copy of it, like `git pull --ff-only`. A branch with local commits of its own is never touched. Overrides your user-scope default for this repo.",
+			"label": "Update base branch after merge"
 		},
 		"upstream-issues": {
 			"description": "For a fork, list the upstream repository's GitHub issues on the board and in issue pickers instead of the fork's own.",

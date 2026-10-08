@@ -89,6 +89,10 @@ const SUBAGENT_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 		'The kanban status describes the whole workspace, not the one unit of work you were handed, so moving the board belongs to the root conversation that spawned you. Say in your report where you think the work now stands.',
 	],
 	[
+		'mergePullRequest',
+		"Merging the pull request lands the whole workspace's change, not the one unit of work you were handed, so it belongs to the root conversation that spawned you — and only when the user has asked for it. Say in your report whether the work is ready to merge.",
+	],
+	[
 		'getArchitectureDiagram',
 		'The architecture diagram describes the whole codebase, not the one unit of work you were handed, so reading and redrawing it both belong to the root conversation that spawned you — which is what your playbook tells you. Read the code you were pointed at instead, and put what you learned about the shape of it in your report.',
 	],
@@ -229,6 +233,10 @@ const CONCIERGE_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 	[
 		'setBranchName',
 		'The workspace name and its git branch describe a body of work you are supervising rather than doing. The orchestrator working there names it.',
+	],
+	[
+		'mergePullRequest',
+		'The pull request belongs to a workspace, and you have none of your own to merge from. Say in your answer which pull request is ready, and let the user or the orchestrator working there merge it.',
 	],
 	[
 		'setName',

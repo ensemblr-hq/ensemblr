@@ -24,6 +24,7 @@ export type ToolGlyph =
 	| 'file-text'
 	| 'folder-tree'
 	| 'git-branch-plus'
+	| 'git-merge'
 	| 'hourglass'
 	| 'image'
 	| 'kanban'

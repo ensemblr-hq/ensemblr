@@ -858,6 +858,23 @@ describe('raw execution disclosure', () => {
 		});
 	});
 
+	test('merge_pull_request is titled and glyphed as a merge, running and done', () => {
+		const running = presentToolCall(
+			dynamicToolCall('ensemblr_merge_pull_request', { method: 'squash' }),
+		);
+		const done = presentToolCall(
+			piCall(
+				'ensemblr_merge_pull_request',
+				{ method: 'squash' },
+				{ status: 'queued' },
+			),
+		);
+
+		expect(running.title).toBe('Merging the pull request: squash');
+		expect(done.title).toBe('Merged the pull request: squash');
+		expect(done.glyph).toBe('git-merge');
+	});
+
 	test('an ordinary tool carries no control disclosure', () => {
 		const presentation = presentToolCall(
 			dynamicToolCall('grep', { pattern: 'linear' }, { text: 'one hit' }),

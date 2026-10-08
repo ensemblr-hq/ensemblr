@@ -59,8 +59,10 @@ import type {
 import { controlToolNamingForRuntime } from '../../shared/agent-control.ts';
 import type { AgentProviderId } from '../../shared/agent-provider.ts';
 import type { AppLanguage } from '../../shared/i18n.ts';
+import type { GithubMergeMethod } from '../../shared/ipc/contracts/github.ts';
 import type { PermissionMode } from '../../shared/permissions.ts';
 import type { NamedSecretValue } from '../../shared/redaction.ts';
+import type { WorkspaceMergeOutcome } from '../../shared/workspace-merge.ts';
 import type { JobQueuePort } from './job-queue-ports.ts';
 
 /**
@@ -647,6 +649,20 @@ export interface BoardPort {
 }
 
 /**
+ * Merges a workspace's pull request the way the Merge button does and reports
+ * what the merge close-out did. The port only delegates: the merge, the board
+ * move, the linked-issue close, and the local base sync all live in the merge
+ * close-out, and the workspace is never archived from here.
+ */
+export interface PullRequestPort {
+	merge: (input: {
+		method?: GithubMergeMethod;
+		workspaceCwd: string;
+		workspaceId: string;
+	}) => Promise<WorkspaceMergeOutcome>;
+}
+
+/**
  * Reads the workspace's own diff, scoped the way the Changes panel scopes it.
  * The port owns the whole assembly — resolving the base branch, composing the
  * status read with the per-file patches, and fitting the result to the payload
@@ -997,6 +1013,7 @@ export interface AgentControlPorts {
 	harnesses: HarnessPort;
 	focus: FocusPort;
 	board: BoardPort;
+	pullRequests: PullRequestPort;
 	/** Concierge-only; absent when the Concierge is not wired. */
 	workspaceCreation?: WorkspaceCreationPort;
 	/** Concierge-only; absent when the Concierge is not wired. */

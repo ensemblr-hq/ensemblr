@@ -152,6 +152,7 @@ import {
 	createToolchainPathResolver,
 	createWorkspaceEnvironmentService,
 } from './environment';
+import { createGithubService } from './github';
 import {
 	createInfisicalAccountStore,
 	createInfisicalApi,
@@ -173,7 +174,11 @@ import {
 	registerPrivilegedSchemes,
 } from './linear';
 import { installApplicationMenu, MenuBarStore, MenuContextStore } from './menu';
-import { createMergeCloseOutService } from './merge-close-out';
+import {
+	createLocalBaseSync,
+	createMergeCloseOutService,
+	mergeWorkspacePullRequest,
+} from './merge-close-out';
 import { createOpenTargetService } from './open-target';
 import { createPiCliRpcAdapter, resolvePiSlashCommands } from './pi-agent';
 import {
@@ -1602,6 +1607,26 @@ const mergeCloseOutService = createMergeCloseOutService({
 			workspaceId,
 		} satisfies BoardStatusBroadcast);
 	},
+	syncLocalBase: createLocalBaseSync({
+		databaseService,
+		localCommandService,
+		/** Resolves the repository's settings for its `updateBaseAfterMerge` choice. */
+		resolveRepositorySettings: (repository) =>
+			settingsResolutionService.resolve({ repository }),
+	}),
+});
+/**
+ * The `gh`-backed review flow. Built here rather than with its IPC handlers so
+ * agent control merges through the same service the Merge button does.
+ */
+const githubService = createGithubService({
+	databaseService,
+	localCommandService,
+	/** Closes out a merged workspace in the background, off the refresh that saw it. */
+	onPullRequestMerged: (event) => {
+		void mergeCloseOutService.closeOut(event);
+	},
+	readCoAuthorEnabled: () => appSettingsService.read().git.coAuthorEnsemblr,
 });
 /**
  * The three ports only the Concierge holds. Built here rather than inside the
@@ -1763,6 +1788,12 @@ agentControlService = createAgentControlService({
 		// handlers that build theirs the same way.
 		reviewService: createReviewService({ databaseService }),
 		workspaceGitService: controlWorkspaceGitService,
+		/** Merges the workspace's pull request through the Merge button's service and close-out. */
+		mergeWorkspacePullRequest: (request) =>
+			mergeWorkspacePullRequest(
+				{ githubService, mergeCloseOutService },
+				request,
+			),
 		planMode: {
 			/** Saves the finished plan, surfaces the review, and ends the turn. */
 			exit: planSubmission.submit,
@@ -2116,6 +2147,7 @@ app.whenReady().then(() => {
 		githubOwnerListService,
 		githubRemoteBranchListService,
 		githubRepositoryListService,
+		githubService,
 		harnessDetectionService,
 		linearAuthService,
 		linearService,
@@ -2137,10 +2169,6 @@ app.whenReady().then(() => {
 		// above; without this rebuild the menu keeps the previous language until
 		// the next restart.
 		onAppSettingsUpdated: notifyAppSettingsUpdated,
-		/** Closes out a merged workspace in the background, off the refresh that saw it. */
-		onPullRequestMerged: (event) => {
-			void mergeCloseOutService.closeOut(event);
-		},
 		menuBarStore,
 		menuContextStore,
 		rebuildMenu,

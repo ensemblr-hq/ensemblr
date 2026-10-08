@@ -84,6 +84,7 @@ const gitSettingsSchema = z.object({
 	renameWorkspaceOnBranch: z.boolean().catch(true),
 	deleteLocalBranchOnArchive: z.boolean().catch(false),
 	archiveAfterMerge: z.boolean().catch(false),
+	updateBaseAfterMerge: z.boolean().catch(true),
 	setUpstreamOnPush: z.boolean().catch(true),
 	coAuthorEnsemblr: z.boolean().catch(true),
 });
@@ -352,6 +353,8 @@ export const appSettingsControlPatchSchema = z.strictObject({
 				gitSettingsSchema.shape.deleteLocalBranchOnArchive.removeCatch(),
 			archiveAfterMerge:
 				gitSettingsSchema.shape.archiveAfterMerge.removeCatch(),
+			updateBaseAfterMerge:
+				gitSettingsSchema.shape.updateBaseAfterMerge.removeCatch(),
 			setUpstreamOnPush:
 				gitSettingsSchema.shape.setUpstreamOnPush.removeCatch(),
 			coAuthorEnsemblr: gitSettingsSchema.shape.coAuthorEnsemblr.removeCatch(),

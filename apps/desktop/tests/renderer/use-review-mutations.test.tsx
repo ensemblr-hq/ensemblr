@@ -110,6 +110,7 @@ function renderReviewMutations(
 					archiveAfterMerge,
 					deleteLocalBranchOnArchive: false,
 					setUpstreamOnPush: false,
+					updateBaseAfterMerge: true,
 				},
 				onSettled: vi.fn(),
 			}),

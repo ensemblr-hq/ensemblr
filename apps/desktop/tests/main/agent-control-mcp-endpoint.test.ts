@@ -182,7 +182,8 @@ describe('agent-control MCP endpoint', () => {
 		expect(names).toContain('ensemblr_run_queued');
 		expect(names).toContain('ensemblr_wait_for_job');
 		expect(names).toContain('ensemblr_cancel_job');
-		expect(tools).toHaveLength(43);
+		expect(names).toContain('ensemblr_merge_pull_request');
+		expect(tools).toHaveLength(44);
 		await client.close();
 	});
 
@@ -310,6 +311,32 @@ describe('agent-control MCP endpoint', () => {
 		expect(calls).toHaveLength(0);
 	});
 
+	it('forwards a merge call with its method and describes the close-out', async () => {
+		server = await startControlServer(stubService);
+		const client = await connect('secret-token');
+		const { tools } = await client.listTools();
+		const mergeTool = tools.find(
+			(tool) => tool.name === 'ensemblr_merge_pull_request',
+		);
+		expect(mergeTool?.description).toContain('Merge button');
+		expect(mergeTool?.description).toContain('never archives');
+
+		await client.callTool({
+			name: 'ensemblr_merge_pull_request',
+			arguments: { method: 'rebase' },
+		});
+
+		expect(calls).toEqual([
+			{
+				op: 'mergePullRequest',
+				token: 'secret-token',
+				rawArgs: { method: 'rebase' },
+				signal: expect.any(AbortSignal),
+			},
+		]);
+		await client.close();
+	});
+
 	it('forwards a tool call to the service with the bearer token', async () => {
 		server = await startControlServer(stubService);
 		const client = await connect('secret-token');
@@ -429,6 +456,7 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 			'ensemblr_exit_plan_mode',
 			'ensemblr_set_branch_name',
 			'ensemblr_wait_for_agents',
+			'ensemblr_merge_pull_request',
 			'ensemblr_linear_create_comment',
 			'ensemblr_linear_update_issue',
 		]) {

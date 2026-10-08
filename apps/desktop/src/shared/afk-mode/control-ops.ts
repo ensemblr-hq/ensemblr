@@ -25,6 +25,10 @@ const AFK_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 		'askUserQuestion',
 		'`ensemblr_ask_user_question` blocks your turn until a human answers, and the user has told the app they are away — nothing would answer it. Decide it yourself: take the most defensible reading, act on it, and put the assumption in your final message under its own heading so they can correct it when they are back. If the decision is genuinely unsafe to make alone, do every part of the task that does not depend on it, then say plainly in your answer what you left undone and why.',
 	],
+	[
+		'mergePullRequest',
+		'`ensemblr_merge_pull_request` merges the pull request into the base branch, and the user has told the app they are away — a merge nobody is watching cannot be taken back by the person it lands on. AFK work opens the pull request and stops there: leave it open, and say in your final message that it is ready to merge and what you verified, so they can merge it when they are back.',
+	],
 ]);
 
 /**
