@@ -121,7 +121,7 @@
 	"dependencies": {
 		"@anthropic-ai/claude-agent-sdk": "^0.3.288",
 		"@atlaskit/pragmatic-drag-and-drop": "^3.1.0",
-		"@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.2.0",
+		"@atlaskit/pragmatic-drag-and-drop-hitbox": "^3.0.0",
 		"@base-ui/react": "^1.8.0",
 		"@iconify/react": "^6.0.2",
 		"@lexical/react": "^0.52.0",
