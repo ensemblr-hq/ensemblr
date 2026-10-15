@@ -18,8 +18,11 @@
  * than reading session state.
  */
 
-import type { AgentControlRole } from '../agent-control/awareness.ts';
-import type { AgentControlOp } from '../agent-control/contracts.ts';
+import type {
+	AgentControlRole,
+	ControlAudience,
+} from '../agent-control/awareness.ts';
+import { type AgentControlOp, isWriteOp } from '../agent-control/contracts.ts';
 import { planModeBlockReason } from './block-reason.ts';
 
 /**
@@ -127,6 +130,7 @@ export const PLAN_MODE_CONDITIONAL_OPS: ReadonlySet<AgentControlOp> = new Set([
  * {@link planModeFollowUpDenial}.
  * @param op - The control op being dispatched.
  * @param role - Whether the caller is a root orchestrator or a spawned sub-agent.
+ * @param depth - A sub-agent's verified lineage depth; a depth-1 manager keeps its child-management ops.
  * @returns The model-facing denial reason, or null when the op may proceed.
  */
 export function planModeControlOpDenial(
@@ -145,6 +149,38 @@ export function planModeControlOpDenial(
 		return null;
 	}
 	return PLAN_MODE_SUBAGENT_BLOCKED_OPS.get(op) ?? null;
+}
+
+/**
+ * Reports whether an MCP client's own plan mode may run a control tool without
+ * asking, which is what the tool's `readOnlyHint` tells it. Claude Code refuses
+ * every MCP tool without the hint while its permission mode is `plan`, and from
+ * 2.1.300 it does so even over a `PreToolUse` hook's `allow`, so the hint is the
+ * one signal its plan mode honours.
+ *
+ * A read qualifies for every caller. A write qualifies only where the control
+ * server runs this module's op gate for the caller — an orchestrator or
+ * sub-agent with a chat tab — and that gate lets the op through, so the hint
+ * never clears a write the server would refuse while planning. A harness and the
+ * Concierge have no such gate behind them, and the hint would only let their
+ * writes run unasked and, since the CLI runs read-only tools concurrently, in
+ * parallel.
+ * @param op - The control op the tool dispatches.
+ * @param audience - The caller's chat tab, role, and verified lineage depth.
+ * @returns True when the tool may declare itself read-only to this caller.
+ */
+export function planModeAdmitsUnasked(
+	op: AgentControlOp,
+	audience: Pick<ControlAudience, 'depth' | 'hasChatTab' | 'role'>,
+): boolean {
+	if (!isWriteOp(op)) {
+		return true;
+	}
+	if (!audience.hasChatTab || audience.role === 'concierge') {
+		return false;
+	}
+	const depth = audience.depth === 1 ? 1 : 2;
+	return planModeControlOpDenial(op, audience.role, depth) === null;
 }
 
 /**

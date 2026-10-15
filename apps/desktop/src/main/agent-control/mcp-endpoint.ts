@@ -53,6 +53,7 @@ import {
 	MAX_COMPONENT_SOURCES,
 } from '../../shared/architecture-diagram.ts';
 import { appSettingsControlPatchSchema } from '../../shared/config.ts';
+import { planModeAdmitsUnasked } from '../../shared/plan-mode.ts';
 import type { AgentControlService } from './agent-control-service.ts';
 import { withProgressHeartbeat } from './mcp-progress.ts';
 
@@ -799,7 +800,9 @@ async function instructionsFor(
 
 /**
  * Builds a fresh MCP server whose tools forward to the control service under a
- * fixed token, carrying the tool list and playbook this caller should hold.
+ * fixed token, carrying the tool list and playbook this caller should hold. Each
+ * tool declares `readOnlyHint` from {@link planModeAdmitsUnasked}, because that
+ * annotation is what a client's own plan mode reads to decide whether to run it.
  * @param service - Agent-control service every tool delegates to.
  * @param token - Per-request bearer token identifying the caller.
  * @param audience - Whether the caller has a chat tab, and its lineage role.
@@ -821,6 +824,9 @@ async function buildMcpServer(
 		server.registerTool(
 			def.name,
 			{
+				annotations: {
+					readOnlyHint: planModeAdmitsUnasked(def.op, audience),
+				},
 				description: namespaceControlToolNames(def.description, naming),
 				inputSchema: def.shape,
 			},
