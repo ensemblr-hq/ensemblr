@@ -35,6 +35,13 @@
  * `read-only` one keeps them blocked by its own mode and regains the reads, the
  * question, and the exit.
  *
+ * This allow is the fallback for older CLIs, not the route. From 2.1.300 the CLI
+ * refuses a plan-mode MCP tool that lacks `readOnlyHint` whatever a hook answers,
+ * so the control server declares the hint on every tool `planModeAdmitsUnasked`
+ * clears, and the CLI's plan mode runs those unasked on its own. What the allow
+ * still buys, on a CLI that honours it, is the control server's own refusal text
+ * for an op planning blocks, in place of the CLI's bare `Cannot call`.
+ *
  * The one other widening is the user's own: a tool they listed as read-only
  * under Settings → Providers is cleared on the same terms while planning, because
  * the CLI withholds an MCP tool it cannot read exactly as it withholds ours. That

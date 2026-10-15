@@ -417,6 +417,45 @@ describe('agent-control MCP endpoint, per-origin surface', () => {
 		expect(names).toContain('ensemblr_close_tab');
 	});
 
+	// Claude Code's plan mode refuses an MCP tool that does not declare
+	// `readOnlyHint`, and from 2.1.300 no hook `allow` clears it.
+	it('declares the read-only hint a client plan mode reads, per caller', async () => {
+		const hintsFor = async (audience: ControlAudience) => {
+			const client = await connectAs(audience);
+			const { tools } = await client.listTools();
+			await client.close();
+			await server?.close();
+			server = null;
+			return new Map(
+				tools.map((tool) => [tool.name, tool.annotations?.readOnlyHint]),
+			);
+		};
+
+		const root = await hintsFor({
+			architectureDiagram: true,
+			tuiHarnesses: true,
+			delegation: 'ensemblr',
+			hasChatTab: true,
+			role: 'orchestrator',
+			toolNaming: 'bare',
+		});
+		for (const tool of [
+			...CHAT_TAB_TOOLS,
+			'ensemblr_set_branch_name',
+			'ensemblr_start_conversation',
+			'ensemblr_list_workspaces',
+		]) {
+			expect(root.get(tool), tool).toBe(true);
+		}
+		for (const tool of ['ensemblr_run_queued', 'ensemblr_start_terminal']) {
+			expect(root.get(tool), tool).toBe(false);
+		}
+
+		const harness = await hintsFor(HARNESS_ROOT);
+		expect(harness.get('ensemblr_list_workspaces')).toBe(true);
+		expect(harness.get('ensemblr_start_conversation')).toBe(false);
+	});
+
 	it('withholds the chat-tab tools from a harness root', async () => {
 		const names = await toolNamesFor(HARNESS_ROOT);
 

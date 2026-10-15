@@ -1217,16 +1217,44 @@ by the same plan workflow that just instructed it to call one. Ensemblr's own
 every planning turn.
 
 **Every MCP tool the CLI cannot read as read-only is routed to `canUseTool`
-while the mode is `plan`** — an annotation check, and this server publishes no
-`readOnlyHint`, so it covers the whole control surface. With no callback wired
-the call is refused outright, which left a planning session on a trusted
-workspace unable to name its tab, name its branch, record a summary, ask a
-question, fan out, *or* submit the plan. The guard clears `mcp__ensemblr__*` with
-a hook `allow`, which the CLI honours ahead of the mode; the control server's own
-`planModeControlOpDenial` remains the gate, per op and per role, which is the
-finer answer, and `gatePermission` still applies the workspace mode on top — so a
-`read-only` workspace regains the reads, the question, and the exit while its
-`app-control-write` ops stay blocked.
+while the mode is `plan`.** What it reads is the tool's `readOnlyHint`
+annotation. With no callback wired the call is refused outright as `Cannot call
+… while in plan mode`, and before this server published the hint that left a
+planning session on a trusted workspace unable to name its tab, name its branch,
+record a summary, ask a question, fan out, *or* submit the plan.
+
+The control server now declares `readOnlyHint` per caller, from
+`planModeAdmitsUnasked` in `src/shared/plan-mode/control-ops.ts`. Every read
+carries it. A write carries it only for an orchestrator or sub-agent with a chat
+tab, and only when `planModeControlOpDenial` lets that op through for the
+caller's role and depth, so the hint never clears a write the server would
+refuse while planning. A harness or the Concierge gets no hint on its writes:
+no plan gate stands behind them there. The CLI's plan mode runs whatever carries
+the hint without asking. The control server's own `planModeControlOpDenial` stays
+the gate, per op and per role, and `gatePermission` still applies the workspace
+mode on top — so a `read-only` workspace regains the reads, the question, and the
+exit while its `app-control-write` ops stay blocked.
+
+The hint has side effects beyond the refusal, all checked against 2.1.300. The
+CLI runs read-only tools concurrently, so two hinted calls in one batch can
+interleave. Outside plan mode it still sends a hinted tool to `canUseTool`,
+because an MCP tool's permission check passes through to the mode whatever the
+tool declares, so `approval-required` shows its approval card as before. Inside
+plan mode it does not: an `approval-required` session that is planning runs a
+hinted tool without the CLI's card. A hinted write still meets `gatePermission`,
+which confirms every `app-control-write` under that mode, so it is asked once
+instead of twice. A hinted read is not asked at all, which is what Claude Code's
+own plan mode does with any read-only tool.
+
+The guard also clears `mcp__ensemblr__*` with a hook `allow`. That was the only
+route through 2.1.270, which honoured the allow ahead of the mode. 2.1.300 does
+not: it refuses a plan-mode MCP tool that lacks the hint whatever a
+`PreToolUse` hook answered, with or without auto mode as the user's default. The
+allow stays as the fallback for an older CLI, where it also carries an op
+planning blocks to the control server, so the model reads the server's refusal
+text instead of the CLI's bare one. A tool the user trusts under Settings →
+Providers lost the same route, and the app has no way to annotate a tool another
+server serves.
 
 `withholdsControlTools` in `src/main/claude-agent/claude-permission-bridge.ts`
 decides when that clearance applies, and it reads two things rather than one.

@@ -4,9 +4,11 @@ import {
 	AGENT_CONTROL_OPS,
 	type AgentControlOp,
 	type AgentControlRole,
+	isWriteOp,
 } from '../../src/shared/agent-control.ts';
 import {
 	PLAN_MODE_CONDITIONAL_OPS,
+	planModeAdmitsUnasked,
 	planModeControlOpDenial,
 	planModeFollowUpDenial,
 } from '../../src/shared/plan-mode.ts';
@@ -153,6 +155,90 @@ describe('plan mode: control-op policy covers every op', () => {
 		for (const op of PLAN_MODE_CONDITIONAL_OPS) {
 			expect(planModeControlOpDenial(op, 'subagent', 2)).not.toBeNull();
 			expect(planModeControlOpDenial(op, 'subagent')).not.toBeNull();
+		}
+	});
+});
+
+// Claude Code's plan mode runs an MCP tool only when it declares `readOnlyHint`,
+// and from 2.1.300 it ignores the hook `allow` that used to clear the control
+// surface — so a planning chat lost its naming, its question, and its fan-out to
+// `Cannot call … while in plan mode`.
+describe('plan mode: the read-only hint a client plan mode reads', () => {
+	const CHAT_ROOT = {
+		hasChatTab: true,
+		role: 'orchestrator',
+	} as const;
+
+	const PLANNING_CALLERS = [
+		CHAT_ROOT,
+		{ depth: 1, hasChatTab: true, role: 'subagent' },
+		{ depth: 2, hasChatTab: true, role: 'subagent' },
+		{ hasChatTab: true, role: 'subagent' },
+	] as const;
+
+	it('never hints a write the plan gate would refuse', () => {
+		for (const caller of PLANNING_CALLERS) {
+			const depth = 'depth' in caller && caller.depth === 1 ? 1 : 2;
+			for (const op of AGENT_CONTROL_OPS) {
+				if (isWriteOp(op) && planModeAdmitsUnasked(op, caller)) {
+					expect(
+						planModeControlOpDenial(op, caller.role, depth),
+						`${op} for ${caller.role} at depth ${depth}`,
+					).toBeNull();
+				}
+			}
+		}
+	});
+
+	it('hints what a planning root needs to name, ask, fan out, and submit', () => {
+		for (const op of [
+			'setName',
+			'setBranchName',
+			'setSummary',
+			'askUserQuestion',
+			'exitPlanMode',
+			'startConversation',
+			'sendFollowUp',
+			'waitForAgents',
+			'addDiffComments',
+			'linearCreateComment',
+		] as const) {
+			expect(planModeAdmitsUnasked(op, CHAT_ROOT), op).toBe(true);
+		}
+	});
+
+	it('leaves the hint off every write planning blocks', () => {
+		for (const op of [
+			'launchHarness',
+			'mergePullRequest',
+			'linearCreateIssue',
+			'runQueued',
+			'startTerminal',
+			'writeTerminal',
+		] as const) {
+			expect(planModeAdmitsUnasked(op, CHAT_ROOT), op).toBe(false);
+		}
+	});
+
+	it('follows the sub-agent split by depth', () => {
+		const manager = { depth: 1, hasChatTab: true, role: 'subagent' } as const;
+		const leaf = { depth: 2, hasChatTab: true, role: 'subagent' } as const;
+
+		expect(planModeAdmitsUnasked('startConversation', manager)).toBe(true);
+		expect(planModeAdmitsUnasked('startConversation', leaf)).toBe(false);
+	});
+
+	// A harness and the Concierge have no plan gate on the server, so a hint on a
+	// write would vouch for something nothing enforces.
+	it('hints every read for any caller and no write without a plan gate', () => {
+		const unplanned = [
+			{ hasChatTab: false, role: 'orchestrator' },
+			{ hasChatTab: true, role: 'concierge' },
+		] as const;
+		for (const caller of unplanned) {
+			for (const op of AGENT_CONTROL_OPS) {
+				expect(planModeAdmitsUnasked(op, caller), op).toBe(!isWriteOp(op));
+			}
 		}
 	});
 });

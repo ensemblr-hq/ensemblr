@@ -30,6 +30,7 @@ export {
 } from './plan-mode/concierge-guard.ts';
 export {
 	PLAN_MODE_CONDITIONAL_OPS,
+	planModeAdmitsUnasked,
 	planModeControlOpDenial,
 	planModeFollowUpDenial,
 } from './plan-mode/control-ops.ts';
