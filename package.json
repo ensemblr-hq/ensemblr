@@ -34,7 +34,7 @@
 		"test": "bun run --workspaces --if-present test"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.14"
+		"@biomejs/biome": "^2.5.15"
 	},
 	"overrides": {
 		"@electron/node-gyp": "10.2.0-electron.1",
