@@ -123,7 +123,7 @@ jobs:
       # only *warns* on an unknown input, so `diff` / `github-token` /
       # `fail-on` / `verbose` silently fell back to defaults and the scan ran
       # advisory and unscoped. Check action.yml before editing.
-      - uses: millionco/react-doctor@013f7373f91a3b9e68bd1dc7d4d354f4b041b117 # v2
+      - uses: millionco/react-doctor@695e46eee203a5d1855020191aa7e9c010a1250e # v2
         with:
           # The desktop app is the React project, and its doctor.config.jsonc
           # lives beside it rather than at the repository root.
