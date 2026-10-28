@@ -4,6 +4,8 @@
 
 # Ensemblr™
 
+> **Ensemblr 0.2.6 is the last release of the Electron-based Ensemblr. The project is moving to Rust.**
+
 **A desktop orchestrator for multi-agent coding work, driving the Pi CLI or the Claude Code CLI — whichever
 you already run.**
 

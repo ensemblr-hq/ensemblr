@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-10-28
+
+> **This is the last release of the Electron-based Ensemblr. The project is moving to Rust.**
+
+Ensemblr 0.2.6 moves every dependency to its latest release, Electron 45 and Electron Forge 8 included, and lets Claude Code's Plan Mode run Ensemblr's control tools again.
+[Release](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.2.6) ·
+[`.dmg` (Apple silicon)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-arm64.dmg) ·
+[`.dmg` (Intel)](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-x64.dmg) ·
+[`.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-x64.AppImage)
+
+### Changed
+
+- **Every dependency is at its latest release.** Electron goes from 44 to 45 (Chrome 156, Node 24.22.1) and Electron Forge from 7 to 8. Forge 8's Vite plugin writes `main.cjs` and `preload.cjs`, so the app's entry points follow. motion goes to 14, happy-dom to 21, Biome to 2.6, `@atlaskit/pragmatic-drag-and-drop` to 4, `@reforged/maker-appimage` to 6, and about sixty minor and patch updates ride along. `@types/node` stays on 24 to match the Node that Electron 45 embeds. Native bindings, the terminal included, are rebuilt against Electron 45. On Linux, the Nix dev shell no longer fails when nixpkgs has no `electron_<major>` yet: nixpkgs stops at Electron 44, so the shell warns and `bun run dev` uses npm's Electron, which cannot start on NixOS until `flake.lock` reaches a nixpkgs that packages 45. (#750)
+
+### Fixed
+
+- **Claude Code's Plan Mode runs Ensemblr's control tools again.** Claude Code 2.1.300 refuses every MCP tool that lacks `readOnlyHint` while its permission mode is plan, and no longer honours a hook's allow for it. A planning chat got "Cannot call ... while in plan mode" for `set_name`, `set_branch_name`, `ask_user_question` and the rest. The control server now declares `readOnlyHint` for every read, and for each write the Plan Mode gate admits for that caller. (#745)
+
 ## [0.2.5] - 2026-10-08
 
 Ensemblr 0.2.5 adds four bundled Claude Code mods, lets a message you send cut an agent's wait short, keeps the local base branch current after a merge, and lets agents merge pull requests.
