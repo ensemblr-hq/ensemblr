@@ -14,7 +14,7 @@ records the resolved versions. Re-check both before asserting an exact version.
 | | |
 | --- | --- |
 | Target | macOS Ventura+ on arm64 **and** x64 (`.dmg`/`.zip` each), and Linux x64 (`.AppImage`); Linux arm64 is planned for the release after the one that adds macOS x64 |
-| Shell | Electron 44 (Node 24 runtime), Electron Forge 7 |
+| Shell | Electron 45 (Node 24 runtime), Electron Forge 8 |
 | Node | **exactly 24.x** (`engines: >=24 <25`); the dev shell supplies `nodejs_24` from nixpkgs |
 | Package manager | Bun 1.4.2 (`packageManager`; the dev shell supplies nixpkgs' `bun`); Node stays the runtime |
 | Dev environment | `nix develop`, from the flake's `devShells.default` (`apps/desktop/nix/dev-shell.nix`) |
@@ -69,7 +69,7 @@ new watch could cover a repository-sized tree.
 
 **Wayland needs no configuration.** Electron 38 removed
 `ELECTRON_OZONE_PLATFORM_HINT` and made native Wayland the default in a Wayland
-session, so a user on this Electron 44 gets it automatically;
+session, so a user on this Electron 45 gets it automatically;
 `--ozone-platform=x11` is the documented escape hatch. What Wayland *does*
 forbid is a client reading or setting its own position, which is why
 `forbidsWindowPositioning` in `apps/desktop/src/main/app/window-state.ts` skips the `x`/`y`
@@ -79,19 +79,20 @@ Nothing gates the Node major any more: the dev shell supplies Node 24, and a
 command run outside it is unsupported rather than refused. Installing under the
 wrong major still compiles `macos-alias` (V8-ABI-bound, via `nan`) for that
 major, so a later Node 24 `make` dies on `NODE_MODULE_VERSION` mismatch. Node 24 is
-also the Active LTS line the Electron 44 runtime embeds.
+also the Active LTS line the Electron 45 runtime embeds.
 
 **`@types/node` stays on `^24`, tracking the runtime rather than the latest
-release.** Electron 44.4.5 embeds Node 24.21.0, so typing against a newer major makes
+release.** Electron 45.1.0 embeds Node 24.22.1, so typing against a newer major makes
 the compiler accept APIs that do not exist at runtime — a green
 `bun run typecheck` then ships a `TypeError`. Dependabot proposes the bump anyway,
 because it reads `@types/node` as an ordinary devDependency rather than a mirror
 of `engines`; decline it until the embedded Node major moves. The Electron 43 →
-44 bump did not move it — check the release's `node` field before assuming a
+44 and 44 → 45 bumps did not move it — check the release's `node` field before assuming a
 major bump carries one.
 
 **Electron 44 raised the macOS floor from Monterey to Ventura**, per the
-`44-x-y` branch README. That floor is declared outside this repo, in the
+`44-x-y` branch README, and Electron 45 keeps it (the `45-x-y` README still says
+Ventura and up). That floor is declared outside this repo, in the
 `ensemblr-hq/homebrew-tap` cask (`Casks/ensemblr.rb`, `depends_on macos:`), so an
 Electron major that moves it needs a matching change there or `brew` offers the
 build to machines that cannot run it. Electron 44 also made the `clipboard`
@@ -99,10 +100,10 @@ module async and removed it from the renderer — the renderer already uses
 `navigator.clipboard`, and the one main-process call site is in
 `apps/desktop/src/main/open-target/open-target-service.ts`.
 
-**There is no `.npmrc`.** `@electron-forge/plugin-fuses@7` declares a stale peer
-range (`@electron/fuses@^1`) against the v2 this repo pins; npm needed
-`legacy-peer-deps=true` to install past it, whereas Bun tolerates it natively and
-exactly one `@electron/fuses@2.1.3` resolves, so no override is needed either.
+**There is no `.npmrc`.** Forge 7's `@electron-forge/plugin-fuses` declared a stale
+peer range (`@electron/fuses@^1`) that npm needed `legacy-peer-deps=true` to
+install past. `@electron-forge/plugin-fuses@8` peers on `@electron/fuses@^2.1.3`,
+which is what resolves, so neither an `.npmrc` nor an override is needed.
 
 **Bun is the package manager, Node is the runtime.** Bun does not shim itself as
 `node`: in `bun run` scripts and in `preinstall`/`postinstall`, `node` is the real
@@ -153,11 +154,21 @@ through `@electron/packager@18`, and that package is abandoned (last publish
 2023) with an unpatched symlink path-traversal advisory,
 [GHSA-jmr9-qjv8-65gv](https://github.com/advisories/GHSA-jmr9-qjv8-65gv) —
 `electron-forge package` unzips the downloaded Electron bundle with it. The alias
-is the same swap Electron made upstream in
-[packager#1917](https://github.com/electron/packager/pull/1917), shipping in
-Forge 8; it is a napi-rs module carrying prebuilds for every platform in the
-tarball, so nothing compiles at install time. Drop the alias once Forge 8 is
-stable.
+was the same swap Electron made upstream in
+[packager#1917](https://github.com/electron/packager/pull/1917). Forge 8 ships it:
+`@electron/packager@20` and `electron@45` both depend on
+`@electron-internal/extract-zip` directly, so nothing in the lockfile resolves the
+original package any more and the override is redundant. The module is napi-rs
+with prebuilds for every platform in the tarball, so nothing compiles at install
+time. The override entry in the root `package.json` can be removed.
+
+**Forge 8 changes three things the repo depends on.** The Vite plugin writes
+`.vite/build/main.cjs` and `.vite/build/preload.cjs` (`apps/desktop/package.json`
+`main` points at the former, `apps/desktop/src/main/app/main-window.ts` loads the
+latter), and packaging fails if `main` names a `.js` file. The plugin has an
+`exports` map, so deep imports such as `@electron-forge/plugin-vite/dist/ViteConfig.js`
+no longer resolve; `apps/desktop/tests/main/vite-config-compat.test.ts` loads it
+from beside the plugin entry. `electron-forge start` also checks the package manager.
 
 ## Dev shell
 
@@ -174,10 +185,13 @@ from the repository root or from `apps/desktop/`.
   `packageManager`.
 - **Everywhere:** Node, Bun, `gnumake`, `python3`.
 - **Linux only:** gcc through `mkShell`'s stdenv, `squashfs-tools` for
-  `make:linux`, and `ELECTRON_OVERRIDE_DIST_PATH` pointing at nixpkgs' Electron.
-  That build is a patch behind the `^44` pins (44.3.0 against 44.4.5 at the
-  current `flake.lock`) and is what runs in development; packaging and releases
-  ship the pinned one. Native modules are ABI-bound to the major alone, so the
+  `make:linux`, and `ELECTRON_OVERRIDE_DIST_PATH` pointing at nixpkgs' Electron
+  when nixpkgs packages the pinned major. nixpkgs-unstable stops at Electron 44, so
+  with the `^45` pin the shell sets no override and prints a warning: `bun run dev`
+  then runs the Electron from the package registry, which cannot start on NixOS
+  until `flake.lock` reaches a nixpkgs that packages Electron 45. Lint, typecheck
+  and tests need no Electron. When an override is set, that build is what runs in
+  development; packaging and releases ship the pinned one. Native modules are ABI-bound to the major alone, so the
   skew is harmless. A `shellHook` unsets `LD_LIBRARY_PATH`, which a NixOS host can
   export for ALSA and PipeWire's JACK shim built against a newer glibc, and which
   kills Electron with `GLIBC_2.43 not found`. For the same reason **`flake.lock`
@@ -358,16 +372,19 @@ a primitive gets reformatted to house style.
 
 ## Tooling
 
-- **Biome 2.5.14** is the only linter and formatter — no ESLint, no Prettier.
+- **Biome 2.6.3** is the only linter and formatter — no ESLint, no Prettier.
   Tabs for indentation; single quotes for JS **and** JSX. The root `biome.json`
   holds that house style, and `apps/desktop/biome.json` extends it (`"root":
   false`, `"extends": "//"`) with the app's ignores. Both pin the
   `$schema` URL to the installed version, so a Biome bump updates that line too
   or `biome check` reports the config as stale.
+  The Markdown formatter and linter are off, `useTailwindSortedClasses` is off (it
+  reorders about 1,160 class lists), and `correctness/noComponentHookFactories` is
+  off for `apps/desktop/tests/**` and the vendored `ui/**` primitives.
   Config uses `linter.rules.preset: "recommended"`; the older
   `linter.rules.recommended: true` was deprecated in Biome 2.5, so do not
   "fix" it back. Import organization runs through `assist.actions.source.organizeImports`.
-- **Vitest 5** with `happy-dom` 20 and `@vitest/coverage-istanbul`. Never
+- **Vitest 5** with `happy-dom` 21 and `@vitest/coverage-istanbul`. Never
   `bun:test`, Jest, or Mocha.
 - **fallow** (`apps/desktop/.fallowrc.jsonc`) and **react-doctor** (`apps/desktop/doctor.config.jsonc`) run
   as review diagnostics; CI runs react-doctor against `master`.

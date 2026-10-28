@@ -76,7 +76,7 @@ Nothing needs root and nothing is written outside `$HOME`:
 
 | Option | Does |
 | --- | --- |
-| `--version <tag>` | install a specific release, e.g. `--version v0.2.5` |
+| `--version <tag>` | install a specific release, e.g. `--version v0.2.6` |
 | `--nightly` | install the rolling canary build, **alongside** a release |
 | `--dir <path>` | where the AppImage goes |
 | `--no-desktop` | skip the launcher entry and the icons |
@@ -150,16 +150,16 @@ variants run directly on the host, so `sudo` works in Ensemblr's terminals.
 
 ## Download
 
-The current build is **`0.2.5`**:
+The current build is **`0.2.6`**:
 
-- [**`Ensemblr-0.2.5-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.5/Ensemblr-0.2.5-arm64.dmg)
+- [**`Ensemblr-0.2.6-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-arm64.dmg)
   — the macOS disk image for Apple silicon. Open it and drag Ensemblr to `/Applications`.
-- [`Ensemblr-darwin-arm64-0.2.5.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.5/Ensemblr-darwin-arm64-0.2.5.zip)
+- [`Ensemblr-darwin-arm64-0.2.6.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-darwin-arm64-0.2.6.zip)
   — the same `.app`, zipped, if you would rather not mount an image.
-- [**`Ensemblr-0.2.5-x64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.5/Ensemblr-0.2.5-x64.dmg)
-  and [`Ensemblr-darwin-x64-0.2.5.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.5/Ensemblr-darwin-x64-0.2.5.zip)
+- [**`Ensemblr-0.2.6-x64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-x64.dmg)
+  and [`Ensemblr-darwin-x64-0.2.6.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-darwin-x64-0.2.6.zip)
   — the same pair for Intel Macs. `0.1.19` and earlier are Apple-silicon only.
-- [**`Ensemblr-0.2.5-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.5/Ensemblr-0.2.5-x64.AppImage)
+- [**`Ensemblr-0.2.6-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-x64.AppImage)
   — the Linux build, if you would rather place it yourself than run the
   [install script](#install-script-linux). One file, no installer:
 
@@ -198,7 +198,7 @@ it against the checksum on the release page if you want a check, or let the
 [install script](#install-script-linux) do it for you. Either way this is
 **pre-1.0** software, with breaking changes expected before 1.0.
 
-The app reports the full version, any prerelease suffix included — `0.2.5` in
+The app reports the full version, any prerelease suffix included — `0.2.6` in
 **Settings → General**, and on macOS in the bundle's
 `CFBundleShortVersionString`. It matches the release tag, so a bug report only
 has to quote one string.
@@ -266,8 +266,8 @@ Building from source is the other path, and the rest of this page covers it.
 
 Nix is the whole toolchain. `nix develop` enters the repository's dev shell, which
 supplies Node **24.x**, Bun 1.4 (`packageManager` is `bun@1.4.2`), and on Linux a
-C++ toolchain, `python3`, `make`, `mksquashfs`, and the Electron that
-`bun run dev` launches. Install Nix from <https://nixos.org/download/> and enable
+C++ toolchain, `python3`, `make`, `mksquashfs`, and, when nixpkgs packages the
+pinned Electron major, the Electron that `bun run dev` launches. Install Nix from <https://nixos.org/download/> and enable
 flakes by adding `experimental-features = nix-command flakes` to your
 `nix.conf`. Intel Macs are not supported, because nixpkgs dropped
 `x86_64-darwin`.
@@ -349,11 +349,15 @@ works on an immutable root such as SteamOS or Silverblue, where the host has no
 compiler: nothing is installed on the host at all.
 
 **The Electron that `bun run dev` launches on Linux comes from nixpkgs, not from
-Bun.** The shell sets `ELECTRON_OVERRIDE_DIST_PATH` to nixpkgs' build of the same
-major, which runs on any Linux, NixOS included, and loads the `node-pty` binding
-the shell compiled. No `nix-ld` configuration is needed. It is a patch release
-behind the one the lockfile pins, which is harmless: native modules are ABI-bound
-to the major. The shell also unsets `LD_LIBRARY_PATH`, because a library on it
+Bun, when nixpkgs has one.** The shell sets `ELECTRON_OVERRIDE_DIST_PATH` to
+nixpkgs' build of the same major, which runs on any Linux, NixOS included, and
+loads the `node-pty` binding the shell compiled. No `nix-ld` configuration is
+needed. It is a patch release behind the one the lockfile pins, which is
+harmless: native modules are ABI-bound to the major. nixpkgs-unstable packages
+Electron only up to 44, so with Electron 45 pinned the shell sets no override and
+prints a warning instead; `bun run dev` then runs npm's Electron, which cannot
+start on NixOS until `flake.lock` reaches a nixpkgs that packages Electron 45.
+Lint, typecheck, and tests need no Electron. The shell also unsets `LD_LIBRARY_PATH`, because a library on it
 that was built against a newer glibc kills Electron at load. On macOS the
 lazily downloaded Electron is used as is.
 

@@ -96,12 +96,10 @@ fetches `SHASUMS256.txt` before the zip so it can verify the archive. A reset or
 server-side 5xx on either request stops the build with nothing in `out/` — which
 reads exactly like the Node-major symptom above.
 
-The reason it is specific to `make` and `package` is a version split in one
-dependency. Two copies of `@electron/get` are installed: `electron`'s own
-postinstall uses **v5**, which downloads over native `fetch`, while Forge reaches
-**v3** through `@electron/packager`, and v3 downloads over `got@11`. So
-`bun install` fetching Electron succeeds on the same network where `bun run make`
-fetching Electron does not.
+Since Forge 8 there is one copy of `@electron/get` (v5, native `fetch`), shared
+by `electron`'s own postinstall, Forge, and `@electron/packager`. A network that
+lets `bun install` fetch Electron will normally let `bun run make` do the same,
+so a failure here is almost always transient.
 
 **Fix.** It is transient, so retry first:
 
@@ -133,7 +131,7 @@ else. If your network fails this consistently rather than intermittently, point
 `ELECTRON_GET_USE_PROXY` to route through the standard proxy variables.
 
 **How to tell the two apart.** The Node-major failure is silent: exit 0, no
-error, empty `out/`. The download failure carries an `@electron/get` / `got`
+error, empty `out/`. The download failure carries an `@electron/get`
 stack and either names `SHASUMS256.txt` or reports an HTTP status such as
 `Response code 500`, often while Forge says `Copying files`. Switching Node
 majors will not help.

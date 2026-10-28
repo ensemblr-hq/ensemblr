@@ -5,7 +5,7 @@ cites the source it was read from. Facts marked `OBSERVED` were not stated in
 docs and must be confirmed against the Phase 1 captures in
 `tests/fixtures/pi-captures/`.
 
-Sources inspected (Pi `0.85.1`, `@earendil-works/pi-coding-agent`). This documents the tested Pi version; it does not change Ensemblr's configured minimum. At runtime
+Sources inspected (Pi `0.85.1`, `@earendil-works/pi-coding-agent`). This documents the tested Pi version; it does not change Ensemblr's configured minimum. The command names below were cross-checked against Pi 1.4.0's `docs/rpc.md` at v0.2.6 and all still exist; frame fields and timing were not re-verified against 1.4.0. At runtime
 Ensemblr resolves the Pi executable through the Pi executable service
 (`resolvePiExecutable` in `src/main/pi-runtime/pi-executable.ts`) — an npm-global
 install, Homebrew, or an explicitly configured path — never a hardcoded

@@ -8,9 +8,10 @@ Everything below was read out of the source, not out of the SDK's docs. Where a
 row says "not set", it means no code path in this repo sets it — not that the SDK
 lacks the option.
 
-Verified against the tree at `4fbeb65` on 2026-08-08 (SDK pinned `^0.3.223` then;
-now `^0.3.267` — the options and methods below were re-checked against the
-installed `0.3.267` tree and hold).
+Verified against the tree at `4fbeb65` on 2026-08-08 (SDK pinned `^0.3.223` then,
+`^0.3.312` at v0.2.6; every option and method name below was matched against
+the installed `0.3.312` types and the adapter source; the behaviour measurements
+below date from the versions they name and were not re-run).
 
 ## `query({ options })` — a chat session
 

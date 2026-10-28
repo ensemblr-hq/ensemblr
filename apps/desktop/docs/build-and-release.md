@@ -127,6 +127,12 @@ the maker reads the local file instead of reaching for the network. Refreshing a
 runtime means downloading it, reviewing what moved upstream, and updating the
 digest in the same commit.
 
+Upstream does republish `continuous`. It did on 2026-10-19, which left the pinned
+digests stale. The script then fails with `expected sha256 …, got …` and says the
+tag has moved. Review the new runtime and re-pin both architectures. If the
+mismatch hit a release build, see *Cutting a release* for how a rerun picks the
+fix up.
+
 ### The Linux build has to run on Linux
 
 Both Linux scripts refuse on any other host, through
@@ -202,15 +208,24 @@ and `package`, using the shell's compiler. The binding links against Nix's
 glibc.
 
 **The shell supplies Electron too, on Linux.** `ELECTRON_OVERRIDE_DIST_PATH`
-points at nixpkgs' `electron_44`, because the Electron that Bun installs is a
+points at nixpkgs' `electron_<major>`, because the Electron that Bun installs is a
 generic-Linux binary: on NixOS it cannot find its libraries (it dies on
 `libglib-2.0.so.0`), and on any Linux it would run against the host's glibc while
 `node-pty` was linked against Nix's. nixpkgs' build runs everywhere and loads
-that binding. It is a patch release behind the pinned one — 44.3.0 against 44.4.5
-at the current `flake.lock` — which does not matter for native modules, since
-they are ABI-bound to the major. Packaging and release builds still ship the
-pinned Electron. On macOS nothing is overridden and the lazily downloaded
-Electron is used as is.
+that binding. It can be a patch release behind the pinned one, which does not
+matter for native modules, since they are ABI-bound to the major. Packaging and
+release builds still ship the pinned Electron. On macOS nothing is overridden and
+the lazily downloaded Electron is used as is.
+
+**nixpkgs trails Electron, and the shell tolerates it.** The pin is Electron 45,
+and nixpkgs at the current `flake.lock` packages Electron only up to 44 (44.3.0).
+When `electron_<major>` is missing, the shell sets no `ELECTRON_OVERRIDE_DIST_PATH`
+and prints a warning from its `shellHook` instead of failing evaluation. Lint,
+typecheck, and the tests need no Electron and run as usual. `bun run dev` runs
+npm's Electron, which cannot start on NixOS until `flake.lock` reaches a nixpkgs
+that packages Electron 45; `nix flake update nixpkgs` picks it up once it lands.
+Pointing the override at `electron_44` would break `node-pty`'s ABI, so the shell
+has no such fallback.
 
 **The shell clears `LD_LIBRARY_PATH`.** A NixOS host can export one for ALSA and
 PipeWire's JACK shim, built against a newer glibc than Nix's, and a library from
@@ -455,6 +470,14 @@ Every later install preserves the version it loaded, under either Bun. The pin i
 temporary: raise `SUPPORTED_LOCKFILE_VERSION` in `scripts/check-lockfile-version.mjs`
 in the same change that regenerates the lockfile once dependabot-core moves.
 
+**Bump direct ranges, then run a plain `bun install`.** `bun update --latest
+--recursive` rewrites the lockfile's transitive resolutions as well, downgrades
+included. To move dependencies by hand, edit the direct ranges in the workspace
+manifests and run `bun install` against the existing lockfile, so only what the
+new ranges require moves. The changed `bun.lock` then stales the Nix deps pin: copy
+the `deps.x86_64-linux` hash the `nix-deps` log prints into `nix/pins.json`, or run
+`nix/update-pins.sh deps` (see [The Nix flake](#the-nix-flake)).
+
 ### The dev shell
 
 `nix develop` is the only supported development environment, and every setup and
@@ -473,9 +496,9 @@ What it provides, with every version read from a manifest rather than restated:
 - **On Linux:** gcc through `mkShell`'s stdenv; `squashfs-tools` for
   `make:linux`; `ELECTRON_OVERRIDE_DIST_PATH` pointing at nixpkgs'
   `electron_<major>`, the major parsed from the desktop `devDependencies.electron`
-  (44.3.0 at the current lock, against the 44.4.5 that packaging and releases
-  ship; native modules are ABI-bound to the major alone); and a `shellHook` that
-  unsets `LD_LIBRARY_PATH`.
+  (native modules are ABI-bound to the major alone), left unset with a
+  `shellHook` warning when nixpkgs has no package for that major yet (the current
+  lock has no `electron_45`); and a `shellHook` that unsets `LD_LIBRARY_PATH`.
 - **On macOS:** `mkShellNoCC`, so the compiler and SDK come from the Xcode
   Command Line Tools. Nix's darwin stdenv exports `SDKROOT` and `DEVELOPER_DIR`,
   which would point `xcrun` at a toolchain without `codesign` or `notarytool`.
@@ -715,7 +738,9 @@ gh release create "$tag" --target "$target" --title "Ensemblr ${tag}" --notes-fi
 Read the notes from `${target}` rather than from the working tree: a release
 workspace is usually on a branch that predates the merged bump, so its
 `NOTES.md` is still the previous release's. The block is bash: fish has no `${var}` syntax and mangles it into a bad
-path, so run it under `bash -c` from a fish shell.
+path, so run it under `bash -c` from a fish shell. In zsh the braces matter too,
+because `$target:path` reads `:path` as a history modifier and `git show` gets a
+mangled revision; keep `${target}:path` as written.
 
 `--title` matters: without it GitHub titles the release with the bare tag, and
 every earlier release is titled `Ensemblr vX.Y.Z`.
@@ -754,6 +779,20 @@ dispatch the workflow manually with that tag as its input. A manual dispatch
 does not bump Homebrew because that side effect belongs to the original
 `release: published` event.
 
+Every job in the workflow checks the tag out by name, so a rerun builds whatever
+the tag points at when the job starts, not the commit the first attempt built.
+That makes a failure caused by the tree itself fixable without a new release: a
+stale pin in a build script (the AppImage runtime digest, for one) is fixed by
+merging the correction to `master`, moving the tag onto the merge commit, and
+running `gh run rerun RUN_ID --failed`. The tagged `package.json` has to keep the
+tag's version.
+
+A job that hangs, for example one stuck in `install-dependencies` for 25 minutes
+while the same step on the other architecture took one, will not fail by itself.
+Cancel it with `gh run cancel RUN_ID`. When the cancel does not complete, force it
+with `gh api -X POST repos/ensemblr-hq/ensemblr/actions/runs/RUN_ID/force-cancel`,
+then run `gh run rerun RUN_ID --failed`.
+
 The workflow refuses to build when `apps/desktop/package.json`'s `version` does not match the
 tag with `v` stripped, or when the release is still a draft.
 
@@ -770,7 +809,7 @@ hand, and `NOTES.md` and `CHANGELOG.md` take the release's own entry:
 | `docs/guide/README.md` | the version this guide describes |
 | `docs/guide/01-install.md` | current-version examples (`--version <tag>`, the Settings → General version) and every asset URL, both architectures |
 | `NOTES.md`, `CHANGELOG.md` | written in the version-bump PR, not here; after the build, check their asset links against the real names |
-| `nix/pins.json` | the flake's `release` variant: version, AppImage name, and hash — run `nix/update-pins.sh release` once the AppImage is attached; `nix` lives at `/nix/var/nix/profiles/default/bin` and may be off a non-login `PATH` |
+| `nix/pins.json` | the flake's `release` variant: version, AppImage name, and hash — run `nix/update-pins.sh release vX.Y.Z` once the AppImage is attached (it works from macOS); `nix` lives at `/nix/var/nix/profiles/default/bin` and may be off a non-login `PATH` |
 
 The examples in this file (`v0.1.20` in the commands and the feed document) are
 illustrative, so a release does not touch them.
@@ -974,7 +1013,7 @@ mistake to anyone who did not hit the underlying constraint:
 
 | Stanza | Why |
 | --- | --- |
-| `depends_on macos: :ventura` | Electron 44's floor, per the `44-x-y` branch README — Electron 44 removed macOS 12 support, so the `:monterey` this stanza carried under Electron 43 now offers the build to machines that cannot run it. Homebrew deprecated the `">= :ventura"` string form; `brew style` rewrites it. Re-read the branch README on every Electron major: the floor moves without a release note. |
+| `depends_on macos: :ventura` | Electron's floor, per the branch README (`45-x-y` for Electron 45, still Ventura and up). Electron 44 removed macOS 12 support, so the `:monterey` this stanza carried under Electron 43 offered the build to machines that cannot run it. Homebrew deprecated the `">= :ventura"` string form; `brew style` rewrites it. Re-read the branch README on every Electron major: the floor moves without a release note. |
 | `auto_updates true` | **Stale; remove it from the tap.** It was added because the in-app updater owned the bundle and a plain `brew upgrade` should skip it. But `--greedy`, a named `brew upgrade --cask ensemblr`, and `brew reinstall` all ignore it, and two updaters writing one bundle left an install that Gatekeeper refused as damaged after a restart. Since [ADR 0076](./adr/0076-stand-the-in-app-updater-down-on-a-homebrew-owned-install.md), the app detects a Homebrew-owned copy and never updates it in-app, so this stanza now just hides Ensemblr from `brew outdated`. |
 | a custom `:github_releases` livecheck | The block accepts tagged prereleases but keys off a leading `v`, which excludes the rolling `nightly` tag and keeps the cask on the highest semver release. |
 | `zap trash:` without the root directory | The root (`~/Ensemblr` by default) holds cloned repositories and worktrees. A `zap` that took it would delete the user's work. |
@@ -1047,7 +1086,7 @@ dependency derivation into every installed closure. `disallowedReferences`
 fails the build if that ever regresses.
 
 **The deps hash goes stale whenever `bun.lock` changes**, which in practice means
-the weekly Dependabot batch. The `nix-deps` job in Checks flags that on the PR,
+the weekly Dependabot batch or a hand-made dependency bump. The `nix-deps` job in Checks flags that on the PR,
 before it reaches master. On every PR whose diff touches `bun.lock`, `bunfig.toml`,
 `flake.nix`, `flake.lock`, or `apps/desktop/nix/`, it builds `master.deps` against
 `nix/pins.json`. A stale pin fails the job, and with it `verify`, and the job
@@ -1221,7 +1260,10 @@ reach this directory through the links `scripts/link-hoisted-packages.mjs` write
   `rm -r node_modules/node-pty/build` at the repository root, then `dev` again.
 - **`libglib-2.0.so.0: cannot open shared object file` on NixOS.** Electron is the
   generic-Linux binary Bun installed, not nixpkgs' build. Launch it from inside
-  the dev shell, which sets `ELECTRON_OVERRIDE_DIST_PATH`.
+  the dev shell, which sets `ELECTRON_OVERRIDE_DIST_PATH`. If the shell printed
+  `nixpkgs has no electron_<major> yet` on entry, there is nothing to set: the
+  flake's nixpkgs predates the pinned Electron major, and `dev` stays unusable on
+  NixOS until `nix flake update nixpkgs` reaches one that packages it.
 - **`libnspr4.so: cannot open shared object file`.** Electron is being launched
   inside a container that has no Chromium runtime libraries. Compile in the
   container; run the app on the host.

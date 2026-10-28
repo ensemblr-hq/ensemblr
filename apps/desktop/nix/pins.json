@@ -1,8 +1,8 @@
 {
 	"release": {
-		"version": "0.2.5",
-		"asset": "Ensemblr-0.2.5-x64.AppImage",
-		"hash": "sha256-tSMlq/noF12Z/orpMNFYW98jaYDTtkKaMo5q+NImod0="
+		"version": "0.2.6",
+		"asset": "Ensemblr-0.2.6-x64.AppImage",
+		"hash": "sha256-x9WJ+Ht1dlxCoYN0b/o27j0qezG0+Gj9BpcppVXLz1o="
 	},
 	"bun": {
 		"version": "1.4.2",
