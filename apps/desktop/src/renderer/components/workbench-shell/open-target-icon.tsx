@@ -32,6 +32,7 @@ const lucide = (Component: IconRenderer): IconRenderer =>
  * @returns An icon renderer that forwards the className.
  */
 const iconify = (icon: string): IconRenderer =>
+	// biome-ignore lint/correctness/noComponentHookFactories: called once at module scope, never during render
 	function IconifyGlyph({ className }) {
 		return <Icon aria-hidden='true' className={className} icon={icon} />;
 	};

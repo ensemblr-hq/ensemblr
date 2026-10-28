@@ -95,25 +95,31 @@ export function installImmediateIntersectionObserver(): () => void {
 /**
  * Gives every element a layout height. happy-dom reports each element as 0×0, so
  * a virtualized list measures an empty viewport and mounts no rows; this is the
- * viewport the real virtualizer then windows against.
+ * viewport the real virtualizer then windows against. TanStack Virtual reads
+ * `clientHeight`, so both it and `offsetHeight` report the height.
  * @param height - Height in pixels every element reports
- * @returns A restore function putting the original getter back
+ * @returns A restore function putting the original getters back
  */
 export function installScrollViewport(height = 1200): () => void {
-	const original = Object.getOwnPropertyDescriptor(
-		HTMLElement.prototype,
-		'offsetHeight',
-	);
-	Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
-		configurable: true,
-		get: () => height,
-	});
+	const properties = ['offsetHeight', 'clientHeight'] as const;
+	const originals = properties.map((property) => ({
+		original: Object.getOwnPropertyDescriptor(HTMLElement.prototype, property),
+		property,
+	}));
+	for (const property of properties) {
+		Object.defineProperty(HTMLElement.prototype, property, {
+			configurable: true,
+			get: () => height,
+		});
+	}
 	return () => {
-		if (original) {
-			Object.defineProperty(HTMLElement.prototype, 'offsetHeight', original);
-			return;
+		for (const { original, property } of originals) {
+			if (original) {
+				Object.defineProperty(HTMLElement.prototype, property, original);
+			} else {
+				Reflect.deleteProperty(HTMLElement.prototype, property);
+			}
 		}
-		Reflect.deleteProperty(HTMLElement.prototype, 'offsetHeight');
 	};
 }
 

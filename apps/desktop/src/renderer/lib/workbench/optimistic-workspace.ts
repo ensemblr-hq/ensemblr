@@ -64,7 +64,7 @@ export function replacePendingWorkspaceInNavigationSnapshot(
 			const pendingIndex = repository.workspaces.findIndex(
 				(candidate) => candidate.id === pendingWorkspaceId,
 			);
-			const insertionIndex = pendingIndex >= 0 ? pendingIndex : 0;
+			const insertionIndex = Math.max(pendingIndex, 0);
 			const nextWorkspaces = [...workspaces];
 			nextWorkspaces.splice(insertionIndex, 0, workspace);
 

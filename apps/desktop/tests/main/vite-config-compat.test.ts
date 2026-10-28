@@ -1,7 +1,7 @@
+import { createRequire } from 'node:module';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import ViteConfigGenerator from '@electron-forge/plugin-vite/dist/ViteConfig.js';
 import {
 	build,
 	createLogger,
@@ -14,6 +14,31 @@ import { describe, expect, test, vi } from 'vitest';
 import preloadConfig from '../../vite.preload.config.mts';
 
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url));
+
+interface ForgeViteConfigGenerator {
+	getBuildConfigs(): Promise<UserConfig[]>;
+}
+
+/** Forge 8 stopped exporting `dist/ViteConfig.js`, so the generator is loaded from beside the plugin's entry point. */
+const { default: ViteConfigGenerator } = (await import(
+	pathToFileURL(
+		path.join(
+			path.dirname(
+				createRequire(import.meta.url).resolve('@electron-forge/plugin-vite'),
+			),
+			'ViteConfig.js',
+		),
+	).href
+)) as {
+	default: new (
+		pluginConfig: {
+			build: { config: string; entry: string; target: string }[];
+			renderer: never[];
+		},
+		projectDir: string,
+		isProd: boolean,
+	) => ForgeViteConfigGenerator;
+};
 const viteConfigs = [
 	'vite.main.config.mts',
 	'vite.preload.config.mts',

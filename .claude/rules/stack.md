@@ -200,7 +200,7 @@ from the repository root or from `apps/desktop/`.
 ## Language and build
 
 - **TypeScript 7**, `strict: true`, `noImplicitAny: true`, `moduleResolution: "bundler"`,
-  `target`/`lib` ES2022, `allowImportingTsExtensions: true`. Path alias `@/*` → `./src/*`.
+  `target`/`lib` ES2024, `allowImportingTsExtensions: true`. Path alias `@/*` → `./src/*`.
 - **Vite 8** — app configs: `apps/desktop/vite.main.config.mts`, `apps/desktop/vite.preload.config.mts`,
   `apps/desktop/vite.renderer.config.mts`; playground: `apps/desktop/vite.playground.config.mts`; demo:
   `apps/desktop/vite.demo-main.config.mts`, `apps/desktop/vite.demo.config.mts`.
