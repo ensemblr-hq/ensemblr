@@ -61,7 +61,7 @@ copy it is cut from is committed at
 [`schemas/README.md`](../../schemas/README.md) covers both config files.
 
 Ensemblr's own `.ensemblr/settings.toml` points at the checked-in copy with a
-relative path (`#:schema ../schemas/settings.schema.json`), which validates
+relative path (`#:schema ../apps/desktop/schemas/settings.schema.json`), which validates
 offline and always against the tree it ships with.
 
 ---

@@ -266,8 +266,8 @@ Building from source is the other path, and the rest of this page covers it.
 
 Nix is the whole toolchain. `nix develop` enters the repository's dev shell, which
 supplies Node **24.x**, Bun 1.4 (`packageManager` is `bun@1.4.2`), and on Linux a
-C++ toolchain, `python3`, `make`, `mksquashfs`, and the Electron that
-`bun run dev` launches. Install Nix from <https://nixos.org/download/> and enable
+C++ toolchain, `python3`, `make`, `mksquashfs`, and, when nixpkgs packages the
+pinned Electron major, the Electron that `bun run dev` launches. Install Nix from <https://nixos.org/download/> and enable
 flakes by adding `experimental-features = nix-command flakes` to your
 `nix.conf`. Intel Macs are not supported, because nixpkgs dropped
 `x86_64-darwin`.
@@ -349,11 +349,15 @@ works on an immutable root such as SteamOS or Silverblue, where the host has no
 compiler: nothing is installed on the host at all.
 
 **The Electron that `bun run dev` launches on Linux comes from nixpkgs, not from
-Bun.** The shell sets `ELECTRON_OVERRIDE_DIST_PATH` to nixpkgs' build of the same
-major, which runs on any Linux, NixOS included, and loads the `node-pty` binding
-the shell compiled. No `nix-ld` configuration is needed. It is a patch release
-behind the one the lockfile pins, which is harmless: native modules are ABI-bound
-to the major. The shell also unsets `LD_LIBRARY_PATH`, because a library on it
+Bun, when nixpkgs has one.** The shell sets `ELECTRON_OVERRIDE_DIST_PATH` to
+nixpkgs' build of the same major, which runs on any Linux, NixOS included, and
+loads the `node-pty` binding the shell compiled. No `nix-ld` configuration is
+needed. It is a patch release behind the one the lockfile pins, which is
+harmless: native modules are ABI-bound to the major. nixpkgs-unstable packages
+Electron only up to 44, so with Electron 45 pinned the shell sets no override and
+prints a warning instead; `bun run dev` then runs npm's Electron, which cannot
+start on NixOS until `flake.lock` reaches a nixpkgs that packages Electron 45.
+Lint, typecheck, and tests need no Electron. The shell also unsets `LD_LIBRARY_PATH`, because a library on it
 that was built against a newer glibc kills Electron at load. On macOS the
 lazily downloaded Electron is used as is.
 

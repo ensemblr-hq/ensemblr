@@ -53,8 +53,9 @@ wizard cannot call a machine ready that diagnostics still blocks.
 The flake's dev shell (`nix/dev-shell.nix`, exposed as `devShells.default` in the
 root `flake.nix`) is the only supported development environment. It supplies
 Node 24 (its major read from `package.json#engines`), Bun 1.4, `make`, and
-`python3`, and on Linux also gcc, `mksquashfs`, and the Electron that
-`bun run dev` launches. Enter it with `nix develop`, or run one command as
+`python3`, and on Linux also gcc, `mksquashfs`, and nixpkgs' Electron for
+`bun run dev` when it packages the pinned major (nixpkgs has no Electron 45 yet,
+so the shell warns and `bun run dev` runs npm's Electron). Enter it with `nix develop`, or run one command as
 `nix develop -c <command>`; it works from `apps/desktop/` too, because Nix
 searches upward for `flake.nix`.
 
@@ -94,9 +95,9 @@ Two things happen that are worth knowing about:
   `node-pty`'s prebuilt `spawn-helper` binaries executable. They ship without the
   exec bit; skipping this surfaces much later as an opaque PTY spawn failure.
 
-There is no `.npmrc`. `@electron-forge/plugin-fuses@7` declares a stale peer range
-(`@electron/fuses@^1`) while the repo pins v2; Bun tolerates that natively, and
-exactly one `@electron/fuses@2.1.3` resolves.
+There is no `.npmrc`. Forge 8's `@electron-forge/plugin-fuses` peers on
+`@electron/fuses@^2.1.3`, which is the version the repo pins, and exactly one
+`@electron/fuses@2.1.3` resolves.
 
 Use `bun ci` for a clean tree that must match `bun.lock` exactly (it fails rather
 than rewrite the lockfile). Only a small, explicit set of dependencies has its

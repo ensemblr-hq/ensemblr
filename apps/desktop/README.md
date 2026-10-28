@@ -457,7 +457,7 @@ Full glossary in [`CONTEXT.md`](./CONTEXT.md); the user-facing tour is
 
 | Area | Choice |
 | --- | --- |
-| Desktop shell | Electron 44, Electron Forge 7 (Vite plugin, Fuses hardening) |
+| Desktop shell | Electron 45, Electron Forge 8 (Vite plugin, Fuses hardening) |
 | UI | React 19, TypeScript 7 (strict) |
 | Styling | Tailwind CSS 4, shadcn/ui (`radix-nova`) + Radix UI, Lucide icons |
 | Routing | TanStack Router (file-based) |
@@ -473,7 +473,7 @@ Full glossary in [`CONTEXT.md`](./CONTEXT.md); the user-facing tour is
 | Storage | SQLite via Node 24's built-in `node:sqlite` |
 | Build | Vite 8, Electron Forge (DMG + ZIP per architecture, hardened runtime, arm64 and x64) |
 | Testing | Vitest 5 (+ happy-dom) and `electron --test` |
-| Lint / format | Biome 2.5 |
+| Lint / format | Biome 2.6 |
 | Runtime / package manager | Node 24.x (exactly), Bun 1.4 |
 
 ---

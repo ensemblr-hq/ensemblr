@@ -131,13 +131,13 @@ Past the wizard, the workbench opens on the welcome screen with three ways in:
 | Action | What it does |
 | --- | --- |
 | **Open GitHub project** | Clone a repo from GitHub. Lists your repositories via `gh`, or takes a URL you paste. |
-| **Open project** | Register a git repository already on your disk in place. Its workspaces become worktrees of that repository under the managed `workspaces/` folder. |
+| **Open local project** | Register a git repository already on your disk in place. Its workspaces become worktrees of that repository under the managed `workspaces/` folder. |
 | **Quick start** | Create a new folder, initialize a fresh git repository in it, and publish it to GitHub as a **private** repository via `gh`. |
 
 All three open the project's first workspace. `repos/` is the default
 repository location. **Open GitHub project** can override it with **Location**,
 and **Quick start** can override it with **Parent folder**; those choices keep
-the repository at the selected path. **Open project** always keeps the
+the repository at the selected path. **Open local project** always keeps the
 repository at the path you selected.
 
 **Quick start can publish into an organization, not just your own account.** The
