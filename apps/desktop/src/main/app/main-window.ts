@@ -73,7 +73,7 @@ export function createMainWindow({
 			// off; without this the file preview's PDF frame renders empty. It is the
 			// only plugin modern Chromium still carries, so this grants nothing else.
 			plugins: true,
-			preload: path.join(__dirname, 'preload.js'),
+			preload: path.join(__dirname, 'preload.cjs'),
 			// Electron ≥20 already infers all three from `nodeIntegration: false`
 			// and a preload that imports nothing outside `electron`. Declared anyway
 			// so the guarantee survives a preload that later reaches for `node:fs`,

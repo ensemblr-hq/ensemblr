@@ -22,6 +22,13 @@ import { beforeEach } from 'vitest';
 import { i18n } from '@/renderer/lib/i18n';
 import { installWebStorage } from './web-storage';
 
+// happy-dom 21 ships a Web Animations implementation whose `cancel()` rejects
+// `finished` with an AbortError that motion never handles, failing the run on an
+// unhandled rejection. Without `animate`, motion drives animations from JS.
+if (typeof Element !== 'undefined') {
+	Reflect.deleteProperty(Element.prototype, 'animate');
+}
+
 beforeEach(async () => {
 	await i18n.changeLanguage('en');
 	installWebStorage();

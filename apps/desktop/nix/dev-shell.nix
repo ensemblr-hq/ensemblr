@@ -23,9 +23,10 @@ let
   # NixOS, and on any Linux it would run against the host glibc while node-pty
   # is compiled against Nix's. nixpkgs' build of the same major runs everywhere
   # and loads that binding; native modules are ABI-bound to the major alone.
-  electron =
-    pkgs."electron_${electronMajor}"
-      or (throw "nixpkgs has no electron_${electronMajor}; bump flake.lock to a nixpkgs that does");
+  # nixpkgs trails Electron's releases, so a major it does not package yet leaves
+  # the shell without an override rather than failing evaluation: lint, typecheck
+  # and Vitest need no Electron, and a nearer major would break node-pty's ABI.
+  electron = pkgs."electron_${electronMajor}" or null;
 
   # On macOS the compiler and SDK come from the Xcode Command Line Tools: Nix's
   # darwin stdenv exports its own SDKROOT and DEVELOPER_DIR, which `xcrun`
@@ -43,14 +44,20 @@ mkShell (
     # `make:linux` packs the AppImage with mksquashfs.
     ++ lib.optionals stdenv.hostPlatform.isLinux [ pkgs.squashfs-tools ];
   }
-  // lib.optionalAttrs stdenv.hostPlatform.isLinux {
-    ELECTRON_OVERRIDE_DIST_PATH = "${electron}/bin";
-
-    # A host LD_LIBRARY_PATH points at libraries built against the host's
-    # glibc. NixOS sets one for ALSA and PipeWire's JACK shim, and a library from
-    # a newer glibc kills Electron at load with `GLIBC_2.43 not found`.
-    shellHook = ''
-      unset LD_LIBRARY_PATH
-    '';
-  }
+  // lib.optionalAttrs stdenv.hostPlatform.isLinux (
+    lib.optionalAttrs (electron != null) {
+      ELECTRON_OVERRIDE_DIST_PATH = "${electron}/bin";
+    }
+    // {
+      # A host LD_LIBRARY_PATH points at libraries built against the host's
+      # glibc. NixOS sets one for ALSA and PipeWire's JACK shim, and a library from
+      # a newer glibc kills Electron at load with `GLIBC_2.43 not found`.
+      shellHook = ''
+        unset LD_LIBRARY_PATH
+      ''
+      + lib.optionalString (electron == null) ''
+        echo "nixpkgs has no electron_${electronMajor} yet: \`bun run dev\` runs npm's Electron, which cannot start on NixOS until flake.lock reaches a nixpkgs that packages it." >&2
+      '';
+    }
+  )
 )

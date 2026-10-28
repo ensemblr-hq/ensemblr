@@ -30,6 +30,7 @@ function makeShellContext<T>(name: string): ShellContext<T> {
 	const Context = createContext<T | null>(null);
 
 	/** Mounts the context, exposing `value` to descendant consumers. */
+	// biome-ignore lint/correctness/noComponentHookFactories: called once at module scope, never during render
 	function Provider({
 		value,
 		children,
@@ -44,6 +45,7 @@ function makeShellContext<T>(name: string): ShellContext<T> {
 	 * Reads the context value, throwing when used outside its provider.
 	 * @returns The current context value
 	 */
+	// biome-ignore lint/correctness/noComponentHookFactories: called once at module scope, never during render
 	function useValue(): T {
 		const value = use(Context);
 		if (value === null) {
@@ -56,6 +58,7 @@ function makeShellContext<T>(name: string): ShellContext<T> {
 	 * Reads the context value without throwing when no provider is mounted.
 	 * @returns The context value, or `null` outside a provider
 	 */
+	// biome-ignore lint/correctness/noComponentHookFactories: called once at module scope, never during render
 	function useOptional(): T | null {
 		return use(Context);
 	}
