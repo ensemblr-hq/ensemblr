@@ -296,6 +296,7 @@ const QUEUE_OFF: ComputeQueueSettings = {
 	exemptPatterns: [],
 	extraPatterns: [],
 	niceness: 10,
+	taskLimit: 20_000,
 };
 
 /** Queue dependencies for a service whose queue is off and must never be reached. */

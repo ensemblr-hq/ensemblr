@@ -384,6 +384,7 @@ export function createComputeQueueService(
 				niceness: options.readSettings().niceness,
 				overlay: assembled.env,
 				redactValues: assembled.redactValues,
+				taskLimit: options.readSettings().taskLimit,
 				workspacePath: record.workspacePath ?? '',
 			});
 		} catch (error) {
@@ -408,7 +409,7 @@ export function createComputeQueueService(
 			signal: outcome.signal,
 			state: cancelled
 				? 'cancelled'
-				: outcome.exitCode === 0
+				: outcome.exitCode === 0 && outcome.taskCapHit !== true
 					? 'succeeded'
 					: 'failed',
 		});

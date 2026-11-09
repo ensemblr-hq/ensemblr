@@ -15,6 +15,7 @@ import type { ComputeQueueSettings } from '../../src/shared/config.ts';
 
 interface FakeRun {
 	finish: (exitCode?: number | null, signal?: string | null) => void;
+	end: (outcome: CommandRunOutcome) => void;
 	killed: number;
 	launch: CommandLaunch;
 	terminated: number;
@@ -41,6 +42,7 @@ const fakeStarter: CommandStarter = (launch) => {
 	});
 	const run: FakeRun = {
 		finish: (exitCode = 0, signal = null) => resolveDone({ exitCode, signal }),
+		end: (outcome) => resolveDone(outcome),
 		killed: 0,
 		launch,
 		terminated: 0,
@@ -139,6 +141,7 @@ beforeEach(() => {
 		exemptPatterns: [],
 		extraPatterns: [],
 		niceness: 7,
+		taskLimit: 4_321,
 	};
 	runs = [];
 	stopped = [];
@@ -360,7 +363,16 @@ describe('command jobs', () => {
 		expect(launch.redactValues).toEqual(['shh']);
 		expect(launch.baseEnv.BASE).toBe('yes');
 		expect(launch.niceness).toBe(7);
+		expect(launch.taskLimit).toBe(4_321);
 		expect(path.basename(launch.cwd)).toBe('pkg');
+	});
+
+	it('fails a job that hit its task cap even when it exited 0', async () => {
+		const job = await enqueue('a', 'runaway');
+		await flush();
+		runFor('runaway').end({ exitCode: 0, signal: null, taskCapHit: true });
+		await flush();
+		expect(queue.getJob(job)).toMatchObject({ exitCode: 0, state: 'failed' });
 	});
 
 	it('refuses an unknown workspace and an escaping cwd', async () => {

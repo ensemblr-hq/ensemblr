@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import {
 	existsSync,
 	mkdirSync,
@@ -26,9 +27,40 @@ import { expandRedactValues } from '../../src/main/compute-queue/output-redactio
 
 const SECRET = 'supersecretvalue123';
 
+/**
+ * Whether this machine can make a capped systemd user scope, which the
+ * task-cap tests need; macOS and CI runners without a user manager skip them.
+ * @returns True when a throwaway capped scope runs.
+ */
+function canMakeUserScope(): boolean {
+	try {
+		execFileSync(
+			'systemd-run',
+			[
+				'--user',
+				'--scope',
+				'--quiet',
+				'--collect',
+				'-p',
+				'TasksMax=16',
+				'--',
+				'true',
+			],
+			{ stdio: 'ignore', timeout: 5_000 },
+		);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+const HAS_USER_SCOPE = process.platform === 'linux' && canMakeUserScope();
+
 let root: string;
 let workspacePath: string;
 let niceness: number;
+let taskLimit: number;
+let jobPath: string | undefined;
 let queue: ComputeQueueService;
 
 /**
@@ -89,12 +121,18 @@ beforeEach(() => {
 	workspacePath = path.join(root, 'ws');
 	mkdirSync(workspacePath);
 	niceness = 0;
+	jobPath = undefined;
+	taskLimit = 20_000;
 	queue = createComputeQueueService({
 		assembleEnvironment: async () => ({
 			env: { MY_TOKEN: SECRET, PLAIN: 'visible' },
 			redactValues: [SECRET],
 		}),
-		baseEnvironment: () => ({ ...process.env, NO_COLOR: undefined }),
+		baseEnvironment: () => ({
+			...process.env,
+			NO_COLOR: undefined,
+			PATH: jobPath ?? process.env.PATH,
+		}),
 		killGraceMs: 500,
 		readSettings: () => ({
 			concurrency: 4,
@@ -102,6 +140,7 @@ beforeEach(() => {
 			exemptPatterns: [],
 			extraPatterns: [],
 			niceness,
+			taskLimit,
 		}),
 		resolveWorkspace: (workspaceId) =>
 			workspaceId === 'ws' ? { name: 'ws', path: workspacePath } : null,
@@ -227,6 +266,111 @@ describe('backgrounded children', () => {
 		expect(isAlive(pid)).toBe(false);
 	});
 });
+
+/**
+ * Waits until a job has written a pid file, then reads every pid in it.
+ * @param file - Pid file the job appends to.
+ * @returns The pids written so far.
+ */
+async function readPids(file: string): Promise<number[]> {
+	const deadline = Date.now() + 5_000;
+	while (!existsSync(file) || readFileSync(file, 'utf8').trim() === '') {
+		if (Date.now() > deadline) {
+			throw new Error(`${file} was never written`);
+		}
+		await new Promise((resolve) => setTimeout(resolve, 20));
+	}
+	return readFileSync(file, 'utf8')
+		.split('\n')
+		.filter(Boolean)
+		.map((line) => Number.parseInt(line, 10));
+}
+
+describe.skipIf(!HAS_USER_SCOPE)('task cap', () => {
+	it('hands the command to the shell without systemd expanding it', async () => {
+		expect((await run(`printf '%s' '$$ $PLAIN'`)).outputTail).toBe('$$ $PLAIN');
+	});
+
+	it('kills a job over its cap with everything it started, and leaves a sibling job running', async () => {
+		taskLimit = 50;
+		const sibling = await queue.enqueueCommand({
+			command: 'sleep 2; echo sibling done',
+			initiator: 'agent',
+			workspaceId: 'ws',
+		});
+		if (!sibling.ok) {
+			throw new Error(sibling.message);
+		}
+		const started = Date.now();
+		const runaway = await run(
+			'for i in $(seq 200); do sleep 30 & echo $! >> spawned.pid; done; wait',
+		);
+		expect(Date.now() - started).toBeLessThan(10_000);
+		expect(runaway.state).toBe('failed');
+		expect(runaway.outputTail).toContain(
+			'Ensemblr stopped this job: it hit its task cap of 50 processes and threads',
+		);
+		const spawned = await readPids(path.join(workspacePath, 'spawned.pid'));
+		expect(spawned.length).toBeGreaterThan(10);
+		expect(spawned.length).toBeLessThan(50);
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		expect(spawned.filter(isAlive)).toEqual([]);
+
+		const siblingResult = await queue.waitFor([sibling.job.id], {
+			timeoutMs: 10_000,
+		});
+		expect(siblingResult.settled[0]).toMatchObject({
+			outputTail: 'sibling done\n',
+			state: 'succeeded',
+		});
+	});
+
+	it('stops a child that left the process group when the job is cancelled', async () => {
+		const outcome = await queue.enqueueCommand({
+			command: 'setsid sleep 30 & echo $! > escaped.pid; wait',
+			initiator: 'agent',
+			workspaceId: 'ws',
+		});
+		if (!outcome.ok) {
+			throw new Error(outcome.message);
+		}
+		const [escaped] = await readPids(path.join(workspacePath, 'escaped.pid'));
+		expect(escaped).toBeDefined();
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		expect(isAlive(escaped ?? 0)).toBe(true);
+
+		expect(queue.cancel(outcome.job.id)).toBe(true);
+		const result = await queue.waitFor([outcome.job.id], { timeoutMs: 10_000 });
+		expect(result.settled[0]?.state).toBe('cancelled');
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		expect(isAlive(escaped ?? 0)).toBe(false);
+	});
+});
+
+describe.skipIf(process.platform !== 'linux')(
+	'task cap without systemd',
+	() => {
+		it('still runs the job, under a soft process limit above what the user holds', async () => {
+			const bin = path.join(root, 'bin');
+			mkdirSync(bin);
+			const bash = execFileSync('bash', ['-c', 'command -v bash'], {
+				encoding: 'utf8',
+			}).trim();
+			symlinkSync(bash, path.join(bin, 'bash'));
+			jobPath = bin;
+			taskLimit = 64;
+			const inherited = execFileSync('bash', ['-c', 'ulimit -S -u'], {
+				encoding: 'utf8',
+			}).trim();
+
+			const job = await run('ulimit -S -u');
+			expect(job.state).toBe('succeeded');
+			const soft = Number.parseInt(job.outputTail, 10);
+			expect(soft).toBeGreaterThan(taskLimit);
+			expect(inherited === 'unlimited' || soft < Number(inherited)).toBe(true);
+		});
+	},
+);
 
 /** A multi-line secret as an environment variable would hold it. */
 const MULTI_LINE_SECRET = 'first-line-of-secret\nsecond-line-of-secret';

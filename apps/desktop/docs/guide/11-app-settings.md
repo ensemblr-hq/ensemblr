@@ -160,6 +160,18 @@ The numeric fields commit when you leave the field or press `↵`, and the four 
 beneath the switch are disabled while the queue is off. The settings tools an agent
 uses refuse this section outright. Background: [ADR 0082](../adr/0082-queue-heavy-agent-commands-through-one-app-wide-queue.md).
 
+**Each queued command has a task cap.** On Linux with a user systemd, every
+queued command runs in its own systemd scope limited to 20,000 processes and
+threads (`TasksMax`). A command that reaches the cap is killed along with
+everything it started, and the agent waiting on it gets a failed job whose output
+ends with a note saying it hit its task cap. Other jobs and agent sessions keep
+running. Stopping or cancelling a job kills its whole scope, including processes
+that left its process group. Linux without a user systemd gets a soft
+`RLIMIT_NPROC` instead, set to your current task count plus the cap, and macOS
+keeps each job in its own process group. Neither fallback can tell the agent the
+job hit its cap. The cap has no row on this page: set `app.computeQueue.taskLimit`
+in `~/.config/ensemblr/config.json` to change it.
+
 **Caffeinate prevents idle sleep, not every kind of sleep.** It does not override
 closing a laptop lid, explicitly choosing Sleep, or critical-battery shutdown.
 Terminal commands and third-party CLI harnesses are not monitored. On Linux,

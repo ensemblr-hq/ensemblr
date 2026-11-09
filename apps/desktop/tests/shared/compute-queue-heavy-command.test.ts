@@ -14,6 +14,7 @@ const SETTINGS: ComputeQueueSettings = {
 	exemptPatterns: [],
 	extraPatterns: [],
 	niceness: 10,
+	taskLimit: 20_000,
 };
 
 describe('classifyHeavyCommand', () => {
