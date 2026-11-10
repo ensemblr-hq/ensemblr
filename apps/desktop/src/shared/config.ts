@@ -185,14 +185,17 @@ const appearanceSettingsSchema = z.object({
  * The app-wide compute queue that heavy agent commands — test runners, builds,
  * typechecks, nix rebuilds — wait in, so parallel agents across workspaces
  * cannot saturate the machine. `concurrency` is how many heavy jobs run at once
- * across every workspace; `niceness` is the CPU priority they run at. The two
- * pattern lists extend and carve out of the built-in heavy-command list.
+ * across every workspace; `niceness` is the CPU priority they run at;
+ * `taskLimit` is how many processes and threads one job may hold before it is
+ * killed, so a runaway job takes down itself rather than the user's session.
+ * The two pattern lists extend and carve out of the built-in heavy-command list.
  * Disabled, every gate passes through and queued work starts at once.
  */
 const computeQueueSettingsSchema = z.object({
 	enabled: z.boolean().catch(true),
 	concurrency: z.number().int().min(1).max(16).catch(1),
 	niceness: z.number().int().min(0).max(19).catch(10),
+	taskLimit: z.number().int().min(64).max(1_000_000).catch(20_000),
 	extraPatterns: z.array(z.string()).catch([]),
 	exemptPatterns: z.array(z.string()).catch([]),
 });

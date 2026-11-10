@@ -461,6 +461,13 @@
 							"default": 10,
 							"description": "CPU priority (`nice` value) queued jobs run at. `0` is normal priority; higher yields more to interactive work."
 						},
+						"taskLimit": {
+							"type": "integer",
+							"minimum": 64,
+							"maximum": 1000000,
+							"default": 20000,
+							"description": "Processes plus threads one queued command may hold at once. On Linux with a user systemd each job runs in its own scope with this as `TasksMax`, and a job that reaches it is killed with everything it started and reported as having hit its task cap. Without systemd, Linux applies a soft `RLIMIT_NPROC` of the user's current task count plus this value; macOS relies on the job's own process group."
+						},
 						"extraPatterns": {
 							"type": "array",
 							"items": { "type": "string" },

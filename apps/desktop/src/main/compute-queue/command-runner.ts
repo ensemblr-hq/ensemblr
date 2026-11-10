@@ -3,7 +3,20 @@ import { accessSync, constants } from 'node:fs';
 import path from 'node:path';
 
 import { stripLaunchContextEnv } from '../environment/launch-env.ts';
-import { createCommandOutput, type OutputTail } from './command-output.ts';
+import {
+	type CommandOutput,
+	createCommandOutput,
+	type OutputTail,
+} from './command-output.ts';
+import {
+	capArgv,
+	capCommand,
+	describeCapHit,
+	planTaskCap,
+	type ScopeWatch,
+	type TaskCapPlan,
+	watchScope,
+} from './task-cap.ts';
 
 /**
  * How long a process that has exited is given for its pipes to reach EOF.
@@ -30,6 +43,8 @@ export interface CommandLaunch {
 	/** Workspace overlay assembled for this launch. */
 	overlay: Record<string, string>;
 	redactValues: readonly string[];
+	/** Processes plus threads the job may hold at once; see {@link TaskCapPlan}. */
+	taskLimit: number;
 	workspacePath: string;
 }
 
@@ -37,18 +52,20 @@ export interface CommandLaunch {
 export interface CommandRunOutcome {
 	exitCode: number | null;
 	signal: string | null;
+	/** True when the job's scope refused a fork and the runner killed it for that. */
+	taskCapHit?: boolean;
 }
 
 /** A started command the queue can observe and stop. */
 export interface CommandRun {
 	/** Settles once the process has exited and its output is flushed; never rejects. */
 	done: Promise<CommandRunOutcome>;
-	/** Sends SIGKILL to the process group at once. */
+	/** Sends SIGKILL to the process group, and the job's scope, at once. */
 	kill: () => void;
 	logPath: string | null;
 	/** The cleaned output tail so far. */
 	tail: () => OutputTail;
-	/** Sends SIGTERM to the process group, then SIGKILL once the grace elapses. */
+	/** Sends SIGTERM to the process group and scope, then SIGKILL once the grace elapses. */
 	terminate: () => void;
 }
 
@@ -146,36 +163,59 @@ function describeSpawnError(error: unknown): string {
 	return `Could not start the command: ${error instanceof Error ? error.message : String(error)}`;
 }
 
-/**
- * Spawns a granted command job in its own process group with output streamed
- * to its log and tail. The returned `done` settles after the process exits and
- * its pipes drain (or the drain grace passes), and never rejects.
- * @param launch - The validated launch description.
- * @returns The running command.
- */
-export function startCommandProcess(launch: CommandLaunch): CommandRun {
-	const output = createCommandOutput({
-		jobId: launch.jobId,
-		redactValues: launch.redactValues,
-		workspacePath: launch.workspacePath,
-	});
-	const env = mergeCommandEnvironment(launch.baseEnv, launch.overlay);
-	const argv = buildCommandArgv(launch.command, env, launch.niceness);
-	let killTimer: ReturnType<typeof setTimeout> | null = null;
-	let pid: number | undefined;
+/** What one spawned job needs to be watched, signalled, and settled. */
+interface SpawnedJob {
+	/** Signals the job's process group and, when it has one, its scope. */
+	signalAll: (signal: NodeJS.Signals) => void;
+	outcome: Promise<CommandRunOutcome>;
+}
 
-	const done = new Promise<CommandRunOutcome>((resolve) => {
-		let outcome: CommandRunOutcome = { exitCode: null, signal: null };
+/**
+ * Spawns one job under its task-cap plan in its own process group, streaming
+ * output and, for a scoped job, killing the scope the moment it refuses a fork.
+ * @param launch - The validated launch description.
+ * @param env - The job's merged environment.
+ * @param plan - How the job is held to its task limit.
+ * @param output - The job's log and tail.
+ * @returns The way to signal it and its settled outcome, which never rejects.
+ */
+function spawnCappedJob(
+	launch: CommandLaunch,
+	env: Record<string, string>,
+	plan: TaskCapPlan,
+	output: CommandOutput,
+): SpawnedJob {
+	const argv = capArgv(
+		plan,
+		buildCommandArgv(capCommand(plan, launch.command), env, launch.niceness),
+	);
+	let pid: number | undefined;
+	let scope: ScopeWatch | null = null;
+	let taskCapHit = false;
+
+	/**
+	 * Signals everything the job started, through both handles.
+	 * @param signal - Signal to send.
+	 */
+	const signalAll = (signal: NodeJS.Signals): void => {
+		signalGroup(pid, signal);
+		scope?.signal(signal);
+	};
+
+	const outcome = new Promise<CommandRunOutcome>((resolve) => {
+		let exit: CommandRunOutcome = { exitCode: null, signal: null };
 		let settled = false;
 
-		/** Reaps the process group, flushes output, and resolves exactly once. */
+		/** Reaps the group and scope, flushes output, and resolves exactly once. */
 		const settle = (): void => {
 			if (settled) {
 				return;
 			}
 			settled = true;
-			signalGroup(pid, 'SIGKILL');
-			void output.end().then(() => resolve(outcome));
+			scope?.check();
+			signalAll('SIGKILL');
+			scope?.stop();
+			void output.end().then(() => resolve({ ...exit, taskCapHit }));
 		};
 
 		try {
@@ -186,6 +226,13 @@ export function startCommandProcess(launch: CommandLaunch): CommandRun {
 				stdio: ['ignore', 'pipe', 'pipe'],
 			});
 			pid = child.pid;
+			if (plan.kind === 'scope' && pid !== undefined) {
+				scope = watchScope(pid, plan.unit, () => {
+					taskCapHit = true;
+					output.note(describeCapHit(plan.limit));
+					signalAll('SIGKILL');
+				});
+			}
 			child.stdout?.on('data', (chunk: Buffer) =>
 				output.write('stdout', chunk),
 			);
@@ -197,7 +244,7 @@ export function startCommandProcess(launch: CommandLaunch): CommandRun {
 				settle();
 			});
 			child.on('exit', (exitCode, signal) => {
-				outcome = { exitCode, signal };
+				exit = { exitCode, signal };
 				setTimeout(() => {
 					if (!settled) {
 						child.stdout?.destroy();
@@ -211,23 +258,68 @@ export function startCommandProcess(launch: CommandLaunch): CommandRun {
 			output.note(describeSpawnError(error));
 			settle();
 		}
-	}).finally(() => {
-		if (killTimer !== null) {
-			clearTimeout(killTimer);
-		}
 	});
+
+	return { outcome, signalAll };
+}
+
+/**
+ * Starts a granted command job: picks its task cap (a systemd scope where one
+ * can be made, a weaker fallback otherwise), then spawns it in its own process
+ * group with output streamed to its log and tail. The returned `done` settles
+ * after the process exits and its pipes drain (or the drain grace passes), and
+ * never rejects. A stop asked for before the spawn means it never spawns.
+ * @param launch - The validated launch description.
+ * @returns The running command.
+ */
+export function startCommandProcess(launch: CommandLaunch): CommandRun {
+	const output = createCommandOutput({
+		jobId: launch.jobId,
+		redactValues: launch.redactValues,
+		workspacePath: launch.workspacePath,
+	});
+	const env = mergeCommandEnvironment(launch.baseEnv, launch.overlay);
+	const launcher = {
+		shell: findExecutable('bash', env.PATH) ?? FALLBACK_SHELL,
+		systemdRun: findExecutable('systemd-run', env.PATH),
+	};
+	let job: SpawnedJob | null = null;
+	let stopped = false;
+	let killTimer: ReturnType<typeof setTimeout> | null = null;
+
+	const done = planTaskCap(env, launcher, launch.taskLimit, launch.jobId)
+		.catch((): TaskCapPlan => ({ kind: 'group' }))
+		.then(async (plan): Promise<CommandRunOutcome> => {
+			if (stopped) {
+				await output.end();
+				return { exitCode: null, signal: null };
+			}
+			job = spawnCappedJob(launch, env, plan, output);
+			return job.outcome;
+		})
+		.finally(() => {
+			if (killTimer !== null) {
+				clearTimeout(killTimer);
+			}
+		});
+
+	/**
+	 * Signals the spawned job, or keeps it from spawning at all.
+	 * @param signal - Signal to send.
+	 */
+	const signalJob = (signal: NodeJS.Signals): void => {
+		stopped = true;
+		job?.signalAll(signal);
+	};
 
 	return {
 		done,
-		kill: () => signalGroup(pid, 'SIGKILL'),
+		kill: () => signalJob('SIGKILL'),
 		logPath: output.logPath,
 		tail: output.tail,
 		terminate: () => {
-			signalGroup(pid, 'SIGTERM');
-			killTimer ??= setTimeout(
-				() => signalGroup(pid, 'SIGKILL'),
-				launch.killGraceMs,
-			);
+			signalJob('SIGTERM');
+			killTimer ??= setTimeout(() => signalJob('SIGKILL'), launch.killGraceMs);
 		},
 	};
 }
