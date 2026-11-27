@@ -155,7 +155,7 @@ jobs:
             echo "deps=true" >>"$GITHUB_OUTPUT"
           fi
 
-      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      - uses: cachix/install-nix-action@382a9ed9481c7c1f94f68b72ef105b3417c73877 # v32.1.0
         if: steps.changes.outputs.deps == 'true'
 
       - name: Build master.deps against apps/desktop/nix/pins.json
