@@ -4,7 +4,9 @@
 
 # Ensemblr™
 
-> **Ensemblr 0.2.6 is the last release of the Electron-based Ensemblr. The project is moving to Rust.**
+> **Ensemblr 0.2.6 is the last release of the Electron-based Ensemblr. The new Rust-based Ensemblr lives at
+> [ensemblr-hq/ensemblr](https://github.com/ensemblr-hq/ensemblr); this repository will be renamed
+> `ensemblr-electron`.**
 
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/ensemblr-hq/ensemblr?utm_source=oss&utm_medium=github&utm_campaign=ensemblr-hq%2Fensemblr&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
