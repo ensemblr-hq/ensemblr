@@ -68,7 +68,6 @@ console.error(
 		'  AppImage would launch with every terminal broken.',
 		'',
 		'  Fix (pick one):',
-		'    • CI: push the tag and let the build-linux job in release.yml do it',
 		dockerHint,
 		`    • Override, knowing terminals will be broken: ${ESCAPE_HATCH}=1`,
 		'',

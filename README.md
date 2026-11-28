@@ -4,7 +4,8 @@
 
 # Ensemblr™
 
-> **Ensemblr 0.2.6 is the last release of the Electron-based Ensemblr. The project is moving to Rust.**
+> **Ensemblr 0.2.6 is the last release of the Electron-based Ensemblr, and this repository is archived. The
+> new Rust-based Ensemblr lives at [ensemblr-hq/ensemblr](https://github.com/ensemblr-hq/ensemblr).**
 
 **A desktop orchestrator for multi-agent coding work, driving the Pi CLI or the Claude Code CLI — whichever
 you already run.**
@@ -14,11 +15,10 @@ in [`apps/desktop/`](./apps/desktop). Start with its [README](./apps/desktop/REA
 
 ## Install
 
-- **macOS** (Apple silicon or Intel): `brew install --cask ensemblr-hq/tap/ensemblr`, or download the `.dmg`
-  from the [latest release](https://github.com/ensemblr-hq/ensemblr/releases/latest).
+- **macOS** (Apple silicon or Intel): download the `.dmg` from the
+  [latest release](https://github.com/ensemblr-hq/ensemblr-electron/releases/latest).
 - **Linux** (x86-64): `curl -fsSL https://www.ensemblr.dev/install.sh | sh`, or take the `.AppImage` from the
-  [latest release](https://github.com/ensemblr-hq/ensemblr/releases/latest).
-- **NixOS**: `nix run github:ensemblr-hq/ensemblr`.
+  [latest release](https://github.com/ensemblr-hq/ensemblr-electron/releases/latest).
 
 The [install guide](./apps/desktop/docs/guide/01-install.md) covers requirements, channels, and building from
 source.
@@ -32,7 +32,7 @@ source.
 | [`packages/shared/`](./packages/shared) | Code the apps share, such as UI pieces lifted out of the desktop app. Not started yet. |
 
 The root holds only what every workspace shares: the Bun workspace manifest and lockfile, the Nix flake and its dev shell,
-the house Biome config, CI, agent tooling, the Nix flake entrypoint, and the community files.
+the house Biome config, agent tooling, and the community files.
 
 ## Development
 

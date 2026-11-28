@@ -6,7 +6,7 @@ import {
 	updateFeedAssetName,
 } from '../../src/main/updates/release-feed';
 
-const SLUG = 'ensemblr-hq/ensemblr';
+const SLUG = 'ensemblr-hq/ensemblr-electron';
 const RELEASES_URL = `https://api.github.com/repos/${SLUG}/releases?per_page=30`;
 const DOWNLOAD = `https://github.com/${SLUG}/releases/download`;
 const DIGEST = `sha256:${'a'.repeat(64)}`;
@@ -489,7 +489,7 @@ describe('createReleaseFeed — version comparison', () => {
 		expect(result).not.toEqual({ candidate: null, status: 'ok' });
 	});
 
-	// The base in `nightly.yml` is stripped to `<major>.<minor>.<patch>` for
+	// The nightly build stripped its base to `<major>.<minor>.<patch>` for
 	// exactly this: keeping the `-beta.N` tail would put `9-nightly` and
 	// `10-nightly` in the same identifier slot, where semver compares them as
 	// strings and the newer build loses.

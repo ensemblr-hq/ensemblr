@@ -35,8 +35,8 @@ each schema declares, so an editor that follows a `$ref` or caches by `$id`
 agrees with the pointer it was given:
 
 ```text
-https://raw.githubusercontent.com/ensemblr-hq/ensemblr/master/apps/desktop/schemas/config.schema.json
-https://raw.githubusercontent.com/ensemblr-hq/ensemblr/master/apps/desktop/schemas/settings.schema.json
+https://raw.githubusercontent.com/ensemblr-hq/ensemblr-electron/master/apps/desktop/schemas/config.schema.json
+https://raw.githubusercontent.com/ensemblr-hq/ensemblr-electron/master/apps/desktop/schemas/settings.schema.json
 ```
 
 The schemas moved here from the repository root's `schemas/` when the

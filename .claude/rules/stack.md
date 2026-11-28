@@ -13,19 +13,19 @@ records the resolved versions. Re-check both before asserting an exact version.
 
 | | |
 | --- | --- |
-| Target | macOS Ventura+ on arm64 **and** x64 (`.dmg`/`.zip` each), and Linux x64 (`.AppImage`); Linux arm64 is planned for the release after the one that adds macOS x64 |
+| Target | macOS Ventura+ on arm64 **and** x64 (`.dmg`/`.zip` each), and Linux x64 (`.AppImage`); Linux arm64 was never built |
 | Shell | Electron 45 (Node 24 runtime), Electron Forge 8 |
 | Node | **exactly 24.x** (`engines: >=24 <25`); the dev shell supplies `nodejs_24` from nixpkgs |
 | Package manager | Bun 1.4.2 (`packageManager`; the dev shell supplies nixpkgs' `bun`); Node stays the runtime |
 | Dev environment | `nix develop`, from the flake's `devShells.default` (`apps/desktop/nix/dev-shell.nix`) |
 
-**Four targets, one build per architecture — not a universal binary.** darwin-arm64
-and darwin-x64 (the latter cross-built on `macos-15`), linux-x64, and linux-arm64
-(next release). A universal build roughly doubles the download for every
+**One build per architecture — not a universal binary.** darwin-arm64,
+darwin-x64 (cross-built from an Apple-silicon Mac), and linux-x64; linux-arm64 was
+never built. A universal build roughly doubles the download for every
 Apple-silicon user, and `@electron/universal` throws on non-Mach-O files that
 differ between architectures — `node-pty/build/Release/.forge-meta` is exactly
 that. No `apps/desktop/package.json` script hardcodes `--arch`, so Forge defaults to the host
-architecture; CI passes `--arch` explicitly on every leg. Update feeds are
+architecture; pass `--arch` to cross-build. Update feeds are
 `update-<platform>-<arch>.json`, and `update-darwin-arm64.json` keeps its exact
 name and shape forever because already-installed arm64 Macs read it by that name
 (ADR 0074).
@@ -33,7 +33,7 @@ name and shape forever because already-installed arm64 Macs read it by that name
 **Linux is a first-class target, not a port.** `bun run make:linux` builds the
 AppImage through `@reforged/maker-appimage` (there is no
 `@electron-forge/maker-appimage`); it declares `mksquashfs` as a required
-external binary, so CI installs `squashfs-tools`. What differs from macOS is
+external binary, which the dev shell's `squashfs-tools` supplies. What differs from macOS is
 declared per platform rather than branched inline: the secret store
 (`safeStorage` ciphertext in SQLite, not the Keychain — ADR 0056), the
 "Open in…" registry (`apps/desktop/src/main/open-target/open-target-registry.ts` carries a
@@ -53,8 +53,8 @@ the binding has to come from Forge's `@electron/rebuild` against Electron's).
 against Nix's glibc and loads in the nixpkgs Electron the shell points
 `ELECTRON_OVERRIDE_DIST_PATH` at, so a local build works on NixOS and on any other
 Linux alike. It is also not portable: an AppImage built locally from the shell has
-terminals that only work where that glibc exists, so release AppImages come from
-CI, which builds outside Nix.
+terminals that only work where that glibc exists; a portable AppImage has to be
+built outside Nix, in a container.
 
 **`fs.watch(dir, { recursive: true })` is not portable performance.** macOS backs
 it with one FSEvents subscription over the whole tree; Linux has no such
@@ -84,18 +84,14 @@ also the Active LTS line the Electron 45 runtime embeds.
 **`@types/node` stays on `^24`, tracking the runtime rather than the latest
 release.** Electron 45.1.0 embeds Node 24.22.1, so typing against a newer major makes
 the compiler accept APIs that do not exist at runtime — a green
-`bun run typecheck` then ships a `TypeError`. Dependabot proposes the bump anyway,
-because it reads `@types/node` as an ordinary devDependency rather than a mirror
-of `engines`; decline it until the embedded Node major moves. The Electron 43 →
+`bun run typecheck` then ships a `TypeError`. Leave it until the embedded Node
+major moves. The Electron 43 →
 44 and 44 → 45 bumps did not move it — check the release's `node` field before assuming a
 major bump carries one.
 
 **Electron 44 raised the macOS floor from Monterey to Ventura**, per the
 `44-x-y` branch README, and Electron 45 keeps it (the `45-x-y` README still says
-Ventura and up). That floor is declared outside this repo, in the
-`ensemblr-hq/homebrew-tap` cask (`Casks/ensemblr.rb`, `depends_on macos:`), so an
-Electron major that moves it needs a matching change there or `brew` offers the
-build to machines that cannot run it. Electron 44 also made the `clipboard`
+Ventura and up). Electron 44 also made the `clipboard`
 module async and removed it from the renderer — the renderer already uses
 `navigator.clipboard`, and the one main-process call site is in
 `apps/desktop/src/main/open-target/open-target-service.ts`.
@@ -203,13 +199,6 @@ from the repository root or from `apps/desktop/`.
   Line Tools. Nix's darwin stdenv exports `SDKROOT` and `DEVELOPER_DIR`, which
   would send `xcrun` to a toolchain without `codesign` or `notarytool`. The
   lazily downloaded Electron is used as is.
-- **CI:** the `lint`, `typecheck`, and `test` jobs run in the shell through
-  `.github/actions/nix-dev-shell`. The shell's closure substitutes from
-  cache.nixos.org on every run; there is no Actions cache of `/nix`, because
-  `nix-community/cache-nix-action` failed whole jobs with "database is locked"
-  (THE-231). The release and nightly build legs keep
-  `.github/actions/install-dependencies` and stay outside Nix, so the shipped
-  AppImage's `node-pty` is portable and macOS signing has the runner's Xcode.
 
 ## Language and build
 
@@ -387,7 +376,7 @@ a primitive gets reformatted to house style.
 - **Vitest 5** with `happy-dom` 21 and `@vitest/coverage-istanbul`. Never
   `bun:test`, Jest, or Mocha.
 - **fallow** (`apps/desktop/.fallowrc.jsonc`) and **react-doctor** (`apps/desktop/doctor.config.jsonc`) run
-  as review diagnostics; CI runs react-doctor against `master`.
+  as review diagnostics.
 - **i18next-cli** drives `bun run i18n:{extract,types,status,lint}`. `i18n:lint`
   runs inside `bun run check` and fails the build on hardcoded user-facing
   strings and on sentences concatenated across translations; suppress a false

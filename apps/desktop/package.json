@@ -6,10 +6,10 @@
 	"homepage": "https://www.ensemblr.dev",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/ensemblr-hq/ensemblr.git"
+		"url": "git+https://github.com/ensemblr-hq/ensemblr-electron.git"
 	},
 	"bugs": {
-		"url": "https://github.com/ensemblr-hq/ensemblr/issues"
+		"url": "https://github.com/ensemblr-hq/ensemblr-electron/issues"
 	},
 	"main": ".vite/build/main.cjs",
 	"private": true,
@@ -101,7 +101,6 @@
 		"package:linux": "node scripts/require-linux-host.mjs && electron-forge package --platform=linux",
 		"package:dev": "ENSEMBLR_BUILD_CHANNEL=dev bun run package",
 		"package:unsigned": "ENSEMBLR_SKIP_SIGN=1 bun run package",
-		"verify:signing": "node scripts/verify-signed-artifacts.mjs",
 		"diagnose:dock-flash": "node scripts/diagnose-dock-flash.mjs",
 		"doctor": "bunx react-doctor@latest",
 		"postinstall": "node scripts/link-hoisted-packages.mjs && node scripts/fix-node-pty-permissions.mjs"
