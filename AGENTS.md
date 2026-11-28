@@ -12,7 +12,7 @@ This is a Bun workspaces monorepo.
 | `apps/website/` | The marketing and documentation site. Not started yet. |
 | `packages/shared/` | Code the apps share, such as UI pieces lifted out of the desktop app. Not started yet. |
 
-The root holds only what the whole repository shares: the workspace manifest (`package.json`) and lockfile, the install settings (`bunfig.toml`; the toolchain itself is the Nix dev shell in `flake.nix`), the house Biome config, the monorepo-level scripts in `scripts/`, CI (`.github/`), agent tooling (`.claude/`, `.codex/`, `.agents/`, `.mcp.json`), Ensemblr's repository settings (`.ensemblr/`), the Nix flake entrypoint, and the community files. **Keep it that way: anything that belongs to one app or package lives under that workspace's directory.**
+The root holds only what the whole repository shares: the workspace manifest (`package.json`) and lockfile, the install settings (`bunfig.toml`; the toolchain itself is the Nix dev shell in `flake.nix`), the house Biome config, the monorepo-level scripts in `scripts/`, the GitHub issue and PR templates (`.github/`), agent tooling (`.claude/`, `.codex/`, `.agents/`, `.mcp.json`), Ensemblr's repository settings (`.ensemblr/`), the Nix flake entrypoint, and the community files. **Keep it that way: anything that belongs to one app or package lives under that workspace's directory.**
 
 - Before working under `apps/desktop/`, read `apps/desktop/AGENTS.md`. Its paths, and those in the scoped `AGENTS.md` files beneath it, are relative to `apps/desktop/`.
 - When you write a path in prose, write it from the repository root, workspace prefix included — `apps/desktop/src/main/main.ts`, not `src/main/main.ts`.
@@ -23,7 +23,6 @@ The root holds only what the whole repository shares: the workspace manifest (`p
 - Bun runs a workspace's own `preinstall` and `postinstall` only when it first installs that workspace — not when a dependency changes, and not on an install with nothing to do. The root manifest's `preinstall` and `postinstall` therefore run every workspace's (`bun run --workspaces --if-present`) on every install, the way a single-package root's ran before; on a first install they run twice, so keep them idempotent.
 - Each workspace owns its `check`, `typecheck`, and `test` scripts. The root's scripts of the same name run every workspace's (`bun run --workspaces --if-present <script>`); `check` first runs the lockfile check and Biome over the whole tree (each file under its nearest `biome.json`).
 - Install from anywhere with `bun install` or `bun ci`; Bun installs every workspace and hoists dependencies into the root `node_modules`. Add a dependency to the workspace that uses it (`bun add <pkg>` inside that workspace's directory, or `bun add <pkg> --cwd apps/desktop`), never to the root manifest.
-- A new workspace manifest changes what `bun install` lays out, so it moves the Nix deps hash: re-pin with `apps/desktop/nix/update-pins.sh deps` (the `nix-deps` check reports the new hash on a pull request).
 
 ## Project Naming
 

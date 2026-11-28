@@ -36,18 +36,7 @@ bun run dev:playground   # the component preview harness, Vite only
 
 ## The gates
 
-Run these before you push. CI runs the same gates, but only once the branch is up:
-`.github/workflows/checks.yml` runs `lint`, `typecheck` and `test` as separate jobs on pushes to `master` and
-PRs targeting it, so the wall clock is the slowest one rather than their sum. `test` is a matrix — both
-`macos-latest` and `ubuntu-latest`, each split into three shards — and `lint` and `typecheck` run on Linux only,
-because neither Biome nor tsc can disagree across platforms. `nix-deps` builds the Nix deps derivation against
-`apps/desktop/nix/pins.json`, and only when the change touches `bun.lock`, `bunfig.toml`, the flake, or
-`apps/desktop/nix/`; a stale pin fails it (`apps/desktop/nix/update-pins.sh deps` re-pins). All four collapse
-into one `verify` status check. `scan` runs a `react-doctor` scan diffed against `master`, failing on `error`. Catching a break locally
-costs a minute; catching it in CI costs a round trip.
-
-Pushing again to a PR cancels the run it superseded, so a fixup does not queue behind the run nobody will
-read.
+Run these before you push. The repository has no CI, so nothing runs them for you.
 
 ```bash
 # From the repository root — each one runs every workspace's script of the same name
@@ -60,8 +49,8 @@ bun run doctor      # react-doctor diagnostics
 ```
 
 The `electron --test` suites (`bun run test:db`, `test:workspace`, `test:github`, `test:linear`,
-`test:agent-runtime`, …) need the Electron runtime and are not part of `bun run test` — so they are the one
-set CI does not run either. Run them from `apps/desktop`. Run the ones your change touches. `apps/desktop/package.json` has the full list.
+`test:agent-runtime`, …) need the Electron runtime and are not part of `bun run test`. Run them from
+`apps/desktop`. Run the ones your change touches. `apps/desktop/package.json` has the full list.
 
 ## House rules
 
@@ -118,7 +107,7 @@ resources/      Shipped Pi extensions (pi-extensions/) and Agent Skill bundles (
 playground/     Vite-only component preview harness (bun run dev:playground)
 demo/           Demo mode: the real app against scripted fixtures, for screenshots (bun run dev:demo)
 schemas/        Published JSON Schemas for config.json and .ensemblr/settings.toml
-nix/            Nix flake packaging (see docs/build-and-release.md)
+nix/            The dev shell behind `nix develop`
 docs/           Guide, ADRs, runtime references — see docs/README.md
 tests/          main/ · renderer/ · shared/ · fixtures/
 scripts/        Build and maintenance scripts

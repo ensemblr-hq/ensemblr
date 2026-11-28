@@ -73,7 +73,7 @@ Inside Ensemblr the setup and run scripts need no action: they go through
 `nix develop -c`. Never set `PATH` in `[environment_variables]` in
 `.ensemblr/settings.toml`. See
 [The dev shell](./build-and-release.md#the-dev-shell) for what the shell
-provides and why CI's release legs stay outside it.
+provides.
 
 ## 2. Install
 
@@ -223,29 +223,7 @@ error only surfaces here. `scripts/typecheck.mjs` runs them at once rather than
 chaining them with `&&`: they each `include` `src`, so the serial form
 type-checked the bulk of the program four times in a row.
 
-Run them locally anyway — CI runs the same gates, but only once the branch is
-pushed. `.github/workflows/checks.yml` runs `lint`, `typecheck` and `test` as
-separate jobs on pushes to `master` and PRs targeting it, so the wall clock is
-the slowest of the three rather than their sum. `test` is a matrix over **both**
-`macos-latest` and `ubuntu-latest`, each split into three shards — running on both
-platforms is what makes a darwin-only assumption fail in CI rather than in a
-user's AppImage. `lint` and `typecheck` run on Linux alone, because neither
-Biome nor tsc can reach a different verdict on macOS. `nix-deps` builds the Nix
-flake's pinned dependencies, but only on a PR that touches `bun.lock`, `bunfig.toml`,
-the flake, or `apps/desktop/nix/` (see [the Nix flake](./build-and-release.md#the-nix-flake)). A tiny
-`verify` job collapses all of them into a single status check. Its name stays
-stable because the repository's GitHub ruleset requires it; confirm the current
-GitHub enforcement on the pull request before merging.
-`scan` runs a `react-doctor` scan diffed against `master`, failing on `error`.
-
-A second push to a PR cancels the run it superseded, so pushing three fixups in
-a minute costs one run rather than three racing for the same runners.
-
-The release workflow calls `checks.yml` as a reusable workflow, passing
-`run_scan: false`, so a release tag runs the same verification a PR does without
-re-diffing against a branch it already is — and skips even that when the tagged
-commit already has a green `Checks` run, which a tag cut from `master` normally
-does.
+Run them locally: the repository has no CI, so nothing runs them for you.
 
 For changed renderer code, also run the `react-doctor` skill and `fallow` on the
 changed set, per [`.claude/rules/code-review.md`](../../../.claude/rules/code-review.md).

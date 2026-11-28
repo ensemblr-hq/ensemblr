@@ -8,46 +8,11 @@ Ensemblr runs on **macOS with Apple silicon or an Intel processor** and on
 | macOS, Apple silicon | `.dmg` and `.zip` | Developer ID, notarized, stapled | Yes |
 | macOS, Intel | `.dmg` and `.zip` | Developer ID, notarized, stapled | Yes |
 | Linux, x86-64 | `.AppImage` | No — there is no equivalent | Yes when the AppImage directory is writable; otherwise it links |
-| Linux, x86-64 (Nix) | flake: `release` or `master` | No | No — Nix does |
 
 macOS ships one build per architecture rather than a universal binary, so an
 Apple-silicon Mac downloads only arm64 code. **The Intel Mac build first shipped
-in `0.1.20`**; the two macOS architectures are built on the same
-runner, and the Linux AppImage on a separate job, all attached to one release.
-The current release workflow does not build Linux arm64, and there is no
-Windows build.
-
-## Homebrew (macOS)
-
-```bash
-brew install --cask ensemblr-hq/tap/ensemblr
-```
-
-The [tap](https://github.com/ensemblr-hq/homebrew-tap) tracks the highest
-semantic-versioned release, including tagged prereleases, and never the rolling
-`nightly` build. It installs the build that matches your Mac's architecture — Apple
-silicon or Intel — and declares macOS Ventura as a requirement, so `brew` refuses
-on a machine that cannot run the app rather than installing something that will
-not open.
-
-The cask used to be marked `auto_updates true`, on the assumption that a plain
-`brew upgrade` should leave a self-updating app alone. But `--greedy`, a named
-`brew upgrade --cask ensemblr`, and `brew reinstall` all ignore that flag, and
-two updaters writing the same bundle — Homebrew's cask install and the in-app
-updater's Squirrel-driven replace — is what corrupted an install and left
-macOS refusing it as damaged after a restart. The flag is gone from the tap as
-of Ensemblr 0.1.21. Instead, the app itself detects a Homebrew-owned copy and
-never updates it in-app (see [ADR
-0076](https://github.com/ensemblr-hq/ensemblr/blob/master/apps/desktop/docs/adr/0076-stand-the-in-app-updater-down-on-a-homebrew-owned-install.md)):
-Settings → General names the command to run in its place, which is the same
-one that always worked for a Homebrew install:
-
-```bash
-brew upgrade --cask ensemblr
-```
-
-If an install is already stuck reading "damaged" from before this fix,
-delete `/Applications/Ensemblr.app` and run `brew reinstall --cask ensemblr`.
+in `0.1.20`**. Each release carries both macOS builds and the Linux AppImage.
+Linux arm64 was never built, and there is no Windows build.
 
 ## Install script (Linux)
 
@@ -99,54 +64,6 @@ curl -fsSL https://www.ensemblr.dev/update.sh | sh -s -- --check   # report only
 `install.sh --print-latest`, compares against `.version` on disk, and re-runs the
 same file. `--check` exits `10` when there is something to install, distinct from
 `1` for a failed lookup, so a shell alias or a cron entry can tell the two apart.
-
-## Nix (NixOS)
-
-The repository is a flake with two variants of the app:
-
-- **`release`**, the default, is the AppImage from the newest release, patched to
-  run natively on NixOS.
-- **`master`** is compiled from the flake's own commit.
-
-Both install as `ensemblr`, with the same launcher entry and the same data, so
-pick one:
-
-```bash
-nix run github:ensemblr-hq/ensemblr           # release
-nix run github:ensemblr-hq/ensemblr#master    # compiled from master
-```
-
-In a NixOS or home-manager configuration, add the input and the package:
-
-```nix
-# flake.nix
-inputs.ensemblr = {
-  url = "github:ensemblr-hq/ensemblr";
-  inputs.nixpkgs.follows = "nixpkgs";
-};
-
-# a NixOS module (home-manager: home.packages)
-environment.systemPackages = [
-  inputs.ensemblr.packages.x86_64-linux.release # or .master
-];
-```
-
-`overlays.default` offers the same pair as `pkgs.ensemblr` and
-`pkgs.ensemblr-master`.
-
-**The first `master` build is slow.** It fetches about 1.2 GB of dependencies,
-compiles `node-pty` against Electron's headers, and packages the app the way CI
-does. Later builds reuse the dependencies until `bun.lock` changes.
-
-**Updates come from Nix.** Run `nix flake update ensemblr` and rebuild. For
-`master` that moves to the newest commit on the branch the input tracks. For
-`release` it moves to whatever release the repository has pinned, which follows
-each release shortly after it is published. A copy running from the Nix store
-never updates itself: **Settings → General** says so rather than offering a
-download it could not install.
-
-Unlike an AppImage wrapped in an FHS sandbox (`appimageTools.wrapType2`), both
-variants run directly on the host, so `sudo` works in Ensemblr's terminals.
 
 ## Download
 
@@ -250,7 +167,7 @@ If a package manager owns your copy, turn **Settings → General → Update Ense
 automatically** off. Ensemblr then never checks, downloads, or installs, and
 leaves the upgrading to whatever installed it. Two package managers are
 recognized without the switch: a copy Homebrew installed, and one running
-from the [Nix store](#nix-nixos). Both report who updates them instead.
+from the Nix store. Both report who updates them instead.
 
 Building from source is the other path, and the rest of this page covers it.
 
@@ -363,8 +280,8 @@ lazily downloaded Electron is used as is.
 
 **An AppImage you build locally is for testing the wrapper, not for sharing.**
 Its `node-pty` links against Nix's glibc, so its terminals work only on a machine
-where that glibc exists. The releases and nightlies on the
-[releases page](https://github.com/ensemblr-hq/ensemblr/releases) are built in CI
+where that glibc exists. The builds on the
+[releases page](https://github.com/ensemblr-hq/ensemblr/releases) were built
 outside Nix and are portable; use one of those when you need terminals to work
 elsewhere.
 
@@ -477,21 +394,8 @@ as ciphertext inside `ensemblr.db` rather than in a keyring entry of their own.
 If you integrated the AppImage with your desktop, remove the `.desktop` entry it
 installed too.
 
-On macOS, if Homebrew installed it, Homebrew removes it — `--zap` takes the
-application data with it:
-
-```bash
-brew uninstall --zap --cask ensemblr
-security delete-generic-password -s dev.ensemblr.app.secret-store
-```
-
-The Keychain entry needs its own line because `zap` cannot reach the Keychain at
-all. It removes one entry at a time, so run it repeatedly if Ensemblr stored
-several; they are also findable in Keychain Access by searching for
-`dev.ensemblr.app.secret-store`.
-
-Otherwise there is no uninstaller, and removing it on macOS is five deletions in
-whatever order suits you:
+On macOS there is no uninstaller, and removing it is five deletions in whatever
+order suits you:
 
 ```bash
 # 1. The app itself
@@ -511,8 +415,7 @@ rm -rf ~/Library/Application\ Support/Ensemblr
 security delete-generic-password -s dev.ensemblr.app.secret-store
 ```
 
-Your **root directory is deliberately not on that list**, and `brew zap` does not
-touch it either. It holds the cloned repositories and git worktrees your work
+Your **root directory is deliberately not on that list**. It holds the cloned repositories and git worktrees your work
 actually lives in. Delete it only once you have confirmed everything you care
 about is pushed. Ensemblr also preserves each archived workspace's handoff files
 under `archived-contexts/` inside it.

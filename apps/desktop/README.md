@@ -39,10 +39,9 @@ the app ships no agent binary of its own — it drives the one you installed.
 
 | Platform | Artifact | Install |
 | --- | --- | --- |
-| macOS, Apple silicon | `.dmg` (signed, notarized, stapled) | `brew install --cask ensemblr-hq/tap/ensemblr` |
-| macOS, Intel | `.dmg` (signed, notarized, stapled) | `brew install --cask ensemblr-hq/tap/ensemblr` |
+| macOS, Apple silicon | `.dmg` (signed, notarized, stapled) | [download](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-arm64.dmg) |
+| macOS, Intel | `.dmg` (signed, notarized, stapled) | [download](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-x64.dmg) |
 | Linux, x86-64 | `.AppImage` | `curl -fsSL https://www.ensemblr.dev/install.sh \| sh` |
-| Linux, x86-64 (Nix) | flake | `nix run github:ensemblr-hq/ensemblr` (`#master` builds from source) |
 
 Each Mac architecture gets its own `.dmg` rather than one universal binary; the Intel build first shipped
 in `0.1.20`. arm64 Linux is planned for a later release and is not built
@@ -60,11 +59,7 @@ in [`CHANGELOG.md`](./CHANGELOG.md) when they land.
 
 ## Install
 
-```bash
-brew install --cask ensemblr-hq/tap/ensemblr
-```
-
-Or download Ensemblr 0.2.6 (.dmg): **[Apple silicon](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-arm64.dmg)** · **[Intel](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-x64.dmg)** — open it and drag Ensemblr to Applications.
+Download Ensemblr 0.2.6 (.dmg): **[Apple silicon](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-arm64.dmg)** · **[Intel](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-x64.dmg)** — open it and drag Ensemblr to Applications.
 
 The macOS build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
 stapled, so it opens without a Gatekeeper prompt and validates offline. Every build is on the
@@ -97,11 +92,6 @@ directory, Ensemblr downloads a newer AppImage, verifies its GitHub-published SH
 and atomically swaps it on restart. A non-AppImage build or one in a read-only directory keeps the
 check-only path and links to the release page.
 
-On **NixOS**, the repository is a flake: `nix run github:ensemblr-hq/ensemblr` runs the release, patched
-to run natively, and `nix run github:ensemblr-hq/ensemblr#master` compiles the newest commit. Both install
-as `ensemblr`, so a system carries one of them. Nix updates them, never the app itself — see
-[the install guide](./docs/guide/01-install.md#nix-nixos).
-
 To build it yourself instead, with Node 24.x and [Bun](https://bun.sh) 1.4 (the flake's `nix develop` shell
 supplies both):
 
@@ -114,8 +104,8 @@ bun run make:linux    # Linux: .AppImage under apps/desktop/out/make/ (needs squ
 
 `make:linux` refuses to run anywhere but Linux. `node-pty` ships no linux-x64
 prebuild, so cross-building it from macOS silently packages the host's Mach-O
-binary and produces an AppImage whose terminals are all dead. Build it on Linux,
-in CI, or in a `linux/amd64` container —
+binary and produces an AppImage whose terminals are all dead. Build it on Linux
+or in a `linux/amd64` container —
 [`docs/build-and-release.md`](./docs/build-and-release.md) has the one-liner.
 
 A build of your own is signed and notarized only when Apple API credentials are present in the

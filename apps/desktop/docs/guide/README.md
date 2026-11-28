@@ -18,7 +18,7 @@ which is what the app itself displays there.
 
 ## Read in order
 
-1. [**Install**](./01-install.md) — the Homebrew cask, the Linux install script, downloading the signed build, building it yourself, build channels, and where Ensemblr keeps its data.
+1. [**Install**](./01-install.md) — the Linux install script, downloading the signed build, building it yourself, build channels, and where Ensemblr keeps its data.
 2. [**Requirements**](./02-requirements.md) — every setup check the app runs, what each one needs, and why you need only *one* agent runtime.
 3. [**First run**](./03-first-run.md) — the setup wizard, choosing a root directory, adding a project, creating your first workspace.
 4. [**Concepts**](./04-concepts.md) — workspace, base branch, runtime versus harness, permission modes, the board. The vocabulary the rest of the guide uses.

@@ -9,11 +9,9 @@ import type {
 } from '../../shared/ipc/contracts/update';
 
 /**
- * Name of the per-target feed document both release workflows attach to every
- * release, beside the artifact it points at. A cross-repo contract with
- * `.github/workflows/release.yml` and `nightly.yml` — renaming the shape here
- * without renaming it there strands every installed build on its current
- * version.
+ * Name of the per-target feed document every published release carries beside
+ * the artifact it points at. Renaming the shape here strands every installed
+ * build on its current version, since the published releases keep the old name.
  *
  * `updateFeedAssetName('darwin', 'arm64')` must equal `update-darwin-arm64.json`
  * forever: that was the only document early releases carried, and every
@@ -103,11 +101,10 @@ const releaseSchema = z.object({
 			browser_download_url: z.url().refine(isTrustedUpdateUrl, {
 				message: 'Asset download URL is not on a trusted GitHub host.',
 			}),
-			// GitHub computes this over what it actually stored, as `sha256:<hex>`,
-			// and `.github/workflows/release.yml` already reads it to bump the
-			// Homebrew cask. Optional because it postdates the API: a release old
-			// enough to lack one is simply not verifiable, and a Linux build then
-			// declines to install it rather than trusting the bytes.
+			// GitHub computes this over what it actually stored, as `sha256:<hex>`.
+			// Optional because it postdates the API: a release old enough to lack
+			// one is simply not verifiable, and a Linux build then declines to
+			// install it rather than trusting the bytes.
 			digest: z.string().nullish(),
 			name: z.string(),
 		})
