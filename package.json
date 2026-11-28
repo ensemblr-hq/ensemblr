@@ -5,10 +5,10 @@
 	"homepage": "https://www.ensemblr.dev",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/ensemblr-hq/ensemblr.git"
+		"url": "git+https://github.com/ensemblr-hq/ensemblr-electron.git"
 	},
 	"bugs": {
-		"url": "https://github.com/ensemblr-hq/ensemblr/issues"
+		"url": "https://github.com/ensemblr-hq/ensemblr-electron/issues"
 	},
 	"license": "Apache-2.0",
 	"packageManager": "bun@1.4.2",

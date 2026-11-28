@@ -69,14 +69,14 @@ same file. `--check` exits `10` when there is something to install, distinct fro
 
 The current build is **`0.2.6`**:
 
-- [**`Ensemblr-0.2.6-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-arm64.dmg)
+- [**`Ensemblr-0.2.6-arm64.dmg`**](https://github.com/ensemblr-hq/ensemblr-electron/releases/download/v0.2.6/Ensemblr-0.2.6-arm64.dmg)
   — the macOS disk image for Apple silicon. Open it and drag Ensemblr to `/Applications`.
-- [`Ensemblr-darwin-arm64-0.2.6.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-darwin-arm64-0.2.6.zip)
+- [`Ensemblr-darwin-arm64-0.2.6.zip`](https://github.com/ensemblr-hq/ensemblr-electron/releases/download/v0.2.6/Ensemblr-darwin-arm64-0.2.6.zip)
   — the same `.app`, zipped, if you would rather not mount an image.
-- [**`Ensemblr-0.2.6-x64.dmg`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-x64.dmg)
-  and [`Ensemblr-darwin-x64-0.2.6.zip`](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-darwin-x64-0.2.6.zip)
+- [**`Ensemblr-0.2.6-x64.dmg`**](https://github.com/ensemblr-hq/ensemblr-electron/releases/download/v0.2.6/Ensemblr-0.2.6-x64.dmg)
+  and [`Ensemblr-darwin-x64-0.2.6.zip`](https://github.com/ensemblr-hq/ensemblr-electron/releases/download/v0.2.6/Ensemblr-darwin-x64-0.2.6.zip)
   — the same pair for Intel Macs. `0.1.19` and earlier are Apple-silicon only.
-- [**`Ensemblr-0.2.6-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-x64.AppImage)
+- [**`Ensemblr-0.2.6-x64.AppImage`**](https://github.com/ensemblr-hq/ensemblr-electron/releases/download/v0.2.6/Ensemblr-0.2.6-x64.AppImage)
   — the Linux build, if you would rather place it yourself than run the
   [install script](#install-script-linux). One file, no installer:
 
@@ -95,16 +95,16 @@ The current build is **`0.2.6`**:
   `--no-sandbox`.
 
 There is also a **nightly** build of `master` under the rolling
-[`nightly`](https://github.com/ensemblr-hq/ensemblr/releases/tag/nightly) tag —
-[`Ensemblr-Canary-arm64.dmg`](https://github.com/ensemblr-hq/ensemblr/releases/download/nightly/Ensemblr-Canary-arm64.dmg)
-(and `Ensemblr-Canary-x64.dmg` for Intel Macs) and [`Ensemblr-Canary-x86_64.AppImage`](https://github.com/ensemblr-hq/ensemblr/releases/download/nightly/Ensemblr-Canary-x86_64.AppImage).
+[`nightly`](https://github.com/ensemblr-hq/ensemblr-electron/releases/tag/nightly) tag —
+[`Ensemblr-Canary-arm64.dmg`](https://github.com/ensemblr-hq/ensemblr-electron/releases/download/nightly/Ensemblr-Canary-arm64.dmg)
+(and `Ensemblr-Canary-x64.dmg` for Intel Macs) and [`Ensemblr-Canary-x86_64.AppImage`](https://github.com/ensemblr-hq/ensemblr-electron/releases/download/nightly/Ensemblr-Canary-x86_64.AppImage).
 The macOS one is signed and notarized the same way, but both are untested: they
 install as "Ensemblr Canary" **alongside** a release rather than replacing it,
 and their assets are overwritten each night.
 
 Every build is on the Releases page:
 
-<https://github.com/ensemblr-hq/ensemblr/releases>
+<https://github.com/ensemblr-hq/ensemblr-electron/releases>
 
 The released **macOS** build is code-signed with a Developer ID certificate, runs
 under the hardened runtime, and is notarized by Apple and stapled — both the
@@ -205,8 +205,8 @@ Ignoring that fails in ways that do not look like a toolchain problem — see
 On macOS:
 
 ```bash
-git clone https://github.com/ensemblr-hq/ensemblr.git
-cd ensemblr
+git clone https://github.com/ensemblr-hq/ensemblr-electron.git
+cd ensemblr-electron
 nix develop
 bun install
 cd apps/desktop
@@ -281,7 +281,7 @@ lazily downloaded Electron is used as is.
 **An AppImage you build locally is for testing the wrapper, not for sharing.**
 Its `node-pty` links against Nix's glibc, so its terminals work only on a machine
 where that glibc exists. The builds on the
-[releases page](https://github.com/ensemblr-hq/ensemblr/releases) were built
+[releases page](https://github.com/ensemblr-hq/ensemblr-electron/releases) were built
 outside Nix and are portable; use one of those when you need terminals to work
 elsewhere.
 

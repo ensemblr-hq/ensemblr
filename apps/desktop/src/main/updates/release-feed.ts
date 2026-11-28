@@ -237,7 +237,7 @@ function fail(code: UpdateFailureCode, message: string): ReadFailure {
 /**
  * Reads the `owner/repo` slug out of the package manifest, so a fork updates
  * from its own releases rather than from this repository's.
- * @returns The slug, e.g. `ensemblr-hq/ensemblr`
+ * @returns The slug, e.g. `ensemblr-hq/ensemblr-electron`
  */
 export function resolveRepositorySlug(): string {
 	const match = repository.url.match(

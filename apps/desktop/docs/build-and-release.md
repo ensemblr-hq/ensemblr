@@ -246,7 +246,7 @@ for it.
 **Build.** Budget ~2 GB for `node_modules` plus the Electron closure.
 
 ```bash
-git clone https://github.com/ensemblr-hq/ensemblr.git && cd ensemblr
+git clone https://github.com/ensemblr-hq/ensemblr-electron.git && cd ensemblr-electron
 nix develop             # Node 24, Bun, gcc, make, python3, squashfs-tools
 
 bun ci                  # installs the tree; node-pty's install script is deliberately not run

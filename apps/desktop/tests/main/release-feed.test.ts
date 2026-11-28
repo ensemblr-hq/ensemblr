@@ -6,7 +6,7 @@ import {
 	updateFeedAssetName,
 } from '../../src/main/updates/release-feed';
 
-const SLUG = 'ensemblr-hq/ensemblr';
+const SLUG = 'ensemblr-hq/ensemblr-electron';
 const RELEASES_URL = `https://api.github.com/repos/${SLUG}/releases?per_page=30`;
 const DOWNLOAD = `https://github.com/${SLUG}/releases/download`;
 const DIGEST = `sha256:${'a'.repeat(64)}`;

@@ -4,11 +4,10 @@
 
 # Ensemblr™
 
-> **Ensemblr 0.2.6 is the last release of the Electron-based Ensemblr. The new Rust-based Ensemblr lives at
-> [ensemblr-hq/ensemblr](https://github.com/ensemblr-hq/ensemblr); this repository will be renamed
-> `ensemblr-electron`.**
+> **Ensemblr 0.2.6 is the last release of the Electron-based Ensemblr, and this repository is archived. The
+> new Rust-based Ensemblr lives at [ensemblr-hq/ensemblr](https://github.com/ensemblr-hq/ensemblr).**
 
-![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/ensemblr-hq/ensemblr?utm_source=oss&utm_medium=github&utm_campaign=ensemblr-hq%2Fensemblr&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/ensemblr-hq/ensemblr-electron?utm_source=oss&utm_medium=github&utm_campaign=ensemblr-hq%2Fensemblr-electron&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 **A desktop orchestrator for multi-agent coding work, driving the Pi CLI or the Claude Code CLI — whichever
 you already run.**
@@ -36,13 +35,13 @@ the app ships no agent binary of its own — it drives the one you installed.
 
 *Ensemblr Control driving the app from inside a workspace: the agent moved the workspace to In progress, started a run script, delegated to two sub-agents in their own chat tabs, and launched a Claude Code harness in a terminal — all of it visible on one screen.*
 
-- **Version:** [`0.2.6`](https://github.com/ensemblr-hq/ensemblr/releases/tag/v0.2.6) (stable)
+- **Version:** [`0.2.6`](https://github.com/ensemblr-hq/ensemblr-electron/releases/tag/v0.2.6) (stable)
 - **License:** Apache-2.0
 
 | Platform | Artifact | Install |
 | --- | --- | --- |
-| macOS, Apple silicon | `.dmg` (signed, notarized, stapled) | [download](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-arm64.dmg) |
-| macOS, Intel | `.dmg` (signed, notarized, stapled) | [download](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-x64.dmg) |
+| macOS, Apple silicon | `.dmg` (signed, notarized, stapled) | [download](https://github.com/ensemblr-hq/ensemblr-electron/releases/download/v0.2.6/Ensemblr-0.2.6-arm64.dmg) |
+| macOS, Intel | `.dmg` (signed, notarized, stapled) | [download](https://github.com/ensemblr-hq/ensemblr-electron/releases/download/v0.2.6/Ensemblr-0.2.6-x64.dmg) |
 | Linux, x86-64 | `.AppImage` | `curl -fsSL https://www.ensemblr.dev/install.sh \| sh` |
 
 Each Mac architecture gets its own `.dmg` rather than one universal binary; the Intel build first shipped
@@ -61,11 +60,11 @@ in [`CHANGELOG.md`](./CHANGELOG.md) when they land.
 
 ## Install
 
-Download Ensemblr 0.2.6 (.dmg): **[Apple silicon](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-arm64.dmg)** · **[Intel](https://github.com/ensemblr-hq/ensemblr/releases/download/v0.2.6/Ensemblr-0.2.6-x64.dmg)** — open it and drag Ensemblr to Applications.
+Download Ensemblr 0.2.6 (.dmg): **[Apple silicon](https://github.com/ensemblr-hq/ensemblr-electron/releases/download/v0.2.6/Ensemblr-0.2.6-arm64.dmg)** · **[Intel](https://github.com/ensemblr-hq/ensemblr-electron/releases/download/v0.2.6/Ensemblr-0.2.6-x64.dmg)** — open it and drag Ensemblr to Applications.
 
 The macOS build is code-signed with a Developer ID certificate, hardened-runtime, notarized by Apple, and
 stapled, so it opens without a Gatekeeper prompt and validates offline. Every build is on the
-[Releases page](https://github.com/ensemblr-hq/ensemblr/releases).
+[Releases page](https://github.com/ensemblr-hq/ensemblr-electron/releases).
 
 On **Linux**, one line installs it:
 
@@ -81,7 +80,7 @@ and nothing else. Re-running it is an update. Useful flags: `--version <tag>` pi
 takes the rolling canary alongside it, `--dir <path>` moves the install, `--no-desktop` skips the launcher
 entry. Pipe to `sh -s -- --flag` to pass one.
 
-Or take the `.AppImage` from the [Releases page](https://github.com/ensemblr-hq/ensemblr/releases) by hand:
+Or take the `.AppImage` from the [Releases page](https://github.com/ensemblr-hq/ensemblr-electron/releases) by hand:
 
 ```bash
 chmod +x Ensemblr-*.AppImage

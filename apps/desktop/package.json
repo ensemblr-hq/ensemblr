@@ -6,10 +6,10 @@
 	"homepage": "https://www.ensemblr.dev",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/ensemblr-hq/ensemblr.git"
+		"url": "git+https://github.com/ensemblr-hq/ensemblr-electron.git"
 	},
 	"bugs": {
-		"url": "https://github.com/ensemblr-hq/ensemblr/issues"
+		"url": "https://github.com/ensemblr-hq/ensemblr-electron/issues"
 	},
 	"main": ".vite/build/main.cjs",
 	"private": true,
